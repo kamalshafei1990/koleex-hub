@@ -105,6 +105,7 @@ type NotifFilter =
   | "security_alerts"
   | "comments_activity"
   | "membership_requests"
+  | "reports_activity"
   | "other";
 
 const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: string }> = [
@@ -127,6 +128,7 @@ const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: str
   { key: "discuss_messages", settingsKey: "act.discuss" },
   { key: "security_alerts", settingsKey: "act.security" },
   { key: "comments_activity", settingsKey: "act.comments" },
+  { key: "reports_activity", settingsKey: "act.reports" },
   { key: "other", hubKey: "notif.filter.other" },
 ];
 

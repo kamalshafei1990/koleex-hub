@@ -156,6 +156,12 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "products/[id]": { chunks: 9, kbytes: 610 },
   "products/preview/[slug]": { chunks: 9, kbytes: 610 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
+  /* reports/[id] + its print route — MEASURED 25/09/2026 at 9 chunks / 586 KB
+     and 12 chunks / 742 KB, +12%. The print route carries the quotation's
+     PRINT_AND_DOC_STYLES like every house document; it only ever loads in
+     the reader's hidden print iframe. */
+  "reports/[id]": { chunks: 10, kbytes: 657 },
+  "reports/[id]/print": { chunks: 14, kbytes: 832 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
      Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of
@@ -251,6 +257,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "projects": { chunks: 10, kbytes: 517 },
   "purchase": { chunks: 11, kbytes: 622 },
   "quotations": { chunks: 11, kbytes: 850 },
+  /* reports — MEASURED 25/09/2026 at 9 chunks / 608 KB, +12% as every app line
+     is. The Reports app home (bundle, lists, template cards); the HR numbers
+     in its Library are a dynamic import and are NOT in this number. */
+  "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },
   /* Re-measured 2026-08-15 after the tabs were moved to next/dynamic:

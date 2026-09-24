@@ -48,6 +48,7 @@ const ACTIVITY_GROUPS: { tKey: string; items: { key: ActivityKey; tKey: string }
       { key: "comments_activity", tKey: "act.comments" },
       { key: "discuss_messages", tKey: "act.discuss" },
       { key: "membership_requests", tKey: "act.membership" },
+      { key: "reports_activity", tKey: "act.reports" },
     ],
   },
   {

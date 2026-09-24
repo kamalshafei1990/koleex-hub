@@ -280,6 +280,7 @@ export const settingsT: Translations = {
   "act.security": { en: "Security alerts", zh: "安全警报", ar: "تنبيهات الأمان" },
   "act.security.hint": { en: "Sign-ins from new devices and repeated failed logins (Super Admins).", zh: "来自新设备的登录和多次登录失败（超级管理员）。", ar: "تسجيلات الدخول من أجهزة جديدة ومحاولات الدخول الفاشلة المتكررة (للمشرفين)." },
   "act.comments": { en: "Comments & notes", zh: "评论与备注", ar: "التعليقات والملاحظات" },
+  "act.reports": { en: "Work reports", zh: "工作报告", ar: "تقارير العمل" },
   "act.comments.hint": { en: "New comments on tasks and QA issues you follow.", zh: "您关注的任务和质检问题的新评论。", ar: "تعليقات جديدة على المهام ومشكلات الجودة التي تتابعها." },
   "act.mentions":         { en: "Mentions and replies", zh: "提及与回复", ar: "الإشارات والردود" },
   "act.mentions.hint":    { en: "When someone @mentions or replies to you.", zh: "当有人 @提及或回复您时。", ar: "عندما يشير إليك أحد أو يرد عليك." },

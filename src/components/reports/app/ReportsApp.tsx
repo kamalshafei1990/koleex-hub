@@ -1,0 +1,299 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   Reports — /reports (Phase 1, owner-approved 25 Sep 2026).
+
+   One app for every written report: pick a type, it opens as a draft
+   addressed to the right person, you fill it in and send it. The engine
+   knows no single type — they all come from src/lib/reports/templates.ts.
+
+   Requests on open: ONE (/api/work-reports/bundle), warm-started from
+   sessionStorage so a revisit paints at once. The Inbox / My reports / Team
+   lists are server-side (search, filter, paging) through the shared
+   useServerList contract and load only when their tab opens. The Library's
+   HR numbers load their own code only when that section is opened.
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { reportsT } from "@/lib/translations/reports";
+import PageHeader from "@/components/ui/PageHeader";
+import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
+import SharedKpiCard from "@/components/ui/KpiCard";
+import RrIcon from "@/components/ui/RrIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import ReportsIcon from "@/components/icons/ReportsIcon";
+import { useServerList } from "@/lib/hooks/useServerList";
+import { REPORT_FAMILIES, REPORT_TEMPLATES } from "@/lib/reports/templates";
+import { createReport, fetchReportsBundle, localToday, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
+import { CARD, ReportRowItem, TemplateIcon, tplName, type T } from "./shared";
+
+const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
+
+type Tab = "home" | "inbox" | "mine" | "team" | "library";
+const TABS: Tab[] = ["home", "inbox", "mine", "team", "library"];
+const WARM_KEY = "kx:reports:bundle";
+
+export default function ReportsApp() {
+  const { t, lang } = useTranslation(reportsT);
+  const router = useRouter();
+  const [tab, setTabState] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "home";
+    const q = new URLSearchParams(window.location.search).get("tab");
+    return (TABS as string[]).includes(q ?? "") ? (q as Tab) : "home";
+  });
+  /* A client-side navigation to /reports?tab=… (after deleting a draft, a
+     notification, a Library link) renders this component BEFORE the router
+     writes the new URL, so the initializer above still sees the old one.
+     Read it again once the navigation has committed. */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if ((TABS as string[]).includes(q ?? "")) setTabState(q as Tab);
+    });
+  }, []);
+  const setTab = useCallback((next: Tab) => {
+    setTabState(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "home") url.searchParams.delete("tab"); else url.searchParams.set("tab", next);
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch { /* no history */ }
+  }, []);
+
+  const [bundle, setBundle] = useState<ReportsBundle | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    const res = await fetchReportsBundle();
+    if (res.ok) {
+      setBundle(res.data);
+      setLoadError(false);
+      try { sessionStorage.setItem(WARM_KEY, JSON.stringify(res.data)); } catch { /* quota */ }
+    } else {
+      setLoadError((had) => had || true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const raw = sessionStorage.getItem(WARM_KEY);
+      if (raw) queueMicrotask(() => { if (!cancelled) setBundle(JSON.parse(raw) as ReportsBundle); });
+    } catch { /* corrupt — the network covers it */ }
+    void Promise.resolve().then(() => { if (!cancelled) reload(); });
+    return () => { cancelled = true; };
+  }, [reload]);
+
+  const start = useCallback(async (key: string) => {
+    setCreating(key);
+    setCreateError(null);
+    const res = await createReport(key, localToday());
+    setCreating(null);
+    if (res.ok) router.push(`/reports/${res.data.id}`);
+    else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
+  }, [router, t]);
+
+  const counts = bundle?.counts;
+  const navItems: AppHomeNavItem[] = [
+    { key: "home", onClick: () => setTab("home"), icon: "home", label: t("nav.home"), active: tab === "home" },
+    { key: "inbox", onClick: () => setTab("inbox"), icon: "download", label: t("nav.inbox"), count: counts?.unread || undefined, active: tab === "inbox" },
+    { key: "mine", onClick: () => setTab("mine"), icon: "file", label: t("nav.mine"), count: counts?.drafts || undefined, active: tab === "mine" },
+    ...(bundle?.me.hasTeam ? [{ key: "team", onClick: () => setTab("team"), icon: "users" as const, label: t("nav.team"), active: tab === "team" }] : []),
+    { key: "library", onClick: () => setTab("library"), icon: "books", label: t("nav.library"), active: tab === "library" },
+  ];
+
+  const [query, setQuery] = useState("");
+  const onSearch = (q: string) => { setQuery(q); if (tab === "home" || tab === "library") setTab("inbox"); };
+
+  return (
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
+      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-28 sm:px-6 lg:px-8">
+        <PageHeader
+          title={t("app.title")}
+          subtitle={t("app.subtitle")}
+          icon={<ReportsIcon size={16} />}
+          showTabs={false}
+        />
+
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+          <SharedKpiCard label={t("kpi.review")} value={counts ? String(counts.review) : "—"} icon="badge-check" tone={counts && counts.review > 0 ? "warning" : undefined} onClick={() => setTab("inbox")} />
+          <SharedKpiCard label={t("kpi.unread")} value={counts ? String(counts.unread) : "—"} icon="download" tone={counts && counts.unread > 0 ? "info" : undefined} onClick={() => setTab("inbox")} />
+          <SharedKpiCard label={t("kpi.drafts")} value={counts ? String(counts.drafts) : "—"} icon="pencil" onClick={() => setTab("mine")} />
+          <SharedKpiCard label={t("kpi.sent")} value={counts ? String(counts.sentThisMonth) : "—"} icon="paper-plane" onClick={() => setTab("mine")} />
+        </div>
+
+        <div className="mt-4 mb-4">
+          <AppHomeMenu searchPlaceholder={t("search.placeholder")} onSearchSubmit={onSearch} navItems={navItems} />
+        </div>
+
+        {loadError && !bundle && (
+          <div className={`${CARD} px-5 py-6 text-center text-[13px] text-[var(--text-dim)]`}>
+            {t("err.generic")} <button type="button" onClick={() => void reload()} className="ms-2 font-medium text-[var(--text-primary)] underline">↻</button>
+          </div>
+        )}
+
+        <div key={tab} className="kx-tab-in">
+          {tab === "home" && <Home t={t} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
+          {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
+          {tab === "library" && <Library t={t} bundle={bundle} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Home: what to write, and what arrived ─────────────────────────────── */
+
+function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
+  t: T; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
+  onStart: (key: string) => void; onOpenInbox: () => void;
+}) {
+  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly).map((x) => x.key)), [bundle]);
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-write">
+        <h2 id="kx-rep-write" className="mb-3 text-[14px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
+        {createError && <p className="mb-3 text-[12.5px] text-red-400">{createError}</p>}
+        <div className="space-y-4">
+          {REPORT_FAMILIES.map((fam) => {
+            const items = REPORT_TEMPLATES.filter((x) => x.family === fam && allowed.has(x.key));
+            if (!items.length) return null;
+            return (
+              <div key={fam}>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">{t(`family.${fam}`)}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {items.map((tpl) => (
+                    <button
+                      key={tpl.key}
+                      type="button"
+                      disabled={!!creating}
+                      onClick={() => onStart(tpl.key)}
+                      className="kx-hover-glow group flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-start transition-colors hover:bg-[var(--bg-surface)] disabled:opacity-60"
+                    >
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]">
+                        {creating === tpl.key ? <SpinnerIcon size={14} /> : <TemplateIcon templateKey={tpl.key} size={15} />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, tpl.key)}</span>
+                        <span className="mt-0.5 block text-[11.5px] leading-snug text-[var(--text-dim)]">{t(`tpl.${tpl.key}.desc`)}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className={`${CARD} p-2 sm:p-3`} aria-labelledby="kx-rep-latest">
+        <div className="flex items-center justify-between px-2 pt-1 pb-2">
+          <h2 id="kx-rep-latest" className="text-[14px] font-semibold text-[var(--text-primary)]">{t("home.latest")}</h2>
+          <button type="button" onClick={onOpenInbox} className="text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("home.viewAll")}</button>
+        </div>
+        {!bundle ? (
+          <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div>
+        ) : bundle.latest.length === 0 ? (
+          <p className="px-3 py-8 text-center text-[13px] text-[var(--text-dim)]">{t("empty.inbox")}</p>
+        ) : (
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {bundle.latest.map((r) => <ReportRowItem key={r.id} r={r} t={t} />)}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* ── Inbox / My reports / Team: server-side lists ──────────────────────── */
+
+function ReportList({ t, box, query, accountId }: { t: T; box: "inbox" | "mine" | "team"; query: string; accountId: string | null }) {
+  const list = useServerList<ReportListRow>({
+    resource: `work-reports:${box}`,
+    endpoint: "/api/work-reports",
+    scope: { accountId },
+    fixedParams: { box },
+    pageSize: 25,
+    initialSort: { field: box === "mine" ? "updated" : "submitted", dir: "desc" },
+  });
+  const { setQuery } = list;
+  useEffect(() => { setQuery(query); }, [query, setQuery]);
+
+  if (list.isInitialLoading) return <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div>;
+  if (list.isError && list.rows.length === 0) {
+    return <div className={`${CARD} px-5 py-8 text-center text-[13px] text-[var(--text-dim)]`}>{t("err.generic")} <button type="button" onClick={() => void list.refetch()} className="ms-2 underline">↻</button></div>;
+  }
+  if (list.rows.length === 0) {
+    return <div className={`${CARD} px-5 py-12 text-center text-[13px] text-[var(--text-dim)]`}>{query ? t("empty.search") : box === "mine" ? t("empty.mine") : box === "team" ? t("empty.team") : t("empty.inbox")}</div>;
+  }
+  return (
+    <section className={`${CARD} p-2 sm:p-3`}>
+      <ul className="divide-y divide-[var(--border-subtle)]">
+        {list.rows.map((r) => <ReportRowItem key={r.id} r={r} t={t} showAuthor={box !== "mine"} />)}
+      </ul>
+      {(list.page > 1 || list.hasMore) && (
+        <div className="flex items-center justify-between gap-2 px-2 pt-3 pb-1 text-[12px]">
+          <button type="button" disabled={list.page <= 1} onClick={() => list.setPage(list.page - 1)} className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[var(--text-secondary)] disabled:opacity-40">‹</button>
+          <span className="tabular-nums text-[var(--text-dim)]">{list.page}{list.total != null ? ` / ${Math.max(1, Math.ceil(list.total / 25))}` : ""}</span>
+          <button type="button" disabled={!list.hasMore} onClick={() => list.setPage(list.page + 1)} className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[var(--text-secondary)] disabled:opacity-40">›</button>
+        </div>
+      )}
+      {list.isRefreshing && <div className="flex justify-center pb-2"><SpinnerIcon size={12} /></div>}
+    </section>
+  );
+}
+
+/* ── Library: the number reports each app already builds ──────────────── */
+
+function Library({ t, bundle }: { t: T; bundle: ReportsBundle | null }) {
+  const [hrOpen, setHrOpen] = useState(false);
+  const lib = bundle?.library;
+  const links: Array<{ show: boolean; href: string; icon: "clock" | "receipt" | "balance-scale-left" | "clipboard"; title: string; hint: string }> = [
+    { show: !!lib?.hr, href: "/hr?tab=attendance", icon: "clock", title: t("library.attendance"), hint: t("library.attendanceHint") },
+    { show: !!lib?.finance, href: "/reports/operational", icon: "receipt", title: t("library.operational"), hint: t("library.operationalHint") },
+    { show: !!lib?.finance, href: "/reports/statements", icon: "balance-scale-left", title: t("library.statements"), hint: t("library.statementsHint") },
+    { show: !!lib?.tasks, href: "/todo/report", icon: "clipboard", title: t("library.tasks"), hint: t("library.tasksHint") },
+  ];
+  return (
+    <div className="space-y-4">
+      <section className={`${CARD} p-4 sm:p-5`}>
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("library.title")}</h2>
+        <p className="mt-1 text-[12.5px] text-[var(--text-dim)]">{t("library.hint")}</p>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {links.filter((l) => l.show).map((l) => (
+            <Link key={l.href} href={l.href} className="kx-hover-glow flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface)]">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><RrIcon name={l.icon} size={15} /></span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-[var(--text-primary)]">{l.title}</span>
+                <span className="mt-0.5 block text-[11.5px] leading-snug text-[var(--text-dim)]">{l.hint}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {lib?.hr && (
+        <section className={`${CARD} p-4 sm:p-5`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("library.hr")}</h2>
+              <p className="mt-1 text-[12.5px] text-[var(--text-dim)]">{t("library.hrHint")}</p>
+            </div>
+            {!hrOpen && (
+              <button type="button" onClick={() => setHrOpen(true)} className="kx-hover-glow rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12.5px] font-medium text-[var(--text-primary)]">
+                {t("library.open")}
+              </button>
+            )}
+          </div>
+          {hrOpen && <div className="mt-4"><HrLibrary /></div>}
+        </section>
+      )}
+    </div>
+  );
+}

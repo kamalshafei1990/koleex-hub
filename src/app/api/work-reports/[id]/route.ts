@@ -1,0 +1,168 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   /api/work-reports/[id]
+
+   GET    The report, its recipients (with read / acknowledged), its thread
+          and what THIS viewer may do with it. Opening it as a recipient marks
+          it read and clears the reader's own notification.
+   PATCH  The author edits a DRAFT: { title?, date?, sections?, to?, cc?,
+          confidential? }. A sent report is never edited — a new version is
+          (POST …/revise).
+   DELETE The author deletes a DRAFT.
+   A report the viewer may not read answers 404, never 403, so a stranger
+   cannot learn that it exists.
+   --------------------------------------------------------------------------- */
+
+import { NextResponse, after } from "next/server";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { requireAuth } from "@/lib/server/auth";
+import { REPORT_LIMITS, normalizeSections, periodFor, reportTemplate } from "@/lib/reports/templates";
+import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
+import { clearMyReportNotifications } from "@/lib/server/reports/notify";
+
+export const dynamic = "force-dynamic";
+
+type Params = { params: Promise<{ id: string }> };
+const notFound = () => NextResponse.json({ error: "not_found" }, { status: 404 });
+
+export async function GET(req: Request, { params }: Params) {
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+  const deny = requireReportsUser(auth);
+  if (deny) return deny;
+  const { id } = await params;
+  if (!isUuid(id)) return notFound();
+  /* ONE wave: the thread and the newer version are read beside the report
+     and thrown away unread if this viewer may not see it — nothing leaves
+     before the access check below. */
+  const [loaded, people, commentsRes, newerRes] = await Promise.all([
+    loadForViewer(id, auth),
+    listPeople(auth.tenant_id),
+    supabaseServer.from("work_report_comments").select("id, account_id, body, kind, created_at").eq("report_id", id).order("created_at", { ascending: true }).limit(500),
+    supabaseServer.from("work_reports").select("id").eq("previous_id", id).order("version", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!loaded) return notFound();
+  const { row, recipients, access } = loaded;
+  const me = auth.account_id;
+  const mine = recipients.find((r) => r.account_id === me) ?? null;
+
+  /* Opening it as a recipient marks it read and clears the bell — after the
+     response, so the reader never waits on the bookkeeping. */
+  if (mine && !mine.read_at && row.status !== "draft") {
+    const now = new Date().toISOString();
+    mine.read_at = now;
+    after(async () => {
+      await supabaseServer.from("work_report_recipients").update({ read_at: now }).eq("report_id", row.id).eq("account_id", me).is("read_at", null);
+      await clearMyReportNotifications(row.id, me);
+    });
+  }
+  const nameOf = new Map(people.map((p) => [p.id, p]));
+  const person = (id: string) => ({ id, name: nameOf.get(id)?.name ?? "—", nameAlt: nameOf.get(id)?.nameAlt ?? null, avatar: nameOf.get(id)?.avatar ?? null });
+  const isAuthor = access === "author";
+  const isTo = mine?.role === "to";
+  const open = row.status === "submitted";
+
+  return NextResponse.json({
+    report: {
+      id: row.id, templateKey: row.template_key, title: row.title, author: person(row.author_account_id),
+      periodStart: row.period_start, periodEnd: row.period_end, periodKey: row.period_key,
+      sections: row.sections, status: row.status, confidential: row.confidential, reviewRequired: row.review_required,
+      version: row.version, previousId: row.previous_id, superseded: row.superseded,
+      newerId: row.superseded ? ((newerRes.data as { id?: string } | null)?.id ?? null) : null,
+      submittedAt: row.submitted_at, decidedAt: row.decided_at, decidedBy: row.decided_by ? person(row.decided_by) : null,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+    },
+    recipients: recipients.map((r) => ({ ...person(r.account_id), role: r.role, readAt: r.read_at, acknowledgedAt: r.acknowledged_at })),
+    comments: ((commentsRes.data ?? []) as Array<{ id: string; account_id: string; body: string; kind: string; created_at: string }>)
+      .map((c) => ({ id: c.id, author: person(c.account_id), body: c.body, kind: c.kind, createdAt: c.created_at })),
+    access,
+    can: {
+      edit: isAuthor && row.status === "draft",
+      remove: isAuthor && row.status === "draft",
+      revise: isAuthor && row.status !== "draft" && !row.superseded,
+      decide: !isAuthor && isTo && row.review_required && open && !row.superseded,
+      acknowledge: !isAuthor && !!mine && !mine.acknowledged_at && row.status !== "draft",
+      comment: row.status !== "draft",
+    },
+    people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
+  }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function PATCH(req: Request, { params }: Params) {
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+  const deny = requireReportsUser(auth);
+  if (deny) return deny;
+  const { id } = await params;
+  const loaded = await loadForViewer(id, auth);
+  if (!loaded || loaded.access !== "author") return notFound();
+  const { row } = loaded;
+  if (row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
+  const tpl = reportTemplate(row.template_key);
+  if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
+
+  const body = (await req.json().catch(() => null)) as {
+    title?: unknown; date?: unknown; sections?: unknown; to?: unknown; cc?: unknown; confidential?: unknown;
+  } | null;
+  if (!body) return NextResponse.json({ error: "bad_body" }, { status: 400 });
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (typeof body.title === "string" && tpl.customTitle) patch.title = body.title.trim().slice(0, REPORT_LIMITS.title);
+  if (typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+    const p = periodFor(tpl.cadence, body.date);
+    patch.period_start = p.start; patch.period_end = p.end; patch.period_key = tpl.cadence ? p.key : p.start;
+  }
+  if (body.sections !== undefined) patch.sections = normalizeSections(tpl, body.sections);
+  /* A confidential type stays confidential; any other may be raised. */
+  if (typeof body.confidential === "boolean") patch.confidential = tpl.confidential ? true : body.confidential;
+
+  /* The composer sends To / Copy with every autosave; the rows are only
+     rewritten when the list actually changed. */
+  if (Array.isArray(body.to) || Array.isArray(body.cc)) {
+    const ids = (v: unknown) => Array.from(new Set((Array.isArray(v) ? v : []).filter(isUuid))) as string[];
+    let to = ids(body.to);
+    let cc = ids(body.cc).filter((x) => !to.includes(x));
+    const current = loaded.recipients;
+    const same = current.length === to.length + cc.length
+      && current.every((c) => (c.role === "to" ? to : cc).includes(c.account_id));
+    if (!same) {
+      const valid = new Set((await listPeople(auth.tenant_id)).map((p) => p.id));
+      valid.delete(auth.account_id);
+      to = to.filter((x) => valid.has(x));
+      cc = cc.filter((x) => valid.has(x));
+      if (to.length + cc.length > REPORT_LIMITS.recipients) return NextResponse.json({ error: "too_many_recipients" }, { status: 400 });
+      const { error: dErr } = await supabaseServer.from("work_report_recipients").delete().eq("report_id", row.id);
+      if (dErr) return NextResponse.json({ error: "Could not save recipients." }, { status: 500 });
+      const rows = [...to.map((a) => ({ report_id: row.id, account_id: a, role: "to" })), ...cc.map((a) => ({ report_id: row.id, account_id: a, role: "cc" }))];
+      if (rows.length) {
+        const { error: iErr } = await supabaseServer.from("work_report_recipients").insert(rows);
+        if (iErr) return NextResponse.json({ error: "Could not save recipients." }, { status: 500 });
+      }
+    }
+  }
+
+  const { error } = await supabaseServer.from("work_reports").update(patch).eq("id", row.id).eq("status", "draft");
+  if (error) {
+    console.error("[api/work-reports PATCH]", error.message);
+    return NextResponse.json({ error: "Could not save the draft." }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, savedAt: patch.updated_at });
+}
+
+export async function DELETE(req: Request, { params }: Params) {
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+  const deny = requireReportsUser(auth);
+  if (deny) return deny;
+  const { id } = await params;
+  const loaded = await loadForViewer(id, auth);
+  if (!loaded || loaded.access !== "author") return notFound();
+  if (loaded.row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
+  const { error } = await supabaseServer.from("work_reports").delete().eq("id", loaded.row.id).eq("status", "draft");
+  if (error) {
+    console.error("[api/work-reports DELETE]", error.message);
+    return NextResponse.json({ error: "Could not delete the draft." }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}

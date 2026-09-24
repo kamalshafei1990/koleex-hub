@@ -21,7 +21,7 @@ export const NOTIFICATION_ACTIVITIES = [
   "quotation_activity", "low_stock", "inventory_activity",
   "finance_activity", "qa_reports", "price_fx",
   "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
-  "membership_requests",
+  "membership_requests", "reports_activity",
 ] as const;
 export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 
@@ -44,6 +44,11 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
      for the same thing — access — so it rides the same switch. */
   if (type.includes("membership") || type.includes("support")) return "membership_requests";
   if (type.includes("comment")) return "comments_activity";
+  /* Work reports (report_submitted, report_decided). A review request
+     (report_approval_request) already went to "approvals" above, and a
+     comment on a report to "comments_activity" — both are the same event
+     the reader silences elsewhere. */
+  if (type.startsWith("report")) return "reports_activity";
   if (type.startsWith("qa")) return "qa_reports";
   if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
   if (type.includes("stock")) return "low_stock";

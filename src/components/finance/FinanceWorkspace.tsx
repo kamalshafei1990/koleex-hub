@@ -117,7 +117,7 @@ export default function FinanceWorkspace() {
             </button>
           </span>
           <FocusToggle />
-          <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
+          <Link href="/reports/operational" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
             <RrIcon name="newspaper" size={12} /> {t("workspace.reports", "Reports")}
           </Link>
         </div>
@@ -257,7 +257,7 @@ export default function FinanceWorkspace() {
           <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <NavCard href="/finance/expenses"   icon="receipt"             label={t("workspace.nav.expenses",  "Expenses")}  count={snap.counts.expenses_open} />
             <NavCard href="/finance/accounting/queue" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
-            <NavCard href="/reports"            icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
+            <NavCard href="/reports/operational" icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
             <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label={t("workspace.nav.fxActivity", "FX Activity")} count={snap.counts.fx_30d} />
           </section>
           </FocusBoundary>

@@ -89,7 +89,7 @@ export default function StatementReports() {
       title="Financial Statements"
       subtitle={tab === "pl" ? "Profit & Loss" : tab === "bs" ? "Balance Sheet" : "Cash Flow"}
       icon="balance-scale-left"
-      backHref="/reports"
+      backHref="/reports/operational"
       filters={
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1.5 rounded-xl border border-white/[0.05] bg-white/[0.012] p-1.5">

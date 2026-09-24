@@ -67,6 +67,15 @@ export default function MeApp() {
     const q = new URLSearchParams(window.location.search).get("tab");
     return (ME_TABS as string[]).includes(q ?? "") ? (q as MeTab) : "overview";
   });
+  /* A notification's /me?tab=leave opened through the router renders this
+     BEFORE the new URL is written, so the initializer above read the old
+     one. Read ?tab= again once the navigation has committed. */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if ((ME_TABS as string[]).includes(q ?? "")) setTab(q as MeTab);
+    });
+  }, []);
   const tabMotion = useTabMotion(ME_TABS.indexOf(tab));
 
   const [bundle, setBundle] = useState<MyHrBundle | null>(null);

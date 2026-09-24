@@ -112,6 +112,16 @@ export default function HRApp() {
     return (TAB_IDS as string[]).includes(t ?? "") ? (t as TabId) : "dashboard";
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  /* A client-side navigation here (a notification's /hr?tab=leave, the
+     Reports Library's attendance sheet) renders this BEFORE the router
+     writes the new URL, so initialTab still read the old one. Read ?tab=
+     again once the navigation has committed. */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if ((TAB_IDS as string[]).includes(q ?? "")) setActiveTab(q as TabId);
+    });
+  }, []);
 
   /* ── Which optional tabs are in the strip ──
      Warm-start from the last session's answer so the strip does not

@@ -72,6 +72,7 @@ import PlanningSidebarIcon from "@/components/icons/PlanningSidebarIcon";
 import KnowledgeSidebarIcon from "@/components/icons/KnowledgeSidebarIcon";
 import SystemSidebarIcon from "@/components/icons/SystemSidebarIcon";
 import ShippingIcon from "@/components/icons/ShippingIcon";
+import ReportsIcon from "@/components/icons/ReportsIcon";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -251,6 +252,12 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "calendar",         tKey: "app.calendar",         name: "Calendar",          icon: CalendarIcon,  route: "/calendar",         active: true  },
   { id: "todo",             tKey: "app.todo",             name: "To-do",             icon: TodoIcon,      route: "/todo",             active: true  },
   { id: "notes",            tKey: "app.notes",            name: "Notes",             icon: NotesIcon,     route: "/notes",            active: true  },
+  /* Reports — every written work report (daily, weekly, visits, memos, HR
+     incidents…) sent to named readers, plus the Library of number reports.
+     Identity-scoped like My HR (the server decides who may read each report
+     from its author, readers and the manager chain), so it is openAccess:
+     no role setup before an employee can send a daily report. */
+  { id: "reports",          tKey: "app.reports",          name: "Reports",           icon: ReportsIcon,   route: "/reports",          active: true,  newSince: "2026-09-25", openAccess: true },
   { id: "translator",       tKey: "app.translator",       name: "Translator",        icon: TranslatorIcon, route: "/translator",      active: true,  newSince: "2026-07-22", openAccess: true },
 
   /* ── Marketing & Growth ── */
@@ -342,7 +349,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.communication",
     label: "Communication",
     icon: CommunicationSidebarIcon,
-    appIds: ["todo", "discuss", "calendar", "notes"],
+    appIds: ["todo", "discuss", "calendar", "notes", "reports"],
   },
   /* "Marketing & Growth" group dissolved 2026-07-31 (owner-approved): it
      rendered a single live item (Website, ~7 events/30d). Website now lives
