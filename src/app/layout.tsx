@@ -123,8 +123,9 @@ export default function RootLayout({
               Mounted once so any component can call dialog.confirm()
               without each page wiring its own state. */}
           <DialogHost />
-          {/* Global "+ Create" launcher — callable from header chips,
-              mobile action bar, and openSmartCreate() helper. */}
+          {/* Global "+ Create" launcher (Smart Create) — header "Create"
+              buttons, the "c" key and openSmartCreate(). Desktop and
+              tablet only: it never opens on a phone. */}
           <SmartCreateDrawer />
           {/* Vercel Speed Insights — real-user Core Web Vitals (LCP/INP/CLS)
               with P75 percentiles per route. Sends only performance timings +

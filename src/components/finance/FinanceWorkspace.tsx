@@ -108,11 +108,14 @@ export default function FinanceWorkspace() {
       backHref="/"
       action={
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => openSmartCreate()}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]"
-                  title={t("header.createTitle", "Create (c)")}>
-            <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
-          </button>
+          {/* Smart Create is desktop/tablet only (owner: not on phones). */}
+          <span className="hidden sm:contents">
+            <button type="button" onClick={() => openSmartCreate()}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]"
+                    title={t("header.createTitle", "Create (c)")}>
+              <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
+            </button>
+          </span>
           <FocusToggle />
           <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
             <RrIcon name="newspaper" size={12} /> {t("workspace.reports", "Reports")}

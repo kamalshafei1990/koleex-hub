@@ -19,9 +19,15 @@
      · the rest
    Only kinds the viewer's role may CREATE are listed (usePermissions).
    ↑/↓ move, Enter opens; the filter matches all three languages.
+
+   Desktop and tablet only. Owner: "remove smart create completely from
+   mobile phone". Below the sm breakpoint (640px) the drawer never opens —
+   whatever asks it to — its chunk is not preloaded, and the "Create"
+   buttons that open it are hidden (hidden sm:contents at each call site).
+   Rotating a tablet into phone width while it is open closes it.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { usePresence } from "@/components/kds/usePresence";
 import { useCurrentAccountId } from "@/lib/identity";
@@ -31,6 +37,16 @@ import { useCurrentAccountId } from "@/lib/identity";
 const SmartCreatePanel = dynamic(() => import("./SmartCreatePanel"), { ssr: false });
 
 const STORE_EVENT = "koleex:smart-create-open";
+
+/* Phone = below Tailwind's sm breakpoint, the same line the call sites use
+   to hide their "Create" buttons. */
+const PHONE_QUERY = "(max-width: 639.98px)";
+const isPhoneNow = () => typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches;
+function subscribePhone(cb: () => void) {
+  const m = window.matchMedia(PHONE_QUERY);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+}
 
 /** Imperatively open the drawer from anywhere in the app. */
 export function openSmartCreate() {
@@ -42,12 +58,14 @@ export default function SmartCreateDrawer() {
   /* The drawer is mounted beside the sign-in screen too; it only works for
      a signed-in operator ("c" on the login form used to open it). */
   const signedIn = !!useCurrentAccountId();
+  const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
   /* Fetch the panel's chunk once the page is idle, so the first "c" opens
      instantly — it stays out of the initial bundle either way. */
   useEffect(() => {
+    if (isPhoneNow()) return;
     const warm = () => { void import("./SmartCreatePanel"); };
     if ("requestIdleCallback" in window) {
       const id = window.requestIdleCallback(warm, { timeout: 5000 });
@@ -58,11 +76,11 @@ export default function SmartCreateDrawer() {
   }, []);
 
   useEffect(() => {
-    function onOpen() { setOpen(true); }
+    function onOpen() { if (!isPhoneNow()) setOpen(true); }
     function onKey(e: KeyboardEvent) {
       /* Keyboard shortcut: bare "c" toggles the drawer (skips when
          the operator is typing in a field). */
-      if (e.key !== "c" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "c" || e.metaKey || e.ctrlKey || e.altKey || isPhoneNow()) return;
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName ?? "";
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
@@ -80,7 +98,7 @@ export default function SmartCreateDrawer() {
   /* Motion + material match the KDS modals (FormModal): pop in, shrink
      away, on the .kx-glass-pop surface Aurora renders as glass. The panel
      (and its permission lookup) only exists while the drawer is shown. */
-  const { mounted, closing } = usePresence(open && signedIn);
+  const { mounted, closing } = usePresence(open && signedIn && !isPhone);
   if (!mounted) return null;
   return <SmartCreatePanel closing={closing} onClose={close} />;
 }

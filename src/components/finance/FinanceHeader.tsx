@@ -256,7 +256,8 @@ export function FinanceHeaderFrame() {
       icon={<AppIcon appId="finance" className="h-4 w-4" size={16} />}
       action={
         <>
-          {createBtn}
+          {/* Smart Create is desktop/tablet only (owner: not on phones). */}
+          <span className="hidden sm:contents">{createBtn}</span>
           {action}
         </>
       }
