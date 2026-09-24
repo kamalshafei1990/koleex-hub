@@ -26,7 +26,7 @@
    "what does **bold** mean?" should see "**bold**", not "bold".
    --------------------------------------------------------------------------- */
 
-import { useCallback, useMemo, useState } from "react";
+import { isValidElement, useCallback, useMemo, useState, type ReactNode } from "react";
 import { COPY } from "@/components/ai/copy";
 import type { Lang } from "@/lib/i18n";
 import ReactMarkdown from "react-markdown";
@@ -172,7 +172,19 @@ export default function MessageMarkdown({
             const text = String(children).replace(/\n$/, "");
             return <CodeBlock labels={labels} language={language}>{text}</CodeBlock>;
           },
-          pre: ({ children }) => <>{children}</>,
+          /* A FENCE WITH NO LANGUAGE IS STILL A BLOCK (deep check,
+             2026-09-24). Blocks were detected by `language-…` on the code
+             element, so a plain ``` fence rendered as inline code: its
+             newlines collapsed and it had no copy button. The <pre> is what
+             marks a block — whatever the code renderer made of it, it is
+             drawn as one here. */
+          pre: ({ children }) => {
+            const child = Array.isArray(children) ? children[0] : children;
+            if (isValidElement(child) && child.type === CodeBlock) return <>{children}</>;
+            const inner = isValidElement(child) ? (child.props as { children?: ReactNode }).children : children;
+            const text = String(inner ?? "").replace(/\n$/, "");
+            return <CodeBlock labels={labels}>{text}</CodeBlock>;
+          },
           /* PRODUCT PHOTOS, DRAWN LIKE PART OF THE ANSWER. The model embeds a
              product's photo as markdown (PRODUCT_PHOTO_RULE); without this
              the image landed as a bare <img> at its natural size with no

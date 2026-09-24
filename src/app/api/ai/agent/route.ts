@@ -124,6 +124,10 @@ function computeTitle(
   return conversationTitle(content) || content.trim().slice(0, 60);
 }
 
+/** A turn no model could answer (AgentResponse.failed) — thrown inside the
+ *  stream so the one catch reports it: error frame, ok=0, nothing saved. */
+class TurnFailedError extends Error {}
+
 export async function POST(req: Request) {
   const t0 = Date.now();
   /* Plan G1: one id for this turn, on every line it writes. */
@@ -423,8 +427,26 @@ export async function POST(req: Request) {
     const send = (obj: unknown) =>
       encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
 
+    /* STOP REACHES THE SERVER (deep check, 2026-09-24). The browser's Stop
+       aborts its fetch; the stream is cancelled, and until now nothing here
+       noticed: the next enqueue threw into the catch, and the turn — model
+       rounds, lookups, WRITES — ran on to the end. `stopped` is set by
+       cancel(); every frame goes through emit(), which goes quiet; the
+       orchestrator reads it before each round and before any tool runs. */
+    let stopped = false;
     const stream = new ReadableStream<Uint8Array>({
+      cancel() {
+        stopped = true;
+      },
       async start(controller) {
+        const emit = (chunk: Uint8Array) => {
+          if (stopped) return;
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            stopped = true;
+          }
+        };
         /* Audit P1 #4 — lifted out of try{} so the finally{} block at
            the bottom can always clearInterval(), even when an early
            load step throws before the original `const keepalive` line. */
@@ -456,7 +478,7 @@ export async function POST(req: Request) {
            read a binding that exists on both paths. */
         let histLen = 0;
         try {
-          controller.enqueue(send({ type: "start", conversationId }));
+          emit(send({ type: "start", conversationId }));
 
           /* Load history + ctx + insert user turn in parallel, same
              as the JSON path — but emit a keepalive comment every
@@ -507,7 +529,7 @@ export async function POST(req: Request) {
           keepalive = setInterval(() => {
             if (!alive) return;
             try {
-              controller.enqueue(encoder.encode(": ping\n\n"));
+              emit(encoder.encode(": ping\n\n"));
             } catch {
               /* Controller closed — nothing to do. */
             }
@@ -728,7 +750,7 @@ export async function POST(req: Request) {
                 if (!gotFirst) gotFirst = true;
                 if (tFirst === null) tFirst = Date.now();
                 accumulated += text;
-                controller.enqueue(send({ type: "delta", text }));
+                emit(send({ type: "delta", text }));
               };
               /* Plan G1: the fast lanes' calls were the one path that wrote
                  no [ai.usage] line. Same meter, same fields, this turn's trace. */
@@ -758,18 +780,18 @@ export async function POST(req: Request) {
                  the turn falls through to the orchestrator as any other fast
                  lane failure does. */
               if (out.ok && generalTools && out.response.toolCalls.length > 0) {
-                if (accumulated) controller.enqueue(send({ type: "retract" }));
+                if (accumulated) emit(send({ type: "retract" }));
                 const hop = await runGeneralSearchHop({
                   ctx,
                   conversationId: conversationId!,
                   calls: out.response.toolCalls,
                   priorContent: accumulated,
                   messages: irMessages,
-                  onStep: (steps) => controller.enqueue(send({ type: "steps", steps })),
+                  onStep: (steps) => emit(send({ type: "steps", steps })),
                   traceId: trace,
                 });
                 fastSteps = hop.steps;
-                controller.enqueue(send({ type: "steps", steps: hop.steps }));
+                emit(send({ type: "steps", steps: hop.steps }));
                 accumulated = "";
                 gotFirst = false;
                 out = await chatWithTools(
@@ -837,14 +859,15 @@ export async function POST(req: Request) {
               onDelta: (text) => {
                 liveDeltaCount++;
                 if (tFirst === null) tFirst = Date.now();
-                controller.enqueue(send({ type: "delta", text }));
+                emit(send({ type: "delta", text }));
               },
               traceId: trace,
+              isCancelled: () => stopped,
               /* The streamed first call narrated and then called a tool: the
                  client clears what it showed; the real answer follows. */
               onRetract: () => {
                 liveDeltaCount = 0;
-                controller.enqueue(send({ type: "retract" }));
+                emit(send({ type: "retract" }));
               },
               ctx,
               history,
@@ -861,9 +884,17 @@ export async function POST(req: Request) {
                  same frame the end-of-turn emit below sends, sent earlier. */
               onStep: (steps) => {
                 const live = steps.filter((s) => s.kind !== "answer");
-                if (live.length > 0) controller.enqueue(send({ type: "steps", steps: live }));
+                if (live.length > 0) emit(send({ type: "steps", steps: live }));
               },
             });
+            /* NO MODEL ANSWERED (deep check, 2026-09-24). The apology used to
+               be revealed and saved as the assistant's answer, logged ok=1 —
+               so the next turn's history held "I couldn't complete that
+               request" as something Koleex AI had said, and the error rate
+               could not be read. It is a failed turn: the catch below sends
+               the error frame (the browser words it in the user's language)
+               and logs ok=0; nothing is saved as a reply. */
+            if (agent.failed) throw new TurnFailedError();
 
             /* Emit tool-chip steps up front so the UI can render them
                above the streamed answer — mirrors how ChatGPT shows
@@ -872,7 +903,7 @@ export async function POST(req: Request) {
               (s) => s.kind !== "answer",
             );
             if (toolSteps.length > 0) {
-              controller.enqueue(send({ type: "steps", steps: toolSteps }));
+              emit(send({ type: "steps", steps: toolSteps }));
             }
 
             /* Reveal a reply that arrived COMPLETE, with no deltas of its
@@ -895,7 +926,7 @@ export async function POST(req: Request) {
             if (full.length > 0) {
               const plan = planReveal(full.length);
               for (let i = 0; i < full.length; i += plan.chunkChars) {
-                controller.enqueue(send({ type: "delta", text: full.slice(i, i + plan.chunkChars) }));
+                emit(send({ type: "delta", text: full.slice(i, i + plan.chunkChars) }));
                 if (i + plan.chunkChars < full.length && plan.delayMs > 0) {
                   await new Promise((r) => setTimeout(r, plan.delayMs));
                 }
@@ -974,7 +1005,7 @@ export async function POST(req: Request) {
           ]);
 
           const tEnd = Date.now();
-          controller.enqueue(
+          emit(
             send({
               type: "end",
               /* PHASE 7 / finding N11 — the browser is told the LANE, not the
@@ -1003,7 +1034,8 @@ export async function POST(req: Request) {
           /* The cause goes to the log; the frame carries one neutral sentence
              — a transport or provider message named hosts and models on the
              screen (audit, 2026-09-11). */
-          console.error("[ai.agent.stream] failed:", e instanceof Error ? e.message : String(e));
+          const noModel = e instanceof TurnFailedError;
+          if (!noModel) console.error("[ai.agent.stream] failed:", e instanceof Error ? e.message : String(e));
           /* Plan G1: the failed turn gets its [ai] line too, so an error rate
              can be read from the same lines as the latency. */
           console.log(
@@ -1011,11 +1043,13 @@ export async function POST(req: Request) {
               ` in_bytes=${content.length} hist=${histLen} ms=${Date.now() - t0} stream=1` +
               traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: false }),
           );
-          controller.enqueue(
-            send({
-              type: "error",
-              message: "Koleex AI hit a problem while answering. Please try again.",
-            }),
+          emit(
+            send(
+              noModel
+                ? /* No message: the browser says it in the user's language. */
+                  { type: "error" }
+                : { type: "error", message: "Koleex AI hit a problem while answering. Please try again." },
+            ),
           );
         } finally {
           /* Audit P1 #4 — keepalive must be cleared on every exit
@@ -1026,7 +1060,7 @@ export async function POST(req: Request) {
              interval callback already fired after clear. */
           alive = false;
           if (keepalive) clearInterval(keepalive);
-          controller.close();
+          try { controller.close(); } catch { /* the browser already went (Stop) */ }
         }
       },
     });
@@ -1098,6 +1132,14 @@ export async function POST(req: Request) {
         : ""),
     languageLock: langLock,
   });
+  /* Same rule as the stream: an apology is not an answer (see TurnFailedError). */
+  if (agent.failed) {
+    console.log(
+      `[ai] lane=protected ep=agent provider=none intent=agent fallback=0 in_bytes=${content.length} ms=${Date.now() - t0} stream=0` +
+        traceFields({ trace, ttftMs: null, ok: false }),
+    );
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
+  }
   const tOrch = Date.now();
 
   /* Final writes — assistant insert + conversation meta update are

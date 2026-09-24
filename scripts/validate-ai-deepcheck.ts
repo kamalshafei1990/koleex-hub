@@ -121,5 +121,48 @@ console.log("\n── 5. Voice: the call keeps its words, its answers and its so
     /if \(healthy \|\| servable\) console\.warn\(line\);\s*else console\.error\(line\);/.test(watch));
 }
 
+console.log("\n── 6. Chat: no duplicate sends, no stuck spinners, Stop really stops ──");
+{
+  const app = read("src/components/ai/KoleexAiApp.tsx");
+  check("a dropped send is resent only after the network COMES BACK — never at once on a link the device still calls online",
+    /if \(!onlineRef\.current && now\) \{\s*playSound\("back-online"\);\s*onlineReturnRef\.current \+= 1;\s*setOnlineReturn\(onlineReturnRef\.current\);/.test(app) &&
+      /if \(onlineReturn <= pending\.afterReturn\) return;/.test(app));
+  check("…and the dropped message's bubble goes with it, so the resend is not shown twice",
+    /setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== placeholderId && !\(isNetwork && m\.id === optimistic\.id\)\)\);/.test(app));
+  check("Retry on a chat that failed to load loads it (a failed chat is not 'already open')",
+    /if \(id === activeIdRef\.current && !loadingConvRef\.current && !loadErrorRef\.current\) \{/.test(app));
+  const newChat = app.slice(app.indexOf("const startNewChat = useCallback("), app.indexOf("const startNewChat = useCallback(") + 1600);
+  check("New chat clears the spinner and error of the chat just left",
+    /setLoadingConv\(false\);\s*loadingConvRef\.current = false;\s*setLoadError\(false\);/.test(newChat));
+  check("the first message's new chat is activated only if the user is still there; a switch or Stop ends the turn without jumping back",
+    /const created = await createConversation\(\{ activate: false \}\);[\s\S]{0,900}?if \(aborter\.signal\.aborted\) \{[\s\S]{0,300}?return;\s*\}[\s\S]{0,300}?setActiveId\(created\);/.test(app) &&
+      /if \(opts\.activate !== false\) setActiveId\(conversation\.id\);/.test(app));
+  check("Stop before the request leaves takes both bubbles away and gives the words back",
+    /if \(aborter\.signal\.aborted\) \{\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== optimistic\.id && m\.id !== placeholderId\)\);/.test(app));
+  check("Regenerate, Edit and a tapped answer leave the composer's draft and files alone; dictation is still the composer's turn",
+    /const fromComposer = textOverride === undefined \|\| viaVoice;\s*const filesToSend = fromComposer \? attachments : \[\];/.test(app) && /if \(fromComposer\) \{\s*setInput\(""\);/.test(app));
+  check("leaving the app aborts the reply and silences the read-aloud",
+    /useEffect\(\(\) => \(\) => \{\s*abortRef\.current\?\.abort\(\);\s*ttsHandleRef\.current\?\.cancel\(\);/.test(app));
+  check("a task card keeps its outcome when its reply's id becomes the saved row's",
+    (app.match(/carryTaskCard\(placeholderId, (?:persisted\.id|finalMessage\.id)\);\s*setMessages/g) ?? []).length === 2);
+  check("deleting a chat on a dead link says so, and a deleted open chat stops loading and leaves the address",
+    /\} catch \{\s*setError\(humanizeError\("NetworkError"\)\);\s*return;\s*\}/.test(app) && /syncUrl\(\{ c: null, view: null \}, "replace"\);\s*\}\s*\}, \[pendingDeleteId, syncUrl\]\);/.test(app));
+  const md = read("src/components/ai/MessageMarkdown.tsx");
+  check("a code fence with no language is drawn as a code block (newlines kept, copy button), not inline code",
+    /pre: \(\{ children \}\) => \{[\s\S]{0,400}return <CodeBlock labels=\{labels\}>\{text\}<\/CodeBlock>;/.test(md));
+  const route = read("src/app/api/ai/agent/route.ts");
+  const orch = read("src/lib/server/ai-agent/orchestrator.ts");
+  check("Stop reaches the server: the stream's cancel() sets `stopped`, every frame goes through emit(), and the turn is told",
+    /cancel\(\) \{\s*stopped = true;\s*\},/.test(route) && /isCancelled: \(\) => stopped,/.test(route) &&
+      !/controller\.enqueue\(send/.test(route.slice(route.indexOf("let stopped = false;"), route.indexOf("try { controller.close(); }"))));
+  check("…and a stopped turn runs no further round and no tool — above all no write",
+    (orch.match(/if \(isCancelled\?\.\(\)\) return \{ steps, finalReply: "", provider: servedLabel\(turnMeta\), conversationId, failed: true \};/g) ?? []).length === 2 &&
+      orch.indexOf("if (isCancelled?.()) return", orch.indexOf("const toolRuns = await Promise.all(") - 400) < orch.indexOf("const toolRuns = await Promise.all("));
+  check("a turn no model answered is a failed turn: not revealed, not saved as a reply, logged ok=0",
+    /failed: true,\s*\};/.test(orch.slice(orch.indexOf('logSealTransform(msg, safeReply, "call-failed");'))) &&
+      /if \(agent\.failed\) throw new TurnFailedError\(\);/.test(route) &&
+      /if \(agent\.failed\) \{[\s\S]{0,300}ok: false[\s\S]{0,120}return NextResponse\.json\(\{ error: "unavailable" \}, \{ status: 503 \}\);/.test(route));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

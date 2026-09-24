@@ -279,7 +279,7 @@ check("world facts: the route treats one as live information", /isWorldFactQuery
   check("general lane: the tool list is asked for ONLY on the general lane", /const generalTools = fastLane === "general" \? generalLaneTools\(ctx\) : null;/.test(body));
   check("general lane: the tools ride the first call only when offered, with toolChoice auto", /\.\.\.\(generalTools \? \{ tools: generalTools, toolChoice: "auto" as const \} : \{\}\)/.test(body));
   check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && generalTools && out\.response\.toolCalls\.length > 0\)/.test(body));
-  check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) controller\.enqueue\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
+  check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) (?:controller\.enqueue|emit)\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
   check("general lane: the second call carries NO tools — a hop, never a loop", /out = await chatWithTools\(\s*\{ messages: hop\.messages, maxTokens, temperature: 0\.3, modelClass: "GENERAL" as const, stream: true \},/.test(body));
   check("general lane: the lookup's steps are on the answer's record and the pricing seal sees them", /sealPricingSafety\(fastReply, fastSteps\)/.test(body) && /\.\.\.fastSteps,\s*\{ kind: "answer"/.test(body));
   check("general lane: the provider label says when a lookup was made", /fast-\$\{fastLane\}\$\{fastSteps\.length > 0 \? "\+search" : ""\}/.test(body));

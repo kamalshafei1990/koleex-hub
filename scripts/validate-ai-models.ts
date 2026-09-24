@@ -170,7 +170,7 @@ async function main() {
     (route.match(/fastProvider = `\$\{out\.servedBy \? `\$\{out\.servedBy\}:\$\{out\.model \?\? "unknown"\}` : activeProviderLabel\(\)\}:fast-/g) ?? []).length === 2);
   const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
   check("the orchestrator turns the model into a preference and passes it on both calls",
-    /model = "auto",\s*\} = input;/.test(orch) && /const prefer = adapterForModel\(model\);/.test(orch) &&
+    /model = "auto", isCancelled,\s*\} = input;/.test(orch) && /const prefer = adapterForModel\(model\);/.test(orch) &&
       /\}, \{ prefer \}\);/.test(orch) && /liveEmit \? \{ onDelta: liveEmit, prefer \} : \{ prefer \},/.test(orch));
   const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
   check("the registry reorders only the CONFIGURED candidates, before the breaker",

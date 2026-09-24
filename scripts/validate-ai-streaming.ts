@@ -179,7 +179,7 @@ console.log("\n── Live tool steps: the screen learns what is being looked up
   check("  …and a listener that throws cannot take the turn down", /onStep\?\.\(steps\.slice\(\)\);\s*\} catch \{/.test(orch));
   const route = rf("src/app/api/ai/agent/route.ts", "utf8");
   check("the agent route streams a steps frame from that hook, answer steps excluded",
-    /onStep: \(steps\) => \{\s*const live = steps\.filter\(\(s\) => s\.kind !== "answer"\);\s*if \(live\.length > 0\) controller\.enqueue\(send\(\{ type: "steps", steps: live \}\)\);/.test(route));
+    /onStep: \(steps\) => \{\s*const live = steps\.filter\(\(s\) => s\.kind !== "answer"\);\s*if \(live\.length > 0\) emit\(send\(\{ type: "steps", steps: live \}\)\);/.test(route));
   const types = rf("src/lib/server/ai/core/types.ts", "utf8");
   check("  …through a typed, optional hook on the turn input", /onStep\?: \(steps: AgentStep\[\]\) => void;/.test(types));
 
@@ -209,7 +209,10 @@ console.log("\n── Live tool steps: the screen learns what is being looked up
         /histLen = history\.length;/.test(route.slice(t, c)) &&
         /hist=\$\{histLen\}/.test(body) &&
         !/history\.length/.test(body) &&
-        /controller\.enqueue\(\s*send\(\{\s*type: "error",/.test(body);
+        /* Frames go through emit(), which goes quiet after Stop (deep
+           check, 2026-09-24); a turn no model answered sends a bare error
+           frame the browser words in the user's language. */
+        /emit\(\s*send\(\s*noModel\s*\?[\s\S]{0,160}\{ type: "error" \}\s*:\s*\{ type: "error", message:/.test(body);
     })());
   check("  …and the success line reads the same hoisted count, so the two cannot drift apart",
     (route.match(/hist=\$\{histLen\}/g) ?? []).length === 2);

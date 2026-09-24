@@ -1271,8 +1271,12 @@ console.log("\n── A chat that failed to load says so; an offline device is t
     /* ONE arming site: a dropped connection. A file that could not be read
        also puts the words back, and must NOT be resent on its own — the
        same unreadable file would go out again. */
-    (app.match(/resendRef\.current = \{ text, conversationId \};/g) ?? []).length === 1 &&
-    /if \(isNetwork && activeIdRef\.current === conversationId\) \{\s*resendRef\.current = \{ text, conversationId \};/.test(app) &&
+    (app.match(/resendRef\.current = \{ text, conversationId, afterReturn: onlineReturnRef\.current \};/g) ?? []).length === 1 &&
+    /if \(isNetwork && activeIdRef\.current === conversationId\) \{\s*resendRef\.current = \{ text, conversationId, afterReturn: onlineReturnRef\.current \};/.test(app) &&
+    /* …and only after the network has COME BACK since the drop (deep
+       check, 2026-09-24): on a link that drops while the device still
+       says online, "online" alone resent at once, again and again. */
+    /if \(onlineReturn <= pending\.afterReturn\) return;/.test(app) &&
     /if \(input\.trim\(\) !== pending\.text\.trim\(\) \|\| activeIdRef\.current !== pending\.conversationId\) return;\s*resendRef\.current = null;\s*void send\(\);/.test(app) &&
     ["en", "zh", "ar"].every((l) => COPY[l as "en" | "zh" | "ar"].offline.length > 0));
   check("on a touch screen every button in the AI app and the call screen has a 44 px hit area, rows are 44 px tall and inputs are 16 px — pointer-coarse only, scoped, the viewport lock untouched",
@@ -1574,7 +1578,7 @@ console.log("\n── An Arabic opening before an English code block reads right
     !/AdminAuth/.test(aiPage) && /export default function AiPage\(\) \{\s*return <KoleexAiApp \/>;\s*\}/.test(aiPage));
 
   check("  …and the caller unlocks on it, so the next message is still sendable",
-    /const created = await createConversation\(\);\s*if \(!created\) \{\s*setError\(copy\.couldNotStartChat\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;\s*\}/.test(app));
+    /const created = await createConversation\(\{ activate: false \}\);[\s\S]{0,1400}?if \(!created\) \{\s*setError\(copy\.couldNotStartChat\);\s*abortRef\.current = null;\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;\s*\}/.test(app));
 }
 
 {
