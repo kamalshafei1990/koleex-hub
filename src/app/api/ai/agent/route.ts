@@ -128,7 +128,10 @@ export async function POST(req: Request) {
   const t0 = Date.now();
   /* Plan G1: one id for this turn, on every line it writes. */
   const trace = newTraceId();
-  const auth = await requireAuth();
+  /* WITH `req`: a super admin viewing as someone is read-only here as on
+     every other write route (deep check, 2026-09-24) — a chat turn writes
+     messages into that person's thread and can run write tools as them. */
+  const auth = await requireAuth(req);
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
   {

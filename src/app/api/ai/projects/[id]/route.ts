@@ -24,7 +24,7 @@ const COLUMNS = "id, name, icon, color, sort_order, created_at, updated_at";
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -61,8 +61,8 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   return NextResponse.json({ project: data });
 }
 
-export async function DELETE(_req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+export async function DELETE(req: Request, { params }: RouteCtx) {
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);

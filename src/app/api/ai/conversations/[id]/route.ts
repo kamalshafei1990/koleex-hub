@@ -58,7 +58,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
 }
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -127,8 +127,8 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   return NextResponse.json({ conversation: data });
 }
 
-export async function DELETE(_req: Request, { params }: RouteCtx) {
-  const auth = await requireAuth();
+export async function DELETE(req: Request, { params }: RouteCtx) {
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);

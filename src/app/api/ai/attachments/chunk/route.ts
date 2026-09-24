@@ -27,7 +27,7 @@ import { partsFolder, PART_BYTES_MAX, MAX_PARTS_SERVER, UPLOAD_ID_RE } from "@/l
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);

@@ -93,7 +93,7 @@ console.log("\n── 4. A big document travels through OUR server, in pieces (2
     /body: JSON\.stringify\(\{ files: refs, question: typedText \}\)/.test(send) && /fd\.append\("question", typedText\);/.test(send));
   const chunk = readFileSync("src/app/api/ai/attachments/chunk/route.ts", "utf8");
   check("the chunk route: auth + internal + its own budget; the folder is composed from the SIGNED-IN account, the upload id must be a UUID, the piece is capped",
-    /requireAuth\(\)[\s\S]{0,200}?requireInternalUser\(auth\)/.test(chunk) && /BUDGETS\.attachmentChunkPerAccount\(\)/.test(chunk) &&
+    /requireAuth\(req\)[\s\S]{0,200}?requireInternalUser\(auth\)/.test(chunk) && /BUDGETS\.attachmentChunkPerAccount\(\)/.test(chunk) &&
     /const path = `\$\{partsFolder\(auth\.account_id, upload\)\}\/\$\{index\}`;/.test(chunk) && /if \(!UPLOAD_ID_RE\.test\(upload\)\)/.test(chunk) &&
     /chunk\.size > PART_BYTES_MAX/.test(chunk) && !/form\.get\("path"\)/.test(chunk));
   const route = readFileSync("src/app/api/ai/attachments/route.ts", "utf8");

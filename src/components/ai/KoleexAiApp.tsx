@@ -54,7 +54,7 @@ import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
-import { useCurrentAccount } from "@/lib/identity";
+import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
@@ -526,13 +526,25 @@ export default function KoleexAiApp() {
   /* v2: the cached shape gained `pinned` / `project_id`. Bumping the key
      retires v1 payloads instead of seeding the sidebar with rows that would
      briefly render every pinned chat as unpinned. */
-  const CONV_CACHE_KEY = "koleex-ai-conversations-cache-v2";
+  /* ONE CACHE PER ACCOUNT (deep check, 2026-09-24). The key used to be the
+     same for everyone, so a second account signed in on this tab was shown
+     the first one's chat titles and previews until the fetch replaced them —
+     and kept them if the fetch was refused. No account, no cache. */
+  const convCacheKey = (): string | null => {
+    const id = getCurrentAccountIdSync();
+    return id ? `koleex-ai-conversations-cache-v3:${id}` : null;
+  };
   const loadConversations = useCallback(async () => {
     /* Offline on first load is routine on this link: the cached list stands
        and the failure is not an unhandled rejection (audit, 2026-09-11). */
     let rows: ConversationRow[] | undefined;
     try {
       const res = await fetch("/api/ai/conversations", { credentials: "include" });
+      /* Refused: whatever is on screen is not this caller's to see. */
+      if (res.status === 401 || res.status === 403) {
+        setConversations([]);
+        return;
+      }
       if (!res.ok) return;
       ({ conversations: rows } = (await res.json()) as { conversations: ConversationRow[] });
     } catch {
@@ -540,9 +552,10 @@ export default function KoleexAiApp() {
     }
     const fresh = rows ?? [];
     setConversations(fresh);
-    if (typeof window !== "undefined") {
+    const key = convCacheKey();
+    if (typeof window !== "undefined" && key) {
       try {
-        window.sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify(fresh));
+        window.sessionStorage.setItem(key, JSON.stringify(fresh));
       } catch {
         /* Quota / private-mode — cache is a best-effort optimisation. */
       }
@@ -581,7 +594,10 @@ export default function KoleexAiApp() {
        ignored. */
     if (typeof window !== "undefined") {
       try {
-        const raw = window.sessionStorage.getItem(CONV_CACHE_KEY);
+        /* The old key was shared by every account; drop it. */
+        window.sessionStorage.removeItem("koleex-ai-conversations-cache-v2");
+        const key = convCacheKey();
+        const raw = key ? window.sessionStorage.getItem(key) : null;
         if (raw) {
           const cached = JSON.parse(raw) as ConversationRow[];
           if (Array.isArray(cached) && cached.length > 0) {

@@ -182,6 +182,19 @@ export async function consumePendingAction(opts: {
   }
 }
 
+/** The key a preview is remembered by INSIDE ONE TURN: the tool and its
+ *  normalised arguments (the same hash the ledger matches on). */
+export function turnPreviewKey(toolName: string, args: Record<string, unknown>): string {
+  return `${toolName}:${hashArgs(args)}`;
+}
+
+/** Message returned when the model confirms, in the SAME reply, a preview it
+ *  made in that reply. Written for the MODEL: the user has not answered yet. */
+export const SAME_TURN_CONFIRM_MESSAGE =
+  "That action was not carried out: the user has not seen or agreed to this " +
+  "preview yet. Show them what will happen, end your reply, and wait for " +
+  "their answer. Do not confirm in the same reply and do not say it is done.";
+
 /** Message returned when a confirm has no matching preview. Written for the
  *  MODEL — it must ask again rather than insisting, and must not claim the
  *  action happened. */

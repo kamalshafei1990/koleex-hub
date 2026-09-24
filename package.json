@@ -39,6 +39,7 @@
     "validate:ai-identity": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-identity.ts",
     "validate:ai-provider": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-provider.ts",
     "validate:ai-models": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-models.ts",
+    "validate:ai-deepcheck": "tsx scripts/validate-ai-deepcheck.ts",
     "validate:ai-transport-timeout": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-transport-timeout.ts",
     "validate:ai-turn-ir": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-turn-ir.ts",
     "validate:ai-api-v1": "tsx scripts/validate-ai-api-v1.ts",

@@ -2429,3 +2429,15 @@ On a call, a model is a line:
 **The Line control is replaced by the model list.** The call's settings now list the four models. Each row names the line it uses; the Auto row also shows the line Auto found. Mind is shown but can't be chosen for a call. A choice made here is the same choice as the picker beside the message box, and it is saved on the account through the parent. Picking a model on a different line rebuilds the call there and keeps the transcript. Nothing writes a hand-picked line (`source: "user"`) any more; a verdict saved earlier still counts for Auto.
 
 **Tests.** `validate:ai-models` has 65 checks (+7). `validate:voice-client` has 799, with its five line-control checks rewritten for the model list. Each change was confirmed by breaking the code on purpose, and all 7 breaks were caught.
+
+## Deep check 2026-09-24, phase 1: security
+
+Owner: "make a deep check for this app and fix any issue or bug". Five read-only audits found the issues: chat client, voice, server, performance and UI/UX. The fixes ship in six phases. This one is security.
+
+- **The model can no longer agree on the user's behalf.** Within a single turn, the model could preview a write and then confirm it on its next iteration, and the ledger row would match. A colleague-written task description or a document was enough to steer it there. The orchestrator now gives each turn a set of the previews it made. `dispatchTool` refuses a confirm of any preview in that set, before the ledger and whatever the ledger's mode. Consent can only come from a later user message or a tap on the confirm route. Pinned in `validate:ai-confirm-ledger`.
+- **Viewing as someone is read-only in Koleex AI too.** The AI write routes (agent, conversations, projects, feedback, attachments, chunk) now pass `req` to `requireAuth`, which refuses mutating methods while viewing as.
+- **The direct storage-path attachment mode is retired.** It accepted any path under `ai-attachments/`, across every account and tenant, then read it and deleted it. The client stopped using it when the chunk relay arrived.
+- **The chat list cache is per account.** Its key now carries the account id; the old shared key is removed; a 401/403 clears the list on screen.
+- **Knowledge-base text is fenced** as untrusted document content, like attachments and web results.
+
+**Tests.** `validate:ai-deepcheck` is a new suite (18 checks), and `validate:ai-confirm-ledger` has 35 (+9). Each was confirmed by breaking the code on purpose, and all 7 breaks were caught.
