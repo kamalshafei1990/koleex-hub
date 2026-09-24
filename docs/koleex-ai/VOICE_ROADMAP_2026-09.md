@@ -2588,3 +2588,15 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
   - One `[ai.auto] order=` log line when the order changes, names only.
 - **Tests:** `validate:ai-models` has 91 checks (+12). Each rule was confirmed by breaking the code on purpose, and all 5 breaks were caught.
 - **Deferred by the owner (2026-09-24):** the cost-and-speed view. The owner approved four nullable columns on `ai_messages` (tokens in/out, cost, time) for when it is built.
+
+## Relay fixes for international calls (2026-09-24, needs a Railway deployment)
+
+- **Calls ended at about ten minutes.**
+  - The relay ticket lives 10 minutes (`RELAY_TICKET_TTL_SEC` = the client secret's TTL), and every 30-second handover presents it again. From minute ten the relay refused every handover (403), the path cut the old socket, the resume was refused too, and the call ended.
+  - Now a resume of a session that is still live or parked, and that the same ticket opened, is admitted on an expired ticket for up to `MAX_SESSION_MS`. The signature is still checked; a fresh dial on an expired ticket is still refused.
+- **Handover ordering.**
+  - The client reads both sockets during a handover, so the new socket's frames could be played before the old socket's last ones.
+  - The relay now holds the vendor's frames until the old socket's close handshake completes, then releases them in order. `HANDOVER_DRAIN_MS` (1.5 s) caps the wait.
+- **Origins.** The default no longer admits every `*.vercel.app` site. It is now `koleexgroup.com,koleex-*.vercel.app`, with a `*` pattern that never crosses a dot. The service's own `VOICE_RELAY_ORIGINS` still decides.
+- **Tests:** relay `npm test` has 16 tests: 11 pure, 5 on real sockets against a fake vendor. Each rule was confirmed by breaking the code on purpose, and all 5 breaks were caught.
+- **Deployment:** auto-deploy is off (no Railway GitHub App on the repo), so this reaches callers only after a manual deployment of the merge commit.

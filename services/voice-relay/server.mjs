@@ -39,9 +39,18 @@ const UPSTREAM_URL = (process.env.VOICE_UPSTREAM_URL || "wss://api.x.ai/v1/realt
 const SECRET = (process.env.VOICE_RELAY_SECRET || "").trim();
 /** The subprotocol prefix the vendor expects; the token follows it. */
 const PROTOCOL_PREFIX = (process.env.VOICE_PROTOCOL_PREFIX || "xai-client-secret.").trim();
-/** Origins allowed to open a socket (comma-separated; suffix match on the
- *  host). Defence in depth beside the ticket: a browser cannot forge it. */
-const ORIGIN_SUFFIXES = (process.env.VOICE_RELAY_ORIGINS || "koleexgroup.com,vercel.app")
+/** Origins allowed to open a socket (comma-separated). A plain entry is a
+ *  host suffix (`koleexgroup.com` admits `hub.koleexgroup.com`); an entry
+ *  with `*` is a pattern on the whole host, `*` standing for letters, digits
+ *  and hyphens (`koleex-*.vercel.app`). Defence in depth beside the ticket:
+ *  a browser cannot forge it.
+ *
+ *  THE DEFAULT NO LONGER ADMITS EVERY `vercel.app` SITE (2026-09-24): a
+ *  suffix of `vercel.app` let anyone's Vercel deployment pass this check
+ *  (the ticket still stopped them, but this line is here to narrow browsers,
+ *  and it narrowed nothing there). Koleex's own previews all start with
+ *  `koleex-`. The service's VOICE_RELAY_ORIGINS, when set, still decides. */
+const ORIGIN_SUFFIXES = (process.env.VOICE_RELAY_ORIGINS || "koleexgroup.com,koleex-*.vercel.app")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 export const MAX_FRAME_BYTES = 1024 * 1024;   // one audio frame is ~10 KB; a session config ~50 KB
@@ -116,6 +125,17 @@ export const NO_SESSION_CODE = 4001;
  *  frame, in order; nothing is lost. The secret is the same secret, on the
  *  same verified ticket, that a resume presents today: no new trust. */
 export const HANDOVER_CODE = 4002;
+/** THE OLD SOCKET IS EMPTIED BEFORE THE NEW ONE SPEAKS (2026-09-24). The
+ *  client reads both sockets during a handover, and nothing orders one
+ *  against the other: an answer's next audio frame, sent on the new socket,
+ *  could be played before the last frames still travelling on the old one
+ *  — a stutter, or a word out of place. So from the handover until the old
+ *  socket's close handshake completes (the client answered the close frame,
+ *  so it has read every frame before it), what the vendor sends is HELD for
+ *  the new socket, then released in order. Bounded: after this long the
+ *  frames go anyway — an old path that never answers must not stall the
+ *  call. */
+export const HANDOVER_DRAIN_MS = 1500;
 
 /* ── The keepalive ──────────────────────────────────────────────────────── */
 
@@ -253,13 +273,15 @@ export function signTicket(secret, token, exp) {
 }
 
 /** True only for a well-formed, unexpired ticket whose signature matches
- *  THIS token. Constant-time on the signature. Pure. */
-export function verifyTicket(secret, token, ticket, nowSec = Math.floor(Date.now() / 1000)) {
+ *  THIS token. Constant-time on the signature. `graceSec` admits a ticket
+ *  that expired at most that long ago — only ever passed for a resume of a
+ *  session the same ticket opened (resumeTicketOk). Pure. */
+export function verifyTicket(secret, token, ticket, nowSec = Math.floor(Date.now() / 1000), graceSec = 0) {
   if (!secret || !token || typeof ticket !== "string") return false;
   const m = /^(\d{1,12})\.([0-9a-f]{64})$/.exec(ticket);
   if (!m) return false;
   const exp = Number(m[1]);
-  if (!Number.isFinite(exp) || exp < nowSec || exp > nowSec + TICKET_MAX_AGE_S) return false;
+  if (!Number.isFinite(exp) || exp < nowSec - graceSec || exp > nowSec + TICKET_MAX_AGE_S) return false;
   const expected = createHmac("sha256", secret).update(`${token}.${exp}`).digest();
   const given = Buffer.from(m[2], "hex");
   return expected.length === given.length && timingSafeEqual(expected, given);
@@ -285,6 +307,13 @@ export function upstreamUrlFor(model) {
   return u.toString();
 }
 
+/** An origin entry with `*` as a whole-host pattern: `*` is one run of
+ *  letters, digits and hyphens (never a dot), everything else literal. Pure. */
+export function hostPattern(entry) {
+  const body = entry.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[a-z0-9-]*");
+  return new RegExp(`^${body}$`);
+}
+
 /** Browsers always send Origin; a request WITHOUT one is not a browser —
  *  our own watchdog dialling from a Vercel function (Node's WebSocket
  *  cannot set the header; 2026-09-08 20:30: `refused origin code=403` on
@@ -300,7 +329,24 @@ export function originAllowed(origin) {
   } catch {
     return false;
   }
-  return ORIGIN_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
+  return ORIGIN_SUFFIXES.some((s) => (s.includes("*") ? hostPattern(s).test(host) : host === s || host.endsWith(`.${s}`)));
+}
+
+/** THE CALL OUTLIVES ITS TICKET (2026-09-24). A ticket lives as long as the
+ *  client secret it names — ten minutes — and every handover and resume
+ *  presents it again. So from minute ten every handover was refused
+ *  (`refused ticket code=403`), the path cut the old socket at its usual
+ *  thirty seconds, the resume was refused too, and an international call
+ *  ended at about ten minutes. A RESUME of a session that is still here —
+ *  live or parked — and that THIS SAME ticket opened is admitted on an
+ *  expired ticket, for as long as a session may last. No new trust: the
+ *  signature is still checked, the session must exist, and it must be the
+ *  one the ticket opened; a fresh dial on an expired ticket is refused as
+ *  before. Pure over the maps it is given. */
+export function resumeTicketOk(secret, token, ticket, sessionsByToken, nowSec = Math.floor(Date.now() / 1000)) {
+  const s = sessionsByToken.map((m) => m.get(token)).find(Boolean);
+  if (!s || typeof ticket !== "string" || s.ticketKey !== ticket) return false;
+  return verifyTicket(secret, token, ticket, nowSec, Math.ceil(MAX_SESSION_MS / 1000));
 }
 
 /* ── The server ─────────────────────────────────────────────────────────── */
@@ -356,7 +402,11 @@ export function createRelay() {
     if (!originAllowed(req.headers.origin)) return refuse(403, "origin");
     const token = tokenFromProtocols(req.headers["sec-websocket-protocol"]);
     if (!token) return refuse(400, "protocol");
-    if (!verifyTicket(SECRET, token, url.searchParams.get("t"))) return refuse(403, "ticket");
+    const wantsResume = url.searchParams.get("resume") === "1";
+    if (!verifyTicket(SECRET, token, url.searchParams.get("t"))) {
+      if (!(wantsResume && resumeTicketOk(SECRET, token, url.searchParams.get("t"), [live, parked]))) return refuse(403, "ticket");
+      log("resume on an expired ticket");
+    }
     if (connections >= MAX_CONNECTIONS) return refuse(503, "busy");
     /* THE ADDRESS THE EDGE SAW, not the one the browser wrote (security
        review, 2026-09-12): a client can put anything in front of
@@ -370,7 +420,6 @@ export function createRelay() {
        relay on its own. */
     const ticketKey = url.searchParams.get("t") || "";
     if ((perTicket.get(ticketKey) || 0) >= MAX_PER_TICKET) return refuse(429, "too-many-ticket");
-    const wantsResume = url.searchParams.get("resume") === "1";
 
     wss.handleUpgrade(req, socket, head, (client) => {
       if (wantsResume) {
@@ -426,6 +475,21 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   let parkTimer = null;
   const held = [];
   let heldBytes = 0;
+  /* During a handover: the socket being emptied, and its time limit. */
+  let draining = null;
+  let drainTimer = null;
+  const endDrain = () => {
+    if (!draining) return;
+    draining = null;
+    if (drainTimer) clearTimeout(drainTimer);
+    drainTimer = null;
+    if (!client) return; /* parked meanwhile: the frames wait for the resume */
+    try {
+      for (const f of held) if (client.readyState === WebSocket.OPEN) client.send(f);
+    } catch { /* the new socket died; its close handles it */ }
+    held.length = 0;
+    heldBytes = 0;
+  };
   const pacing = createPacing();
 
   const upstream = new WebSocket(upstreamUrlFor(model), [`${PROTOCOL_PREFIX}${token}`], {
@@ -453,6 +517,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     clearInterval(pinger);
     clearTimeout(cap);
     if (parkTimer) clearTimeout(parkTimer);
+    if (drainTimer) clearTimeout(drainTimer);
     if (parked.get(token)?.attach === attach) parked.delete(token);
     if (live.get(token)?.handover === handover) live.delete(token);
     try { client?.close(code); } catch { /* gone */ }
@@ -507,9 +572,14 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   const park = () => {
     releaseAddress();
     client = null;
+    /* A replacement that died mid-handover: what was held stays held, for
+       the resume, and nothing is being emptied any more. */
+    draining = null;
+    if (drainTimer) clearTimeout(drainTimer);
+    drainTimer = null;
     live.delete(token);
     parkedAt = Date.now();
-    parked.set(token, { attach });
+    parked.set(token, { attach, ticketKey });
     parkTimer = setTimeout(() => {
       parkTimer = null;
       if (!client) finish("resume-expired", 1001);
@@ -528,7 +598,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     client = c;
     address = addr;
     perAddress.set(address, (perAddress.get(address) || 0) + 1);
-    live.set(token, { handover });
+    live.set(token, { handover, ticketKey });
     alive = true;
     resumes++;
     const gapMs = parkedAt ? Date.now() - parkedAt : 0;
@@ -553,6 +623,9 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
       try { c.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
       return;
     }
+    /* A second handover before the first finished emptying: release what
+       was held to the socket that is about to be replaced, in order. */
+    endDrain();
     const old = client;
     releaseAddress();
     client = c;
@@ -562,7 +635,10 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     handovers++;
     wire(c);
     try { c.send(relayHello(true)); } catch { /* the new socket died at once; its close handles it */ }
-    try { old.close(HANDOVER_CODE, "handover"); } catch { /* gone */ }
+    draining = old;
+    old.once("close", () => { if (draining === old) endDrain(); });
+    drainTimer = setTimeout(() => { if (draining === old) endDrain(); }, HANDOVER_DRAIN_MS);
+    try { old.close(HANDOVER_CODE, "handover"); } catch { endDrain(); }
     log(`session=${id} handover ms=${Date.now() - t0} up=${up} down=${down}`);
   };
 
@@ -577,11 +653,12 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     down++;
     const text = data.toString();
     pacing.note(text);
-    if (client) {
+    if (client && !draining) {
       if (client.readyState === WebSocket.OPEN) client.send(text);
       return;
     }
-    /* Parked: held for the client that comes back, bounded. */
+    /* Parked, or a handover still emptying the old socket: held for the
+       client, bounded. */
     if (heldBytes + text.length > MAX_PARK_BYTES) return finish("park-overflow", 1011);
     held.push(text);
     heldBytes += text.length;
@@ -592,7 +669,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     finish("upstream-error", 1011);
   });
 
-  live.set(token, { handover });
+  live.set(token, { handover, ticketKey });
   wire(client);
   log(`session=${id} start model=${typeof model === "string" && /^[\w.-]{1,64}$/.test(model) ? model : "default"}`);
 }
