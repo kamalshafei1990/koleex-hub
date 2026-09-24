@@ -221,6 +221,29 @@ async function main() {
   check("the button's short name drops only the brand prefix",
     (["blink", "mind", "deep"] as const).every((id) => KOLEEX_MODEL_INFO[id].short.en === KOLEEX_MODEL_INFO[id].name.en.replace(/^Koleex /, "")));
 
+  console.log("\n── 7. The call follows the model ──");
+  const { pinnedLaneFor } = await import("../src/lib/voice/voice-pref");
+  const open = { wsAvailable: true, fellBack: false };
+  check("Blink is the mainland line and Deep the international one; Auto and Mind pin nothing",
+    pinnedLaneFor("blink", open) === "rtc" && pinnedLaneFor("deep", open) === "ws" &&
+      pinnedLaneFor("auto", open) === null && pinnedLaneFor("mind", open) === null);
+  check("Deep that cannot have its line — it failed this screen, or the deployment has none — is answered on the mainland line",
+    pinnedLaneFor("deep", { wsAvailable: true, fellBack: true }) === "rtc" && pinnedLaneFor("deep", { wsAvailable: false, fellBack: false }) === "rtc" &&
+      pinnedLaneFor("blink", { wsAvailable: false, fellBack: true }) === "rtc");
+  const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("every new call applies the model's line first; a resume keeps the line it had",
+    /if \(sessionRef\.current\) return;\s*if \(!opts\?\.resume\) applyModelLane\(\);/.test(btn));
+  check("a pin moves the lane; Auto after a pin puts the lane rules back; Auto after Auto touches nothing; Deep off its line says so",
+    /if \(\(pinned \|\| lanePinnedRef\.current\) && lane !== transportRef\.current\) \{\s*transportRef\.current = lane;\s*offerLane\(lane\);\s*\}\s*lanePinnedRef\.current = pinned;\s*if \(m === "deep" && lane === "rtc"\) setLaneNote\("international-unreachable"\);/.test(btn));
+  check("the lane rules' answer is the same one the button already trusts (the server's word and this device's verdicts), and an unknown deployment counts as having an international line",
+    /pinnedLaneFor\(m, \{ wsAvailable: wsKnownRef\.current !== false, fellBack: laneFellBackRef\.current \}\)/.test(btn) &&
+      /serverLaneRef\.current \? decideLane\(serverLaneRef\.current, saved, now\)\.lane : startingLane\(saved, now\)/.test(btn));
+  check("the call reads the same choice as the composer, and saves a choice made on the call through the parent",
+    /const model = useModelChoice\(\);/.test(btn) && /onChooseModel=\{chooseModel\}/.test(app));
+  const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the call's settings list the Koleex models by their Koleex names, and a Mind call says it is on Auto",
+    /KOLEEX_MODEL_INFO\[m\]\.name\[lang\]/.test(scr) && /\{model === "mind" && \(/.test(scr) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(scr.slice(scr.indexOf("THE MODEL (2026-09-23; the Line"), scr.indexOf("{onSelectTalkMode && ("))));
+
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

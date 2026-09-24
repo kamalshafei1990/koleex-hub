@@ -2410,3 +2410,22 @@ A button beside the message box shows the model in use ("Auto ⌄", "Mind ⌄").
 **Who answered.** Every turn sends `model`. When a chosen model did not answer, because it was down or not set up and the turn failed over, the reply shows a quiet "Answered by Koleex X" under it. Auto, or the model that was asked for, gets no note. This note is only in the browser and is never saved.
 
 **Tests.** `validate:ai-models` now has 58 checks (+11). Each was confirmed by breaking the code on purpose, and all 7 breaks were caught.
+
+## Koleex AI models, part 3: the call follows the model (2026-09-24)
+
+On a call, a model is a line:
+
+| Model | Call line |
+|---|---|
+| **Auto** | the line the lane rules choose, exactly as before: the server's word, this device's probe and call verdicts, and a line picked by hand earlier |
+| **Koleex Blink** | China (Mainland) line |
+| **Koleex Mind** | text only, so the call runs on Auto and the call screen says so |
+| **Koleex Deep** | International line |
+
+**Where it happens.** `pinnedLaneFor(model, { wsAvailable, fellBack })` in `lib/voice/voice-pref.ts` is pure. `VoiceCallButton.applyModelLane()` runs at the start of every new call, but not on a resume, because a call coming back keeps its line. For Blink and Deep it pins the line. For Auto right after a pinned call, it restores the lane rules' answer. For Auto after Auto it does nothing, so the existing lane machinery is unchanged.
+
+**A preference, not a cage.** If Deep can't have its line, because the international line already failed on this screen or the deployment has none, the call is placed on the mainland line and shows the existing "can't be reached" note. The one-time fallback, the retry and the background re-check all work as before.
+
+**The Line control is replaced by the model list.** The call's settings now list the four models. Each row names the line it uses; the Auto row also shows the line Auto found. Mind is shown but can't be chosen for a call. A choice made here is the same choice as the picker beside the message box, and it is saved on the account through the parent. Picking a model on a different line rebuilds the call there and keeps the transcript. Nothing writes a hand-picked line (`source: "user"`) any more; a verdict saved earlier still counts for Auto.
+
+**Tests.** `validate:ai-models` has 65 checks (+7). `validate:voice-client` has 799, with its five line-control checks rewritten for the model list. Each change was confirmed by breaking the code on purpose, and all 7 breaks were caught.
