@@ -926,6 +926,10 @@ export class VoiceSession {
   private servedRegion: "primary" | "alt" = "primary";
   private altAvailable = false;
   private regionHint: "primary" | "alt" | null = null;
+  /* The hint is only the device's memory of its last call until this call
+     finds the served endpoint dead; the server lets the caller's network
+     outrank a memory, never the in-call "other one" (orderRegionSlots). */
+  private regionHintIsMemory = false;
   private regionRetried = false;
   /** Mirrors the mic tracks' enabled flag, so the UI has one thing to read. */
   private muted = false;
@@ -997,7 +1001,10 @@ export class VoiceSession {
     /** Which lane, as the server said on the voices GET. */
     private readonly transport: VoiceTransport = "rtc",
   ) {
-    if (initialRegion) this.regionHint = initialRegion;
+    if (initialRegion) {
+      this.regionHint = initialRegion;
+      this.regionHintIsMemory = true;
+    }
   }
 
   /* ---------------------------------------------------------------------
@@ -1656,6 +1663,7 @@ export class VoiceSession {
       if (!this.iceEverConnected && this.altAvailable && !this.regionRetried) {
         this.regionRetried = true;
         this.regionHint = this.servedRegion === "alt" ? "primary" : "alt";
+        this.regionHintIsMemory = false;
         void this.reconnectViaOtherRegion();
         return;
       }
@@ -2673,6 +2681,7 @@ export class VoiceSession {
          it owns. Sent only after a call through the served region never
          connected its media. */
       if (this.regionHint) query.set("region", this.regionHint);
+      if (this.regionHint && this.regionHintIsMemory) query.set("region_src", "memory");
       const qs = query.toString();
       const path = qs ? `${HANDSHAKE_PATH}?${qs}` : HANDSHAKE_PATH;
       /* ONE RETRY ON A LINK THAT DROPPED THE REQUEST. A handshake dies as a

@@ -80,6 +80,7 @@ export async function POST(req: Request) {
       `dc=${short(body.dc, 16) || "none"} lastEvent=${short(body.last_event, 60) || "none"} toolCalls=${num(body.tool_calls)} ` +
       `slot=${short(body.region, 8) || "none"} lane=${short(body.lane, 4) || "rtc"} fellBack=${body.fell_back === true} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
       (cause(body.err) ? ` err="${cause(body.err)}"` : "") +
+      (body.redial === "deep" ? " redial=deep" : "") +
       (num(body.ws_reconnects) ? ` wsReconnects=${num(body.ws_reconnects)}` : "") +
       (short(body.ws_close, 6) ? ` wsClose=${short(body.ws_close, 6)}` : "") +
       (num(body.ws_rotations) ? ` wsRotations=${num(body.ws_rotations)}` : "") +
