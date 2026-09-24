@@ -2554,3 +2554,37 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - Pins were updated in client-render, voice-client and models.
 - Each rule was confirmed by breaking the code on purpose, and all 4 breaks were caught.
 - Screenshots were taken at 375 px in English and Arabic.
+
+## Koleex models 4/4, step 1: the owner's on/off switch per model (2026-09-24)
+
+- **Where:** Settings → Koleex AI → "Koleex models (for everyone)", shown to super admins only.
+  - One switch per model, by Koleex name, with a note: Blink keeps China calls; Mind is text only; turning Deep off closes the international call line.
+  - A model whose slot isn't set up, or that `AI_MODELS_DISABLED` turns off, is shown but can't be flipped.
+- **Storage:** `platform_settings` (the existing KV table, RLS deny-all), keys `ai_model_off_<id>`, booleans.
+  - No new table.
+  - Written through `/api/platform-settings` PATCH: super admin only, booleans only, known keys only.
+  - Not in `READABLE`, so the GET does not hand the switches to everyone.
+- **Read:** `provider/model-switches.ts`, cached for 30 s per instance.
+  - A save clears the cache on the instance that saved it; other instances follow within 30 s.
+  - A failed read keeps the last known state.
+  - The env switch and the table switch both count.
+- **Effect:**
+  - A switched-off model is Auto when chosen and "unavailable" in the picker.
+  - It is dropped from Auto and from failover: `chatWithTools` reads the switches once for every caller, and `chatWithToolsVia({ exclude })` drops them.
+  - It is still used if it is the only configured model left: a switch never leaves a user without an answer.
+  - Deep off also removes the socket call lane (voice session route and ws-session route).
+  - Blink's mainland voice lane is never switched off from here.
+- **Tests:** `validate:ai-models` has 79 checks (+14). Each rule was confirmed by breaking the code on purpose, and all 6 breaks were caught.
+
+## Koleex models 4/4, step 2: Auto that learns (2026-09-24)
+
+- **`router/auto-rank.ts`, in memory per instance** (like the breaker): no storage, no network.
+- **A recent failure** (a provider fault in the last 2 minutes) moves a model behind the healthy ones. It stays in the list for failover, and returns to its place after 2 minutes or on its next answer.
+- **Chronic slowness** moves a model behind the faster one. It applies when the model's time to the first word (to the answer, when not streaming) is more than 2× another healthy model's, with at least 5 answers each.
+- **Otherwise the registry order stands.** It is a decision (see `provider/registry.ts`), not a race. The user's own choice still goes first. Nothing is removed.
+- **Wiring:**
+  - `chatWithToolsVia({ auto })` ranks before `preferFirst` and records each attempt: first-delta time on success, and a failure on a provider fault.
+  - `chatWithTools` hands in the instance's stats.
+  - One `[ai.auto] order=` log line when the order changes, names only.
+- **Tests:** `validate:ai-models` has 91 checks (+12). Each rule was confirmed by breaking the code on purpose, and all 5 breaks were caught.
+- **Deferred by the owner (2026-09-24):** the cost-and-speed view. The owner approved four nullable columns on `ai_messages` (tokens in/out, cost, time) for when it is built.

@@ -188,6 +188,16 @@ export const settingsT: Translations = {
   "ai.saving":            { en: "Saving…", zh: "保存中…", ar: "جارٍ الحفظ…" },
   "ai.saved":             { en: "Saved", zh: "已保存", ar: "تم الحفظ" },
   "ai.error":             { en: "Could not save. Try again.", zh: "无法保存，请重试。", ar: "مقدرناش نحفظ. جرّب تاني." },
+  /* Koleex models 4/4 — the owner's on/off switch per model, for everyone. */
+  "ai.models.title":      { en: "Koleex models (for everyone)", zh: "Koleex 模型（对所有人）", ar: "موديلات Koleex (للكل)" },
+  "ai.models.desc":       { en: "A model switched off is not offered in the picker and is not used by Auto. If every model is off, Koleex AI still answers rather than go silent. Takes effect within half a minute.", zh: "关闭的模型不会出现在选择器中，“自动”也不会使用它。即使全部关闭，Koleex AI 仍会回答，不会停止。半分钟内生效。", ar: "الموديل المقفول مش بيظهر في الاختيار، و«تلقائي» مش بيستخدمه. لو كلهم اتقفلوا، Koleex AI برضه هيرد ومش هيسكت. التغيير بيشتغل خلال نص دقيقة." },
+  "ai.models.notSetUp":   { en: "Not set up yet", zh: "尚未配置", ar: "لسه مش متجهز" },
+  "ai.models.envOff":     { en: "Switched off in the server settings", zh: "已在服务器设置中关闭", ar: "مقفول من إعدادات السيرفر" },
+  "ai.models.blinkHint":  { en: "Voice calls in China always keep Koleex Blink.", zh: "中国境内的语音通话始终保留 Koleex Blink。", ar: "المكالمات في الصين دايماً بتفضل على Koleex Blink." },
+  "ai.models.mindHint":   { en: "Text only.", zh: "仅文字。", ar: "كتابة بس." },
+  "ai.models.deepHint":   { en: "Off also closes the international call line.", zh: "关闭后也会关闭国际通话线路。", ar: "لو اتقفل، خط المكالمات الدولية بيتقفل معاه." },
+  "ai.models.failed":     { en: "Could not load the models.", zh: "无法加载模型。", ar: "مقدرناش نحمّل الموديلات." },
+  "ai.models.saveFailed": { en: "Could not save. Try again.", zh: "无法保存，请重试。", ar: "مقدرناش نحفظ. جرّب تاني." },
   /* Roadmap D3 — usage, for the owner. Counts only; no content, no cost. */
   "ai.usage.title":       { en: "Usage (last 14 days)", zh: "使用情况（最近 14 天）", ar: "الاستخدام (آخر 14 يوم)" },
   "ai.usage.desc":        { en: "How much Koleex AI is used across the company. Counts only — no message content. Cost is not shown: token usage is logged per turn but not stored, so a figure here would be a guess.", zh: "全公司使用 Koleex AI 的情况。仅统计数量，不含消息内容。不显示费用：每轮的 token 用量只记录在日志中，未保存，这里的数字只会是猜测。", ar: "قد إيه الشركة بتستخدم Koleex AI. أرقام بس من غير محتوى الرسائل. التكلفة مش معروضة: استهلاك كل رسالة بيتسجل في اللوج بس مابيتحفظش، فأي رقم هنا هيبقى تخمين." },

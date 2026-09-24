@@ -38,6 +38,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { switchedOffModels } from "@/lib/server/ai/provider/model-switches";
 import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -308,7 +309,11 @@ export async function GET(req: Request) {
      else takes the WebSocket lane when it is configured. The country is
      what the platform stamps on the request — never a client claim. The
      voices offered are the serving lane's, under the same product names. */
-  const grok = parseGrokVoiceConfig(readGrokVoiceEnv());
+  /* KOLEEX DEEP SWITCHED OFF (models 4/4): the socket lane is Deep's voice,
+     so it is simply not offered. Blink's lane is never switched off from
+     here — it is the one mainland callers reach without a VPN. */
+  const deepOff = (await switchedOffModels()).has("deep");
+  const grok = deepOff ? null : parseGrokVoiceConfig(readGrokVoiceEnv());
   const lane = chooseVoiceLane({ country: req.headers.get("x-vercel-ip-country"), rtc: cfg !== null, ws: grok !== null });
   const voices = lane === "ws" && grok ? grok.voices : cfg ? cfg.voices : [];
   /* THE SERVER'S ANSWER IS A DEFAULT, NOT A VERDICT (lane-probe.ts): a
