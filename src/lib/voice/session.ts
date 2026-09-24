@@ -787,7 +787,22 @@ export class VoiceSession {
   private mic: MediaStream | null = null;
   /** The channel we opened. Step 3 sends session.update and tool results
    *  through it; nothing writes to it yet. */
+  /** The conversation this call's previews were recorded under — the id a
+   *  tap-to-confirm must name, or the ledger cannot find them. */
+  get callConversationId(): string | null {
+    return this.conversationId;
+  }
   private channel: VoiceChannel | null = null;
+  /* THE SOCKET THAT CARRIES ON THE SAME FAR-SIDE SESSION (deep check,
+     2026-09-24). A lookup's answer was sent on the channel its question
+     arrived on. On the socket lane that socket is handed over every ~24 s
+     (and resumed after a cut), and the relay drops frames from a socket it
+     no longer holds — so a lookup that outlived its socket was answered into
+     nothing: "let me check…", then silence. A handover and a `resumed:true`
+     redial link the old channel to the new one here; an answer follows the
+     links to the socket that continues the session. A FRESH session gets no
+     link — its far side never asked the question. */
+  private channelSuccessor = new WeakMap<VoiceChannel, VoiceChannel>();
   /* THE WEBSOCKET LANE'S TWO OBJECTS — null on the WebRTC lane. */
   private ws: VoiceSocket | null = null;
   /** Redial bookkeeping for a dropped socket (WS_RECONNECT_DELAYS_MS). */
@@ -1519,9 +1534,22 @@ export class VoiceSession {
     this.sendToolResult(channel, call.callId, output);
   }
 
+  /** The channel that continues `channel`'s far-side session now (see
+   *  channelSuccessor) — itself when nothing replaced it. */
+  private liveChannelFor(channel: VoiceChannel): VoiceChannel {
+    let c = channel;
+    for (let hops = 0; hops < 64; hops++) {
+      const next = this.channelSuccessor.get(c);
+      if (!next) break;
+      c = next;
+    }
+    return c;
+  }
+
   /** The output item, then — once every call of its response is answered —
    *  the one request for the model to carry on. */
-  private sendToolResult(channel: VoiceChannel, callId: string, output: unknown): void {
+  private sendToolResult(origin: VoiceChannel, callId: string, output: unknown): void {
+    const channel = this.liveChannelFor(origin);
     if (channel.readyState !== "open") return;
     try {
       channel.send(buildToolOutputMessage(callId, output));
@@ -1589,7 +1617,8 @@ export class VoiceSession {
     }, TOOL_RESPONSE_CREATE_FALLBACK_MS);
   }
 
-  private sendResponseCreate(channel: VoiceChannel): void {
+  private sendResponseCreate(origin: VoiceChannel): void {
+    const channel = this.liveChannelFor(origin);
     if (channel.readyState !== "open") return;
     try {
       channel.send(RESPONSE_CREATE_MESSAGE);
@@ -1988,12 +2017,21 @@ export class VoiceSession {
       } catch { /* already closed */ }
     }
     this.ws = ws;
+    /* NOT OPEN YET: this socket's age starts at ITS onopen. Left at the old
+       socket's time, a redial that never opened (a refused resume) closed
+       with the old socket's age plus the backoff and "taught" that as the
+       path's lifetime — rotation drifted later and more cuts got through
+       (deep check, 2026-09-24). learnSocketLife skips a zero. */
+    this.wsOpenedAt = 0;
     const channel: VoiceChannel = {
       get readyState() {
         return ws.readyState === 1 ? "open" : ws.readyState === 0 ? "connecting" : "closed";
       },
       send: (data: string) => ws.send(data),
     };
+    /* The channel this redial may continue — linked only if the relay says
+       it resumed the same far side (the hello, below). */
+    const previousChannel = this.channel;
     this.channel = channel;
     /* THE AUDIO OUTLIVES THE SOCKET. One context, one microphone reader,
        one far-side stream for the whole call; a redial changes only the
@@ -2059,6 +2097,7 @@ export class VoiceSession {
         if (hello.resumed) {
           this.configSent = true;
           this.configAckPending = false;
+          if (previousChannel && previousChannel !== channel) this.channelSuccessor.set(previousChannel, channel);
           this.markTransportUp();
         } else {
           this.sendSessionConfig(channel);
@@ -2259,6 +2298,9 @@ export class VoiceSession {
       send: (data: string) => next.send(data),
     };
     this.ws = next;
+    /* A handover is the same far side on a new path: answers still owed on
+       the old socket go on this one (channelSuccessor). */
+    if (this.channel && this.channel !== channel) this.channelSuccessor.set(this.channel, channel);
     this.channel = channel;
     this.wsOpenedAt = this.clock();
     next.onmessage = (m) => {

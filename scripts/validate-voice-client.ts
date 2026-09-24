@@ -3770,7 +3770,10 @@ function describeErrorCheck(): boolean {
     const fs29 = await import("node:fs");
     const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
     check("the browser player pushes every decoded frame into the ring and tells the gate; the worklet is loaded from a blob with no inputs and one channel out; the processor is the fallback; dry reports from either reach the gate; flush is the gate's flush; no node per frame remains",
-      /if \(sink\) sink\.push\(samples\);\s*else early\.push\(samples\);\s*farFrames \+= 1;\s*gate\.push\(samples\.length\);/.test(wa) &&
+      /* COUNTED BEFORE THE TRANSFER (deep check, 2026-09-24): the worklet
+         sink transfers the buffer, after which samples.length reads 0. */
+      /const n = samples\.length;\s*if \(sink\) sink\.push\(samples\);\s*else early\.push\(samples\);\s*farFrames \+= 1;\s*gate\.push\(n\);/.test(wa) &&
+      !/sink\.push\(samples\);[\s\S]{0,80}gate\.push\(samples\.length\)/.test(wa) &&
       /URL\.createObjectURL\(new Blob\(\[PLAYOUT_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) &&
       /new AudioWorkletNode\(ctx, PLAYOUT_WORKLET_NAME, \{ numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: \[1\] \}\)/.test(wa) &&
       /if \(m && m\.type === "dry"\) gate\.onDry\(Number\(m\.gen\), Number\(m\.consumed\)\);/.test(wa) &&
@@ -4782,7 +4785,7 @@ console.log("\n── 41. bug hunt: resume count, a busy server, corrections by 
       /const delay = this\.wsRetryAfterMs !== null \? Math\.max\(backoff, this\.wsRetryAfterMs\) : backoff;\s*this\.wsRetryAfterMs = null;/.test(src));
     const btn = fsE.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     check("the call button closes the cut answer on `reconnecting`, finishes the dying call's writer before the next start, and seeds the next writer from where it stopped",
-      /if \(next === "reconnecting"\) \{\s*playSound\("call-reconnecting"\);\s*const cut = settleOpenLine\(linesRef\.current, "assistant"\);/.test(btn) &&
+      /if \(next === "reconnecting"\) \{\s*playSound\("call-reconnecting"\);\s*(?:\/\*[\s\S]*?\*\/\s*)?const cut = settleOpenLine\(linesRef\.current, "assistant", \{ cut: true \}\);/.test(btn) &&
       /const dropped = settleOpenLine\(linesRef\.current, "assistant"\);[\s\S]*?resumeSettledRef\.current = persisterRef\.current\?\.settled\(\) \?\? null;\s*void persisterRef\.current\?\.finish\(\);\s*persisterRef\.current = null;\s*if \(canFallBack\) \{/.test(btn) &&
       /opts\?\.resume \? \(resumeSettledRef\.current \?\? linesRef\.current\.filter\(\(l\) => l\.final\)\.length\) : 0,\s*\);\s*resumeSettledRef\.current = null;/.test(btn));
     const route = fsE.readFileSync("src/app/api/ai/agent/route.ts", "utf8");

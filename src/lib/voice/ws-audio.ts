@@ -857,10 +857,17 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       if (closed) return;
       const samples = down.process(pcm16ToFloat(base64ToBytes(b64)));
       if (samples.length === 0) return;
+      /* COUNTED BEFORE IT IS HANDED OVER (deep check, 2026-09-24). The
+         worklet sink TRANSFERS the buffer, and a transferred Float32Array
+         reads length 0 — the gate was told every frame was empty, believed
+         the buffer was always dry, and so opened each answer on its timer
+         and closed on every small gap: silences of 0.85–1.45 s inside
+         sentences whose next frames were milliseconds away (the "pulses"). */
+      const n = samples.length;
       if (sink) sink.push(samples);
       else early.push(samples);
       farFrames += 1;
-      gate.push(samples.length);
+      gate.push(n);
       void ctx.resume().catch(() => {});
     },
     mute(on) {
