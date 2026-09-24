@@ -197,8 +197,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      vendor — the assertion above this one still holds that. */
   /* FOUR now: the fourth is a REGION HINT of two allow-listed words, which
      selects between endpoints the server owns and can name neither. */
-  check("the only request fields read are a voice KEY, a conversation ID, a transcription LANGUAGE and a two-word REGION HINT — each allow-listed",
-    (code.match(/searchParams\.get/g) ?? []).length === 4 &&
+  check("the only request fields read are a voice KEY, a conversation ID, a transcription LANGUAGE, a two-word REGION HINT and whether that hint is a memory — each allow-listed",
+    (code.match(/searchParams\.get/g) ?? []).length === 5 &&
+    /const hintIsMemory = new URL\(req\.url\)\.searchParams\.get\("region_src"\) === "memory";/.test(code) &&
     /parseRegionHint\(new URL\(req\.url\)\.searchParams\.get\("region"\)\)/.test(code) &&
     /searchParams\.get\("voice"\)/.test(code) &&
     /resolveVoice\(cfg\.voices, requested\)/.test(code) &&
@@ -295,9 +296,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
-    check("  …and the cron jobs sharing this file survived the edit (nine since the finance reminders joined the tasks, calendar, project and HR ones)",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 9 &&
-      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders"]
+    check("  …and the cron jobs sharing this file survived the edit (ten since attendance joined the finance, tasks, calendar, project and HR ones)",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 10 &&
+      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance"]
         .every((p) => (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === p)));
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
@@ -1241,8 +1242,29 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /let lastFailed: \{ slot: VoiceRegionSlot; at: number \} \| null = null;\s*const LAST_FAILED_TTL_MS = 10 \* 60_000;/.test(route) &&
       /const pathDown = timedOut \|\| \/CONNECT_TIMEOUT\|ECONNREFUSED\|ENOTFOUND\|EAI_AGAIN\|ECONNRESET\/\.test\(lastCause\);\s*const another = candidates\.indexOf\(region\) < candidates\.length - 1;\s*if \(pathDown && another\) \{\s*lastFailed = \{ slot: region\.slot, at: Date\.now\(\) \};\s*continue regions;\s*\}/.test(route) &&
       /\|\| 12;/.test(route));
+    /* THE CALLER'S NETWORK OUTRANKS THE DEVICE'S MEMORY (2026-09-24 15:28:
+       a caller on a US VPN exit was sent to the mainland endpoint because
+       the phone remembered it; 232 of 1176 packets lost). Never the in-call
+       "other one", and the mainland or no stamp changes nothing. */
+    const { networkRegionSlot } = await import("../src/lib/server/ai/voice/config");
+    check("an exit outside the mainland points at the international slot; the mainland, a missing or malformed stamp point nowhere",
+      networkRegionSlot("US") === "alt" && networkRegionSlot("jp") === "alt" && networkRegionSlot("HK") === "alt" &&
+      networkRegionSlot("CN") === null && networkRegionSlot("cn") === null && networkRegionSlot("") === null &&
+      networkRegionSlot(null) === null && networkRegionSlot(undefined) === null && networkRegionSlot("USA") === null && networkRegionSlot("X1") === null);
+    check("the network outranks a remembered hint and the instance's memory, never an in-call hint, and a failed slot still goes last",
+      JSON.stringify(orderRegionSlots("primary", null, { primary: true, alt: true }, null, "alt", true)) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots(null, "primary", { primary: true, alt: true }, null, "alt", false)) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots("primary", null, { primary: true, alt: true }, null, "alt", false)) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots("alt", null, { primary: true, alt: true }, null, null, true)) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots("primary", "alt", { primary: true, alt: true }, null, null, true)) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots(null, null, { primary: true, alt: true }, "alt", "alt", false)) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots("primary", null, { primary: true, alt: false }, null, "alt", true)) === '["primary"]');
+    check("  …the route reads the country from the edge's stamp and the hint's source from an allow-listed word, and logs the network",
+      /const hintIsMemory = new URL\(req\.url\)\.searchParams\.get\("region_src"\) === "memory";/.test(route) &&
+      /const network = networkRegionSlot\(req\.headers\.get\("x-vercel-ip-country"\)\);/.test(route) &&
+      /first=\$\{candidates\[0\]\.slot\} net=\$\{network \?\? "none"\}/.test(route));
     check("the route builds its candidates from that order, slots mapped back to the server's own configs",
-      /const order = orderRegionSlots\(hint, rememberedSlot\(\), \{ primary: primary !== null, alt: alt !== null \}, recentlyFailedSlot\(\)\);/.test(route) &&
+      /const order = orderRegionSlots\(hint, rememberedSlot\(\), \{ primary: primary !== null, alt: alt !== null \}, recentlyFailedSlot\(\), network, hintIsMemory\);/.test(route) &&
       /order\.map\(\(slot\) => \(\{\s*slot,\s*cfg: \(slot === "alt" \? alt : primary\) as VoiceConfig,\s*\}\)\)/.test(route));
     check("  …the memory is set only on an answer that is a call, after the ok line, and expires",
       (() => { const ok = route.indexOf("[ai.voice] handshake ok"); const set = route.indexOf("lastServed = { slot: region.slot, at: Date.now() };"); const brk = route.indexOf("break regions;"); return ok > 0 && set > ok && brk > set; })() &&

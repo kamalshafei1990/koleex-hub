@@ -54,6 +54,7 @@ import {
   type VoiceConfig,
   type VoiceRegionSlot,
   orderRegionSlots,
+  networkRegionSlot,
 } from "@/lib/server/ai/voice/config";
 import {
   buildVoiceSessionPayload,
@@ -383,12 +384,18 @@ export async function POST(req: Request) {
      the SERVER owns; it can neither name one nor invent one, and it is
      ignored when there is no second region to select. */
   const hint = parseRegionHint(new URL(req.url).searchParams.get("region"));
-  /* The hint first, then the slot that served the last call from this
-     instance, then the configured order. See orderRegionSlots for why the
+  /* A hint that is only the device's memory of its last call says so; the
+     caller's network then outranks it (orderRegionSlots). An older page
+     sends no marker, and its hint keeps the weight it always had. */
+  const hintIsMemory = new URL(req.url).searchParams.get("region_src") === "memory";
+  const network = networkRegionSlot(req.headers.get("x-vercel-ip-country"));
+  /* The in-call hint first, then the caller's network, then the device's
+     memory, then the slot that served the last call from this instance,
+     then the configured order. See orderRegionSlots for why the
      memory exists: it is the difference between a call that connects in a
      second and one that spends thirteen seconds timing out on a region that
      has not answered all day. */
-  const order = orderRegionSlots(hint, rememberedSlot(), { primary: primary !== null, alt: alt !== null }, recentlyFailedSlot());
+  const order = orderRegionSlots(hint, rememberedSlot(), { primary: primary !== null, alt: alt !== null }, recentlyFailedSlot(), network, hintIsMemory);
   const candidates: Array<{ slot: VoiceRegionSlot; cfg: VoiceConfig }> = order.map((slot) => ({
     slot,
     cfg: (slot === "alt" ? alt : primary) as VoiceConfig,
@@ -504,7 +511,7 @@ export async function POST(req: Request) {
       console.warn(
         `[ai.voice] handshake ok attempt=${attempt}/${budgets.length} slot=${region.slot} ` +
           `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} ` +
-          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} first=${candidates[0].slot}`,
+          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} first=${candidates[0].slot} net=${network ?? "none"}`,
       );
       /* Remembered for the next call this instance serves. Set only on an
          answer that is a call: a refusal or a timeout teaches nothing about

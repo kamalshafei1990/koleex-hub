@@ -21,6 +21,9 @@ export type VoiceTelemetryFields = {
   /** Which lane the call was on, and whether this failure moved it. */
   lane?: string;
   fell_back?: boolean;
+  /** "deep": the failure is followed by Deep's one more dial on its own
+   *  line, not by the fall-back (VoiceCallButton DEEP_REDIAL_DELAY_MS). */
+  redial?: string;
   events?: string;
   /** Socket lane: redials on this call, and the last close code. */
   ws_reconnects?: number;

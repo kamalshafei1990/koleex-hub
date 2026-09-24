@@ -2064,7 +2064,7 @@ console.log("\n── 12. Mute ──");
   const hangUpAt16 = btn.indexOf("const releaseCall");
   const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
   check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
-  check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
+  check("  …and so does unmount", /persisterRef\.current = null;\s*(?:\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;[\s\S]{0,260}?deepRedialRef\.current = null;\s*\}\s*)?tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
   check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
   const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
@@ -2113,6 +2113,8 @@ console.log("\n── 12. Mute ──");
     await sleep(160);
     check("after the grace window the handshake is done AGAIN, asking for the other slot",
       recorded.length === 2 && /[?&]region=alt(&|$)/.test(recorded[1].url));
+    check("  …as the in-call hint, never marked as a memory — the one hint the caller's network does not outrank",
+      !/region_src=/.test(recorded[1].url));
     check("  …through connecting back to live, with no failure shown", r.states.some(([st]) => st === "connecting") && r.session.getState() === "live" && r.states.every(([st]) => st !== "failed"));
     check("  …the first connection was closed and a new one negotiated", r.pcCalls.closed === 1 && r.pcCalls.remoteSdp.length > 0);
     check("  …and the microphone was KEPT across it — no second permission prompt", !r.mic.allStopped());
@@ -2130,8 +2132,23 @@ console.log("\n── 12. Mute ──");
     const r = await run({ recorded, envelope: twoRegion("alt", true) });
     r.ice("failed");
     await sleep(160);
-    check("a call served by the alt asks for the primary", recorded.length === 2 && /[?&]region=primary(&|$)/.test(recorded[1].url));
+    check("a call served by the alt asks for the primary", recorded.length === 2 && /[?&]region=primary(&|$)/.test(recorded[1].url) && !/region_src=/.test(recorded[1].url));
     r.session.stop();
+  }
+  {
+    /* A CALL THAT STARTED ON THE DEVICE'S MEMORY and found that endpoint
+       dead: the flip is the in-call hint, and it is no longer marked as a
+       memory — the server must not let the network send it back. */
+    const recorded: Recorded[] = [];
+    const d = deps({ recorded, envelope: twoRegion("primary", true) });
+    const sM = new VoiceSession(d.deps, {}, null, null, null, "primary");
+    await sM.start();
+    d.ice("failed");
+    await sleep(160);
+    check("a memory hint goes out marked; the flip after dead media goes out unmarked",
+      recorded.length === 2 && /[?&]region=primary&region_src=memory$/.test(recorded[0].url) &&
+      /[?&]region=alt$/.test(recorded[1].url));
+    sM.stop();
   }
   {
     const recorded: Recorded[] = [];
@@ -2302,7 +2319,7 @@ console.log("\n── 12. Mute ──");
   tel.sendVoiceTelemetry({ reason: "x" }, () => { throw new Error("offline"); });
   check("  …and never throws", true);
   check("  …the button sends it on every failure, with the session's diagnostics, before deciding to resume",
-    /sendVoiceTelemetry\(\{ reason: canResume \? "resumed" : failure, resumes: resumesRef\.current, lane: transportRef\.current, fell_back: canFallBack, \.\.\.diag \}\);/.test(btn18) && /const diag = sessionRef\.current\?\.diagnostics\(\);/.test(btn18));
+    /sendVoiceTelemetry\(\{ reason: canResume \? "resumed" : failure, resumes: resumesRef\.current, lane: transportRef\.current, fell_back: canFallBack, \.\.\.\(deepRedial \? \{ redial: "deep" \} : \{\}\), \.\.\.diag \}\);/.test(btn18) && /const diag = sessionRef\.current\?\.diagnostics\(\);/.test(btn18));
   const telRoute = fs18.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
   check("the telemetry route is authenticated, allow-lists the reason, bounds every field, logs one line and stores nothing",
     /const auth = await requireAuth\(req\);/.test(telRoute) && /const REASONS = new Set\(/.test(telRoute) && /if \(!REASONS\.has\(reason\)\) return NextResponse\.json/.test(telRoute) &&
@@ -2380,7 +2397,7 @@ console.log("\n── 12. Mute ──");
     /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(btn19));
   check("  …hangUp is the release plus idle — the same teardown, one more step",
     /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?setLaneNote\(null\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(btn19) &&
-    /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
+    /const releaseCall = useCallback\(\(\) => \{\s*const redial = deepRedialRef\.current;[\s\S]{0,260}?\}\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
     (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
   check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
     (() => { const b = btn19.indexOf('sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, lane: transportRef.current, ...diag });'); const r = btn19.indexOf("setSwapping(true);\n    releaseCall();"); return b > 0 && r > b; })());
@@ -2417,7 +2434,7 @@ console.log("\n── 12. Mute ──");
   const recordedR: Recorded[] = [];
   const sR = new VoiceSession(deps({ status: 200, recorded: recordedR }).deps, {}, "v1", null, null, "alt");
   await sR.start();
-  check("  …the session sends it as the two-word hint the server allow-lists", recordedR[0]?.url === `${HANDSHAKE_PATH}?voice=v1&region=alt`);
+  check("  …the session sends it as the two-word hint the server allow-lists, marked as the device's memory (the caller's network outranks a memory)", recordedR[0]?.url === `${HANDSHAKE_PATH}?voice=v1&region=alt&region_src=memory`);
   const recordedR2: Recorded[] = [];
   const sR2 = new VoiceSession(deps({ status: 200, recorded: recordedR2 }).deps, {}, "v1", null, null, null);
   await sR2.start();
@@ -3042,7 +3059,7 @@ function describeErrorCheck(): boolean {
     check("the button takes the lane from the voices GET — the server's word — and hands it to the session; it never picks one",
       /const server: "rtc" \| "ws" = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && (btn.match(/transportRef\.current = "ws";/g) ?? []).length === 1);
     check("  …a ws lane that never came up falls back to the mainland lane ONCE, silently, and never the other way inside a call — the one move back to the socket lane is after a fallen-back call ENDS, and only on a probe that answered",
-      /const canFallBack = transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
+      /const canFallBack = !deepRedial && transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
       /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) &&
       /const recheckLaneAfterFallback = useCallback\(\(\) => \{\s*if \(!laneFellBackRef\.current \|\| byLaneRef\.current\.ws\.length === 0\) return;\s*void probeWsLane\(/.test(btn) &&
       /if \(!ok \|\| sessionRef\.current \|\| !laneFellBackRef\.current\) return;\s*laneFellBackRef\.current = false;\s*transportRef\.current = "ws";\s*saveLane\("ws", Date\.now\(\), "probe"\);/.test(btn) &&
@@ -3050,6 +3067,19 @@ function describeErrorCheck(): boolean {
       /const hangUp = useCallback\(\(\) => \{\s*\/\*[^*]*\*\/\s*recheckLaneAfterFallback\(\);/.test(btn) &&
       /onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);\s*recheckLaneAfterFallback\(\);\s*\}/.test(btn) &&
       /\}, \[releaseCall, beaconHangUp, recheckLaneAfterFallback\]\);/.test(btn));
+    /* DEEP IS ASKED ONCE MORE BEFORE IT IS GIVEN UP (2026-09-24 15:28: both
+       socket-lane answers lost in a three-second stall, the mainland POST
+       through at :11, and the caller who chose Deep put on Blink). */
+    check("a Deep call whose line never came up (service-unreachable) is dialled again on the SAME line after a pause, once per call, with the microphone kept — only that dial failing falls back",
+      /export const DEEP_REDIAL_DELAY_MS = 1_000;/.test(btn) &&
+      /const deepRedial = modelRef\.current === "deep" && transportRef\.current === "ws" && !wasUp\s*&& failure === "service-unreachable" && !deepRedialedRef\.current && !laneFellBackRef\.current;/.test(btn) &&
+      /if \(keptMic && !canResume && !deepRedial\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
+      /if \(deepRedial\) \{\s*deepRedialedRef\.current = true;[\s\S]{0,200}?setState\("connecting"\);[\s\S]{0,400}?timer: setTimeout\(\(\) => \{\s*deepRedialRef\.current = null;\s*void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\);\s*\}, DEEP_REDIAL_DELAY_MS\),\s*\};\s*return;\s*\}\s*if \(canFallBack\)/.test(btn) &&
+      /resumesRef\.current = 0;\s*deepRedialedRef\.current = false;\s*\}/.test(btn));
+    check("  …a call released (or a screen unmounted) during the pause cancels the dial and gives the microphone back; the beacon says `redial=deep`",
+      /beacon\("unmounted"\);[\s\S]{0,600}?persisterRef\.current = null;\s*\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;\s*if \(redial\) \{\s*clearTimeout\(redial\.timer\);\s*redial\.mic\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*deepRedialRef\.current = null;\s*\}\s*tonesRef\.current\?\.close\(\);/.test(btn) &&
+      /const releaseCall = useCallback\(\(\) => \{\s*const redial = deepRedialRef\.current;\s*if \(redial\) \{\s*clearTimeout\(redial\.timer\);\s*redial\.mic\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*deepRedialRef\.current = null;\s*\}/.test(btn) &&
+      /\(body\.redial === "deep" \? " redial=deep" : ""\)/.test(fs26.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8")));
     check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
       /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "far-side-error", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn) && !/reason: "config-rejected"/.test(btn));
     check("hanging up a live call beacons `hung-up` with the lane and the diagnostics, before the release drops the session",
@@ -3987,7 +4017,7 @@ function describeErrorCheck(): boolean {
     check("  …only the two newest answers with pictures keep their pixels on a call; older tiles draw their frame",
       /export const RECENT_PHOTO_LINES = 2;/.test(trSrc) && /withPixels\.size < RECENT_PHOTO_LINES/.test(trSrc));
     check("  …a resumed call is handed the microphone the lost one kept — and a microphone nobody resumes is released",
-      /const keptMic = sessionRef\.current\?\.takeMicrophone\(\) \?\? null;\s*sessionRef\.current = null;\s*if \(keptMic && !canResume\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
+      /const keptMic = sessionRef\.current\?\.takeMicrophone\(\) \?\? null;\s*sessionRef\.current = null;\s*if \(keptMic && !canResume && !deepRedial\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
       /if \(kept && kept\.getAudioTracks\(\)\.some\(\(t\) => t\.readyState === "live"\)\) \{\s*deps\.getMicrophone = async \(\) => kept;/.test(btn));
   }
 }
@@ -4786,7 +4816,7 @@ console.log("\n── 41. bug hunt: resume count, a busy server, corrections by 
     const btn = fsE.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     check("the call button closes the cut answer on `reconnecting`, finishes the dying call's writer before the next start, and seeds the next writer from where it stopped",
       /if \(next === "reconnecting"\) \{\s*playSound\("call-reconnecting"\);\s*(?:\/\*[\s\S]*?\*\/\s*)?const cut = settleOpenLine\(linesRef\.current, "assistant", \{ cut: true \}\);/.test(btn) &&
-      /const dropped = settleOpenLine\(linesRef\.current, "assistant"\);[\s\S]*?resumeSettledRef\.current = persisterRef\.current\?\.settled\(\) \?\? null;\s*void persisterRef\.current\?\.finish\(\);\s*persisterRef\.current = null;\s*if \(canFallBack\) \{/.test(btn) &&
+      /const dropped = settleOpenLine\(linesRef\.current, "assistant"\);[\s\S]*?resumeSettledRef\.current = persisterRef\.current\?\.settled\(\) \?\? null;\s*void persisterRef\.current\?\.finish\(\);\s*persisterRef\.current = null;\s*if \(deepRedial\) \{/.test(btn) &&
       /opts\?\.resume \? \(resumeSettledRef\.current \?\? linesRef\.current\.filter\(\(l\) => l\.final\)\.length\) : 0,\s*\);\s*resumeSettledRef\.current = null;/.test(btn));
     const route = fsE.readFileSync("src/app/api/ai/agent/route.ts", "utf8");
     check("a fast lane that returned nothing at all is null, never an empty reply", /fastReply = \(out\.response\.content \|\| accumulated\) \|\| null;/.test(route) && !/fastReply = out\.response\.content \|\| accumulated;/.test(route));

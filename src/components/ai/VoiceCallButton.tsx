@@ -173,6 +173,17 @@ export const RESUME_MIN_LIVE_MS = 5_000;
 /* Twice, then the truth: a line that drops three times in one call is not
    coming back, and the caller should hear so rather than watch it try. */
 export const MAX_RESUMES = 2;
+/* DEEP IS ASKED ONCE MORE BEFORE IT IS GIVEN UP (owner, 2026-09-24 15:28:
+   "Koleex Deep can't be reached from your network right now"). Our route
+   answered both socket-lane handshakes — 200 at :04 and :08 — and neither
+   answer reached the phone; the canary to our own origin timed out beside
+   them. The mainland lane's POST from the same page went straight through
+   at :11. A tunnel that stalls for three seconds is not a network where
+   the international line cannot work, and a caller who CHOSE Deep was put
+   on Blink — the other model, the other voice — for the rest of the call.
+   So a Deep call whose line never came up is dialled again on the same line
+   after this pause, once; only that dial failing too falls back. */
+export const DEEP_REDIAL_DELAY_MS = 1_000;
 
 const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string; speak: string; holdHint: string; dictating: string }> = {
   en: { start: "Start voice call", end: "End call", connecting: "Connecting…", speak: "Speak", holdHint: "Tap to call · hold to dictate", dictating: "Listening… release to send" },
@@ -290,6 +301,11 @@ export default function VoiceCallButton({
      network that blocks the vendor's host, a refused secret — is retried
      ONCE on the other lane, silently, before the caller sees a failure. */
   const laneFellBackRef = useRef(false);
+  /* Deep's one more dial on its own line (DEEP_REDIAL_DELAY_MS): whether
+     this call has had it, and the pause before it — cleared, with the
+     microphone it holds, if the call is released in the meantime. */
+  const deepRedialedRef = useRef(false);
+  const deepRedialRef = useRef<{ timer: ReturnType<typeof setTimeout>; mic: MediaStream | null } | null>(null);
   /* THE KOLEEX MODEL PICKS THE LINE (owner, 2026-09-23; voice-pref
      pinnedLaneFor). Blink is the mainland line, Deep the international one;
      Auto and Mind leave the lane rules above to decide. Read at each call's
@@ -633,6 +649,14 @@ export default function VoiceCallButton({
          goes. `finish` posts with keepalive so it outlives the unmount. */
       void persisterRef.current?.finish();
       persisterRef.current = null;
+      /* Deep's pending dial (DEEP_REDIAL_DELAY_MS) must not start a call
+         under a screen that is gone, nor keep its microphone. */
+      const redial = deepRedialRef.current;
+      if (redial) {
+        clearTimeout(redial.timer);
+        redial.mic?.getTracks().forEach((t) => t.stop());
+        deepRedialRef.current = null;
+      }
       tonesRef.current?.close();
       tonesRef.current = null;
       /* THE REST OF THE RELEASE, on the exit that skipped it. The wake lock
@@ -660,6 +684,12 @@ export default function VoiceCallButton({
      `idle`, so a caller who is about to start the next session (a voice
      switch) can do so with the screen still up. hangUp is this plus idle. */
   const releaseCall = useCallback(() => {
+    const redial = deepRedialRef.current;
+    if (redial) {
+      clearTimeout(redial.timer);
+      redial.mic?.getTracks().forEach((t) => t.stop());
+      deepRedialRef.current = null;
+    }
     sessionRef.current?.stop();
     sessionRef.current = null;
     /* The call is over on purpose: no pulse to find later, and the page's
@@ -953,6 +983,7 @@ export default function VoiceCallButton({
       linesRef.current = [];
       setLines(linesRef.current);
       resumesRef.current = 0;
+      deepRedialedRef.current = false;
     }
     liveSinceRef.current = null;
     setPhase(null);
@@ -1090,14 +1121,16 @@ export default function VoiceCallButton({
              retried on the mainland lane before the caller hears anything.
              Never the other way round. */
           const laneFailed = failure === "service-unreachable" || failure === "handshake-failed" || failure === "service-refused" || failure === "unavailable" || failure === "connection-lost";
-          const canFallBack = transportRef.current === "ws" && !wasUp && laneFailed && !laneFellBackRef.current;
-          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, lane: transportRef.current, fell_back: canFallBack, ...diag });
+          const deepRedial = modelRef.current === "deep" && transportRef.current === "ws" && !wasUp
+            && failure === "service-unreachable" && !deepRedialedRef.current && !laneFellBackRef.current;
+          const canFallBack = !deepRedial && transportRef.current === "ws" && !wasUp && laneFailed && !laneFellBackRef.current;
+          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, lane: transportRef.current, fell_back: canFallBack, ...(deepRedial ? { redial: "deep" } : {}), ...diag });
           /* The session has already torn itself down; drop our handle so the
              next start makes a fresh one rather than reusing a dead session.
              The microphone it kept goes to the resume, or is released. */
           const keptMic = sessionRef.current?.takeMicrophone() ?? null;
           sessionRef.current = null;
-          if (keptMic && !canResume) keptMic.getTracks().forEach((t) => t.stop());
+          if (keptMic && !canResume && !deepRedial) keptMic.getTracks().forEach((t) => t.stop());
           /* THE WRITER OF THE CALL THAT DIED FINISHES FIRST (bug hunt,
              2026-09-12). The answer in flight at the drop closes with the
              words it has and goes to the thread with this writer; the next
@@ -1116,6 +1149,22 @@ export default function VoiceCallButton({
           resumeSettledRef.current = persisterRef.current?.settled() ?? null;
           void persisterRef.current?.finish();
           persisterRef.current = null;
+          if (deepRedial) {
+            deepRedialedRef.current = true;
+            /* Still connecting, as far as the caller can tell: the same
+               line, the same voice, the microphone kept (no second ask). */
+            setState("connecting");
+            setReady(false);
+            chimedRef.current = false;
+            deepRedialRef.current = {
+              mic: keptMic,
+              timer: setTimeout(() => {
+                deepRedialRef.current = null;
+                void startCallRef.current?.({ resume: true, mic: keptMic });
+              }, DEEP_REDIAL_DELAY_MS),
+            };
+            return;
+          }
           if (canFallBack) {
             laneFellBackRef.current = true;
             transportRef.current = "rtc";

@@ -302,6 +302,18 @@ export function parseRegionHint(raw: string | null | undefined): VoiceRegionSlot
 
     Only slots that exist are returned, in a stable order, so the caller can
     map slots back to configs without a second lookup. */
+/** The endpoint the caller's network points at, from the country our edge
+ *  stamps on the request. Only an exit OUTSIDE the mainland says anything:
+ *  its media leaves the country before it reaches us, and the mainland
+ *  endpoint is then the far one — the round trip crosses the border twice.
+ *  The mainland itself, or no stamp, says nothing, and the order is what
+ *  it was. The country is the edge's, never the client's. */
+export function networkRegionSlot(country: string | null | undefined): VoiceRegionSlot | null {
+  const c = (country ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c) || c === "CN") return null;
+  return "alt";
+}
+
 export function orderRegionSlots(
   hint: VoiceRegionSlot | null,
   remembered: VoiceRegionSlot | null,
@@ -313,9 +325,19 @@ export function orderRegionSlots(
      outranked the server's memory of it failing). A failure that fresh is
      the one fact newer than the hint; the slot goes last. */
   failed: VoiceRegionSlot | null = null,
+  /* WHERE THE CALLER'S NETWORK POINTS (networkRegionSlot), and whether the
+     hint is only the device's memory of its last call (2026-09-24 15:28:
+     a caller on a VPN exiting in the US was sent to the mainland endpoint
+     because the phone remembered it from a call without the VPN; 232 of
+     1176 packets lost in two minutes). The network outranks a memory — it
+     is about THIS call — but never the in-call hint "the other one", which
+     is sent after the endpoint the network chose never connected. */
+  network: VoiceRegionSlot | null = null,
+  hintIsMemory = false,
 ): VoiceRegionSlot[] {
   const base = (["primary", "alt"] as const).filter((s) => have[s]);
-  const first = hint && have[hint] ? hint : remembered && have[remembered] ? remembered : null;
+  const pick = (s: VoiceRegionSlot | null) => (s && have[s] ? s : null);
+  const first = (hintIsMemory ? null : pick(hint)) ?? pick(network) ?? pick(hint) ?? pick(remembered);
   const order = first ? [first, ...base.filter((s) => s !== first)] : base;
   if (failed && order.length > 1 && order[0] === failed) return [...order.slice(1), failed];
   return order;

@@ -2600,3 +2600,45 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - **Origins.** The default no longer admits every `*.vercel.app` site. It is now `koleexgroup.com,koleex-*.vercel.app`, with a `*` pattern that never crosses a dot. The service's own `VOICE_RELAY_ORIGINS` still decides.
 - **Tests:** relay `npm test` has 16 tests: 11 pure, 5 on real sockets against a fake vendor. Each rule was confirmed by breaking the code on purpose, and all 5 breaks were caught.
 - **Deployment:** auto-deploy is off (no Railway GitHub App on the repo), so this reaches callers only after a manual deployment of the merge commit.
+- **Deployed 2026-09-24 09:30 UTC** (Railway deployment of `5a4948d`, region `asia-southeast1-eqsg3a`, `configured=true`). The watch cron's sessions pass through it every ~7 minutes. The stale staged patch from 12 Sep was discarded on the owner's word.
+
+## Calls over a VPN: Deep asked once more, Blink sent to the near endpoint (2026-09-24)
+
+Owner, 15:28 UTC: "Koleex Deep can't be reached from your network right now, continue in Koleex Blink. And the voice with VPN is so bad."
+
+What the logs say (`x-vercel-ip-country=US`, a VPN exit):
+
+| time | what | result |
+|---|---|---|
+| 15:28:04, :08 | two socket-lane handshakes | our route answered both (200, `socket=relay`); neither answer reached the phone; the canary to `/api/version` timed out beside them |
+| 15:28:10 | beacon | `service-unreachable … canary=timeout:2502ms+retry fellBack=true` |
+| 15:28:11 | the mainland lane's handshake from the same page | through at once, `slot=primary region=cn-north` |
+| 15:30:14 | that call hung up after 123 s | `rtc=recv1176 lost232`: one packet in five lost |
+| all afternoon | relay | only the watch cron's sessions; no call ever reached it |
+
+Two separate faults:
+
+1. **A three-second tunnel stall cost the caller Deep.** A caller who chose Deep was moved to Blink (another model and another voice) for the whole call, because the international line did not answer within about 6 seconds. The same stall had cleared one second later.
+   - **Change:** a Deep call whose line never came up (`service-unreachable`, never live) is dialled again on the same line after `DEEP_REDIAL_DELAY_MS` (1 s), once per call.
+   - The microphone is kept and the screen still says connecting.
+   - Only if that second dial fails does the call fall back to Blink as before.
+   - A release or unmount during the pause cancels the pending dial and releases the microphone.
+   - The beacon says `redial=deep`.
+2. **Blink over a VPN went to the mainland endpoint.** The phone remembered `primary` from calls made without the VPN, and a remembered hint outranked everything. So media from a US exit was sent to Beijing, crossing the border twice.
+   - **Change:** the server takes the caller's network from our own edge's country stamp (`networkRegionSlot`): an exit outside the mainland points at the international slot.
+   - **New order in `orderRegionSlots`:**
+     1. the in-call hint ("the other one", sent after media never connected);
+     2. the caller's network;
+     3. the device's memory;
+     4. the instance's memory;
+     5. the configured order.
+   - A slot that just failed still goes last.
+   - The client marks a remembered hint `region_src=memory`, one allow-listed word. The in-call flip is never marked, so the network can't send a caller back to an endpoint that has just failed. An older page sends no marker, and its hint keeps the weight it had before.
+   - A mainland exit, or no country stamp, changes nothing.
+   - The ok line now carries `net=`.
+
+- **Tests:**
+  - `validate:ai-voice` has 381 checks (+3). This includes porting the cron-count pin to ten jobs now that attendance has joined; that pin was red on main.
+  - `validate:voice-client` has 804 checks (+4).
+  - Each rule was confirmed by breaking the code on purpose, and all 7 breaks were caught.
+- **Still open:** why the VPN path loses whole responses from our origin for a few seconds. It is outside our code, and the canary is what shows it.
