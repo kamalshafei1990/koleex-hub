@@ -2489,3 +2489,16 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - **Time to first token.** The per-account and per-tenant rate-limit round trip now runs beside the ownership and reply-language reads. A refused turn still returns before any write.
 
 **Tests.** `validate:ai-deepcheck` has 51 checks (+8), with pins updated in client-render, export and models. Each change was confirmed by breaking the code on purpose, and all 6 breaks were caught.
+
+## Deep check 2026-09-24, phase 5: hygiene
+
+- **Dead code removed:**
+  - `restoredRef`: written four times, never read. Its comments described an auto-restore effect that no longer exists.
+  - `urlModeRef`: never set to anything but "push".
+  - `isRtl` / `RTL_RE` in `Bubble.tsx`: superseded by `lib/text-direction`. Its test now checks `textDirection` directly.
+  - The `orTypeYourOwn` copy key, which nothing rendered.
+- **One network-drop test.** `lib/ai/network-error.ts`'s `isNetworkError()` replaces two copies that disagreed (one called any TypeError a drop, the other missed Chrome's mid-stream "network error").
+- **The app has a budget of its own.** Section J of `validate:budgets` finds the Koleex AI app chunk: 115 KB, with a 130 KB ceiling. It also asserts that the markdown renderer stays out of it. Section B only ever measured the `/ai` shell, because the app mounts through `next/dynamic`.
+- **Held for phase 6:**
+  - The inline SVGs in the message actions and the composer move to library icons there, because both rows are being redesigned.
+  - The large `KoleexAiApp` split (sidebar, composer, turn logic) is also done with the redesign, so those screens are rewritten once, not twice.
