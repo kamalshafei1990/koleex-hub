@@ -6,7 +6,6 @@
    A single drawer mounted at the layout root that surfaces every
    creation flow. Operators open it from:
      · header chip ("+ Create")
-     · the phone "+" button (SmartCreateFab, bottom start corner)
      · any empty state via the openSmartCreate() event
      · keyboard shortcut "c"
 

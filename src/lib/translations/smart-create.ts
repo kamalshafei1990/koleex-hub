@@ -25,7 +25,6 @@ export const smartCreateT: Translations = {
   "sc.dataEntry":     { en: "Don’t see it? Open the Data Entry hub",
                         zh: "没有找到？打开数据录入中心",
                         ar: "لا تجده؟ افتح مركز إدخال البيانات" },
-  "sc.fab":           { en: "Create",                    zh: "创建",                   ar: "إنشاء" },
 
   /* Effect chips — what saving the record touches. */
   "sc.fx.acc":        { en: "Accounting",                zh: "会计",                   ar: "الحسابات" },
