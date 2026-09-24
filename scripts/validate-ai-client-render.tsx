@@ -512,10 +512,11 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
 
   /* Server-side turn detection has no push-to-talk. A user waiting for a
      button to hold waits forever, so it is said once, before any words. */
+  /* Said as what to do, not what is missing (UI/UX pass, 2026-09-24). */
   check("with no transcript yet, the interaction is explained",
-    connecting.includes("no button to hold"));
+    connecting.includes("Just talk. I answer when you pause.") && !connecting.includes("no button to hold"));
   check("and the hint gives way to the words once there are any",
-    !listening.includes("no button to hold"));
+    !listening.includes("Just talk. I answer when you pause."));
 
   /* BRAND. Monochrome plus one functional red on the destructive control. */
   /* SCOPED TO THE CHROME THIS SCREEN AUTHORS. AIOrb renders its own gradient
@@ -847,8 +848,10 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en"
       onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} /> as ReactElement,
   );
-  check("closed: a Voice control that opens a dialog, labelled with the voice now speaking, and no tiles",
-    /aria-haspopup="dialog"/.test(closedSheet) && /aria-expanded="false"/.test(closedSheet) && />Omar</.test(closedSheet) &&
+  /* Labelled "Settings" since the UI/UX pass (2026-09-24): the voice's name
+     under a sliders glyph read as the name of some other control. */
+  check("closed: a Settings control that opens a dialog, labelled as settings, and no tiles",
+    /aria-haspopup="dialog"/.test(closedSheet) && /aria-expanded="false"/.test(closedSheet) && />Settings</.test(closedSheet) && !/>Omar</.test(closedSheet) &&
     !closedSheet.includes("Layla") && !/aria-pressed=/.test(closedSheet) && !/z-\[250\]/.test(closedSheet));
   check("  …and the old chip row is gone: no 'Voice' caption with buttons beside it", !/uppercase tracking-wide[^>]*>Voice</.test(closedSheet));
   const withPicker = renderToStaticMarkup(
@@ -1062,8 +1065,15 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
 {
   const lines: TranscriptLine[] = [{ role: "user", text: "hi", final: true }];
   const withComposer = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} onSendText={() => true} defaultTypingOpen /> as ReactElement,
+  );
+  /* THE LINE WAITS BEHIND A KEYBOARD BUTTON (UI/UX pass, 2026-09-24). */
+  const composerClosed = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} onSendText={() => true} /> as ReactElement,
   );
+  check("the type-in line is closed until the keyboard button opens it, and the button says what it is",
+    !/<input/.test(composerClosed) && /data-type-toggle/.test(composerClosed) && /aria-expanded="false"[^>]*aria-label="Type something into the call…"/.test(composerClosed) &&
+      />Type</.test(composerClosed) && /data-type-toggle/.test(withComposer) && /aria-expanded="true"[^>]*aria-label="Type something into the call…"/.test(withComposer));
   const without = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
   );
@@ -1083,8 +1093,8 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
   const allowed = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#FFFFFF", "#000000"]);
   check("the composer introduces no colour outside the Koleex palette", hexes.every((h) => allowed.has(h)));
   check("the composer is localised",
-    /placeholder="اكتب حاجة في المكالمة…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} onSendText={() => true} /> as ReactElement)) &&
-    /placeholder="在通话中输入文字…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="zh" onEnd={() => {}} onSendText={() => true} /> as ReactElement)));
+    /placeholder="اكتب حاجة في المكالمة…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} onSendText={() => true} defaultTypingOpen /> as ReactElement)) &&
+    /placeholder="在通话中输入文字…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="zh" onEnd={() => {}} onSendText={() => true} defaultTypingOpen /> as ReactElement)));
   /* Escape must leave the field, not end the call: read from source, since a
      keydown is not a first paint. */
   const screenSrc = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
@@ -1117,9 +1127,9 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
     <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={[]} lang="en" onEnd={() => {}}
       muted={false} onToggleMute={() => {}} talkMode="hands-free" onSelectTalkMode={() => {}} onHold={() => {}} /> as ReactElement,
   );
-  check("the hint under the orb explains the hold instead of saying there is no button to hold — and hands-free keeps the old hint",
-    text(holdEmpty).includes("Hold the button while you speak") && !text(holdEmpty).includes("There is no button to hold") &&
-    text(handsFreeEmpty).includes("There is no button to hold") && !text(handsFreeEmpty).includes("Hold the button while you speak"));
+  check("the hint under the orb explains the hold — and hands-free says to just talk",
+    text(holdEmpty).includes("Hold the button while you speak") && !text(holdEmpty).includes("Just talk") &&
+    text(handsFreeEmpty).includes("Just talk. I answer when you pause.") && !text(handsFreeEmpty).includes("Hold the button while you speak"));
   check("the long press is protected from the browser: touch-action none, no callout, no selection",
     /touch-action:\s*none/.test(holdScreen) && /-webkit-touch-callout:\s*none/.test(holdScreen) && /user-select:\s*none/.test(holdScreen));
   const handsFreeScreen = renderToStaticMarkup(

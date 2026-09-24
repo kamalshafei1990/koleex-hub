@@ -2538,3 +2538,19 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - `validate:ai-deepcheck` has 64 checks (+5), and `validate:ai-client-render` has 3 new rendered checks.
 - Each rule was confirmed by breaking the code on purpose, and all 6 breaks were caught.
 - Screenshots were taken at 375 px: English dark, Arabic light, and Aurora.
+
+## Deep check 2026-09-24, phase 6c: design, the call screen
+
+- **The type-in line waits behind a keyboard button.** The button is labelled "Type" and sits beside Mic, Settings and End. A call is spoken, and a text box across the bottom of every call said otherwise and pushed the controls up. One tap opens the line with the cursor in it; it stays open while it holds text or a "not live yet" notice. `KeyboardIcon` was drawn into the library in the house stroke grammar.
+- **One helper line under the orb, at most.** The order is: the line note ("Koleex Deep can't be reached"), else the text-only note for Mind, else the how-to hint. Before, two or three stacked up.
+- **The hint says what to do, not what is missing.** "Just talk. I answer when you pause." / «اتكلم عادي، وأنا هرد لما تسكت.» / 「直接说话，你一停下我就回答。」 replaces "There is no button to hold".
+- **The settings button is labelled "Settings".** Before, the voice's name sat under a sliders glyph and read as the name of a different control. The voice is still in the sheet.
+- **The four controls fit a 375 px phone** (`gap-6`, `sm:gap-10`).
+- **Kept on purpose:** the KOLEEX wordmark at the top. The owner asked for its position on 2026-09-11, and a suite pins it.
+
+**Tests.**
+- `validate:ai-deepcheck` has 68 checks (+4).
+- `validate:ai-client-render` has a new rendered check for the closed / open type line.
+- Pins were updated in client-render, voice-client and models.
+- Each rule was confirmed by breaking the code on purpose, and all 4 breaks were caught.
+- Screenshots were taken at 375 px in English and Arabic.

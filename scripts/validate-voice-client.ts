@@ -4565,7 +4565,7 @@ function describeErrorCheck(): boolean {
     /\{onSelectModel && \(/.test(scr) && /\{KOLEEX_MODELS\.map\(\(m\) => \{\s*const on = model === m;\s*const off = !KOLEEX_MODEL_INFO\[m\]\.voice;/.test(scr) &&
     /data-model=\{m\}/.test(scr) && /onClick=\{\(\) => \{ if \(!off\) onSelectModel\(m\); \}\}/.test(scr) &&
     /m === "blink" \? copy\.laneMainland\s*: m === "deep" \? copy\.laneInternational\s*: m === "mind" \? copy\.modelTextOnly/.test(scr) && /\{copy\.lineHint\}/.test(scr) &&
-    /laneNote === "international-unreachable" && \(/.test(scr) && /\{model === "mind" && \(/.test(scr) &&
+    /laneNote === "international-unreachable" && \(/.test(scr) && /\{model === "mind" && laneNote !== "international-unreachable" && \(/.test(scr) &&
     ["en", "zh", "ar"].every((l) => { const blk = scr.slice(scr.indexOf(`  ${l}: {`)); return /modelPick: "/.test(blk) && /modelLineAuto: "/.test(blk) && /modelTextOnly: "/.test(blk) && /mindCallNote: "/.test(blk) && /lineHint: "/.test(blk) && /laneMainland: "/.test(blk) && /laneInternational: "/.test(blk) && /laneUnreachable: "/.test(blk); }) &&
     !/(modelPick|modelLineAuto|modelTextOnly|mindCallNote|lineHint|laneMainland|laneInternational|laneUnreachable): "[^"]*(Qwen|Grok|xAI|Alibaba|DeepSeek|通义|千问)/i.test(scr));
   check("  …and the model list keeps the talk-mode control's own divider when it is the section above it",
@@ -4613,7 +4613,7 @@ console.log("\n── 39. one voice control: a long press dictates through the s
   const scr = fsC.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
     /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
-    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-10 pb-6"/.test(scr));
+    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-6 sm:gap-10 pb-6"/.test(scr));
 }
 /* ── 40. THE CALLER'S LINE STANDS; THE SCREEN TELLS STATE FROM WORDS (audit, 2026-09-11) ── */
 console.log("\n── 40. lane verdicts carry their source; status line; memoised transcript ──");

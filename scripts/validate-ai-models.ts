@@ -242,7 +242,7 @@ async function main() {
     /const model = useModelChoice\(\);/.test(btn) && /onChooseModel=\{chooseModel\}/.test(app));
   const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the call's settings list the Koleex models by their Koleex names, and a Mind call says it is on Auto",
-    /KOLEEX_MODEL_INFO\[m\]\.name\[lang\]/.test(scr) && /\{model === "mind" && \(/.test(scr) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(scr.slice(scr.indexOf("THE MODEL (2026-09-23; the Line"), scr.indexOf("{onSelectTalkMode && ("))));
+    /KOLEEX_MODEL_INFO\[m\]\.name\[lang\]/.test(scr) && /\{model === "mind" && laneNote !== "international-unreachable" && \(/.test(scr) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(scr.slice(scr.indexOf("THE MODEL (2026-09-23; the Line"), scr.indexOf("{onSelectTalkMode && ("))));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

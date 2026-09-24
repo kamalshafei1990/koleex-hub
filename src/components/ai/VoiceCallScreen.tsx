@@ -32,6 +32,7 @@ import { type TalkMode } from "@/lib/voice/voice-pref";
 import { KOLEEX_MODELS, KOLEEX_MODEL_INFO, type KoleexModelId } from "@/lib/ai/koleex-models";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import KeyboardIcon from "@/components/icons/ui/KeyboardIcon";
 import { textDirection, textLang } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
@@ -80,6 +81,11 @@ const COPY: Record<Lang, {
      user has no icon to read. These name the control the way a phone does —
      one or two words that survive being set at 11px under a 56px circle. */
   micShort: string;
+  /** Under the keyboard button that opens the type-in line. */
+  typeShort: string;
+  /** Under the settings button (it used to show the voice's name, which
+   *  read as a label for a different control). */
+  settingsShort: string;
   endShort: string;
   /* The far side has the turn and is composing — the gap the orb fills. */
   thinking: string;
@@ -140,13 +146,15 @@ const COPY: Record<Lang, {
     muted: "Microphone off",
     searching: "Looking it up…",
     title: "Voice call",
-    hint: "Speak, then pause. There is no button to hold.",
+    hint: "Just talk. I answer when you pause.",
     voice: "Voice",
     thinking: "Thinking…",
     showChat: "Show conversation",
     showOrb: "Back to Koleex AI",
     closePhoto: "Close photo",
     micShort: "Mic",
+    typeShort: "Type",
+    settingsShort: "Settings",
     endShort: "End",
     typePlaceholder: "Type something into the call…",
     sendTyped: "Send typed message",
@@ -203,13 +211,15 @@ const COPY: Record<Lang, {
     muted: "麦克风已关闭",
     searching: "正在查询…",
     title: "语音通话",
-    hint: "说完后停顿一下，无需按住任何按键。",
+    hint: "直接说话，你一停下我就回答。",
     voice: "音色",
     thinking: "思考中…",
     showChat: "显示对话",
     showOrb: "返回 Koleex AI",
     closePhoto: "关闭图片",
     micShort: "麦克风",
+    typeShort: "打字",
+    settingsShort: "设置",
     endShort: "结束",
     typePlaceholder: "在通话中输入文字…",
     sendTyped: "发送文字",
@@ -266,13 +276,15 @@ const COPY: Record<Lang, {
     muted: "الميكروفون مقفول",
     searching: "بدوّر على المعلومة…",
     title: "مكالمة صوتية",
-    hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
+    hint: "اتكلم عادي، وأنا هرد لما تسكت.",
     voice: "الصوت",
     thinking: "بفكّر…",
     showChat: "عرض المحادثة",
     showOrb: "الرجوع لـ Koleex AI",
     closePhoto: "اقفل الصورة",
     micShort: "مايك",
+    typeShort: "اكتب",
+    settingsShort: "الإعدادات",
     endShort: "إنهاء",
     typePlaceholder: "اكتب حاجة في المكالمة…",
     sendTyped: "ابعت الرسالة المكتوبة",
@@ -380,6 +392,9 @@ export type VoiceCallScreenProps = {
   /** Open the voice sheet from the first render — for tests and deep links;
    *  the caller opens it from the Voice control otherwise. */
   defaultVoiceSheetOpen?: boolean;
+  /** Open the type-in line on first paint (a test, or a caller who was
+   *  already typing when the screen remounted). */
+  defaultTypingOpen?: boolean;
   /** Type into the call. Returns whether it went — false while the channel is
    *  not up yet, which the screen says rather than swallowing the text. Absent
    *  means no composer is drawn. */
@@ -424,6 +439,7 @@ export default function VoiceCallScreen({
   onStopPreview,
   onSendText,
   defaultVoiceSheetOpen = false,
+  defaultTypingOpen = false,
   pendingWrite = null,
   onConfirmWrite,
   onCancelWrite,
@@ -546,7 +562,6 @@ export default function VoiceCallScreen({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [voiceSheet]);
-  const selectedVoiceLabel = voices.find((v) => v.key === selectedVoice)?.label ?? copy.voice;
   /* The picture being looked at, if any. Inside the app, over the call. */
   const [openPhoto, setOpenPhoto] = useState<TranscriptPhoto | null>(null);
   const closePhoto = useCallback(() => setOpenPhoto(null), []);
@@ -622,6 +637,12 @@ export default function VoiceCallScreen({
   const [typed, setTyped] = useState("");
   const [typedNotice, setTypedNotice] = useState<string | null>(null);
   const typedRef = useRef<HTMLInputElement | null>(null);
+  /* THE TYPE-IN LINE WAITS BEHIND A KEYBOARD BUTTON (UI/UX pass,
+     2026-09-24). A call is spoken; a text box across the bottom of every
+     call said otherwise and pushed the controls up. One tap opens it with
+     the cursor in it; it stays open while it holds text or a notice. */
+  const [typingOpen, setTypingOpen] = useState(defaultTypingOpen);
+  const showTyping = typingOpen || typed.length > 0 || typedNotice !== null;
 
   /* Escape ends the call. A full-screen mode with no keyboard exit is a trap,
      and this one is holding the microphone open.
@@ -850,10 +871,13 @@ export default function VoiceCallScreen({
             </>
           ) : status}
         </p>
+        {/* AT MOST ONE HELPER LINE (UI/UX pass, 2026-09-24): the line note
+            first, then the text-only note, then the how-to hint below — never
+            two stacked under the orb. */}
         {laneNote === "international-unreachable" && (
           <p className="mt-2 max-w-[28rem] text-[12px] text-[#AAAAAA]" role="status">{copy.laneUnreachable}</p>
         )}
-        {model === "mind" && (
+        {model === "mind" && laneNote !== "international-unreachable" && (
           <p className="mt-2 max-w-[28rem] text-[12px] text-[#AAAAAA]" role="status">{copy.mindCallNote}</p>
         )}
         {/* A SLOW HANDSHAKE OFFERS A WAY OUT THAT IS NOT "END": one tap
@@ -917,7 +941,9 @@ export default function VoiceCallScreen({
                 {copy.brief}
               </button>
             )}
-            <p className="max-w-[820px] mx-auto text-center text-[13px] text-[#AAAAAA]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
+            {laneNote !== "international-unreachable" && model !== "mind" && (
+              <p className="max-w-[820px] mx-auto text-center text-[13px] text-[#AAAAAA]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
+            )}
           </div>
         )}
         {latestPhotos.length > 0 && (
@@ -1044,9 +1070,9 @@ export default function VoiceCallScreen({
             inverted only once there is something to send — a control that
             cannot be used should not look ready. Not a textarea: this is a
             line into a conversation, not a document. */}
-        {onSendText && (
+        {onSendText && showTyping && (
           <form
-            className="max-w-[820px] mx-auto px-6 pb-6"
+            className="w-full max-w-[820px] mx-auto px-6 pb-4"
             onSubmit={(e) => {
               e.preventDefault();
               submitTyped();
@@ -1054,7 +1080,14 @@ export default function VoiceCallScreen({
           >
             <div className="flex items-center gap-2 h-12 ps-4 pe-1.5 rounded-full border border-white/20 bg-white/[0.04] focus-within:border-white/40 transition-colors">
               <input
-                ref={typedRef}
+                ref={(el) => {
+                  typedRef.current = el;
+                  /* Opened by the keyboard button: take the cursor, without
+                     iOS scrolling the call screen to reveal the field. */
+                  if (el && typingOpen && document.activeElement !== el && !typed) {
+                    try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+                  }
+                }}
                 type="text"
                 value={typed}
                 onChange={(e) => {
@@ -1112,7 +1145,7 @@ export default function VoiceCallScreen({
         {/* Room under the controls: on the desktop app "Mic / End" sat on the
             window's edge and on a phone on the home-indicator strip (the
             safe-area inset is added by the root, on top of this). */}
-        <div className="flex items-end justify-center gap-10 pb-6">
+        <div className="flex items-end justify-center gap-6 sm:gap-10 pb-6">
           {talkMode === "hold" && onHold ? (
             /* HOLD TO TALK (roadmap B2), in Mute's place: the one control a
                caller in a loud room uses, so it is the widest thing on the
@@ -1201,6 +1234,29 @@ export default function VoiceCallScreen({
             </div>
           )}
 
+          {onSendText && (
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTypingOpen((v) => !v)}
+                aria-expanded={showTyping}
+                aria-label={copy.typePlaceholder}
+                title={copy.typePlaceholder}
+                data-type-toggle
+                className={`h-14 w-14 rounded-full inline-flex items-center justify-center border transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                  showTyping
+                    ? "text-white border-white/40 bg-white/[0.1]"
+                    : "text-[#AAAAAA] hover:text-white border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
+                }`}
+              >
+                <KeyboardIcon size={22} />
+              </button>
+              <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA]`}>
+                {copy.typeShort}
+              </span>
+            </div>
+          )}
+
           {(voices.length > 0 || onSelectTalkMode) && (
             <div className="flex flex-col items-center gap-2">
               {/* VOICE. The same family as Mute — a circle on the grid, the
@@ -1226,7 +1282,7 @@ export default function VoiceCallScreen({
                 </svg>
               </button>
               <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA] max-w-[72px] truncate`}>
-                {selectedVoiceLabel}
+                {copy.settingsShort}
               </span>
             </div>
           )}
