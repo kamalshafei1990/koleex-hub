@@ -253,5 +253,21 @@ console.log("\n── 9. Design, part 2: the thread ──");
     !/border-white\/15/.test(bubble));
 }
 
+console.log("\n── 10. Design, part 3: the call screen ──");
+{
+  const scr = read("src/components/ai/VoiceCallScreen.tsx");
+  check("the type-in line waits behind a keyboard button, and stays open while it holds text or a notice",
+    /const showTyping = typingOpen \|\| typed\.length > 0 \|\| typedNotice !== null;/.test(scr) && /\{onSendText && showTyping && \(/.test(scr) &&
+      /onClick=\{\(\) => setTypingOpen\(\(v\) => !v\)\}/.test(scr) && /<KeyboardIcon size=\{22\} \/>/.test(scr) &&
+      /export \{ default as KeyboardIcon \} from "\.\/KeyboardIcon";/.test(read("src/components/icons/ui/index.ts")));
+  check("at most one helper line under the orb: the line note, else the text-only note, else the how-to hint",
+    /\{model === "mind" && laneNote !== "international-unreachable" && \(/.test(scr) &&
+      /\{laneNote !== "international-unreachable" && model !== "mind" && \(\s*<p[^>]*>\{talkMode === "hold" \? copy\.holdHint : copy\.hint\}/.test(scr));
+  check("the hint says what to do, not what is missing — in all three languages",
+    !/There is no button to hold|无需按住任何按键|مفيش زرار تفضل ضاغط عليه/.test(scr) && /hint: "Just talk\. I answer when you pause\.",/.test(scr));
+  check("the settings button is labelled as settings, not with the voice's name",
+    /\{copy\.settingsShort\}/.test(scr) && !/selectedVoiceLabel/.test(scr));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

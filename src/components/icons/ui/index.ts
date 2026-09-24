@@ -106,6 +106,7 @@ export { default as InboxRawIcon } from "./InboxRawIcon";
 export { default as InfoIcon } from "./InfoIcon";
 export { default as ItalicIcon } from "./ItalicIcon";
 export { default as KeyIcon } from "./KeyIcon";
+export { default as KeyboardIcon } from "./KeyboardIcon";
 export { default as LandmarkIcon } from "./LandmarkIcon";
 export { default as LanguagesIcon } from "./LanguagesIcon";
 export { default as LayersIcon } from "./LayersIcon";
