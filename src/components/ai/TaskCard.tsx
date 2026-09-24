@@ -66,7 +66,7 @@ export function taskCardDetails(
     due ? `${copy.due} ${due}` : "",
     remind ? `${copy.remind} ${remind}` : "",
     start ? `${copy.starts} ${start}` : "",
-    priority && priority !== "medium" ? priority : "",
+    priority === "high" ? copy.priorityHigh : priority === "low" ? copy.priorityLow : "",
     label,
     people.length ? `${copy.forPeople} ${people.join(", ")}` : "",
     observers.length ? `${copy.observers} ${observers.join(", ")}` : "",
@@ -104,21 +104,21 @@ export default function TaskCard({
   const busy = status.state === "saving";
   return (
     <div
-      className={`w-full max-w-[560px] rounded-2xl border px-4 py-3 ${settled ? "border-[var(--border)] bg-[var(--bg-secondary)]" : "border-[var(--border-strong,var(--border))] bg-[var(--bg-elevated,var(--bg-secondary))]"}`}
+      className={`w-full max-w-[560px] rounded-2xl border px-4 py-3 ${settled ? "border-[var(--border-subtle)] bg-[var(--bg-secondary)]" : "border-[var(--border-strong)] bg-[var(--bg-elevated)]"}`}
       data-task-card
       data-task-state={status.state}
     >
-      <div className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
+      <div className="text-[12px] font-medium text-[var(--text-dim)]">
         {status.state === "saved" ? copy.taskSaved : status.state === "cancelled" ? copy.taskCancelled : heading}
       </div>
       {title && <div className="mt-1 text-[15px] font-semibold leading-snug text-[var(--text-primary)]" dir="auto" lang={textLang(title)} data-task-title>{title}</div>}
       {details.length > 0 && (
-        <div className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-secondary)]" data-task-details>{details.join(" · ")}</div>
+        <div className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)]" data-task-details>{details.join(" · ")}</div>
       )}
-      {status.state === "failed" && <div className="mt-2 text-[12px] text-[var(--danger,#D92D20)]" data-task-error>{copy.taskFailed}</div>}
+      {status.state === "failed" && <div className="mt-2 text-[12px] text-[var(--kx-ai-danger-text,#FF7A7A)]" data-task-error>{copy.taskFailed}</div>}
       {status.state === "saved" && status.todoId && (
-        <Link href={`/todo?task=${encodeURIComponent(status.todoId)}`} className="mt-2 inline-block text-[13px] font-medium text-[var(--brand,#0066FF)] hover:underline" data-task-open>
-          {copy.openTodo} →
+        <Link href={`/todo?task=${encodeURIComponent(status.todoId)}`} className="mt-2 inline-block text-[13px] font-medium text-[var(--kx-ai-accent,#0066FF)] hover:underline" data-task-open>
+          {copy.openTodo} {lang === "ar" ? "←" : "→"}
         </Link>
       )}
       {live && (status.state === "pending" || status.state === "saving" || status.state === "failed") && (
@@ -127,7 +127,7 @@ export default function TaskCard({
             type="button"
             onClick={onSave}
             disabled={busy}
-            className="h-10 flex-1 rounded-full bg-[#0066FF] text-white text-[13px] font-semibold active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-primary)]"
+            className="h-10 flex-1 rounded-full bg-[var(--kx-ai-accent,#0066FF)] text-white text-[13px] font-semibold active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-primary)]"
             data-task-save
           >
             {busy ? copy.savingTask : copy.saveTask}
@@ -136,7 +136,7 @@ export default function TaskCard({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="h-10 px-4 rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[13px] active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+            className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[13px] active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kx-ai-accent,#0066FF)]"
             data-task-cancel
           >
             {copy.cancelTask}

@@ -22,7 +22,7 @@
    "it compiles" and "it renders what it rendered before".
    --------------------------------------------------------------------------- */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as uw from "../src/components/pwa/UpdateWatcher";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
@@ -566,7 +566,7 @@ console.log("\n── The AI interface speaks the user's language, all of it ─
   const AI_TSX = [
     "src/components/ai/Bubble.tsx",
     "src/components/ai/KoleexAiApp.tsx",
-    "src/components/ai/EmojiButton.tsx",
+    "src/components/ai/ComposerAddMenu.tsx",
     "src/components/ai/TypingIndicator.tsx",
     "src/components/ai/VoiceCallButton.tsx",
     "src/components/ai/VoiceCallScreen.tsx",
@@ -652,11 +652,11 @@ console.log("\n── The AI interface speaks the user's language, all of it ─
      EVERY CALL SITE. Both new `lang` props are optional with an English
      default — deliberately, so that adding them did not force every caller
      to change at once — but that same default is what makes an unwired
-     caller silently monolingual instead of broken. EmojiButton sits inside
+     caller silently monolingual instead of broken. ComposerAddMenu sits inside
      KoleexAiApp, which is far too large to render here, so this is checked
      at the source: weaker than rendering, and the only thing that catches
      it at all. */
-  for (const comp of ["EmojiButton", "TypingIndicator"]) {
+  for (const comp of ["ComposerAddMenu", "TypingIndicator"]) {
     const sites: string[] = [];
     for (const f of AI_TSX) {
       let src = "";
@@ -670,7 +670,7 @@ console.log("\n── The AI interface speaks the user's language, all of it ─
   }
   /* Non-vacuity: there must BE call sites, or the loop proved nothing. */
   const anySite = AI_TSX.some((f) => {
-    try { return /<EmojiButton|<TypingIndicator/.test(readFileSync(f, "utf8")); } catch { return false; }
+    try { return /<ComposerAddMenu|<TypingIndicator/.test(readFileSync(f, "utf8")); } catch { return false; }
   });
   check("  …and those components really are used somewhere", anySite);
 
@@ -1196,10 +1196,10 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
     const live = html(<Bubble {...base} />);
     check("a to-do preview step renders the Task card above the answer: the title in the user's words, the times in words, the person, the label, the priority",
       /data-task-card/.test(live) && /data-task-state="pending"/.test(live) && text(live).includes("Call Mr Li about the Ningbo shipment") && text(live).includes("Due Fri 18 Sept, 15:00") &&
-      text(live).includes("Reminder Fri 18 Sept, 15:00") && text(live).includes("For Ahmed Hassan") && text(live).includes("Following Sara") && text(live).includes("high") && text(live).includes("Sales") &&
+      text(live).includes("Reminder Fri 18 Sept, 15:00") && text(live).includes("For Ahmed Hassan") && text(live).includes("Following Sara") && text(live).includes("High priority") && text(live).includes("Sales") &&
       text(live).includes("Ready — a reminder at 3 to call Mr Li. Save?"));
     check("  …live on the last message: Save is the one Hub-Blue control, Cancel beside it",
-      /data-task-save/.test(live) && live.includes("bg-[#0066FF]") && text(live).includes("Save task") && /data-task-cancel/.test(live) && text(live).includes("Cancel"));
+      /data-task-save/.test(live) && live.includes("bg-[var(--kx-ai-accent,#0066FF)]") && (live.match(/kx-ai-accent,#0066FF\)\] text-white/g) ?? []).length === 1 && text(live).includes("Save task") && /data-task-cancel/.test(live) && text(live).includes("Cancel"));
     const older = html(<Bubble {...({ ...base, isLast: false } as any)} />);
     check("  …an older message keeps the card as a record with no buttons", /data-task-card/.test(older) && !/data-task-save/.test(older) && text(older).includes("Call Mr Li"));
     const answered = html(<Bubble {...({ ...base, answeredWith: "actually make it tomorrow" } as any)} />);
@@ -1316,9 +1316,11 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
      pill's height, padding, icon and colour with a blank for the word; the
      emoji button's has its 40 px; the orb's hello waits until the screen
      has settled. */
-  check("the Speak pill and the emoji button keep their shape while their code loads, and the orb's hello comes after the screen has settled",
+  /* The emoji button went in the UI/UX pass (2026-09-24) — the phone's own
+     keyboard has emoji — so its stand-in must be gone with it. */
+  check("the Speak pill keeps its shape while its code loads, no emoji picker is left behind, and the orb's hello comes after the screen has settled",
     /loading: \(\) => \(\s*<span aria-hidden className="h-9 rounded-full px-3\.5 inline-flex items-center gap-1\.5 shrink-0 bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\] text-\[13px\] font-semibold">/.test(app) &&
-    /<span className="inline-block w-\[40px\]" \/>/.test(app) && /loading: \(\) => <span className="h-10 w-10 inline-block shrink-0" aria-hidden \/>/.test(app) && !/h-9 w-9 inline-block shrink-0/.test(app) &&
+    /<span className="inline-block w-\[40px\]" \/>/.test(app) && !/EmojiButton|emojiData/.test(app) && !existsSync("src/components/ai/EmojiButton.tsx") && !/h-9 w-9 inline-block shrink-0/.test(app) &&
     /const t = setTimeout\(\(\) => setGreet\(1\), 900\);/.test(readFileSync("src/components/ai/WelcomeCard.tsx", "utf8")));
   check("the app's root fades in over 220 ms and the aurora canvas over 600 ms — opacity only, motion-safe only",
     /className="kx-ai-root kx-ai-enter /.test(app) &&

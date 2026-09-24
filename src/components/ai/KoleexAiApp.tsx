@@ -32,6 +32,7 @@ import type { TaskCardState } from "@/components/ai/TaskCard";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import ComposerAddMenu from "@/components/ai/ComposerAddMenu";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
 import { shrinkImage } from "@/lib/ai/image-shrink";
@@ -133,10 +134,6 @@ const VoiceCallButton = dynamic(() => import("@/components/ai/VoiceCallButton"),
       <span className="inline-block w-[40px]" />
     </span>
   ),
-});
-const EmojiButton = dynamic(() => import("@/components/ai/EmojiButton"), {
-  ssr: false,
-  loading: () => <span className="h-10 w-10 inline-block shrink-0" aria-hidden />,
 });
 
 const SIDEBAR_W = 248;
@@ -1589,36 +1586,6 @@ export default function KoleexAiApp() {
     abortRef.current?.abort();
   }, []);
 
-  /** Insert an emoji at the current cursor position in the composer.
-   *  Preserves selection/typing context so the user can pick several
-   *  emojis in a row without losing their place. Falls back to
-   *  append-to-end when the textarea ref isn't available. */
-  const insertEmoji = useCallback((emoji: string) => {
-    const ta = composerRef.current;
-    if (!ta) {
-      setInput((prev) => prev + emoji);
-      return;
-    }
-    const start = ta.selectionStart ?? ta.value.length;
-    const end = ta.selectionEnd ?? ta.value.length;
-    const before = ta.value.slice(0, start);
-    const after = ta.value.slice(end);
-    const next = before + emoji + after;
-    setInput(next);
-    /* Restore focus + place caret right after the inserted emoji on
-       the next frame (after React's re-render commits the new
-       value). preventScroll keeps the page stable on iOS. */
-    requestAnimationFrame(() => {
-      try { ta.focus({ preventScroll: true }); } catch { ta.focus(); }
-      const pos = start + emoji.length;
-      ta.setSelectionRange(pos, pos);
-      /* Kick the autosize onChange path so the textarea grows if the
-         added emoji pushed content onto a new line. */
-      ta.style.height = "auto";
-      ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
-    });
-  }, []);
-
   /** Copy an assistant message to the clipboard. Returns true on
    *  success so the bubble can flash its ✓ "Copied" confirmation.
    *
@@ -2477,10 +2444,14 @@ export default function KoleexAiApp() {
             desktop "glitch". The aside's overflow-hidden does the clipping. */}
         <div className="flex h-full w-[248px] shrink-0 flex-col">
         <div className="kx-ai-side-sep p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
+          {/* Phone only: on a desktop the page header right beside this
+              already carries the back arrow — two arrows to the same place
+              one inch apart (UI/UX pass, 2026-09-24). */}
           <Link
             href="/"
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
+            className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
             title={copy.back}
+            aria-label={copy.backToHub}
           >
             <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
           </Link>
@@ -2669,23 +2640,9 @@ export default function KoleexAiApp() {
                     </button>
                   </SectionHeader>
 
-                  {projects.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProjectDraft({
-                          id: null,
-                          name: "",
-                          icon: DEFAULT_PROJECT_ICON,
-                          color: DEFAULT_PROJECT_COLOR,
-                        })
-                      }
-                      className="mx-2 w-[calc(100%-1rem)] px-2 py-1.5 rounded-lg text-start text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-2"
-                    >
-                      <PlusIcon size={13} />
-                      {copy.newProject}
-                    </button>
-                  ) : (
+                  {/* No projects yet: the "+" in the header above is the way in —
+                      a second "New project" row under it said the same thing. */}
+                  {projects.length > 0 && (
                     <>
                       {visibleProjects.map((p) => (
                         <ProjectRow
@@ -2862,9 +2819,6 @@ export default function KoleexAiApp() {
             <h1 className="kx-ai-bar-title text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug" dir="auto" lang={active?.title ? textLang(active.title) : undefined}>
               {active?.title || "Koleex AI"}
             </h1>
-            {!active && (
-              <p className="text-[12px] text-[var(--text-dim)] truncate">{copy.welcomeSub}</p>
-            )}
           </div>
           <ReportIssueButton variant="inline" />
           {sidebarCollapsed && (
@@ -3234,19 +3188,16 @@ export default function KoleexAiApp() {
                       the edge of one cannot land on its neighbour (UI review,
                       2026-09-12). */}
                   <div className="flex items-center gap-1">
-                    {/* + Attachment */}
-                    <button
-                      type="button"
-                      onClick={openFilePicker}
-                      className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                      aria-label={copy.attachFile}
-                      title={copy.attachFile}
-                    >
-                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                    </button>
+                    {/* ONE "+" (UI/UX pass, 2026-09-24): files and photos,
+                        and the web search switch, behind a single control.
+                        While search is on, a chip beside it says so. */}
+                    <ComposerAddMenu
+                      onAttach={openFilePicker}
+                      webSearch={webSearch}
+                      onWebSearchChange={setWebSearch}
+                      lang={lang}
+                      copy={copy}
+                    />
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -3257,33 +3208,6 @@ export default function KoleexAiApp() {
                       aria-hidden
                       tabIndex={-1}
                     />
-
-                    {/* Emoji picker (iOS-style). */}
-                    <EmojiButton
-                      lang={lang}
-                      onSelect={insertEmoji}
-                      className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                    />
-
-                    {/* Web search toggle — emerald tint when on. */}
-                    <button
-                      type="button"
-                      onClick={() => setWebSearch((v) => !v)}
-                      aria-pressed={webSearch}
-                      aria-label={copy.searchWeb}
-                      title={webSearch ? copy.webSearchOn : copy.webSearchOff}
-                      className={`h-10 w-10 rounded-full inline-flex items-center justify-center transition-colors ${
-                        webSearch
-                          ? "bg-[var(--kx-ai-accent-soft)] text-[var(--kx-ai-accent)] ring-1 ring-[var(--kx-ai-accent-line)]"
-                          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-                      }`}
-                    >
-                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="2" y1="12" x2="22" y2="12" />
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                      </svg>
-                    </button>
                   </div>
 
                   <div className="flex items-center gap-0.5">
@@ -3355,9 +3279,6 @@ export default function KoleexAiApp() {
                 </div>
               </div>
             </form>
-            <div className="text-[12px] text-[var(--text-dim)] mt-2.5 text-center">
-              {copy.footer}
-            </div>
           </div>
         </div>
       </main>

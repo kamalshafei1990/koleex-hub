@@ -189,7 +189,7 @@ export default function ModelPicker({
             aria-label={copy.model}
             onKeyDown={onMenuKey}
             dir={lang === "ar" ? "rtl" : "ltr"}
-            className="kx-pop-panel fixed z-[61] overflow-y-auto py-1.5"
+            className="kx-pop-panel kx-ai-tokens fixed z-[61] overflow-y-auto py-1.5"
             style={{ bottom: pos.bottom, left: pos.left, width: W, maxHeight: pos.maxHeight }}
           >
             <div className="px-4 pt-1.5 pb-1 text-[12px] font-semibold text-[var(--text-dim)]">{copy.model}</div>
