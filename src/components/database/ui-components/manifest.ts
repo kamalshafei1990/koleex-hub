@@ -933,7 +933,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "ReportTotal",
       "SmartCreateDrawer",
       "SmartCreatePage",
-      "SmartEmpty",
       "SmartEmptyState",
       "SmartField",
       "SmartHelpCard",

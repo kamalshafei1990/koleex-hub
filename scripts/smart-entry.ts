@@ -3,7 +3,7 @@
 /* ===========================================================================
    Smart Data Entry validator.
 
-   Coverage (12 assertions):
+   Coverage (11 assertions):
      01  humanizeError translates FK errors to plain English
      02  humanizeError translates duplicate-key to "already exists"
      03  humanizeError translates HTTP status to generic message
@@ -14,8 +14,7 @@
      08  useDraftAutosave isolates by tenant
      09  buildSmartDefaults base_currency = tenant base (CNY)
      10  SmartCreateDrawer exports openSmartCreate function
-     11  SmartEmpty component is importable + has expected props
-     12  InlineEntityPicker accepts onRefresh callback (new prop)
+     11  InlineEntityPicker accepts onRefresh callback (new prop)
    ========================================================================== */
 
 import { humanizeError } from "../src/lib/ui/humanize-error";
@@ -125,12 +124,8 @@ async function main() {
   ok("10  SmartCreateDrawer exports openSmartCreate",
      drawerSrc.includes("export function openSmartCreate"));
 
-  const emptySrc = await fs.readFile("./src/components/ui/empty/SmartEmpty.tsx", "utf8");
-  ok("11  SmartEmpty exports a default component",
-     emptySrc.includes("export default function SmartEmpty"));
-
   const pickerSrc = await fs.readFile("./src/components/ui/create/SmartCreate.tsx", "utf8");
-  ok("12  InlineEntityPicker accepts onRefresh prop",
+  ok("11  InlineEntityPicker accepts onRefresh prop",
      pickerSrc.includes("onRefresh"));
 
   fakeStore.clear();
