@@ -20,7 +20,9 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, type ServerAuthContext } from "@/lib/server/auth";
 import { openTodoItems } from "@/lib/todo-open-count";
-import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
+import { nextEffectiveOccurrence, type CalendarRec } from "@/lib/calendar-recurrence";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
+import { accountTimezone } from "@/lib/server/calendar-notify";
 import { capabilityApp, isOpenAccessModule, PERMISSION_MODULES } from "@/lib/permission-modules";
 
 export const dynamic = "force-dynamic";
@@ -370,9 +372,10 @@ async function projectsWidget(auth: ServerAuthContext): Promise<Widget> {
 }
 
 /* Calendar: MY next five events — one-offs ahead of now and, for each live
-   series, its next occurrence (the same date math the reminder cron uses),
-   merged by date. Series used to be only COUNTED, so a person whose whole
-   week is standing meetings read "nothing scheduled". */
+   series, its next occurrence (the same date math the reminder cron uses:
+   on the organizer's clock, deleted occurrences skipped, a moved or renamed
+   one as it now is), merged by date. Series used to be only COUNTED, so a
+   person whose whole week is standing meetings read "nothing scheduled". */
 async function calendarWidget(auth: ServerAuthContext): Promise<Widget> {
   const now = new Date();
   const nowIso = now.toISOString();
@@ -383,7 +386,7 @@ async function calendarWidget(auth: ServerAuthContext): Promise<Widget> {
       .is("recurrence", null).gte("start_at", nowIso)
       .order("start_at", { ascending: true }).limit(5),
     supabaseServer.from("koleex_calendar_events")
-      .select("title, start_at, recurrence, recurrence_until")
+      .select("id, title, start_at, end_at, recurrence, recurrence_until")
       .eq("account_id", auth.account_id).not("recurrence", "is", null)
       .or(`recurrence_until.is.null,recurrence_until.gte.${todayDate}`)
       .limit(100),
@@ -396,11 +399,16 @@ async function calendarWidget(auth: ServerAuthContext): Promise<Widget> {
     at: new Date(r.start_at as string).getTime(),
   }));
   let seriesCount = 0;
-  for (const r of (series.data ?? []) as Array<{ title: string | null; start_at: string; recurrence: CalendarRec; recurrence_until: string | null }>) {
-    const occ = nextOccurrenceStart(r.start_at, r.recurrence, r.recurrence_until, now);
+  const seriesRows = (series.data ?? []) as Array<{ id: string; title: string | null; start_at: string; end_at: string; recurrence: CalendarRec; recurrence_until: string | null }>;
+  const [tz, exceptions] = await Promise.all([
+    seriesRows.length ? accountTimezone(auth.account_id) : Promise.resolve("UTC"),
+    loadExceptions(seriesRows.map((r) => r.id)),
+  ]);
+  for (const r of seriesRows) {
+    const occ = nextEffectiveOccurrence(r.start_at, r.end_at, r.recurrence, r.recurrence_until, now, exceptions.get(r.id), tz);
     if (!occ) continue;
     seriesCount += 1;
-    next.push({ name: r.title || "—", at: occ.getTime() });
+    next.push({ name: occ.override?.title || r.title || "—", at: occ.start.getTime() });
   }
   next.sort((a, b) => a.at - b.at);
   const upcoming = next.slice(0, 5).map((r) => ({

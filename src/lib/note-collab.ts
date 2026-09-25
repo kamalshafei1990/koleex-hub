@@ -7,6 +7,9 @@
      1. Presence — who else is in this note right now (viewing / editing).
      2. Change pings — after a collaborator's save LANDS, peers receive a
         content-free ping and re-fetch the note through the authorized API.
+        A ping with `body: true` (sent by the server after a single-editor
+        body save was merged into the Yjs state) tells LIVE peers to pull
+        and merge the stored state — the change never rode the socket.
      3. Live co-editing (when a NoteYjsSession is passed) — Yjs updates and
         awareness ride broadcast event "y" on this same channel, END-TO-END
         ENCRYPTED with a per-note key from the authorized collab endpoint
@@ -43,6 +46,8 @@ export interface NotePeer {
 export interface NoteUpdate {
   by: string;
   at: string;
+  /** The body changed outside the live session (single-editor save). */
+  body?: boolean;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -64,11 +69,13 @@ export function useNoteCollab(opts: {
   onRemoteUpdate: (u: NoteUpdate) => void;
   /** Live co-editing session for this note (shared notes only). */
   yjs?: NoteYjsSession | null;
+  /** The channel (re)subscribed — `first` is false after a reconnect. */
+  onSubscribed?: (first: boolean) => void;
 }): {
   peers: NotePeer[];
-  broadcastUpdate: () => void;
+  broadcastUpdate: (opts?: { body?: boolean }) => void;
 } {
-  const { noteId, me, status, enabled, onRemoteUpdate, yjs = null } = opts;
+  const { noteId, me, status, enabled, onRemoteUpdate, yjs = null, onSubscribed } = opts;
   const [peers, setPeers] = useState<NotePeer[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const statusRef = useRef<CollabStatus>(status);
@@ -79,6 +86,8 @@ export function useNoteCollab(opts: {
   // Keep the latest callback without re-subscribing the channel.
   const onRemoteRef = useRef(onRemoteUpdate);
   useEffect(() => { onRemoteRef.current = onRemoteUpdate; }, [onRemoteUpdate]);
+  const onSubscribedRef = useRef(onSubscribed);
+  useEffect(() => { onSubscribedRef.current = onSubscribed; }, [onSubscribed]);
 
   /* The Yjs session can change (joined after the channel, rebuilt on a key
      refresh) without re-subscribing the channel. */
@@ -107,6 +116,7 @@ export function useNoteCollab(opts: {
     const supa = getBrowserSupabase();
     if (!supa) return;
     const clientId = getTabClientId();
+    let subscribedOnce = false;
 
     const channel = supa.channel(`note:${noteId}`, {
       config: { presence: { key: clientId } },
@@ -150,6 +160,7 @@ export function useNoteCollab(opts: {
         onRemoteRef.current({
           by: String(u.by ?? ""),
           at: typeof u.at === "string" ? u.at : new Date().toISOString(),
+          ...(u.body === true ? { body: true } : {}),
         });
       })
       .on("broadcast", { event: "y" }, ({ payload: p }) => {
@@ -161,6 +172,9 @@ export function useNoteCollab(opts: {
           void channel.track(payload());
           // (Re)connected: sync the live document with whoever is here.
           yjsRef.current?.attach(sendY);
+          const first = !subscribedOnce;
+          subscribedOnce = true;
+          onSubscribedRef.current?.(first);
         } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
           subscribedRef.current = false;
           yjsRef.current?.detach();
@@ -185,14 +199,18 @@ export function useNoteCollab(opts: {
     } catch { /* ignore */ }
   }, [status]);
 
-  const broadcastUpdate = useCallback(() => {
+  const broadcastUpdate = useCallback((o?: { body?: boolean }) => {
     const ch = channelRef.current;
     if (!ch) return;
     try {
       void ch.send({
         type: "broadcast",
         event: "ping",
-        payload: { by: getTabClientId(), at: new Date().toISOString() } satisfies NoteUpdate,
+        payload: {
+          by: getTabClientId(),
+          at: new Date().toISOString(),
+          ...(o?.body ? { body: true } : {}),
+        } satisfies NoteUpdate,
       });
     } catch { /* ignore */ }
   }, []);

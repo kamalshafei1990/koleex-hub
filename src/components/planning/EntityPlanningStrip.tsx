@@ -9,7 +9,8 @@
 
    It handles its own fetch (no-store — an item saved seconds ago must
    show), loading, error and empty states. Each row deep-links into the
-   Planning app with ?item=<id>, which opens that item's modal.
+   Planning app with ?item=<id>, which opens that item's modal. Times read
+   on the planner's clock (lib/planning-tz), like the Planning app itself.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -27,6 +28,7 @@ import {
 } from "@/lib/planning";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
+import { usePlannerTimeZone } from "@/lib/planning-tz";
 
 export default function EntityPlanningStrip({
   entityType,
@@ -42,6 +44,7 @@ export default function EntityPlanningStrip({
   title?: string;
 }) {
   const { t } = useTranslation(planningT);
+  const tz = usePlannerTimeZone();
   /* Stamped with the key it answered, so a stale answer for a previous
      record never shows under a new one (and no setState-in-effect reset). */
   const reqKey = `${entityType}|${entityId}|${upcomingOnly ? 1 : 0}|${limit}`;
@@ -121,7 +124,7 @@ export default function EntityPlanningStrip({
                   {it.title || t(`type.${it.type}`, ITEM_TYPE_LABELS[it.type])}
                 </div>
                 <div className="text-[10px] text-[var(--text-dim)] truncate">
-                  {formatRange(it.start_at, it.end_at)} ·{" "}
+                  {formatRange(it.start_at, it.end_at, tz)} ·{" "}
                   {durationHours(it.start_at, it.end_at)}
                   {t("unit.h")}
                   {it.resource?.name ? ` · ${it.resource.name}` : ""}

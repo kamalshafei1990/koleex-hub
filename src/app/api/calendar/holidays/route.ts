@@ -18,8 +18,9 @@ import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/ser
 
    Calendar is a personal/Type-C module; any authenticated user with Calendar
    module access can read holidays. Writes are restricted to Super Admin
-   (holidays are tenant-wide reference data). POST and DELETE have no screen
-   yet — holidays are seeded; the routes stay for the admin panel to come.
+   (holidays are tenant-wide reference data); the Calendar's holidays panel
+   (components/admin/calendar/HolidaysPanel) calls POST and DELETE. A
+   customer holiday must name a customer of the caller's tenant.
    A session without a tenant reads and writes the tenant-less rows.
    --------------------------------------------------------------------------- */
 
@@ -103,13 +104,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "national/official holidays need a date" }, { status: 400 });
   }
 
+  const customerId = scopeType === "customer" ? String(body.customer_id ?? "").trim() : "";
+  if (scopeType === "customer") {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)) {
+      return NextResponse.json({ error: "customer holidays need a customer_id" }, { status: 400 });
+    }
+    let cq = supabaseServer.from("customers").select("id").eq("id", customerId);
+    cq = auth.tenant_id ? cq.eq("tenant_id", auth.tenant_id) : cq.is("tenant_id", null);
+    const { data: cust, error: custErr } = await cq.maybeSingle();
+    if (custErr) {
+      console.error("[api/calendar/holidays POST] customer:", custErr.message);
+      return NextResponse.json({ error: "Failed to create holiday" }, { status: 500 });
+    }
+    if (!cust) return NextResponse.json({ error: "unknown customer" }, { status: 400 });
+  }
+
   const row = {
     tenant_id: auth.tenant_id,
     name,
     holiday_type: holidayType,
     scope_type: scopeType,
     country: scopeType === "country" ? (String(body.country ?? "").trim() || null) : null,
-    customer_id: scopeType === "customer" ? (String(body.customer_id ?? "").trim() || null) : null,
+    customer_id: scopeType === "customer" ? customerId : null,
     holiday_date: holidayType === "weekly" ? null : holidayDate,
     weekday: holidayType === "weekly" ? weekday : null,
     recurs_annually: Boolean(body.recurs_annually),

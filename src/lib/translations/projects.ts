@@ -270,7 +270,7 @@ export const projectsT: Translations = {
   "mem.role.viewer":     { en: "Viewer",            zh: "查看者",            ar: "مشاهد" },
   "mem.roleHelp":        { en: "Managers edit members and archive; members work on tasks; viewers can only look.", zh: "管理者可管理成员并归档；成员处理任务；查看者只能查看。", ar: "المديرون يديرون الأعضاء والأرشفة؛ الأعضاء يعملون على المهام؛ المشاهدون للاطلاع فقط." },
   "mem.remove":          { en: "Remove member",     zh: "移除成员",          ar: "إزالة العضو" },
-  "mem.removeConfirm":   { en: "Remove {name} from this project?", zh: "从此项目中移除 {name}？", ar: "إزالة {name} من هذا المشروع؟" },
+  "mem.removeConfirm":   { en: "Remove {name} from this project? They also leave the project chat.", zh: "从此项目中移除 {name}？其也将退出项目聊天。", ar: "إزالة {name} من هذا المشروع؟ سيغادر أيضًا دردشة المشروع." },
   "mem.empty":           { en: "No members yet.",   zh: "暂无成员。",         ar: "لا يوجد أعضاء بعد." },
   "mem.notAvailable":    { en: "Project members become available once the database update is applied.", zh: "数据库更新应用后即可使用项目成员功能。", ar: "ستتوفر ميزة أعضاء المشروع بعد تطبيق تحديث قاعدة البيانات." },
   "mem.readOnly":        { en: "Only the project's managers can change members.", zh: "只有项目管理者可以更改成员。", ar: "يمكن لمديري المشروع فقط تغيير الأعضاء." },
@@ -344,4 +344,9 @@ export const projectsT: Translations = {
   "due.title":           { en: "Due today & overdue", zh: "今日到期与逾期",   ar: "مستحقة اليوم ومتأخرة" },
   "due.count":           { en: "{today} today · {overdue} overdue", zh: "今日 {today} · 逾期 {overdue}", ar: "{today} اليوم · {overdue} متأخرة" },
   "due.readOnly":        { en: "View only",         zh: "仅查看",            ar: "للعرض فقط" },
+
+  /* Viewer (read-only) access */
+  "access.viewOnly":     { en: "View only",         zh: "仅查看",            ar: "للعرض فقط" },
+  "access.viewOnlyTip":  { en: "You are a viewer on this project — you can look but not make changes.", zh: "您是此项目的查看者——可以查看但不能更改。", ar: "أنت مشاهد في هذا المشروع — يمكنك الاطلاع دون إجراء تغييرات." },
+  "btn.close":           { en: "Close",             zh: "关闭",              ar: "إغلاق" },
 };

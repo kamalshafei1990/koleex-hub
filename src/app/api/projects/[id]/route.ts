@@ -2,9 +2,9 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertProjectAccess, canManageProject } from "@/lib/server/project-access";
+import { assertProjectAccess, canManageProject, projectAccessLevels } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
-import { upsertProjectMembers } from "@/lib/server/project-members";
+import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-members";
 import { collectProjectAttachmentPaths, removeTaskAttachmentFiles } from "@/lib/server/project-files";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
@@ -19,22 +19,30 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   const gate = await assertProjectAccess(auth, id);
   if (gate instanceof NextResponse) return gate;
 
-  const { data, error } = await supabaseServer
-    .from("projects")
-    .select(
-      `*,
-       customer:customer_id ( id, display_name, company_name ),
-       manager:manager_account_id ( id, username )`,
-    )
-    .eq("id", id)
-    .eq("tenant_id", auth.tenant_id)
-    .maybeSingle();
+  /* `member_count` feeds the Members button; `my_access` (manage | edit |
+     view) lets the board hide what the write gates would refuse. */
+  const [{ data, error }, memberCounts, access] = await Promise.all([
+    supabaseServer
+      .from("projects")
+      .select(
+        `*,
+         customer:customer_id ( id, display_name, company_name ),
+         manager:manager_account_id ( id, username )`,
+      )
+      .eq("id", id)
+      .eq("tenant_id", auth.tenant_id)
+      .maybeSingle(),
+    projectMemberCounts(auth.tenant_id, [id]),
+    requireModuleAction(auth, "Projects", "edit").then((denied) => projectAccessLevels(auth, [gate], !denied)),
+  ]);
   if (error) {
     console.error("[api/projects/:id GET]", error.message);
     return NextResponse.json({ error: "Failed to load project" }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ project: data });
+  return NextResponse.json({
+    project: { ...data, member_count: memberCounts.get(id) ?? 0, my_access: access.get(id) ?? "view" },
+  });
 }
 
 export async function PATCH(req: Request, { params }: RouteCtx) {

@@ -103,3 +103,30 @@ export function shiftDaysInZone(iso: string, days: number, tzIn: string): string
   const p = zonedParts(Date.parse(iso), tz);
   return new Date(zonedToUtc(p.y, p.m, p.d + days, p.h, p.mi, p.s, p.ms, tz)).toISOString();
 }
+
+/** A change between two instants as seen on the wall clock in `tz`: whole
+ *  calendar days plus the change in time of day (ms, may be negative). */
+export interface WallDelta {
+  days: number;
+  ms: number;
+}
+
+const wallMsOfDay = (p: { h: number; mi: number; s: number; ms: number }) =>
+  ((p.h * 60 + p.mi) * 60 + p.s) * 1000 + p.ms;
+
+/** The wall-clock delta that takes `fromIso` to `toIso` in `tz`. */
+export function wallDelta(fromIso: string, toIso: string, tzIn: string): WallDelta {
+  const tz = safeTimeZone(tzIn);
+  const a = zonedParts(Date.parse(fromIso), tz);
+  const b = zonedParts(Date.parse(toIso), tz);
+  const days = Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
+  return { days, ms: wallMsOfDay(b) - wallMsOfDay(a) };
+}
+
+/** Apply a wall-clock delta to an instant in `tz` (DST-safe: "+1 day, +30
+ *  minutes" keeps landing on the same wall time across a DST change). */
+export function applyWallDelta(iso: string, delta: WallDelta, tzIn: string): string {
+  const tz = safeTimeZone(tzIn);
+  const p = zonedParts(Date.parse(iso), tz);
+  return new Date(zonedToUtc(p.y, p.m, p.d + delta.days, p.h, p.mi, p.s, p.ms + delta.ms, tz)).toISOString();
+}

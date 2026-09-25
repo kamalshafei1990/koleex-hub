@@ -26,13 +26,17 @@
 
    Opened on ONE occurrence of a series (`occurrence`), the editor asks what
    a change applies to: "This event" stores an exception for that occurrence
-   (title, time, place and link — the fields one occurrence can have of its
-   own; the rest is locked while it is chosen), "All events" edits the
+   (title, time, place, link and notes — the fields one occurrence can have
+   of its own; emptying the place, link or notes empties them for that
+   occurrence only; the rest is locked while it is chosen), "All events" edits the
    series, shifting it by as much as the occurrence was moved. Delete asks
    the same.
 
    A meeting link (https) gets a Join button — Hub Blue on the day — and an
-   event with guests a "Chat with attendees" link to Discuss. With guests
+   event with other people on it a "Chat with attendees" link to Discuss
+   (/discuss?with=<ids>&title=<event>: the DM with one person, else the
+   group of exactly those people — the organizer and every guest who has
+   not declined, never the viewer). With guests
    picked, a free/busy timeline shows everyone's day (FreeBusy).
    --------------------------------------------------------------------------- */
 
@@ -322,13 +326,17 @@ export default function EventModal({
     if (form.title.trim() !== draft.title.trim()) change.title = form.title.trim();
     if (form.start_at !== draft.start_at || form.end_at !== draft.end_at) { change.start_at = form.start_at; change.end_at = form.end_at; }
     if ((form.location?.trim() || null) !== (draft.location?.trim() || null)) change.location = form.location?.trim() || null;
+    /* null = none for this occurrence (the server stores it as ''). */
     if ((form.meeting_url?.trim() || null) !== (draft.meeting_url?.trim() || null)) change.meeting_url = form.meeting_url?.trim() || null;
+    if ((form.description?.trim() || null) !== (draft.description?.trim() || null)) change.description = form.description?.trim() || null;
     if (Object.keys(change).length === 0) { onClose(); return; }
     setSaving(true);
     const res = await changeOccurrence(existingId, occurrence.start, { action: "override", ...change });
     setSaving(false);
     if (!res.ok) { onError?.(res.unavailable ? t("err.occurrenceUnavailable") : t("err.save")); return; }
     onSaved(null);
+    /* Saved, but the server could not yet keep a cleared link / the notes. */
+    if (res.degraded && ("meeting_url" in change || "description" in change)) onError?.(t("err.occurrencePartial"));
   }
 
   /** "All events" from an occurrence: only what changed goes to the series;
@@ -430,7 +438,16 @@ export default function EventModal({
   const liveGuests = attendees.filter((a) => a.status !== "declined").length > 0;
   const link = validMeetingUrl(form.meeting_url);
   const linkInvalid = !!form.meeting_url?.trim() && !link;
-  const hasGuests = attendees.some((a) => a.status !== "declined") || (!readOnly && attendeeIds.length > 0);
+  /* "Chat with attendees": the saved event's organizer and every guest who
+     has not declined, without the viewer — guests are internal accounts
+     (lib/server/calendar-guests). Nobody else, no button. */
+  const chatIds = existingId
+    ? Array.from(new Set([draft.account_id, ...attendees.filter((a) => a.status !== "declined").map((a) => a.account_id)]))
+        .filter((id): id is string => !!id && id !== viewerId)
+    : [];
+  const chatHref = chatIds.length
+    ? `/discuss?with=${chatIds.map(encodeURIComponent).join(",")}&title=${encodeURIComponent(draft.title.trim())}`
+    : null;
   /* Free/busy: the organizer and the picked guests, on the event's day. */
   const fbIds = useMemo(() => [organizerId, ...attendeeIds.filter((id) => id !== organizerId)].slice(0, 20), [organizerId, attendeeIds]);
   const startWall = toWall(form.start_at, timezone);
@@ -888,14 +905,14 @@ export default function EventModal({
               className={textareaClass}
               rows={3}
               value={form.description ?? ""}
-              disabled={locked}
+              disabled={readOnly}
               onChange={(e) => patch("description", e.target.value || null)}
               placeholder={readOnly ? "" : t("f.description.placeholder")}
             />
           </div>
 
           {/* Meeting link + Join, and the chat with the guests */}
-          {(!readOnly || link || (existingId && hasGuests)) && (
+          {(!readOnly || link || chatHref) && (
           <div>
             {readOnly
               ? <span className={labelClass}>{t("f.meetingUrl")}</span>
@@ -918,7 +935,7 @@ export default function EventModal({
             {linkInvalid && (
               <p id={ids.linkHint} className="mt-1 text-[11px] text-[var(--state-error)]">{t("err.meetingUrl")}</p>
             )}
-            {(link || (existingId && hasGuests)) && (
+            {(link || chatHref) && (
               <div className="mt-2 flex items-center gap-2 flex-wrap">
                 {link && (
                   <a
@@ -935,9 +952,9 @@ export default function EventModal({
                     <span className="sr-only"> · {link}</span>
                   </a>
                 )}
-                {existingId && hasGuests && (
+                {chatHref && (
                   <a
-                    href="/discuss"
+                    href={chatHref}
                     className="h-9 px-4 rounded-xl inline-flex items-center gap-2 text-[13px] font-semibold bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
                   >
                     <MessageSquareIcon size={15} aria-hidden /> {t("chatAttendees")}

@@ -3,9 +3,9 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectAccessLevels, UUID_RE } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
-import { upsertProjectMembers } from "@/lib/server/project-members";
+import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-members";
 
 /* GET  /api/projects — list projects (tenant-scoped).
      Query:
@@ -19,7 +19,10 @@ import { upsertProjectMembers } from "@/lib/server/project-members";
        projects[]  each with task_counts { open, overdue, done, total }
                    (done/total = top-level non-cancelled, the progress
                    rule in src/lib/project-progress.ts) and `involved`
-                   (the CALLER manages / created / holds a task in it)
+                   (the CALLER manages / created / holds a task in it),
+                   `member_count` (project_members rows — one grouped
+                   query) and `my_access` manage|edit|view (the caller's
+                   effective permission, see projectAccessLevels)
        counts      { active, on_hold, completed, archived, all } for the
                    filter chips — same scope + search, every status.
 
@@ -154,7 +157,7 @@ export async function GET(req: Request) {
   }
 
   const ids = projects.map((p) => p.id);
-  const [tc, mine] = await Promise.all([
+  const [tc, mine, memberCounts, access] = await Promise.all([
     templatesOnly ? Promise.resolve(new Map<string, Counts>()) : taskCounts(auth.tenant_id, ids),
     /* `involved` for the SA "My view" lens — for everyone else the scope
        already guarantees it. */
@@ -169,11 +172,15 @@ export async function GET(req: Request) {
           memberProjectIds(auth.tenant_id, auth.account_id),
         ]).then(([r, m]) => new Set([...(r.data ?? []).map((x) => (x as { project_id: string }).project_id), ...m]))
       : Promise.resolve(null),
+    templatesOnly ? Promise.resolve(new Map<string, number>()) : projectMemberCounts(auth.tenant_id, ids),
+    requireModuleAction(auth, "Projects", "edit").then((denied) => projectAccessLevels(auth, projects, !denied)),
   ]);
 
   const out = projects.map((p) => ({
     ...p,
     task_counts: tc.get(p.id) ?? ZERO,
+    member_count: memberCounts.get(p.id) ?? 0,
+    my_access: access.get(p.id) ?? "view",
     involved: mine
       ? p.manager_account_id === auth.account_id || p.created_by_account_id === auth.account_id || mine.has(p.id)
       : true,

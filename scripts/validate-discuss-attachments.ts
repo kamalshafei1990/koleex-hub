@@ -267,7 +267,9 @@ check("objecturl: DiscussApp never calls createObjectURL directly",
 check("objecturl: DiscussApp never calls revokeObjectURL directly",
   !/URL\.revokeObjectURL/.test(app));
 check("objecturl: recorder-local preview still revokes its own blob",
-  /URL\.revokeObjectURL\(previewUrl\)/.test(voice));
+  /* The recorder tracks its clip URL in a ref (previewUrlRef) so unmount
+     cleanup sees the latest value; either spelling revokes its own blob. */
+  /URL\.revokeObjectURL\(previewUrl(Ref\.current)?\)/.test(voice));
 check("objecturl: released on reconcile", /releasePreviewUrls\(clientMsgId\);/.test(app));
 /* Scoped to the conversation-switch handler, not to two adjacent lines: the
    release must run inside handleSelectChannel and before the selection

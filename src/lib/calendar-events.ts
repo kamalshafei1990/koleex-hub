@@ -171,18 +171,21 @@ export interface OccurrenceChange {
   start_at?: string;
   end_at?: string;
   location?: string | null;
+  /** null / "" = no link for this occurrence. */
   meeting_url?: string | null;
+  description?: string | null;
 }
 
 /** Change or delete ONE occurrence of a recurring event ("This event").
  *  `occurrenceStart` is the occurrence's ORIGINAL start (the feed's
  *  occurrence_start). `unavailable` = the server cannot store single
- *  occurrences yet (migration not applied). */
+ *  occurrences yet (migration not applied); `degraded` = saved, but a
+ *  cleared link / the notes could not be (2026-09-27 migration not applied). */
 export async function changeOccurrence(
   eventId: string,
   occurrenceStart: string,
   change: { action: "skip" } | ({ action: "override" } & OccurrenceChange),
-): Promise<{ ok: boolean; unavailable?: boolean }> {
+): Promise<{ ok: boolean; unavailable?: boolean; degraded?: boolean }> {
   try {
     const res = await fetch(`/api/calendar/events/${eventId}/occurrences`, {
       method: "POST",
@@ -190,7 +193,10 @@ export async function changeOccurrence(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ occurrence_start: occurrenceStart, ...change }),
     });
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      const j = (await res.json().catch(() => null)) as { degraded?: boolean } | null;
+      return j?.degraded ? { ok: true, degraded: true } : { ok: true };
+    }
     logUnlessDenied("changeOccurrence", res.status, [401, 403, 404, 503]);
     return { ok: false, unavailable: res.status === 503 };
   } catch (e) {
@@ -215,10 +221,13 @@ export async function fetchFreeBusy(accountIds: string[], from: Date, to: Date, 
   }
 }
 
-/** The viewer's own and invited events matching `q`, ±3 months. null = failed. */
-export async function searchEvents(q: string, signal?: AbortSignal): Promise<CalendarSearchHit[] | null> {
+/** The own and invited events matching `q`, ±3 months, of the viewer — or,
+ *  for a Super Admin, of `accountId`. null = failed. */
+export async function searchEvents(q: string, signal?: AbortSignal, accountId?: string | null): Promise<CalendarSearchHit[] | null> {
+  const params = new URLSearchParams({ q });
+  if (accountId) params.set("accountId", accountId);
   try {
-    const res = await fetch("/api/calendar/search?q=" + encodeURIComponent(q), { credentials: "include", signal });
+    const res = await fetch("/api/calendar/search?" + params.toString(), { credentials: "include", signal });
     if (!res.ok) return null;
     return ((await res.json()) as { hits?: CalendarSearchHit[] }).hits ?? [];
   } catch (e) {

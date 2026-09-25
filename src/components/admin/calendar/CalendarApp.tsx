@@ -603,7 +603,9 @@ export default function CalendarApp() {
           start_at: e.start_at, end_at: e.end_at,
           start_date: e.start_date, end_date: e.end_date,
           title: e.title, location: e.location ?? null,
-          meeting_url: e.meeting_url ?? base.meeting_url ?? null,
+          /* The occurrence's own link / notes — null when cleared for it. */
+          meeting_url: "meeting_url" in e ? e.meeting_url ?? null : base.meeting_url ?? null,
+          description: "description" in e ? e.description ?? null : base.description ?? null,
         } : {}),
       }, occurrence);
       return;
@@ -611,17 +613,21 @@ export default function CalendarApp() {
     openModalFor(e);
   }
 
-  /** A search hit: jump to its date (on the viewer's own calendar) and open
-   *  it — an occurrence of a series as that occurrence. */
+  /** A search hit: jump to its date on the calendar that was searched (the
+   *  one on screen) and open it — an occurrence of a series as that
+   *  occurrence, with its own link and notes when it has them. */
   async function openSearchHit(hit: CalendarSearchHit) {
-    if (!viewingOwn) setPickedAccountId(null);
     setFocusChoice(hit.all_day && hit.start_date ? fromDateInput(hit.start_date) : toWall(hit.start_at, timezone));
     const base = await fetchEventById(hit.id);
     if (!base) { showToast(t("err.openSeries"), "error"); return; }
     const occurrence = hit.recurring && hit.occurrence_start ? { start: hit.occurrence_start, base: { start_at: base.start_at, end_at: base.end_at } } : undefined;
     openModalFor({
       ...base,
-      ...(occurrence ? { start_at: hit.start_at, end_at: hit.end_at, start_date: hit.start_date, end_date: hit.end_date, title: hit.title, location: hit.location } : {}),
+      ...(occurrence ? {
+        start_at: hit.start_at, end_at: hit.end_at, start_date: hit.start_date, end_date: hit.end_date, title: hit.title, location: hit.location,
+        ...("meeting_url" in hit ? { meeting_url: hit.meeting_url ?? null } : {}),
+        ...("description" in hit ? { description: hit.description ?? null } : {}),
+      } : {}),
     }, occurrence);
   }
 
@@ -842,7 +848,12 @@ export default function CalendarApp() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto sm:ms-auto order-last sm:order-none">
-              <CalendarSearch timezone={timezone} inputRef={searchRef} onPick={(h) => { void openSearchHit(h); }} />
+              <CalendarSearch
+                timezone={timezone}
+                accountId={viewingOwn ? null : activeAccountId}
+                inputRef={searchRef}
+                onPick={(h) => { void openSearchHit(h); }}
+              />
             </div>
 
             {/* View switcher */}

@@ -17,20 +17,25 @@
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
 import { addDays, dateKey, type LeaveSpan, type PlanningItem, type PlanningResource } from "@/lib/planning";
+import { wallInstant } from "@/lib/planning-tz";
 
 export default function UtilizationView({
   items,
   resources,
   leaves,
   weekStart,
+  tz,
 }: {
   items: PlanningItem[];
   resources: PlanningResource[];
   leaves: LeaveSpan[];
+  /** Wall date in the planner's zone (lib/planning-tz). */
   weekStart: Date;
+  tz: string;
 }) {
   const { t } = useTranslation(planningT);
-  const weekEnd = addDays(weekStart, 7);
+  const weekFromMs = wallInstant(weekStart, tz).getTime();
+  const weekToMs = wallInstant(addDays(weekStart, 7), tz).getTime();
   const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) => {
     const dow = d.getDay();
     return dow !== 0 && dow !== 6;
@@ -38,8 +43,8 @@ export default function UtilizationView({
 
   const clippedHours = (i: PlanningItem) => {
     if (i.allocated_hours != null) return i.allocated_hours;
-    const s = Math.max(new Date(i.start_at).getTime(), weekStart.getTime());
-    const e = Math.min(new Date(i.end_at).getTime(), weekEnd.getTime());
+    const s = Math.max(new Date(i.start_at).getTime(), weekFromMs);
+    const e = Math.min(new Date(i.end_at).getTime(), weekToMs);
     return Math.max(0, (e - s) / 3_600_000);
   };
 

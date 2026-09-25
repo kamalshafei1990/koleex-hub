@@ -25,6 +25,11 @@
 
    Templates: "Start from a template" fills type, title, role, resource and
    the template's times on the chosen day (in the planner's zone).
+
+   Time zone: the start / end inputs read and write wall time on the
+   planner's clock (lib/planning-tz) — the same clock as the grid and the
+   timeline — not the browser's. A grid cell's `preset.date` is a wall date
+   in that zone; a timeline click's `preset.start` is a real instant.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +43,7 @@ import { planningT } from "@/lib/translations/planning";
 import { fmtDMY } from "@/lib/finance/format";
 import { zonedParts, zonedToUtc } from "@/lib/calendar-tz";
 import { expandWeekly } from "@/lib/planning-recurrence";
+import { plannerNow } from "@/lib/planning-tz";
 import {
   ITEM_TYPE_LABELS,
   type PlanningTemplate,
@@ -53,6 +59,7 @@ import { PLANNING_LIMITS } from "@/lib/planning-validate";
 
 export interface ItemModalPreset {
   resource_id?: string | null;
+  /** A wall date in the planner's zone (the grid cell's day). */
   date?: Date;
   /** Exact start (timeline click); end defaults to +1h. */
   start?: Date;
@@ -108,7 +115,7 @@ export default function ItemModal({
   readOnly?: boolean;
   onClose: () => void;
   templates?: PlanningTemplate[];
-  /** The planner's zone (templates + recurrence weekdays). */
+  /** The planner's zone (start/end inputs, templates, recurrence weekdays). */
   tz: string;
   /** Throws on failure — the modal then stays open. */
   onSave: (payload: Partial<PlanningItem> & { start_at: string; end_at: string }, opts: ItemSaveOptions) => Promise<void>;
@@ -133,6 +140,9 @@ export default function ItemModal({
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [until, setUntil] = useState("");
   const [scope, setScope] = useState<SeriesScope>("this");
+  /* The zone the start/end inputs are written in — fixed when the form is
+     seeded, so a zone that resolves later never reinterprets them. */
+  const [formTz, setFormTz] = useState(tz);
   const inSeries = !!editing?.recurrence_parent_id;
   /* Read through a ref: the zone can resolve a moment after the modal opens
      (bootstrap), and that must not reseed — and wipe — the form. */
@@ -149,10 +159,15 @@ export default function ItemModal({
     setSaving(false);
     setRepeat(false);
     setScope("this");
+    const zone = tzRef.current;
+    setFormTz(zone);
+    /* A new item from a grid cell: 09:00–17:00 on that wall day. */
+    const cellDay = preset?.date ?? plannerNow(zone);
+    const atCell = (h: number) => zonedToUtc(cellDay.getFullYear(), cellDay.getMonth() + 1, cellDay.getDate(), h, 0, 0, 0, zone);
     {
-      const baseMs = editing ? Date.parse(editing.start_at) : (preset?.start ?? preset?.date ?? new Date()).getTime();
-      setWeekdays([weekdayInZone(baseMs, tzRef.current)]);
-      setUntil(dateKeyInZone(baseMs + 27 * 86_400_000, tzRef.current));
+      const baseMs = editing ? Date.parse(editing.start_at) : preset?.start ? preset.start.getTime() : atCell(9);
+      setWeekdays([weekdayInZone(baseMs, zone)]);
+      setUntil(dateKeyInZone(baseMs + 27 * 86_400_000, zone));
     }
     if (editing) {
       setType(editing.type);
@@ -160,8 +175,8 @@ export default function ItemModal({
       setNotes(editing.notes ?? "");
       setResourceId(editing.resource_id ?? "");
       setRoleId(editing.role_id ?? "");
-      setStartAt(toDTLocal(editing.start_at));
-      setEndAt(toDTLocal(editing.end_at));
+      setStartAt(toDTLocal(editing.start_at, zone));
+      setEndAt(toDTLocal(editing.end_at, zone));
       setLinkedType(editing.linked_entity_type ?? "");
       setLinkedId(editing.linked_entity_id ?? null);
       setLinkedLabel(editing.linked_entity_label ?? "");
@@ -172,13 +187,10 @@ export default function ItemModal({
       setNotes("");
       setResourceId(preset?.resource_id ?? "");
       setRoleId("");
-      const base = preset?.date ?? new Date();
-      const startD = preset?.start ? new Date(preset.start) : new Date(base);
-      if (!preset?.start) startD.setHours(9, 0, 0, 0);
-      const endD = preset?.end ? new Date(preset.end) : preset?.start ? new Date(startD.getTime() + 3_600_000) : new Date(base);
-      if (!preset?.start && !preset?.end) endD.setHours(17, 0, 0, 0);
-      setStartAt(toDTLocal(startD.toISOString()));
-      setEndAt(toDTLocal(endD.toISOString()));
+      const startMs0 = preset?.start ? preset.start.getTime() : atCell(9);
+      const endMs0 = preset?.end ? preset.end.getTime() : preset?.start ? startMs0 + 3_600_000 : atCell(17);
+      setStartAt(toDTLocal(new Date(startMs0).toISOString(), zone));
+      setEndAt(toDTLocal(new Date(endMs0).toISOString(), zone));
       setLinkedType("");
       setLinkedId(null);
       setLinkedLabel("");
@@ -205,8 +217,8 @@ export default function ItemModal({
   }, [open, saving, onClose]);
 
   /* Live validity of the date pair — shown inline, blocks Save. */
-  const startMs = startAt ? Date.parse(startAt) : NaN;
-  const endMs = endAt ? Date.parse(endAt) : NaN;
+  const startMs = fromDTLocal(startAt, formTz);
+  const endMs = fromDTLocal(endAt, formTz);
   const datesMissing = !startAt || !endAt || Number.isNaN(startMs) || Number.isNaN(endMs);
   const endBeforeStart = !datesMissing && endMs <= startMs;
   const titleTooLong = title.trim().length > PLANNING_LIMITS.title;
@@ -231,17 +243,17 @@ export default function ItemModal({
     const tpl = templates.find((x) => x.id === id);
     if (!tpl) return;
     const dayMs = Number.isNaN(startMs) ? Date.now() : startMs;
-    const p = zonedParts(dayMs, tz);
+    const p = zonedParts(dayMs, formTz);
     const [h, mi] = tpl.start_time.split(":").map(Number);
-    const s0 = zonedToUtc(p.y, p.m, p.d, h, mi, 0, 0, tz);
+    const s0 = zonedToUtc(p.y, p.m, p.d, h, mi, 0, 0, formTz);
     const e0 = s0 + tpl.duration_hours * 3_600_000;
     setType(tpl.type);
     if (!title.trim()) setTitle(tpl.name);
     if (tpl.role_id) setRoleId(tpl.role_id);
     if (tpl.resource_id && !resourceId) setResourceId(tpl.resource_id);
     if (tpl.default_note && !notes.trim()) setNotes(tpl.default_note);
-    setStartAt(toDTLocal(new Date(s0).toISOString()));
-    setEndAt(toDTLocal(new Date(e0).toISOString()));
+    setStartAt(toDTLocal(new Date(s0).toISOString(), formTz));
+    setEndAt(toDTLocal(new Date(e0).toISOString(), formTz));
   };
 
   const buildPayload = (overrides: Partial<PlanningItem> = {}) => ({
@@ -691,10 +703,18 @@ function Field({
   );
 }
 
-/** ISO → `<input type="datetime-local">` value using the user's local TZ. */
-function toDTLocal(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
+/** ISO → `<input type="datetime-local">` value on the planner's clock. */
+function toDTLocal(iso: string, tz: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return "";
+  const p = zonedParts(ms, tz);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${p.y}-${pad(p.m)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`;
+}
+
+/** `<input type="datetime-local">` value on the planner's clock → ms (NaN when empty/invalid). */
+function fromDTLocal(v: string, tz: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(v);
+  if (!m) return NaN;
+  return zonedToUtc(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0), 0, tz);
 }

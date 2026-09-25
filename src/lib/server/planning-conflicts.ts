@@ -12,21 +12,30 @@ import "server-only";
        is not cancelled (candidates in one batch are checked against each
        other too, so a series or a copied week can't double-book itself);
      · leave          — the resource's employee is on APPROVED HR leave on
-       any day the item covers (days read in the caller's zone, else UTC).
-
-   Travel: the Hub has no travel / trip booking table today (trip REPORTS are
-   written after the fact and carry no approval of a planned absence), so no
-   travel check runs. When a travel table lands, add it here — the routes and
-   the UI already carry any `kind` through.
+       any day the item covers (days read in the caller's zone, else UTC);
+     · travel         — the same, when that leave's TYPE is a business trip
+       (code / name reads travel, trip, mission …). The Hub has no trip
+       booking table (the Travel app issues visa letters for VISITORS, and
+       trip reports are written after the fact), so an approved HR leave of
+       a travel type is the one record of a planned trip;
+     · out_of_office  — the person's own Calendar holds an "out of office"
+       event overlapping the item (one-offs and recurring series, with their
+       per-occurrence exceptions). Its title is never returned — a private
+       event only ever shows as a time span.
 
    Queries are bounded by the batch's own window and resources: one items
-   query, and for leave one resources → employees → leave chain.
+   query, for leave one resources → employees → leave chain, and for the
+   calendar one one-off + one series query. A Calendar read failure is
+   logged and skipped — it never blocks a planning write.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { safeTimeZone, zonedDateKey } from "@/lib/calendar-tz";
+import { allDayKeys, safeTimeZone, zonedDateKey } from "@/lib/calendar-tz";
+import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
+import { accountTimezones } from "@/lib/server/calendar-notify";
 
-export type PlanningConflictKind = "double_booking" | "leave";
+export type PlanningConflictKind = "double_booking" | "leave" | "travel" | "out_of_office";
 
 export interface PlanningConflictCandidate {
   id?: string | null;
@@ -53,12 +62,24 @@ export interface PlanningConflict {
   other_end_at?: string;
   leave_start?: string;
   leave_end?: string;
+  /** out_of_office: the calendar event's span (instants). */
+  away_start_at?: string;
+  away_end_at?: string;
 }
 
 /** The most conflicts a response lists (the count is still exact). */
 export const MAX_LISTED_CONFLICTS = 50;
 
 const DAY_MS = 86_400_000;
+
+/** An HR leave type that stands for a business trip rather than time off. */
+const TRAVEL_TYPE_RE = /travel|trip|mission|出差|差旅|سفر|مأمورية|انتداب/i;
+
+type LeaveTypeJoin = { code?: string | null; name?: string | null };
+function isTravelType(t: LeaveTypeJoin | LeaveTypeJoin[] | null | undefined): boolean {
+  const one = Array.isArray(t) ? t[0] : t;
+  return !!one && TRAVEL_TYPE_RE.test(`${one.code ?? ""} ${one.name ?? ""}`);
+}
 
 /** Every local-day key ("YYYY-MM-DD") an item touches in `tz`. */
 function coveredDayKeys(startIso: string, endIso: string, tz: string): string[] {
@@ -176,6 +197,12 @@ export async function checkPlanningConflicts(
   );
   const accountIds = [...new Set(accountByRes.values())];
   if (accountIds.length > 0) {
+    /* The Calendar read runs alongside the HR chain; a failure there is
+       logged and skipped (see the header). */
+    const awayP = outOfOffice(tenantId, accountIds, minStart, maxEnd).catch((e: unknown) => {
+      console.error("[planning-conflicts] out of office:", e instanceof Error ? e.message : e);
+      return new Map<string, AwaySpan[]>();
+    });
     const fromKey = zonedDateKey(Date.parse(minStart) - DAY_MS, tz);
     const toKey = zonedDateKey(Date.parse(maxEnd) + DAY_MS, tz);
     const { data: emps, error: empErr } = await supabaseServer
@@ -189,19 +216,23 @@ export async function checkPlanningConflicts(
     if (empIds.length > 0) {
       const { data: reqs, error: lvErr } = await supabaseServer
         .from("hr_leave_requests")
-        .select("employee_id, start_date, end_date")
+        .select("employee_id, start_date, end_date, hr_leave_types ( code, name )")
         .eq("status", "approved")
         .in("employee_id", empIds)
         .lte("start_date", toKey)
         .gte("end_date", fromKey)
         .limit(1000);
       if (lvErr) throw new Error(lvErr.message);
-      const leaveByAccount = new Map<string, Array<{ start: string; end: string }>>();
-      for (const r of reqs ?? []) {
-        const acct = accountByEmp.get(r.employee_id as string);
+      const leaveByAccount = new Map<string, Array<{ start: string; end: string; travel: boolean }>>();
+      for (const r of (reqs ?? []) as Array<{ employee_id: string; start_date: string; end_date: string; hr_leave_types?: LeaveTypeJoin | LeaveTypeJoin[] | null }>) {
+        const acct = accountByEmp.get(r.employee_id);
         if (!acct) continue;
         const arr = leaveByAccount.get(acct) ?? [];
-        arr.push({ start: String(r.start_date).slice(0, 10), end: String(r.end_date).slice(0, 10) });
+        arr.push({
+          start: String(r.start_date).slice(0, 10),
+          end: String(r.end_date).slice(0, 10),
+          travel: isTravelType(r.hr_leave_types),
+        });
         leaveByAccount.set(acct, arr);
       }
       for (const { c, index } of live) {
@@ -210,13 +241,99 @@ export async function checkPlanningConflicts(
         if (!spans?.length) continue;
         const days = coveredDayKeys(c.start_at, c.end_at, tz);
         const hit = spans.find((sp) => days.some((d) => sp.start <= d && d <= sp.end));
-        if (hit) out.push({ kind: "leave", ...base(c, index), leave_start: hit.start, leave_end: hit.end });
+        if (hit) out.push({ kind: hit.travel ? "travel" : "leave", ...base(c, index), leave_start: hit.start, leave_end: hit.end });
+      }
+    }
+
+    /* 3. Out-of-office time on the person's own Calendar. An all-day
+          event counts per local day; a timed one by overlap. */
+    const away = await awayP;
+    for (const { c, index } of live) {
+      const acct = accountByRes.get(c.resource_id as string);
+      const spans = acct ? away.get(acct) : undefined;
+      if (!spans?.length) continue;
+      const s = Date.parse(c.start_at);
+      const e = Date.parse(c.end_at);
+      const days = coveredDayKeys(c.start_at, c.end_at, tz);
+      const hit = spans.find(({ s: as, e: ae, days: dk }) =>
+        dk ? days.some((d) => dk.start <= d && d <= dk.end) : as < e && ae > s,
+      );
+      if (hit) {
+        out.push({
+          kind: "out_of_office",
+          ...base(c, index),
+          away_start_at: new Date(hit.s).toISOString(),
+          away_end_at: new Date(hit.e).toISOString(),
+          ...(hit.days ? { leave_start: hit.days.start, leave_end: hit.days.end } : {}),
+        });
       }
     }
   }
 
   out.sort((a, b) => a.index - b.index || a.kind.localeCompare(b.kind));
   return { conflicts: out.slice(0, MAX_LISTED_CONFLICTS), total: out.length };
+}
+
+type AwaySpan = { s: number; e: number; days?: { start: string; end: string } };
+
+/** Out-of-office spans per account in [fromIso, toIso): one-off events plus
+ *  recurring series expanded on their owner's clock with their exceptions.
+ *  An all-day event also carries its date keys (compared per local day). */
+async function outOfOffice(tenantId: string, accountIds: string[], fromIso: string, toIso: string): Promise<Map<string, AwaySpan[]>> {
+  const COLS = "id, account_id, start_at, end_at, all_day, recurrence, recurrence_until";
+  const [oneOff, series] = await Promise.all([
+    supabaseServer
+      .from("koleex_calendar_events")
+      .select(COLS)
+      .eq("tenant_id", tenantId)
+      .eq("event_type", "out_of_office")
+      .in("account_id", accountIds)
+      .is("recurrence", null)
+      .lt("start_at", toIso)
+      .gte("end_at", fromIso)
+      .limit(1000),
+    supabaseServer
+      .from("koleex_calendar_events")
+      .select(COLS)
+      .eq("tenant_id", tenantId)
+      .eq("event_type", "out_of_office")
+      .in("account_id", accountIds)
+      .not("recurrence", "is", null)
+      .lte("start_at", toIso)
+      .or(`recurrence_until.is.null,recurrence_until.gte.${fromIso.slice(0, 10)}`)
+      .limit(500),
+  ]);
+  if (oneOff.error) throw new Error(oneOff.error.message);
+  if (series.error) throw new Error(series.error.message);
+  type Ev = { id: string; account_id: string; start_at: string; end_at: string; all_day: boolean | null; recurrence: CalendarRec; recurrence_until: string | null };
+  const rows = [...(oneOff.data ?? []), ...(series.data ?? [])] as Ev[];
+  const out = new Map<string, AwaySpan[]>();
+  if (rows.length === 0) return out;
+
+  const recurring = rows.filter((r) => r.recurrence);
+  const [tzs, exceptions] = await Promise.all([
+    accountTimezones(rows.map((r) => r.account_id)),
+    loadExceptions(recurring.map((r) => r.id)),
+  ]);
+  const push = (acct: string, startIso: string, endIso: string, allDay: boolean, ownerTz: string) => {
+    const s = Date.parse(startIso);
+    const e = Math.max(Date.parse(endIso), s + 1);
+    const arr = out.get(acct) ?? [];
+    arr.push(allDay ? { s, e, days: allDayKeys(startIso, endIso, ownerTz) } : { s, e });
+    out.set(acct, arr);
+  };
+  const winFrom = new Date(Date.parse(fromIso) - DAY_MS);
+  const winTo = new Date(Date.parse(toIso) + DAY_MS);
+  for (const r of rows) {
+    const ownerTz = tzs.get(r.account_id) ?? "UTC";
+    if (!r.recurrence) {
+      push(r.account_id, r.start_at, r.end_at, !!r.all_day, ownerTz);
+      continue;
+    }
+    const occ = expandWithExceptions(r.start_at, r.end_at, r.recurrence, r.recurrence_until, winFrom, winTo, exceptions.get(r.id), 400, ownerTz);
+    for (const o of occ) push(r.account_id, o.start.toISOString(), o.end.toISOString(), !!r.all_day, ownerTz);
+  }
+  return out;
 }
 
 /** The 409 body every planning write answers with on a conflict. */

@@ -53,7 +53,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import { ArchiveIcon, GanttChartIcon, MessageSquareIcon, UndoIcon, UsersIcon } from "@/components/icons/ui";
+import { ArchiveIcon, EyeIcon, GanttChartIcon, MessageSquareIcon, UndoIcon, UsersIcon } from "@/components/icons/ui";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
@@ -396,7 +396,7 @@ function ProjectsListView({
               onEdit={() => { setEditingProject(p); setFormOpen(true); }}
               onToggleFavourite={() => run(p.id, () => updateProject(p.id, { is_favorite: !p.is_favorite }))}
               onDuplicate={() => run(p.id, () => duplicateProject(p))}
-              onRestore={p.status === "archived" ? () => run(p.id, async () => {
+              onRestore={p.status === "archived" && (p.my_access ?? "manage") === "manage" ? () => run(p.id, async () => {
                 await restoreProject(p.id);
                 showToast(t("restore.done"), "success");
               }) : undefined}
@@ -443,6 +443,8 @@ function ProjectCard({
   const progress = progressPct(c.done, c.total);
   const color = project.color ?? HUB_BLUE;
   const customerName = project.customer?.display_name ?? project.customer?.company_name;
+  /* Viewers cannot PATCH the project (favourite / edit) or restore it. */
+  const viewOnly = project.my_access === "view";
 
   return (
     <div
@@ -463,7 +465,8 @@ function ProjectCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onToggleFavourite(); }}
-            className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-amber-400 transition-colors"
+            disabled={viewOnly}
+            className="h-7 w-7 shrink-0 rounded-md disabled:pointer-events-none flex items-center justify-center text-[var(--text-dim)] hover:text-amber-400 transition-colors"
             aria-label={t("tip.favourite")}
             aria-pressed={project.is_favorite}
           >
@@ -486,15 +489,17 @@ function ProjectCard({
           >
             <CopyIcon className="h-3 w-3" />
           </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            title={t("tip.editProject")}
-            aria-label={t("tip.editProject")}
-            className={`h-7 w-7 shrink-0 ${revealCls} rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)]`}
-          >
-            <PencilIcon className="h-3 w-3" />
-          </button>
+          {!viewOnly && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              title={t("tip.editProject")}
+              aria-label={t("tip.editProject")}
+              className={`h-7 w-7 shrink-0 ${revealCls} rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)]`}
+            >
+              <PencilIcon className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -522,6 +527,11 @@ function ProjectCard({
           {c.overdue > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 font-semibold">
               {c.overdue} {t("card.overdue")}
+            </span>
+          )}
+          {viewOnly && (
+            <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-dim)] font-semibold inline-flex items-center gap-1" title={t("access.viewOnlyTip")}>
+              <EyeIcon size={10} aria-hidden /> {t("access.viewOnly")}
             </span>
           )}
           {onRestore && (
@@ -573,7 +583,12 @@ function ProjectDetailView({
   const accounts = useAccounts();
   const [filter, setFilter] = useState<TaskFilterState>(() => filterDefaults("all"));
   const [membersOpen, setMembersOpen] = useState(false);
-  const [memberCount, setMemberCount] = useState<number | null>(null);
+  /* The Members count comes with the project payload (member_count); the
+     panel patches it in place after an add / remove. */
+  const onMembersChanged = useCallback(
+    (n: number) => setProject((p) => (p ? { ...p, member_count: n } : p)),
+    [],
+  );
   const [chatBusy, setChatBusy] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
 
@@ -876,6 +891,12 @@ function ProjectDetailView({
   const color = project.color ?? HUB_BLUE;
   const openTask = (tk: TaskRow) => setTaskModal({ open: true, editing: tk });
   const isArchived = project.status === "archived";
+  /* Server-computed effective permission. "view" = viewer-only membership
+     (or no Projects edit right): every write gate answers 403, so the
+     board hides / disables them. Absent (older payload) = the old UI. */
+  const readOnly = project.my_access === "view";
+  const canManage = (project.my_access ?? "manage") === "manage";
+  const memberCount = project.member_count ?? null;
   const budget = budgetSummary(project, sumLoggedHours(tasks));
   const headerBtn = "h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 text-[11px] font-semibold shrink-0 disabled:opacity-50";
   const viewSwitch = (
@@ -915,7 +936,7 @@ function ProjectDetailView({
           selection.selected.has(tk.id) ? "border-[#567FB2]/60 bg-[#567FB2]/5" : "border-[var(--border-subtle)]"
         }`}
       >
-        <SelectBox checked={selection.selected.has(tk.id)} onToggle={(shift) => selection.toggle(tk.id, shift)} label={`${t("bulk.select")}: ${tk.title}`} />
+        {!readOnly && <SelectBox checked={selection.selected.has(tk.id)} onToggle={(shift) => selection.toggle(tk.id, shift)} label={`${t("bulk.select")}: ${tk.title}`} />}
         <span className="w-1 h-4 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[tk.priority] }} />
         <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}><AutoTranslatedText text={tk.title} /></span>
         {due && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? "bg-rose-500/15 text-rose-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"}`}>{due}</span>}
@@ -956,7 +977,16 @@ function ProjectDetailView({
                 {project.is_billable ? ` · ${t("form.billable")}` : ""}
               </div>
             </div>
-            {project.is_billable && (
+            {readOnly && (
+              <span
+                title={t("access.viewOnlyTip")}
+                className="h-6 px-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[10.5px] font-semibold text-[var(--text-muted)] inline-flex items-center gap-1 shrink-0"
+              >
+                <EyeIcon size={11} aria-hidden />
+                {t("access.viewOnly")}
+              </span>
+            )}
+            {project.is_billable && !readOnly && (
               <button
                 type="button"
                 onClick={invoiceTime}
@@ -978,29 +1008,35 @@ function ProjectDetailView({
               {chatBusy ? <SpinnerIcon className="h-3 w-3" /> : <MessageSquareIcon size={12} />}
               <span className="hidden lg:inline">{t("chat.short")}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => toggleArchive(isArchived)}
-              disabled={archiveBusy}
-              aria-label={isArchived ? t("action.restore") : t("action.archive")}
-              title={isArchived ? t("action.restore") : t("action.archive")}
-              className={headerBtn}
-            >
-              {archiveBusy ? <SpinnerIcon className="h-3 w-3" /> : isArchived ? <UndoIcon size={12} /> : <ArchiveIcon size={12} />}
-              <span className="hidden lg:inline">{isArchived ? t("action.restore") : t("action.archive")}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setProjectFormOpen(true)}
-              aria-label={t("tip.editProject")}
-              title={t("tip.editProject")}
-              className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
-            >
-              <PencilIcon className="h-3.5 w-3.5" />
-            </button>
-            <Button onClick={() => setTaskModal({ open: true, editing: null })} icon={<PlusIcon size={12} />} aria-label={t("btn.addTask")}>
-              <span className="hidden sm:inline">{t("btn.addTask")}</span>
-            </Button>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => toggleArchive(isArchived)}
+                disabled={archiveBusy}
+                aria-label={isArchived ? t("action.restore") : t("action.archive")}
+                title={isArchived ? t("action.restore") : t("action.archive")}
+                className={headerBtn}
+              >
+                {archiveBusy ? <SpinnerIcon className="h-3 w-3" /> : isArchived ? <UndoIcon size={12} /> : <ArchiveIcon size={12} />}
+                <span className="hidden lg:inline">{isArchived ? t("action.restore") : t("action.archive")}</span>
+              </button>
+            )}
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => setProjectFormOpen(true)}
+                aria-label={t("tip.editProject")}
+                title={t("tip.editProject")}
+                className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
+              >
+                <PencilIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {!readOnly && (
+              <Button onClick={() => setTaskModal({ open: true, editing: null })} icon={<PlusIcon size={12} />} aria-label={t("btn.addTask")}>
+                <span className="hidden sm:inline">{t("btn.addTask")}</span>
+              </Button>
+            )}
           </div>
           {(budget.hasBudget || budget.loggedHours > 0) && (
             <div className="pb-3" role="group" aria-label={t("budget.title")}>
@@ -1020,9 +1056,11 @@ function ProjectDetailView({
                 {t("archive.banner")}
                 {project.archived_at ? ` ${t("archive.since").replace("{date}", formatDMY(project.archived_at))}` : ""}
               </span>
-              <button type="button" onClick={() => toggleArchive(true)} disabled={archiveBusy} className="h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11px] font-semibold hover:text-[var(--text-primary)] disabled:opacity-50">
-                {t("action.restore")}
-              </button>
+              {canManage && (
+                <button type="button" onClick={() => toggleArchive(true)} disabled={archiveBusy} className="h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11px] font-semibold hover:text-[var(--text-primary)] disabled:opacity-50">
+                  {t("action.restore")}
+                </button>
+              )}
             </div>
           )}
           <div className="mb-3">
@@ -1037,6 +1075,7 @@ function ProjectDetailView({
                 stages={stages}
                 onUpdateDates={updateDates}
                 onOpenTask={openTask}
+                readOnly={readOnly}
               />
             </div>
           )}
@@ -1077,7 +1116,8 @@ function ProjectDetailView({
                       onClick={() => openTask(tk)}
                       selected={selection.selected.has(tk.id)}
                       selecting={selecting}
-                      onToggleSelect={(shift) => selection.toggle(tk.id, shift)}
+                      onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
+                      draggable={!readOnly}
                     />
                   ))}
                 </div>
@@ -1106,6 +1146,7 @@ function ProjectDetailView({
                     stage={stage}
                     taskCount={cellTasks.length}
                     canDelete={stages.length > 1}
+                    readOnly={readOnly}
                     onChanged={refresh}
                     onError={fail}
                   />
@@ -1130,7 +1171,8 @@ function ProjectDetailView({
                           onClick={() => openTask(tk)}
                           selected={selection.selected.has(tk.id)}
                           selecting={selecting}
-                          onToggleSelect={(shift) => selection.toggle(tk.id, shift)}
+                          onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
+                          draggable={!readOnly}
                         />
                       </div>
                     ))}
@@ -1139,7 +1181,7 @@ function ProjectDetailView({
                         {t("empty.noTasks")}
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5">
+                    {!readOnly && <div className="flex items-center gap-1.5">
                       <div className="flex-1 min-w-0">
                         <QuickAddTask
                           projectId={project.id}
@@ -1160,14 +1202,14 @@ function ProjectDetailView({
                       >
                         <PencilIcon className="h-3 w-3" />
                       </button>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               );
             })}
 
             {/* Add stage column */}
-            <div className="w-[260px] shrink-0 rounded-2xl border border-dashed border-[var(--border-subtle)] p-3 flex flex-col gap-2">
+            {!readOnly && <div className="w-[260px] shrink-0 rounded-2xl border border-dashed border-[var(--border-subtle)] p-3 flex flex-col gap-2">
               <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
                 {t("btn.addStage")}
               </div>
@@ -1187,12 +1229,12 @@ function ProjectDetailView({
               >
                 {addingStage ? t("btn.saving") : t("btn.add")}
               </button>
-            </div>
+            </div>}
           </div>
 
           {/* Milestones */}
           <div className="mt-3">
-            <MilestoneStrip projectId={project.id} />
+            <MilestoneStrip projectId={project.id} readOnly={readOnly} />
           </div>
 
           {/* Linked Planning strip */}
@@ -1200,7 +1242,7 @@ function ProjectDetailView({
             <EntityPlanningStrip entityType="project" entityId={project.id} />
           </div>
 
-          {viewMode !== "timeline" && (
+          {viewMode !== "timeline" && !readOnly && (
             <BulkBar
               count={selection.count}
               total={orderedIds.length}
@@ -1220,7 +1262,7 @@ function ProjectDetailView({
           open={membersOpen}
           accounts={accounts}
           onClose={() => setMembersOpen(false)}
-          onChanged={setMemberCount}
+          onChanged={onMembersChanged}
           onError={(msg) => showToast(msg, "error")}
         />
       )}
@@ -1234,6 +1276,7 @@ function ProjectDetailView({
           stages={stages}
           tags={tags}
           allTasks={tasks}
+          readOnly={readOnly}
           onClose={closeTaskModal}
           onSaved={() => { closeTaskModal(); void refresh(); }}
         />
@@ -1255,12 +1298,15 @@ function StageHeader({
   stage,
   taskCount,
   canDelete,
+  readOnly = false,
   onChanged,
   onError,
 }: {
   stage: ProjectStage;
   taskCount: number;
   canDelete: boolean;
+  /** Viewer access: no rename / recolour / delete. */
+  readOnly?: boolean;
   onChanged: () => Promise<void> | void;
   onError: (key: "toast.saveFailed" | "toast.deleteFailed", e: unknown) => void;
 }) {
@@ -1328,16 +1374,18 @@ function StageHeader({
           <span className="text-[10px] font-semibold text-[var(--text-ghost)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-full shrink-0">
             {taskCount}
           </span>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label={t("tip.editStage")}
-            title={t("tip.editStage")}
-            className={`h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center ${revealCls}`}
-          >
-            <PencilIcon className="h-3 w-3" />
-          </button>
-          {canDelete && (
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label={t("tip.editStage")}
+              title={t("tip.editStage")}
+              className={`h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center ${revealCls}`}
+            >
+              <PencilIcon className="h-3 w-3" />
+            </button>
+          )}
+          {canDelete && !readOnly && (
             <button
               type="button"
               onClick={remove}
@@ -1361,10 +1409,13 @@ function TaskCard({
   selected = false,
   selecting = false,
   onToggleSelect,
+  draggable = true,
 }: {
   task: TaskRow;
   tags: ProjectTag[];
   onClick: () => void;
+  /** False for viewers — the card opens but never drags. */
+  draggable?: boolean;
   selected?: boolean;
   /** Any card selected → every checkbox stays visible. */
   selecting?: boolean;
@@ -1379,16 +1430,16 @@ function TaskCard({
 
   return (
     <div
-      draggable
+      draggable={draggable}
       role="button"
       tabIndex={0}
-      onDragStart={(e) => {
+      onDragStart={draggable ? (e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", task.id);
-      }}
+      } : undefined}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
-      className={`group cursor-grab active:cursor-grabbing rounded-xl bg-[var(--bg-surface)] border p-2.5 hover:border-[var(--border-focus)] transition-all space-y-1.5 ${
+      className={`group ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} rounded-xl bg-[var(--bg-surface)] border p-2.5 hover:border-[var(--border-focus)] transition-all space-y-1.5 ${
         task.status === "done" ? "opacity-60" : ""
       } ${selected ? "border-[#567FB2] ring-1 ring-[#567FB2]/40" : "border-[var(--border-subtle)]"}`}
     >

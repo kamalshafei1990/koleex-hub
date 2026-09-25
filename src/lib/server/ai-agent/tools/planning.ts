@@ -11,9 +11,10 @@ import "server-only";
    Rate fields (hourly_rate) are intentionally not selected.
 
    Writes run the SAME server conflict check as the app
-   (lib/server/planning-conflicts): a double booking or approved leave is
-   shown in the preview and blocks the confirmed write, unless a super
-   admin explicitly passes override_conflicts:true. copyLastWeek and
+   (lib/server/planning-conflicts): a double booking, approved leave or
+   business trip, or Calendar out-of-office time is shown in the preview
+   and blocks the confirmed write, unless a super admin explicitly passes
+   override_conflicts:true. copyLastWeek and
    publishWeek share lib/server/planning-week with the app's routes, so they
    only ever touch rows the user may edit.
    --------------------------------------------------------------------------- */
@@ -35,7 +36,11 @@ function describeConflicts(list: PlanningConflict[], total: number): string {
   const lines = list.slice(0, 5).map((c) =>
     c.kind === "leave"
       ? `${c.resource_name ?? "The person"} is on approved leave ${c.leave_start} → ${c.leave_end}`
-      : `${c.resource_name ?? "That resource"} is already booked for "${c.other_title ?? "another item"}" (${c.other_start_at} → ${c.other_end_at})`,
+      : c.kind === "travel"
+        ? `${c.resource_name ?? "The person"} is on an approved business trip ${c.leave_start} → ${c.leave_end}`
+        : c.kind === "out_of_office"
+          ? `${c.resource_name ?? "The person"} is out of office in their calendar (${c.away_start_at} → ${c.away_end_at})`
+          : `${c.resource_name ?? "That resource"} is already booked for "${c.other_title ?? "another item"}" (${c.other_start_at} → ${c.other_end_at})`,
   );
   if (total > lines.length) lines.push(`…and ${total - lines.length} more`);
   return lines.join("; ");

@@ -16,6 +16,7 @@ import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
+import { plannerNow } from "@/lib/planning-tz";
 import {
   addDays,
   dateKey,
@@ -66,7 +67,7 @@ export default function WorkloadView({
   }, [reqKey, retry]);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const todayKey = dateKey(new Date());
+  const todayKey = dateKey(plannerNow(tz));
 
   const nav = (
     <div className="flex items-center gap-1.5">

@@ -42,7 +42,10 @@ export interface CalendarEventException {
   start_at?: string | null;
   end_at?: string | null;
   location?: string | null;
+  /** '' = no link for this occurrence (NULL = as the series). */
   meeting_url?: string | null;
+  /** Needs the 2026-09-27 migration; '' = no notes for this occurrence. */
+  description?: string | null;
 }
 
 /** One busy interval of GET /api/calendar/freebusy. `title` only when the
@@ -71,4 +74,8 @@ export interface CalendarSearchHit {
   recurring: boolean;
   invited: boolean;
   occurrence_start?: string;
+  /** An overridden occurrence's own link / notes (null = none for it);
+   *  absent = as the series. */
+  meeting_url?: string | null;
+  description?: string | null;
 }

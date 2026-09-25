@@ -10,6 +10,10 @@
    guarded against double submission; hover-revealed delete buttons are also
    revealed on keyboard focus and are always visible on small (touch)
    screens, where hover does not exist.
+
+   `readOnly` (the caller's project access is "view"): every panel still
+   reads, but its add row, delete buttons and toggles are gone — the write
+   routes would answer 403 (project-access.ts { write: true } gates).
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -62,7 +66,7 @@ function usePanelFeedback() {
 }
 
 /* ── Checklist ──────────────────────────────────────────────────────── */
-export function ChecklistPanel({ taskId }: { taskId: string }) {
+export function ChecklistPanel({ taskId, readOnly = false }: { taskId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -114,28 +118,28 @@ export function ChecklistPanel({ taskId }: { taskId: string }) {
         {items.map((it) => (
           <div key={it.id} className={`group flex items-center gap-2 px-2.5 py-2 ${card}`}>
             <button
-              type="button" onClick={() => toggle(it)}
+              type="button" onClick={() => toggle(it)} disabled={readOnly}
               aria-label={t("tip.toggleDone")} aria-pressed={it.is_done}
               className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${it.is_done ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"}`}
             ><CheckIcon size={10} /></button>
             <span className={`flex-1 text-[12.5px] ${it.is_done ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{it.title}</span>
-            <button type="button" onClick={() => remove(it.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>
+            {!readOnly && <button type="button" onClick={() => remove(it.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noChecklist", "No checklist items yet.")} />}
       </div>
-      <div className="flex items-center gap-2">
+      {!readOnly && <div className="flex items-center gap-2">
         <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.addItem", "Add an item…")} aria-label={t("x.addItem", "Add an item…")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} disabled={busy || !title.trim()} aria-label={t("tip.addItem")} className={btnCls}>
           {busy ? <SpinnerIcon className="h-3 w-3" /> : <PlusIcon size={12} />}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
 
 /* ── Comments ───────────────────────────────────────────────────────── */
-export function CommentsPanel({ taskId }: { taskId: string }) {
+export function CommentsPanel({ taskId, readOnly = false }: { taskId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<TaskComment[]>([]);
@@ -177,7 +181,7 @@ export function CommentsPanel({ taskId }: { taskId: string }) {
               <span className="text-[11px] font-semibold text-[var(--text-muted)]">{c.author?.username ?? "—"}</span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-[var(--text-ghost)] tabular-nums">{stamp(c.created_at)}</span>
-                <button type="button" onClick={() => remove(c.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>
+                {!readOnly && <button type="button" onClick={() => remove(c.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>}
               </div>
             </div>
             <AutoTranslatedText block text={c.body} className="text-[12.5px] text-[var(--text-primary)] break-words" />
@@ -185,16 +189,16 @@ export function CommentsPanel({ taskId }: { taskId: string }) {
         ))}
         {items.length === 0 && <Empty text={t("x.noComments", "No comments yet.")} />}
       </div>
-      <div className="flex items-end gap-2">
+      {!readOnly && <div className="flex items-end gap-2">
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder={t("x.writeComment", "Write a comment…")} aria-label={t("x.writeComment", "Write a comment…")} className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none" />
         <button type="button" onClick={add} disabled={!body.trim() || busy} className={btnCls}>{busy ? t("btn.saving") : t("x.post", "Post")}</button>
-      </div>
+      </div>}
     </div>
   );
 }
 
 /* ── Time tracking ──────────────────────────────────────────────────── */
-export function TimePanel({ taskId }: { taskId: string }) {
+export function TimePanel({ taskId, readOnly = false }: { taskId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<TimeEntry[]>([]);
@@ -247,24 +251,24 @@ export function TimePanel({ taskId }: { taskId: string }) {
             <span className="text-[10px] text-[var(--text-ghost)]">{e.account?.username ?? ""}</span>
             {e.invoiced_invoice_id ? (
               <span className="text-[10px] font-semibold text-[var(--text-dim)]">{t("x.invoiced")}</span>
-            ) : (
+            ) : !readOnly && (
               <button type="button" onClick={() => remove(e.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>
             )}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noTime", "No time logged yet.")} />}
       </div>
-      <div className="flex items-center gap-2">
+      {!readOnly && <div className="flex items-center gap-2">
         <input value={hours} onChange={(e) => setHours(e.target.value)} type="number" step="0.25" min="0" placeholder={t("x.hours", "Hours")} aria-label={t("x.hours", "Hours")} className={`w-24 ${inputCls}`} />
         <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.noteOptional", "Note (optional)")} aria-label={t("x.noteOptional", "Note (optional)")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} disabled={busy || !(Number(hours) > 0)} className={btnCls}>{busy ? t("btn.saving") : t("x.log", "Log")}</button>
-      </div>
+      </div>}
     </div>
   );
 }
 
 /* ── Attachments ────────────────────────────────────────────────────── */
-export function AttachmentsPanel({ taskId }: { taskId: string }) {
+export function AttachmentsPanel({ taskId, readOnly = false }: { taskId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<TaskAttachment[]>([]);
@@ -313,22 +317,22 @@ export function AttachmentsPanel({ taskId }: { taskId: string }) {
               <span className="flex-1 text-[12.5px] text-[var(--text-primary)] truncate">{a.file_name}</span>
             )}
             <span className="text-[10px] text-[var(--text-ghost)] shrink-0">{fmtSize(a.file_size)}</span>
-            <button type="button" onClick={() => remove(a.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>
+            {!readOnly && <button type="button" onClick={() => remove(a.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noFiles", "No files attached.")} />}
       </div>
-      <input ref={fileRef} type="file" onChange={onPick} className="hidden" />
-      <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center gap-1.5 disabled:opacity-50">
+      {!readOnly && <input ref={fileRef} type="file" onChange={onPick} className="hidden" />}
+      {!readOnly && <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center gap-1.5 disabled:opacity-50">
         {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <UploadIcon size={13} />}
         {busy ? t("x.uploading") : t("x.upload")}
-      </button>
+      </button>}
     </div>
   );
 }
 
 /* ── Subtasks (child tasks via parent_task_id) ──────────────────────── */
-export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId: string }) {
+export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId: string; projectId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<TaskRow[]>([]);
@@ -381,28 +385,28 @@ export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId
         {items.map((s) => (
           <div key={s.id} className={`group flex items-center gap-2 px-2.5 py-2 ${card}`}>
             <button
-              type="button" onClick={() => toggle(s)}
+              type="button" onClick={() => toggle(s)} disabled={readOnly}
               aria-label={s.status === "done" ? t("task.reopen") : t("task.markDone")} aria-pressed={s.status === "done"}
               className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${s.status === "done" ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"}`}
             ><CheckIcon size={10} /></button>
             <span className={`flex-1 text-[12.5px] ${s.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{s.title}</span>
-            <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>
+            {!readOnly && <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noSubtasks", "No subtasks yet.")} />}
       </div>
-      <div className="flex items-center gap-2">
+      {!readOnly && <div className="flex items-center gap-2">
         <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.addSubtask", "Add a subtask…")} aria-label={t("x.addSubtask", "Add a subtask…")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} disabled={busy || !title.trim()} aria-label={t("tip.addItem")} className={btnCls}>
           {busy ? <SpinnerIcon className="h-3 w-3" /> : <PlusIcon size={12} />}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
 
 /* ── Milestones (project detail) ────────────────────────────────────── */
-export function MilestoneStrip({ projectId }: { projectId: string }) {
+export function MilestoneStrip({ projectId, readOnly = false }: { projectId: string; readOnly?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<Milestone[]>([]);
@@ -449,20 +453,20 @@ export function MilestoneStrip({ projectId }: { projectId: string }) {
       <div className="flex items-center gap-2 mb-2">
         <FlagIcon size={13} className="text-[var(--text-dim)]" />
         <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("x.milestones", "Milestones")}</h3>
-        <button type="button" onClick={() => setAdding((v) => !v)} aria-label={t("x.addMilestone")} aria-expanded={adding} className="ms-auto h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"><PlusIcon size={13} /></button>
+        {!readOnly && <button type="button" onClick={() => setAdding((v) => !v)} aria-label={t("x.addMilestone")} aria-expanded={adding} className="ms-auto h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"><PlusIcon size={13} /></button>}
       </div>
       <div className="flex flex-wrap gap-2">
         {items.map((m) => (
           <div key={m.id} className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11.5px] ${m.is_reached ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)]"}`}>
-            <button type="button" onClick={() => toggle(m)} aria-label={t("tip.toggleDone")} aria-pressed={m.is_reached} className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${m.is_reached ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent"}`}><CheckIcon size={9} /></button>
+            <button type="button" onClick={() => toggle(m)} disabled={readOnly} aria-label={t("tip.toggleDone")} aria-pressed={m.is_reached} className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${m.is_reached ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent"}`}><CheckIcon size={9} /></button>
             <span className="font-semibold">{m.name}</span>
             {m.due_date && <span className="text-[10px] opacity-70 tabular-nums">{formatDMY(m.due_date)}</span>}
-            <button type="button" onClick={() => remove(m.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400 ms-0.5`}><TrashIcon className="h-2.5 w-2.5" /></button>
+            {!readOnly && <button type="button" onClick={() => remove(m.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400 ms-0.5`}><TrashIcon className="h-2.5 w-2.5" /></button>}
           </div>
         ))}
         {items.length === 0 && !adding && <span className="text-[11.5px] text-[var(--text-dim)]">{t("x.noMilestones", "No milestones yet.")}</span>}
       </div>
-      {adding && (
+      {adding && !readOnly && (
         <div className="flex items-center gap-2 mt-2">
           <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.milestoneName", "Milestone name")} aria-label={t("x.milestoneName", "Milestone name")} className={`flex-1 ${inputCls}`} />
           <input value={due} onChange={(e) => setDue(e.target.value)} type="date" aria-label={t("task.dueDate")} className={inputCls} />

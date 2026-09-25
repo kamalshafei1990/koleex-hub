@@ -20,7 +20,7 @@ import "server-only";
 
    A series is expanded with its "this occurrence only" exceptions
    (lib/server/calendar-exceptions): a skipped occurrence is gone, an
-   overridden one carries its own title / time / place / link. Every
+   overridden one carries its own title / time / place / link / notes. Every
    occurrence says which it is (`occurrence_start` = its original start, the
    key such a change is stored under) and has a STABLE id `<base>~<ms of that
    start>`, the same whichever window it was read in.
@@ -97,8 +97,10 @@ function expandRow(base: Row, w: FeedWindow, tz: string, exceptions?: CalendarEv
       ...(ov ? {
         overridden: true,
         ...(ov.title ? { title: ov.title } : {}),
-        ...(ov.location != null ? { location: ov.location } : {}),
-        ...(ov.meeting_url != null ? { meeting_url: ov.meeting_url } : {}),
+        /* '' = none for this occurrence; NULL = as the series. */
+        ...(ov.location != null ? { location: ov.location || null } : {}),
+        ...(ov.meeting_url != null ? { meeting_url: ov.meeting_url || null } : {}),
+        ...(ov.description != null ? { description: ov.description || null } : {}),
       } : {}),
     }, tz);
   });

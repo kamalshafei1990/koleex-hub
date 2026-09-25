@@ -514,6 +514,7 @@ export function TaskFormModal({
   stages,
   tags,
   allTasks = [],
+  readOnly = false,
   onClose,
   onSaved,
 }: {
@@ -523,6 +524,9 @@ export function TaskFormModal({
   stages: ProjectStage[];
   tags: ProjectTag[];
   allTasks?: TaskRow[];
+  /** The caller's project access is "view": every field is disabled and
+   *  save / delete / schedule are gone (the write routes would 403). */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -552,7 +556,7 @@ export function TaskFormModal({
   const [detailTab, setDetailTab] = useState<DetailTab>("details");
 
   const save = async () => {
-    if (!title.trim() || saving) return;
+    if (readOnly || !title.trim() || saving) return;
     setSaving(true);
     /* logged_hours is NOT sent — it is derived from time entries. */
     const payload = {
@@ -675,12 +679,12 @@ export function TaskFormModal({
       footer={
         <>
           <div className="flex items-center gap-1.5">
-            {editing && (
+            {editing && !readOnly && (
               <button type="button" onClick={remove} className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
                 <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
               </button>
             )}
-            {editing && !editing.linked_planning_item_id && (
+            {editing && !readOnly && !editing.linked_planning_item_id && (
               <button
                 type="button"
                 onClick={scheduleInPlanning}
@@ -697,8 +701,8 @@ export function TaskFormModal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors">{t("btn.cancel")}</button>
-            <SaveButton saving={saving} disabled={!title.trim()} onClick={save} label={editing ? t("btn.save") : t("btn.create")} />
+            <button type="button" onClick={onClose} className="h-10 px-5 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium transition-colors">{readOnly ? t("btn.close") : t("btn.cancel")}</button>
+            {!readOnly && <SaveButton saving={saving} disabled={!title.trim()} onClick={save} label={editing ? t("btn.save") : t("btn.create")} />}
           </div>
         </>
       }
@@ -707,15 +711,17 @@ export function TaskFormModal({
       {toastElement}
       {editing && detailTab !== "details" && (
         <div className="px-5 py-4 overflow-y-auto" role="tabpanel">
-          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} />}
-          {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} />}
-          {detailTab === "comments" && <CommentsPanel taskId={editing.id} />}
-          {detailTab === "time" && <TimePanel taskId={editing.id} />}
-          {detailTab === "files" && <AttachmentsPanel taskId={editing.id} />}
+          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={readOnly} />}
+          {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} readOnly={readOnly} />}
+          {detailTab === "comments" && <CommentsPanel taskId={editing.id} readOnly={readOnly} />}
+          {detailTab === "time" && <TimePanel taskId={editing.id} readOnly={readOnly} />}
+          {detailTab === "files" && <AttachmentsPanel taskId={editing.id} readOnly={readOnly} />}
         </div>
       )}
 
-      <div className={`px-5 py-4 space-y-3 overflow-y-auto ${editing && detailTab !== "details" ? "hidden" : ""}`}>
+      {/* A disabled fieldset disables every control inside it — the whole
+          form reads but cannot change for a viewer. */}
+      <fieldset disabled={readOnly} className={`min-w-0 px-5 py-4 space-y-3 overflow-y-auto ${editing && detailTab !== "details" ? "hidden" : ""}`}>
         <Field label={t("task.namePh")}>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("task.namePh")} className={inputCls} />
         </Field>
@@ -872,7 +878,7 @@ export function TaskFormModal({
             ))}
           </div>
         </div>
-      </div>
+      </fieldset>
     </ModalFrame>
   );
 }

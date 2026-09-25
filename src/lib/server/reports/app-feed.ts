@@ -13,7 +13,8 @@ import "server-only";
    the viewer is the author of a draft. What "mine" means per app (mapped
    25/09/2026):
      calendar   events.account_id + attendee rows (declined left out);
-                repeating events expanded in the window (expandRecurrence)
+                repeating events expanded in the window with their
+                "this occurrence only" changes (expandWithExceptions)
      to-do      assigned to me, or created by me and not handed to anyone
      projects   project_tasks.assignee_account_id
      planning   items on my own planning resources (published / completed)
@@ -26,7 +27,9 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
-import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
+import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
+import { accountTimezones } from "@/lib/server/calendar-notify";
 import { feedSources, feedWindow, type AppRecord, type AppSource } from "@/lib/reports/app-feed";
 import { periodFor, type ReportPeriod } from "@/lib/reports/templates";
 import { templateOf } from "@/lib/reports/custom-templates";
@@ -54,8 +57,8 @@ const rows = <T>(res: { data: unknown; error: { message: string } | null }, what
   return (res.data ?? []) as T[];
 };
 
-type EventRow = { id: string; title: string | null; start_at: string; end_at: string; all_day: boolean | null; event_type: string | null; recurrence: CalendarRec; recurrence_until: string | null };
-const EVENT_COLS = "id, title, start_at, end_at, all_day, event_type, recurrence, recurrence_until";
+type EventRow = { id: string; account_id: string; title: string | null; start_at: string; end_at: string; all_day: boolean | null; event_type: string | null; recurrence: CalendarRec; recurrence_until: string | null };
+const EVENT_COLS = "id, account_id, title, start_at, end_at, all_day, event_type, recurrence, recurrence_until";
 
 const calendar: Loader = async (c) => {
   const [own, series, invites] = await Promise.all([
@@ -71,13 +74,22 @@ const calendar: Loader = async (c) => {
     ? rows<EventRow>(await supabaseServer.from("koleex_calendar_events").select(EVENT_COLS).in("id", invitedIds).neq("account_id", c.me).limit(LIMIT), "invited")
     : [];
   const from = new Date(c.from), to = new Date(c.to);
+  const all = [...rows<EventRow>(own, "events"), ...rows<EventRow>(series, "series"), ...invited].filter((e) => !NOT_MEETINGS.has(e.event_type ?? ""));
+  /* A series runs on its organizer's clock, with its "this occurrence only"
+     changes (one read for every series). */
+  const repeating = all.filter((e) => e.recurrence);
+  const [tzs, exceptions] = await Promise.all([
+    accountTimezones(repeating.map((e) => e.account_id)),
+    loadExceptions(repeating.map((e) => e.id)),
+  ]);
   const out: AppRecord[] = [];
-  for (const e of [...rows<EventRow>(own, "events"), ...rows<EventRow>(series, "series"), ...invited]) {
-    if (NOT_MEETINGS.has(e.event_type ?? "")) continue;
+  for (const e of all) {
     const base = { source: "calendar" as const, state: "scheduled" as const, allDay: !!e.all_day, title: (e.title ?? "").trim() };
     if (e.recurrence) {
-      expandRecurrence(e.start_at, e.end_at, e.recurrence, e.recurrence_until, from, to).forEach((o, i) =>
-        out.push({ ...base, id: `${e.id}~${i}`, at: o.start.toISOString(), end: o.end.toISOString() }));
+      /* The id is the occurrence's original start, stable whatever else of
+         the series was deleted or moved. */
+      expandWithExceptions(e.start_at, e.end_at, e.recurrence, e.recurrence_until, from, to, exceptions.get(e.id), 400, tzs.get(e.account_id) ?? "UTC").forEach((o) =>
+        out.push({ ...base, ...(o.override?.title ? { title: o.override.title.trim() } : {}), id: `${e.id}~${o.original.getTime()}`, at: o.start.toISOString(), end: o.end.toISOString() }));
     } else if (e.start_at < c.to && e.end_at >= c.from) {
       out.push({ ...base, id: e.id, at: e.start_at, end: e.end_at });
     }

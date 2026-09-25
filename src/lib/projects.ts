@@ -79,7 +79,15 @@ export interface ProjectRow {
   task_counts?: ProjectTaskCounts;
   /** Only on list rows: the caller manages / created / holds a task. */
   involved?: boolean;
+  /** project_members rows (list + detail payloads) — the Members button
+   *  count without fetching the member list. */
+  member_count?: number;
+  /** The caller's effective permission (list + detail payloads). "view" =
+   *  read-only: every write route answers 403, so the UI hides writes. */
+  my_access?: ProjectAccess;
 }
+
+export type ProjectAccess = "manage" | "edit" | "view";
 
 export interface ProjectTaskCounts {
   open: number;

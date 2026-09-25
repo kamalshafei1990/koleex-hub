@@ -110,6 +110,9 @@ export function expandHolidays(
 export interface HolidayInput {
   name: string;
   holiday_type: HolidayType;
+  /** Default "country". A customer holiday names the customer instead. */
+  scope_type?: HolidayScope;
+  customer_id?: string | null;
   country?: string | null;
   holiday_date?: string | null;
   weekday?: number | null;
@@ -122,10 +125,30 @@ export async function createHoliday(input: HolidayInput): Promise<HolidayRow | n
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...input, scope_type: "country" }),
+      body: JSON.stringify({ ...input, scope_type: input.scope_type ?? "country" }),
     });
     if (!res.ok) return null;
     return ((await res.json()) as { holiday?: HolidayRow }).holiday ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A customer a holiday can be scoped to (the Customers list, slim). */
+export interface HolidayCustomer {
+  id: string;
+  name: string | null;
+  company_name: string | null;
+  country: string | null;
+}
+
+/** The tenant's customers for the holiday picker (GET /api/customers).
+ *  null = the read failed (e.g. no Customers access). */
+export async function fetchHolidayCustomers(signal?: AbortSignal): Promise<HolidayCustomer[] | null> {
+  try {
+    const res = await fetch("/api/customers", { credentials: "include", signal });
+    if (!res.ok) return null;
+    return ((await res.json()) as { customers?: HolidayCustomer[] }).customers ?? [];
   } catch {
     return null;
   }

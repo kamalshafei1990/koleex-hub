@@ -1,10 +1,11 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   CalendarSearch — the toolbar's search box. Searches the viewer's own and
-   invited events by title, location and description, three months either
-   side of today (GET /api/calendar/search). Picking a hit jumps the calendar
-   to its date and opens it.
+   CalendarSearch — the toolbar's search box. Searches the own and invited
+   events of the calendar on screen — the viewer's, or the account a Super
+   Admin is viewing (`accountId`) — by title, location and description,
+   three months either side of today (GET /api/calendar/search). Picking a
+   hit jumps that calendar to its date and opens it.
 
    A combobox: the list opens under the field, ↑/↓ move, Enter picks, Escape
    closes (and clears when the list is already closed). "/" focuses the field
@@ -27,10 +28,13 @@ function dmyKey(key: string): string {
 
 export default function CalendarSearch({
   timezone,
+  accountId,
   inputRef,
   onPick,
 }: {
   timezone: string;
+  /** Someone else's calendar (Super Admin); null = the viewer's own. */
+  accountId: string | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onPick: (hit: CalendarSearchHit) => void;
 }) {
@@ -43,16 +47,18 @@ export default function CalendarSearch({
   const boxRef = useRef<HTMLDivElement>(null);
 
   const term = q.trim();
+  /* A result belongs to one text on one calendar. */
+  const key = `${accountId ?? ""}|${term}`;
   useEffect(() => {
     if (term.length < 2) return;
     const ctrl = new AbortController();
     const timer = setTimeout(() => {
-      void searchEvents(term, ctrl.signal).then((hits) => {
-        if (!ctrl.signal.aborted) { setResult({ q: term, hits }); setActive(0); }
+      void searchEvents(term, ctrl.signal, accountId).then((hits) => {
+        if (!ctrl.signal.aborted) { setResult({ q: key, hits }); setActive(0); }
       });
     }, 250);
     return () => { clearTimeout(timer); ctrl.abort(); };
-  }, [term]);
+  }, [term, accountId, key]);
 
   /* Click outside closes the list. */
   useEffect(() => {
@@ -64,8 +70,8 @@ export default function CalendarSearch({
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
-  const loading = term.length >= 2 && result?.q !== term;
-  const hits = term.length >= 2 && result?.q === term ? result.hits : [];
+  const loading = term.length >= 2 && result?.q !== key;
+  const hits = term.length >= 2 && result?.q === key ? result.hits : [];
   const failed = hits === null;
   const list = hits ?? [];
   const showList = open && term.length >= 2;
@@ -157,7 +163,7 @@ export default function CalendarSearch({
               </li>
             ))}
           </ul>
-          <p className="border-t border-[var(--border-subtle)] px-3 py-1.5 text-[10px] text-[var(--text-dim)]">{t("search.scope")}</p>
+          <p className="border-t border-[var(--border-subtle)] px-3 py-1.5 text-[10px] text-[var(--text-dim)]">{t(accountId ? "search.scopeOther" : "search.scope")}</p>
         </div>
       )}
     </div>

@@ -18,10 +18,12 @@ import {
 } from "@/lib/server/planning-project-sync";
 import { validatePlanningItemInput } from "@/lib/planning-validate";
 import {
+  applyWallDelta,
   expandWeekly,
   parsePlanningRecurrence,
   parsePlanningTz,
   recurrenceRuleText,
+  wallDelta,
 } from "@/lib/planning-recurrence";
 
 /* GET    /api/planning/items/:id — fetch a single item
@@ -37,8 +39,12 @@ import {
    SERIES. Rows of a recurring series share recurrence_parent_id (see
    lib/planning-recurrence). `?scope=future` on PATCH / DELETE applies to
    this row and every LATER row of its series the caller may write; a time
-   change moves each by the same offset and gives each the new duration.
-   Without it only this row changes. A PATCH carrying `recurrence` on a row
+   change is applied as a DELTA: each row's start moves by the change made
+   to this row's start, and its end by the change made to this row's end,
+   both as wall-clock changes in the planner's zone (DST-safe). A row that
+   was resized on its own keeps its own length. A delta that would leave a
+   later row ending at or before its start is refused (400
+   series_end_before_start). Without the scope only this row changes. A PATCH carrying `recurrence` on a row
    that is not yet in a series turns it into the first row of a new one.
 
    CONFLICTS. A PATCH that moves an item in time, re-assigns it, or brings
@@ -260,25 +266,43 @@ async function patchSeriesFuture(
   if (!rows.some((r) => r.id === prev.id)) rows.unshift(prev);
 
   const ms = (s: string) => Date.parse(s);
-  const timeChanged = "start_at" in patch || "end_at" in patch;
-  const dStart = "start_at" in patch ? ms(patch.start_at as string) - ms(prev.start_at) : 0;
-  const newDur = ms((patch.end_at as string | undefined) ?? prev.end_at) - ms((patch.start_at as string | undefined) ?? prev.start_at);
+  /* Deltas from the edited row, as wall-clock changes in the planner's
+     zone: "start 30 min later, end 1 h later" lands on each row's own wall
+     times, so a row resized on its own keeps its length and a DST change
+     inside the series does not shift anything by an hour. */
+  const newStartIso = (patch.start_at as string | undefined) ?? prev.start_at;
+  const newEndIso = (patch.end_at as string | undefined) ?? prev.end_at;
+  const startMoved = ms(newStartIso) !== ms(prev.start_at);
+  const endMoved = ms(newEndIso) !== ms(prev.end_at);
+  const timeChanged = startMoved || endMoved;
+  const dStart = wallDelta(prev.start_at, newStartIso, opts.tz);
+  const dEnd = wallDelta(prev.end_at, newEndIso, opts.tz);
 
   const now = new Date().toISOString();
   const updates = rows.map((r) => {
     const u: Record<string, unknown> = { ...patch };
+    delete u.start_at;
+    delete u.end_at;
     if (timeChanged) {
-      const s = ms(r.start_at) + dStart;
-      u.start_at = new Date(s).toISOString();
-      u.end_at = new Date(s + newDur).toISOString();
+      if (r.id === prev.id) {
+        /* The edited row gets exactly what was entered. */
+        u.start_at = new Date(ms(newStartIso)).toISOString();
+        u.end_at = new Date(ms(newEndIso)).toISOString();
+      } else {
+        u.start_at = startMoved ? applyWallDelta(r.start_at, dStart, opts.tz) : r.start_at;
+        u.end_at = endMoved ? applyWallDelta(r.end_at, dEnd, opts.tz) : r.end_at;
+      }
     }
     if (patch.status === "published" && r.status !== "published") u.published_at = now;
     if (patch.status === "cancelled" && r.status !== "cancelled") u.cancelled_at = now;
     return { row: r, u };
   });
+  if (timeChanged && updates.some(({ u }) => ms(u.end_at as string) <= ms(u.start_at as string))) {
+    return NextResponse.json({ error: "series_end_before_start", field: "end_at" }, { status: 400 });
+  }
 
   const placementChanged =
-    (timeChanged && (dStart !== 0 || newDur !== ms(prev.end_at) - ms(prev.start_at))) ||
+    timeChanged ||
     ("resource_id" in patch && patch.resource_id !== prev.resource_id) ||
     ("status" in patch && patch.status !== "cancelled" && rows.some((r) => r.status === "cancelled"));
   if (placementChanged) {

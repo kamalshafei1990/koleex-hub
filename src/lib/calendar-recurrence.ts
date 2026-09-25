@@ -128,8 +128,12 @@ export function nextOccurrenceStart(
 /* ── "This occurrence only" ──────────────────────────────────────────────
    A series can have exceptions (koleex_calendar_event_exceptions), keyed by
    an occurrence's ORIGINAL start: a skip removes the occurrence, an override
-   replaces its title / time / place / link. The feed and the reminder cron
-   both run the expansion through here, so they agree on what happens. */
+   replaces its title / time / place / link / notes. The feed, the reminder
+   cron, the dashboard, the AI brief and the reports feed all run the
+   expansion through here, so they agree on what happens.
+
+   In an override NULL means "as the series"; for location, meeting_url and
+   description an empty string means "none for this occurrence". */
 
 export interface OccurrenceException {
   occurrence_start: string;
@@ -139,6 +143,7 @@ export interface OccurrenceException {
   end_at?: string | null;
   location?: string | null;
   meeting_url?: string | null;
+  description?: string | null;
 }
 
 export interface EffectiveOccurrence {

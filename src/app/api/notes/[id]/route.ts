@@ -12,7 +12,12 @@ import {
 } from "@/lib/notes-server";
 import { extractPlainText } from "@/lib/notes-text";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
-import { mergeState, notesCollabAvailable } from "@/lib/notes-yjs-server";
+import {
+  applyBodyToState,
+  mergeState,
+  notesCollabAvailable,
+  pingNoteBodyChanged,
+} from "@/lib/notes-yjs-server";
 import { afterContentSaved } from "@/lib/notes-history-server";
 
 /* GET    /api/notes/[id] — full note including body_json. Owner OR anyone the
@@ -29,6 +34,14 @@ import { afterContentSaved } from "@/lib/notes-history-server";
                             into the stored state and body_json/body_plain
                             are derived from the merge — a merge cannot
                             conflict, so no base token and no 409.
+                            SINGLE-EDITOR body save on a note that has a
+                            Yjs state (a client that fell back from the
+                            live session): body_json is converted into a
+                            Yjs update against the stored state and merged
+                            (never a reset), body_json/body_plain are
+                            derived from the merge, and the note's live
+                            peers are pinged to pull it. Guarded by the
+                            base token → a stale copy gets a 409.
                             Every landed content save then (after the
                             response) snapshots a version (≤ 1 / 10 min) and
                             refreshes the note's outgoing links.
@@ -137,6 +150,87 @@ async function collabPatch(
   return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
 }
 
+/**
+ * Single-editor body save on a note with live co-editing available.
+ *
+ * With a Yjs state stored, the incoming body_json becomes a Yjs update
+ * against that state (see applyBodyToState) and the merged state is written
+ * together with the body DERIVED from it — so concurrent live edits that are
+ * already in the state, or that peers merge later, are never discarded the
+ * way a state reset + last-writer-wins would. The write is conditional on
+ * the row's updated_at (and on the base token, when sent): a stale fallback
+ * copy gets a 409 instead of diffing newer collaborative content away.
+ *
+ * Without a state (never co-edited) the body is written plainly, on the
+ * condition that the note is STILL unseeded — a seed racing in from the
+ * older body makes us retry against it rather than leave it stale.
+ */
+async function singleEditorBodyPatch(
+  id: string,
+  patch: Record<string, unknown>,
+  base: string | null,
+  conflict: () => Promise<NextResponse>,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select("yjs_state, updated_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH body read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as { yjs_state: string | null; updated_at: string };
+    // The client's copy is older than the note: its body would undo newer
+    // (possibly collaborative) content. Let it reload instead.
+    if (base && row.updated_at !== base) return conflict();
+
+    const write: Record<string, unknown> = { ...patch };
+    let bodyJson: unknown = patch.body_json;
+    if (row.yjs_state) {
+      const r = applyBodyToState(row.yjs_state, patch.body_json);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      if (JSON.stringify(r.bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
+        return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+      }
+      bodyJson = r.bodyJson;
+      write.body_json = r.bodyJson;
+      write.body_plain = extractPlainText(r.bodyJson);
+      write.yjs_state = r.state;
+    }
+
+    let q = supabaseServer.from("notes").update(write).eq("id", id).eq("updated_at", row.updated_at);
+    if (!row.yjs_state) q = q.is("yjs_state", null);
+    const { data, error } = await q.select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH body]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    // Someone wrote in between: re-read. With a base token a real save
+    // turns into a 409 above; a mere seed (state appeared, updated_at
+    // unchanged) is diffed against on the next pass.
+    if (!saved) continue;
+    const hadState = !!row.yjs_state;
+    after(async () => {
+      // Live peers pull + merge the new state; solo peers refetch.
+      if (hadState) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson,
+        bodyChanged: true,
+      });
+    });
+    return NextResponse.json({ ok: true, updated_at: saved.updated_at });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -193,20 +287,8 @@ export async function PATCH(
      not make a collaborator's next save look like a conflict. */
   const isContent = ["title", "body_json", "color", "tags"].some((k) => k in patch);
   if (isContent) patch.updated_at = new Date().toISOString();
-  /* A single-editor body save makes any stored Yjs state stale: drop it so
-     the next collaborative session re-seeds from this body. */
   const bodyChanged = "body_json" in patch;
-  if (bodyChanged && (await notesCollabAvailable())) patch.yjs_state = null;
-
-  let q = supabaseServer.from("notes").update(patch).eq("id", id);
-  if (base && isContent) q = q.eq("updated_at", base);
-  const { data, error } = await q.select("id, updated_at, title, body_json");
-  if (error) {
-    console.error("[api/notes/[id] PATCH]", error.message);
-    return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
-  }
-  const row = (data ?? [])[0] as { updated_at: string } | undefined;
-  if (!row) {
+  const conflict = async (): Promise<NextResponse> => {
     // The row moved on since the client's base: hand back the fresh copy.
     const fresh = await getNoteAccess(id, auth.account_id, "*");
     if (!fresh.note || !canRead(fresh.role)) {
@@ -222,7 +304,26 @@ export async function PATCH(
       },
       { status: 409 },
     );
+  };
+
+  /* A body save where live co-editing exists: never reset the Yjs state —
+     express the body as a Yjs update and merge it. */
+  if (bodyChanged && (await notesCollabAvailable())) {
+    return singleEditorBodyPatch(id, patch, base, conflict, {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
   }
+
+  let q = supabaseServer.from("notes").update(patch).eq("id", id);
+  if (base && isContent) q = q.eq("updated_at", base);
+  const { data, error } = await q.select("id, updated_at, title, body_json");
+  if (error) {
+    console.error("[api/notes/[id] PATCH]", error.message);
+    return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+  }
+  const row = (data ?? [])[0] as { updated_at: string } | undefined;
+  if (!row) return conflict();
   if (isContent) {
     const saved = row as unknown as { title: string; body_json: unknown };
     after(() => afterContentSaved({

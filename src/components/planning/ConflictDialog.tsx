@@ -3,8 +3,9 @@
 /* ---------------------------------------------------------------------------
    ConflictDialog — what a 409 schedule_conflict from the server looks like.
 
-   Lists each clash (double booking, approved leave) in plain words, D/M/Y
-   and 24-hour times. A super admin (the server says so through
+   Lists each clash (double booking, approved leave, an approved business
+   trip, Calendar out-of-office time) in plain words, D/M/Y and 24-hour
+   times on the planner's clock. A super admin (the server says so through
    can_override) gets "Save anyway", which retries the SAME write with
    force; everyone else gets the reason and a way back to change it.
 
@@ -18,7 +19,8 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
 import { fmtDMY } from "@/lib/finance/format";
-import { formatRange, type PlanningConflictInfo } from "@/lib/planning";
+import { formatRange, type PlanningConflict, type PlanningConflictInfo } from "@/lib/planning";
+import { toWall } from "@/lib/calendar-tz";
 
 const fill = (s: string, vars: Record<string, string | number>) =>
   s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
@@ -31,10 +33,13 @@ const dmyKey = (key?: string) => {
 
 export default function ConflictDialog({
   info,
+  tz,
   onClose,
   onOverride,
 }: {
   info: PlanningConflictInfo | null;
+  /** The planner's zone (lib/planning-tz). */
+  tz: string;
   onClose: () => void;
   /** Retry the write with force. Resolves when done (the dialog then closes). */
   onOverride: () => Promise<void>;
@@ -57,6 +62,34 @@ export default function ConflictDialog({
 
   if (!info) return null;
   const listed = info.conflicts;
+  const describe = (c: PlanningConflict) => {
+    const res = c.resource_name ?? "—";
+    switch (c.kind) {
+      case "leave":
+      case "travel":
+        return fill(t(c.kind === "travel" ? "conflict.travel" : "conflict.leave"), {
+          res,
+          from: dmyKey(c.leave_start),
+          to: dmyKey(c.leave_end),
+        });
+      case "out_of_office":
+        return fill(t("conflict.away"), {
+          res,
+          /* An all-day event reads as its days; a timed one as its span. */
+          range: c.leave_start
+            ? `${dmyKey(c.leave_start)} – ${dmyKey(c.leave_end)}`
+            : c.away_start_at && c.away_end_at
+              ? formatRange(c.away_start_at, c.away_end_at, tz)
+              : "—",
+        });
+      default:
+        return fill(t("conflict.double"), {
+          res,
+          other: c.other_title || "—",
+          range: c.other_start_at && c.other_end_at ? formatRange(c.other_start_at, c.other_end_at, tz) : "—",
+        });
+    }
+  };
   const more = Math.max(0, info.total - listed.length);
 
   const override = async () => {
@@ -95,21 +128,11 @@ export default function ConflictDialog({
                 key={`${c.kind}-${c.index}-${c.other_id ?? i}`}
                 className="rounded-lg border border-red-500/25 bg-red-500/[0.06] px-2.5 py-1.5 text-[12px] leading-snug text-[var(--text-primary)]"
               >
-                {c.kind === "leave"
-                  ? fill(t("conflict.leave"), {
-                      res: c.resource_name ?? "—",
-                      from: dmyKey(c.leave_start),
-                      to: dmyKey(c.leave_end),
-                    })
-                  : fill(t("conflict.double"), {
-                      res: c.resource_name ?? "—",
-                      other: c.other_title || "—",
-                      range: c.other_start_at && c.other_end_at ? formatRange(c.other_start_at, c.other_end_at) : "—",
-                    })}
+                {describe(c)}
                 {(info.total > 1 || listed.length > 1) && (
                   <span className="block text-[10px] text-[var(--text-dim)] mt-0.5">
                     {c.title ? `${c.title} · ` : ""}
-                    {fmtDMY(new Date(c.start_at))}
+                    {fmtDMY(toWall(c.start_at, tz))}
                   </span>
                 )}
               </li>

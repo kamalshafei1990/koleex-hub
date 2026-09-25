@@ -32,7 +32,10 @@ import "server-only";
      · every ~3s an `chg` event names channels touched by an edit / delete /
        reaction / pin, so those reach open clients without a broadcast ping;
        `meta: true` on it marks a sidebar-level change (rename, archive, the
-       caller joining or being removed) so the client refetches its list
+       caller joining or being removed) so the client refetches its list;
+       `members: true` marks a membership change (someone added / removed /
+       left, a role change) so the client reloads the member list only then —
+       never after a plain reaction or edit
 
    Delivery latency: poll cadence /2 (~0.5s median) + SSE push ≈ WeChat-feel,
    independent of Supabase websocket reachability. The Supabase broadcast path
@@ -59,6 +62,27 @@ const CHANNELS = "discuss_channels";
  *  re-description or archive (reported to the client as `meta`). */
 function sigOf(ch: { name: string | null; description: string | null; archived_at: string | null }): string {
   return `${ch.name ?? ""}\u0000${ch.description ?? ""}\u0000${ch.archived_at ?? ""}`;
+}
+
+/** Active membership of each channel (account + role), keyed by channel id —
+ *  compared between change passes to flag `members` changes. */
+async function memberSigs(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  const { data } = await supabaseServer
+    .from(MEMBERS)
+    .select("channel_id, account_id, role")
+    .in("channel_id", ids)
+    .is("left_at", null)
+    .limit(10_000);
+  const by = new Map<string, string[]>();
+  for (const r of (data ?? []) as Array<{ channel_id: string; account_id: string; role: string | null }>) {
+    const list = by.get(r.channel_id) ?? [];
+    list.push(`${r.account_id}:${r.role ?? ""}`);
+    by.set(r.channel_id, list);
+  }
+  for (const id of ids) out.set(id, (by.get(id) ?? []).sort().join(","));
+  return out;
 }
 
 async function myChannelIds(me: string): Promise<string[]> {
@@ -132,8 +156,14 @@ export async function GET(req: Request) {
       /* name / description / archived_at per channel, to tell a rename or an
          archive (sidebar-level, `meta`) from an edit / reaction / pin. */
       const metaSig = new Map<string, string>();
+      /* Active member set per channel, to tell a membership change from an
+         edit / reaction (both only touch updated_at). */
+      const memberSig = new Map<string, string>();
       const seedSigs = async (ids: string[]) => {
         if (ids.length === 0) return;
+        try {
+          for (const [id, sig] of await memberSigs(ids)) if (!memberSig.has(id)) memberSig.set(id, sig);
+        } catch { /* unseeded channels report their first membership change as a plain chg */ }
         try {
           const { data: rows } = await supabaseServer
             .from(CHANNELS)
@@ -167,8 +197,8 @@ export async function GET(req: Request) {
                mainland. */
             const before = new Set(channelIds);
             const after = new Set(next);
-            for (const id of next) if (!before.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true })}\n\n`);
-            for (const id of channelIds) if (!after.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true })}\n\n`);
+            for (const id of next) if (!before.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true, members: true })}\n\n`);
+            for (const id of channelIds) if (!after.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true, members: true })}\n\n`);
             const added = next.filter((id) => !before.has(id));
             channelIds = next;
             await seedSigs(added);
@@ -224,7 +254,20 @@ export async function GET(req: Request) {
               .in("id", channelIds)
               .gt("updated_at", changeCursor)
               .limit(100);
-            for (const ch of (touched ?? []) as Array<{ id: string; updated_at: string; last_message_at: string | null; name: string | null; description: string | null; archived_at: string | null }>) {
+            const touchedRows = (touched ?? []) as Array<{ id: string; updated_at: string; last_message_at: string | null; name: string | null; description: string | null; archived_at: string | null }>;
+            /* Membership of the channels touched by something other than a
+               new message (membership writes touch the channel too), so a
+               reaction burst costs one small read here instead of a member
+               reload on every open client. */
+            const edited = touchedRows.filter((ch) => {
+              const last = ch.last_message_at ? Date.parse(ch.last_message_at) : 0;
+              return Date.parse(ch.updated_at) - last > CHANGE_SLACK_MS;
+            });
+            let members = new Map<string, string>();
+            if (edited.length > 0) {
+              try { members = await memberSigs(edited.map((ch) => ch.id)); } catch { /* flag nothing this pass */ }
+            }
+            for (const ch of touchedRows) {
               if (ch.updated_at > changeCursor) changeCursor = ch.updated_at;
               const upd = Date.parse(ch.updated_at);
               const last = ch.last_message_at ? Date.parse(ch.last_message_at) : 0;
@@ -234,8 +277,12 @@ export async function GET(req: Request) {
               const prevSig = metaSig.get(ch.id);
               metaSig.set(ch.id, sig);
               const meta = prevSig !== undefined && prevSig !== sig;
-              if (upd - last > CHANGE_SLACK_MS || meta) {
-                send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at, ...(meta ? { meta: true } : {}) })}\n\n`);
+              const mSig = members.get(ch.id);
+              const prevMSig = memberSig.get(ch.id);
+              if (mSig !== undefined) memberSig.set(ch.id, mSig);
+              const membersChanged = mSig !== undefined && prevMSig !== undefined && prevMSig !== mSig;
+              if (upd - last > CHANGE_SLACK_MS || meta || membersChanged) {
+                send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at, ...(meta ? { meta: true } : {}), ...(membersChanged ? { members: true } : {}) })}\n\n`);
                 lastActivity = Date.now();
               }
             }

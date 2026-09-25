@@ -197,6 +197,59 @@ export function canModerate(auth: AccessAuth, project: ProjectAccessRow): boolea
   return auth.is_super_admin || project.manager_account_id === auth.account_id;
 }
 
+/** The caller's effective permission on a project, returned with the
+ *  project payload as `my_access` so the UI can match the server:
+ *    manage — super admin, manager, creator, or member role manager
+ *             (members, archive, plus everything below);
+ *    edit   — member role member, or the assignee of a task in it;
+ *    view   — viewer membership is the only way in (every { write: true }
+ *             gate answers 403), or the caller lacks the Projects module's
+ *             edit action (`canEditModule` false; also view-as).
+ *  Two batched queries for any number of projects — never per project. */
+export type ProjectAccessLevel = "manage" | "edit" | "view";
+
+export async function projectAccessLevels(
+  auth: AccessAuth,
+  projects: ProjectAccessRow[],
+  canEditModule: boolean,
+): Promise<Map<string, ProjectAccessLevel>> {
+  const out = new Map<string, ProjectAccessLevel>();
+  if (!canEditModule) {
+    for (const p of projects) out.set(p.id, "view");
+    return out;
+  }
+  const rest: string[] = [];
+  for (const p of projects) {
+    if (auth.is_super_admin || managesOrCreated(auth, p)) out.set(p.id, "manage");
+    else rest.push(p.id);
+  }
+  if (rest.length === 0) return out;
+  const [roles, assigned] = await Promise.all([
+    supabaseServer
+      .from("project_members")
+      .select("project_id, role")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("account_id", auth.account_id)
+      .in("project_id", rest),
+    supabaseServer
+      .from("project_tasks")
+      .select("project_id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("assignee_account_id", auth.account_id)
+      .in("project_id", rest),
+  ]);
+  /* A missing project_members table (migration pending) reads as "no roles". */
+  const roleOf = new Map(
+    (roles.error ? [] : ((roles.data ?? []) as { project_id: string; role: MemberRole }[])).map((r) => [r.project_id, r.role]),
+  );
+  const hasTask = new Set(((assigned.data ?? []) as { project_id: string }[]).map((r) => r.project_id));
+  for (const id of rest) {
+    const role = roleOf.get(id);
+    out.set(id, role === "manager" ? "manage" : role === "member" || hasTask.has(id) ? "edit" : "view");
+  }
+  return out;
+}
+
 /** Who may add/remove members, archive, and open the project chat for
  *  others: super admin, manager, creator, or a member with role manager. */
 export async function canManageProject(auth: AccessAuth, project: ProjectAccessRow): Promise<boolean> {

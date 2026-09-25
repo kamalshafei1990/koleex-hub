@@ -6,7 +6,7 @@ import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 /* DELETE /api/calendar/holidays/[id] — soft-delete (is_active=false) a holiday.
    Super Admin only, tenant-scoped (a tenant-less session touches only the
-   tenant-less rows). No screen calls this yet. (Report GEN-10) */
+   tenant-less rows). The Calendar's holidays panel calls it. (Report GEN-10) */
 export async function DELETE(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },

@@ -15,7 +15,10 @@
        with the Collaboration extension once the session has joined; saves
        then send the Yjs state, which the server MERGES (no 409s). Where
        collaboration is unavailable it falls back to the single-editor path
-       (a peer's save pings us and we re-fetch).
+       (a peer's save pings us and we re-fetch). A fallback save on a live
+       note is merged into the Yjs state server-side (409 when stale) and
+       live peers pull it; a transient fallback keeps retrying and REJOINS
+       — pending edits are saved first, then the editor rebinds.
      • "/" block menu, "[[" note links + Backlinks, checklist → To-do,
        version history, Koleex AI (summary / action items), duplicate,
        Markdown export, print / PDF, Send to Discuss, a phone keyboard bar
@@ -54,7 +57,7 @@ import {
   type NotesFolderRow,
 } from "@/lib/notes";
 import { NOTES_IMAGE_MIME } from "@/lib/notes-policy";
-import { getTabClientId, useNoteCollab } from "@/lib/note-collab";
+import { getTabClientId, useNoteCollab, type NoteUpdate } from "@/lib/note-collab";
 import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink } from "@/lib/notes-schema";
 import { NoteYjsSession, fetchCollabJoin, peerColor } from "@/lib/notes-yjs";
 import { noteFileName, noteToMarkdown } from "@/lib/notes-markdown";
@@ -204,6 +207,10 @@ const TEXT_COLORS = ["#567FB2", "#E5484D", "#0FA968", "#E8A33D", "#9B7BE0", "#88
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
+/* Rejoin backoff for a note that fell back to the single-editor path. */
+const JOIN_RETRY_MIN_MS = 15_000;
+const JOIN_RETRY_MAX_MS = 120_000;
+
 export type EditorChange = {
   title?: string;
   /** Always the editor's current document (also in collab mode, where it
@@ -348,7 +355,12 @@ export default function NoteEditor({
   const noteId = note?.id ?? null;
   const collabEligible = !!note && !isTrashed && (isSharee || !!note.is_shared) && !!me;
   const [session, setSession] = useState<NoteYjsSession | null>(null);
-  const [collab, setCollab] = useState<{ id: string | null; phase: "off" | "joining" | "live" }>({ id: null, phase: "off" });
+  /* `retry`: the fallback is transient (join or pre-join save failed) —
+     the editor keeps trying to rejoin; false = collaboration is off for
+     this note (server said so). */
+  const [collab, setCollab] = useState<{ id: string | null; phase: "off" | "joining" | "live"; retry?: boolean }>({ id: null, phase: "off" });
+  const [joinTick, setJoinTick] = useState(0);
+  const fallbackRetry = collabEligible && !!noteId && collab.id === noteId && collab.phase === "off" && collab.retry === true;
   const activeSession = session && noteId && session.noteId === noteId ? session : null;
   const collabPending = collabEligible && !activeSession && !(collab.id === noteId && collab.phase === "off");
   const editingDisabled = readOnly || isTrashed || isViewer || collabPending;
@@ -376,7 +388,9 @@ export default function NoteEditor({
   const onChangeRef = useRef(onChange);
   const sessionRef = useRef<NoteYjsSession | null>(activeSession);
   const onOpenNoteRef = useRef(onOpenNote);
+  const fallbackRetryRef = useRef(fallbackRetry);
   useEffect(() => {
+    fallbackRetryRef.current = fallbackRetry;
     noteRef.current = note;
     noteIdRef.current = note?.id ?? null;
     disabledRef.current = editingDisabled;
@@ -396,7 +410,7 @@ export default function NoteEditor({
   const pendingRef = useRef<Map<string, EditorChange>>(new Map());
   const inflightRef = useRef<Map<string, Promise<void>>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const broadcastRef = useRef<() => void>(() => {});
+  const broadcastRef = useRef<(o?: { body?: boolean }) => void>(() => {});
 
   const sendNote = useCallback(async (id: string, keepalive = false): Promise<void> => {
     if (!keepalive) {
@@ -414,12 +428,22 @@ export default function NoteEditor({
           // session the body already reached them over the socket — ping
           // only for what is not in the Yjs doc (title / tags / colour).
           const metaChanged = "title" in payload || "tags" in payload || "color" in payload;
-          if (id === noteIdRef.current && (!payload.yjs_update || metaChanged)) broadcastRef.current();
+          if (id === noteIdRef.current && (!payload.yjs_update || metaChanged)) {
+            // A single-editor body save is not in anyone's live doc yet:
+            // flag it so live peers pull the merged state (the server
+            // pings too — this covers a server without realtime config).
+            broadcastRef.current({ body: !payload.yjs_update && "body_json" in payload });
+          }
         } else if (res === "error") {
           // Keep the edits: newer pending changes win over the failed ones.
           pendingRef.current.set(id, { ...payload, ...(pendingRef.current.get(id) ?? {}) });
         }
         // "conflict": the parent reloaded the note; these edits are void.
+        // A fallback client is stale because the live session moved on —
+        // try to rejoin it rather than keep saving an old copy.
+        else if (res === "conflict" && id === noteIdRef.current && fallbackRetryRef.current) {
+          setJoinTick((n) => n + 1);
+        }
       })
       .catch(() => {
         pendingRef.current.set(id, { ...payload, ...(pendingRef.current.get(id) ?? {}) });
@@ -573,20 +597,66 @@ export default function NoteEditor({
     onRemoteApplied(fresh);
   }, [editor, onRemoteApplied]);
 
+  /* A body change landed OUTSIDE the live session (a single-editor save,
+     merged into the stored Yjs state by the server): pull the stored state
+     and merge it into the live doc. Merging is always safe — our own
+     unsaved edits are separate CRDT items — so this never waits for "not
+     busy". Coalesced: one pull in flight, at most one queued behind it. */
+  const pullingRef = useRef(false);
+  const pullAgainRef = useRef(false);
+  const pullServerState = useCallback(async () => {
+    if (pullingRef.current) { pullAgainRef.current = true; return; }
+    pullingRef.current = true;
+    try {
+      do {
+        pullAgainRef.current = false;
+        const s = sessionRef.current;
+        if (!s) return;
+        const j = await fetchCollabJoin(s.noteId);
+        if (!j || !j.available || sessionRef.current !== s) return;
+        s.setKeys(j.keys);
+        s.applyServerState(j.state);
+      } while (pullAgainRef.current);
+    } finally {
+      pullingRef.current = false;
+    }
+  }, []);
+
+  const onRemoteUpdate = useCallback((u: NoteUpdate) => {
+    if (u.body && sessionRef.current) void pullServerState();
+    void handleRemote();
+  }, [handleRemote, pullServerState]);
+
+  /* The channel came back after a drop: a live session may have missed a
+     body ping, so pull the stored state; a client that had fallen back to
+     the single-editor path tries to rejoin. */
+  const onSubscribed = useCallback((first: boolean) => {
+    if (sessionRef.current) { if (!first) void pullServerState(); return; }
+    if (fallbackRetryRef.current) setJoinTick((n) => n + 1);
+  }, [pullServerState]);
+
   /* Only a note that is actually shared opens a realtime channel. */
   const { peers, broadcastUpdate } = useNoteCollab({
     noteId: note?.id,
     me,
     status: editingDisabled ? "viewing" : "editing",
     enabled: collabEligible,
-    onRemoteUpdate: handleRemote,
+    onRemoteUpdate,
     yjs: activeSession,
+    onSubscribed,
   });
   useEffect(() => { broadcastRef.current = broadcastUpdate; }, [broadcastUpdate]);
 
+  const retryDelayRef = useRef(JOIN_RETRY_MIN_MS);
   /* Join the live session of a shared note. Pending single-editor edits of
-     this note are landed FIRST so the server's seed contains them; if they
-     cannot be saved, the note stays on the single-editor path. */
+     this note are landed FIRST so the server's seed (or, when a session
+     already exists, the stored state they are merged into) contains them;
+     if they cannot be saved, the note stays on the single-editor path for
+     now. The same sequence REJOINS after a fallback (joinTick): flush the
+     local edits through the save pipeline, then join — nothing typed on
+     the single-editor path is lost when the editor rebinds to the shared
+     doc. While joining the editor is read-only, so nothing slips between
+     the flush and the rebind. */
   useEffect(() => {
     if (!collabEligible || !noteId) {
       setSession(null);
@@ -598,15 +668,43 @@ export default function NoteEditor({
     void (async () => {
       await sendNote(noteId);
       if (cancelled) return;
-      if (pendingRef.current.has(noteId)) { setCollab({ id: noteId, phase: "off" }); return; }
+      if (pendingRef.current.has(noteId)) { setCollab({ id: noteId, phase: "off", retry: true }); return; }
       const j = await fetchCollabJoin(noteId);
       if (cancelled) return;
-      if (!j || !j.available) { setCollab({ id: noteId, phase: "off" }); return; }
+      if (!j) { setCollab({ id: noteId, phase: "off", retry: true }); return; }
+      if (!j.available) { setCollab({ id: noteId, phase: "off", retry: false }); return; }
+      retryDelayRef.current = JOIN_RETRY_MIN_MS;
       setSession(new NoteYjsSession({ noteId, state: j.state, keys: j.keys, tabId: getTabClientId() }));
       setCollab({ id: noteId, phase: "live" });
     })();
     return () => { cancelled = true; };
-  }, [collabEligible, noteId, sendNote]);
+  }, [collabEligible, noteId, sendNote, joinTick]);
+
+  /* Fallen back for a transient reason: retry with backoff, and at once
+     when the browser comes back online. (A realtime reconnect retries via
+     onSubscribed; a 409 on a fallback save retries from sendNote.) */
+  useEffect(() => {
+    if (!fallbackRetry) return;
+    const kick = () => setJoinTick((n) => n + 1);
+    const timer = setTimeout(kick, retryDelayRef.current);
+    retryDelayRef.current = Math.min(retryDelayRef.current * 2, JOIN_RETRY_MAX_MS);
+    window.addEventListener("online", kick);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", kick);
+    };
+  }, [fallbackRetry, joinTick]);
+
+  /* Leaving a live session for the single-editor path (the note was
+     unshared under us): the solo editor starts from our last saved copy,
+     so refresh it from the server once the rebuilt editor is up — its base
+     token and body then describe the same version. */
+  const soloRefreshRef = useRef(false);
+  useEffect(() => {
+    if (activeSession || !editor || !soloRefreshRef.current) return;
+    soloRefreshRef.current = false;
+    void handleRemote();
+  }, [activeSession, editor, handleRemote]);
 
   /* One session at a time; a replaced session is torn down (its caret is
      removed for everyone). A peer using a different key (someone was added
@@ -624,8 +722,9 @@ export default function NoteEditor({
         const j = await fetchCollabJoin(session.noteId);
         if (!j) return;
         if (!j.available) {
+          soloRefreshRef.current = true;
           setSession((cur) => (cur === session ? null : cur));
-          setCollab({ id: session.noteId, phase: "off" });
+          setCollab({ id: session.noteId, phase: "off", retry: false });
           return;
         }
         session.setKeys(j.keys);

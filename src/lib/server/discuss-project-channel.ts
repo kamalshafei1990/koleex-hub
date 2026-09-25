@@ -10,6 +10,7 @@ import "server-only";
    and the membership shape it writes (channel_id, account_id, role
    admin|member). Membership revival mirrors that route's ensureMembers:
    a soft-left member (left_at set) is brought back instead of duplicated.
+   Removal mirrors that route's removeMember (soft-leave + promoteIfNoAdmin).
 
    Everything runs with the service-role client; callers MUST have already
    passed the Projects access gate. Tenant is always the caller's.
@@ -161,5 +162,67 @@ export async function addAccountsToProjectChannel(tenantId: string, projectId: s
     await emitPings(accountIds.map((id) => ({ topic: rtTopic.account(id) })));
   } catch (e) {
     console.error("[discuss-project-channel] add members:", e);
+  }
+}
+
+/** If the channel has active members but no active admin, promote the
+ *  longest-standing member — same rule as the Discuss route's
+ *  promoteIfNoAdmin (the last admin leaving must not orphan the chat).
+ *  Best-effort. */
+async function promoteIfNoAdmin(channelId: string): Promise<void> {
+  try {
+    const { data: rows } = await supabaseServer
+      .from(MEMBERS)
+      .select("id, role, joined_at")
+      .eq("channel_id", channelId)
+      .is("left_at", null)
+      .order("joined_at", { ascending: true });
+    const active = (rows ?? []) as { id: string; role: string }[];
+    if (active.length === 0 || active.some((r) => r.role === "admin")) return;
+    await supabaseServer.from(MEMBERS).update({ role: "admin" }).eq("id", active[0].id);
+  } catch { /* best-effort */ }
+}
+
+/** A member removed from the project leaves the project's chat, if one
+ *  exists. Mirrors Discuss `removeMember`: the row is soft-left (left_at
+ *  stamped, pin / unread cleared) — never deleted — so re-adding the
+ *  person to the project revives it via ensureMembers. If that leaves no
+ *  admin, the longest-standing member is promoted. Never throws; a missing
+ *  channel / column is a no-op. */
+export async function removeAccountFromProjectChannel(tenantId: string, projectId: string, accountId: string): Promise<void> {
+  try {
+    const channelId = await findProjectChannel(tenantId, projectId);
+    if (!channelId) return;
+    const { data: target } = await supabaseServer
+      .from(MEMBERS)
+      .select("id, role")
+      .eq("channel_id", channelId)
+      .eq("account_id", accountId)
+      .is("left_at", null)
+      .maybeSingle();
+    if (!target) return;
+    const { error } = await supabaseServer
+      .from(MEMBERS)
+      .update({ left_at: new Date().toISOString(), pinned_at: null, marked_unread: false })
+      .eq("id", (target as { id: string }).id);
+    if (error) {
+      console.error("[discuss-project-channel] remove member:", error.message);
+      return;
+    }
+    await promoteIfNoAdmin(channelId);
+    /* Bump updated_at so SSE clients (which watch it) refresh the roster. */
+    await supabaseServer.from(CHANNELS).update({ updated_at: new Date().toISOString() }).eq("id", channelId);
+    const { data: rest } = await supabaseServer
+      .from(MEMBERS)
+      .select("account_id")
+      .eq("channel_id", channelId)
+      .is("left_at", null);
+    await emitPings([
+      { topic: rtTopic.channel(channelId) },
+      { topic: rtTopic.account(accountId) },
+      ...((rest ?? []) as { account_id: string }[]).map((r) => ({ topic: rtTopic.account(r.account_id) })),
+    ]);
+  } catch (e) {
+    console.error("[discuss-project-channel] remove member:", e);
   }
 }

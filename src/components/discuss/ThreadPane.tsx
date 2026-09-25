@@ -17,6 +17,11 @@
    Voice messages, file attachments, and product mentions stay in the
    main channel composer so threads feel focused on back-and-forth
    discussion, not side-channel file drops.
+
+   Sends behave like the main composer: an optimistic bubble at once; a
+   failure a retry can fix keeps it as "Not sent · Retry · Delete" (retry
+   reuses the same client_msg_id, so it can never duplicate) and parks it in
+   the reload-proof outbox under this parent (discuss-outbox.ts).
    --------------------------------------------------------------------------- */
 
 import {
@@ -30,17 +35,25 @@ import {
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { RefreshIcon } from "@/components/icons/ui";
 import {
   connectDiscussStream,
   fetchThreadMessages,
-  sendDiscussMessage,
+  sendDiscussMessageResult,
   toggleReaction,
   subscribeToChannel,
 } from "@/lib/discuss";
+import {
+  outboxBubble,
+  putDiscussOutbox,
+  readDiscussOutbox,
+  removeDiscussOutbox,
+} from "@/lib/discuss-outbox";
 import { discussTime } from "@/lib/discuss-time";
 import { TranslatableBody } from "./TranslatableBody";
 import { DiscussAvatar } from "./DiscussAvatar";
-import type { DiscussMessageWithAuthor } from "@/types/supabase";
+import type { DiscussAuthor, DiscussMessageWithAuthor } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Quick-pick reactions shown in the hover row — matches Slack defaults. */
@@ -51,6 +64,8 @@ export interface ThreadPaneProps {
   parent: DiscussMessageWithAuthor;
   /** Current user's account id for authoring replies + reaction toggle. */
   currentAccountId: string;
+  /** How the current user's own optimistic replies are drawn. */
+  currentAuthor?: DiscussAuthor | null;
   /** The channel the parent message lives in. */
   channelId: string;
   /** Close the thread drawer. */
@@ -62,6 +77,14 @@ export interface ThreadPaneProps {
   lang?: string;
   /** i18n helper. */
   t: (key: string, fallback?: string) => string;
+}
+
+/* Server rows plus my still-unsent replies (temp ids) the server has not
+   acknowledged by client_msg_id. */
+function withPending(rows: DiscussMessageWithAuthor[], prev: DiscussMessageWithAuthor[]): DiscussMessageWithAuthor[] {
+  const have = new Set(rows.map((r) => r.client_msg_id).filter(Boolean) as string[]);
+  const pending = prev.filter((m) => m.id.startsWith("temp_") && !(m.client_msg_id && have.has(m.client_msg_id)));
+  return pending.length ? [...rows, ...pending] : rows;
 }
 
 /* Replace-or-append by id, keeping chronological order. */
@@ -77,6 +100,7 @@ function upsertById(list: DiscussMessageWithAuthor[], m: DiscussMessageWithAutho
 export function ThreadPane({
   parent,
   currentAccountId,
+  currentAuthor = null,
   channelId,
   onClose,
   autoTranslate = false,
@@ -84,11 +108,21 @@ export function ThreadPane({
   lang = "en",
   t,
 }: ThreadPaneProps) {
-  const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
+  /* Unsent replies of THIS thread from the reload-proof outbox come back as
+     "Not sent" bubbles; the thread then loads around them (load() keeps
+     temp bubbles). The pane is keyed by parent id, so this runs per thread. */
+  const [restored] = useState(() =>
+    readDiscussOutbox(currentAccountId)
+      .filter((e) => e.channelId === channelId && e.threadParentId === parent.id)
+      .map(outboxBubble),
+  );
+  const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>(restored);
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
+  /* Temp ids of replies that failed in a retryable way. */
+  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(() => new Set(restored.map((b) => b.id)));
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -98,15 +132,29 @@ export function ThreadPane({
   const loadSeq = useRef(0);
   const load = useCallback(async (silent = false) => {
     const seq = ++loadSeq.current;
-    if (!silent) setLoading(true);
+    /* `loading` starts true and only the mount load is non-silent (the pane
+       is keyed per parent), so there is nothing to switch on here. */
     const rows = await fetchThreadMessages(parent.id, currentAccountId);
     if (seq !== loadSeq.current) return; // a newer load superseded this one
+    /* The server has these keys now: their "Not sent" copies are settled. */
+    const have = rows.map((r) => r.client_msg_id).filter(Boolean) as string[];
+    if (have.length > 0) {
+      removeDiscussOutbox(currentAccountId, have);
+      setFailedIds((prev) => {
+        const drop = have.map((id) => `temp_${id}`).filter((id) => prev.has(id));
+        if (drop.length === 0) return prev;
+        const next = new Set(prev);
+        for (const id of drop) next.delete(id);
+        return next;
+      });
+    }
     /* A failed silent refresh returns [] — never wipe a visible thread. */
-    setMessages((prev) => (silent && rows.length === 0 && prev.length > 0 ? prev : rows));
+    setMessages((prev) => (silent && rows.length === 0 && prev.length > 0 ? prev : withPending(rows, prev)));
     setLoading(false);
   }, [parent.id, currentAccountId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() only sets state after its fetch resolves
     void load();
   }, [load]);
 
@@ -154,30 +202,124 @@ export function ThreadPane({
     };
   }, [channelId, parent.id, load]);
 
+  /* One attempt for a reply bubble (first send and every retry share the
+     same clientMsgId, so the server dedupes). */
+  const attempt = useCallback(
+    async (bubble: DiscussMessageWithAuthor): Promise<"sent" | "retry" | "refused"> => {
+      const clientMsgId = bubble.client_msg_id as string;
+      const result = await sendDiscussMessageResult({
+        channelId,
+        authorId: currentAccountId,
+        body: bubble.body ?? "",
+        kind: "text",
+        replyToMessageId: parent.id,
+        clientMsgId,
+      });
+      const unfail = (prev: ReadonlySet<string>) => {
+        if (!prev.has(bubble.id)) return prev;
+        const next = new Set(prev);
+        next.delete(bubble.id);
+        return next;
+      };
+      if (result.row) {
+        const saved = result.row;
+        removeDiscussOutbox(currentAccountId, [clientMsgId]);
+        setFailedIds(unfail);
+        setMessages((prev) =>
+          prev.some((m) => m.id === saved.id)
+            ? prev.filter((m) => m.id !== bubble.id)
+            : prev.map((m) => (m.id === bubble.id ? { ...m, id: saved.id, created_at: saved.created_at } : m)),
+        );
+        void load(true);
+        return "sent";
+      }
+      if (result.retryable) {
+        putDiscussOutbox(currentAccountId, {
+          clientMsgId,
+          channelId,
+          body: bubble.body ?? "",
+          kind: "text",
+          metadata: {},
+          replyToMessageId: parent.id,
+          threadParentId: parent.id,
+          display: bubble,
+        });
+        setFailedIds((prev) => new Set(prev).add(bubble.id));
+        return "retry";
+      }
+      removeDiscussOutbox(currentAccountId, [clientMsgId]);
+      setFailedIds(unfail);
+      setMessages((prev) => prev.filter((m) => m.id !== bubble.id));
+      return "refused";
+    },
+    [channelId, currentAccountId, parent.id, load],
+  );
+
   const handleSend = useCallback(async () => {
     const body = composerBody.trim();
     if (!body || sending) return;
     setSending(true);
     setSendError(false);
-    const row = await sendDiscussMessage({
-      channelId,
-      authorId: currentAccountId,
-      body,
+    const clientMsgId = crypto.randomUUID();
+    const bubble: DiscussMessageWithAuthor = {
+      id: `temp_${clientMsgId}`,
+      channel_id: channelId,
+      author_account_id: currentAccountId,
+      reply_to_message_id: parent.id,
       kind: "text",
-      replyToMessageId: parent.id,
-      clientMsgId: crypto.randomUUID(),
-    });
+      body,
+      body_html: null,
+      metadata: {},
+      edited_at: null,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      client_msg_id: clientMsgId,
+      author: currentAuthor ?? { id: currentAccountId, username: "me", avatar_url: null, full_name: null },
+      reactions: [],
+      reply_preview: null,
+    };
+    setMessages((prev) => [...prev, bubble]);
+    setComposerBody("");
+    const outcome = await attempt(bubble);
     setSending(false);
-    if (row) {
-      setComposerBody("");
-      void load(true);
-      /* Refocus composer so users can keep hammering replies. */
-      textareaRef.current?.focus();
-    } else {
-      /* Keep the text so nothing typed is lost; say it failed. */
+    if (outcome === "refused") {
+      /* Refused for good (not a member, too long): hand the text back so
+         nothing typed is lost, and say it failed. */
+      setComposerBody((cur) => cur || body);
       setSendError(true);
     }
-  }, [composerBody, sending, channelId, currentAccountId, parent.id, load]);
+    /* Refocus composer so users can keep hammering replies. */
+    textareaRef.current?.focus();
+  }, [composerBody, sending, channelId, currentAccountId, currentAuthor, parent.id, attempt]);
+
+  const handleRetry = useCallback(
+    (tempId: string) => {
+      const bubble = messages.find((m) => m.id === tempId);
+      if (!bubble) return;
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      void attempt(bubble).then((outcome) => {
+        if (outcome === "refused") setSendError(true);
+      });
+    },
+    [messages, attempt],
+  );
+
+  const handleDiscard = useCallback(
+    (tempId: string) => {
+      removeDiscussOutbox(currentAccountId, [tempId.replace(/^temp_/, "")]);
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    },
+    [currentAccountId],
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -243,10 +385,10 @@ export function ThreadPane({
     [currentAccountId, applyReaction],
   );
 
-  /* Count replies only (parent excluded). */
+  /* Count replies only (parent excluded; unsent bubbles are not replies yet). */
   const replyCount = useMemo(
-    () => Math.max(0, messages.length - 1),
-    [messages.length],
+    () => Math.max(0, messages.filter((m) => !m.id.startsWith("temp_")).length - 1),
+    [messages],
   );
 
   return (
@@ -290,8 +432,12 @@ export function ThreadPane({
               <ThreadMessage
                 key={m.id}
                 msg={m}
-                isParent={idx === 0}
+                isParent={idx === 0 && !m.id.startsWith("temp_")}
                 currentAccountId={currentAccountId}
+                pending={m.id.startsWith("temp_")}
+                failed={failedIds.has(m.id)}
+                onRetry={() => handleRetry(m.id)}
+                onDiscard={() => handleDiscard(m.id)}
                 onToggleReaction={(emoji) => void handleToggleReaction(m.id, emoji)}
                 autoTranslate={autoTranslate}
                 targetLang={targetLang}
@@ -358,6 +504,10 @@ function ThreadMessage({
   msg,
   isParent,
   currentAccountId,
+  pending = false,
+  failed = false,
+  onRetry,
+  onDiscard,
   onToggleReaction,
   autoTranslate = false,
   targetLang = "en",
@@ -367,6 +517,12 @@ function ThreadMessage({
   msg: DiscussMessageWithAuthor;
   isParent: boolean;
   currentAccountId: string;
+  /** Optimistic reply the server has not acknowledged yet. */
+  pending?: boolean;
+  /** Pending reply whose send failed — shows "Not sent · Retry · Delete". */
+  failed?: boolean;
+  onRetry?: () => void;
+  onDiscard?: () => void;
   onToggleReaction: (emoji: string) => void;
   autoTranslate?: boolean;
   targetLang?: string;
@@ -436,6 +592,36 @@ function ThreadMessage({
             />
           )}
 
+          {/* Unsent reply — same affordances as the main list's bubble. */}
+          {failed && (
+            <div
+              role="group"
+              aria-label={t("send.notSent", "Not sent")}
+              className="mt-1 flex items-center gap-1.5 text-[11px]"
+            >
+              <span className="font-semibold text-[var(--state-error)]">{t("send.notSent", "Not sent")}</span>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-surface)] transition-colors"
+              >
+                <RefreshIcon className="h-3 w-3" aria-hidden />
+                {t("send.retry", "Retry")}
+              </button>
+              <button
+                type="button"
+                onClick={onDiscard}
+                className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[var(--text-muted)] hover:text-[var(--state-error)] hover:bg-[var(--bg-surface)] transition-colors"
+              >
+                <TrashIcon className="h-3 w-3" aria-hidden />
+                {t("send.discard", "Delete")}
+              </button>
+            </div>
+          )}
+          {pending && !failed && (
+            <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{t("send.sending", "Sending…")}</div>
+          )}
+
           {/* Reactions row — same look as the main list. */}
           {msg.reactions.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -459,8 +645,9 @@ function ThreadMessage({
           )}
         </div>
 
-        {/* Hover / focus actions — reaction picker */}
-        {!msg.deleted_at && (
+        {/* Hover / focus actions — reaction picker (not on an unsent reply:
+            it has no server id to react to yet). */}
+        {!msg.deleted_at && !pending && (
           <div className="relative shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <button
               type="button"

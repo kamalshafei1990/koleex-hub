@@ -520,4 +520,14 @@ export const discussT: Translations = {
   "admin.lastAdmin":         { en: "A conversation needs at least one admin.", zh: "对话至少需要一位管理员。", ar: "تحتاج المحادثة إلى مسؤول واحد على الأقل." },
   "admin.dangerZone":        { en: "Conversation",            zh: "对话",                 ar: "المحادثة" },
   "keyboard.editLast":       { en: "↑ in an empty box edits your last message", zh: "空白输入框中按 ↑ 可编辑上一条消息", ar: "اضغط ↑ في مربع فارغ لتعديل آخر رسالة لك" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     2026-09-27 — reload-proof unsent messages, muted pill outside Discuss,
+     "chat with these people" links (/discuss?with=…&title=…). {n} is
+     substituted.
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "send.attachmentReadd":    { en: "The attachment didn't upload — add it again after sending.", zh: "附件未上传成功——发送后请重新添加。", ar: "لم يُرفع المرفق — أضفه مرة أخرى بعد الإرسال." },
+  "conv.mutedUnread":        { en: "{n} unread · muted",      zh: "{n} 条未读 · 免打扰",     ar: "{n} غير مقروءة · مكتومة" },
+  "with.failed":             { en: "Couldn't open a conversation with those people.", zh: "无法与这些人开始对话。", ar: "تعذر فتح محادثة مع هؤلاء الأشخاص." },
+  "with.defaultTitle":       { en: "Group chat",              zh: "群聊",                 ar: "دردشة جماعية" },
 };

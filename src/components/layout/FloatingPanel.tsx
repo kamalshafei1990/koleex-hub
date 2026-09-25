@@ -53,7 +53,10 @@ import {
   subscribeToMyChannels,
   subscribeToChannel,
   connectDiscussStream,
+  type DiscussChannelListRow,
 } from "@/lib/discuss";
+import { discussT } from "@/lib/translations/discuss";
+import BellOffIcon from "@/components/icons/ui/BellOffIcon";
 import { useCurrentAccount } from "@/lib/identity";
 import { useSkin } from "@/lib/appearance";
 import type {
@@ -106,6 +109,8 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
 
 export default function FloatingPanel() {
   const { t } = useTranslation(hubT);
+  /* Discuss strings (muted pill) live in the Discuss dictionary. */
+  const { t: td } = useTranslation(discussT);
   const pathname = usePathname();
   const dk = useTheme();
   /* Aurora restyles the dock's three surfaces; Core keeps every value below
@@ -188,7 +193,7 @@ export default function FloatingPanel() {
     if (!showAi && tab === "ai") setTab("discuss");
     if (!showDiscuss && tab === "discuss") setTab("ai");
   }, [showAi, showDiscuss, tab]);
-  const [channels, setChannels] = useState<DiscussChannelWithState[]>([]);
+  const [channels, setChannels] = useState<DiscussChannelListRow[]>([]);
   const [activeChannel, setActiveChannel] = useState<DiscussChannelWithState | null>(null);
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -304,10 +309,14 @@ export default function FloatingPanel() {
     return subscribeToMyChannels({
       onMessageInsert: (msg) => {
         if (msg.author_account_id === accountIdRef.current) return;
+        /* A muted chat counts in muted_unread_count (quiet pill, off the
+           FAB badge) — the same split as the server read and Discuss. */
         setChannels(prev =>
           prev.map(c =>
             c.id === msg.channel_id
-              ? { ...c, unread_count: (c.unread_count ?? 0) + 1 }
+              ? c.muted
+                ? { ...c, muted_unread_count: (c.muted_unread_count ?? 0) + 1 }
+                : { ...c, unread_count: (c.unread_count ?? 0) + 1 }
               : c,
           ),
         );
@@ -330,7 +339,7 @@ export default function FloatingPanel() {
          put the newest message at the TOP of the dock. */
       setMessages(msgs);
       await markChannelRead(ch.id, aid);
-      setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, unread_count: 0 } : c));
+      setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
       window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
     } catch { /* ignore */ }
     setLoadingMsgs(false);
@@ -351,7 +360,7 @@ export default function FloatingPanel() {
         const aid = accountIdRef.current;
         if (aid && msg.author_account_id !== aid) {
           void markChannelRead(activeChannel.id, aid);
-          setChannels(prev => prev.map(c => c.id === activeChannel.id ? { ...c, unread_count: 0 } : c));
+          setChannels(prev => prev.map(c => c.id === activeChannel.id ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
         }
       },
       onMessageUpdate: () => {},
@@ -372,7 +381,7 @@ export default function FloatingPanel() {
       });
       if (aid && m.author_account_id !== aid) {
         void markChannelRead(channelId, aid);
-        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, unread_count: 0 } : c));
+        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
       }
     });
     return () => {
@@ -1004,6 +1013,10 @@ export default function FloatingPanel() {
                   ) : (
                     sortedChannels.map((ch) => {
                       const hasUnread = (ch.unread_count ?? 0) > 0;
+                      /* Muted rows keep their count (WeChat) in a quieter
+                         pill, as in the Discuss sidebar; it never reaches
+                         the FAB badge. */
+                      const mutedUnread = ch.muted ? (ch.muted_unread_count ?? 0) : 0;
                       const preview = ch.last_message?.body?.trim() || "";
                       const author = ch.last_message?.author_username;
                       const avatar = channelAvatar(ch);
@@ -1036,10 +1049,25 @@ export default function FloatingPanel() {
                               <span className={`text-[11.5px] truncate ${hasUnread ? (dk ? "text-white/60" : "text-black/60") : textG}`}>
                                 {author && preview ? `${author}: ${preview}` : preview || "No messages"}
                               </span>
-                              {hasUnread && (
+                              {hasUnread ? (
                                 <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
                                   {ch.unread_count! > 99 ? "99+" : ch.unread_count}
                                 </span>
+                              ) : mutedUnread > 0 ? (
+                                <span
+                                  title={td("conv.mutedUnread", "{n} unread · muted").replace("{n}", String(mutedUnread))}
+                                  className={`min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold tabular-nums flex items-center justify-center shrink-0 ${
+                                    dk ? "bg-white/[0.10] text-white/55" : "bg-black/[0.07] text-black/50"
+                                  }`}
+                                >
+                                  {mutedUnread > 99 ? "99+" : mutedUnread}
+                                </span>
+                              ) : null}
+                              {ch.muted && (
+                                <BellOffIcon
+                                  className={`h-3 w-3 shrink-0 ${textG}`}
+                                  aria-label={td("conv.mutedLabel", "Muted")}
+                                />
                               )}
                             </div>
                           </div>

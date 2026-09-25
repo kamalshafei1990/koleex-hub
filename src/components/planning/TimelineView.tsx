@@ -7,8 +7,10 @@
      · Day   — the whole day, 64px an hour, opened scrolled to 06:00.
      · Week  — seven days side by side, 06:00–22:00 each, 14px an hour.
 
-   Times are read on the planner's clock: the Calendar's timezone preference
-   when they set one, else the browser's zone (lib/calendar-tz, read only).
+   Times are read on the planner's clock (lib/planning-tz): the Calendar's
+   timezone preference when they set one, else the browser's zone — the
+   same clock as the week grid, so both views put an item on the same day.
+   `days` are wall dates in that zone.
 
    Editing (only items the caller may write): drag a bar to move it — across
    time and onto another row — or drag its end edge to resize. Everything
@@ -23,7 +25,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
-import { zonedParts, zonedToUtc } from "@/lib/calendar-tz";
+import { toWall, zonedParts, zonedToUtc } from "@/lib/calendar-tz";
 import {
   dateKey,
   ITEM_TYPE_COLOR,
@@ -447,7 +449,7 @@ export default function TimelineView({
                         key={`${item.id}-${si}`}
                         role="button"
                         tabIndex={si === 0 ? 0 : -1}
-                        aria-label={`${label}, ${fmtDMY(new Date(s))} ${range_}, ${t(`status.${item.status}`)}${writable ? "" : `, ${t("tl.readOnly")}`}`}
+                        aria-label={`${label}, ${fmtDMY(toWall(s, tz))} ${range_}, ${t(`status.${item.status}`)}${writable ? "" : `, ${t("tl.readOnly")}`}`}
                         aria-describedby={writable ? hintId : undefined}
                         onPointerDown={(ev) => beginDrag(ev, item, "move", item.resource_id ?? "__open__")}
                         onKeyDown={(ev) => onBarKey(ev, item)}

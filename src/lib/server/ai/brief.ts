@@ -14,7 +14,9 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
-import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
+import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
+import { accountTimezone } from "@/lib/server/calendar-notify";
 import { dayRangeISO } from "@/lib/server/ai-agent/tools/task-draft";
 
 export { briefText, hourIn, dayIn, type BriefLang, type BriefCounts } from "@/lib/server/ai/brief-text";
@@ -35,7 +37,9 @@ export async function buildBriefCounts(viewer: TodoViewer, tz: string, now: Date
   const endMs = Date.parse(endOfToday);
 
   /* MEETINGS: the person's own calendar, one-off events starting today and
-     recurring ones with an occurrence today. */
+     recurring ones with an occurrence today — on the organizer's clock, with
+     their "this occurrence only" changes (a deleted one is not a meeting, a
+     moved or renamed one counts as it now is). */
   let evQ = supabaseServer
     .from("koleex_calendar_events")
     .select("id, title, start_at, end_at, recurrence, recurrence_until")
@@ -43,10 +47,16 @@ export async function buildBriefCounts(viewer: TodoViewer, tz: string, now: Date
   if (viewer.tenantId) evQ = evQ.eq("tenant_id", viewer.tenantId);
   const { data: events } = await evQ.or(`recurrence.not.is.null,and(start_at.gte.${startOfToday},start_at.lte.${endOfToday})`).limit(200);
   const todays: Array<{ title: string; at: number }> = [];
-  for (const e of (events ?? []) as Array<{ title: string | null; start_at: string; end_at: string | null; recurrence: CalendarRec; recurrence_until: string | null }>) {
+  const evRows = (events ?? []) as Array<{ id: string; title: string | null; start_at: string; end_at: string | null; recurrence: CalendarRec; recurrence_until: string | null }>;
+  const seriesIds = evRows.filter((e) => e.recurrence).map((e) => e.id);
+  const [ownerTz, exceptions] = await Promise.all([
+    seriesIds.length ? accountTimezone(viewer.accountId) : Promise.resolve("UTC"),
+    loadExceptions(seriesIds),
+  ]);
+  for (const e of evRows) {
     if (e.recurrence) {
-      const occ = expandRecurrence(e.start_at, e.end_at ?? e.start_at, e.recurrence, e.recurrence_until, new Date(startMs), new Date(endMs + 1));
-      for (const o of occ) todays.push({ title: e.title ?? "", at: o.start.getTime() });
+      const occ = expandWithExceptions(e.start_at, e.end_at ?? e.start_at, e.recurrence, e.recurrence_until, new Date(startMs), new Date(endMs + 1), exceptions.get(e.id), 400, ownerTz);
+      for (const o of occ) todays.push({ title: o.override?.title || e.title || "", at: o.start.getTime() });
     } else {
       const at = Date.parse(e.start_at);
       if (at >= startMs && at <= endMs) todays.push({ title: e.title ?? "", at });

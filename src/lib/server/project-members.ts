@@ -10,7 +10,9 @@ import "server-only";
    is left alone.
 
    Every writer here also mirrors the change into the project's Discuss
-   chat (if one exists): new members join the channel.
+   chat (if one exists): new members join the channel, a removed member
+   leaves it (soft-leave, so re-adding revives the same row) unless they
+   are still the project manager. A role change never touches the chat.
 
    Before the migration is applied the table is missing: reads answer
    { available: false }, writes answer a clear 409, and the automatic sync
@@ -18,7 +20,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { addAccountsToProjectChannel } from "@/lib/server/discuss-project-channel";
+import { addAccountsToProjectChannel, removeAccountFromProjectChannel } from "@/lib/server/discuss-project-channel";
 import type { MemberRole } from "@/lib/server/project-access";
 
 export const MEMBER_ROLES: readonly MemberRole[] = ["manager", "member", "viewer"];
@@ -119,6 +121,17 @@ export async function removeProjectMember(
     console.error("[project-members] delete:", error.message);
     return { error: "Failed to remove member", status: 500 };
   }
+  /* The project manager keeps their seat in the chat — the members route
+     already refuses to remove them, this guards any other caller. */
+  const { data: proj } = await supabaseServer
+    .from("projects")
+    .select("manager_account_id")
+    .eq("tenant_id", auth.tenant_id)
+    .eq("id", projectId)
+    .maybeSingle();
+  if ((proj as { manager_account_id: string | null } | null)?.manager_account_id !== accountId) {
+    await removeAccountFromProjectChannel(auth.tenant_id, projectId, accountId);
+  }
   return { ok: true };
 }
 
@@ -150,4 +163,30 @@ export async function syncProjectMembersFromAssignees(auth: Auth, projectId: str
   } catch (e) {
     console.error("[project-members] sync:", e);
   }
+}
+
+/** Member count per project in ONE query: the project_member_counts RPC
+ *  (supabase/migrations/20260927_projects_partials.sql). Until that is
+ *  applied, one narrow select aggregated here. Projects without members
+ *  are absent (read as 0); before 20260926 the map is empty. */
+export async function projectMemberCounts(tenantId: string, projectIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (projectIds.length === 0) return out;
+  const { data, error } = await supabaseServer.rpc("project_member_counts", {
+    p_tenant: tenantId,
+    p_project_ids: projectIds,
+  });
+  if (!error && Array.isArray(data)) {
+    for (const r of data as { project_id: string; member_count: number }[]) out.set(r.project_id, r.member_count);
+    return out;
+  }
+  const { data: rows, error: selErr } = await supabaseServer
+    .from("project_members")
+    .select("project_id")
+    .eq("tenant_id", tenantId)
+    .in("project_id", projectIds)
+    .limit(50000);
+  if (selErr) return out;
+  for (const r of (rows ?? []) as { project_id: string }[]) out.set(r.project_id, (out.get(r.project_id) ?? 0) + 1);
+  return out;
 }

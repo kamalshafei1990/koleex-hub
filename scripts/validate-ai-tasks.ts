@@ -326,7 +326,7 @@ const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons: Array
 check("vercel runs it hourly", vercel.crons.some((c) => c.path === "/api/cron/ai-brief" && c.schedule === "0 * * * *"));
 const briefSrc = readFileSync("src/lib/server/ai/brief.ts", "utf8");
 check("the brief reads the person's own calendar (one-off and recurring, today in their zone) and the tasks through the shared scope; it writes nothing",
-  /\.from\("koleex_calendar_events"\)[\s\S]{0,200}?\.eq\("account_id", viewer\.accountId\)/.test(briefSrc) && /expandRecurrence\(e\.start_at/.test(briefSrc) &&
+  /\.from\("koleex_calendar_events"\)[\s\S]{0,200}?\.eq\("account_id", viewer\.accountId\)/.test(briefSrc) && /expand(?:Recurrence|WithExceptions)\(e\.start_at/.test(briefSrc) &&
   /tq = applyTodoScope\(tq, viewer, await sharedTodoIds\(viewer\)\);/.test(briefSrc) && !/\.insert\(|\.update\(|\.delete\(/.test(briefSrc));
 check("the settings tab offers the hour beside the suggestion tiles, in three languages; the chat opens the brief from the notification and drops the parameter",
   /BRIEF_HOURS = \[5, 6, 7, 8, 9, 10, 11, 12\]/.test(readFileSync("src/components/settings/tabs/AiTab.tsx", "utf8")) && /set\("briefHour", v === "off" \? null : Number\(v\)\)/.test(readFileSync("src/components/settings/tabs/AiTab.tsx", "utf8")) &&

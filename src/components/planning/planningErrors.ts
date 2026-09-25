@@ -16,6 +16,7 @@ export function planningErrorKey(e: unknown): string {
   if (e.code === "invalid_recurrence") return "err.recurrence";
   if (e.code === "invalid_resource" || e.code === "invalid_role") return "err.invalidRef";
   if (e.code === "end_before_start") return "val.endAfterStart";
+  if (e.code === "series_end_before_start") return "err.seriesRange";
   if (e.code === "start_end_required") return "val.required";
   if (e.status === 403) return e.code === "forbidden" ? "err.forbidden" : "err.generic";
   if (e.status === 404) return "err.notFound";

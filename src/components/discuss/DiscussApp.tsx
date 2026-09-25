@@ -103,6 +103,7 @@ import {
   fetchPinnedMessages,
   fetchStarredMessages,
   findOrCreateDirectChannel,
+  resolveGroupWith,
   markChannelRead,
   setChannelPinned,
   hideChannel,
@@ -113,7 +114,6 @@ import {
   saveDraft,
   fetchDraft,
   clearDraft,
-  sendDiscussMessage,
   setChannelMuted,
   setNotificationPref,
   subscribeToChannel,
@@ -136,6 +136,12 @@ import {
 } from "@/lib/discuss";
 import { findMentionQuery, normalizeMentions, rankMentionCandidates } from "@/lib/discuss-mentions";
 import { setActiveDiscussChannel } from "@/lib/discuss-active-store";
+import {
+  outboxBubble,
+  putDiscussOutbox,
+  readDiscussOutbox,
+  removeDiscussOutbox,
+} from "@/lib/discuss-outbox";
 import { discussAttachmentUrl } from "@/lib/discuss-attachments";
 import {
   createPreviewUrl,
@@ -251,10 +257,26 @@ function rowUnread(c: DiscussChannelListRow): number {
 }
 
 /** A row after muting / unmuting: its count moves between the badge-counted
- *  field and the muted one, so the bell / home tile follow immediately. */
+ *  field and the muted one, so the bell / home tile follow immediately. A
+ *  manual "unread" mark folds into the muted count as 1 (as the server read
+ *  does), so a muted chat never lights a badge. */
 function withMuted(c: DiscussChannelListRow, muted: boolean): DiscussChannelListRow {
   const n = rowUnread(c);
-  return { ...c, muted, unread_count: muted ? 0 : n, muted_unread_count: muted ? n : 0 };
+  if (muted) {
+    return { ...c, muted, unread_count: 0, muted_unread_count: n || (c.marked_unread ? 1 : 0), marked_unread: false };
+  }
+  return { ...c, muted, unread_count: n, muted_unread_count: 0 };
+}
+
+/** Undo an optimistic withMuted() from the row as it was before. */
+function restoreMuteCounts(c: DiscussChannelListRow, before: DiscussChannelListRow): DiscussChannelListRow {
+  return {
+    ...c,
+    muted: before.muted,
+    unread_count: before.unread_count,
+    muted_unread_count: before.muted_unread_count,
+    marked_unread: before.marked_unread,
+  };
 }
 
 /** Tell the bell / home tile what a conversation's BADGE count now is. */
@@ -337,6 +359,14 @@ export default function DiscussApp() {
   const accountUsername = account?.username ?? "me";
   const accountDisplayName =
     account?.person?.full_name || account?.username || "Me";
+  /* How my own optimistic thread-pane replies are drawn. */
+  const threadAuthor = useMemo<DiscussAuthor | null>(
+    () =>
+      accountId
+        ? { id: accountId, username: accountUsername, avatar_url: account?.avatar_url ?? null, full_name: accountDisplayName }
+        : null,
+    [accountId, accountUsername, account?.avatar_url, accountDisplayName],
+  );
 
   /* ── Sidebar state ─────────────────────────────────────────────── */
   /* Warm start: paint the conversation list from the last answer (wiped on
@@ -388,6 +418,9 @@ export default function DiscussApp() {
      for a retry, which the server dedupes on (channel_id, client_msg_id). */
   const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(() => new Set());
   const failedPayloadsRef = useRef<Map<string, PendingSend>>(new Map());
+  /* Failed bubbles restored from the outbox whose attachment never finished
+     uploading: the text is kept, the bubble asks for the file again. */
+  const [droppedAttachIds, setDroppedAttachIds] = useState<ReadonlySet<string>>(() => new Set());
   /* @mention autocomplete: the "@query" the caret is in, and the highlighted
      suggestion. `dismissedAt` remembers an Esc so the same "@" stays closed. */
   const [mentionState, setMentionState] = useState<{ start: number; query: string; active: number } | null>(null);
@@ -564,10 +597,6 @@ export default function DiscussApp() {
      on the two things that actually imply "teardown + resubscribe":
      `selectedChannelId` and `accountId`. */
   const channelsRef = useRef<DiscussChannelListRow[]>(channels);
-  const detailsOpenRef = useRef(false);
-  useEffect(() => {
-    detailsOpenRef.current = detailsOpen;
-  }, [detailsOpen]);
   const membersRef = useRef(members);
   const notifApiRef = useRef(notifApi);
   const accountRef = useRef(account);
@@ -647,6 +676,83 @@ export default function DiscussApp() {
     if (channelRefreshTimerRef.current != null) window.clearTimeout(channelRefreshTimerRef.current);
   }, []);
 
+  /* The server now has these client_msg_ids: any "Not sent" copy of them
+     (in memory or in the reload-proof outbox) is settled. mergeServerPage
+     already swaps the bubble for the canonical row; this drops the rest. */
+  const settleOutbox = useCallback(
+    (channelId: string, rows: DiscussMessageWithAuthor[]) => {
+      if (!accountId || rows.length === 0) return;
+      const have = new Set(rows.map((r) => r.client_msg_id).filter(Boolean) as string[]);
+      if (have.size === 0) return;
+      const settled = readDiscussOutbox(accountId)
+        .filter((e) => e.channelId === channelId && have.has(e.clientMsgId))
+        .map((e) => e.clientMsgId);
+      const tempIds = new Set<string>();
+      for (const [tempId, p] of failedPayloadsRef.current) {
+        if (p.channelId === channelId && have.has(p.clientMsgId)) {
+          failedPayloadsRef.current.delete(tempId);
+          tempIds.add(tempId);
+        }
+      }
+      for (const id of settled) tempIds.add(`temp_${id}`);
+      if (settled.length > 0) removeDiscussOutbox(accountId, settled);
+      if (tempIds.size === 0) return;
+      const drop = (prev: ReadonlySet<string>) => {
+        if (![...tempIds].some((id) => prev.has(id))) return prev;
+        const next = new Set(prev);
+        for (const id of tempIds) next.delete(id);
+        return next;
+      };
+      setFailedIds(drop);
+      setDroppedAttachIds(drop);
+    },
+    [accountId],
+  );
+
+  /* Put this conversation's unsent messages back on screen as "Not sent"
+     bubbles (after a reload, or on returning to the chat). Thread-pane
+     replies are restored by the thread pane itself. */
+  const restoreOutbox = useCallback(
+    (channelId: string) => {
+      if (!accountId) return;
+      const entries = readDiscussOutbox(accountId).filter(
+        (e) => e.channelId === channelId && !e.threadParentId,
+      );
+      if (entries.length === 0) return;
+      const bubbles = entries.map(outboxBubble);
+      for (const e of entries) {
+        failedPayloadsRef.current.set(`temp_${e.clientMsgId}`, {
+          channelId: e.channelId,
+          body: e.body,
+          kind: e.kind,
+          metadata: e.metadata,
+          replyToMessageId: e.replyToMessageId,
+          clientMsgId: e.clientMsgId,
+        });
+      }
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        for (const b of bubbles) next.add(b.id);
+        return next;
+      });
+      const dropped = entries.filter((e) => e.attachmentsDropped).map((e) => `temp_${e.clientMsgId}`);
+      if (dropped.length > 0) {
+        setDroppedAttachIds((prev) => {
+          const next = new Set(prev);
+          for (const id of dropped) next.add(id);
+          return next;
+        });
+      }
+      setMessages((prev) => {
+        const ids = new Set(prev.map((m) => m.id));
+        const cmids = new Set(prev.map((m) => m.client_msg_id).filter(Boolean) as string[]);
+        const add = bubbles.filter((b) => !ids.has(b.id) && !cmids.has(b.client_msg_id as string));
+        return add.length ? [...prev, ...add] : prev;
+      });
+    },
+    [accountId],
+  );
+
   const loadMessages = useCallback(
     async (channelId: string, silent = false) => {
       if (!accountId) return;
@@ -666,6 +772,7 @@ export default function DiscussApp() {
          thread kept coming back). A response may only touch the UI if its
          channel is STILL the selected one; otherwise it just refreshes that
          channel's snapshot cache so the fetch isn't wasted. */
+      settleOutbox(channelId, rows);
       if (selectedChannelIdRef.current !== channelId) {
         if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
         return;
@@ -684,7 +791,7 @@ export default function DiscussApp() {
       /* Keep the snapshot cache in sync with the freshest server truth. */
       if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
     },
-    [accountId],
+    [accountId, settleOutbox],
   );
 
   const loadMembers = useCallback(async (channelId: string) => {
@@ -1006,11 +1113,12 @@ export default function DiscussApp() {
         });
       },
       (channelId, info) => {
-        /* A rename / archive / membership change: the LIST is stale. */
-        if (info?.meta) {
-          scheduleChannelRefresh();
-          if (selectedChannelIdRef.current === channelId) void loadMembers(channelId);
-        }
+        /* A rename / archive / my own membership change: the LIST is stale. */
+        if (info?.meta) scheduleChannelRefresh();
+        /* Someone joined / left / was removed, or a role changed: the only
+           events that touch the member list (details pane, @mentions). A
+           reaction or an edit no longer reloads it. */
+        if (info?.members && selectedChannelIdRef.current === channelId) void loadMembers(channelId);
         /* An edit / delete / reaction / pin landed somewhere. */
         if (!channelsRef.current.some((c) => c.id === channelId)) {
           scheduleChannelRefresh();
@@ -1029,9 +1137,6 @@ export default function DiscussApp() {
           changeTimer = null;
           if (selectedChannelIdRef.current !== channelId) return;
           void loadMessages(channelId, true);
-          /* Role changes / member adds touch the channel too; keep the
-             details pane's member list honest while it is on screen. */
-          if (detailsOpenRef.current) void loadMembers(channelId);
         }, 350);
       },
     );
@@ -1060,6 +1165,9 @@ export default function DiscussApp() {
       setMessages([]);
       void loadMessages(selectedChannelId);
     }
+    /* Unsent messages of this chat (reload-proof outbox) go back on screen
+       after the snapshot paint; the refresh above keeps temp bubbles. */
+    restoreOutbox(selectedChannelId);
     void loadMembers(selectedChannelId);
 
     const unsubChannel = subscribeToChannel(selectedChannelId, {
@@ -1217,7 +1325,7 @@ export default function DiscussApp() {
        notifApi, t, account*) is read via refs above. If we re-added
        any of those here the subscription would flap constantly and
        drop realtime messages. */
-  }, [selectedChannelId, accountId, loadMessages, loadMembers, notifyInbound]);
+  }, [selectedChannelId, accountId, loadMessages, loadMembers, notifyInbound, restoreOutbox]);
 
   /* Connection-aware reconciliation (Phase 3C).
 
@@ -1624,20 +1732,16 @@ export default function DiscussApp() {
   }, [kdsShowToast]);
 
   const handleSelectChannel = useCallback((channelId: string) => {
-    /* Switching conversations tears down every pending bubble in the old one,
-       so their previews have no reader left. Releasing here is what stops
-       object URLs accumulating for the whole session as the user browses. */
-    if (selectedChannelIdRef.current !== channelId) releaseAllPreviewUrls();
-    setAiChatOpen(false); // redesign: close the AI panel when changing chats
-    setSelectedChannelId(channelId);
-    setMobileView("thread");
-    setProductPickerOpen(false);
-    setMentionPickerOpen(false);
-    setEmojiPickerOpen(false);
     /* Per-conversation UI state must not follow you into the next chat:
        a thread pane, reply banner or inline edit from chat A acting on
        chat B is a wrong-channel write waiting to happen. */
     if (selectedChannelIdRef.current !== channelId) {
+      /* Switching conversations tears down every pending bubble in the old
+         one, so their previews have no reader left. Releasing here is what
+         stops object URLs accumulating for the whole session as the user
+         browses. (A failed send keeps its text/payload in the outbox and is
+         redrawn on return — only the local preview is gone.) */
+      releaseAllPreviewUrls();
       setThreadTarget(null);
       setReplyTarget(null);
       setEditingMessageId(null);
@@ -1652,6 +1756,12 @@ export default function DiscussApp() {
       setAddMembersOpen(false);
       needsReadRef.current = false;
     }
+    setAiChatOpen(false); // redesign: close the AI panel when changing chats
+    setSelectedChannelId(channelId);
+    setMobileView("thread");
+    setProductPickerOpen(false);
+    setMentionPickerOpen(false);
+    setEmojiPickerOpen(false);
   }, []);
 
   const handleStartDirect = useCallback(
@@ -1788,6 +1898,39 @@ export default function DiscussApp() {
       releasePreviewUrls(clientMsgId);
     },
     [],
+  );
+
+  /* Keep a send as "Not sent · Retry · Delete": the wire payload waits in
+     memory for a retry AND in the per-account outbox, so the bubble comes
+     back after a reload (see discuss-outbox.ts). */
+  const markSendFailed = useCallback(
+    (tempId: string, payload: PendingSend, display: DiscussMessageWithAuthor) => {
+      failedPayloadsRef.current.set(tempId, payload);
+      setFailedIds((prev) => new Set(prev).add(tempId));
+      if (accountId) {
+        const stored = putDiscussOutbox(accountId, { ...payload, display });
+        if (stored?.attachmentsDropped) setDroppedAttachIds((prev) => new Set(prev).add(tempId));
+      }
+    },
+    [accountId],
+  );
+
+  /* The send is settled (sent, refused for good, or deleted by the user):
+     forget it everywhere. The bubble itself is the caller's business. */
+  const forgetFailedSend = useCallback(
+    (tempId: string, clientMsgId: string) => {
+      failedPayloadsRef.current.delete(tempId);
+      const drop = (prev: ReadonlySet<string>) => {
+        if (!prev.has(tempId)) return prev;
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      };
+      setFailedIds(drop);
+      setDroppedAttachIds(drop);
+      if (accountId) removeDiscussOutbox(accountId, [clientMsgId]);
+    },
+    [accountId],
   );
 
   const handleSend = useCallback(async () => {
@@ -1939,8 +2082,7 @@ export default function DiscussApp() {
          Delete. Its previews stay alive (the bubble still renders them) and
          are released on reconcile or discard. */
       perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
-      failedPayloadsRef.current.set(tempId, payload);
-      setFailedIds((prev) => new Set(prev).add(tempId));
+      markSendFailed(tempId, payload, optimistic);
       showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
     } else {
       perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
@@ -1971,6 +2113,7 @@ export default function DiscussApp() {
     showError,
     t,
     reconcileSent,
+    markSendFailed,
   ]);
 
   /* Retry a "Not sent" bubble with the SAME payload + clientMsgId. If the
@@ -1986,33 +2129,31 @@ export default function DiscussApp() {
       });
       const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
       if (result.row) {
-        failedPayloadsRef.current.delete(tempId);
+        forgetFailedSend(tempId, payload.clientMsgId);
         reconcileSent(tempId, result.row, payload.clientMsgId);
         void loadChannels(true);
       } else if (result.retryable) {
+        /* Still in the outbox from the first failure — just show it again. */
         setFailedIds((prev) => new Set(prev).add(tempId));
         showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
       } else {
-        failedPayloadsRef.current.delete(tempId);
+        forgetFailedSend(tempId, payload.clientMsgId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         releasePreviewUrls(payload.clientMsgId);
         showError(t("status.failed", "Failed to send"));
       }
     },
-    [accountId, reconcileSent, loadChannels, showError, t],
+    [accountId, reconcileSent, loadChannels, showError, t, forgetFailedSend],
   );
 
   const handleDiscardSend = useCallback((tempId: string) => {
     const payload = failedPayloadsRef.current.get(tempId);
-    failedPayloadsRef.current.delete(tempId);
-    setFailedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(tempId);
-      return next;
-    });
+    /* A temp id is `temp_<clientMsgId>` for every send path. */
+    const clientMsgId = payload?.clientMsgId ?? tempId.replace(/^temp_/, "");
+    forgetFailedSend(tempId, clientMsgId);
     setMessages((prev) => prev.filter((m) => m.id !== tempId));
-    if (payload) releasePreviewUrls(payload.clientMsgId);
-  }, []);
+    releasePreviewUrls(clientMsgId);
+  }, [forgetFailedSend]);
 
   const handleStartEdit = useCallback((msg: DiscussMessageWithAuthor) => {
     setEditingMessageId(msg.id);
@@ -2440,13 +2581,15 @@ export default function DiscussApp() {
     );
     const ok = await setChannelMuted(id, accountId, next);
     if (!ok) {
-      setChannels((prev) => prev.map((c) => (c.id === id ? withMuted(c, !next) : c)));
+      setChannels((prev) => prev.map((c) => (c.id === id ? restoreMuteCounts(c, ch) : c)));
       showError(t("error.mute", "Couldn't change notifications."));
       return;
     }
     /* Muted conversations leave the bell / home-tile count (and come back
-       on unmute) right away, not on the next recount. */
-    announceUnread(id, next ? 0 : rowUnread(ch));
+       on unmute) right away, not on the next recount. Muting also takes a
+       manual "unread" mark off the badges. */
+    if (next) announceUnread(id, 0, false);
+    else announceUnread(id, rowUnread(ch));
     showToast(
       next
         ? t("notif.muted", "Channel muted")
@@ -2515,11 +2658,14 @@ export default function DiscussApp() {
       setChannels((prev) => prev.map((c) => (c.id === ch.id ? withMuted(c, next) : c)));
       const ok = await setChannelMuted(ch.id, accountId, next);
       if (!ok) {
-        setChannels((prev) => prev.map((c) => (c.id === ch.id ? withMuted(c, !next) : c)));
+        setChannels((prev) => prev.map((c) => (c.id === ch.id ? restoreMuteCounts(c, ch) : c)));
         showError(t("error.mute", "Couldn't change notifications."));
         return;
       }
-      announceUnread(ch.id, next ? 0 : rowUnread(ch));
+      /* Muting takes a manual "unread" mark off the badges too; unmuting puts
+         the row's whole count (including such a mark) back on them. */
+      if (next) announceUnread(ch.id, 0, false);
+      else announceUnread(ch.id, rowUnread(ch));
       showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
     },
     [accountId, showToast, showError, t],
@@ -2541,6 +2687,15 @@ export default function DiscussApp() {
             detail: { channelId: ch.id, unread: 0, markedUnread: false },
           }),
         );
+      } else if (ch.muted) {
+        /* Muted: counts as one muted unread (the quiet pill), never on the
+           bell / home badges — the same shape the server read returns. */
+        setChannels((prev) =>
+          prev.map((c) =>
+            c.id === ch.id ? { ...c, muted_unread_count: Math.max(1, c.muted_unread_count ?? 0), marked_unread: false } : c,
+          ),
+        );
+        await markChannelUnread(ch.id);
       } else {
         setChannels((prev) =>
           prev.map((c) => (c.id === ch.id ? { ...c, marked_unread: true } : c)),
@@ -2829,9 +2984,14 @@ export default function DiscussApp() {
   }, [convMenu, closeConvMenu]);
 
   /* Voice note: optimistic bubble first (playable from the local blob),
-     then upload + send. Any failure removes the bubble, says so, and THROWS
-     so the recorder drops back to its preview with the clip intact for a
-     retry — it used to close as if the note had been sent. */
+     then upload + send.
+       · Upload failed, or the send was refused for good → remove the bubble,
+         say so, and THROW so the recorder drops back to its preview with the
+         clip intact for its own retry (it used to close as if sent).
+       · Uploaded but the send failed in a way a retry can fix (network,
+         timeout, 5xx) → the clip is already on the server, so the bubble
+         stays as "Not sent · Retry · Delete" exactly like a text send (same
+         clientMsgId on retry, reload-proof outbox) and the recorder closes. */
   const handleSendVoice = useCallback(
     async (input: { blob: Blob; durationMs: number; waveform: number[] }) => {
       if (!accountId || !selectedChannelId) throw new Error("no channel");
@@ -2887,27 +3047,28 @@ export default function DiscussApp() {
         waveform: input.waveform,
       });
       if (!uploaded) fail("voice.uploadFailed", "Voice upload failed");
-      const saved = await sendDiscussMessage({
+      const payload: PendingSend = {
         channelId,
-        authorId: accountId,
         body: "",
         kind: "voice",
         metadata: { voice: uploaded! },
+        replyToMessageId: null,
         clientMsgId,
-      });
-      if (!saved) fail("status.failed", "Failed to send");
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId
-            ? { ...m, id: saved!.id, created_at: saved!.created_at, metadata: saved!.metadata ?? m.metadata }
-            : m,
-        ),
-      );
-      releasePreviewUrls(clientMsgId);
+      };
+      const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
+      if (!result.row) {
+        if (!result.retryable) fail("status.failed", "Failed to send");
+        perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
+        markSendFailed(tempId, payload, optimistic);
+        setVoiceOpen(false);
+        showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
+        return;
+      }
+      reconcileSent(tempId, result.row, clientMsgId);
       setVoiceOpen(false);
       void loadChannels(true);
     },
-    [accountId, selectedChannelId, accountUsername, account?.avatar_url, accountDisplayName, showError, t, loadChannels],
+    [accountId, selectedChannelId, accountUsername, account?.avatar_url, accountDisplayName, showError, t, loadChannels, markSendFailed, reconcileSent],
   );
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -2957,6 +3118,95 @@ export default function DiscussApp() {
       window.history.replaceState(window.history.state, "", "/discuss");
     } catch { /* non-fatal */ }
   }, [channelParam, msgParam, channels, loadingChannels, loadChannels, handleSelectChannel]);
+
+  /* ── "Chat with these people": /discuss?with=<accountId,…>&title=<text> ──
+     Contract used by other apps (Calendar's "Chat with attendees"):
+       · `with`  — comma-separated account UUIDs. Anything that is not a UUID,
+                   the caller's own id and duplicates are ignored; at most 50
+                   are used.
+       · `title` — name for a NEW group (trimmed, cut to the 120-character
+                   channel-name limit). Optional; falls back to "Group chat".
+     Resolution:
+       · exactly one other account → the DM with them (find-or-create via
+         directChannel — the server checks the account is an active internal
+         account of the caller's tenant);
+       · several → the server (read `groupWith`) keeps only accounts the
+         caller may message (same tenant / internal / active gate as
+         createChannel) and returns an existing non-archived group whose
+         active member set is exactly {caller + those accounts}; with none,
+         a group named `title` is created through the regular createChannel
+         mutate action (Discuss "create" permission, members re-filtered
+         server-side). If only one account survives the filter, it is a DM.
+     The conversation is then selected and both params are stripped with
+     history.replaceState, so a reload or back-navigation never re-runs it. */
+  const withParam = searchParams?.get("with") ?? null;
+  const titleParam = searchParams?.get("title") ?? null;
+  const handledWithRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!withParam) {
+      handledWithRef.current = null;
+      return;
+    }
+    if (!accountId || loadingChannels) return;
+    const key = `${withParam}|${titleParam ?? ""}`;
+    if (handledWithRef.current === key) return;
+    handledWithRef.current = key;
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ids = Array.from(
+      new Set(
+        withParam
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => UUID.test(s) && s !== accountId.toLowerCase()),
+      ),
+    ).slice(0, 50);
+    const strip = () => {
+      try {
+        window.history.replaceState(window.history.state, "", "/discuss");
+      } catch { /* non-fatal */ }
+    };
+    const fail = () => showError(t("with.failed", "Couldn't open a conversation with those people."));
+    void (async () => {
+      if (ids.length === 0) {
+        strip();
+        return;
+      }
+      const openDm = async (otherId: string) => {
+        const id = await findOrCreateDirectChannel(accountId, otherId);
+        if (!id) return fail();
+        await loadChannels(true);
+        handleSelectChannel(id);
+      };
+      if (ids.length === 1) {
+        await openDm(ids[0]);
+        strip();
+        return;
+      }
+      const resolved = await resolveGroupWith(ids);
+      if (!resolved || resolved.allowed.length === 0) {
+        fail();
+      } else if (resolved.allowed.length === 1) {
+        await openDm(resolved.allowed[0]);
+      } else if (resolved.channelId) {
+        await loadChannels(true);
+        handleSelectChannel(resolved.channelId);
+      } else {
+        const name = (titleParam ?? "").trim().slice(0, 120) || t("with.defaultTitle", "Group chat");
+        const row = await createChannel({
+          kind: "group",
+          name,
+          createdBy: accountId,
+          memberIds: resolved.allowed,
+        });
+        if (!row) fail();
+        else {
+          await loadChannels(true);
+          handleSelectChannel(row.id);
+        }
+      }
+      strip();
+    })();
+  }, [withParam, titleParam, accountId, loadingChannels, loadChannels, handleSelectChannel, showError, t]);
 
   /* Scroll to + briefly highlight a message once it is rendered. If it is
      older than the loaded page, pull older pages (bounded) until found. */
@@ -3579,6 +3829,7 @@ export default function DiscussApp() {
                     onOpenThread={handleOpenThread}
                     onToggleReaction={handleToggleReaction}
                     failedIds={failedIds}
+                    droppedAttachIds={droppedAttachIds}
                     onRetrySend={handleRetrySend}
                     onDiscardSend={handleDiscardSend}
                     autoTranslate={translatePrefs.auto}
@@ -3745,6 +3996,7 @@ export default function DiscussApp() {
               key={threadTarget.id}
               parent={threadTarget}
               currentAccountId={accountId}
+              currentAuthor={threadAuthor}
               channelId={selectedChannel.id}
               onClose={() => setThreadTarget(null)}
               autoTranslate={translatePrefs.auto}
@@ -4168,6 +4420,8 @@ type MessageListProps = {
   onToggleReaction: (messageId: string, emoji: string) => void;
   /** Temp ids of optimistic sends that failed ("Not sent — Retry"). */
   failedIds: ReadonlySet<string>;
+  /** Failed sends restored without their (never-uploaded) attachment. */
+  droppedAttachIds: ReadonlySet<string>;
   onRetrySend: (tempId: string) => void;
   onDiscardSend: (tempId: string) => void;
   autoTranslate: boolean;
@@ -4297,6 +4551,7 @@ function MessageList(props: MessageListProps) {
             onOpenThread={props.onOpenThread}
             onToggleReaction={props.onToggleReaction}
             failed={props.failedIds.has(row.msg.id)}
+            attachmentDropped={props.droppedAttachIds.has(row.msg.id)}
             onRetrySend={props.onRetrySend}
             onDiscardSend={props.onDiscardSend}
             autoTranslate={props.autoTranslate}
@@ -4433,6 +4688,8 @@ type MessageBubbleProps = {
   onToggleReaction: (messageId: string, emoji: string) => void;
   /** Optimistic send that failed — shows "Not sent · Retry · Delete". */
   failed?: boolean;
+  /** The failed send lost an attachment that was never uploaded. */
+  attachmentDropped?: boolean;
   onRetrySend?: (tempId: string) => void;
   onDiscardSend?: (tempId: string) => void;
   autoTranslate: boolean;
@@ -4532,6 +4789,7 @@ function MessageBubble({
   onOpenThread,
   onToggleReaction,
   failed = false,
+  attachmentDropped = false,
   onRetrySend,
   onDiscardSend,
   autoTranslate,
@@ -4986,6 +5244,11 @@ function MessageBubble({
               <TrashIcon className="h-3 w-3" aria-hidden />
               {t("send.discard", "Delete")}
             </button>
+          </div>
+        )}
+        {failed && attachmentDropped && (
+          <div className={`mt-0.5 text-[10.5px] text-[var(--text-dim)] ${isSelf ? "text-end" : ""}`}>
+            {t("send.attachmentReadd", "The attachment didn't upload — add it again after sending.")}
           </div>
         )}
       </div>

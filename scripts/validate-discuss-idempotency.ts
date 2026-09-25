@@ -37,7 +37,7 @@ check("temp id derives from that UUID (no `temp_${Date.now()}` collision)",
   /const tempId = `temp_\$\{clientMsgId\}`/.test(app)
   && !/const tempId\s*=\s*`temp_\$\{Date\.now\(\)\}`/.test(app));
 check("the key is sent to the server on every send",
-  /clientMsgId,/.test(app) && /sendDiscussMessage\(/.test(app));
+  /clientMsgId,/.test(app) && /^\s*const result = await sendDiscussMessageResult\(/m.test(app));
 check("send lib forwards clientMsgId in the mutate payload",
   /clientMsgId\?: string/.test(lib) && /clientMsgId: input\.clientMsgId \?\? null/.test(lib));
 

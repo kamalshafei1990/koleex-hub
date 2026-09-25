@@ -24,6 +24,7 @@
 
 import { cachedGet } from "./client-cache";
 import { fmtDMY } from "./finance/format";
+import { fromWall, toWall } from "./calendar-tz";
 
 export class PlanningApiError extends Error {
   status: number;
@@ -41,7 +42,8 @@ export class PlanningApiError extends Error {
 /* ── Schedule conflicts (409 schedule_conflict) ── */
 
 export interface PlanningConflict {
-  kind: "double_booking" | "leave";
+  /** travel = approved HR leave of a business-trip type; out_of_office = a Calendar out-of-office event. */
+  kind: "double_booking" | "leave" | "travel" | "out_of_office";
   index: number;
   item_id: string | null;
   title: string | null;
@@ -55,6 +57,8 @@ export interface PlanningConflict {
   other_end_at?: string;
   leave_start?: string;
   leave_end?: string;
+  away_start_at?: string;
+  away_end_at?: string;
 }
 
 export interface PlanningConflictInfo {
@@ -489,14 +493,14 @@ export async function deleteResource(id: string): Promise<void> {
   await send<{ ok: true }>(`/api/planning/resources/${encodeURIComponent(id)}`, jsonInit("DELETE"));
 }
 
-/* ── Date helpers ── */
+/* ── Date helpers ──
+   Every helper that reads a clock takes the planner's zone (lib/planning-tz)
+   as `tz`; without it they read the browser's zone. Days and week starts
+   are WALL dates in that zone (see lib/planning-tz). */
 
-export function toLocalDateKey(iso: string): string {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+/** YYYY-MM-DD of an instant, in `tz` (else the browser's zone). */
+export function toLocalDateKey(iso: string, tz?: string): string {
+  return dateKey(tz ? toWall(iso, tz) : new Date(iso));
 }
 
 export function startOfWeek(d: Date): Date {
@@ -515,22 +519,25 @@ export function addDays(d: Date, n: number): Date {
   return copy;
 }
 
-/** "14:05" — 24-hour clock, the Hub's house time format. */
-export function formatTime(d: Date | string): string {
+/** "14:05" — 24-hour clock, the Hub's house time format, in `tz`. */
+export function formatTime(d: Date | string, tz?: string): string {
   const x = d instanceof Date ? d : new Date(d);
   if (Number.isNaN(x.getTime())) return "—";
-  return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;
+  const w = tz ? toWall(x, tz) : x;
+  return `${String(w.getHours()).padStart(2, "0")}:${String(w.getMinutes()).padStart(2, "0")}`;
 }
 
-/** D/M/Y range: "25/09/2026 · 09:00–17:00" or
- *  "25/09/2026 22:00 → 26/09/2026 06:00". Local time. */
-export function formatRange(startISO: string, endISO: string): string {
+/** D/M/Y range in `tz`: "25/09/2026 · 09:00–17:00" or
+ *  "25/09/2026 22:00 → 26/09/2026 06:00". */
+export function formatRange(startISO: string, endISO: string, tz?: string): string {
   const s = new Date(startISO);
   const e = new Date(endISO);
   if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "—";
-  const sameDay = toLocalDateKey(startISO) === toLocalDateKey(endISO);
-  if (sameDay) return `${fmtDMY(s)} · ${formatTime(s)}–${formatTime(e)}`;
-  return `${fmtDMY(s)} ${formatTime(s)} → ${fmtDMY(e)} ${formatTime(e)}`;
+  const ws = tz ? toWall(s, tz) : s;
+  const we = tz ? toWall(e, tz) : e;
+  const hm = (w: Date) => `${String(w.getHours()).padStart(2, "0")}:${String(w.getMinutes()).padStart(2, "0")}`;
+  if (dateKey(ws) === dateKey(we)) return `${fmtDMY(ws)} · ${hm(ws)}–${hm(we)}`;
+  return `${fmtDMY(ws)} ${hm(ws)} → ${fmtDMY(we)} ${hm(we)}`;
 }
 
 /** D/M/Y week label: "22/09/2026 – 28/09/2026". */
@@ -538,25 +545,27 @@ export function formatWeekRange(weekStart: Date): string {
   return `${fmtDMY(weekStart)} – ${fmtDMY(addDays(weekStart, 6))}`;
 }
 
-/** Local-day keys (YYYY-MM-DD) of every day in `days` that the item
- *  overlaps — a multi-day item appears on each day it covers. */
-export function itemDayKeys(item: { start_at: string; end_at: string }, days: Date[]): string[] {
+/** Day keys (YYYY-MM-DD) of every day in `days` (wall dates in `tz`) that
+ *  the item overlaps — a multi-day item appears on each day it covers. */
+export function itemDayKeys(item: { start_at: string; end_at: string }, days: Date[], tz?: string): string[] {
   const s = new Date(item.start_at).getTime();
   const e = new Date(item.end_at).getTime();
+  const at = (wall: Date) => (tz ? fromWall(wall, tz) : wall).getTime();
   const keys: string[] = [];
   for (const d of days) {
     const dayStart = new Date(d);
     dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = addDays(dayStart, 1);
+    const from = at(dayStart);
+    const to = at(addDays(dayStart, 1));
     /* Overlap test; a zero-length item still lands on its start day. */
-    if ((s < dayEnd.getTime() && e > dayStart.getTime()) || (s === e && s >= dayStart.getTime() && s < dayEnd.getTime())) {
+    if ((s < to && e > from) || (s === e && s >= from && s < to)) {
       keys.push(dateKey(dayStart));
     }
   }
   return keys;
 }
 
-/** YYYY-MM-DD of a Date in LOCAL time (never via toISOString, which is UTC). */
+/** YYYY-MM-DD of a Date's LOCAL fields (never via toISOString, which is UTC). */
 export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

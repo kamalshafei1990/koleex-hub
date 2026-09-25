@@ -136,9 +136,10 @@ export async function GET(req: Request) {
     const occMs = occ.getTime();
     if (nowMs < occMs - (row.reminder_minutes ?? 0) * MIN) continue; // not time yet
     if (row.reminded_at && Date.parse(row.reminded_at) >= occMs) continue; // this occurrence is done
-    /* This occurrence's own title / link, when it was changed on its own. */
+    /* This occurrence's own title / link, when it was changed on its own
+       ('' = its link was cleared). */
     const ov = next.override;
-    const ev: EvRow = ov ? { ...row, title: ov.title || row.title, meeting_url: ov.meeting_url ?? row.meeting_url ?? null } : row;
+    const ev: EvRow = ov ? { ...row, title: ov.title || row.title, meeting_url: ov.meeting_url != null ? ov.meeting_url || null : row.meeting_url ?? null } : row;
     if (nowMs > occMs + 60 * MIN) missed.push({ ev, occ });
     else due.push({ ev, occ, end: next.end, tz });
   }

@@ -12,6 +12,8 @@ import "server-only";
      · channelMessages&channelId   → a channel's messages (membership-gated)
      · thread&parentId             → a thread (membership-gated via parent)
      · members&channelId           → a channel's members (membership-gated)
+     · groupWith&ids=a,b,…         → which of those accounts the caller may
+                                     message + an existing exact-match group
      · search&q=…[&channelId]      → full-text over the caller's channels only
 
    Identity is ALWAYS the session account — never client-supplied. Freshness is
@@ -30,6 +32,7 @@ import {
   DISCUSS_AUTHOR_SELECT as AUTHOR_SELECT,
   type DiscussAuthorJoin as AuthorJoin,
 } from "@/lib/server/discuss-serialize";
+import { filterTenantAccounts } from "@/lib/server/discuss-validate";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -324,13 +327,17 @@ export async function GET(req: Request) {
                  like WeChat. Their count still travels, separately, as
                  muted_unread_count so Discuss can show it on the row. */
               unread_count: st?.muted ? 0 : unreadN,
-              muted_unread_count: st?.muted ? unreadN : 0,
+              /* A muted chat the user manually marked unread counts here as
+                 1 (like its other unread) and NOT as marked_unread below —
+                 every badge adds marked_unread as 1, and a muted chat must
+                 stay off all of them. */
+              muted_unread_count: st?.muted ? unreadN || (st?.marked_unread ? 1 : 0) : 0,
               last_read_at: st?.last_read_at ?? null,
               muted: st?.muted ?? false,
               notification_pref: st?.notification_pref ?? "all",
               pinned: !!st?.pinned_at,
               pinned_at: st?.pinned_at ?? null,
-              marked_unread: st?.marked_unread ?? false,
+              marked_unread: st?.muted ? false : (st?.marked_unread ?? false),
               other: otherByChannel.get(ch.id) ?? null,
               linked_contact: contactByChannel.get(ch.id) ?? null,
               last_message: lastByChannel.get(ch.id) ?? null,
@@ -543,6 +550,60 @@ export async function GET(req: Request) {
             reactions: reactionMap.get(row.id) ?? [], reply_preview: null, thread: null,
           }));
         return NextResponse.json({ ok: true, data: out });
+      }
+
+      /* ---- "Chat with these people" resolver (/discuss?with=…) ---------
+         ids=<uuid,uuid,…> → { allowed, channelId }.
+           · allowed   — the requested accounts the caller may actually
+             message: valid UUIDs, not the caller, capped at 50, active
+             INTERNAL accounts of the caller's tenant (filterTenantAccounts,
+             the same gate createChannel / directChannel apply on write).
+           · channelId — an existing non-archived GROUP the caller is in
+             whose active member set is exactly {caller} ∪ allowed, or null
+             (the client then creates one through createChannel).
+         Read-only; creating anything stays with /api/discuss/mutate. */
+      case "groupWith": {
+        const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const requested = Array.from(
+          new Set(
+            (url.searchParams.get("ids") ?? "")
+              .split(",")
+              .map((s) => s.trim().toLowerCase())
+              .filter((s) => UUID.test(s) && s !== me.toLowerCase()),
+          ),
+        ).slice(0, 50);
+        const allowed = await filterTenantAccounts(requested, auth.tenant_id ?? null);
+        if (allowed.length < 2) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const want = new Set([me, ...allowed]);
+        const scope = await myChannelIds(me);
+        if (scope.length === 0) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const { data: groups } = await supabaseServer
+          .from(CHANNELS)
+          .select("id, last_message_at")
+          .in("id", scope)
+          .eq("kind", "group")
+          .is("archived_at", null);
+        const groupIds = ((groups ?? []) as Array<{ id: string; last_message_at: string | null }>)
+          .sort((a, b) => (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""))
+          .map((g) => g.id);
+        if (groupIds.length === 0) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const { data: rows } = await supabaseServer
+          .from(MEMBERS)
+          .select("channel_id, account_id")
+          .in("channel_id", groupIds)
+          .is("left_at", null);
+        const sets = new Map<string, Set<string>>();
+        for (const r of (rows ?? []) as Array<{ channel_id: string; account_id: string }>) {
+          const set = sets.get(r.channel_id) ?? new Set<string>();
+          set.add(r.account_id);
+          sets.set(r.channel_id, set);
+        }
+        /* Most recently active exact match wins. */
+        const match = groupIds.find((id) => {
+          const set = sets.get(id);
+          return !!set && set.size === want.size && [...want].every((a) => set.has(a));
+        });
+        return NextResponse.json({ ok: true, data: { allowed, channelId: match ?? null } });
       }
 
       /* ---- a channel's members (membership-gated) --------------------- */

@@ -202,6 +202,20 @@ export async function createChannel(input: {
   return res.ok ? (res.data ?? null) : null;
 }
 
+/** For "chat with these people" links: which of `accountIds` the caller may
+ *  message (server-validated: UUIDs, not self, ≤ 50, active internal accounts
+ *  of the caller's tenant) and the id of an existing non-archived group whose
+ *  active members are exactly the caller + those accounts. `null` = the read
+ *  failed. */
+export async function resolveGroupWith(
+  accountIds: string[],
+): Promise<{ allowed: string[]; channelId: string | null } | null> {
+  const data = await discussRead<{ allowed: string[]; channelId: string | null }>("groupWith", {
+    ids: accountIds.join(","),
+  });
+  return data && Array.isArray(data.allowed) ? data : null;
+}
+
 /** Fetch every channel the account is a member of, enriched with:
  *   - unread_count (messages since last_read_at by OTHER people)
  *   - last_message preview
@@ -217,7 +231,9 @@ let shellChannelsUsed = false;
  *   · muted_unread_count — unread messages of a MUTED conversation. For a
  *     muted row `unread_count` is 0 so every badge that sums unread_count
  *     (bell, home tile, floating panel) leaves it out, WeChat-style; Discuss
- *     still shows this count on the row.
+ *     still shows this count on the row. A muted row the user manually
+ *     marked unread arrives as muted_unread_count 1 with marked_unread
+ *     false, so it stays off the badges as well.
  *   · linked_project_id — set when the conversation belongs to a Project
  *     (column added by the Projects migration; absent until it is applied). */
 export type DiscussChannelExtras = {
@@ -930,9 +946,11 @@ let sseSource: EventSource | null = null;
 let sseHealthy = false;
 let sseRefs = 0;
 const sseListeners = new Set<(m: DiscussMessageWithAuthor) => void>();
-/** `meta` = a sidebar-level change (rename, archive, membership) rather than
- *  an edit / reaction / pin inside the conversation. */
-export type DiscussStreamChange = { meta?: boolean };
+/** `meta` = a sidebar-level change (rename, archive, my own membership)
+ *  rather than an edit / reaction / pin inside the conversation.
+ *  `members` = the channel's member set or a member's role changed — the
+ *  only case a member list needs reloading. */
+export type DiscussStreamChange = { meta?: boolean; members?: boolean };
 const sseChangeListeners = new Set<(channelId: string, info: DiscussStreamChange) => void>();
 /* Newest created_at seen on the stream — sent as ?since= on reconnect so a
    dropped connection (routine on the China link) replays the gap instead of
@@ -984,10 +1002,14 @@ function sseOpen() {
     /* An edit / delete / reaction / pin touched this channel. Marks it
        dirty for the reconcile loop and tells listeners to refresh. */
     try {
-      const { channelId, meta } = JSON.parse((ev as MessageEvent).data) as { channelId?: string; meta?: boolean };
+      const { channelId, meta, members } = JSON.parse((ev as MessageEvent).data) as {
+        channelId?: string;
+        meta?: boolean;
+        members?: boolean;
+      };
       if (!channelId) return;
       lastPingAt.set(channelId, performance.now());
-      const info: DiscussStreamChange = { meta: meta === true };
+      const info: DiscussStreamChange = { meta: meta === true, members: members === true };
       for (const l of sseChangeListeners) {
         try { l(channelId, info); } catch { /* isolate listeners */ }
       }

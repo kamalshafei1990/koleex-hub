@@ -18,16 +18,20 @@ import { isOccurrenceOf } from "@/lib/calendar-recurrence";
      { occurrence_start, action: "skip" }
          the occurrence is deleted; the rest of the series stays.
      { occurrence_start, action: "override", title?, start_at?, end_at?,
-       location?, meeting_url? }
+       location?, meeting_url?, description? }
          the occurrence takes its own values; a key left out keeps what the
          occurrence already had (an earlier override, else the series).
+         meeting_url / location / description null or "" = none for THIS
+         occurrence (stored as '', NULL being "as the series").
 
    `occurrence_start` is the occurrence's ORIGINAL start, exactly as the
    feed hands it out (CalendarFeedEvent.occurrence_start) — a time the series
    never has is refused. Owner or Super Admin, like editing the series.
    Guests who have not declined are told, with the occurrence named, and the
    reminder cron picks the new time up (lib/calendar-recurrence
-   nextEffectiveOccurrence). 503 until the 2026-09-26 migration has run. */
+   nextEffectiveOccurrence). 503 until the 2026-09-26 migration has run.
+   Until the 2026-09-27 one has, a cleared link or new notes are not stored
+   (the rest is) and the answer carries `degraded: true`. */
 
 export async function POST(
   req: Request,
@@ -70,7 +74,8 @@ export async function POST(
     start_at: prev?.start_at ?? occISO,
     end_at: prev?.end_at ?? new Date(occMs + durationMs).toISOString(),
     location: prev?.location != null ? prev.location || null : ev.location ?? null,
-    meeting_url: prev?.meeting_url ?? ev.meeting_url ?? null,
+    meeting_url: prev?.meeting_url != null ? prev.meeting_url || null : ev.meeting_url ?? null,
+    description: prev?.description != null ? prev.description || null : ev.description ?? null,
   };
   const guests = await eventAttendeeIds(id, { excludeDeclined: true });
 
@@ -113,18 +118,33 @@ export async function POST(
     if (v === undefined) return NextResponse.json({ error: "meeting_url must be an https link (max 500 characters)" }, { status: 400 });
     next.meeting_url = v;
   }
+  if ("description" in body) {
+    if (body.description !== null && typeof body.description !== "string") return NextResponse.json({ error: "description must be text" }, { status: 400 });
+    next.description = typeof body.description === "string" ? body.description.trim().slice(0, 4000) || null : null;
+  }
 
+  /* Stored only where the occurrence differs from the series; "" = this
+     occurrence has none (NULL would mean "as the series"). */
+  const own = {
+    title: next.title !== ev.title ? next.title : null,
+    location: next.location !== (ev.location ?? null) ? next.location ?? "" : null,
+    meeting_url: next.meeting_url !== (ev.meeting_url ?? null) ? next.meeting_url ?? "" : null,
+    description: next.description !== (ev.description ?? null) ? next.description ?? "" : null,
+  };
   const res = await saveException({
     event_id: id, tenant_id: ev.tenant_id, occurrence_start: occISO, kind: "override",
-    /* Stored only where the occurrence differs from the series. */
-    title: next.title !== ev.title ? next.title : null,
     start_at: next.start_at,
     end_at: next.end_at,
-    /* "" = this occurrence has no place (NULL would mean "as the series"). */
-    location: next.location !== (ev.location ?? null) ? next.location ?? "" : null,
-    meeting_url: next.meeting_url !== (ev.meeting_url ?? null) ? next.meeting_url : null,
+    ...own,
   });
   if (!res.ok) return unavailableOr500(res.unavailable);
+  /* Before the 2026-09-27 migration a cleared link and the notes are not
+     stored — the occurrence keeps the series' — so guests hear only what
+     really changed. */
+  if (res.degraded) {
+    if (own.meeting_url === "") next.meeting_url = ev.meeting_url ?? null;
+    if (own.description != null) next.description = ev.description ?? null;
+  }
 
   const timeChanged = next.start_at !== before.start_at || next.end_at !== before.end_at;
   const placeChanged = next.location !== before.location;
@@ -137,7 +157,7 @@ export async function POST(
       { occurrence: occISO },
     );
   }
-  return NextResponse.json({ ok: true, occurrence: { occurrence_start: occISO, ...next } });
+  return NextResponse.json({ ok: true, ...(res.degraded ? { degraded: true } : {}), occurrence: { occurrence_start: occISO, ...next } });
 }
 
 function unavailableOr500(unavailable: boolean) {

@@ -24,13 +24,18 @@
    times onto that day.
 
    CONFLICTS. Every write can answer 409 schedule_conflict (double booking,
-   approved leave — lib/server/planning-conflicts). The board rolls back
+   approved leave or business trip, Calendar out-of-office time —
+   lib/server/planning-conflicts). The board rolls back
    and shows ConflictDialog; a super admin may "Save anyway", which retries
    the same write with force.
 
-   TIME ZONE. The Calendar's timezone preference when set, else the
-   browser's — used by the timeline, templates, recurrence and the server's
-   leave-day check.
+   TIME ZONE. One planner's clock (lib/planning-tz): the Calendar's
+   timezone preference when set, else the browser's. The week boundaries,
+   the grid's days, the timeline, the item modal, templates, recurrence,
+   copy-week / publish-week and the server's leave-day check all use it, so
+   the grid and the timeline always agree. `weekStart` and the grid's days
+   are WALL dates in that zone; they become instants only at the server
+   edge (wallInstant).
 
    DATA. Resources and roles load once per visit through useWarmData (they
    paint from the last answer instantly); only items + leave are keyed by
@@ -41,7 +46,7 @@
    with Retry, never an empty week.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -64,8 +69,8 @@ import TimelineIcon from "@/components/icons/ui/TimelineIcon";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import ConflictDialog from "@/components/planning/ConflictDialog";
 import type { TimelinePatch, TimelineRow } from "@/components/planning/TimelineView";
-import { useMeBootstrap } from "@/lib/me-bootstrap";
-import { browserTimeZone, safeTimeZone, zonedToUtc } from "@/lib/calendar-tz";
+import { zonedToUtc } from "@/lib/calendar-tz";
+import { plannerNow, plannerWall, usePlannerTimeZone, wallInstant } from "@/lib/planning-tz";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
@@ -137,7 +142,6 @@ const TAB_ORDER: TabId[] = ["schedule", "open", "mine", "utilization", "workload
 type SchedMode = "grid" | "timeline";
 type TlRange = "day" | "week";
 
-const noopSubscribe = () => () => {};
 const fillVars = (s: string, vars: Record<string, string | number>) =>
   s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
 
@@ -168,10 +172,12 @@ function writeUrlParams(patch: Record<string, string | null>) {
   }
 }
 
-const itemsKeyFor = (weekStart: Date) => `planning:items:${dateKey(weekStart)}`;
+/* Items are keyed by zone too: the same wall week is a different window of
+   instants in another zone. Leave spans are plain dates. */
+const itemsKeyFor = (weekStart: Date, tz: string) => `planning:items:${tz}:${dateKey(weekStart)}`;
 const leavesKeyFor = (weekStart: Date) => `planning:leaves:${dateKey(weekStart)}`;
-const weekItemsLoader = (weekStart: Date) => () =>
-  fetchItems({ start: weekStart.toISOString(), end: addDays(weekStart, 7).toISOString() });
+const weekItemsLoader = (weekStart: Date, tz: string) => () =>
+  fetchItems({ start: wallInstant(weekStart, tz).toISOString(), end: wallInstant(addDays(weekStart, 7), tz).toISOString() });
 const weekLeavesLoader = (weekStart: Date) => () =>
   fetchLeaves(dateKey(weekStart), dateKey(addDays(weekStart, 6)));
 
@@ -181,11 +187,7 @@ export default function PlanningApp() {
   const meId = getCurrentAccountIdSync();
   const { showToast, toastElement } = useToast();
   /* The planner's clock: the Calendar timezone preference, else the browser's. */
-  const boot = useMeBootstrap();
-  const prefTz = (boot.data?.header as { preferences?: { calendar?: { timezone?: string | null } } } | null | undefined)
-    ?.preferences?.calendar?.timezone;
-  const deviceTz = useSyncExternalStore(noopSubscribe, browserTimeZone, () => "UTC");
-  const tz = prefTz ? safeTimeZone(prefTz) : deviceTz;
+  const tz = usePlannerTimeZone();
   /* SA audience lens — "own" | "all" | resource account_id. */
   const [saView, setSaView] = useState<string>("own");
   const searchPlaceholder = useSearchPlaceholder("planning");
@@ -228,12 +230,16 @@ export default function PlanningApp() {
   const roles = useMemo(() => rolesQ.data ?? [], [rolesQ.data]);
 
   /* ── Week-keyed data: items + leave ── */
-  const [anchor, setAnchor] = useState<Date>(() => startOfWeek(new Date()));
-  const weekStart = useMemo(() => startOfWeek(anchor), [anchor]);
-  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
-  const itemsKey = itemsKeyFor(weekStart);
+  /* null = the current week, read on the planner's clock (so it follows
+     the zone once the preference loads). */
+  const [anchor, setAnchor] = useState<Date | null>(null);
+  const weekStart = useMemo(() => startOfWeek(anchor ?? plannerNow(tz)), [anchor, tz]);
+  /* The week as real instants, for overlap tests against stored items. */
+  const weekFromMs = useMemo(() => wallInstant(weekStart, tz).getTime(), [weekStart, tz]);
+  const weekToMs = useMemo(() => wallInstant(addDays(weekStart, 7), tz).getTime(), [weekStart, tz]);
+  const itemsKey = itemsKeyFor(weekStart, tz);
   const leavesKey = leavesKeyFor(weekStart);
-  const loadItems = useMemo(() => weekItemsLoader(weekStart), [weekStart]);
+  const loadItems = useMemo(() => weekItemsLoader(weekStart, tz), [weekStart, tz]);
   const loadLeaves = useMemo(() => weekLeavesLoader(weekStart), [weekStart]);
   const itemsQ = useWarmData<PlanningItem[]>(itemsKey, loadItems, DEFAULT_MAX_AGE_MS, ITEMS_STALE_MS);
   const leavesQ = useWarmData<LeaveSpan[]>(leavesKey, loadLeaves, DEFAULT_MAX_AGE_MS, ITEMS_STALE_MS);
@@ -261,17 +267,17 @@ export default function PlanningApp() {
     if (!serverItems) return;
     for (const d of [-7, 7]) {
       const ws = addDays(weekStart, d);
-      const ik = itemsKeyFor(ws);
+      const ik = itemsKeyFor(ws, tz);
       const lk = leavesKeyFor(ws);
       if (warmAge(ik) > ITEMS_STALE_MS) {
         warmedWeeks.current.add(ik);
-        weekItemsLoader(ws)().then((v) => writeWarm(ik, v), () => {});
+        weekItemsLoader(ws, tz)().then((v) => writeWarm(ik, v), () => {});
       }
       if (warmAge(lk) > ITEMS_STALE_MS) {
         weekLeavesLoader(ws)().then((v) => writeWarm(lk, v), () => {});
       }
     }
-  }, [serverItems, weekStart]);
+  }, [serverItems, weekStart, tz]);
 
   /* Attach the joined resource/role the list route returns, so an item
      coming back from a write renders exactly like a fetched one. */
@@ -290,8 +296,8 @@ export default function PlanningApp() {
 
   const inWeek = useCallback(
     (it: { start_at: string; end_at: string }) =>
-      new Date(it.end_at).getTime() >= weekStart.getTime() && new Date(it.start_at).getTime() < weekEnd.getTime(),
-    [weekStart, weekEnd],
+      new Date(it.end_at).getTime() >= weekFromMs && new Date(it.start_at).getTime() < weekToMs,
+    [weekFromMs, weekToMs],
   );
 
   /** Show `next` now; persist it as the week's warm answer when `commit`. */
@@ -371,6 +377,11 @@ export default function PlanningApp() {
   }, []);
 
   const deepLinkDone = useRef(false);
+  /* The deep link runs once; it reads the zone through a ref. */
+  const tzRef = useRef(tz);
+  useEffect(() => {
+    tzRef.current = tz;
+  }, [tz]);
   useEffect(() => {
     if (deepLinkDone.current) return;
     deepLinkDone.current = true;
@@ -380,7 +391,7 @@ export default function PlanningApp() {
       (item) => {
         setModal({ open: true, editing: item });
         /* Jump the board to the item's week so it is visible behind the modal. */
-        setAnchor(startOfWeek(new Date(item.start_at)));
+        setAnchor(startOfWeek(plannerWall(item.start_at, tzRef.current)));
       },
       (e) => {
         toastError(e);
@@ -506,18 +517,24 @@ export default function PlanningApp() {
     async (itemId: string, targetResourceId: string | null, targetDate: Date) => {
       const existing = items.find((i) => i.id === itemId);
       if (!existing) return;
-      const oldStart = new Date(existing.start_at);
-      const oldEnd = new Date(existing.end_at);
-      const durationMs = oldEnd.getTime() - oldStart.getTime();
-      // Stamp targetDate's Y/M/D onto old time-of-day.
-      const newStart = new Date(targetDate);
-      newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), oldStart.getSeconds(), oldStart.getMilliseconds());
-      const newEnd = new Date(newStart.getTime() + durationMs);
+      const durationMs = Date.parse(existing.end_at) - Date.parse(existing.start_at);
+      // Stamp targetDate's Y/M/D (a wall day) onto the old wall time-of-day.
+      const oldWall = plannerWall(existing.start_at, tz);
+      const newWall = new Date(targetDate);
+      newWall.setHours(oldWall.getHours(), oldWall.getMinutes(), oldWall.getSeconds(), oldWall.getMilliseconds());
       // No-op if nothing changed (e.g. dropped on same cell).
-      if (dateKey(oldStart) === dateKey(newStart) && existing.resource_id === targetResourceId) return;
-      await moveItem(itemId, { start_at: newStart.toISOString(), end_at: newEnd.toISOString(), resource_id: targetResourceId });
+      if (dateKey(oldWall) === dateKey(newWall) && existing.resource_id === targetResourceId) return;
+      const newStart = zonedToUtc(
+        newWall.getFullYear(), newWall.getMonth() + 1, newWall.getDate(),
+        newWall.getHours(), newWall.getMinutes(), newWall.getSeconds(), newWall.getMilliseconds(), tz,
+      );
+      await moveItem(itemId, {
+        start_at: new Date(newStart).toISOString(),
+        end_at: new Date(newStart + durationMs).toISOString(),
+        resource_id: targetResourceId,
+      });
     },
-    [items, moveItem],
+    [items, moveItem, tz],
   );
 
   const handleTimelineMove = useCallback(
@@ -564,7 +581,12 @@ export default function PlanningApp() {
   const startWeekAction = useCallback(
     async (kind: "copy" | "publish", resourceIds: string[] | null) => {
       if (weekBusy) return;
-      const body: WeekActionBody = { week_start: weekStart.toISOString(), resource_ids: resourceIds, include_open: true, tz };
+      const body: WeekActionBody = {
+        week_start: wallInstant(weekStart, tz).toISOString(),
+        resource_ids: resourceIds,
+        include_open: true,
+        tz,
+      };
       setWeekBusy(kind);
       try {
         if (kind === "copy") {
@@ -713,7 +735,7 @@ export default function PlanningApp() {
                   leaves={leaves}
                   onPrev={() => setAnchor(addDays(weekStart, -7))}
                   onNext={() => setAnchor(addDays(weekStart, 7))}
-                  onToday={() => setAnchor(startOfWeek(new Date()))}
+                  onToday={() => setAnchor(null)}
                   onCellClick={(resource_id, date) => setModal({ open: true, editing: null, preset: { resource_id, date } })}
                   onItemClick={openItem}
                   onItemDrop={handleItemDrop}
@@ -731,7 +753,7 @@ export default function PlanningApp() {
                   onWeekAction={startWeekAction}
                 />
               ) : tab === "utilization" ? (
-                <UtilizationView items={lensItems} resources={resources} leaves={leaves} weekStart={weekStart} />
+                <UtilizationView items={lensItems} resources={resources} leaves={leaves} weekStart={weekStart} tz={tz} />
               ) : tab === "workload" ? (
                 <WorkloadView
                   weekStart={weekStart}
@@ -740,11 +762,12 @@ export default function PlanningApp() {
                   version={version}
                   onPrev={() => setAnchor(addDays(weekStart, -7))}
                   onNext={() => setAnchor(addDays(weekStart, 7))}
-                  onToday={() => setAnchor(startOfWeek(new Date()))}
+                  onToday={() => setAnchor(null)}
                 />
               ) : tab === "open" ? (
                 <OpenShiftsView
                   items={scopedItems.filter((i) => !i.resource_id)}
+                  tz={tz}
                   roles={roles}
                   taking={taking}
                   canWrite={canWrite}
@@ -752,7 +775,7 @@ export default function PlanningApp() {
                   onEdit={openItem}
                 />
               ) : tab === "mine" ? (
-                <MyPlanningView roles={roles} version={version} matches={matchesSearch} onEdit={openItem} />
+                <MyPlanningView roles={roles} version={version} matches={matchesSearch} onEdit={openItem} tz={tz} />
               ) : (
                 <ConfigurationView
                   roles={roles}
@@ -787,6 +810,7 @@ export default function PlanningApp() {
       )}
       <ConflictDialog
         info={conflict?.info ?? null}
+        tz={tz}
         onClose={() => setConflict(null)}
         onOverride={async () => {
           const c = conflict;
@@ -935,9 +959,9 @@ function ScheduleView({
   /* Every day an item covers, computed once per item. */
   const coveredDays = useMemo(() => {
     const m = new Map<string, string[]>();
-    for (const it of items) m.set(it.id, itemDayKeys(it, days));
+    for (const it of items) m.set(it.id, itemDayKeys(it, days, tz));
     return m;
-  }, [items, days]);
+  }, [items, days, tz]);
 
   const visibleResources = useMemo(() => {
     if (resourceType === "all") return resources.filter((r) => r.is_active);
@@ -1008,7 +1032,7 @@ function ScheduleView({
 
   // Mobile-only: which day is currently in focus. Defaults to today if
   // it's inside the current week, otherwise the first day of the week.
-  const todayKey = dateKey(new Date());
+  const todayKey = dateKey(plannerNow(tz));
   const todayIdx = dayKeys.indexOf(todayKey);
   const [mobileDay, setMobileDay] = useState<{ week: string; idx: number } | null>(null);
   const weekId = dayKeys[0];
@@ -1168,9 +1192,6 @@ function ScheduleView({
             </button>
           </div>
         </div>
-        {isTimeline && tz !== browserTimeZone() && (
-          <p className="text-[11px] text-[var(--text-dim)]">{fillVars(t("tl.tzNote"), { tz })}</p>
-        )}
       </div>
 
       {/* ── Day pager (mobile list; every breakpoint for the Day timeline) ── */}
@@ -1264,7 +1285,7 @@ function ScheduleView({
                 {cellItems.length > 0 ? (
                   <div className="space-y-1.5">
                     {cellItems.map((it) => (
-                      <MobileItemRow key={it.id} item={it} onClick={onItemClick} conflict={conflictIds.has(it.id)} />
+                      <MobileItemRow key={it.id} item={it} tz={tz} onClick={onItemClick} conflict={conflictIds.has(it.id)} />
                     ))}
                   </div>
                 ) : (
@@ -1366,7 +1387,7 @@ function ScheduleView({
                     </span>
                   )}
                   {cellItems.map((it) => (
-                    <ItemPill key={it.id} item={it} onClick={onItemClick} draggable={droppable} conflict={conflictIds.has(it.id)} />
+                    <ItemPill key={it.id} item={it} tz={tz} onClick={onItemClick} draggable={droppable} conflict={conflictIds.has(it.id)} />
                   ))}
                   {droppable && (
                     <div className="absolute top-1 end-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity">
@@ -1502,10 +1523,12 @@ function TemplateMenu({
 /** Mobile list row — fuller info than ItemPill because it has real width. */
 function MobileItemRow({
   item,
+  tz,
   onClick,
   conflict = false,
 }: {
   item: PlanningItem;
+  tz: string;
   onClick: (i: PlanningItem) => void;
   conflict?: boolean;
 }) {
@@ -1527,7 +1550,7 @@ function MobileItemRow({
           {item.title ? <AutoTranslatedText text={item.title} /> : t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
         </div>
         <div className="text-[10px] text-[var(--text-dim)] truncate">
-          {formatRange(item.start_at, item.end_at)}
+          {formatRange(item.start_at, item.end_at, tz)}
           {item.role?.name ? ` · ${item.role.name}` : ""}
         </div>
       </div>
@@ -1539,11 +1562,13 @@ function MobileItemRow({
  *  a <button>: Firefox will not start a drag from a <button>. */
 function ItemPill({
   item,
+  tz,
   onClick,
   draggable = false,
   conflict = false,
 }: {
   item: PlanningItem;
+  tz: string;
   onClick: (i: PlanningItem) => void;
   draggable?: boolean;
   conflict?: boolean;
@@ -1557,7 +1582,7 @@ function ItemPill({
       role="button"
       tabIndex={0}
       data-item-pill
-      aria-label={`${label}, ${formatRange(item.start_at, item.end_at)}, ${t(`status.${item.status}`)}`}
+      aria-label={`${label}, ${formatRange(item.start_at, item.end_at, tz)}, ${t(`status.${item.status}`)}`}
       draggable={draggable}
       onDragStart={(e) => {
         e.stopPropagation();
@@ -1583,7 +1608,7 @@ function ItemPill({
         {item.title ? <AutoTranslatedText text={item.title} /> : label}
       </div>
       <div className="text-[9px] opacity-80">
-        {formatTime(item.start_at)}–{formatTime(item.end_at)}
+        {formatTime(item.start_at, tz)}–{formatTime(item.end_at, tz)}
       </div>
     </div>
   );
@@ -1595,6 +1620,7 @@ function ItemPill({
 
 function OpenShiftsView({
   items,
+  tz,
   roles,
   taking,
   canWrite,
@@ -1602,6 +1628,7 @@ function OpenShiftsView({
   onEdit,
 }: {
   items: PlanningItem[];
+  tz: string;
   roles: PlanningRole[];
   taking: string | null;
   canWrite: (i: PlanningItem) => boolean;
@@ -1635,7 +1662,7 @@ function OpenShiftsView({
                 {i.title ? <AutoTranslatedText text={i.title} /> : label}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
-                {formatRange(i.start_at, i.end_at)} · {durationHours(i.start_at, i.end_at)}
+                {formatRange(i.start_at, i.end_at, tz)} · {durationHours(i.start_at, i.end_at)}
                 {t("unit.h")}
                 {role ? ` · ${role.name}` : ""}
               </div>
@@ -1680,7 +1707,9 @@ function MyPlanningView({
   version,
   matches,
   onEdit,
+  tz,
 }: {
+  tz: string;
   roles: PlanningRole[];
   version: number;
   matches: (i: PlanningItem) => boolean;
@@ -1693,16 +1722,17 @@ function MyPlanningView({
 
   useEffect(() => {
     let cancelled = false;
-    const since = addDays(new Date(), -7);
+    /* Midnight seven days ago on the planner's clock. */
+    const since = addDays(plannerNow(tz), -7);
     since.setHours(0, 0, 0, 0);
-    fetchItems({ mine: true, start: since.toISOString(), limit: MINE_LIMIT }).then(
+    fetchItems({ mine: true, start: wallInstant(since, tz).toISOString(), limit: MINE_LIMIT }).then(
       (res) => { if (!cancelled) setState({ v: reqV, items: res, failed: false }); },
       () => { if (!cancelled) setState({ v: reqV, items: null, failed: true }); },
     );
     return () => {
       cancelled = true;
     };
-  }, [reqV]);
+  }, [reqV, tz]);
 
   /* Keep showing the previous answer while a refetch runs. */
   if (!state) return <CenteredSpinner />;
@@ -1734,7 +1764,7 @@ function MyPlanningView({
                 {i.title ? <AutoTranslatedText text={i.title} /> : t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
-                {formatRange(i.start_at, i.end_at)} · {durationHours(i.start_at, i.end_at)}
+                {formatRange(i.start_at, i.end_at, tz)} · {durationHours(i.start_at, i.end_at)}
                 {t("unit.h")}
                 {role ? ` · ${role.name}` : ""}
               </div>

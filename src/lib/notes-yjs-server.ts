@@ -12,6 +12,13 @@ import "server-only";
        MERGED into the stored state (never overwrites it), and body_json /
        body_plain are DERIVED from the merged document, so list + search stay
        exactly as before.
+     · Single-editor saves. A client on the single-editor path (collab
+       unavailable to it for a moment) sends body_json. On a note that has a
+       Yjs state, that body is turned into a Yjs update against the stored
+       state and merged — never a reset — and live peers are pinged to pull
+       the new state (pingNoteBodyChanged). The save is guarded by the
+       updated_at concurrency token, so a stale fallback copy gets a 409
+       instead of undoing newer collaborative content.
      · Keys. Realtime broadcast channels are not access-checked, so every
        Yjs/awareness payload is AES-GCM encrypted with a per-note key handed
        out only by the authorized collab endpoint. The key is derived from
@@ -24,29 +31,21 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { createHash, createHmac } from "node:crypto";
-import * as Y from "yjs";
-import { getSchema } from "@tiptap/core";
-import type { Schema } from "@tiptap/pm/model";
-import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { NOTES_YJS_FIELD, notesSchemaExtensions } from "@/lib/notes-schema";
-import { NOTE_LIMITS } from "@/lib/notes-policy";
+import { emitPings } from "@/lib/server/realtime-broadcast";
+import { seedStateFromJson } from "@/lib/notes-yjs-merge";
 import type { NoteRole, NoteShareLite } from "@/lib/notes-server";
 
-const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
-
-let _schema: Schema | null = null;
-function schema(): Schema {
-  if (!_schema) _schema = getSchema(notesSchemaExtensions());
-  return _schema;
-}
-
-export function b64encode(u: Uint8Array): string {
-  return Buffer.from(u).toString("base64");
-}
-export function b64decode(s: string): Uint8Array {
-  return new Uint8Array(Buffer.from(s, "base64"));
-}
+/* The pure CRDT operations live in notes-yjs-merge (no DB, testable alone). */
+export {
+  applyBodyToState,
+  b64decode,
+  b64encode,
+  mergeState,
+  seedStateFromJson,
+  type BodyToStateResult,
+  type MergeResult,
+} from "@/lib/notes-yjs-merge";
 
 /* ── Availability (is the yjs_state column there?) ─────────────────────── */
 
@@ -65,51 +64,7 @@ export async function notesCollabAvailable(): Promise<boolean> {
   return value;
 }
 
-/* ── Seeding + merging ──────────────────────────────────────────────────── */
-
-/** Build a Yjs state from a TipTap doc (the one-time seed). */
-export function seedStateFromJson(bodyJson: unknown): string {
-  let doc: Y.Doc;
-  try {
-    doc = prosemirrorJSONToYDoc(schema(), bodyJson ?? EMPTY_DOC, NOTES_YJS_FIELD);
-  } catch (e) {
-    // Content the schema can't read (legacy/garbage) — start clean rather
-    // than refuse collaboration; body_json itself is untouched until a save.
-    console.error("[notes-yjs] seed", e instanceof Error ? e.message : e);
-    doc = prosemirrorJSONToYDoc(schema(), EMPTY_DOC, NOTES_YJS_FIELD);
-  }
-  const out = b64encode(Y.encodeStateAsUpdate(doc));
-  doc.destroy();
-  return out;
-}
-
-export type MergeResult =
-  | { ok: true; state: string; bodyJson: Record<string, unknown> }
-  | { ok: false; error: string };
-
-/** Merge a client's Yjs update into the stored state and derive body_json. */
-export function mergeState(stored: string | null, incomingB64: string): MergeResult {
-  if (typeof incomingB64 !== "string" || !incomingB64 || incomingB64.length > NOTE_LIMITS.yjsStateChars) {
-    return { ok: false, error: "Invalid collaborative update" };
-  }
-  const doc = new Y.Doc();
-  try {
-    if (stored) Y.applyUpdate(doc, b64decode(stored));
-    Y.applyUpdate(doc, b64decode(incomingB64));
-    const state = b64encode(Y.encodeStateAsUpdate(doc));
-    if (state.length > NOTE_LIMITS.yjsStateChars) return { ok: false, error: "Note is too large" };
-    const bodyJson = yDocToProsemirrorJSON(doc, NOTES_YJS_FIELD) as Record<string, unknown>;
-    // Validate the derived document against the schema — a malformed update
-    // must not become the note's body.
-    schema().nodeFromJSON(bodyJson);
-    return { ok: true, state, bodyJson };
-  } catch (e) {
-    console.error("[notes-yjs] merge", e instanceof Error ? e.message : e);
-    return { ok: false, error: "Invalid collaborative update" };
-  } finally {
-    doc.destroy();
-  }
-}
+/* ── Seeding ────────────────────────────────────────────────────────────── */
 
 /**
  * The note's Yjs state, seeding it (once, conditionally) when absent.
@@ -174,4 +129,21 @@ export function collabKeysFor(
     w: role === "owner" || role === "editor" ? write.toString("base64") : null,
     e,
   };
+}
+
+/* ── Out-of-session body changes ───────────────────────────────────────── */
+
+/**
+ * Tell a note's live session that its stored Yjs state gained changes that
+ * did not travel over the socket (a single-editor save). Content-free, like
+ * every ping on this channel: live peers pull the state through the
+ * authorized collab endpoint and merge it; solo peers refetch the note.
+ * Fire-and-forget.
+ */
+export async function pingNoteBodyChanged(noteId: string): Promise<void> {
+  await emitPings([{
+    topic: `note:${noteId}`,
+    event: "ping",
+    payload: { by: "server", at: new Date().toISOString(), body: true },
+  }]);
 }
