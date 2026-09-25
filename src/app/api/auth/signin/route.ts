@@ -151,11 +151,11 @@ export async function POST(req: Request) {
           if ((count ?? 0) >= 5) {
             await notifySuperAdmins({
               kind: "failed_login_threshold",
-              subject: `Repeated failed logins for ${account.username || account.login_email}`,
+              /* In the reader's language (translations/notif-templates/admin.ts). */
+              tpl: { k: "failed_login_threshold", p: { account: account.username || account.login_email, count, ip } },
               actorName: account.username || account.login_email,
               action: `${count} failed sign-in attempts in 15 min`,
               location: locationLabel(requestMeta(req)),
-              body: `${count} failed attempts in the last 15 minutes${ip ? ` · ${ip}` : ""}`,
               severity: "critical",
               tenantId: account.tenant_id,
               metadata: { account_id: account.id, attempts: count, ip },

@@ -33,6 +33,21 @@ interface ReminderRow {
   status: string;
 }
 
+/* What the reminder says — collect / pay × named / unnamed ("a party") ×
+   due / overdue: one template each, so no reader gets a sentence glued from
+   translated fragments. The counterparty's name and the amount are plain
+   values (a name is never machine-translated). */
+const REMINDER_TPL = {
+  collect: {
+    named: { due: { k: "finance_reminder.collect.due" }, overdue: { k: "finance_reminder.collect.overdue" } },
+    unnamed: { due: { k: "finance_reminder.collect.unnamed.due" }, overdue: { k: "finance_reminder.collect.unnamed.overdue" } },
+  },
+  pay: {
+    named: { due: { k: "finance_reminder.pay.due" }, overdue: { k: "finance_reminder.pay.overdue" } },
+    unnamed: { due: { k: "finance_reminder.pay.unnamed.due" }, overdue: { k: "finance_reminder.pay.unnamed.overdue" } },
+  },
+} as const;
+
 /** Active accounts whose role is named "Finance", plus the Super Admins. */
 async function financeRecipients(tenantId: string | null): Promise<string[]> {
   const ids = new Set<string>(await superAdminAccountIds(tenantId));
@@ -75,19 +90,13 @@ export async function GET(req: Request) {
       recipientsByTenant.set(r.tenant_id, recipients);
     }
     const amount = r.amount != null ? `${Number(r.amount).toLocaleString("en")} ${r.currency ?? ""}`.trim() : null;
-    const who = r.party_name || "a party";
     const overdue = r.due_date < today;
-    const subject = r.type === "collect"
-      ? `Collect from ${who}${amount ? `: ${amount}` : ""}`
-      : `Pay ${who}${amount ? `: ${amount}` : ""}`;
-    const body = overdue
-      ? `Was due ${dmyDate(r.due_date)} — still open.`
-      : `Due ${dmyDate(r.due_date)}.`;
+    const side = r.type === "collect" ? REMINDER_TPL.collect : REMINDER_TPL.pay;
+    const { k } = side[r.party_name ? "named" : "unnamed"][overdue ? "overdue" : "due"];
     await notifyLite({
       tenantId: r.tenant_id,
       recipients,
-      subject,
-      body,
+      tpl: { k, p: { who: r.party_name || null, amount, due: dmyDate(r.due_date) } },
       link: "/finance/notifications",
       type: "finance_reminder",
       metadata: { source: "finance", reminder_id: r.id, reference_type: r.type, due_date: r.due_date },

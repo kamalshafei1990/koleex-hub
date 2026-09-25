@@ -87,10 +87,11 @@ export default function PreferencesTab({ account, onChanged }: Props) {
               className={selectClass}
               value={prefs.language ?? "en"}
               onChange={(e) =>
-                setPrefs({ ...prefs, language: e.target.value as "en" | "ar" })
+                setPrefs({ ...prefs, language: e.target.value as "en" | "zh" | "ar" })
               }
             >
               <option value="en">{t("acc.prefs.langEnglish")}</option>
+              <option value="zh">中文 (Chinese)</option>
               <option value="ar">العربية (Arabic)</option>
             </select>
           </div>

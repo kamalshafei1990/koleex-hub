@@ -20,8 +20,11 @@ import { employeeNames } from "@/lib/server/attendance-records";
 import { employeeAccountId } from "@/lib/server/leave-review";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
+import { dmyDate } from "@/lib/work-reports";
 
 type Rec = { id: string; employee_id: string; date: string; clock_in: string | null; clock_out: string | null; overtime_status: string | null };
+/** One decided day, as the employee's notification tells it. */
+type Decided = { date: string; decision: "approved" | "rejected"; duration: string | null };
 
 async function withOvertime(recs: Rec[]) {
   const [rows, countries] = await Promise.all([loadPolicyRows(), resolveEmployeeCountries(recs.map((r) => r.employee_id))]);
@@ -68,7 +71,7 @@ export async function POST(req: Request) {
   const byId = new Map((await withOvertime((data ?? []) as Rec[])).map((x) => [x.rec.id, x]));
   const now = new Date().toISOString();
   const done: Array<{ record_id: string; status: string; minutes: number }> = [];
-  const perEmployee = new Map<string, string[]>();
+  const perEmployee = new Map<string, Decided[]>();
   for (const w of wanted) {
     const x = byId.get(w.record_id);
     if (!x || x.minutes <= 0 || x.rec.overtime_status) continue;
@@ -81,17 +84,26 @@ export async function POST(req: Request) {
     if (!upd) continue;
     done.push({ record_id: x.rec.id, status: w.decision === "approve" ? "approved" : "rejected", minutes });
     await clearUnreadByMeta({ attendance_record_id: x.rec.id });
-    const line = `${x.rec.date}: ${w.decision === "approve" ? `approved ${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m` : "not approved"}`;
-    perEmployee.set(x.rec.employee_id, [...(perEmployee.get(x.rec.employee_id) ?? []), line]);
+    const day: Decided = w.decision === "approve"
+      ? { date: dmyDate(x.rec.date), decision: "approved", duration: `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m` }
+      : { date: dmyDate(x.rec.date), decision: "rejected", duration: null };
+    perEmployee.set(x.rec.employee_id, [...(perEmployee.get(x.rec.employee_id) ?? []), day]);
   }
   /* One message per employee, however many days were decided. */
   if (perEmployee.size) {
     const { data: emps } = await supabaseServer.from("koleex_employees").select("id, account_id, person_id").in("id", Array.from(perEmployee.keys()));
     for (const e of (emps ?? []) as Array<{ id: string; account_id: string | null; person_id: string | null }>) {
       const to = await employeeAccountId(e);
+      const days = perEmployee.get(e.id) ?? [];
+      /* One day reads as a sentence in the reader's language; several stay
+         the stored list of days (data). */
+      const only = days.length === 1 ? days[0] : null;
       after(() => notifyLite({
         tenantId: auth.tenant_id, recipients: [to], senderId: auth.account_id,
-        subject: "Overtime decided", body: (perEmployee.get(e.id) ?? []).join(" · "),
+        tpl: only
+          ? { k: "hr_attendance_overtime_decided.one", p: { date: only.date, decision: only.decision, duration: only.duration } }
+          : { k: "hr_attendance_overtime_decided" },
+        body: only ? null : days.map((d) => `${d.date}: ${d.decision === "approved" ? `approved ${d.duration}` : "not approved"}`).join(" · "),
         link: "/me?tab=attendance", type: "hr_attendance_overtime_decided", metadata: { employee_id: e.id },
       }));
     }

@@ -16,6 +16,7 @@ import "server-only";
    so even concurrent cron runs cannot double-spawn. */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { prepareTpl } from "@/lib/notification-templates";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
@@ -193,26 +194,28 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
          recipient, same recurring subject, still unread → read+archived
          before the new row lands. A copy the user already read is
          history and stays. */
-      await supersedeUnread({ recipients, category: "task", subject: `🔁 ${t.title}` });
+      const text = prepareTpl({ k: "todo_recurring", p: { title: t.title } });
+      await supersedeUnread({ recipients, category: "task", subject: text.subject });
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,
           sender_account_id: null,
           tenant_id: t.tenant_id,
           category: "task",
-          subject: `🔁 ${t.title}`,
+          subject: text.subject,
           body: t.description || t.title,
           link: `/todo?task=${newId}`,
-          metadata: { type: "todo_recurring", todo_id: newId, cadence },
+          metadata: { type: "todo_recurring", todo_id: newId, cadence, ...(text.tpl ? { tpl: text.tpl } : {}) },
         })),
       );
       await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
       await sendPushToAccounts(recipients, {
-        title: `🔁 ${t.title}`,
+        title: text.subject,
         body: t.description || "Recurring task",
         url: `/todo?task=${newId}`,
         tag: `todo-recurring-${newId}`,
         kind: "todo_recurring",
+        tpl: text.tpl,
       }).catch((e) => console.error("[todo-recurrence] push:", e));
     }
 

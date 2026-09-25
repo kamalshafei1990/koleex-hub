@@ -14,14 +14,16 @@ import "server-only";
        "Security alerts" switch in Settings → Notifications, which covers the
        sign-in noise family only (see suppressedRecipients).
 
-   metadata shape: { sam: true, kind, severity, actor, ...extra } so the bell /
-   inbox can recognise Super-Admin security alerts.
+   metadata shape: { sam: true, kind, severity, actor, ...extra, tpl? } so the
+   bell / inbox can recognise Super-Admin security alerts (and, with `tpl`,
+   show them in the reader's language).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 
 /* Every kind here has a live emitter: new_device (activity heartbeat),
    failed_login_threshold (signin), the rest from audit.ts alertKindForAction.
@@ -39,7 +41,15 @@ export type AlertKind =
 
 export interface SaAlert {
   kind: AlertKind;
-  subject: string;
+  /** What happened, rendered in each reader's language (notification-
+   *  templates; words in translations/notif-templates/admin.ts). The stored
+   *  subject — and body, when the template has one — are its English, byte
+   *  for byte the sentence callers wrote before, so the dedupe and the
+   *  supersede below (both keyed on the subject) behave exactly as before.
+   *  Pass `subject` only for an alert with no template. */
+  tpl?: NotifTpl;
+  subject?: string;
+  /** The stored body when the template has none. */
   body?: string | null;
   severity?: "info" | "warning" | "critical";
   link?: string | null;
@@ -64,9 +74,18 @@ export interface SaAlert {
      {actor name}          ← push title (bold)
      {action} · from {loc} ← push body
    so we deliberately DON'T set title to "Koleex Hub" (that would duplicate the
-   app-name line); the actor's name goes in the title instead. */
-function buildPushPayload(alert: SaAlert, actorName: string | null) {
-  const actionText = alert.action || alert.subject;
+   app-name line); the actor's name goes in the title instead.
+
+   A reader whose Hub is in Chinese or Arabic gets the alert's template in
+   their language instead (web-push renders `tpl`) — but only where that
+   template still says WHO: the new-device and failed-sign-in sentences name
+   the account. An audited action's sentence ("Delete — product: …") does
+   not, and a security push that drops who did it is worse than one in
+   English, so those keep the English three lines. */
+const PUSH_TEMPLATED: ReadonlySet<AlertKind> = new Set(["new_device", "failed_login_threshold"]);
+
+function buildPushPayload(alert: SaAlert, subject: string, actorName: string | null, tpl: NotifTpl | null) {
+  const actionText = alert.action || subject;
   const body = alert.location ? `${actionText} · from ${alert.location}` : actionText;
   return {
     title: actorName || "Koleex Hub",
@@ -74,6 +93,7 @@ function buildPushPayload(alert: SaAlert, actorName: string | null) {
     url: alert.link ?? "/super-admin/activity",
     tag: alert.kind,
     kind: alert.kind,
+    tpl: PUSH_TEMPLATED.has(alert.kind) ? tpl : null,
   };
 }
 
@@ -169,14 +189,17 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     if (recipients.length === 0) return;
 
     const off = await suppressedRecipients(recipients, alert.kind);
+    const text = alert.tpl ? prepareTpl(alert.tpl) : null;
+    const subject = text?.subject ?? alert.subject ?? "";
+    const body = text?.body ?? alert.body ?? null;
     const rows = recipients
       .filter((id) => !off.has(id))
       .map((id) => ({
         recipient_account_id: id,
         sender_account_id: alert.actorAccountId ?? null,
         category: "alert" as const,
-        subject: alert.subject,
-        body: alert.body ?? null,
+        subject,
+        body,
         link: alert.link ?? "/super-admin/activity",
         metadata: {
           sam: true,
@@ -184,6 +207,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
           severity: alert.severity ?? "info",
           actor: alert.actorAccountId ?? null,
           ...(alert.metadata ?? {}),
+          ...(text?.tpl ? { tpl: text.tpl } : {}),
         },
       }));
     if (rows.length === 0) return;
@@ -200,7 +224,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
       .select("id")
       .in("recipient_account_id", rows.map((r) => r.recipient_account_id))
       .eq("category", "alert")
-      .eq("subject", alert.subject)
+      .eq("subject", subject)
       .gte("created_at", since);
     /* Same RECORD, not just the same words: two different products that
        share a name (the catalogue had duplicates) are two deletions. */
@@ -214,7 +238,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     await supersedeUnread({
       recipients,
       category: "alert",
-      subject: alert.subject,
+      subject,
     });
     await supabaseServer.from("inbox_messages").insert(rows);
     await emitPings(rows.map((r) => ({ topic: rtTopic.inbox((r as { recipient_account_id: string }).recipient_account_id) })));
@@ -225,7 +249,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     const pushTargets = recipients.filter((id) => !off.has(id));
     if (pushTargets.length) {
       const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
-      await sendPushToAccounts(pushTargets, buildPushPayload(alert, actorName), {
+      await sendPushToAccounts(pushTargets, buildPushPayload(alert, subject, actorName, text?.tpl ?? null), {
         actorAccountId: alert.actorAccountId,
       });
     }

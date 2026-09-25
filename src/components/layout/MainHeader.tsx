@@ -23,6 +23,7 @@ import NotificationBellGate from "./NotificationBellGate";
 import ViewAsTrigger from "./view-as-trigger";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { whenPageLoaded } from "@/lib/net-idle";
+import { syncAccountLanguage } from "@/lib/account-language";
 /* Super-Admin tools load AFTER the page has loaded — every other person
    downloaded them on every cold load and never saw them (measured
    25/09/2026), and loading them before the load event held that event open.
@@ -183,6 +184,8 @@ export default function MainHeader() {
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
     localStorage.setItem("koleex-lang", lang);
     window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));
+    /* …and the account learns it, so pushes are written in it too. */
+    void syncAccountLanguage(lang);
   }, [lang]);
 
   const dk = theme === "dark";

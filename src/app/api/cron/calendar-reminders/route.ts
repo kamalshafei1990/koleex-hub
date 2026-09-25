@@ -29,11 +29,12 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { prepareTpl, type NotifTpl, type TplParams } from "@/lib/notification-templates";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { nextEffectiveOccurrence, type CalendarRec } from "@/lib/calendar-recurrence";
-import { accountTimezones, eventLink, formatWhen } from "@/lib/server/calendar-notify";
+import { accountTimezones, eventLink, formatWhen, whenParts } from "@/lib/server/calendar-notify";
 import { isMissingSchema } from "@/lib/server/calendar-access";
 import { loadExceptions } from "@/lib/server/calendar-exceptions";
 
@@ -57,19 +58,24 @@ interface EvRow {
 const MIN = 60_000;
 const EVENTS = "koleex_calendar_events";
 
-/** "in 5 min", "in 1 h 30 min", "in 2 days", "now" — from what is actually
- *  left, not from the configured lead (a late run would otherwise say "in
- *  15 min" about a meeting starting in 3). */
-function timeLeft(ms: number): string {
+/** "in 5 min", "in 1 h 30 min", "in 2 days", "starting now" — from what is
+ *  actually left, not from the configured lead (a late run would otherwise
+ *  say "in 15 min" about a meeting starting in 3). `lead` is the English
+ *  words (the push); `tpl` the inbox row's template, one per wording, so
+ *  each reader gets it in their own language. */
+function timeLeft(ms: number, p: TplParams): { lead: string; tpl: NotifTpl } {
   const mins = Math.round(ms / MIN);
-  if (mins <= 0) return "now";
-  if (mins < 60) return `in ${mins} min`;
+  if (mins <= 0) return { lead: "starting now", tpl: { k: "calendar_reminder.now", p } };
+  if (mins < 60) return { lead: `in ${mins} min`, tpl: { k: "calendar_reminder.min", p: { ...p, min: mins } } };
   if (mins < 48 * 60) {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    return m ? `in ${h} h ${m} min` : `in ${h} h`;
+    return m
+      ? { lead: `in ${h} h ${m} min`, tpl: { k: "calendar_reminder.hours_min", p: { ...p, h, min: m } } }
+      : { lead: `in ${h} h`, tpl: { k: "calendar_reminder.hours", p: { ...p, h } } };
   }
-  return `in ${Math.round(mins / 1440)} days`;
+  const days = Math.round(mins / 1440);
+  return { lead: `in ${days} days`, tpl: { k: "calendar_reminder.days", p: { ...p, days } } };
 }
 
 /** Stamp the occurrence as handled — only if no other run has. */
@@ -169,8 +175,11 @@ export async function GET(req: Request) {
 
     const recipients = Array.from(new Set([ev.account_id, ...(guestsByEvent.get(ev.id) ?? [])]));
     const when = formatWhen(occISO, end.toISOString(), ev.all_day, tz);
-    const left = timeLeft(occ.getTime() - Date.now());
-    const lead = left === "now" ? "starting now" : left;
+    const w = whenParts(occISO, end.toISOString(), ev.all_day, tz);
+    const { lead, tpl } = timeLeft(occ.getTime() - Date.now(), {
+      title: ev.title, when: w.when, allDay: w.allDay, url: ev.meeting_url || null,
+    });
+    const text = prepareTpl(tpl);
     const join = ev.meeting_url ? ` Join: ${ev.meeting_url}` : "";
 
     const meta = { type: "calendar_reminder", event_id: ev.id };
@@ -182,10 +191,10 @@ export async function GET(req: Request) {
           sender_account_id: null,
           tenant_id: ev.tenant_id,
           category: "calendar",
-          subject: `Starting soon: ${ev.title}`,
-          body: `${when} (${lead}).${join}`,
+          subject: text.subject,
+          body: text.body ?? `${when} (${lead}).${join}`,
           link: eventLink(ev.id),
-          metadata: meta,
+          metadata: { ...meta, ...(text.tpl ? { tpl: text.tpl } : {}) },
         })),
       );
       await emitPings(recipients.map((id) => ({ topic: rtTopic.inbox(id) })));
@@ -195,6 +204,8 @@ export async function GET(req: Request) {
         url: eventLink(ev.id),
         tag: `calendar-reminder-${ev.id}`,
         kind: "calendar_reminder",
+        /* A reader in another language gets the row's own template. */
+        tpl: text.tpl,
       }).catch((e) => console.error("[cron/calendar-reminders] push:", e));
       fired += 1;
     } catch (e) {

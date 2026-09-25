@@ -29,6 +29,7 @@ import { dmyDate } from "@/lib/work-reports";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
+import { fillTemplate } from "@/lib/notification-templates";
 
 export type LeaveDecision = "approve" | "reject";
 export type ReviewerRole = "manager" | "hr";
@@ -76,20 +77,27 @@ async function loadRequest(requestId: string) {
   ]);
   if (!emp) return null;
   const e = emp as EmployeeRow;
+  const t = type as { name?: string; code?: string | null } | null;
+  const typeName = t?.name ?? "Leave";
   return {
     req: r, emp: e,
     name: one(e.people)?.full_name ?? "Employee",
-    typeName: (type as { name?: string } | null)?.name ?? "Leave",
+    /* The leave type for a notification template: its code when the
+       dictionary's English word for it is exactly today's name (zh / ar then
+       read their own word), else the name itself — an unknown code renders
+       as given, so the stored English never changes. */
+    leaveType: t?.code && fillTemplate(`enum.leave_type.${t.code}`, "en") === typeName ? t.code : typeName,
   };
 }
 
-const span = (r: RequestRow) => r.start_date === r.end_date ? dmyDate(r.start_date) : `${dmyDate(r.start_date)} → ${dmyDate(r.end_date)}`;
+/** The request's dates for a template: `{from}[[ → {to}]]` — one day has no `to`. */
+const span = (r: RequestRow) => ({ from: dmyDate(r.start_date), to: r.start_date === r.end_date ? null : dmyDate(r.end_date) });
 
 /** A request was just filed by the employee: tell the first approver. */
 export async function notifyLeaveFiled(requestId: string, tenantId: string | null, requesterAccountId: string | null): Promise<void> {
   const ctx = await loadRequest(requestId);
   if (!ctx) return;
-  const { req, emp, name, typeName } = ctx;
+  const { req, emp, name, leaveType } = ctx;
   const managerFirst = !!emp.manager_id && emp.manager_id !== emp.id;
   let recipients: string[] = [];
   let link = "/hr?tab=leave";
@@ -102,8 +110,9 @@ export async function notifyLeaveFiled(requestId: string, tenantId: string | nul
   if (recipients.length === 0) recipients = await hrReviewerAccountIds(tenantId);
   await notifyLite({
     tenantId, recipients, senderId: requesterAccountId,
-    subject: `Leave request — ${name}`,
-    body: `${typeName} · ${span(req)} · ${req.days} day${req.days === 1 ? "" : "s"}`,
+    tpl: req.days === 1
+      ? { k: "leave_approval_request.one", p: { name, leaveType, ...span(req), days: req.days } }
+      : { k: "leave_approval_request.many", p: { name, leaveType, ...span(req), days: req.days } },
     link, type: "leave_approval_request",
     metadata: { leave_request_id: req.id, employee_id: emp.id, step: managerFirst ? "manager" : "hr" },
     tag: `leave-${req.id}`,
@@ -129,7 +138,7 @@ export async function reviewLeave(opts: {
 }): Promise<ReviewResult> {
   const ctx = await loadRequest(opts.requestId);
   if (!ctx) return { ok: false, error: "not_found" };
-  const { req, emp, name, typeName } = ctx;
+  const { req, emp, name, leaveType } = ctx;
   const now = new Date().toISOString();
   const notes = opts.notes?.trim().slice(0, 2000) || null;
 
@@ -158,26 +167,25 @@ export async function reviewLeave(opts: {
 
   /* ── Notifications ── */
   const requesterAccount = await employeeAccountId(emp);
-  const label = `${typeName} · ${span(req)}`;
+  const label = { leaveType, ...span(req) };
   if (next === "manager_approved") {
     /* The manager's copy is done; HR's turn. */
     await clearUnreadByMeta({ type: "leave_approval_request", leave_request_id: req.id });
     await notifyLite({
       tenantId: opts.tenantId, recipients: await hrReviewerAccountIds(opts.tenantId), senderId: opts.reviewerAccountId,
-      subject: `Leave request — ${name} (manager approved)`, body: label, link: "/hr?tab=leave",
+      tpl: { k: "leave_approval_request.hr", p: { name, ...label } }, link: "/hr?tab=leave",
       type: "leave_approval_request", metadata: { leave_request_id: req.id, employee_id: emp.id, step: "hr" }, tag: `leave-${req.id}`,
     });
     await notifyLite({
       tenantId: opts.tenantId, recipients: [requesterAccount], senderId: opts.reviewerAccountId,
-      subject: `Your leave request was approved by your manager`, body: `${label} — now with HR`, link: "/me?tab=leave",
+      tpl: { k: "leave_request_decided.manager_approved", p: label }, link: "/me?tab=leave",
       type: "leave_request_decided", metadata: { leave_request_id: req.id, decision: "manager_approved" }, tag: `leave-${req.id}-me`,
     });
   } else {
     await clearUnreadByMeta({ leave_request_id: req.id });
     await notifyLite({
       tenantId: opts.tenantId, recipients: [requesterAccount], senderId: opts.reviewerAccountId,
-      subject: next === "approved" ? "Your leave request was approved" : "Your leave request was declined",
-      body: notes ? `${label} — ${notes}` : label, link: "/me?tab=leave",
+      tpl: { k: "leave_request_decided", p: { decision: next, ...label, notes } }, link: "/me?tab=leave",
       type: "leave_request_decided", metadata: { leave_request_id: req.id, decision: next }, tag: `leave-${req.id}-me`,
     });
   }

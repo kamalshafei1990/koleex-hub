@@ -160,6 +160,10 @@ async function runTenant(tenantId: string, now: string, opts: { dryRun?: boolean
   const byRecipient = new Map<string, PlannedNudge[]>();
   for (const n of mine) for (const r of n.recipients) byRecipient.set(r, [...(byRecipient.get(r) ?? []), n]);
   const tz = (id: string) => clocks.get(id)?.tz ?? "Asia/Shanghai";
+  /* Templated (translations/notif-templates/reports.ts): one report or
+     several are different sentences; a list of several stays the stored body
+     (data). The period labels are English words from the reports dictionary
+     and the due time an HH:MM on the reader's clock — plain values. */
   for (const [recipient, list] of byRecipient) {
     const reminders = list.filter((n) => n.kind === "reminder");
     const escalations = list.filter((n) => n.kind === "escalation");
@@ -167,10 +171,10 @@ async function runTenant(tenantId: string, now: string, opts: { dryRun?: boolean
       const first = reminders[0];
       await notifyLite({
         tenantId, recipients: [recipient], senderId: null,
-        subject: reminders.length === 1
-          ? `Reminder: your ${periodText(first).replace(/^(\w)/, (c) => c.toLowerCase())} is due at ${clock(first.dueAt, tz(recipient))}`
-          : `Reminder: ${reminders.length} reports are due soon`,
-        body: reminders.length > 1 ? reminders.map((n) => `${periodText(n)} — due ${clock(n.dueAt, tz(recipient))}`).join("\n") : "Send it from Reports before the deadline.",
+        tpl: reminders.length === 1
+          ? { k: "report_reminder.one", p: { report: periodText(first).replace(/^(\w)/, (c) => c.toLowerCase()), time: clock(first.dueAt, tz(recipient)) } }
+          : { k: "report_reminder.many", p: { count: reminders.length } },
+        body: reminders.length > 1 ? reminders.map((n) => `${periodText(n)} — due ${clock(n.dueAt, tz(recipient))}`).join("\n") : undefined,
         link: reminders.length === 1 && first.requestId ? `/reports?write=${first.key}&request=${first.requestId}` : "/reports",
         type: "report_reminder",
         metadata: { reminders: reminders.map((n) => ({ key: n.key, period_key: n.periodKey })) },
@@ -182,9 +186,11 @@ async function runTenant(tenantId: string, now: string, opts: { dryRun?: boolean
       const people = Array.from(new Set(escalations.map((n) => n.authorName)));
       await notifyLite({
         tenantId, recipients: [recipient], senderId: null,
-        subject: escalations.length === 1
-          ? `Missing report: ${escalations[0].authorName} — ${periodText(escalations[0])}`
-          : `${escalations.length} reports missing from ${people.length === 1 ? people[0] : `${people.length} people`}`,
+        tpl: escalations.length === 1
+          ? { k: "report_escalation.one", p: { author: escalations[0].authorName, report: periodText(escalations[0]) } }
+          : people.length === 1
+            ? { k: "report_escalation.many.person", p: { count: escalations.length, author: people[0] } }
+            : { k: "report_escalation.many.people", p: { count: escalations.length, people: people.length } },
         body: escalations.map((n) => `${n.authorName} — ${periodText(n)}`).join("\n"),
         link: "/reports?tab=compliance",
         type: "report_escalation",

@@ -16,6 +16,12 @@
      E  every declared lifecycle is backed by code: a clear/supersede key is
         passed to a lifecycle verb somewhere, a settle list is settled
      F  the open lifecycle gaps are counted, so their closing is visible
+     G  the templates (translations/notif-templates): every entry in en, zh
+        and ar with the same placeholders; every key a writer stores exists;
+        no template without a writer; every type has one (or a reason)
+     H  the template travels: a push sent beside a templated row carries it
+        (so it is written in the reader's language), and a notifyLite call
+        with a template never also hand-writes the subject
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -25,6 +31,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripComments } from "./lib/strip-comments";
 import { classifyBySubstring } from "../src/lib/notification-activity";
+import { notifTemplatesT } from "../src/lib/translations/notif-templates";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const R = (p: string) => path.join(ROOT, p);
@@ -190,6 +197,97 @@ check("every clear / supersede key and settle list reaches a lifecycle verb", un
 const gaps = [...entries].filter(([, e]) => /kind:\s*"gap"/.test(e.lifecycle)).map(([t]) => t);
 console.log(`\nF. open lifecycle gaps: ${gaps.length} of ${entries.size} types`);
 for (const g of gaps) console.log(`  · ${g}`);
+
+/* ── G: the templates ───────────────────────────────────────────────── */
+console.log("\nG. every notification reads in en, zh and ar");
+const LANGS = ["en", "zh", "ar"] as const;
+const shape = (text: string) => {
+  const ph = [...text.matchAll(/\{(\w+)(?::(\w+))?\}/g)].map((m) => `${m[1]}${m[2] ? `:${m[2]}` : ""}`).sort().join(",");
+  return `${ph}|${(text.match(/\[\[/g) ?? []).length}/${(text.match(/\]\]/g) ?? []).length}`;
+};
+const tplKeys = Object.keys(notifTemplatesT);
+const badLang: string[] = [];
+const badShape: string[] = [];
+const enumsUsed = new Set<string>();
+for (const key of tplKeys) {
+  const e = notifTemplatesT[key] as Record<string, string | undefined>;
+  const missing = LANGS.filter((l) => !e[l] || !e[l]!.trim());
+  if (missing.length) { badLang.push(`${key} (${missing.join("/")})`); continue; }
+  const en = shape(e.en!);
+  const [open, close] = en.split("|")[1].split("/");
+  if (open !== close) badShape.push(`${key}: unbalanced [[ ]]`);
+  for (const l of ["zh", "ar"] as const) if (shape(e[l]!) !== en) badShape.push(`${key} ${l}: ${shape(e[l]!)} ≠ en ${en}`);
+  for (const m of e.en!.matchAll(/\{\w+:(\w+)\}/g)) if (m[1] !== "free") enumsUsed.add(m[1]);
+}
+check("every template entry has en, zh and ar", badLang.length === 0, badLang.join("; "));
+check("zh and ar carry exactly the placeholders and [[optional]] parts of en", badShape.length === 0, badShape.join("; "));
+const noEnum = [...enumsUsed].filter((en) => !tplKeys.some((k) => k.startsWith(`enum.${en}.`)));
+check("every {x:enum} placeholder has its enum.<name>.* words", noEnum.length === 0, noEnum.join(", "));
+
+/* Keys writers store: `k: "…"` in any file that builds a template. */
+const usedK = new Map<string, string>();
+for (const f of files) {
+  const rel = path.relative(ROOT, f);
+  if (/translations\/notif-templates|notification-templates\.ts$/.test(rel)) continue;
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  if (!/\btpl\b|prepareTpl\(/.test(src)) continue;
+  for (const m of src.matchAll(/\bk:\s*"([a-z][\w.]*)"/g)) usedK.set(m[1], rel);
+}
+const tplOf = new Set(tplKeys.filter((k) => /\.(s|b)$/.test(k)).map((k) => k.replace(/\.(s|b)$/, "")));
+const unknownK = [...usedK].filter(([k]) => !notifTemplatesT[`${k}.s`]).map(([k, f]) => `${k} (${f})`);
+check("every template a writer stores exists (<k>.s)", unknownK.length === 0, unknownK.join("; "));
+const bodyOnly = [...tplOf].filter((k) => !notifTemplatesT[`${k}.s`]);
+check("every body template has its subject", bodyOnly.length === 0, bodyOnly.join(", "));
+const deadTpl = [...tplOf].filter((k) => !usedK.has(k));
+check("no template without a writer", deadTpl.length === 0, deadTpl.join(", "));
+/* Types that deliberately have no template, each with its reason. */
+const NO_TEMPLATE: Record<string, string> = {
+  ai_brief: "written in the reader's own language already — briefText(counts, lang)",
+  discuss_message: "push-only: never an inbox row",
+  test: "push-only: the user's own test push",
+};
+const staleNoTpl = Object.keys(NO_TEMPLATE).filter((t) => !entries.has(t));
+check("every NO_TEMPLATE exception is a registered type", staleNoTpl.length === 0, staleNoTpl.join(", "));
+const untemplated = [...entries.keys()].filter((t) => !(t in NO_TEMPLATE) && ![...usedK.keys()].some((k) => k === t || k.startsWith(`${t}.`)));
+check("every registered type has a template (or a NO_TEMPLATE reason)", untemplated.length === 0, `${untemplated.length}: ${untemplated.join(", ")}`);
+
+/* ── H: the template travels with the push ──────────────────────────── */
+console.log("\nH. a templated notification's push is templated too");
+/* The argument text of every `name(` call, balanced on parentheses. */
+const callArgs = (src: string, name: string): string[] => {
+  const out: string[] = [];
+  for (const m of src.matchAll(new RegExp(`\\b${name}\\(`, "g"))) {
+    let depth = 0, i = m.index! + m[0].length - 1;
+    for (; i < src.length; i++) {
+      if (src[i] === "(") depth++;
+      else if (src[i] === ")" && --depth === 0) break;
+    }
+    out.push(src.slice(m.index! + m[0].length, i));
+  }
+  return out;
+};
+const untemplatedPush: string[] = [];
+const doubleSubject: string[] = [];
+for (const f of files) {
+  const rel = path.relative(ROOT, f);
+  if (/lib\/server\/web-push\.ts$/.test(rel)) continue;
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  if (!/prepareTpl\(|\btpl:/.test(src)) continue;
+  for (const a of callArgs(src, "sendPushToAccounts")) if (!/\btpl\b/.test(a)) untemplatedPush.push(`${rel}: sendPushToAccounts(${a.replace(/\s+/g, " ").slice(0, 50)}…`);
+  for (const a of callArgs(src, "notifyLite")) {
+    /* Only the options object's OWN keys: a template parameter may well be
+       named `subject` (p: { subject: … }) — that is not a hand-written one. */
+    let depth = 0, top = "";
+    for (const ch of a) {
+      if (ch === "{" || ch === "(" || ch === "[") depth++;
+      else if (ch === "}" || ch === ")" || ch === "]") depth--;
+      else if (depth === 1) top += ch;
+    }
+    if (/\btpl:/.test(top) && /\bsubject:/.test(top)) doubleSubject.push(rel);
+  }
+}
+check("every push beside a templated row passes its tpl", untemplatedPush.length === 0, untemplatedPush.join("; "));
+check("no notifyLite call has both a template and a hand-written subject", doubleSubject.length === 0, doubleSubject.join(", "));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

@@ -25,7 +25,7 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
-import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import { NotificationBody, NotificationSubject } from "@/components/layout/NotificationText";
 import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
@@ -71,7 +71,6 @@ import { readWarmMailFeed, writeWarmMailFeed } from "@/lib/inbox-warm";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { dmy, discussListStamp, discussTime } from "@/lib/discuss-time";
-import { cleanInboxBody } from "@/lib/inbox-display";
 import type { InboxMessageWithSender, ProductRow } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -985,15 +984,15 @@ export default function InboxPage() {
                                   : "text-[var(--text-muted)]"
                               }`}
                             >
-                              <AutoTranslatedText text={msg.subject} />
+                              <NotificationSubject meta={msg.metadata} subject={msg.subject} lang={lang} plain />
                             </div>
-                            {msg.body && (
-                              <AutoTranslatedText
-                                text={cleanInboxBody(msg.body)}
-                                block
-                                className="text-[11.5px] text-[var(--text-dim)] mt-0.5 line-clamp-2 leading-snug"
-                              />
-                            )}
+                            <NotificationBody
+                              meta={msg.metadata}
+                              body={msg.body}
+                              lang={lang}
+                              plain
+                              className="text-[11.5px] text-[var(--text-dim)] mt-0.5 line-clamp-2 leading-snug"
+                            />
                             <div className="flex items-center gap-1.5 mt-1.5">
                               {hasAttachments && (
                                 <PaperclipIcon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
@@ -1462,16 +1461,15 @@ function MessageDetail({
           </div>
 
           <h2 className="text-[24px] md:text-[28px] font-bold text-[var(--text-primary)] leading-tight tracking-tight mb-6">
-            <AutoTranslatedText text={msg.subject} />
+            <NotificationSubject meta={msg.metadata} subject={msg.subject} lang={detailLang} />
           </h2>
 
-          {msg.body && (
-            <AutoTranslatedText
-              text={cleanInboxBody(msg.body)}
-              block
-              className="text-[14px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap break-words"
-            />
-          )}
+          <NotificationBody
+            meta={msg.metadata}
+            body={msg.body}
+            lang={detailLang}
+            className="text-[14px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap break-words"
+          />
 
           {/* Attachments grid — Apple Mail shows inline thumbnails at
               the bottom of the message body. We keep file-type icons

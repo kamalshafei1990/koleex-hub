@@ -23,6 +23,8 @@ import "server-only";
 import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { activityAllowed, classifyNotificationActivity, inQuietHours } from "@/lib/notification-activity";
+import type { NotifTpl } from "@/lib/notification-templates";
+import type { Lang } from "@/lib/i18n";
 
 /** Are the VAPID keys present? Pure env check — does NOT load `web-push`. */
 export function isPushConfigured(): boolean {
@@ -58,6 +60,10 @@ export interface PushPayload {
   url?: string;
   tag?: string;
   kind?: string;
+  /** The notification's template (notification-templates). With it, each
+   *  recipient's push is written in the language their account reads
+   *  (preferences.language); title/body above stay the English. */
+  tpl?: NotifTpl | null;
 }
 
 interface SubRow {
@@ -100,6 +106,7 @@ export async function sendPushToAccounts(
      not explicitly opted out. */
   const activity = classifyNotificationActivity(payload.kind);
   let allowedIds = ids;
+  const langOf = new Map<string, Lang>();
   {
     const { data: prefRows } = await supabaseServer
       .from("accounts")
@@ -107,6 +114,10 @@ export async function sendPushToAccounts(
       .in("id", ids);
     type PrefRow = { id: string; preferences: { notifications?: Record<string, unknown> } | null };
     const rows = (prefRows ?? []) as PrefRow[];
+    for (const r of rows) {
+      const l = (r.preferences as { language?: unknown } | null)?.language;
+      if (l === "zh" || l === "ar") langOf.set(r.id, l);
+    }
     const now = new Date();
     const activityMuted = new Set(
       rows.filter((r) => !activityAllowed(r.preferences?.notifications, activity)).map((r) => r.id),
@@ -153,12 +164,23 @@ export async function sendPushToAccounts(
   /* A push with no url lands on the Hub home — never on a Super-Admin page
      a regular recipient cannot open. Callers that mean the activity monitor
      say so (sa-notify does). */
-  const body = JSON.stringify({
-    title: payload.title,
-    body: payload.body ?? "",
-    url: payload.url ?? "/",
-    tag: payload.tag,
-  });
+  /* One message per language, built once. English — and any language the
+     template cannot fill — is the payload as the writer gave it. The
+     dictionary is imported only when someone needs another language: this
+     module sits on the cold-start graph of sign-in, the heartbeat and every
+     audited route (see the note at the top). */
+  const langs = new Set<Lang>(subs.map((s) => langOf.get(s.account_id) ?? "en"));
+  const bodies = new Map<Lang, string>();
+  const tr = payload.tpl && [...langs].some((l) => l !== "en") ? await import("@/lib/notification-templates") : null;
+  for (const lang of langs) {
+    const r = tr && lang !== "en" ? tr.renderNotification({ tpl: payload.tpl }, lang) : null;
+    bodies.set(lang, JSON.stringify({
+      title: r ? tr!.partsText(r.subject) : payload.title,
+      body: r?.body ? tr!.partsText(r.body) : payload.body ?? "",
+      url: payload.url ?? "/",
+      tag: payload.tag,
+    }));
+  }
 
   const deadIds: string[] = [];
   await Promise.all(
@@ -172,7 +194,7 @@ export async function sendPushToAccounts(
         await Promise.race([
           webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            body,
+            bodies.get(langOf.get(s.account_id) ?? "en")!,
             { TTL: 60 * 60 * 24, urgency: "high", timeout: 8000 },
           ),
           new Promise((_, reject) =>

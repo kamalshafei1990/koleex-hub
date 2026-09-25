@@ -128,11 +128,14 @@ export async function POST(req: Request) {
   if (dev.isNew && !loopback && !(await seenOnSameBrowserRecently(accountId, deviceId, meta.browser, meta.os))) {
     await notifySuperAdmins({
       kind: "new_device",
-      subject: `${auth.username || "A user"} signed in from a new device`,
+      /* "{actor} signed in from a new device" / "{browser} on {os} · {country}",
+         in the reader's language (translations/notif-templates/admin.ts). */
+      tpl: auth.username
+        ? { k: "new_device", p: { actor: auth.username, browser: meta.browser, os: meta.os, country: meta.country } }
+        : { k: "new_device.unknown", p: { browser: meta.browser, os: meta.os, country: meta.country } },
       actorName: auth.username || null,
       action: `New device · ${meta.browser} on ${meta.os}`,
       location: locationLabel(meta),
-      body: `${meta.browser} on ${meta.os}${meta.country ? ` · ${meta.country}` : ""}`,
       severity: "warning",
       actorAccountId: accountId,
       tenantId: auth.tenant_id,

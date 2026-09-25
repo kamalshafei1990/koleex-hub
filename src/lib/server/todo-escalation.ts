@@ -7,6 +7,7 @@ import "server-only";
    No schema change — the marker lives in the existing jsonb metadata. */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { prepareTpl } from "@/lib/notification-templates";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
@@ -70,23 +71,25 @@ export async function escalateOverdueTodos(now: Date = new Date()): Promise<numb
     const delegated = assignees.some((a) => a !== assigner);
     if (!delegated) continue;
 
+    const text = prepareTpl({ k: "todo_overdue", p: { title: t.title } });
     await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: assigner,
       sender_account_id: null,
       tenant_id: t.tenant_id,
       category: "task",
-      subject: `⚠️ Overdue: ${t.title}`,
-      body: "A task you assigned is past its due date and still open.",
+      subject: text.subject,
+      body: text.body,
       link: `/todo?task=${t.id}`,
-      metadata: { type: "todo_overdue", todo_id: t.id },
+      metadata: { type: "todo_overdue", todo_id: t.id, ...(text.tpl ? { tpl: text.tpl } : {}) },
     });
     await emitPings([{ topic: rtTopic.inbox(assigner) }]);
     await sendPushToAccounts([assigner], {
-      title: `⚠️ Overdue: ${t.title}`,
+      title: text.subject,
       body: "A task you assigned is past its due date.",
       url: `/todo?task=${t.id}`,
       tag: `todo-overdue-${t.id}`,
       kind: "todo_overdue",
+      tpl: text.tpl,
     }).catch((e) => console.error("[todo-escalation] push:", e));
 
     // Stamp so we don't re-nag on every cron tick.

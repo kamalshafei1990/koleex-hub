@@ -25,9 +25,10 @@ import type { ReportRow } from "@/lib/server/reports/core";
 import { pickWord, readSnapshot, templateOf } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
 
-/* Notifications are written once in English — the inbox row is data, and
-   every reader's bell already shows it through the auto-translation the
-   inbox uses for free text. The template name keeps its English form here
+/* Every notification is a template (translations/notif-templates/reports.ts):
+   the bell and Koleex Mail read it in the reader's own language, and the
+   row stores its English. The report's title is the author's own words —
+   {title:free}; with none, its type's name stands in, in its English form
    (a builder type's: as its report was started with it — 4E). */
 const nameOf = (r: ReportRow) =>
   (reportsT[`tpl.${r.template_key}.name`]?.en as string | undefined) ?? (pickWord(readSnapshot(r.template_snapshot)?.head.name, "en") || "Report");
@@ -36,12 +37,16 @@ const titleOf = (r: ReportRow) => (r.title?.trim() ? r.title.trim() : nameOf(r))
 export async function notifyReportSubmitted(r: ReportRow, recipientIds: string[], authorName: string): Promise<void> {
   const tpl = templateOf(r);
   const urgent = !!tpl?.urgent;
+  /* One sentence per variant: "Urgent · " leads for an urgent type, and a
+     review request says "Waiting for your review." in its body. */
+  const p = { title: titleOf(r), author: authorName };
   await notifyLite({
     tenantId: r.tenant_id,
     recipients: recipientIds,
     senderId: r.author_account_id,
-    subject: `${urgent ? "Urgent · " : ""}${titleOf(r)} — ${authorName}`,
-    body: r.review_required ? "Waiting for your review." : null,
+    tpl: r.review_required
+      ? urgent ? { k: "report_approval_request.urgent", p } : { k: "report_approval_request", p }
+      : urgent ? { k: "report_submitted.urgent", p } : { k: "report_submitted", p },
     link: `/reports/${r.id}`,
     type: r.review_required ? "report_approval_request" : "report_submitted",
     metadata: { report_id: r.id, template_key: r.template_key },
@@ -56,7 +61,9 @@ export async function notifyReportDecided(r: ReportRow, decision: "approved" | "
     tenantId: r.tenant_id,
     recipients: [r.author_account_id],
     senderId: deciderId,
-    subject: `${decision === "approved" ? "Approved" : "Returned"}: ${titleOf(r)}`,
+    tpl: decision === "approved"
+      ? { k: "report_decided.approved", p: { title: titleOf(r) } }
+      : { k: "report_decided.returned", p: { title: titleOf(r) } },
     body: note,
     link: `/reports/${r.id}`,
     type: "report_decided",
@@ -70,7 +77,7 @@ export async function notifyReportComment(r: ReportRow, participantIds: string[]
     tenantId: r.tenant_id,
     recipients: participantIds,
     senderId: commenterId,
-    subject: `${commenterName} commented: ${titleOf(r)}`,
+    tpl: { k: "report_comment", p: { actor: commenterName, title: titleOf(r) } },
     body: body.length > 280 ? `${body.slice(0, 277)}…` : body,
     link: `/reports/${r.id}`,
     type: "report_comment",

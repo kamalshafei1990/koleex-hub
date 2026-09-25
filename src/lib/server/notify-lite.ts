@@ -19,12 +19,18 @@ import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { superAdminAccountIds } from "@/lib/server/sa-notify";
 import { clearUnreadByMeta, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 
 export async function notifyLite(opts: {
   tenantId: string | null;
   recipients: Array<string | null | undefined>;
   senderId?: string | null;
-  subject: string;
+  /** What was said, rendered in each reader's language (notification-
+   *  templates); the stored subject — and body, when the template has one —
+   *  are its English. Pass `subject` only for a row with no template. */
+  tpl?: NotifTpl;
+  subject?: string;
+  /** The stored body when the template has none (data, a person's words). */
   body?: string | null;
   link?: string | null;
   /** classifier-visible type — also used as the push kind */
@@ -41,6 +47,9 @@ export async function notifyLite(opts: {
       .filter((id) => id !== opts.senderId);
     if (to.length === 0) return;
 
+    const text = opts.tpl ? prepareTpl(opts.tpl) : null;
+    const subject = text?.subject ?? opts.subject ?? "";
+    const body = text?.body ?? opts.body ?? null;
     if (opts.supersede) await supersedeUnread({ recipients: to, meta: opts.supersede });
     await supabaseServer.from("inbox_messages").insert(
       to.map((recipient) => ({
@@ -48,10 +57,10 @@ export async function notifyLite(opts: {
         sender_account_id: opts.senderId ?? null,
         tenant_id: opts.tenantId,
         category: "system",
-        subject: opts.subject,
-        body: opts.body ?? null,
+        subject,
+        body,
         link: opts.link ?? null,
-        metadata: { ...(opts.metadata ?? {}), type: opts.type },
+        metadata: { ...(opts.metadata ?? {}), type: opts.type, ...(text?.tpl ? { tpl: text.tpl } : {}) },
       })),
     );
     /* Wake the recipients' bells now — without the ping the row waited for
@@ -60,11 +69,12 @@ export async function notifyLite(opts: {
     await sendPushToAccounts(
       to,
       {
-        title: opts.subject,
-        body: opts.body ?? "",
+        title: subject,
+        body: body ?? "",
         url: opts.link ?? "/",
         tag: opts.tag ?? opts.type,
         kind: opts.type,
+        tpl: text?.tpl,
       },
       { actorAccountId: opts.senderId ?? null },
     );
@@ -141,8 +151,9 @@ export async function checkLowStockAndNotify(
       tenantId,
       recipients: admins,
       senderId: actorId,
-      subject: `Low stock: ${level.name ?? "item"}`,
-      body: `On hand ${qty} ≤ minimum ${threshold}.`,
+      tpl: level.name
+        ? { k: "low_stock_alert", p: { item: level.name, qty, threshold } }
+        : { k: "low_stock_alert.unnamed", p: { qty, threshold } },
       link: "/inventory/items?filter=low_stock",
       type: "low_stock_alert",
       metadata: { source: "inventory", item_id: inventoryItemId, warehouse_id: warehouseId, qty, threshold },

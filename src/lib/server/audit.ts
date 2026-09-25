@@ -116,15 +116,21 @@ export async function logAudit(input: AuditInput): Promise<void> {
       const label = input.entity_label || input.entity_id || input.entity_type || "record";
       // Push body reads "{action} {entity}: {label}" — e.g. "Deleted product: NEXD 9000".
       const entity = input.entity_type ?? "record";
+      const action = humanizeAction(input.action_type);
+      const kind = alertKindForAction(input.action_type);
+      const typed = !!input.entity_label && TYPED_LABEL.has(entity);
       await notifySuperAdmins({
-        kind: alertKindForAction(input.action_type),
-        subject: `${humanizeAction(input.action_type)} — ${entity}: ${label}`,
-        action: `${humanizeAction(input.action_type)} ${entity}: ${label}`,
+        kind,
+        /* "{action} — {entity}: {label}" and "In {module}", in the reader's
+           language. The module name only: the raw route ("(/product-data)")
+           was printed to the reader as if it were text; it stays in
+           audit_logs.route, where the activity monitor shows it. With no
+           module there is no body — that alert is written plain, as before. */
+        ...(input.module
+          ? { tpl: { ...ALERT_TPL[kind][typed ? "typed" : "id"], p: { action, entity, label, module: input.module } } }
+          : { subject: `${action} — ${entity}: ${label}`, body: null }),
+        action: `${action} ${entity}: ${label}`,
         location: locationLabel(meta),
-        /* The module name only. The raw route ("(/product-data)") was printed
-           to the reader as if it were text; it stays in audit_logs.route,
-           where the activity monitor shows it. */
-        body: input.module ? `In ${input.module}` : null,
         severity,
         link: "/super-admin/activity",
         actorAccountId: accountId,
@@ -137,6 +143,23 @@ export async function logAudit(input: AuditInput): Promise<void> {
   }
 }
 
+/* The alert's template per kind (translations/notif-templates/admin.ts) —
+   a template key starts with the kind it is filed under. `typed` when the
+   label is a name a person typed (a product, a role): shown as typed, and
+   the reader's screen may translate that piece alone. Any other label — a
+   quote number, a person's name, a section code, an id — stays as stored. */
+type AuditAlertKind = Exclude<AlertKind, "new_device" | "failed_login_threshold">;
+const ALERT_TPL: Record<AuditAlertKind, { id: { k: string }; typed: { k: string } }> = {
+  data_delete:       { id: { k: "data_delete" },       typed: { k: "data_delete.typed" } },
+  sensitive_export:  { id: { k: "sensitive_export" },  typed: { k: "sensitive_export.typed" } },
+  price_cost_change: { id: { k: "price_cost_change" }, typed: { k: "price_cost_change.typed" } },
+  settings_change:   { id: { k: "settings_change" },   typed: { k: "settings_change.typed" } },
+  admin_role_change: { id: { k: "admin_role_change" }, typed: { k: "admin_role_change.typed" } },
+  file_change:       { id: { k: "file_change" },       typed: { k: "file_change.typed" } },
+  suspicious:        { id: { k: "suspicious" },        typed: { k: "suspicious.typed" } },
+};
+const TYPED_LABEL: ReadonlySet<string> = new Set(["product", "role"]);
+
 function humanizeAction(action: string): string {
   return action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -145,7 +168,7 @@ function humanizeAction(action: string): string {
    `setting`, so an "admin_export" or "admin_settings_change" was filed as
    a role change and answered to the wrong preference row. Deletion stays
    first on purpose: deleting a price list IS a deletion. */
-function alertKindForAction(action: string): AlertKind {
+function alertKindForAction(action: string): AuditAlertKind {
   if (/delete|remove|purge|destroy/i.test(action)) return "data_delete";
   if (/export/i.test(action)) return "sensitive_export";
   if (/price|cost/i.test(action)) return "price_cost_change";

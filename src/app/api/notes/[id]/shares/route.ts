@@ -157,7 +157,10 @@ export async function POST(
       tenantId: auth.tenant_id,
       recipients: [accountId],
       senderId: auth.account_id,
-      subject: `${auth.username || "Someone"} shared a note with you`,
+      tpl: auth.username
+        ? { k: "note_shared", p: { actor: auth.username } }
+        : { k: "note_shared.someone" },
+      /* The body is the note's title — the owner's own words, stored as is. */
       body: title || null,
       link: `/notes?id=${id}`,
       type: "note_shared",

@@ -9,6 +9,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { prepareTpl } from "@/lib/notification-templates";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
@@ -103,25 +104,27 @@ export async function GET(req: Request) {
          writing today's — the recurrence spawner's lesson applied here:
          reminders inform, they must not accumulate. */
       await supersedeUnread({ recipients, category: "task", meta: { todo_id: t.id, type: "todo_reminder" } });
+      const text = prepareTpl({ k: "todo_reminder", p: { title: t.title } });
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,
           sender_account_id: null,
           tenant_id: t.tenant_id,
           category: "task",
-          subject: `⏰ Reminder: ${t.title}`,
+          subject: text.subject,
           body: t.description || t.title,
           link: `/todo?task=${t.id}`,
-          metadata: { type: "todo_reminder", todo_id: t.id },
+          metadata: { type: "todo_reminder", todo_id: t.id, ...(text.tpl ? { tpl: text.tpl } : {}) },
         })),
       );
       await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
       await sendPushToAccounts(recipients, {
-        title: `⏰ Reminder: ${t.title}`,
+        title: text.subject,
         body: t.description || "Task reminder",
         url: `/todo?task=${t.id}`,
         tag: `todo-reminder-${t.id}`,
         kind: "todo_reminder",
+        tpl: text.tpl,
       }).catch((e) => console.error("[cron/todo-reminders] push:", e));
     }
     // Stamp regardless so a task with no recipients doesn't loop forever.

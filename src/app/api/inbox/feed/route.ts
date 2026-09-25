@@ -184,11 +184,15 @@ export async function GET(req: Request) {
                the bell could not type them: its filter row showed nothing but
                "All", the Security chip never appeared, and those rows took
                the default chime. Two keys, both short strings. */
-            const meta = base.metadata as { type?: unknown; kind?: unknown } | null;
+            /* …and `tpl`: the template the bell renders in the reader's
+               language (lib/notification-templates) — a key and a few short
+               values, never a payload. */
+            const meta = base.metadata as { type?: unknown; kind?: unknown; tpl?: unknown } | null;
             if (meta && typeof meta === "object") {
               const trimmed: Record<string, unknown> = {};
               if (meta.type != null) trimmed.type = meta.type;
               if (meta.kind != null) trimmed.kind = meta.kind;
+              if (meta.tpl != null) trimmed.tpl = meta.tpl;
               base.metadata = trimmed;
             } else {
               base.metadata = {};

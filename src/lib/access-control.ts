@@ -233,7 +233,11 @@ export function defaultAccessFromPreset(
 /*  Preferences Shape                                                         */
 /* ========================================================================== */
 
-export type LanguagePref = "en" | "ar";
+/* The language this account READS in. The interface itself follows the
+   device (localStorage "koleex-lang"); each device reports it here
+   (lib/account-language), and the server writes the person's push
+   notifications in it (lib/server/web-push + notification-templates). */
+export type LanguagePref = "en" | "zh" | "ar";
 export type ThemePref = "light" | "dark" | "system";
 export interface NotificationPrefs {
   /* ── Per-activity toggles (optional; default on) ──

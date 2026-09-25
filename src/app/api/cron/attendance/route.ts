@@ -85,8 +85,7 @@ export async function GET(req: Request) {
       if (who) {
         await notifyLite({
           tenantId: who.tenantId, recipients: [who.accountId],
-          subject: `Attendance closed automatically — ${dmyDate(r.date)}`,
-          body: `Nobody clocked out, so the day was closed at ${policy.workEnd}. If you left later, ask for a correction in My HR.`,
+          tpl: { k: "hr_attendance_auto_closed", p: { date: dmyDate(r.date), workEnd: policy.workEnd } },
           link: "/me?tab=attendance", type: "hr_attendance_auto_closed",
           metadata: { attendance_record_id: r.id }, tag: `att-closed-${r.id}`,
         });
@@ -102,8 +101,7 @@ export async function GET(req: Request) {
       if (who) {
         await notifyLite({
           tenantId: who.tenantId, recipients: [who.accountId],
-          subject: "Don't forget to clock out",
-          body: `Your working day ended at ${policy.workEnd}. Clock out in My HR when you leave.`,
+          tpl: { k: "hr_attendance_clockout_reminder", p: { workEnd: policy.workEnd } },
           link: "/me?tab=attendance", type: "hr_attendance_clockout_reminder",
           metadata: { attendance_record_id: r.id }, tag: `att-remind-${r.id}`,
         });

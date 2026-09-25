@@ -12,7 +12,9 @@ import "server-only";
      recipient_account_id  → who is notified
      sender_account_id     → the actor (used to suppress self-notifications)
      category              → 'task' (normal) | 'alert' (reopen / urgent)
-     subject / body        → title / message
+     subject / body        → title / message — the English render of the
+                             target's template (metadata.tpl), so every
+                             reader sees it in their own language
      link                  → /issues?issue=<id>  (auto-selects the issue)
      metadata.type         → the fine-grained type (qa_issue_assigned, …) —
                              the key the shared classifier reads, so the row
@@ -31,6 +33,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { clearUnreadByMetaIn, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 import type { IssueStatus } from "@/lib/qa/types";
 
 export type QaNotificationType =
@@ -61,8 +64,14 @@ export function reporterIssueLink(issueId: string): string {
 export interface NotifyTarget {
   recipientId: string | null | undefined;
   type: QaNotificationType;
-  title: string;
-  body: string;
+  /** What was said, rendered in each reader's language (notification-
+   *  templates, dictionary translations/notif-templates/qa.ts); the stored
+   *  subject — and body, when the template has one — are its English. */
+  tpl?: NotifTpl;
+  /** The stored subject for a target with no template. */
+  title?: string;
+  /** The stored body when there is no template, or the template has none. */
+  body?: string;
   /** Force the alert tier (e.g. urgent priority). */
   alert?: boolean;
   /** Per-recipient destination. Defaults to the admin console link.
@@ -75,6 +84,13 @@ export interface NotifyContext {
   issueId: string;
   actorId: string | null;
   actorName: string | null;
+}
+
+/** A target's stored English subject/body, and its template when it fully
+ *  renders (prepareTpl) — the row and its push say the same thing. */
+function textOf(t: NotifyTarget): { subject: string; body: string; tpl: NotifTpl | null } {
+  const r = t.tpl ? prepareTpl(t.tpl) : null;
+  return { subject: r?.subject ?? t.title ?? "", body: r?.body ?? t.body ?? "", tpl: r?.tpl ?? null };
 }
 
 /**
@@ -97,23 +113,28 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
     byRecipient.set(id, t);
   }
   if (byRecipient.size === 0) return;
+  const texts = new Map(Array.from(byRecipient, ([recipientId, t]) => [recipientId, textOf(t)] as const));
 
-  const rows = Array.from(byRecipient.entries()).map(([recipientId, t]) => ({
-    tenant_id: ctx.tenantId,
-    recipient_account_id: recipientId,
-    sender_account_id: ctx.actorId,
-    category: t.alert || ALERT_TYPES.has(t.type) ? "alert" : "task",
-    subject: t.title.slice(0, 200),
-    body: t.body.slice(0, 1000),
-    link: t.link ?? issueLink(ctx.issueId),
-    metadata: {
-      type: t.type,
-      qa_type: t.type,
-      entity_type: "qa_issue",
-      entity_id: ctx.issueId,
-      actor_name: ctx.actorName,
-    },
-  }));
+  const rows = Array.from(byRecipient.entries()).map(([recipientId, t]) => {
+    const text = texts.get(recipientId)!;
+    return {
+      tenant_id: ctx.tenantId,
+      recipient_account_id: recipientId,
+      sender_account_id: ctx.actorId,
+      category: t.alert || ALERT_TYPES.has(t.type) ? "alert" : "task",
+      subject: text.subject.slice(0, 200),
+      body: text.body.slice(0, 1000),
+      link: t.link ?? issueLink(ctx.issueId),
+      metadata: {
+        type: t.type,
+        qa_type: t.type,
+        entity_type: "qa_issue",
+        entity_id: ctx.issueId,
+        actor_name: ctx.actorName,
+        ...(text.tpl ? { tpl: text.tpl } : {}),
+      },
+    };
+  });
 
   // Thread per issue: collapse repeated updates into ONE notification per
   // recipient per issue instead of piling up a new row for every change. Any
@@ -137,11 +158,12 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
       sendPushToAccounts(
         [recipientId],
         {
-          title: t.title.slice(0, 120),
-          body: t.body.slice(0, 200),
+          title: texts.get(recipientId)!.subject.slice(0, 120),
+          body: texts.get(recipientId)!.body.slice(0, 200),
           url: t.link ?? issueLink(ctx.issueId),
           tag: `qa:${ctx.issueId}`,
           kind: t.type,
+          tpl: texts.get(recipientId)!.tpl,
         },
         { actorAccountId: ctx.actorId },
       ).catch((e) => console.error("[qa notify] push:", e instanceof Error ? e.message : e)),

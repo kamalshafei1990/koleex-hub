@@ -305,12 +305,18 @@ async function readProbation(tree: Awaited<ReturnType<typeof loadOrgTree>>, byEm
 /* ── Telling the writer ──────────────────────────────────────────────── */
 
 const typeName = (key: string) => (reportsT[`tpl.${key}.name`]?.en as string | undefined) ?? "Report";
-const whenText = (iso: string, tz: string) => {
+/** The due moment on the writer's clock, in pieces — "Fri" (an en-GB short
+ *  weekday: the template's weekdayShort code), "26/09", "18:00". null when
+ *  the zone cannot be read. */
+const dueParts = (iso: string, tz: string) => {
   try {
-    const d = new Date(iso);
-    const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short" }).format(d);
-    return `${day} ${dm(localDayOf(iso, tz))} at ${wallClock(iso, tz)}`;
-  } catch { return iso.slice(0, 16).replace("T", " "); }
+    const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short" }).format(new Date(iso));
+    return { day, date: dm(localDayOf(iso, tz)), time: wallClock(iso, tz) };
+  } catch { return null; }
+};
+const whenText = (iso: string, tz: string) => {
+  const w = dueParts(iso, tz);
+  return w ? `${w.day} ${w.date} at ${w.time}` : iso.slice(0, 16).replace("T", " ");
 };
 
 async function announce(tenantId: string, rows: Array<{ id: string; account_id: string; template_key: string; subject: string; event_day: string; due_at: string }>, clocks: Map<string, PersonClock>, now: string): Promise<void> {
@@ -319,10 +325,22 @@ async function announce(tenantId: string, rows: Array<{ id: string; account_id: 
   for (const [writer, list] of byWriter) {
     const tz = clocks.get(writer)?.tz ?? "Asia/Shanghai";
     const one = list.length === 1 ? list[0] : null;
+    const due = one ? dueParts(one.due_at, tz) : null;
+    /* Templated (translations/notif-templates/reports.ts). One request: its
+       type (the English label) and what it is about, plain; its due moment
+       in the reader's words — or, when the zone cannot be read, the raw
+       instant as the stored body. Several: the subject counts them, and the
+       list stays the stored body (data). */
     await notifyLite({
       tenantId, recipients: [writer], senderId: null,
-      subject: one ? `New report to write: ${typeName(one.template_key)} — ${one.subject}` : `${list.length} new reports to write`,
-      body: one ? `Due ${whenText(one.due_at, tz)}.` : list.map((r) => `${typeName(r.template_key)} — ${r.subject} (due ${whenText(r.due_at, tz)})`).join("\n"),
+      tpl: !one
+        ? { k: "report_request.many", p: { count: list.length } }
+        : due
+          ? { k: "report_request.one", p: { type: typeName(one.template_key), subject: one.subject, ...due } }
+          : { k: "report_request.one.raw", p: { type: typeName(one.template_key), subject: one.subject } },
+      body: !one
+        ? list.map((r) => `${typeName(r.template_key)} — ${r.subject} (due ${whenText(r.due_at, tz)})`).join("\n")
+        : due ? undefined : `Due ${whenText(one.due_at, tz)}.`,
       link: one ? `/reports?write=${one.template_key}&date=${String(one.event_day).slice(0, 10)}&request=${one.id}` : "/reports",
       type: "report_request",
       metadata: { requests: list.map((r) => r.id) },

@@ -93,8 +93,10 @@ export async function POST(req: Request) {
       tenantId: auth.tenant_id,
       recipients: await hrReviewerAccountIds(auth.tenant_id),
       senderId: auth.account_id,
-      subject: `Overtime to approve — ${name}`,
-      body: `${dmyDate(today)} · ${Math.floor(otMin / 60)}h ${String(otMin % 60).padStart(2, "0")}m after ${policy.workEnd}`,
+      tpl: {
+        k: "attendance_overtime_approval_request",
+        p: { name, date: dmyDate(today), duration: `${Math.floor(otMin / 60)}h ${String(otMin % 60).padStart(2, "0")}m`, workEnd: policy.workEnd },
+      },
       link: "/hr?tab=attendance",
       type: "attendance_overtime_approval_request",
       metadata: { attendance_record_id: rec.id, employee_id: me.id },

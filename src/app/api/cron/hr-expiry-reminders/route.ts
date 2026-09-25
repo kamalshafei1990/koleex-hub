@@ -16,17 +16,20 @@ import { ensureProbationReviewTask } from "@/lib/server/hr-lifecycle";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { prepareTpl } from "@/lib/notification-templates";
 
 export const dynamic = "force-dynamic";
 
 const WINDOW_DAYS = 30;
 
-const EXPIRY_FIELDS: { column: string; label: string }[] = [
-  { column: "visa_expiry_date", label: "Visa" },
-  { column: "insurance_expiry_date", label: "Insurance" },
-  { column: "contract_end_date", label: "Contract" },
-  { column: "probation_end_date", label: "Probation" },
-  { column: "driving_license_expiry", label: "Driving licence" },
+/* Each column's words ("Visa", "Driving licence") are the notification
+   templates' enum.hr_expiry_field.<column>, in en / zh / ar. */
+const EXPIRY_FIELDS: { column: string }[] = [
+  { column: "visa_expiry_date" },
+  { column: "insurance_expiry_date" },
+  { column: "contract_end_date" },
+  { column: "probation_end_date" },
+  { column: "driving_license_expiry" },
 ];
 
 interface EmployeeRow {
@@ -123,8 +126,7 @@ export async function GET(req: Request) {
         .limit(1);
       if (existing && existing.length > 0) continue;
 
-      const subject = `${field.label} expiring soon: ${empName}`;
-      const body = `${field.label} for ${empName} expires on ${dmyDate(day)}. Review and renew before the deadline.`;
+      const text = prepareTpl({ k: "hr_expiry", p: { field: field.column, name: empName, date: dmyDate(day) } });
       /* Supersede the earlier tier's unread copy — the 60-day warning is
          finished business once the 30-day one lands for the same document. */
       await supersedeUnread({
@@ -135,23 +137,25 @@ export async function GET(req: Request) {
         recipients.map((recipientId) => ({
           recipient_account_id: recipientId,
           category: "task",
-          subject,
-          body,
+          subject: text.subject,
+          body: text.body,
           link: `/employees/${emp.id}`,
           metadata: {
             type: "hr_expiry",
             employee_id: emp.id,
             field: field.column,
             date: day,
+            ...(text.tpl ? { tpl: text.tpl } : {}),
           },
         })),
       );
       await sendPushToAccounts(recipients, {
-        title: subject,
-        body,
+        title: text.subject,
+        body: text.body ?? "",
         url: `/employees/${emp.id}`,
         tag: `hr-expiry:${emp.id}:${field.column}`,
         kind: "hr_expiry",
+        tpl: text.tpl,
       });
       fired++;
     }

@@ -21,6 +21,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { prepareTpl } from "@/lib/notification-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -91,17 +92,27 @@ export async function GET(req: Request) {
     .in("metadata->>task_id", toSend.map((t) => t.id));
   if (supErr) console.error("[cron/project-task-reminders] supersede:", supErr.message);
 
-  const rows = toSend.map((t) => {
-    const overdue = t.due_date < today;
+  const texts = toSend.map((t) =>
+    prepareTpl(
+      t.due_date < today
+        ? { k: "project_task_due.overdue", p: { title: t.title, due: dmyDate(t.due_date) } }
+        : { k: "project_task_due.today", p: { title: t.title } },
+    ),
+  );
+  const rows = toSend.map((t, i) => {
+    const text = texts[i];
     return {
       recipient_account_id: t.assignee_account_id,
       sender_account_id: null,
       tenant_id: t.tenant_id,
       category: "system",
-      subject: overdue ? `Task overdue: ${t.title}` : `Task due today: ${t.title}`,
-      body: overdue ? `Due ${dmyDate(t.due_date)} — still open.` : "Due today.",
+      subject: text.subject,
+      body: text.body ?? "",
       link: taskLink(t),
-      metadata: { source: "projects", type: "project_task_due", task_id: t.id, project_id: t.project_id, due_date: t.due_date },
+      metadata: {
+        source: "projects", type: "project_task_due", task_id: t.id, project_id: t.project_id, due_date: t.due_date,
+        ...(text.tpl ? { tpl: text.tpl } : {}),
+      },
     };
   });
   const { error: insErr } = await supabaseServer.from("inbox_messages").insert(rows);
@@ -123,6 +134,7 @@ export async function GET(req: Request) {
         url: taskLink(t),
         tag: `ptask-due:${t.id}`,
         kind: "project_task_due",
+        tpl: texts[i].tpl,
       }).catch((e) => console.error("[cron/project-task-reminders] push:", e)),
     ),
   );

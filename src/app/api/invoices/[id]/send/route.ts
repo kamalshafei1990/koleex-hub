@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { ledgerDraft } from "@/lib/accounting/hooks";
+import { prepareTpl } from "@/lib/notification-templates";
 
 /* POST /api/invoices/:id/send — mark a draft invoice as sent, draft its
    revenue recognition in the ledger (Dr A/R / Cr Revenue / Cr Tax) and
@@ -45,15 +46,26 @@ export async function POST(_req: Request, { params }: RouteCtx) {
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle();
     if (custAcct?.id) {
+      const text = prepareTpl({
+        k: "invoice_sent",
+        p: {
+          no: data.inv_no,
+          amount: `${data.currency} ${Number(data.total).toFixed(2)}`,
+          due: data.due_date ? dmyDate(data.due_date) : null,
+        },
+      });
       void supabaseServer.from("inbox_messages").insert({
         recipient_account_id: custAcct.id,
         sender_account_id: auth.account_id,
         tenant_id: auth.tenant_id,
         category: "system",
-        subject: `Invoice ${data.inv_no} issued`,
-        body: `An invoice for ${data.currency} ${Number(data.total).toFixed(2)} has been issued${data.due_date ? ` and is due ${dmyDate(data.due_date)}` : ""}.`,
+        subject: text.subject,
+        body: text.body,
         link: "/invoices",
-        metadata: { source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no },
+        metadata: {
+          source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no,
+          ...(text.tpl ? { tpl: text.tpl } : {}),
+        },
       });
     }
   }

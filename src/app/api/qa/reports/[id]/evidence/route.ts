@@ -21,6 +21,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, issueLink } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
+import type { NotifTpl } from "@/lib/notification-templates";
 
 interface AttachmentIn {
   path: unknown;
@@ -152,16 +153,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   });
 
   // Notify reporter + watchers. notifyIssue dedupes + self-suppresses.
-  const title = `Fix evidence added (cycle ${cycle})`;
-  const message = `${auth.username ?? "Admin"} attached fix evidence for "${issue.title}". Open to compare BEFORE / AFTER.`;
+  // Translated per reader (translations/notif-templates/qa.ts).
+  const tpl: NotifTpl = {
+    k: "qa_status_changed.evidence",
+    p: { cycle, actor: auth.username ?? "Admin", title: issue.title },
+  };
   const watchers = await watcherTargets({
     tenantId: auth.tenant_id,
     issueId: id,
     actorId: auth.account_id,
     internal: false,
     type: "qa_status_changed",
-    title,
-    body: message,
+    tpl,
   });
   const targets = [
     // Reporter always gets it, pointed at their reporter-safe view.
@@ -169,8 +172,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       ? [{
           recipientId: issue.reporter_id,
           type: "qa_status_changed" as const,
-          title,
-          body: message,
+          tpl,
           link: `/qa/report/${id}`,
         }]
       : []),

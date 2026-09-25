@@ -60,9 +60,8 @@ import { hubT } from "@/lib/translations/hub";
    "By activity" switches — one label per activity, everywhere. */
 import { settingsT } from "@/lib/translations/settings";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
-import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import { NotificationBody, NotificationSubject } from "@/components/layout/NotificationText";
 import { dmy } from "@/lib/discuss-time";
-import { cleanInboxBody } from "@/lib/inbox-display";
 import {
   classifyInboxActivity,
   playAppSound,
@@ -234,7 +233,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
      already happened by then, so the panel must come up open — otherwise the
      first tap would look like it did nothing. */
   const router = useRouter();
-  const { t } = useTranslation(hubT);
+  const { t, lang } = useTranslation(hubT);
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
 
@@ -1112,25 +1111,25 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                                 {timeAgo(msg.created_at, t)}
                               </span>
                             </div>
-                            {/* Auto-translate the notification into the reader's
-                                language — a task assigned in English reaches an
-                                Arabic/Chinese employee readable. */}
+                            {/* In the reader's language: a templated row from
+                                the dictionary at once, an older row through
+                                auto-translation — a task assigned in English
+                                reaches an Arabic/Chinese employee readable. */}
                             <div
                               className={`text-[12.5px] font-semibold truncate ${
                                 dk ? "text-white" : "text-black"
                               }`}
                             >
-                              <AutoTranslatedText text={msg.subject} />
+                              <NotificationSubject meta={msg.metadata} subject={msg.subject} lang={lang} />
                             </div>
-                            {msg.body && (
-                              <AutoTranslatedText
-                                text={cleanInboxBody(msg.body)}
-                                block
-                                className={`text-[11.5px] mt-0.5 line-clamp-2 ${
-                                  dk ? "text-white/55" : "text-black/55"
-                                }`}
-                              />
-                            )}
+                            <NotificationBody
+                              meta={msg.metadata}
+                              body={msg.body}
+                              lang={lang}
+                              className={`text-[11.5px] mt-0.5 line-clamp-2 ${
+                                dk ? "text-white/55" : "text-black/55"
+                              }`}
+                            />
                             <div
                               className={`text-[10.5px] mt-1 ${
                                 dk ? "text-white/40" : "text-black/40"

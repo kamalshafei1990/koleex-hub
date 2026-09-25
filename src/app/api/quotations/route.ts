@@ -323,8 +323,7 @@ export async function POST(req: Request) {
         tenantId: auth.tenant_id,
         recipients: [cur.created_by as string],
         senderId: auth.account_id,
-        subject: `Quotation ${quoteNo} updated`.trim(),
-        body: `${auth.username} saved changes to your quotation.`,
+        tpl: { k: "quotation_updated", p: { no: quoteNo, actor: auth.username } },
         /* The builder opens ?doc=<id> straight into the editor. */
         link: `/quotations?doc=${encodeURIComponent(body.id)}`,
         type: "quotation_updated",

@@ -20,6 +20,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { clearUnreadByMeta, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 import type { CalendarAttendeeStatus } from "@/lib/calendar-enums";
 import { allDayKeys, safeTimeZone } from "@/lib/calendar-tz";
 
@@ -64,8 +65,12 @@ export async function accountTimezones(accountIds: string[]): Promise<Map<string
   return out;
 }
 
-/** "20/09/2026 14:00–15:00", "20/09/2026 (all day)", or a two-day span. */
-export function formatWhen(startISO: string, endISO: string | null | undefined, allDay: boolean | null | undefined, tz: string): string {
+/** formatWhen in two parts, for a template: the dates/times, and
+ *  `allDay: "all_day"` for an all-day event — its "(all day)" is the
+ *  reader's own word (enum.calendarSpan), not a fixed English suffix. */
+export function whenParts(
+  startISO: string, endISO: string | null | undefined, allDay: boolean | null | undefined, tz: string,
+): { when: string; allDay: "all_day" | null } {
   const s = new Date(startISO);
   const e = endISO ? new Date(endISO) : null;
   const zone = safeTimeZone(tz) === tz ? tz : DEFAULT_TZ;
@@ -75,13 +80,22 @@ export function formatWhen(startISO: string, endISO: string | null | undefined, 
     /* An all-day event is a run of dates in the organizer's zone. */
     const k = allDayKeys(startISO, endISO || startISO, zone);
     const dmy = (key: string) => key.split("-").reverse().join("/");
-    return k.start === k.end ? `${dmy(k.start)} (all day)` : `${dmy(k.start)} → ${dmy(k.end)} (all day)`;
+    return { when: k.start === k.end ? dmy(k.start) : `${dmy(k.start)} → ${dmy(k.end)}`, allDay: "all_day" };
   }
-  if (!e || Number.isNaN(e.getTime())) return `${day.format(s)} ${time.format(s)}`;
+  if (!e || Number.isNaN(e.getTime())) return { when: `${day.format(s)} ${time.format(s)}`, allDay: null };
   const sameDay = day.format(s) === day.format(e);
-  return sameDay
-    ? `${day.format(s)} ${time.format(s)}–${time.format(e)}`
-    : `${day.format(s)} ${time.format(s)} → ${day.format(e)} ${time.format(e)}`;
+  return {
+    when: sameDay
+      ? `${day.format(s)} ${time.format(s)}–${time.format(e)}`
+      : `${day.format(s)} ${time.format(s)} → ${day.format(e)} ${time.format(e)}`,
+    allDay: null,
+  };
+}
+
+/** "20/09/2026 14:00–15:00", "20/09/2026 (all day)", or a two-day span. */
+export function formatWhen(startISO: string, endISO: string | null | undefined, allDay: boolean | null | undefined, tz: string): string {
+  const w = whenParts(startISO, endISO, allDay, tz);
+  return w.allDay ? `${w.when} (all day)` : w.when;
 }
 
 async function deliver(opts: {
@@ -89,13 +103,15 @@ async function deliver(opts: {
   recipients: string[];
   actorId: string | null;
   type: string;
-  subject: string;
-  body: string;
+  /** What was said — rendered in each reader's language (notification-templates). */
+  tpl: NotifTpl;
   pushTitle?: string;
   tag?: string;
 }): Promise<void> {
   const to = Array.from(new Set(opts.recipients.filter(Boolean))).filter((id) => id !== opts.actorId);
   if (to.length === 0) return;
+  const text = prepareTpl(opts.tpl);
+  const body = text.body ?? "";
   try {
     await supabaseServer.from("inbox_messages").insert(
       to.map((recipient_account_id) => ({
@@ -103,21 +119,22 @@ async function deliver(opts: {
         sender_account_id: opts.actorId,
         tenant_id: opts.ev.tenant_id ?? null,
         category: "calendar",
-        subject: opts.subject,
-        body: opts.body,
+        subject: text.subject,
+        body,
         link: eventLink(opts.ev.id),
-        metadata: { type: opts.type, event_id: opts.ev.id },
+        metadata: { type: opts.type, event_id: opts.ev.id, ...(text.tpl ? { tpl: text.tpl } : {}) },
       })),
     );
     await emitPings(to.map((id) => ({ topic: rtTopic.inbox(id) })));
     await sendPushToAccounts(
       to,
       {
-        title: opts.pushTitle ?? opts.subject,
-        body: opts.body,
+        title: opts.pushTitle ?? text.subject,
+        body,
         url: eventLink(opts.ev.id),
         tag: opts.tag ?? `calendar-${opts.ev.id}`,
         kind: opts.type,
+        tpl: text.tpl,
       },
       { actorAccountId: opts.actorId },
     );
@@ -129,12 +146,14 @@ async function deliver(opts: {
 /** "Invitation: …" to newly added guests. */
 export async function notifyInvited(ev: EventLike, recipients: string[], actorId: string | null): Promise<void> {
   if (recipients.length === 0) return;
-  const when = formatWhen(ev.start_at, ev.end_at, ev.all_day, await accountTimezone(ev.account_id));
+  const w = whenParts(ev.start_at, ev.end_at, ev.all_day, await accountTimezone(ev.account_id));
   await deliver({
     ev, recipients, actorId,
     type: "calendar_invite",
-    subject: `Invitation: ${ev.title ?? "Event"}`,
-    body: `You are invited — ${when}${ev.location ? ` · ${ev.location}` : ""}${ev.meeting_url ? ` · Join: ${ev.meeting_url}` : ""}. Open it to accept or decline.`,
+    tpl: {
+      k: "calendar_invite",
+      p: { title: ev.title ?? "Event", when: w.when, allDay: w.allDay, where: ev.location || null, url: ev.meeting_url || null },
+    },
     tag: `calendar-invite-${ev.id}`,
   });
 }
@@ -147,10 +166,11 @@ export async function notifyInvited(ev: EventLike, recipients: string[], actorId
  *
  *  `occurrence` (the ORIGINAL start of one occurrence of a series) says the
  *  change is to that occurrence only — `ev` then carries its new time — and
- *  the notice says the rest of the series stays as it was.
+ *  the notice says the rest of the series stays as it was (the `.occurrence`
+ *  templates: its date, and "the rest of the series is unchanged").
  *
- *  The inbox and push have no per-recipient language yet, so these stay in
- *  English — the Hub's shared notification language. */
+ *  Stored in English and rendered in each reader's language from the
+ *  template; the push stays English. */
 export async function notifyEventChanged(
   ev: EventLike,
   recipients: string[],
@@ -163,39 +183,46 @@ export async function notifyEventChanged(
   const type = kind === "cancelled" ? "calendar_cancelled" : "calendar_rescheduled";
   const tz = await accountTimezone(ev.account_id);
   await supersedeUnread({ recipients, meta: { event_id: ev.id } });
-  const onDay = opts.occurrence ? ` on ${formatWhen(opts.occurrence, null, ev.all_day, tz).split(" ")[0]}` : "";
-  const rest = opts.occurrence ? " The rest of the series is unchanged." : "";
+  /* One occurrence of a series: its date (D/M/Y) picks the `.occurrence` template. */
+  const day = opts.occurrence ? formatWhen(opts.occurrence, null, ev.all_day, tz).split(" ")[0] : null;
   if (kind === "cancelled") {
     await deliver({
       ev, recipients, actorId, type,
-      subject: `Cancelled: ${title}${onDay}`,
-      body: `"${title}"${onDay} has been cancelled by the organizer.${rest}`,
+      tpl: day ? { k: "calendar_cancelled.occurrence", p: { title, day } } : { k: "calendar_cancelled", p: { title } },
     });
     return;
   }
-  const when = formatWhen(ev.start_at, ev.end_at, ev.all_day, tz);
-  const where = ev.location ? ` · ${ev.location}` : "";
-  const join = ev.meeting_url ? ` Join: ${ev.meeting_url}` : "";
+  const w = whenParts(ev.start_at, ev.end_at, ev.all_day, tz);
+  const p = { title, day, when: w.when, allDay: w.allDay, where: ev.location || null, url: ev.meeting_url || null };
   if (kind === "link") {
     await deliver({
       ev, recipients, actorId, type,
-      subject: `New meeting link: ${title}`,
-      body: ev.meeting_url
-        ? `"${title}" (${when}) has a new meeting link.${join}${rest}`
-        : `"${title}" (${when}) no longer has a meeting link.${rest}`,
+      tpl: ev.meeting_url
+        ? day ? { k: "calendar_rescheduled.link.occurrence", p } : { k: "calendar_rescheduled.link", p }
+        : day ? { k: "calendar_rescheduled.link_removed.occurrence", p } : { k: "calendar_rescheduled.link_removed", p },
     });
     return;
   }
   if (kind === "moved") {
     await deliver({
       ev, recipients, actorId, type,
-      subject: `New location: ${title}`,
-      body: (ev.location ? `"${title}" (${when}) is now at ${ev.location}.` : `"${title}" (${when}) no longer has a location.`) + join + rest,
+      tpl: ev.location
+        ? day ? { k: "calendar_rescheduled.location.occurrence", p } : { k: "calendar_rescheduled.location", p }
+        : day ? { k: "calendar_rescheduled.location_removed.occurrence", p } : { k: "calendar_rescheduled.location_removed", p },
     });
     return;
   }
-  await deliver({ ev, recipients, actorId, type, subject: `Rescheduled: ${title}${onDay}`, body: `"${title}"${onDay} is now ${when}${where}.${join}${rest}` });
+  await deliver({
+    ev, recipients, actorId, type,
+    tpl: day ? { k: "calendar_rescheduled.occurrence", p } : { k: "calendar_rescheduled", p },
+  });
 }
+
+/* One template per answer, so each key is written out (not built from the verb). */
+const RSVP_TPL = {
+  accepted: { k: "calendar_rsvp_accepted" },
+  declined: { k: "calendar_rsvp_declined" },
+} as const;
 
 /** A guest answered → the organizer hears. */
 export async function notifyRsvp(ev: EventLike, responderId: string, responderName: string, status: CalendarAttendeeStatus): Promise<void> {
@@ -204,8 +231,7 @@ export async function notifyRsvp(ev: EventLike, responderId: string, responderNa
   await deliver({
     ev, recipients: [ev.account_id], actorId: responderId,
     type: `calendar_rsvp_${verb}`,
-    subject: `${responderName} ${verb}: ${ev.title ?? "Event"}`,
-    body: `${responderName} ${verb} the invitation to "${ev.title ?? "Event"}".`,
+    tpl: { k: RSVP_TPL[verb].k, p: { actor: responderName, title: ev.title ?? "Event" } },
     tag: `calendar-rsvp-${ev.id}-${responderId}`,
   });
 }

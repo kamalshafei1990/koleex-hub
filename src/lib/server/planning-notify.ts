@@ -18,6 +18,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { clearUnreadByMetaIn, settleListedItems } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 
 interface AuthCtx {
   account_id: string;
@@ -35,9 +36,10 @@ interface PlanningItemLike {
 }
 
 /* House date format (D/M/Y, 24h). The server has no idea of the reader's
-   time zone, so the stamp says UTC rather than pretending to be local. The
-   inbox has no i18n-key support, so copy stays short and neutral: a label,
-   the item title, the stamp — no sentences to translate. */
+   time zone, so the stamp says UTC rather than pretending to be local. Copy
+   stays short: a label, the item title, the stamp — each notice is also
+   stored as a template (notif-templates/work.ts) so it reads in the
+   reader's language. */
 const fmt = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -45,6 +47,13 @@ const fmt = (iso: string) => {
   return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
 };
 const itemLink = (id: string) => `/planning?item=${encodeURIComponent(id)}`;
+
+/** "Scheduled: …" for one item: its title (a person's words), or — when it
+ *  has none — its kind, which every language names (enum.planningItemType). */
+const publishedTpl = (item: PlanningItemLike): NotifTpl =>
+  item.title
+    ? { k: "planning_published", p: { title: item.title, when: fmt(item.start_at) } }
+    : { k: "planning_published.untitled", p: { itemType: item.type, when: fmt(item.start_at) } };
 
 /** The item went live: tell the account behind its resource (skips self). */
 export async function notifyPlanningPublished(auth: AuthCtx, item: PlanningItemLike): Promise<void> {
@@ -60,15 +69,19 @@ export async function notifyPlanningPublished(auth: AuthCtx, item: PlanningItemL
     if (!to || to === auth.account_id) return;
 
     const when = fmt(item.start_at);
+    const text = prepareTpl(publishedTpl(item));
     await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: to,
       sender_account_id: auth.account_id,
       tenant_id: auth.tenant_id,
       category: "system",
-      subject: `Scheduled: ${item.title || item.type}`,
-      body: `${item.title || item.type} · ${when}`,
+      subject: text.subject,
+      body: text.body ?? `${item.title || item.type} · ${when}`,
       link: itemLink(item.id),
-      metadata: { source: "planning", type: "planning_published", planning_item_id: item.id, item_type: item.type },
+      metadata: {
+        source: "planning", type: "planning_published", planning_item_id: item.id, item_type: item.type,
+        ...(text.tpl ? { tpl: text.tpl } : {}),
+      },
     });
     await emitPings([{ topic: rtTopic.inbox(to) }]);
     await sendPushToAccounts(
@@ -79,6 +92,7 @@ export async function notifyPlanningPublished(auth: AuthCtx, item: PlanningItemL
         url: itemLink(item.id),
         tag: `planning:${item.id}`,
         kind: "planning_published",
+        tpl: text.tpl,
       },
       { actorAccountId: auth.account_id },
     );
@@ -128,15 +142,24 @@ export async function notifyPlanningTaken(auth: AuthCtx, item: PlanningItemLike)
     const to = item.created_by_account_id;
     if (!to || to === auth.account_id) return;
     const when = fmt(item.start_at);
+    const actor = auth.username ?? "—";
+    const text = prepareTpl(
+      item.title
+        ? { k: "planning_taken", p: { actor, title: item.title, when } }
+        : { k: "planning_taken.untitled", p: { actor, itemType: item.type, when } },
+    );
     await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: to,
       sender_account_id: auth.account_id,
       tenant_id: auth.tenant_id,
       category: "system",
-      subject: `Shift taken: ${item.title || item.type}`,
-      body: `${auth.username ?? "—"} · ${item.title || item.type} · ${when}`,
+      subject: text.subject,
+      body: text.body ?? `${actor} · ${item.title || item.type} · ${when}`,
       link: itemLink(item.id),
-      metadata: { source: "planning", type: "planning_taken", planning_item_id: item.id, item_type: item.type },
+      metadata: {
+        source: "planning", type: "planning_taken", planning_item_id: item.id, item_type: item.type,
+        ...(text.tpl ? { tpl: text.tpl } : {}),
+      },
     });
     await emitPings([{ topic: rtTopic.inbox(to) }]);
   } catch (e) {
@@ -173,23 +196,31 @@ export async function notifyPlanningPublishedBatch(auth: AuthCtx, items: Plannin
       const sorted = [...list].sort((a, b) => a.start_at.localeCompare(b.start_at));
       const lines = sorted.slice(0, MAX_LINES).map((i) => `${i.title || i.type} · ${fmt(i.start_at)}`);
       if (sorted.length > MAX_LINES) lines.push(`+${sorted.length - MAX_LINES}`);
+      /* One item reads exactly like the single notice (same subject, and its
+         one line IS that notice's body); several keep the list as the
+         stored body — it is data. */
+      const text = prepareTpl(
+        sorted.length === 1 ? publishedTpl(sorted[0]) : { k: "planning_published.many", p: { count: sorted.length } },
+      );
       return {
         to,
         count: sorted.length,
+        tpl: text.tpl,
         link: sorted.length === 1 ? itemLink(sorted[0].id) : "/planning",
         row: {
           recipient_account_id: to,
           sender_account_id: auth.account_id,
           tenant_id: auth.tenant_id,
           category: "system",
-          subject: sorted.length === 1 ? `Scheduled: ${sorted[0].title || sorted[0].type}` : `Scheduled: ${sorted.length} items`,
-          body: lines.join("\n"),
+          subject: text.subject,
+          body: text.body ?? lines.join("\n"),
           link: sorted.length === 1 ? itemLink(sorted[0].id) : "/planning",
           metadata: {
             source: "planning",
             type: "planning_published",
             planning_item_ids: sorted.map((i) => i.id),
             count: sorted.length,
+            ...(text.tpl ? { tpl: text.tpl } : {}),
           },
         },
       };
@@ -204,10 +235,15 @@ export async function notifyPlanningPublishedBatch(auth: AuthCtx, items: Plannin
           [r.to],
           {
             title: "Scheduled",
-            body: r.row.subject,
+            /* The shifts themselves (titles and D/M/Y times — the same in
+               every language), not the subject again: in zh/ar the title
+               comes from the template, and repeating the English subject
+               under it said nothing new, in the wrong language. */
+            body: r.row.body,
             url: r.link,
             tag: `planning:week:${r.to}`,
             kind: "planning_published",
+            tpl: r.tpl,
           },
           { actorAccountId: auth.account_id },
         ),

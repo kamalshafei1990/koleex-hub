@@ -228,8 +228,8 @@ export async function POST(req: Request) {
       .eq("is_super_admin", true);
     const reporter = auth.username ?? auth.login_email ?? "Someone";
     const moduleLabel = clampStr(body.app_module, 80) ?? moduleForRoute(route);
-    const subject = `New issue: ${title}`;
-    const messageBody = `${reporter} filed "${title}" on ${moduleLabel}${route ? ` (${route})` : ""}.`;
+    // Translated per reader (translations/notif-templates/qa.ts).
+    const p = { actor: reporter, title, module: moduleLabel, route };
     await notifyIssue(
       { tenantId: auth.tenant_id, issueId: data.id, actorId: auth.account_id, actorName: auth.username ?? null },
       [
@@ -238,8 +238,7 @@ export async function POST(req: Request) {
           ? [{
               recipientId: assigneeId,
               type: "qa_issue_assigned" as const,
-              title: `Assigned to you: ${title}`,
-              body: `${reporter} assigned you "${title}" on ${moduleLabel}.`,
+              tpl: { k: "qa_issue_assigned.on_create", p },
               link: issueLink(data.id),
               alert: true,
             }]
@@ -247,8 +246,7 @@ export async function POST(req: Request) {
         ...(admins ?? []).map((a) => ({
           recipientId: a.id,
           type: "qa_issue_assigned" as const,   // closest existing type; UI surfaces it as a task chip
-          title: subject,
-          body: messageBody,
+          tpl: { k: "qa_issue_assigned.new_issue", p },
           link: issueLink(data.id),
         })),
       ],
@@ -270,7 +268,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const p = url.searchParams;
-  const module = p.get("module");
+  const moduleFilter = p.get("module");
   const severity = p.get("severity");
   const status = p.get("status");
   const priority = p.get("priority");
@@ -289,7 +287,7 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: false })
     .limit(500);
 
-  if (module) query = query.eq("app_module", module);
+  if (moduleFilter) query = query.eq("app_module", moduleFilter);
   if (severity && (SEVERITY_VALUES as string[]).includes(severity)) query = query.eq("severity", severity);
   if (status && (STATUS_VALUES as string[]).includes(status)) query = query.eq("status", status);
   if (priority && (PRIORITY_VALUES as string[]).includes(priority)) query = query.eq("priority", priority);

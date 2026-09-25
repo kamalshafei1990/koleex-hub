@@ -24,6 +24,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 
 export interface TodoLike {
   id: string;
@@ -45,8 +46,10 @@ async function deliver(opts: {
   todo: TodoLike;
   recipients: string[];
   actorId: string | null;
-  subject: string;
-  body: string;
+  /** What was said — rendered in each reader's language (notification-templates). */
+  tpl: NotifTpl;
+  /** The stored body when the template has none: the task's own words. */
+  body?: string;
   type: string;
   extra?: Record<string, unknown>;
   pushTitle?: string;
@@ -54,6 +57,8 @@ async function deliver(opts: {
 }): Promise<void> {
   const to = Array.from(new Set(opts.recipients.filter(Boolean))).filter((id) => id !== opts.actorId);
   if (to.length === 0) return;
+  const text = prepareTpl(opts.tpl);
+  const body = text.body ?? opts.body ?? "";
   try {
     await supabaseServer.from("inbox_messages").insert(
       to.map((recipient_account_id) => ({
@@ -61,21 +66,22 @@ async function deliver(opts: {
         sender_account_id: opts.actorId,
         tenant_id: opts.todo.tenant_id ?? null,
         category: "task",
-        subject: opts.subject,
-        body: opts.body,
+        subject: text.subject,
+        body,
         link: link(opts.todo.id),
-        metadata: { type: opts.type, todo_id: opts.todo.id, ...(opts.extra ?? {}) },
+        metadata: { type: opts.type, todo_id: opts.todo.id, ...(opts.extra ?? {}), ...(text.tpl ? { tpl: text.tpl } : {}) },
       })),
     );
     await emitPings(to.map((id) => ({ topic: rtTopic.inbox(id) })));
     await sendPushToAccounts(
       to,
       {
-        title: opts.pushTitle ?? opts.subject,
-        body: opts.body,
+        title: opts.pushTitle ?? text.subject,
+        body,
         url: link(opts.todo.id),
         tag: opts.tag ?? `todo-${opts.todo.id}`,
         kind: opts.type,
+        tpl: text.tpl,
       },
       { actorAccountId: opts.actorId },
     );
@@ -89,7 +95,7 @@ export async function notifyTodoAssigned(todo: TodoLike, recipients: string[], a
   const title = todo.title ?? "Task";
   await deliver({
     todo, recipients, actorId,
-    subject: `New task: ${title}`,
+    tpl: { k: "todo_assignment", p: { title } },
     body: todo.description || title,
     type: "todo_assignment",
     extra: { priority: todo.priority ?? "medium" },
@@ -107,10 +113,10 @@ export async function notifyTodoPeopleAdded(
   const title = todo.title ?? "Task";
   await deliver({
     todo, recipients, actorId,
-    subject: kind === "mention" ? `You were mentioned: ${title}` : `You are now an observer: ${title}`,
-    body: kind === "mention"
-      ? (todo.description || "You were mentioned on a task.")
-      : "You were added as an observer — you can follow this task and update its situation.",
+    tpl: kind === "observer"
+      ? { k: "todo_observer", p: { title } }
+      : todo.description ? { k: "todo_mention", p: { title } } : { k: "todo_mention.plain", p: { title } },
+    body: todo.description || undefined,
     type: `todo_${kind}`,
   });
 }
@@ -126,8 +132,7 @@ export async function notifySubmittedForApproval(
   const title = t.title ?? "Task";
   await deliver({
     todo: t, recipients: [assigner], actorId,
-    subject: `Awaiting your approval: ${title}`,
-    body: `The task "${title}" was submitted as done and needs your confirmation.`,
+    tpl: { k: "todo_approval_request", p: { title } },
     type: "todo_approval_request",
     pushTitle: "Task awaiting your approval",
     tag: `todo-approval-${t.id}`,
@@ -150,12 +155,11 @@ export async function notifyApprovalDecision(
   const approved = decision === "approved";
   await deliver({
     todo: t, recipients, actorId,
-    subject: approved ? `Task confirmed done: ${title}` : `Task reopened: ${title}`,
-    body: approved
-      ? `Your submission for "${title}" was confirmed. The task is done.`
+    tpl: approved
+      ? { k: "todo_approval_decision.approved", p: { title } }
       : reason
-        ? `"${title}" was sent back: ${reason}`
-        : `"${title}" was reopened — it is not fully done yet.`,
+        ? { k: "todo_approval_decision.returned", p: { title, reason } }
+        : { k: "todo_approval_decision.reopened", p: { title } },
     type: "todo_approval_decision",
     extra: { decision, reason: reason || undefined },
     pushTitle: approved ? "Task confirmed done" : "Task sent back for rework",

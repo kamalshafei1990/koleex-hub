@@ -7,14 +7,13 @@ import {
   STATUS_VALUES,
   PRIORITY_VALUES,
   RESOLVED_STATUSES,
-  STATUS_LABEL,
-  PRIORITY_LABEL,
   type IssueStatus,
   type Priority,
 } from "@/lib/qa/types";
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
 import { SETTLED_STATUSES, notifyIssue, reporterIssueLink, settleIssueNotifications, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
+import type { NotifTpl } from "@/lib/notification-templates";
 import { loadFixEvidence } from "@/lib/qa/evidence";
 
 const BUCKET = "qa-screenshots";
@@ -311,15 +310,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       : (cur.assigned_to as string | null)) ?? null;
     const targets: NotifyTarget[] = [];
     // Watchers get one notification per PATCH for the primary change (first
-    // wins); phrased in the third person (never "assigned you").
-    let watcherEvt: { type: QaNotificationType; title: string; body: string; alert?: boolean } | null = null;
+    // wins); phrased in the third person (never "assigned you"). Every
+    // sentence is a template (translations/notif-templates/qa.ts), rendered in
+    // each reader's language; statuses / priorities are enum codes.
+    let watcherEvt: { type: QaNotificationType; tpl: NotifTpl; alert?: boolean } | null = null;
 
     if (body.action === "reopen") {
       const reason = (patch.reopen_reason as string | null) || null;
-      const msg = `${actor} reopened "${title}"${reason ? `: ${reason}` : ""}`;
-      targets.push({ recipientId: effectiveAssignee, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
-      targets.push({ recipientId: reporterId, type: "qa_issue_reopened", title: "Issue reopened", body: msg, link: reporterLink });
-      watcherEvt ??= { type: "qa_issue_reopened", title: "Issue reopened", body: msg };
+      const tpl: NotifTpl = { k: "qa_issue_reopened", p: { actor, title, reason } };
+      targets.push({ recipientId: effectiveAssignee, type: "qa_issue_reopened", tpl });
+      targets.push({ recipientId: reporterId, type: "qa_issue_reopened", tpl, link: reporterLink });
+      watcherEvt ??= { type: "qa_issue_reopened", tpl };
     } else if (patch.status && patch.status !== cur.status) {
       const newStatus = patch.status as IssueStatus;
       const type =
@@ -327,53 +328,55 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         : newStatus === "closed" ? "qa_issue_closed"
         : newStatus === "duplicate" ? "qa_issue_duplicate_marked"
         : "qa_status_changed";
-      const msg = `${actor} moved "${title}" to ${STATUS_LABEL[newStatus] ?? newStatus}`;
-      const ntitle = `Status: ${STATUS_LABEL[newStatus] ?? newStatus}`;
-      targets.push({ recipientId: reporterId, type, title: ntitle, body: msg, link: reporterLink });
-      targets.push({ recipientId: effectiveAssignee, type, title: ntitle, body: msg });
-      watcherEvt ??= { type, title: ntitle, body: msg };
+      // "Status: <label>" / "<actor> moved "<title>" to <label>" — one
+      // sentence, keyed under each type it can be sent as.
+      const sp = { actor, title, status: newStatus };
+      const tpl: NotifTpl =
+        type === "qa_issue_verified" ? { k: "qa_issue_verified.status", p: sp }
+        : type === "qa_issue_closed" ? { k: "qa_issue_closed", p: sp }
+        : type === "qa_issue_duplicate_marked" ? { k: "qa_issue_duplicate_marked.status", p: sp }
+        : { k: "qa_status_changed", p: sp };
+      targets.push({ recipientId: reporterId, type, tpl, link: reporterLink });
+      targets.push({ recipientId: effectiveAssignee, type, tpl });
+      watcherEvt ??= { type, tpl };
     }
 
     if (patch.priority && patch.priority !== cur.priority) {
       const np = patch.priority as Priority;
-      const pbody = `${actor} set "${title}" priority to ${PRIORITY_LABEL[np] ?? np}`;
+      const tpl: NotifTpl = { k: "qa_priority_changed", p: { actor, title, priority: np } };
       targets.push({
         recipientId: effectiveAssignee,
         type: "qa_priority_changed",
-        title: `Priority: ${PRIORITY_LABEL[np] ?? np}`,
-        body: pbody,
+        tpl,
         alert: np === "urgent",
       });
-      watcherEvt ??= { type: "qa_priority_changed", title: `Priority: ${PRIORITY_LABEL[np] ?? np}`, body: pbody, alert: np === "urgent" };
+      watcherEvt ??= { type: "qa_priority_changed", tpl, alert: np === "urgent" };
     }
 
     // New assignee (assigned or reassigned) — only when it actually changed.
     if ("assigned_to" in patch && patch.assigned_to) {
       const reassigned = !!(cur.assigned_to as string | null);
+      const ap = { actor, title };
       targets.push({
         recipientId: patch.assigned_to as string,
         type: reassigned ? "qa_issue_reassigned" : "qa_issue_assigned",
-        title: reassigned ? "Issue reassigned to you" : "Issue assigned to you",
-        body: `${actor} assigned you "${title}"`,
+        tpl: reassigned ? { k: "qa_issue_reassigned", p: ap } : { k: "qa_issue_assigned", p: ap },
       });
-      watcherEvt ??= {
-        type: reassigned ? "qa_issue_reassigned" : "qa_issue_assigned",
-        title: reassigned ? "Issue reassigned" : "Issue assigned",
-        body: `${actor} ${reassigned ? "reassigned" : "assigned"} "${title}"`,
-      };
+      watcherEvt ??= reassigned
+        ? { type: "qa_issue_reassigned", tpl: { k: "qa_issue_reassigned.watcher", p: ap } }
+        : { type: "qa_issue_assigned", tpl: { k: "qa_issue_assigned.watcher", p: ap } };
     }
 
     // Duplicate marked → tell the reporter.
     if ("duplicate_of_issue_id" in patch && patch.duplicate_of_issue_id) {
-      const dmsg = `${actor} marked "${title}" as a duplicate`;
+      const tpl: NotifTpl = { k: "qa_issue_duplicate_marked", p: { actor, title } };
       targets.push({
         recipientId: reporterId,
         type: "qa_issue_duplicate_marked",
-        title: "Marked as duplicate",
-        body: dmsg,
+        tpl,
         link: reporterLink,
       });
-      watcherEvt ??= { type: "qa_issue_duplicate_marked", title: "Marked as duplicate", body: dmsg };
+      watcherEvt ??= { type: "qa_issue_duplicate_marked", tpl };
     }
 
     // Every super admin is notified on a status change (incl. reopen) — Kamal's
@@ -391,8 +394,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         targets.push({
           recipientId: a.id as string,
           type: watcherEvt.type,
-          title: watcherEvt.title,
-          body: watcherEvt.body,
+          tpl: watcherEvt.tpl,
           alert: watcherEvt.alert,
           link: `/issues?issue=${id}`,
         });
