@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* ---------------------------------------------------------------------------
    POST /api/me/hr/attendance — { action: "in" | "out", tz } for MYSELF, today,
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       recipients: await hrReviewerAccountIds(auth.tenant_id),
       senderId: auth.account_id,
       subject: `Overtime to approve — ${name}`,
-      body: `${today} · ${Math.floor(otMin / 60)}h ${String(otMin % 60).padStart(2, "0")}m after ${policy.workEnd}`,
+      body: `${dmyDate(today)} · ${Math.floor(otMin / 60)}h ${String(otMin % 60).padStart(2, "0")}m after ${policy.workEnd}`,
       link: "/hr?tab=attendance",
       type: "attendance_overtime_approval_request",
       metadata: { attendance_record_id: rec.id, employee_id: me.id },

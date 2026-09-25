@@ -121,7 +121,10 @@ export async function logAudit(input: AuditInput): Promise<void> {
         subject: `${humanizeAction(input.action_type)} — ${entity}: ${label}`,
         action: `${humanizeAction(input.action_type)} ${entity}: ${label}`,
         location: locationLabel(meta),
-        body: input.module ? `In ${input.module}${input.route ? ` (${input.route})` : ""}` : null,
+        /* The module name only. The raw route ("(/product-data)") was printed
+           to the reader as if it were text; it stays in audit_logs.route,
+           where the activity monitor shows it. */
+        body: input.module ? `In ${input.module}` : null,
         severity,
         link: "/super-admin/activity",
         actorAccountId: accountId,

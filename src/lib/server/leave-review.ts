@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* ---------------------------------------------------------------------------
    leave-review — the ONE place a leave request changes state after filing.
@@ -82,7 +83,7 @@ async function loadRequest(requestId: string) {
   };
 }
 
-const span = (r: RequestRow) => r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`;
+const span = (r: RequestRow) => r.start_date === r.end_date ? dmyDate(r.start_date) : `${dmyDate(r.start_date)} → ${dmyDate(r.end_date)}`;
 
 /** A request was just filed by the employee: tell the first approver. */
 export async function notifyLeaveFiled(requestId: string, tenantId: string | null, requesterAccountId: string | null): Promise<void> {

@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* ---------------------------------------------------------------------------
    /api/me/hr/attendance/corrections — MY correction requests (Phase 1,
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
     recipients: await hrReviewerAccountIds(auth.tenant_id),
     senderId: auth.account_id,
     subject: `Attendance correction — ${name}`,
-    body: `${date} · ${[inRaw ? `in ${inRaw}` : null, outRaw ? `out ${outRaw}` : null].filter(Boolean).join(" · ")} · ${reason}`,
+    body: `${dmyDate(date)} · ${[inRaw ? `in ${inRaw}` : null, outRaw ? `out ${outRaw}` : null].filter(Boolean).join(" · ")} · ${reason}`,
     link: "/hr?tab=attendance",
     type: "attendance_correction_approval_request",
     metadata: { attendance_correction_id: (data as { id: string }).id, employee_id: me.id },

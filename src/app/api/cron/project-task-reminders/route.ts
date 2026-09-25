@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* GET /api/cron/project-task-reminders — daily (09:00 Asia/Shanghai).
    Reminds each assignee about open project tasks due today or overdue
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
       tenant_id: t.tenant_id,
       category: "system",
       subject: overdue ? `Task overdue: ${t.title}` : `Task due today: ${t.title}`,
-      body: overdue ? `Due ${t.due_date} — still open.` : "Due today.",
+      body: overdue ? `Due ${dmyDate(t.due_date)} — still open.` : "Due today.",
       link: taskLink(t),
       metadata: { source: "projects", type: "project_task_due", task_id: t.id, project_id: t.project_id, due_date: t.due_date },
     };

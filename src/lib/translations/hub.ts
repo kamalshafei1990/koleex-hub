@@ -131,6 +131,7 @@ export const hubT: Translations = {
   "notif.minAgo":       { en: "{n}m ago",         zh: "{n}分钟前",         ar: "قبل {n} د" },
   "notif.hourAgo":      { en: "{n}h ago",         zh: "{n}小时前",         ar: "قبل {n} س" },
   "notif.dayAgo":       { en: "{n}d ago",         zh: "{n}天前",           ar: "قبل {n} يوم" },
+  "notif.yesterday":    { en: "Yesterday",        zh: "昨天",              ar: "أمس" },
   "notif.filter.all":   { en: "All",              zh: "全部",              ar: "الكل" },
   "notif.filter.other": { en: "Other",            zh: "其他",              ar: "أخرى" },
   "notif.noneOfType":   { en: "No notifications of this type", zh: "没有此类型的通知", ar: "لا توجد إشعارات من هذا النوع" },

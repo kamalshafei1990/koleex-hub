@@ -38,7 +38,7 @@ import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import {
-  fetchInboxMessages,
+  fetchInboxMessagesOrNull,
   fetchUnreadCount,
   markAllRead,
   markMessageRead,
@@ -51,7 +51,8 @@ import {
   subscribeToMyChannels,
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
-import { useCurrentAccount } from "@/lib/identity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
+import { readWarmBellFeed, writeWarmBellFeed } from "@/lib/inbox-warm";
 import { activityAllowed, inQuietHours } from "@/lib/notification-activity";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
@@ -60,6 +61,8 @@ import { hubT } from "@/lib/translations/hub";
 import { settingsT } from "@/lib/translations/settings";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import { dmy } from "@/lib/discuss-time";
+import { cleanInboxBody } from "@/lib/inbox-display";
 import {
   classifyInboxActivity,
   playAppSound,
@@ -145,7 +148,9 @@ function timeAgo(iso: string, t: TFn): string {
   if (hours < 24) return t("notif.hourAgo").replace("{n}", String(hours));
   const days = Math.floor(hours / 24);
   if (days < 7) return t("notif.dayAgo").replace("{n}", String(days));
-  return new Date(iso).toLocaleDateString();
+  /* Day first, always (owner rule). toLocaleDateString() took the BROWSER's
+     locale and printed 9/18/2026 on an en-US machine. */
+  return dmy(new Date(iso), true);
 }
 
 function categoryStyle(
@@ -251,10 +256,23 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   const [open, setOpen] = useState(defaultOpen);
   const [inboxUnread, setInboxUnread] = useState(0);
-  const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
-  /* Starts true when the panel mounts open for a signed-in account: the
-     open-effect below fetches straight away. */
-  const [loadingInbox, setLoadingInbox] = useState(() => defaultOpen && !!accountId);
+  /* Painted from the last answer (inbox-warm): the panel opens with rows,
+     not a spinner, and the refresh below replaces them. Read synchronously,
+     here, so nothing shifts after the first frame. */
+  const [messages, setMessages] = useState<InboxMessageWithSender[]>(
+    () => readWarmBellFeed(getCurrentAccountIdSync()) ?? [],
+  );
+  /* Starts true when the panel mounts open for a signed-in account with
+     nothing painted yet: the open-effect below fetches straight away. */
+  const [loadingInbox, setLoadingInbox] = useState(() => defaultOpen && !!accountId && messages.length === 0);
+  /* Keep the stored list in step with the screen — every path that changes
+     `messages` (refresh, realtime, mark read) lands here once. Only after a
+     real answer has arrived, so an empty first frame never erases a good
+     list. */
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (loadedRef.current) writeWarmBellFeed(accountId, messages);
+  }, [messages, accountId]);
   const [filter, setFilter] = useState<NotifFilter>("all");
   /* Chip labels for the eight activities live in the Settings dictionary. */
   const { t: tAct } = useTranslation(settingsT);
@@ -286,7 +304,9 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       setMessages([]);
     }
     if (closed) setFilter("all");
-    if (open && accountId && (opened || accountChanged)) setLoadingInbox(true);
+    /* A spinner only over an empty panel — rows painted from the last
+       answer stay put while the refresh runs. */
+    if (open && accountId && (opened || accountChanged)) setLoadingInbox(messages.length === 0);
   }
   /* Latest list for the realtime handler (per-channel mute check). */
   const discussChannelsRef = useRef<DiscussChannelWithState[]>([]);
@@ -626,16 +646,25 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   const loadInbox = useCallback(() => {
     /* Signed out: the feed was cleared by the render-time transition above.
-       The spinner was switched on there too (on open / account change), so
-       this only ever settles state after the network answers. */
-    if (!accountId) return;
-    const aid = accountId;
-    /* State is written only in the continuation (never synchronously in the
-       effect that calls this). */
-    return fetchInboxMessages(aid, { limit: FEED_LIMIT, slim: true }).then(async (rows) => {
-      setMessages(rows);
+       The profile (accountId) can still be loading on a fresh tab while the
+       id in localStorage is already there — the request is session-scoped,
+       so it goes out on either. State is written only in the continuation
+       (never synchronously in the effect that calls this). */
+    const aid = accountId ?? getCurrentAccountIdSync();
+    if (!aid) return;
+    /* List and count leave together (the count used to wait for the list).
+       A FAILED list keeps what is shown — null, not [] — because a blink in
+       the network used to empty the panel and announce "You're all caught
+       up", and would now also overwrite the stored list with nothing. */
+    return Promise.all([
+      fetchInboxMessagesOrNull({ limit: FEED_LIMIT, slim: true }),
+      fetchUnreadCount(aid),
+    ]).then(([rows, n]) => {
+      if (rows) {
+        loadedRef.current = true;
+        setMessages(rows);
+      }
       setLoadingInbox(false);
-      const n = await fetchUnreadCount(aid);
       setInboxUnread(n);
     });
   }, [accountId]);
@@ -1095,7 +1124,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                             </div>
                             {msg.body && (
                               <AutoTranslatedText
-                                text={msg.body}
+                                text={cleanInboxBody(msg.body)}
                                 block
                                 className={`text-[11.5px] mt-0.5 line-clamp-2 ${
                                   dk ? "text-white/55" : "text-black/55"

@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* ---------------------------------------------------------------------------
    GET /api/cron/attendance  (every 15 minutes)
@@ -82,7 +83,7 @@ export async function GET(req: Request) {
       if (who) {
         await notifyLite({
           tenantId: who.tenantId, recipients: [who.accountId],
-          subject: `Attendance closed automatically — ${r.date}`,
+          subject: `Attendance closed automatically — ${dmyDate(r.date)}`,
           body: `Nobody clocked out, so the day was closed at ${policy.workEnd}. If you left later, ask for a correction in My HR.`,
           link: "/me?tab=attendance", type: "hr_attendance_auto_closed",
           metadata: { attendance_record_id: r.id }, tag: `att-closed-${r.id}`,

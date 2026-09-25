@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* GET /api/cron/hr-expiry-reminders  (daily)
    Makes the HR expiry dates the Add Employee form collects ACTIONABLE:
@@ -123,7 +124,7 @@ export async function GET(req: Request) {
       if (existing && existing.length > 0) continue;
 
       const subject = `${field.label} expiring soon: ${empName}`;
-      const body = `${field.label} for ${empName} expires on ${day}. Review and renew before the deadline.`;
+      const body = `${field.label} for ${empName} expires on ${dmyDate(day)}. Review and renew before the deadline.`;
       /* Supersede the earlier tier's unread copy — the 60-day warning is
          finished business once the 30-day one lands for the same document. */
       await supersedeUnread({

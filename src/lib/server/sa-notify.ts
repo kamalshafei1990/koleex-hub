@@ -187,6 +187,27 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
         },
       }));
     if (rows.length === 0) return;
+    /* The SAME alert fired twice within seconds is one event, not two.
+       Measured 26/09: 5 deletions raised their alert twice, 2 s apart. The
+       supersede below already keeps only one unread row, but both calls
+       still pushed — two phone notifications and two chimes for one delete.
+       An identical subject to these recipients in the last minute ends it
+       here, before the row and before the push. Best-effort: a failed check
+       lets the alert through rather than risk losing it. */
+    const since = new Date(Date.now() - 60_000).toISOString();
+    let dupe = supabaseServer
+      .from("inbox_messages")
+      .select("id")
+      .in("recipient_account_id", rows.map((r) => r.recipient_account_id))
+      .eq("category", "alert")
+      .eq("subject", alert.subject)
+      .gte("created_at", since);
+    /* Same RECORD, not just the same words: two different products that
+       share a name (the catalogue had duplicates) are two deletions. */
+    const entityId = (alert.metadata as { entity_id?: unknown } | undefined)?.entity_id;
+    if (entityId != null) dupe = dupe.eq("metadata->>entity_id", String(entityId));
+    const { data: recent } = await dupe.limit(1);
+    if (recent && recent.length > 0) return;
     /* Security alerts REPEAT ("xiang signed in" ×25 measured on the
        owner's inbox). The newest unread copy represents the series; the
        audit log keeps full history. Superseded by recipient+subject. */

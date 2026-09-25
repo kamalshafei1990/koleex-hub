@@ -53,7 +53,7 @@ import MailIcon from "@/components/icons/MailIcon";
 import {
   archiveMessage,
   broadcastToRole,
-  fetchInboxMessages,
+  fetchInboxMessagesOrNull,
   fetchMessageableAccounts,
   markAllRead,
   markMessageRead,
@@ -66,7 +66,12 @@ import {
   type InboxProductRef,
 } from "@/lib/inbox";
 import { fetchProductMainImages, fetchProductsSlim } from "@/lib/products-admin";
-import { useCurrentAccount } from "@/lib/identity";
+import { useCurrentAccount, useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
+import { readWarmMailFeed, writeWarmMailFeed } from "@/lib/inbox-warm";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
+import { dmy, discussListStamp, discussTime } from "@/lib/discuss-time";
+import { cleanInboxBody } from "@/lib/inbox-display";
 import type { InboxMessageWithSender, ProductRow } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -143,7 +148,7 @@ type ComposeInitial = {
    block. Keeps the layout greppable in the DB and renders fine with the
    existing `whitespace-pre-wrap` paragraph. */
 function buildReplyBody(msg: InboxMessageWithSender, senderName: string): string {
-  const when = new Date(msg.created_at).toLocaleString();
+  const when = `${dmy(new Date(msg.created_at))} ${discussTime(msg.created_at, "en")}`;
   const quoted = (msg.body ?? "")
     .split("\n")
     .map((line) => "> " + line)
@@ -152,7 +157,7 @@ function buildReplyBody(msg: InboxMessageWithSender, senderName: string): string
 }
 
 function buildForwardBody(msg: InboxMessageWithSender, senderName: string): string {
-  const when = new Date(msg.created_at).toLocaleString();
+  const when = `${dmy(new Date(msg.created_at))} ${discussTime(msg.created_at, "en")}`;
   return [
     "",
     "",
@@ -191,21 +196,12 @@ const BROADCAST_ROLES = [
   "HR",
 ];
 
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
-  }
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays < 7) {
-    return d.toLocaleDateString("en", { weekday: "short" });
-  }
-  return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+/* The list stamp, day first (owner rule) and in the app language: time
+   today, "Yesterday", weekday this week, else D/M (D/M/Y another year).
+   It was "Sep 18" / "Thu" in forced English — Discuss's helper already does
+   this right, so the mailbox uses the same one. */
+function formatTimestamp(iso: string, lang: string, yesterday: string): string {
+  return discussListStamp(iso, lang, yesterday);
 }
 
 /* Build initials from the sender's display name — matches Apple Mail's
@@ -293,6 +289,9 @@ export default function InboxPage() {
      mounts. Every other Aurora difference is CSS scoped to
      [data-kx-skin="aurora"], which is what keeps Core byte-identical. */
   const aurora = useSkin() === "aurora";
+  /* Only the app language and one word ("Yesterday") for the list stamp; the
+     page's own strings are a later pass. Above every early return. */
+  const { t: tHub, lang } = useTranslation(hubT);
 
   /* Deep-link support. NotificationBell routes `router.push(msg.link)`
      and the membership-request trigger emits `/inbox?request=<uuid>`,
@@ -303,8 +302,13 @@ export default function InboxPage() {
   const deepLinkRequestId = searchParams?.get("request") ?? null;
   const deepLinkMessageId = searchParams?.get("id") ?? null;
 
-  const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
-  const [loading, setLoading] = useState(true);
+  /* Painted from the last answer (inbox-warm, full rows — the reading pane
+     needs the whole metadata), refreshed underneath. The spinner is for an
+     empty first visit only. */
+  const [messages, setMessages] = useState<InboxMessageWithSender[]>(
+    () => readWarmMailFeed(getCurrentAccountIdSync()) ?? [],
+  );
+  const [loading, setLoading] = useState(() => messages.length === 0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeMailbox, setActiveMailbox] = useState<Mailbox>("inbox");
   const [search, setSearch] = useState("");
@@ -326,24 +330,44 @@ export default function InboxPage() {
      to wire up a global notification system. */
   const { showToast: kdsShowToast, toastElement } = useToast();
 
+  /* The list does not need the profile: the feed is scoped by the session,
+     and the id already sits in localStorage. Waiting for the full profile
+     (accountLoading) is why the request only left 1.6 s after the page
+     opened (measured on prod, 26/09). The quick id is stable from the first
+     render, so this runs once, alongside the profile rather than after it. */
+  const quickAccountId = useCurrentAccountId();
+  const feedAccountId = quickAccountId ?? accountId;
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const loadedRef = useRef(false);
   const loadMessages = useCallback(async () => {
-    if (!accountId) {
+    if (!feedAccountId) {
       setMessages([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const rows = await fetchInboxMessages(accountId, {
+    setLoading(messagesRef.current.length === 0);
+    /* null = the request failed: keep what is on screen. */
+    const rows = await fetchInboxMessagesOrNull({
       includeArchived: true,
       limit: 200,
     });
-    setMessages(rows);
+    if (rows) {
+      loadedRef.current = true;
+      setMessages(rows);
+    }
     setLoading(false);
-  }, [accountId]);
+  }, [feedAccountId]);
 
   useEffect(() => {
-    if (!accountLoading) void loadMessages();
-  }, [accountLoading, loadMessages]);
+    void loadMessages();
+  }, [loadMessages]);
+
+  /* Keep the stored list in step with the screen (read/unread, archive,
+     refresh) — once a real answer has arrived, never from the first frame. */
+  useEffect(() => {
+    if (loadedRef.current) writeWarmMailFeed(feedAccountId, messages);
+  }, [messages, feedAccountId]);
 
   /* Live: a new row for this account reloads the list, so the mailbox stops
      going stale the moment it is opened. Same ref-counted broadcast channel
@@ -546,7 +570,17 @@ export default function InboxPage() {
        --bg-primary transparent and --bg-secondary into the glass fill, so
        every surface below inherits the skin without being rewritten. Under
        Core the class matches nothing and this renders byte-identical. */
-    <div className="kx-app relative flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+    /* @container: the layout follows the width THIS PAGE gets, not the
+       window's. The Hub sidebar beside it is 56 px collapsed and far wider
+       open, so a viewport breakpoint cannot know how much room is left. It
+       showed three columns from 768 px — 220 + 380 = 600 px of rails left
+       ~110 px to read in, and the message text was cut off (measured on a
+       tablet, 26/09). Header and body query the same container, so they can
+       never disagree about whether there is a "back to list" level.
+         < 45rem (720 px)   one pane: list, or the open message
+         ≥ 45rem            two panes: list + message; mailboxes as chips
+         ≥ 68rem (1088 px)  three panes: the mailbox rail joins */
+    <div className="@container kx-app relative flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
       {aurora && (
         <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground topLight />
@@ -581,7 +615,7 @@ export default function InboxPage() {
              answers hover and NOTHING else moves. Owner's rule, verbatim —
              "only the borders colors, no more". Inert under Core. */
           className={`kx-ph-chrome h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
-            mobileView === "detail" ? "hidden md:flex" : "flex"
+            mobileView === "detail" ? "hidden @[45rem]:flex" : "flex"
           }`}
           aria-label="Back to Hub"
         >
@@ -594,7 +628,7 @@ export default function InboxPage() {
             /* Was text-blue-400: a SECOND blue, and on a navigation control
                rather than a status. Back is chrome — same neutral-text /
                border-hover language as the Hub arrow it replaces on phones. */
-            className="kx-ph-chrome md:hidden h-8 ps-1.5 pe-2.5 flex items-center gap-1 rounded-lg border border-transparent text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            className="kx-ph-chrome @[45rem]:hidden h-8 ps-1.5 pe-2.5 flex items-center gap-1 rounded-lg border border-transparent text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Mailboxes
@@ -612,7 +646,7 @@ export default function InboxPage() {
         <button
           onClick={handleMarkAllRead}
           disabled={mailboxCounts.unread === 0}
-          className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
+          className="hidden @[45rem]:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
         >
           <CheckCheckIcon className="h-3.5 w-3.5" />
           Mark all read
@@ -628,7 +662,7 @@ export default function InboxPage() {
           className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-lg"
         >
           <PenSquareIcon className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Compose</span>
+          <span className="hidden @[45rem]:inline">Compose</span>
         </button>
       </header>
 
@@ -652,7 +686,7 @@ export default function InboxPage() {
              skins (solid under Core, glass after kx-app's remap under Aurora);
              the class only adds the blur. */
           className={`kx-glass-drawer w-[220px] shrink-0 border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-y-auto ${
-            mobileView === "list" ? "hidden md:flex md:flex-col" : "hidden md:flex md:flex-col"
+            "hidden @[68rem]:flex @[68rem]:flex-col"
           }`}
         >
           <div className="px-3 py-3">
@@ -735,8 +769,8 @@ export default function InboxPage() {
 
         {/* ── Column 2: Message list ─────────────────────────────── */}
         <section
-          className={`kx-glass-drawer shrink-0 md:w-[380px] md:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
-            mobileView === "list" ? "flex w-full" : "hidden md:flex"
+          className={`kx-glass-drawer shrink-0 @[45rem]:w-[320px] @[80rem]:w-[380px] @[45rem]:border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-col min-h-0 ${
+            mobileView === "list" ? "flex w-full" : "hidden @[45rem]:flex"
           }`}
         >
           {/* List header: mailbox title + search input. The title is
@@ -766,7 +800,7 @@ export default function InboxPage() {
             <div
               role="tablist"
               aria-label="Mailbox"
-              className="md:hidden -mx-4 px-4 mb-3 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="@[68rem]:hidden -mx-4 px-4 mb-3 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {MAILBOX_ORDER.map((box) => {
                 const on = activeMailbox === box;
@@ -941,7 +975,7 @@ export default function InboxPage() {
                                 )}
                               </span>
                               <span className="text-[10.5px] text-[var(--text-dim)] shrink-0 tabular-nums group-hover/row:md:opacity-0 transition-opacity">
-                                {formatTimestamp(msg.created_at)}
+                                {formatTimestamp(msg.created_at, lang, tHub("notif.yesterday"))}
                               </span>
                             </div>
                             <div
@@ -955,7 +989,7 @@ export default function InboxPage() {
                             </div>
                             {msg.body && (
                               <AutoTranslatedText
-                                text={msg.body}
+                                text={cleanInboxBody(msg.body)}
                                 block
                                 className="text-[11.5px] text-[var(--text-dim)] mt-0.5 line-clamp-2 leading-snug"
                               />
@@ -978,7 +1012,7 @@ export default function InboxPage() {
                       </button>
 
                       {/* Hover action strip (desktop only). */}
-                      <div className="hidden md:flex absolute top-2.5 end-2.5 items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity pointer-events-none group-hover/row:pointer-events-auto">
+                      <div className="hidden @[45rem]:flex absolute top-2.5 end-2.5 items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity pointer-events-none group-hover/row:pointer-events-auto">
                         {msg.sender_account_id && (
                           <button
                             type="button"
@@ -1045,7 +1079,7 @@ export default function InboxPage() {
             not by different fills. */}
         <section
           className={`kx-glass-drawer flex-1 min-h-0 bg-[var(--bg-primary)] ${
-            mobileView === "detail" ? "flex w-full" : "hidden md:flex"
+            mobileView === "detail" ? "flex w-full" : "hidden @[45rem]:flex"
           }`}
         >
           {composeInitial !== null && accountId ? (
@@ -1218,6 +1252,7 @@ function MessageDetail({
     (msg.sender_account_id === null ? "Koleex System" : "Unknown");
   const badge = categoryBadge(msg.category);
   const created = new Date(msg.created_at);
+  const { lang: detailLang } = useTranslation(hubT);
 
   /* Inline expander for the Approve / Reject note, Gmail-style: clicking
      Reject opens a small textarea below the toolbar for an optional
@@ -1251,16 +1286,9 @@ function MessageDetail({
   /* Apple Mail's header shows the full date in an unambiguous format
      (day, date, time) because the message list only shows the short
      form. */
-  const formattedDate = created.toLocaleDateString("en", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-  const formattedTime = created.toLocaleTimeString("en", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  /* Unambiguous and day first: 24/09/2026 at 15:45, in the app language. */
+  const formattedDate = dmy(created);
+  const formattedTime = discussTime(msg.created_at, detailLang);
 
   return (
     <div className="flex flex-col h-full w-full min-w-0">
@@ -1439,7 +1467,7 @@ function MessageDetail({
 
           {msg.body && (
             <AutoTranslatedText
-              text={msg.body}
+              text={cleanInboxBody(msg.body)}
               block
               className="text-[14px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap break-words"
             />

@@ -26,7 +26,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { cachedGet } from "@/lib/client-cache";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
-import { useCurrentAccount } from "@/lib/identity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 
 /* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
    and even with the module ALREADY imported and awaited, that wrapper renders
@@ -114,6 +114,17 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
     const warm = () => {
       if (cancelled || document.visibilityState !== "visible") return;
       void import("./NotificationBell");
+      /* ...and the LIST it will open on. The chunk alone made the first
+         press fast to mount but still left it waiting 0.5–1.2 s for rows
+         (measured on prod, 26/09). One slim request, skipped when a fresh
+         answer is already stored, after the screen's own requests settle. */
+      void (async () => {
+        const { whenNetworkQuiet } = await import("@/lib/net-idle");
+        await whenNetworkQuiet({ quietMs: 500, maxWaitMs: 6000 });
+        if (cancelled) return;
+        const { prewarmBellFeed } = await import("@/lib/inbox-warm");
+        await prewarmBellFeed(getCurrentAccountIdSync());
+      })();
     };
     const t = window.setTimeout(() => {
       const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
@@ -136,6 +147,11 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
        the open, not a live feed, so it must not become the source of a
        number the user watches change. */
     let firstRead = true;
+    /* When the count MOVES, the stored list (inbox-warm) is known to be
+       behind — refresh it now so the next open shows the new row at once
+       instead of a moment later. Only on a change, so a quiet inbox costs
+       nothing beyond the count it already polls. */
+    let lastUnread: number | null = null;
     const read = async () => {
       try {
         let inbox: Badges | null = null;
@@ -169,6 +185,12 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
         if (!alive) return;
         const unreadInbox = inbox?.data?.unread ?? 0;
         setCount(unreadInbox + discussUnreadOf(channels));
+        if (inbox && lastUnread !== null && unreadInbox !== lastUnread && document.visibilityState === "visible") {
+          void import("@/lib/inbox-warm").then(({ prewarmBellFeed }) =>
+            prewarmBellFeed(getCurrentAccountIdSync(), { force: true }),
+          );
+        }
+        if (inbox) lastUnread = unreadInbox;
         /* The UserMenu's Inbox pill reads the shared store. Only the real
            bell used to publish there, and the real bell mounts on the first
            click — so on every ordinary page load the pill said 0. At rest,

@@ -128,6 +128,22 @@ export async function fetchInboxMessages(
   return data ?? [];
 }
 
+/** Same request, but a FAILED fetch is `null`, not `[]`. A list that is
+ *  already on screen must survive a dropped connection: turning a failure
+ *  into an empty array made the bell say "You're all caught up" whenever the
+ *  network blinked, and would now also overwrite the stored list with
+ *  nothing. Callers that can show the last answer use this one. */
+export async function fetchInboxMessagesOrNull(
+  options: { includeArchived?: boolean; limit?: number; slim?: boolean } = {},
+): Promise<InboxMessageWithSender[] | null> {
+  const { includeArchived = false, limit = 100, slim = false } = options;
+  const params: Record<string, string> = { limit: String(limit) };
+  if (includeArchived) params.archived = "1";
+  if (slim) params.slim = "1";
+  const data = await inboxFeed<InboxMessageWithSender[]>("messages", params);
+  return data ?? null;
+}
+
 /* ── Realtime ────────────────────────────────────────────────────────
    Live INSERT subscription on `inbox_messages` filtered to a single
    recipient. Mirrors `subscribeToMyChannels()` in src/lib/discuss.ts:

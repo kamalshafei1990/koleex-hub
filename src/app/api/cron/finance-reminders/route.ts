@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* GET /api/cron/finance-reminders — fire the Finance payment reminders.
 
@@ -80,8 +81,8 @@ export async function GET(req: Request) {
       ? `Collect from ${who}${amount ? `: ${amount}` : ""}`
       : `Pay ${who}${amount ? `: ${amount}` : ""}`;
     const body = overdue
-      ? `Was due ${r.due_date} — still open.`
-      : `Due ${r.due_date}.`;
+      ? `Was due ${dmyDate(r.due_date)} — still open.`
+      : `Due ${dmyDate(r.due_date)}.`;
     await notifyLite({
       tenantId: r.tenant_id,
       recipients,

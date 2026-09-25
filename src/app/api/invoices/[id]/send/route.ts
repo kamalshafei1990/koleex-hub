@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -50,7 +51,7 @@ export async function POST(_req: Request, { params }: RouteCtx) {
         tenant_id: auth.tenant_id,
         category: "system",
         subject: `Invoice ${data.inv_no} issued`,
-        body: `An invoice for ${data.currency} ${Number(data.total).toFixed(2)} has been issued${data.due_date ? ` and is due ${data.due_date}` : ""}.`,
+        body: `An invoice for ${data.currency} ${Number(data.total).toFixed(2)} has been issued${data.due_date ? ` and is due ${dmyDate(data.due_date)}` : ""}.`,
         link: "/invoices",
         metadata: { source: "invoices", type: "invoice_sent", invoice_id: data.id, inv_no: data.inv_no },
       });

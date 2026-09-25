@@ -1,4 +1,5 @@
 import "server-only";
+import { dmyDate } from "@/lib/work-reports";
 
 /* ---------------------------------------------------------------------------
    project-notify — inbox + web-push notifications for the Projects app.
@@ -40,7 +41,7 @@ export async function notifyTaskAssigned(auth: AuthCtx, task: TaskLike): Promise
       tenant_id: auth.tenant_id,
       category: "system",
       subject: `Task assigned: ${task.title}`,
-      body: `You've been assigned a task${task.due_date ? ` due ${task.due_date}` : ""}.`,
+      body: `You've been assigned a task${task.due_date ? ` due ${dmyDate(task.due_date)}` : ""}.`,
       link: taskLink(task),
       metadata: { source: "projects", type: "project_task_assigned", task_id: task.id, project_id: task.project_id },
     });
