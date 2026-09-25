@@ -13,6 +13,7 @@ import {
 } from "@/lib/hr-admin";
 import { ModalShell, FieldLabel, StatusBadge, PAYSLIP_STATUS_MAP, inputCls, primaryBtnCls, cancelBtnCls, dangerBtnCls, cardCls, sectionTitleCls, fmtDate, makeTranslationHelpers } from "@/components/hr/shared";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
+import { employerTotal, totalsByCurrency, type CurrencyTotal } from "@/lib/hr/payroll-totals";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
 import PrinterIcon from "@/components/icons/ui/PrinterIcon";
@@ -22,6 +23,9 @@ const monthNow = () => new Date().toISOString().slice(0, 7);
 const money = (n: number | null | undefined, ccy?: string | null) => n === null || n === undefined ? "—" : `${ccy ? `${ccy} ` : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
 const emptyRule = (): PayrollRuleInput => ({ country: null, name: "", kind: "employee_deduction", base: "gross", rate: 0, cap: null, bracket_from: null, bracket_to: null, sort_order: 0, is_active: true });
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+/* A total in each currency the run pays — "EGP 10,000.00 · USD 2,000.00",
+   never one number that adds them together. */
+const perCurrency = (lines: CurrencyTotal[], pick: (l: CurrencyTotal) => number) => (lines.length ? lines.map((l) => money(pick(l), l.currency)).join(" · ") : money(0));
 
 export default function PayrollRunPanel({ t, onChanged }: { t: (k: string) => string; onChanged: () => void }) {
   const { tStatus } = makeTranslationHelpers(t);
@@ -47,7 +51,7 @@ export default function PayrollRunPanel({ t, onChanged }: { t: (k: string) => st
     if (!r.ok || !r.result) { setNotice(r.error ?? t("hr.me.error")); return; }
     const res = r.result;
     const skipped = res.skipped.length ? ` · ${res.skipped.length} ${t("hr.pay.skipped")} (${res.skipped.filter((s) => s.reason === "no_salary").length} ${t("hr.pay.skipNoSalary")}, ${res.skipped.filter((s) => s.reason === "locked").length} ${t("hr.pay.skipLocked")})` : "";
-    setNotice(`${res.totals.employees} ${t("hr.pay.employees")} · ${t("hr.pay.totalNet")} ${money(res.totals.net)}${skipped}`);
+    setNotice(`${res.totals.employees} ${t("hr.pay.employees")} · ${t("hr.pay.totalNet")} ${perCurrency(res.totals.byCurrency, (l) => l.net)}${skipped}`);
     await reloadRuns(); await open(res.runId); onChanged();
   };
 
@@ -77,6 +81,8 @@ export default function PayrollRunPanel({ t, onChanged }: { t: (k: string) => st
   const countryLabel = (code: string | null) => { const c = code ? COUNTRIES.find((x) => x.code === code) : null; return c ? `${c.flag} ${c.name}` : t("hr.pay.allCountries"); };
   const num = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
   const name = (p: RunPayslipRow) => one(p.koleex_employees?.people)?.full_name ?? "Employee";
+  /* The open run's totals, per currency, from its own slips. */
+  const runLines = selected ? totalsByCurrency(selected.payslips.map((p) => ({ currency: p.currency, gross: p.gross_amount, net: p.net_amount, employer: employerTotal(p.employer_contributions) }))) : [];
 
   return (
     <div className={cardCls}>
@@ -118,7 +124,7 @@ export default function PayrollRunPanel({ t, onChanged }: { t: (k: string) => st
         {selected && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {([["hr.pay.employees", String(selected.run.employees)], ["hr.pay.totalGross", money(selected.run.total_gross, selected.run.currency)], ["hr.pay.totalNet", money(selected.run.total_net, selected.run.currency)], ["hr.pay.employerCost", money(selected.run.total_employer, selected.run.currency)]] as Array<[string, string]>).map(([k, v]) => (
+              {([["hr.pay.employees", String(selected.run.employees)], ["hr.pay.totalGross", perCurrency(runLines, (l) => l.gross)], ["hr.pay.totalNet", perCurrency(runLines, (l) => l.net)], ["hr.pay.employerCost", perCurrency(runLines, (l) => l.employer)]] as Array<[string, string]>).map(([k, v]) => (
                 <div key={k} className="rounded-xl border border-[var(--border-subtle)] px-3 py-2"><div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t(k)}</div><div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{v}</div></div>
               ))}
             </div>

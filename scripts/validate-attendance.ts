@@ -13,6 +13,8 @@
  *      secret-guarded and its writes are conditional.
  *   §4 the HR screen edits a day — it no longer clocks out "on behalf".
  *   §5 wiring — the cron in vercel.json, the migration.
+ *   §6 payroll totals per currency (26 Sep 2026) — a run never adds EGP and
+ *      USD together, on its row, on its screen or in its ledger entry.
  *
  * Source rules are checked in both directions, like validate:me-hr: the real
  * files pass, and a mutated copy that breaks each rule must fail.
@@ -25,6 +27,7 @@ import {
   type AttendancePolicy,
 } from "../src/lib/server/work-calendar";
 import { stripComments } from "./lib/strip-comments";
+import { employerTotal, payrollLines, runColumns, totalsByCurrency } from "../src/lib/hr/payroll-totals";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -214,6 +217,40 @@ for (const col of ["tracking_from", "punch_method", "works_remote", "auto_closed
 }
 expect(/CREATE TABLE IF NOT EXISTS hr_attendance_corrections/.test(mig), "migration creates hr_attendance_corrections");
 expect(/ALTER TABLE hr_attendance_corrections ENABLE ROW LEVEL SECURITY/.test(mig), "…with RLS on (server routes only)");
+
+console.log("\n§6 payroll totals per currency (26 Sep 2026)");
+{
+  const slips = [
+    { currency: "EGP", gross: 10000, net: 8600, employer: 1875 },
+    { currency: "USD", gross: 2000, net: 1800, employer: 0 },
+    { currency: "egp", gross: 5000, net: 4300, employer: 937.5 },
+    { currency: null, gross: 100, net: 100, employer: 0 },
+  ];
+  const lines = totalsByCurrency(slips);
+  expect(JSON.stringify(lines.map((l) => [l.currency, l.employees, l.gross, l.net, l.employer])) === JSON.stringify([["EGP", 2, 15000, 12900, 2812.5], ["USD", 2, 2100, 1900, 0]]),
+    "a run's totals are one line per currency — EGP and USD never added together; a slip with no currency counts as USD, the engine's default",
+    JSON.stringify(lines));
+  const one = runColumns(totalsByCurrency([slips[0], slips[2]]));
+  expect(one.currency === "EGP" && one.total_gross === 15000 && one.employees === 2, "a run that pays one currency keeps its totals on its row");
+  const many = runColumns(lines);
+  expect(many.currency === null && many.total_gross === null && many.total_net === null && many.employees === 4, "…and one that pays several keeps NO total (no sum of EGP and USD) and no currency", JSON.stringify(many));
+  expect(employerTotal({ "Social insurance": 1875.25, Other: "10" }) === 1885.25, "a slip's employer share adds its contributions");
+  const ledger = payrollLines(lines, { salaries: "5500", employer: "5510", netOwed: "2300", deductionsOwed: "2310" }, "2026-09");
+  const byCur = new Map<string, { dr: number; cr: number }>();
+  for (const l of ledger) { const c = byCur.get(l.currency) ?? { dr: 0, cr: 0 }; c.dr += l.debit; c.cr += l.credit; byCur.set(l.currency, c); }
+  expect([...byCur.values()].every((c) => Math.abs(c.dr - c.cr) < 0.005) && byCur.size === 2, "the ledger entry is one balanced group of lines per currency — so it balances at any rate",
+    JSON.stringify([...byCur]));
+  expect(ledger.filter((l) => l.account_id === "5500").map((l) => `${l.currency}:${l.debit}`).join() === "EGP:15000,USD:2100", "…salaries are debited in each currency, never as one sum");
+}
+rule("the payroll run saves its totals per currency", "src/lib/server/payroll-run.ts",
+  (c) => (c.includes("result.totals.byCurrency = totalsByCurrency(paid);") && c.includes("...runColumns(result.totals.byCurrency)") && !/currency = currency \?\? breakdown\.currency/.test(c) ? [] : ["the run adds every currency under the first slip's"]),
+  (src) => src.replace("...runColumns(result.totals.byCurrency)", "currency: paid[0]?.currency ?? null, total_gross: paid.reduce((a, p) => a + Number(p.gross), 0)"));
+rule("the payroll ledger entry is drafted per currency from the run's own slips", "src/lib/accounting/posting.ts",
+  (c) => (c.includes('.from("hr_payslips")') && c.includes("const lines: DraftLine[] = payrollLines(groups, {") && !/const gross = r2\(run\.total_gross \?\? 0\);/.test(c) ? [] : ["the ledger posts one sum in one currency"]),
+  (src) => src.replace("const lines: DraftLine[] = payrollLines(groups, {", "const lines: DraftLine[] = payrollLines(groups.slice(0, 1), {"));
+rule("the run screen shows each currency's total", "src/components/hr/modules/PayrollRun.tsx",
+  (c) => (c.includes('["hr.pay.totalGross", perCurrency(runLines, (l) => l.gross)]') && !c.includes("money(selected.run.total_gross, selected.run.currency)") ? [] : ["the screen shows one mixed total"]),
+  (src) => src.replace('["hr.pay.totalGross", perCurrency(runLines, (l) => l.gross)]', '["hr.pay.totalGross", money(selected.run.total_gross, selected.run.currency)]'));
 
 console.log(failed ? `\nvalidate:attendance FAILED (${failed})` : "\nvalidate:attendance passed");
 process.exit(failed ? 1 : 0);

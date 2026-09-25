@@ -42,6 +42,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { resolveBaseCurrency, resolveRate } from "@/lib/finance/currency";
+import { employerTotal, payrollLines, totalsByCurrency, type CurrencyTotal } from "@/lib/hr/payroll-totals";
 import type {
   AccountingAccount,
   PostingContext,
@@ -702,28 +703,34 @@ async function buildPayroll(ctx: PostingContext, runId: string): Promise<DraftAr
   const run = data as { id: string; period: string; country: string | null; status: string; currency: string | null; total_gross: number | null; total_net: number | null; total_employer: number | null };
   if (run.status === "draft") return notApproved("Payroll run", "draft");
 
-  const gross = r2(run.total_gross ?? 0);
-  const net = r2(run.total_net ?? 0);
-  const employer = r2(run.total_employer ?? 0);
-  const deductions = r2(gross - net + employer);
-  if (gross <= 0) return { ok: false, error: "Payroll run has no gross pay", code: 422 };
-  const currency = run.currency || (await resolveBaseCurrency(ctx.tenantId));
+  /* Per currency, from the run's own slips (lib/hr/payroll-totals): a run
+     that pays EGP and USD is two balanced groups of lines, each valued at
+     its own rate — never one sum in the first slip's currency. A run from
+     before its slips carried a currency falls back to its row. */
+  const { data: slipRows, error: slipErr } = await supabaseServer
+    .from("hr_payslips")
+    .select("currency, gross_amount, net_amount, employer_contributions")
+    .eq("payroll_run_id", run.id);
+  if (slipErr) return { ok: false, error: `Payroll slips: ${slipErr.message}`, code: 500 };
+  const slips = (slipRows ?? []) as Array<{ currency: string | null; gross_amount: number | null; net_amount: number | null; employer_contributions: Record<string, unknown> | null }>;
+  const groups: CurrencyTotal[] = slips.length
+    ? totalsByCurrency(slips.map((s) => ({ currency: s.currency, gross: s.gross_amount, net: s.net_amount, employer: employerTotal(s.employer_contributions) })))
+    : [{ currency: run.currency || (await resolveBaseCurrency(ctx.tenantId)), employees: 0, gross: r2(run.total_gross ?? 0), net: r2(run.total_net ?? 0), employer: r2(run.total_employer ?? 0) }];
+  if (!groups.some((g) => g.gross > 0)) return { ok: false, error: "Payroll run has no gross pay", code: 422 };
   /* Dated the last day of the month it pays for. */
   const [y, m] = run.period.split("-").map(Number);
   const entryDate = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
   const accts = await loadAccountsByCode(ctx.tenantId);
-  const lines: DraftLine[] = [
-    { account_id: requireAccount(accts, "5500").id, debit: gross, credit: 0, currency, description: `Salaries ${run.period}`, reference: run.period },
-  ];
-  if (employer > 0) lines.push({ account_id: requireAccount(accts, "5510").id, debit: employer, credit: 0, currency, description: "Employer contributions", reference: run.period });
-  lines.push({ account_id: requireAccount(accts, "2300").id, debit: 0, credit: net, currency, description: "Net pay owed", reference: run.period });
-  if (deductions > 0) lines.push({ account_id: requireAccount(accts, "2310").id, debit: 0, credit: deductions, currency, description: "Deductions, tax and contributions owed", reference: run.period });
+  const lines: DraftLine[] = payrollLines(groups, {
+    salaries: requireAccount(accts, "5500").id, employer: requireAccount(accts, "5510").id,
+    netOwed: requireAccount(accts, "2300").id, deductionsOwed: requireAccount(accts, "2310").id,
+  }, run.period);
   return {
     tenantId: ctx.tenantId, postedBy: ctx.postedByAccountId,
     sourceType: "payroll", sourceId: run.id, entryDate,
     description: `Payroll · ${run.period}${run.country ? ` · ${run.country}` : ""}`,
-    metadata: { period: run.period, country: run.country, gross, net, employer },
+    metadata: { period: run.period, country: run.country, by_currency: groups.map(({ currency, gross, net, employer }) => ({ currency, gross, net, employer })) },
     lines,
   };
 }

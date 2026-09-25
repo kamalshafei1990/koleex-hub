@@ -30,11 +30,18 @@ import "server-only";
 
    A slip already approved or paid is never overwritten by a re-run; it is
    reported as skipped. Everything else is upserted on (employee, period).
+
+   Totals are per CURRENCY (26 Sep 2026, lib/hr/payroll-totals): a run for
+   every country pays EGP, CNY, USD… side by side, and adding them into one
+   number under the first slip's currency put a wrong total on screen and in
+   the ledger. The run row keeps its total columns only when it pays one
+   currency.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { buildAttendanceSheet } from "@/lib/server/attendance-sheet";
 import { resolveEmployeeCountry } from "@/lib/server/work-calendar";
+import { runColumns, totalsByCurrency, type CurrencyTotal, type SlipMoney } from "@/lib/hr/payroll-totals";
 
 export const OVERTIME_MULTIPLIER = 1.5;
 
@@ -115,7 +122,8 @@ export function computePayslip(input: {
 export interface RunResult {
   runId: string; period: string; country: string | null; created: number; updated: number;
   skipped: Array<{ employeeId: string; reason: "no_salary" | "locked" }>;
-  totals: { gross: number; net: number; employer: number; employees: number };
+  /** One line per currency — never one sum of several. */
+  totals: { employees: number; byCurrency: CurrencyTotal[] };
 }
 
 export async function runPayroll(opts: { tenantId: string | null; period: string; country: string | null; createdBy: string | null; today: string;
@@ -149,8 +157,8 @@ export async function runPayroll(opts: { tenantId: string | null; period: string
     runId = (created as { id: string }).id;
   }
 
-  const result: RunResult = { runId, period: opts.period, country: opts.country, created: 0, updated: 0, skipped: [], totals: { gross: 0, net: 0, employer: 0, employees: 0 } };
-  let currency: string | null = null;
+  const result: RunResult = { runId, period: opts.period, country: opts.country, created: 0, updated: 0, skipped: [], totals: { employees: 0, byCurrency: [] } };
+  const paid: SlipMoney[] = [];
 
   for (const employeeId of employeeIds) {
     const country = await resolveEmployeeCountry(employeeId);
@@ -195,17 +203,14 @@ export async function runPayroll(opts: { tenantId: string | null; period: string
       : await supabaseServer.from("hr_payslips").insert(row);
     if (error) { console.error("[payroll-run] slip:", employeeId, error.message); continue; }
     if (prior) result.updated++; else result.created++;
-    result.totals.gross = r2(result.totals.gross + breakdown.gross);
-    result.totals.net = r2(result.totals.net + breakdown.net);
-    result.totals.employer = r2(result.totals.employer + breakdown.employerTotal);
-    result.totals.employees++;
-    currency = currency ?? breakdown.currency;
+    paid.push({ currency: breakdown.currency, gross: breakdown.gross, net: breakdown.net, employer: breakdown.employerTotal });
   }
 
-  await supabaseServer.from("hr_payroll_runs").update({
-    employees: result.totals.employees, total_gross: result.totals.gross, total_net: result.totals.net, total_employer: result.totals.employer,
-    currency, updated_at: new Date().toISOString(),
-  }).eq("id", runId);
+  result.totals.byCurrency = totalsByCurrency(paid);
+  result.totals.employees = paid.length;
+  /* One currency: its totals on the row. Several: none (a sum of EGP and
+     USD is no number) — the screens and the ledger read the slips. */
+  await supabaseServer.from("hr_payroll_runs").update({ ...runColumns(result.totals.byCurrency), updated_at: new Date().toISOString() }).eq("id", runId);
   return result;
 }
 
