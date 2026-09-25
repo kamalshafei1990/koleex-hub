@@ -207,7 +207,8 @@ const vercel = JSON.parse(read("vercel.json")) as { crons?: Array<{ path: string
 const cron = vercel.crons?.find((c) => c.path === "/api/cron/attendance");
 expect(!!cron, "vercel.json schedules /api/cron/attendance", "the forgotten-clock-out reminder and auto-close would never run");
 expect(!!cron && /^\*\/(5|10|15) \* \* \* \*$/.test(cron.schedule), `…every few minutes (${cron?.schedule ?? "none"})`, "a reminder 30 minutes after the end needs a run at least every 15 minutes");
-const mig = code(read("supabase/migrations/20260923_attendance_phase1.sql"));
+// SQL, not TS: its -- comments go too, so a commented-out statement cannot pass
+const mig = stripComments(read("supabase/migrations/20260923_attendance_phase1.sql"), { lang: "sql" });
 for (const col of ["tracking_from", "punch_method", "works_remote", "auto_closed", "corrected", "reminded_at", "overtime_status", "overtime_approved_minutes"]) {
   expect(new RegExp(`ADD COLUMN IF NOT EXISTS ${col}\\b`).test(mig), `migration adds ${col}`);
 }
