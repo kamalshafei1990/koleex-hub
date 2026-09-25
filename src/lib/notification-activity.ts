@@ -15,6 +15,8 @@
    DEFAULT_PREFERENCES.notifications, and in the two Settings screens.
    --------------------------------------------------------------------------- */
 
+import { notificationTypeDef } from "@/lib/notification-types";
+
 export const NOTIFICATION_ACTIVITIES = [
   "mentions", "approvals", "assignments", "tasks_due",
   "calendar_events", "projects_planning",
@@ -29,6 +31,24 @@ export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
  *  into an activity key — null when it matches none (never gated). */
 export function classifyNotificationActivity(raw: unknown): NotificationActivity | null {
   const type = typeof raw === "string" ? raw : "";
+  if (!type) return null;
+  /* The registry first (lib/notification-types): a registered type's switch
+     is DECLARED there, not guessed from words inside its name. The substring
+     rules below remain the fallback for strings nobody registered — rows
+     written before the registry, or a writer the validator has not seen —
+     and validate:notification-types pins that every registered type still
+     lands exactly where these rules put it, so adopting the registry moved
+     no one's mute or chime. */
+  const def = notificationTypeDef(type);
+  if (def) return def.activity;
+  return classifyBySubstring(type);
+}
+
+/** The pre-registry rules, kept as the fallback for unregistered strings and
+ *  exported for validate:notification-types, which proves every registered
+ *  type still lands where these rules put it. Order matters: specific
+ *  families before generic word matches. */
+export function classifyBySubstring(type: string): NotificationActivity | null {
   if (!type) return null;
   /* Order matters: specific families before generic word matches. */
   if (type.includes("mention")) return "mentions";
