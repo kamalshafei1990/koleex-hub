@@ -6,19 +6,22 @@ import { requireAuth, requireModuleAccess, requireModuleAction, type ServerAuthC
 import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
 import { sanitizeEventInput } from "@/lib/server/calendar-access";
+import { loadDeadlines } from "@/lib/server/reports/obligations";
+import { reportsT } from "@/lib/translations/reports";
 import type { CalendarViewEvent } from "@/types/supabase";
 
 /* GET /api/calendar/events?accountId=&from=&to=
    One account's calendar within [from, to): its own events, the occurrences
    of its recurring series, the events it is invited to, and read-only
-   mirrors of Planning, To-do, Projects and approved leave.
+   mirrors of Planning, To-do, Projects, approved leave and report
+   deadlines.
 
    Calendar is a Type C (personal) module: only the account itself or a
    Super Admin may read it, whatever the role's Scope says. Private events on
    someone else's calendar are hidden unless the role has can_view_private
    (break-glass), in which case the read is audit-logged.
 
-   The five sources are independent, so they are fetched together — the
+   The sources are independent, so they are fetched together — the
    sequential version cost eight round trips per month view. */
 
 type Row = Record<string, unknown> & {
@@ -268,6 +271,35 @@ async function leaveMirror(auth: ServerAuthContext, accountId: string, w: Window
     });
 }
 
+/** The account's report deadlines (Reports Phase 3C, owner's pick 25 Sep
+ *  2026: every report, the daily on each working day), each at its moment on
+ *  the person's own clock — sent, missing or still to write. Computed from
+ *  the obligation rules, never stored; nothing before tracking starts. A
+ *  failure here leaves the rest of the calendar standing. The Calendar words
+ *  the title in the viewer's language; the English one is the fallback. A
+ *  draft is only ever its author's to open, so its id rides on their own
+ *  calendar only. */
+async function reportMirror(auth: ServerAuthContext, accountId: string, viewingOwn: boolean, w: Window): Promise<CalendarViewEvent[]> {
+  const items = await loadDeadlines(auth.tenant_id, accountId, w.from, w.to).catch((e: unknown) => {
+    console.error("[api/calendar/events] report deadlines:", e instanceof Error ? e.message : e);
+    return [];
+  });
+  return items.map((d) => mirrorRow({
+    id: `report:${d.key}:${d.periodKey}`,
+    accountId, tenantId: auth.tenant_id,
+    title: (reportsT[`tpl.${d.key}.name`]?.en as string | undefined) ?? "Report",
+    description: null,
+    start_at: d.dueAt,
+    end_at: new Date(Date.parse(d.dueAt) + 30 * 60_000).toISOString(),
+    all_day: false,
+    color: d.state === "sent" || d.state === "late" ? MUTED : d.state === "missing" ? DANGER : ACCENT,
+    event_type: "reminder",
+    source: "report",
+    source_kind: d.state,
+    extra: { report_key: d.key, report_date: d.date, report_id: d.reportId || (viewingOwn ? d.draftId : undefined) || undefined },
+  }));
+}
+
 /** A dated item's [start, end] as YYYY-MM-DD, or null when it has no date or
  *  misses the window. */
 function daySpan(startDate: string | null, dueDate: string | null, w: Window): { start: string; end: string } | null {
@@ -342,15 +374,16 @@ export async function GET(req: Request) {
   };
 
   try {
-    const [own, invited, planning, todos, projects, leave] = await Promise.all([
+    const [own, invited, planning, todos, projects, leave, reports] = await Promise.all([
       ownEvents(auth, accountId, viewingOwn, w),
       viewingOwn ? invitedEvents(auth, accountId, w) : Promise.resolve([]),
       viewingOwn ? planningMirror(auth, accountId, w) : Promise.resolve([]),
       todoMirror(auth, accountId, w),
       projectTaskMirror(auth, accountId, w),
       leaveMirror(auth, accountId, w),
+      reportMirror(auth, accountId, viewingOwn, w),
     ]);
-    return NextResponse.json({ events: [...own, ...invited, ...planning, ...todos, ...projects, ...leave] });
+    return NextResponse.json({ events: [...own, ...invited, ...planning, ...todos, ...projects, ...leave, ...reports] });
   } catch (e) {
     console.error("[api/calendar/events]", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "Failed to load events" }, { status: 500 });

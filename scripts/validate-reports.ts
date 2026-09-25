@@ -37,6 +37,12 @@
  *      manager 2 hours after a daily / one working day after a weekly or
  *      monthly, only inside a window, nothing before tracking or once sent,
  *      each nudge claimed before it is sent, the job's answer names no one.
+ *   §14 the calendar and Home (Phase 3C) — every deadline on the person's
+ *      own calendar with what became of it, nothing before tracking, a draft
+ *      only on its author's calendar, a Reports failure never takes the
+ *      calendar down, "write it" opens once, and the Home greeting's line
+ *      costs no request, stays inside the quote's space and out of the Home
+ *      bundle, and never says a report is due once it is sent.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -58,9 +64,13 @@ import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
 import {
-  boardRow, cellOf, dailyDue, dayKind, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
+  boardRow, cellOf, dailyDue, dayKind, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
   type Clock, type PersonClock, type Sent,
 } from "../src/lib/reports/obligations";
+import { REPORT_DUE_WORDS, reportDueLine } from "../src/lib/home/report-due-line";
+import type { HomeDueItem } from "../src/lib/home/report-due";
+import { calendarT } from "../src/lib/translations/calendar";
+import { dayLanes } from "../src/lib/calendar-utils";
 import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
@@ -891,6 +901,153 @@ console.log("\n§13 reminders and escalation");
   expect(/UNIQUE \(account_id, template_key, period_key, kind\)/.test(mig) && /ALTER TABLE work_report_nudges ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig), "the ledger is one row per person × report × period × kind, RLS-on with no policy");
   eq(classifyNotificationActivity("report_reminder"), "reports_activity", "a reminder rides the Work reports switch the reader owns");
   eq(classifyNotificationActivity("report_escalation"), "reports_activity", "so does an escalation");
+}
+
+/* ── §14 the calendar and Home ─────────────────────────────────────────── */
+console.log("\n§14 deadlines on the calendar, and the Home greeting");
+{
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8, "Africa/Cairo": 3 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(["2026-10-01", "2026-10-02"]), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-09-21" };
+  const eg: PersonClock = { weekend: [5, 6], holidays: new Set(), leave: new Set(), tz: "Africa/Cairo", workEnd: "17:00", from: "2026-09-21" };
+  const all = { daily: true, weekly: true, monthly: true };
+  const sentMap = new Map<string, Sent>([["daily|2026-09-21", { at: "2026-09-21T09:00:00.000Z", id: "a" }], ["daily|2026-09-22", { at: "2026-09-22T12:00:00.000Z", id: "b" }]]);
+  const lookup = (k: string, pk: string) => sentMap.get(`${k}|${pk}`) ?? null;
+  const drafts = (k: string, pk: string) => (pk === "2026-09-25" || pk === "2026-09-22" ? { at: "", id: `d-${pk}` } : null);
+  const none = () => null;
+  const NOW = "2026-09-25T08:00:00.000Z"; // Friday 16:00 in Shanghai
+  const sig = (xs: ReturnType<typeof deadlinesIn>) => xs.map((d) => `${d.key}:${d.periodKey}:${d.state}`);
+
+  /* The week of 21/09, Monday 00:00 → Monday 00:00 in Shanghai. */
+  const wk = deadlinesIn({ obliged: all, clock: cn }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", lookup, drafts, NOW, clock);
+  eq(sig(wk), ["daily:2026-09-21:sent", "daily:2026-09-22:late", "daily:2026-09-23:missing", "daily:2026-09-24:missing", "daily:2026-09-25:due", "weekly:2026-W39:due"],
+    "a Chinese week on the calendar: each working day's daily and the week's weekly, with what became of each; the weekend asks nothing");
+  eq(wk.map((d) => d.dueAt), ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-25"].map((d) => `${d}T10:00:00.000Z`), "each sits at its deadline, 18:00 on the person's own clock");
+  eq([wk[0].reportId, wk[1].reportId, wk[1].draftId, wk[4].draftId, wk[4].reportId, wk[2].draftId], ["a", "b", undefined, "d-2026-09-25", undefined, undefined],
+    "a sent report links itself (never a draft); a draft started rides on the report still owed");
+  eq(sig(deadlinesIn({ obliged: all, clock: cn }, "2026-09-27T16:00:00.000Z", "2026-10-04T16:00:00.000Z", lookup, none, NOW, clock)),
+    ["daily:2026-09-28:upcoming", "daily:2026-09-29:upcoming", "daily:2026-09-30:upcoming", "weekly:2026-W40:upcoming"],
+    "next week: the days ahead are upcoming, the 1–2 October holidays ask nothing, the weekly falls on Wednesday");
+  const oct = deadlinesIn({ obliged: { daily: false, weekly: false, monthly: true }, clock: cn }, "2026-09-30T16:00:00.000Z", "2026-10-31T16:00:00.000Z", lookup, none, NOW, clock);
+  eq(oct.map((d) => `${d.key}:${d.periodKey}:${d.dueDay}:${d.state}`), ["monthly:2026-09:2026-10-07:due"],
+    "a month's view shows September's monthly on the day it falls due (7 October, past the holidays), already due since September began");
+  eq(sig(deadlinesIn({ obliged: all, clock: eg }, "2026-09-20T21:00:00.000Z", "2026-09-27T21:00:00.000Z", none, none, NOW, clock)),
+    ["daily:2026-09-21:missing", "daily:2026-09-22:missing", "daily:2026-09-23:missing", "daily:2026-09-24:missing", "weekly:2026-W39:missing", "daily:2026-09-27:upcoming"],
+    "an Egyptian week: Friday and Saturday rest, Sunday works, the weekly is due Thursday");
+  eq(deadlinesIn({ obliged: all, clock: { ...cn, from: null } }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", lookup, drafts, NOW, clock), [], "nothing on the calendar before tracking starts");
+  eq(sig(deadlinesIn({ obliged: all, clock: { ...cn, from: "2026-09-24" } }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", lookup, drafts, NOW, clock)),
+    ["daily:2026-09-24:missing", "daily:2026-09-25:due", "weekly:2026-W39:due"], "nor for a day before the start date");
+  eq(sig(deadlinesIn({ obliged: all, clock: cn }, "2026-09-20T16:00:00.000Z", "2026-09-25T10:00:00.000Z", lookup, none, NOW, clock)).at(-1), "daily:2026-09-24:missing",
+    "the window's end is exclusive, to the millisecond");
+  eq(deadlinesIn({ obliged: all, clock: cn }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", (k, pk) => (k === "daily" && pk === "2026-09-21" ? { at: "2026-09-21T09:00:00.000Z", id: "" } : null), none, NOW, clock)[0].reportId, "",
+    "a confidential report is counted on the calendar, never linked");
+  eq(deadlinesIn({ obliged: { daily: false, weekly: false, monthly: false }, clock: cn }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", lookup, drafts, NOW, clock), [], "someone who owes nothing sees no deadline");
+
+  /* The route and the Calendar, as their code states them. */
+  const EV = "src/app/api/calendar/events/route.ts";
+  rule("a Reports failure leaves the rest of the calendar standing", EV,
+    (c) => (/await loadDeadlines\(auth\.tenant_id, accountId, w\.from, w\.to\)\.catch\(/.test(c) ? [] : ["the report mirror can fail the whole calendar"]),
+    (src) => src.replace(/\.catch\(\(e: unknown\) => \{\n\s*console\.error\("\[api\/calendar\/events\] report deadlines:"[\s\S]*?return \[\];\n\s*\}\)/, ""));
+  rule("a draft's id rides only on its author's own calendar", EV,
+    (c) => (/report_id: d\.reportId \|\| \(viewingOwn \? d\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a draft can be linked from someone else's calendar"]),
+    (src) => src.replace("(viewingOwn ? d.draftId : undefined)", "d.draftId"));
+  rule("the deadlines are part of every calendar answer", EV,
+    (c) => (/reportMirror\(auth, accountId, viewingOwn, w\),/.test(c) && /\.\.\.leave, \.\.\.reports\] \}\)/.test(c) ? [] : ["the mirror is computed but not sent"]),
+    (src) => src.replace("...leave, ...reports] })", "...leave] })"));
+  rule("nothing is read for the calendar before tracking starts", "src/lib/server/reports/obligations.ts",
+    (c) => (/if \(!settings\.trackingFrom \|\| addDays\(toIso\.slice\(0, 10\), 1\) < settings\.trackingFrom\) return \[\];/.test(c) ? [] : ["deadlines can show before tracking starts"]),
+    (src) => src.replace("if (!settings.trackingFrom || addDays(toIso.slice(0, 10), 1) < settings.trackingFrom) return [];", "if (addDays(toIso.slice(0, 10), 1) < (settings.trackingFrom ?? \"\")) return [];"));
+  const CA = "src/components/admin/calendar/CalendarApp.tsx";
+  rule("someone else's deadline never opens a draft or starts a report", CA,
+    (c) => (/if \(e\.report_id && \(sent \|\| own\)\) return `\/reports\/\$\{e\.report_id\}`;\s*if \(!own\) return "\/reports\?tab=compliance";/.test(c) ? [] : ["another person's deadline can open a draft or a new report"]),
+    (src) => src.replace("if (e.report_id && (sent || own))", "if (e.report_id)"));
+  rule("a report deadline opens Reports, before the other mirrors go inert", CA,
+    (c) => { const a = c.indexOf('if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }'); const b = c.indexOf("if (e.source) return;"); return a > 0 && b > a ? [] : ["a tap on a deadline does nothing"]; },
+    (src) => src.replace('    if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }\n', ""));
+  rule("the views draw the worded deadlines", CA,
+    (c) => ((c.match(/events=\{shownEvents\}/g) ?? []).length === 3 ? [] : ["a view draws the English fallback"]),
+    (src) => src.replace("events={shownEvents}", "events={events}"));
+  const RA = "src/components/reports/app/ReportsApp.tsx";
+  rule("\"write it\" starts once: the link's parameters go before the report starts, and it replaces the stop", RA,
+    (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key, [^\n]*\{ replace: true \}\);/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /REPORT_TEMPLATES\.some\(\(x\) => x\.key === key\)/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
+    (src) => src.replace('      window.history.replaceState(window.history.state, "", url.toString());\n      if (!REPORT_TEMPLATES', "      if (!REPORT_TEMPLATES"));
+
+  /* Side by side: the daily and the weekly fall due at the same moment every
+     week, so two blocks at one time must never be drawn on top of each other. */
+  {
+    const prevTz = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    const ev = (id: string, s: string, e: string) => ({ id, start_at: s, end_at: e, all_day: false }) as unknown as Parameters<typeof dayLanes>[0][number];
+    const lanes = dayLanes([
+      ev("daily", "2026-09-25T10:00:00Z", "2026-09-25T10:30:00Z"), ev("weekly", "2026-09-25T10:00:00Z", "2026-09-25T10:30:00Z"),
+      ev("m1", "2026-09-25T01:00:00Z", "2026-09-25T02:00:00Z"), ev("m2", "2026-09-25T01:30:00Z", "2026-09-25T03:00:00Z"), ev("m3", "2026-09-25T02:00:00Z", "2026-09-25T02:30:00Z"),
+      ev("solo", "2026-09-25T05:00:00Z", "2026-09-25T06:00:00Z"),
+    ], new Date("2026-09-25T00:00:00+08:00"), 48);
+    eq(["daily", "weekly", "m1", "m2", "m3", "solo"].map((id) => `${lanes.get(id)?.lane}/${lanes.get(id)?.lanes}`), ["0/2", "1/2", "0/2", "1/2", "0/2", "0/1"],
+      "two deadlines at one moment sit side by side; a meeting that ends frees its lane; a lone block keeps the full width");
+    if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+    for (const f of ["src/components/admin/calendar/WeekView.tsx", "src/components/admin/calendar/DayView.tsx"]) {
+      rule("each timed block takes its lane", f,
+        (c) => (/const lanes = dayLanes\(dayEvents\.filter\(\(e\) => !e\.all_day\), /.test(c) && /\.\.\.laneStyle\(lanes\.get\(ev\.id\), /.test(c) ? [] : ["blocks at the same time are drawn on top of each other"]),
+        (src) => src.replace(/\.\.\.laneStyle\(lanes\.get\(ev\.id\), [^)]*\),\n/, ""));
+    }
+  }
+
+  /* Home: the greeting's line. */
+  const HD = "src/lib/home/report-due.ts";
+  rule("the Home chunk carries nothing of Reports, and the sentence loads only when something is owed", HD,
+    (c) => {
+      const probs: string[] = [];
+      if (/from "@\/lib\/(work-reports|translations\/reports|reports\/|server\/)/.test(c)) probs.push("a Reports module is imported into Home");
+      if (/from "\.\/report-due-line"/.test(c)) probs.push("the sentence and its words ship in the Home bundle");
+      if (!/await import\("\.\/report-due-line"\)/.test(c)) probs.push("the sentence is never loaded");
+      return probs;
+    },
+    (src) => src.replace('import { useEffect, useState } from "react";', 'import { useEffect, useState } from "react";\nimport { reportDueLine } from "./report-due-line";'));
+  rule("Home asks no server of its own: what is owed rides in the work snapshot the shell already fetches", HD,
+    (c) => (/cachedGet<\{ reportsDue\?: HomeDueItem\[\] \}>\("\/api\/me\/work", 15_000\)/.test(c) && !/\bfetch\(/.test(c) ? [] : ["the greeting opens a request of its own"]),
+    (src) => src.replace('const work = await cachedGet<{ reportsDue?: HomeDueItem[] }>("/api/me/work", 15_000);', 'const work = await (await fetch("/api/work-reports/due")).json() as { reportsDue?: HomeDueItem[] };'));
+  const MW = "src/app/api/me/work/route.ts";
+  rule("the snapshot computes what is owed beside its other reads, and a failure there never fails it", MW,
+    (c) => { const a = c.indexOf("const reportsDue = loadMyDue(auth).catch("); const b = c.indexOf("await Promise.all(["); return a > 0 && b > a && /reportsDue: await reportsDue,/.test(c) ? [] : ["what is owed is computed after the rest, or can fail the snapshot"]; },
+    (src) => src.replace(/  const reportsDue = loadMyDue\(auth\)\.catch\([\s\S]*?\n  \}\);\n/, "").replace("reportsDue: await reportsDue,", "reportsDue: await loadMyDue(auth),"));
+  rule("before tracking starts the snapshot reads the start date and nothing else of Reports", "src/lib/server/reports/obligations.ts",
+    (c) => { const body = /export async function loadMyDue[\s\S]*?\n\}/.exec(c)?.[0] ?? ""; const a = body.indexOf("if (!trackingFrom) return [];"); const b = body.indexOf("loadOwners("); return a > 0 && b > a ? [] : ["every screen reads the person and their calendar even before tracking starts"]; },
+    (src) => src.replace("  if (!trackingFrom) return [];\n  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me) return [];", "  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me || !trackingFrom) return [];"));
+  rule("a report sent clears the work snapshot, so Home never says it is still due", "src/lib/work-reports.ts",
+    (c) => (/if \(res\.ok\) void import\("@\/lib\/client-cache"\)\.then\(\(\{ invalidateCachedGet \}\) => invalidateCachedGet\("\/api\/me\/work"\)\);/.test(c) ? [] : ["a sent report can still read as due on Home"]),
+    (src) => src.replace('  if (res.ok) void import("@/lib/client-cache").then(({ invalidateCachedGet }) => invalidateCachedGet("/api/me/work"));\n', ""));
+  const HP = "src/app/page.tsx";
+  rule("Home asks only someone whose launcher shows Reports", HP,
+    (c) => (/const dueLine = useReportDue\(reportsOn, lang\);/.test(c) && /const reportsOn = useMemo\(\(\) => visibleRegistry\.some\(\(a\) => a\.id === "reports"\), \[visibleRegistry\]\);/.test(c) ? [] : ["the greeting asks everyone"]),
+    (src) => src.replace("const dueLine = useReportDue(reportsOn, lang);", "const dueLine = useReportDue(true, lang);"));
+  rule("the line stays inside the quote's two lines", HP,
+    (c) => (/min-h-\[3\.1em\]" : "min-h-\[2\.8em\]/.test(c) && /className=\{`line-clamp-2 rounded-md/.test(c) ? [] : ["the due line can grow the greeting and move the page"]),
+    (src) => src.replace("className={`line-clamp-2 rounded-md", "className={`rounded-md"));
+
+  /* The line itself, on a Shanghai clock. */
+  const prevTz = process.env.TZ;
+  process.env.TZ = "Asia/Shanghai";
+  const daily: HomeDueItem = { key: "daily", periodKey: "2026-09-25", date: "2026-09-25", dueAt: "2026-09-25T10:00:00.000Z", state: "due" };
+  const at = (iso: string) => Date.parse(iso);
+  eq(reportDueLine([daily], "en", at("2026-09-25T08:00:00.000Z")), { text: "Your daily report is due today at 18:00 — write it now", href: "/reports?write=daily&date=2026-09-25" }, "one report due today: named, timed on the viewer's clock, and opened ready to write");
+  eq(reportDueLine([{ ...daily, draftId: "d1" }], "en", at("2026-09-25T08:00:00.000Z")), { text: "Your daily report is due today at 18:00 — continue it", href: "/reports/d1" }, "a draft already started opens itself");
+  eq(reportDueLine([daily], "en", at("2026-09-25T10:30:00.000Z"))?.text, "Your daily report for 25/09 is missing — write it now", "a deadline that passed while Home stayed open reads missing");
+  eq(reportDueLine([{ key: "weekly", periodKey: "2026-W39", date: "2026-09-21", dueAt: "2026-09-25T10:00:00.000Z", state: "missing" }], "en", at("2026-09-26T08:00:00.000Z"))?.text, "Your weekly report for 21/09–27/09 is missing — write it now", "a missing weekly names its week, D/M");
+  eq(reportDueLine([{ key: "weekly", periodKey: "2026-W39", date: "2026-09-21", dueAt: "2026-09-25T10:00:00.000Z", state: "due" }], "en", at("2026-09-23T08:00:00.000Z"))?.text, "Your weekly report is due 25/09 at 18:00 — write it now", "one due another day gives the day");
+  eq(reportDueLine([daily, { ...daily, key: "weekly", periodKey: "2026-W39", date: "2026-09-21" }], "en", at("2026-09-25T08:00:00.000Z")), { text: "2 reports are waiting for you — open Reports", href: "/reports" }, "several say how many and open Reports");
+  eq(reportDueLine([], "en"), null, "nothing owed: the quote stays");
+  eq(reportDueLine([daily], "ar", at("2026-09-25T08:00:00.000Z"))?.text, "تقريرك اليومي مطلوب اليوم قبل 18:00 — اكتبه الآن", "Arabic builds its own sentence around the report's name");
+  eq(reportDueLine([daily], "fr", at("2026-09-25T08:00:00.000Z"))?.text, "Your daily report is due today at 18:00 — write it now", "any other language reads English");
+  if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+
+  /* Words. */
+  const holes: Record<string, string[]> = { today: ["{report}", "{time}"], on: ["{report}", "{date}", "{time}"], missing: ["{report}", "{period}"], many: ["{n}"] };
+  const badHome = Object.keys(REPORT_DUE_WORDS).filter((k) => (["en", "zh", "ar"] as const).some((l) => { const v = REPORT_DUE_WORDS[k]?.[l]; return !v || (holes[k] ?? []).some((h) => !v.includes(h)); }));
+  expect(badHome.length === 0 && ["daily", "weekly", "monthly", "today", "on", "missing", "many", "write", "finish", "open"].every((k) => k in REPORT_DUE_WORDS), "the greeting's words speak en / zh / ar, every placeholder in every language", badHome.join(", "));
+  const calKeys = ["report.daily", "report.weekly", "report.monthly", "report.sent", "report.late", "report.missing"];
+  const badCal = calKeys.filter((k) => (["en", "zh", "ar"] as const).some((l) => !calendarT[k]?.[l]));
+  expect(badCal.length === 0, "the calendar's report words speak en / zh / ar", badCal.join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

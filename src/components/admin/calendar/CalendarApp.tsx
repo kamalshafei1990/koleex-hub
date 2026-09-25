@@ -76,6 +76,21 @@ interface ModalState {
 
 type OpenableEvent = CalendarEventRow & { invited?: boolean };
 
+/** Where a report deadline leads (Reports Phase 3C). A sent report opens
+ *  itself; on the viewer's own calendar a draft started opens too, and a
+ *  report still owed opens ready to write. Someone else's deadline leads to
+ *  the compliance board — a draft is only ever its author's to open. */
+function reportHref(e: CalendarViewEvent, own: boolean): string {
+  const sent = e.source_kind === "sent" || e.source_kind === "late";
+  if (e.report_id && (sent || own)) return `/reports/${e.report_id}`;
+  if (!own) return "/reports?tab=compliance";
+  if (sent) return "/reports?tab=mine";
+  if ((e.source_kind === "due" || e.source_kind === "missing") && e.report_key && e.report_date) {
+    return `/reports?write=${e.report_key}&date=${e.report_date}`;
+  }
+  return "/reports";
+}
+
 export default function CalendarApp() {
   const { t, lang } = useTranslation(calendarT);
   const boot = useMeBootstrap();
@@ -157,6 +172,15 @@ export default function CalendarApp() {
     });
     return () => { alive = false; };
   }, [activeAccountId, visibleRange, fetchKey]);
+
+  /* Report deadlines arrive worded in English; here they take the viewer's
+     language and say what became of them (sent, late, missing). */
+  const shownEvents = useMemo(() => events.map((e) => {
+    if (e.source !== "report" || !e.report_key) return e;
+    const k = e.source_kind;
+    const state = k === "sent" || k === "late" || k === "missing" ? ` · ${t(`report.${k}`)}` : "";
+    return { ...e, title: `${t(`report.${e.report_key}`)}${state}` };
+  }), [events, t]);
 
   /* A guest's calendar changes when the organizer moves or cancels a
      meeting; coming back to the tab refetches the window. */
@@ -289,10 +313,11 @@ export default function CalendarApp() {
   useOpenOnNewParam(openNewEvent, !!activeAccountId);
 
   async function openEvent(e: CalendarViewEvent) {
-    /* Mirrors are read-only shadows of another module. A To-do or a project
-       task deep-links to its app; the rest are inert. */
+    /* Mirrors are read-only shadows of another module. A To-do, a project
+       task or a report deadline deep-links to its app; the rest are inert. */
     if (e.source === "todo" && e.todo_id) { window.location.assign(`/todo?task=${e.todo_id}`); return; }
     if (e.source === "project") { window.location.assign("/projects"); return; }
+    if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }
     if (e.source) return;
 
     /* An occurrence of a series edits the WHOLE series: open the base row
@@ -479,7 +504,7 @@ export default function CalendarApp() {
             ) : view === "month" ? (
               <MonthView
                 focusDate={focusDate}
-                events={events}
+                events={shownEvents}
                 preferences={preferences}
                 weekStart={weekStart}
                 holidaysByDay={holidaysByDay}
@@ -490,7 +515,7 @@ export default function CalendarApp() {
             ) : view === "week" ? (
               <WeekView
                 focusDate={focusDate}
-                events={events}
+                events={shownEvents}
                 preferences={preferences}
                 weekStart={weekStart}
                 onNewEventAtSlot={(d) => openNewEvent(d)}
@@ -499,7 +524,7 @@ export default function CalendarApp() {
             ) : (
               <DayView
                 focusDate={focusDate}
-                events={events}
+                events={shownEvents}
                 preferences={preferences}
                 onNewEventAtSlot={(d) => openNewEvent(d)}
                 onEventClick={(e) => { void openEvent(e); }}

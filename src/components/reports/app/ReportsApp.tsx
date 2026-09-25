@@ -96,14 +96,36 @@ export default function ReportsApp() {
   /* A new report — or, for a day / week / month that already has one, that
      one (the server returns it), so "Write it now" on an owed report opens
      the draft already started. */
-  const start = useCallback(async (key: string, date?: string) => {
+  const start = useCallback(async (key: string, date?: string, opts?: { replace?: boolean }) => {
     setCreating(date ? `${key}|${date}` : key);
     setCreateError(null);
     const res = await createReport(key, date ?? localToday());
     setCreating(null);
-    if (res.ok) router.push(`/reports/${res.data.id}`);
-    else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
+    if (res.ok) {
+      if (opts?.replace) router.replace(`/reports/${res.data.id}`);
+      else router.push(`/reports/${res.data.id}`);
+    } else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
   }, [router, t]);
+
+  /* /reports?write=<type>&date=<day> — "write it" from the Calendar or the
+     Home greeting (Phase 3C) opens that day's, week's or month's report
+     (the draft already started, if there is one). The parameters go first,
+     so Back or a refresh never starts it twice, and the report REPLACES
+     this stop in the history: Back returns to where the tap came from. Read
+     once the navigation has committed (the ?tab= trap above). */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const url = new URL(window.location.href);
+      const key = url.searchParams.get("write");
+      if (!key) return;
+      const date = url.searchParams.get("date");
+      url.searchParams.delete("write");
+      url.searchParams.delete("date");
+      window.history.replaceState(window.history.state, "", url.toString());
+      if (!REPORT_TEMPLATES.some((x) => x.key === key)) return;
+      void start(key, date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, { replace: true });
+    });
+  }, [start]);
 
   const counts = bundle?.counts;
   const navItems: AppHomeNavItem[] = [

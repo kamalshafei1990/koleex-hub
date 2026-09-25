@@ -122,6 +122,10 @@ export function prevMonth(month: string): string {
   const [y, m] = month.split("-").map(Number);
   return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
 }
+export function nextMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
+}
 
 export type CellState = "sent" | "late" | "missing" | "due" | "upcoming" | "off" | "leave" | "untracked";
 export interface Cell { state: CellState; dueAt?: string; sentAt?: string; reportId?: string }
@@ -285,4 +289,54 @@ export function nudgesDue(p: PersonFacts, sent: SentLookup, now: string, clock: 
     for (const m of [prevMonth(month), month]) consider("monthly", m, monthlyDue(c, m, clock));
   }
   return out;
+}
+
+/* ── Phase 3C: every deadline on the person's own calendar (owner's pick,
+   25 Sep 2026: all of them — the daily on each working day too) ──────────
+   Computed from the same rules as the board, never stored. Nothing before
+   tracking starts: until then no report is due, so none is shown. */
+export type DeadlineState = "sent" | "late" | "missing" | "due" | "upcoming";
+export interface Deadline {
+  key: ObligationKey;
+  periodKey: string;
+  /** A day inside the period — what "write it" creates the report for. */
+  date: string;
+  dueDay: string;
+  dueAt: string;
+  state: DeadlineState;
+  /** The sent report to open; "" for a confidential one (counted, never linked). */
+  reportId?: string;
+  /** A draft already started for a report still owed. */
+  draftId?: string;
+}
+
+/** The person's deadlines whose moment falls in [fromIso, toIso), earliest
+ *  first. The days scanned reach one past each end, so a deadline is found
+ *  whatever the gap between the window's zone and the person's. */
+export function deadlinesIn(p: PersonFacts, fromIso: string, toIso: string, sent: SentLookup, drafts: SentLookup, now: string, clock: Clock): Deadline[] {
+  const c = p.clock;
+  if (!c.from) return [];
+  const lo = ms(fromIso);
+  const hi = ms(toIso);
+  const first = addDays(fromIso.slice(0, 10), -1);
+  const last = addDays(toIso.slice(0, 10), 1);
+  const out: Deadline[] = [];
+  const push = (key: ObligationKey, periodKey: string, date: string, due: Due | null) => {
+    if (!due || due.day < c.from!) return;
+    const at = ms(due.at);
+    if (!(at >= lo && at < hi)) return;
+    const cell = cellOf({ due, sent: sent(key, periodKey), now, startsAt: clock(date, "00:00", c.tz), from: c.from });
+    if (cell.state !== "sent" && cell.state !== "late" && cell.state !== "missing" && cell.state !== "due" && cell.state !== "upcoming") return;
+    const owed = cell.state !== "sent" && cell.state !== "late";
+    out.push({
+      key, periodKey, date, dueDay: due.day, dueAt: due.at, state: cell.state,
+      ...(owed ? { draftId: drafts(key, periodKey)?.id } : { reportId: cell.reportId ?? "" }),
+    });
+  };
+  if (p.obliged.daily) for (let d = first; d <= last; d = addDays(d, 1)) push("daily", d, d, dailyDue(c, d, clock));
+  if (p.obliged.weekly) for (let m = mondayOf(first); m <= last; m = addDays(m, 7)) push("weekly", isoWeekKey(m), m, weeklyDue(c, m, clock));
+  /* A month's report falls due in the next month — two back covers a
+     deadline pushed late by holidays. */
+  if (p.obliged.monthly) for (let mo = prevMonth(prevMonth(monthOf(first))); mo <= monthOf(last); mo = nextMonth(mo)) push("monthly", mo, `${mo}-01`, monthlyDue(c, mo, clock));
+  return out.sort((a, b) => ms(a.dueAt) - ms(b.dueAt));
 }

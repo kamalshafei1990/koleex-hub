@@ -102,7 +102,13 @@ export const saveDraft = (id: string, patch: { title?: string; date?: string; se
   call<{ ok: true; savedAt: string }>(`/api/work-reports/${id}`, { method: "PATCH", body: JSON.stringify(patch), keepalive: opts?.keepalive });
 
 export const deleteDraft = (id: string) => call<{ ok: true }>(`/api/work-reports/${id}`, { method: "DELETE" });
-export const submitReport = (id: string) => call<{ ok: true; submittedAt: string }>(`/api/work-reports/${id}/submit`, { method: "POST" });
+export async function submitReport(id: string) {
+  const res = await call<{ ok: true; submittedAt: string }>(`/api/work-reports/${id}/submit`, { method: "POST" });
+  /* What the person owes just changed: the work snapshot (Home's greeting
+     reads "your report is due" from it) must not keep saying so. */
+  if (res.ok) void import("@/lib/client-cache").then(({ invalidateCachedGet }) => invalidateCachedGet("/api/me/work"));
+  return res;
+}
 export const decideReport = (id: string, action: "approve" | "return" | "acknowledge", note?: string) =>
   call<{ ok: true }>(`/api/work-reports/${id}/decision`, { method: "POST", body: JSON.stringify({ action, note }) });
 export const commentOnReport = (id: string, body: string) =>

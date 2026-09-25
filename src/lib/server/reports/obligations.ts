@@ -19,8 +19,8 @@ import { listPeople, loadOrgTree, type OrgTree, type PersonLite } from "@/lib/se
 import { loadPolicyRows, loadWorkCalendar, pickPolicy, resolveEmployeeCountries, wallClockToIso } from "@/lib/server/work-calendar";
 import { isoWeekKey } from "@/lib/reports/templates";
 import {
-  OBLIGATION_KEYS, addDays, boardRow, dueList, effectiveObliged, mondayOf, summarize, weekDays,
-  type BoardRow, type BoardSummary, type Clock, type DueItem, type ObligationKey, type Obliged, type PersonClock, type Sent,
+  OBLIGATION_KEYS, addDays, boardRow, deadlinesIn, dueList, effectiveObliged, mondayOf, summarize, weekDays,
+  type BoardRow, type BoardSummary, type Clock, type Deadline, type DueItem, type ObligationKey, type Obliged, type PersonClock, type Sent,
 } from "@/lib/reports/obligations";
 
 export const obligationClock: Clock = (day, hhmm, tz) => wallClockToIso(day, hhmm, tz);
@@ -200,9 +200,11 @@ export async function loadBoard(auth: ServerAuthContext, anyDay: string): Promis
 
 /** What the viewer owes now (the Reports home's "Due from you"). */
 export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promise<DueItem[]> {
-  const t = tree ?? (await loadOrgTree(auth.tenant_id));
-  const [owners, trackingFrom] = await Promise.all([loadOwners(t, new Set([auth.account_id])), loadTrackingFrom(auth.tenant_id)]);
-  const me = owners[0];
+  const [t, trackingFrom] = await Promise.all([tree ?? loadOrgTree(auth.tenant_id), loadTrackingFrom(auth.tenant_id)]);
+  /* Before tracking starts nothing is owed — the person and their calendar
+     are not even read (the work snapshot asks this on every screen). */
+  if (!trackingFrom) return [];
+  const [me] = await loadOwners(t, new Set([auth.account_id]));
   if (!me) return [];
   const obliged = effectiveObliged(me, me.exceptions);
   if (!obliged.daily && !obliged.weekly && !obliged.monthly) return [];
@@ -217,6 +219,30 @@ export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promis
   if (!clock) return [];
   const key = (k: ObligationKey, pk: string) => `${me.accountId}|${k}|${pk}`;
   return dueList({ obliged, clock }, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, new Date().toISOString(), obligationClock);
+}
+
+/** One person's report deadlines whose moment falls in [fromIso, toIso) —
+ *  the Calendar's mirror (Phase 3C). Empty until tracking starts, and for
+ *  someone who owes no report (a super admin, unless an exception says so). */
+export async function loadDeadlines(tenantId: string | null, accountId: string, fromIso: string, toIso: string): Promise<Deadline[]> {
+  const [settings, tree] = await Promise.all([loadSettings(tenantId), loadOrgTree(tenantId)]);
+  if (!settings.trackingFrom || addDays(toIso.slice(0, 10), 1) < settings.trackingFrom) return [];
+  const [me] = await loadOwners(tree, new Set([accountId]));
+  if (!me) return [];
+  const obliged = effectiveObliged(me, me.exceptions);
+  if (!obliged.daily && !obliged.weekly && !obliged.monthly) return [];
+  /* From two months back (a monthly report's own month), to a little past
+     the window (a deadline read on the person's clock). */
+  const from = addDays(fromIso.slice(0, 10), -62);
+  const to = addDays(toIso.slice(0, 10), 2);
+  const [clocks, { sent, drafts }] = await Promise.all([
+    loadClocks(tenantId, [me], from, to, settings.trackingFrom),
+    loadSent([me.accountId], from, to),
+  ]);
+  const clock = clocks.get(me.accountId);
+  if (!clock) return [];
+  const key = (k: ObligationKey, pk: string) => `${me.accountId}|${k}|${pk}`;
+  return deadlinesIn({ obliged, clock }, fromIso, toIso, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, new Date().toISOString(), obligationClock);
 }
 
 export interface SetupRow { person: PersonLite; isSuperAdmin: boolean; hasTeam: boolean; defaults: Obliged; exceptions: Partial<Obliged> }

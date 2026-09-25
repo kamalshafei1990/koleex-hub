@@ -120,4 +120,12 @@ export const calendarT: Translations = {
 
   /* Empty states */
   "empty.pickAccount": { en: "Pick an account to see their calendar.", zh: "选择一个账户以查看其日历。", ar: "اختر حسابًا لعرض تقويمه." },
+
+  /* Report deadlines (Reports Phase 3C): the type, and what became of it */
+  "report.daily":      { en: "Daily report",               zh: "日报",                   ar: "تقرير يومي" },
+  "report.weekly":     { en: "Weekly report",              zh: "周报",                   ar: "تقرير أسبوعي" },
+  "report.monthly":    { en: "Monthly report",             zh: "月报",                   ar: "تقرير شهري" },
+  "report.sent":       { en: "sent",                       zh: "已提交",                 ar: "أُرسل" },
+  "report.late":       { en: "sent late",                  zh: "逾期提交",               ar: "أُرسل متأخرًا" },
+  "report.missing":    { en: "missing",                    zh: "未提交",                 ar: "لم يُرسل" },
 };

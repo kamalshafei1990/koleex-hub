@@ -247,6 +247,50 @@ export function eventLayoutInDay(
   return { topPx, heightPx };
 }
 
+/** Side by side, for a day's timed events: blocks that overlap on the grid
+ *  form a cluster, each takes the first lane free where it starts, and the
+ *  cluster shares the column width between its lanes. Overlap is judged on
+ *  the DRAWN block (never under 20 px), so two short meetings back to back
+ *  cannot cover each other either. Before this every block took the full
+ *  width and a second one at the same time was drawn on top of the first —
+ *  which report deadlines make routine: the daily and the weekly fall due
+ *  at the same moment every week. */
+export function dayLanes(events: CalendarEventRow[], day: Date, hourHeight: number): Map<string, { lane: number; lanes: number }> {
+  const boxes = events
+    .map((e) => { const { topPx, heightPx } = eventLayoutInDay(e, day, hourHeight); return { id: e.id, top: topPx, bottom: topPx + heightPx }; })
+    .sort((a, b) => a.top - b.top || b.bottom - a.bottom);
+  const out = new Map<string, { lane: number; lanes: number }>();
+  let group: Array<{ id: string; lane: number }> = [];
+  let ends: number[] = [];
+  let groupBottom = 0;
+  const close = () => {
+    for (const g of group) out.set(g.id, { lane: g.lane, lanes: ends.length });
+    group = [];
+    ends = [];
+  };
+  for (const b of boxes) {
+    if (group.length && b.top >= groupBottom) close();
+    let lane = ends.findIndex((end) => end <= b.top);
+    if (lane < 0) { lane = ends.length; ends.push(b.bottom); } else ends[lane] = b.bottom;
+    group.push({ id: b.id, lane });
+    groupBottom = group.length === 1 ? b.bottom : Math.max(groupBottom, b.bottom);
+  }
+  close();
+  return out;
+}
+
+/** Where a block sits across its day column, from its lane: `pad` px kept
+ *  at each side of the column, `gap` px between lanes. Inline-start, so the
+ *  first lane is on the reading side in Arabic too. */
+export function laneStyle(l: { lane: number; lanes: number } | undefined, pad: number, gap = 2): { insetInlineStart: string; width: string } {
+  const { lane, lanes } = l ?? { lane: 0, lanes: 1 };
+  const share = `(100% - ${2 * pad + (lanes - 1) * gap}px) / ${lanes}`;
+  return {
+    insetInlineStart: `calc(${pad}px + (${share}) * ${lane} + ${lane * gap}px)`,
+    width: `calc(${share})`,
+  };
+}
+
 /** Round a Date forward to the next :00 or :30. */
 export function roundToNextHalfHour(d: Date): Date {
   const x = new Date(d);

@@ -17,6 +17,7 @@ import { calendarT } from "@/lib/translations/calendar";
 import {
   HOURS_OF_DAY,
   colorForEvent,
+  dayLanes,
   eventLayoutInDay,
   eventsOnDay,
   formatHourLabel,
@@ -24,6 +25,7 @@ import {
   isSameDay,
   isToday,
   isoWeekday,
+  laneStyle,
   nowOffsetPx,
   weekDays,
   workingHoursBand,
@@ -117,6 +119,7 @@ export default function WeekView({
           {days.map((day) => {
             const isWorking = wh.days.includes(isoWeekday(day));
             const dayEvents = eventsOnDay(events, day);
+            const lanes = dayLanes(dayEvents.filter((e) => !e.all_day), day, HOUR_HEIGHT);
             const nowPx = isToday(day) ? nowOffsetPx(HOUR_HEIGHT) : null;
             return (
               <div
@@ -150,8 +153,9 @@ export default function WeekView({
                         e.stopPropagation();
                         onEventClick?.(ev);
                       }}
-                      className="absolute inset-x-1 rounded-md px-1.5 py-1 text-left text-[10px] font-medium overflow-hidden hover:brightness-125 transition-all"
+                      className="absolute rounded-md px-1.5 py-1 text-left text-[10px] font-medium overflow-hidden hover:brightness-125 transition-all"
                       style={{
+                        ...laneStyle(lanes.get(ev.id), 4),
                         top: topPx,
                         height: heightPx,
                         backgroundColor: color + "22",

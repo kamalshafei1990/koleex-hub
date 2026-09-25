@@ -14,6 +14,7 @@ import { calendarT } from "@/lib/translations/calendar";
 import {
   HOURS_OF_DAY,
   colorForEvent,
+  dayLanes,
   eventLayoutInDay,
   eventsOnDay,
   formatEventTimeRange,
@@ -21,6 +22,7 @@ import {
   formatTime,
   isToday,
   isoWeekday,
+  laneStyle,
   nowOffsetPx,
   workingHoursBand,
 } from "@/lib/calendar-utils";
@@ -48,6 +50,7 @@ export default function DayView({
   const isWorkingDay = wh.days.includes(isoWeekday(focusDate));
   const band = workingHoursBand(wh, HOUR_HEIGHT);
   const dayEvents = eventsOnDay(events, focusDate);
+  const lanes = dayLanes(dayEvents.filter((e) => !e.all_day), focusDate, HOUR_HEIGHT);
   const nowPx = isToday(focusDate) ? nowOffsetPx(HOUR_HEIGHT) : null;
 
   function handleSlotClick(hour: number) {
@@ -104,8 +107,9 @@ export default function DayView({
                       e.stopPropagation();
                       onEventClick?.(ev);
                     }}
-                    className="absolute inset-x-2 rounded-lg px-3 py-2 text-left overflow-hidden hover:brightness-125 transition-all"
+                    className="absolute rounded-lg px-3 py-2 text-left overflow-hidden hover:brightness-125 transition-all"
                     style={{
+                      ...laneStyle(lanes.get(ev.id), 8, 4),
                       top: topPx,
                       height: heightPx,
                       backgroundColor: color + "22",

@@ -10,6 +10,7 @@
 import { PRODUCTS_PREFETCH_URL, PRODUCT_DATA_PREFETCH_URL } from "@/lib/products-list-params";
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import { type OrbState } from "@/components/ai/KoleexOrb";
@@ -45,6 +46,7 @@ import {
   saveHomeApps, seedPins, type HomeAppsPref,
 } from "@/lib/home/my-apps";
 import { whenNetworkQuiet } from "@/lib/net-idle";
+import { useReportDue } from "@/lib/home/report-due";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -523,11 +525,15 @@ const AIGreeter = memo(function AIGreeter({
   firstName,
   t,
   lang,
+  reportsOn,
 }: {
   dk: boolean;
   firstName: string | null;
   t: (key: string, fb: string) => string;
   lang: string;
+  /** The Reports app is on this person's launcher — only then does the
+   *  greeting look at what they owe. */
+  reportsOn: boolean;
 }) {
   const skin = useSkin();
   const greetingText = `${t(getGreetingKey(), "")}${firstName ? `, ${firstName}` : ""}`;
@@ -560,20 +566,35 @@ const AIGreeter = memo(function AIGreeter({
     };
   }, [lang]);
 
-  const quoteTyping = quoteTyped.length < quote.length;
+  /* Reports Phase 3C (owner's pick, 25 Sep 2026): while a report is owed,
+     this line says so in place of the quote — the same line, so nothing on
+     the page appears or moves — and opens it. The answer rides in with the
+     work snapshot the shell already fetches, so it usually lands while the
+     greeting is still typing; if not, the line waits up to 1.5 s before it
+     types a quote, so it seldom types one only to take it back. */
+  const dueLine = useReportDue(reportsOn, lang);
+  const [waited, setWaited] = useState(false);
   useEffect(() => {
-    if (!introDone || !quote) return;
+    if (!introDone) return;
+    const id = setTimeout(() => setWaited(true), 1500);
+    return () => clearTimeout(id);
+  }, [introDone]);
+  const line = !introDone || (dueLine === undefined && !waited) ? "" : dueLine ? dueLine.text : quote;
+
+  const quoteTyping = quoteTyped.length < line.length;
+  useEffect(() => {
+    if (!introDone || !line) return;
     setQuoteTyped("");
     let i = 0;
     let timer: ReturnType<typeof setTimeout>;
     const step = () => {
       i += 1;
-      setQuoteTyped(quote.slice(0, i));
-      if (i < quote.length) timer = setTimeout(step, 26 + Math.random() * 42);
+      setQuoteTyped(line.slice(0, i));
+      if (i < line.length) timer = setTimeout(step, 26 + Math.random() * 42);
     };
     timer = setTimeout(step, 220);
     return () => clearTimeout(timer);
-  }, [quote, introDone]);
+  }, [line, introDone]);
 
   useEffect(() => {
     if (!greetingText) return;
@@ -666,13 +687,39 @@ const AIGreeter = memo(function AIGreeter({
           )}
         </h1>
         <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-          <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug min-h-[2.8em] ${dk ? "text-white/45" : "text-black/50"}`}>
-            <span aria-hidden>{quoteTyped || " "}</span>
-            {quoteTyping && (
-              <span
-                aria-hidden
-                className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
-              />
+          {/* Two lines held from the first frame. Arabic letters stand taller
+              than the line height, so its two lines hold more — measured
+              40.3 px at 13 px where 2.8em holds 36.4 — or the card would
+              grow as the second line types. */}
+          <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug ${lang === "ar" ? "min-h-[3.1em]" : "min-h-[2.8em]"} ${dk ? "text-white/45" : "text-black/50"}`}>
+            {dueLine ? (
+              /* Two lines at most, whatever the language or the screen: the
+                 space the quote holds is the space this line gets. */
+              <Link
+                href={dueLine.href}
+                prefetch={false}
+                aria-label={dueLine.text}
+                className={`line-clamp-2 rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white/85 hover:text-white" : "text-black/80 hover:text-black"}`}
+              >
+                <span aria-hidden>{quoteTyped || " "}</span>
+                {!quoteTyping && <span aria-hidden className="ms-1 text-[#7FA9D6]">›</span>}
+                {quoteTyping && (
+                  <span
+                    aria-hidden
+                    className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/60" : "bg-black/60"}`}
+                  />
+                )}
+              </Link>
+            ) : (
+              <>
+                <span aria-hidden>{quoteTyped || " "}</span>
+                {quoteTyping && (
+                  <span
+                    aria-hidden
+                    className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
+                  />
+                )}
+              </>
             )}
           </p>
         </div>
@@ -961,6 +1008,10 @@ export default function HomePage() {
       return permittedModules.has(a.name);
     });
   }, [permLoading, permittedModules, isSuperAdmin]);
+
+  /* The greeting looks at what reports are owed only for someone whose
+     launcher shows Reports (staff); for anyone else it is the quote. */
+  const reportsOn = useMemo(() => visibleRegistry.some((a) => a.id === "reports"), [visibleRegistry]);
 
   /* ── Derived ── */
   const filteredApps = useMemo(() => {
@@ -1294,7 +1345,7 @@ export default function HomePage() {
         <div className="mb-4 min-h-[130px] md:min-h-[150px] flex items-center">
           <div className="flex items-stretch justify-between gap-5 md:gap-8 w-full">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-              <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} />
+              <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} reportsOn={reportsOn} />
             </div>
             <ClockWidget dk={dk} />
           </div>
