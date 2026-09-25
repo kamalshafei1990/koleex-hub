@@ -24,6 +24,7 @@ import {
   overtimeMinutes, wallClockToIso, todayInZone, dayEndIso, lateMinutes, workedHours, DEFAULT_POLICY,
   type AttendancePolicy,
 } from "../src/lib/server/work-calendar";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -32,7 +33,7 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 const eq = (got: unknown, want: unknown, m: string) => expect(got === want, m, `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const code = (src: string) => stripComments(src);
 
 /** A rule is a function from source to problems; it must pass on the real
  *  file and fail on the mutation. */

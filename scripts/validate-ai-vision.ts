@@ -4,6 +4,7 @@
    --------------------------------------------------------------------------- */
 import { readFileSync } from "node:fs";
 import { buildVisionPrompt, parseVisionConfig, questionForPrompt } from "../src/lib/server/ai/vision";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -45,7 +46,7 @@ console.log("\n── 3. The module, read ──");
   const src = readFileSync("src/lib/server/ai/vision.ts", "utf8");
   check("the configured provider is tried FIRST, the default provider answers when there is none or it failed; every path returns null, never throws",
     /if \(configured\) \{\s*const text = await askProvider\(configured, configuredKey, prompt, dataUrl\);\s*if \(text\) return \{ text \};\s*\}\s*if \(defaultKey\) \{/.test(src) &&
-    /if \(!configured && !defaultKey\) return null;/.test(src) && !/\bthrow\b/.test(src.replace(/\/\*[\s\S]*?\*\//g, "")));
+    /if \(!configured && !defaultKey\) return null;/.test(src) && !/\bthrow\b/.test(stripComments(src, { line: "keep" })));
   check("logs carry the host label, timing and counts — never the reading, never a model name in the result",
     /console\.log\(`\[ai\.vision\] ok via=\$\{provider\.label\} ms=\$\{Date\.now\(\) - t0\} chars=\$\{text\.length\}`\)/.test(src) &&
     /export interface VisionResult \{\s*text: string;\s*\}/.test(src));

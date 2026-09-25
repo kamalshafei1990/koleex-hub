@@ -23,6 +23,7 @@ import { type TranscriptLine } from "../src/lib/voice/events";
 import { extractProductPhotos, photosMarkdown, stripImageMarkdown, imageUrlsIn, MAX_PHOTOS_PER_RESULT, MAX_WEB_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
 import { CallTones, scheduleTone, READY_TONE, RECOVERED_TONE, TONE_GAIN, type ToneContextLike, type ToneOscillatorLike, type ToneGainLike } from "../src/lib/voice/tones";
 import { stepLevel, LEVEL_ATTACK, LEVEL_RELEASE } from "../src/lib/voice/level";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -498,7 +499,7 @@ async function main() {
     check("the label carries no vendor identity", !/oai|openai|qwen|dashscope/i.test(r.pcCalls.channels[0] ?? ""));
 
     const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, "");
+    const code = stripComments(src, { line: "keep" });
     check("a server-opened channel is still wired, rather than assumed away",
       /pc\.ondatachannel = /.test(code));
     /* THREE: stop, fail, and the re-handshake on the other region, which
@@ -510,7 +511,7 @@ async function main() {
   console.log("\n── 6. The module cannot be pointed anywhere else ──");
   {
     const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const code = stripComments(src);
     /* THE GUARANTEE, not its old shape. A voice choice is now appended as a
        query parameter, so the call is no longer literally `fetchFn(CONST,`.
        What must remain true is that the BASE is a constant this module owns —
@@ -2339,7 +2340,7 @@ console.log("\n── 12. Mute ──");
   check("the call screen marks itself as uninterruptible, and nothing reloads the page over it — the watcher only offers, and the offer is hidden during a call",
     /data-kx-call-active="1"/.test(scr) &&
     /export function busyWithSomethingUninterruptible\(\): boolean \{\s*return Boolean\(document\.querySelector\("\[data-kx-unsaved='1'\], \[data-kx-call-active='1'\]"\)\);/.test(uw18) &&
-    !/onHide|healInstalledApp/.test(uw18.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    !/onHide|healInstalledApp/.test(stripComments(uw18, { line: "keep" })) &&
     /body:has\(\[data-kx-call-active='1'\]\) \.kx-update-offer \{ display: none; \}/.test(css18) &&
     !/document\.querySelector\("\[data-kx-unsaved='1'\]"\)/.test(uw18));
   const md18 = fs18.readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
@@ -2520,7 +2521,7 @@ console.log("\n── 12. Mute ──");
     /<PhotoTile key=\{p\.url\} photo=\{p\} onOpen=\{setOpenPhoto\} label=\{copy\.photos\} size=\{88\} visible=\{view === "orb"\} \/>/.test(scr21));
   check("both layers stay mounted: the words layer and the orb layer are always rendered, hidden by class, never keyed",
     /<div ref=\{stageRef\} className="relative flex-1 min-h-0" data-view=\{view\}>\s*\{wordsLayer\}\s*\{orbLayer\}\s*<\/div>/.test(scr21) &&
-    !/key=\{view\}/.test(scr21) && !/leaving/.test(scr21.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    !/key=\{view\}/.test(scr21) && !/leaving/.test(stripComments(scr21, { line: "keep" })) &&
     /className=\{`kx-call-words absolute inset-0 flex flex-col pt-4 \$\{view === "chat" \? "is-in" : ""\}`\}/.test(scr21));
   check("  …the hidden layer is out of the accessibility tree and takes no taps; the orb alone stays tappable over the words",
     /aria-hidden=\{view !== "chat"\}/.test(scr21) && /aria-hidden=\{view !== "orb"\}/.test(scr21) &&

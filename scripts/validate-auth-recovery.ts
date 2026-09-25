@@ -29,6 +29,7 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -42,7 +43,7 @@ function check(label: string, cond: boolean) {
   }
 }
 
-const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const strip = (t: string) => stripComments(t);
 
 console.log("\n── 1. The recovery button destroys the credential ──");
 {

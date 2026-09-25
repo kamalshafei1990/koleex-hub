@@ -99,6 +99,7 @@ check("label: idle stays brand", orbStatusLabel("idle", "none", "en") === "Kolee
 /* ── INDICATOR GEOMETRY LOCK: static source assertions ── */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { stripComments } from "./lib/strip-comments";
 const orbSrc = readFileSync(join(__dirname, "../src/components/ai-orb/AIOrb.tsx"), "utf8");
 
 check("lock: base geometry 16x48 r8 present",
@@ -260,7 +261,7 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     if (rel === "components/ai-orb/ChosenOrb.tsx" || rel.startsWith("app/ai-orb-lab/")) return false;
     /* Code only: a comment that says "never <AIOrb> directly" is the rule
        being written down, not broken. */
-    const code = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const code = stripComments(readFileSync(f, "utf8"), { line: "all" });
     return /<(AIOrb|DottedOrb)\b/.test(code);
   }).map((f) => f.slice(srcRoot.length + 1));
   check("wiring: no surface draws <AIOrb> or <DottedOrb> directly — every orb goes through <ChosenOrb>",

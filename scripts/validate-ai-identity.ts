@@ -47,6 +47,7 @@ import { buildVoiceSessionPayload } from "../src/lib/server/ai/voice/session-con
 import { classifyBrandSection, isCapabilityQuestion } from "../src/lib/server/ai/core/decide-turn";
 import { listTools } from "../src/lib/server/ai-agent/tool-registry";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -979,7 +980,7 @@ console.log("\n── 12. The same facts, a different answer each time ──");
   check("  …but still describes the shapes", /shapes only/i.test(brandName) && /A name question →/.test(brandName));
 
   /* 6. THE ORCHESTRATOR LETS IT HAPPEN: history on identity turns, warmth. */
-  const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const orch = stripComments(readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8"), { line: "keep" });
   check("identity turns keep a clipped tail of the conversation",
     /const isIdentityTurn = brandSection === "ai" \|\| brandSection === "both";/.test(orch) &&
     /sanitisedHistory\.slice\(-IDENTITY_HISTORY_TURNS\)/.test(orch) &&

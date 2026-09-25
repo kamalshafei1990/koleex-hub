@@ -39,6 +39,7 @@ import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-b
 import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
 import { toOpenAiBody } from "../src/lib/server/ai/provider/turn-ir";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -159,7 +160,7 @@ console.log("\n── 4. The registry has one door, and its order is a decision 
 console.log("\n── 5. The adapter delegates; it does not re-implement the transport ──");
 {
   const adapter = readFileSync("src/lib/server/ai/provider/adapters/deepseek.ts", "utf8");
-  const code = adapter.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(adapter);
   check("the adapter makes no fetch of its own", !/\bfetch\s*\(/.test(code));
   /* Phase 4A INVERTS this one, deliberately. In 3B the adapter was a thin
      delegate and the endpoint, model and key all lived in core/transport.ts —
@@ -759,7 +760,7 @@ async function asyncChecks() {
     const routeSrc = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
     const dsSrc = readFileSync("src/lib/server/ai/provider/adapters/deepseek.ts", "utf8");
     const fbSrc = readFileSync("src/lib/server/ai/provider/adapters/openai-compatible.ts", "utf8");
-    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const strip = (t: string) => stripComments(t);
     check(
       "the tool loop asks for REASONING",
       /modelClass: "REASONING"/.test(strip(orchSrc)),

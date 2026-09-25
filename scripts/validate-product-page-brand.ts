@@ -21,6 +21,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -41,7 +42,7 @@ const FILES = [
   "src/app/products/[id]/print/page.tsx",
 ];
 
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const code = (src: string) => stripComments(src);
 
 /** Lines that write the brand as a word, after removing every allowed form. */
 function brandWords(src: string): string[] {

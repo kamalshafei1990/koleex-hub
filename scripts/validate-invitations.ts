@@ -28,6 +28,7 @@ import fs from "node:fs";
 import * as mrz from "../src/lib/invitations/mrz";
 import * as types from "../src/lib/invitations/types";
 import * as tpl from "../src/lib/invitations/templates";
+import { stripComments } from "./lib/strip-comments";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const R = (p: string) => path.resolve(__dirname, "..", p);
@@ -375,7 +376,7 @@ ok("the licence overlay closes on Escape", settingsSrc.includes('e.key === "Esca
 ok("watermark tile is a data: URI",
   /url\("data:image\/svg\+xml[;,]/.test(styles));
 ok(".inv-a4 uses background-color, never the shorthand",
-  !/\.inv-a4 \{[^}]*background:\s*#/.test(styles.replace(/\/\*[\s\S]*?\*\//g, "")));
+  !/\.inv-a4 \{[^}]*background:\s*#/.test(stripComments(styles, { lang: "css" })));
 ok("the licence page carries no watermark",
   /\.inv-licence-page \{[\s\S]*?background-image: none/.test(styles));
 const printPageSrc = fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8");

@@ -27,12 +27,13 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = join(__dirname, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 /* Comments are stripped before matching so a guard cannot trip on its own
    documentation (the products-i18n guard did exactly that once). */
-const code = (p: string) => read(p).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+const code = (p: string) => stripComments(read(p), { line: "all" });
 
 let pass = 0, fail = 0;
 function check(name: string, ok: boolean, detail = "") {
@@ -108,7 +109,7 @@ console.log("\nproducts-payload");
 {
   const s = read("src/lib/server/product-access.ts");
   const m = s.match(/export const LIST_PRODUCT_COLUMNS = \[([\s\S]*?)\]\.join/);
-  const cols = m ? m[1].replace(/\/\*[\s\S]*?\*\//g, "").split(",").map((x) => x.trim().replace(/^"|"$/g, "")).filter(Boolean) : [];
+  const cols = m ? stripComments(m[1], { line: "keep" }).split(",").map((x) => x.trim().replace(/^"|"$/g, "")).filter(Boolean) : [];
   check("LIST_PRODUCT_COLUMNS is a short projection", cols.length > 0 && cols.length <= 16, `${cols.length} columns`);
   check("LIST_PRODUCT_COLUMNS carries no prose columns", !cols.includes("excerpt") && !cols.includes("description") && !cols.includes("specs"));
 }

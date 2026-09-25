@@ -22,6 +22,7 @@
    parallel) — a static file cannot prove that and does not pretend to. */
 
 import { readFileSync } from "node:fs";
+import { stripComments } from "./lib/strip-comments";
 
 const ROUTE = "src/app/api/discuss/read/route.ts";
 const src = readFileSync(ROUTE, "utf8");
@@ -35,9 +36,6 @@ function ok(cond: boolean, msg: string) {
 
 /* Comments describe intent; they must never satisfy an assertion. Strip them
    before every grep, or a validator can be "passed" by a promise in prose. */
-function stripComments(s: string): string {
-  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-}
 
 /* Scope every assertion to the block it is about. A match anywhere in a
    500-line file proves nothing about the branch under test. */

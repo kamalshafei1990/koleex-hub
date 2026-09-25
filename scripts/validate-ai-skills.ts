@@ -29,6 +29,7 @@ import { deepseekEnabled, streamingFastLaneEnabled } from "../src/lib/server/ai/
 import { validateArgs, validationMode, isBlocking, formatValidationLine } from "../src/lib/server/ai/skills/validate";
 import { timeoutFor, raceTimeout, DEFAULT_TOOL_TIMEOUT_MS } from "../src/lib/server/ai/skills/timeout";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -187,7 +188,7 @@ console.log("\n── 6. Behaviour is unchanged where it must be ──");
      change makes the ledger match on it, this assertion is where that is
      caught. */
   const ledger = readFileSync("src/lib/server/ai/security/pending-actions.ts", "utf8");
-  const code = ledger.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(ledger);
   const consume = code.slice(code.indexOf("export async function consumePendingAction"));
   check(
     "consumePendingAction does not match on risk_class — so a re-classification cannot invalidate a pending row",
@@ -365,7 +366,7 @@ async function asyncChecks() {
     check("an abandoned handler that rejects later does not become an unhandled rejection", !unhandled);
 
     const reg = readFileSync("src/lib/server/ai-agent/tool-registry.ts", "utf8");
-    const regCode = reg.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const regCode = stripComments(reg);
     check("the dispatcher races the handler rather than awaiting it unbounded", /raceTimeout\(tool\.handler\(/.test(regCode));
     check("a timeout produces the same denied ToolResult shape a thrown handler does", /timed out after/.test(reg) && /permissionStatus: "denied"/.test(regCode));
     check("validation runs BEFORE the confirmation ledger, so a malformed confirm never consumes a pending row", regCode.indexOf("validateArgs(tool.parameters") < regCode.indexOf("consumePendingAction({"));

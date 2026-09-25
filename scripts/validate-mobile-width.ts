@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -191,7 +192,7 @@ ok("MainHeader sets the scroll flag from the Hub scroller",
    scrolled content, which reads exactly like the header washing over it.
    Strip comments before matching: the rule's own note quotes the reverted
    value while explaining it. */
-const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, "");
+const cssCode = stripComments(css, { lang: "css" });
 const paneItem = /\.kx-pane-progressive > i \{([^}]*)\}/.exec(cssCode)?.[1] ?? "";
 ok("blur layers cover the whole pane, header included",
   /inset:\s*0/.test(paneItem) && !/top:\s*var\(--kx-header-h/.test(paneItem));

@@ -18,6 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -26,7 +27,7 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 
 const BARREL = /from\s+["'](@\/lib\/product-schema|@\/lib\/product-schema\/registry|@\/lib\/product-schema\/schemas\/[^"']+)["']/;
-const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const strip = (src: string) => stripComments(src);
 const isClient = (src: string) => /^\s*["']use client["'];?/.test(src);
 
 function walk(dir: string, out: string[] = []): string[] {

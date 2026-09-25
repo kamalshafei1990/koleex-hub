@@ -24,6 +24,7 @@ import {
   GENERAL_SEARCH_MAX_CALLS,
   GENERAL_SEARCH_NOTE,
 } from "../src/lib/server/ai/core/general-search";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -39,8 +40,6 @@ function check(label: string, cond: boolean) {
 
 const CONNECTOR = "src/lib/server/ai/connectors/koleex-hub/index.ts";
 const read = (p: string) => readFileSync(p, "utf8");
-const stripComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 function ctxOf(opts: { userType?: string; tenant?: string | null; superAdmin?: boolean }): UserContext {
   return {

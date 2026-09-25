@@ -22,6 +22,7 @@ import { execSync } from "node:child_process";
 import { parsePriceTable, priceFor, costUsd, type PriceTable } from "../src/lib/server/ai/cost/prices";
 import { buildUsageRecord, formatUsageLine, recordUsage } from "../src/lib/server/ai/cost/meter";
 import { publicProviderLabel, withPublicProvider } from "../src/lib/server/ai/observability/public-provider";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -118,7 +119,7 @@ console.log("\n── 4. The line carries numbers, never text ──");
      prompt or reply text, and the formatter emits only the fields it knows —
      so this is checked at the source, not by eyeballing one sample line. */
   const meterSrc = readFileSync("src/lib/server/ai/cost/meter.ts", "utf8");
-  const meterCode = meterSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const meterCode = stripComments(meterSrc);
   check(
     "the meter's input type has no field for prompt, reply, message or content",
     !/\b(prompt|reply|message|content|text)\??:/.test(meterCode),
@@ -153,7 +154,7 @@ console.log("\n── 6. The turn reports who ACTUALLY served it ──");
      is wrong on every failover turn — and that label is what the audit trail
      stores. */
   const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
-  const orchCode = orch.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const orchCode = stripComments(orch);
   const predicted = (orchCode.match(/provider: activeProviderLabel\(\)/g) ?? []).length;
   const served = (orchCode.match(/provider: servedLabel\(/g) ?? []).length;
   check(
@@ -182,9 +183,7 @@ console.log("\n── 6. The turn reports who ACTUALLY served it ──");
      `stream_options` to explain why it is not sent, so a raw search for it
      "finds" the very thing it is asserting the absence of. Purity rules have
      to read code, or prose can violate them and prose can satisfy them. */
-  const transportCode = readFileSync("src/lib/server/ai/core/transport.ts", "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  const transportCode = stripComments(readFileSync("src/lib/server/ai/core/transport.ts", "utf8"));
   check(
     "the SSE reader captures usage BEFORE the empty-choices guard that would skip its frame",
     transportCode.includes("j.usage &&") &&
@@ -231,7 +230,7 @@ console.log("\n── 7. The browser is told the lane, not the vendor (N11) ─�
      path nobody remembered. The persisted ROW is sent too, and it carries the
      column verbatim — sanitising only `agent` would have left it exposed. */
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
-  const code = route.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(route);
   const sanitised = (code.match(/withPublicProvider\(/g) ?? []).length;
   const rawAgentSends = (code.match(/^\s+agent,$/gm) ?? []).length;
   const rawRowSends = (code.match(/message: assistantInsert\.data,/g) ?? []).length;
@@ -272,7 +271,7 @@ console.log("\n── 7b. EVERY AI route, not just the one the fix touched (N11,
   const offenders: string[] = [];
   for (const file of routes) {
     const raw = readFileSync(file, "utf8");
-    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const src = stripComments(raw);
     const lines = src.split("\n");
     for (let i = 0; i < lines.length; i++) {
       /* MATCH ANYWHERE ON THE LINE, not just at its start. The first version
@@ -333,7 +332,7 @@ console.log("\n── 7b. EVERY AI route, not just the one the fix touched (N11,
   const rowSenders: string[] = [];
   for (const file of routes) {
     const raw = readFileSync(file, "utf8");
-    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const src = stripComments(raw);
     if (!/from\("ai_messages"\)/.test(src)) continue;
     /* A route that reads or writes ai_messages and returns a row must show the
        transform somewhere. Routes that never return one (they only insert) are

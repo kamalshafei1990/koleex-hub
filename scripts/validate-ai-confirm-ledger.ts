@@ -15,6 +15,7 @@
 
 import { readFileSync } from "node:fs";
 import { normalizeArgs, hashArgs, riskClassFor, ledgerMode, turnPreviewKey, SAME_TURN_CONFIRM_MESSAGE } from "../src/lib/server/ai/security/pending-actions";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: string) {
@@ -100,7 +101,7 @@ console.log("\n── The MECHANISM, not just the maths (Phase 7 review) ──"
    egress scanning (ai-egress). This was the one gap. */
 {
   const registry = readFileSync("src/lib/server/ai-agent/tool-registry.ts", "utf8");
-  const code = registry.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(registry);
   const dispatchStart = code.indexOf("export async function dispatchTool(");
   const body = dispatchStart >= 0 ? code.slice(dispatchStart) : "";
 
@@ -161,7 +162,7 @@ console.log("\n── The model cannot agree for the user (deep check, 2026-09-2
   const handlerIdx = body.indexOf("tool.handler(ctx, args)");
   check(`a same-turn confirm is refused BEFORE the ledger and the handler (guard@${guardIdx}, ledger@${ledgerIdx}, handler@${handlerIdx})`,
     guardIdx > 0 && guardIdx < ledgerIdx && guardIdx < handlerIdx &&
-      /if \(args\.confirm === true && opts\.turnPreviews\?\.has\(turnPreviewKey\(name, args\)\)\) \{[\s\S]{0,120}message: SAME_TURN_CONFIRM_MESSAGE/.test(body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/console\.warn\([^)]*\);/g, "").replace(/const result: ToolResult = \{\s*ok: false,\s*permissionStatus: "allowed",\s*data: null,\s*/g, "")));
+      /if \(args\.confirm === true && opts\.turnPreviews\?\.has\(turnPreviewKey\(name, args\)\)\) \{[\s\S]{0,120}message: SAME_TURN_CONFIRM_MESSAGE/.test(stripComments(body, { line: "keep" }).replace(/console\.warn\([^)]*\);/g, "").replace(/const result: ToolResult = \{\s*ok: false,\s*permissionStatus: "allowed",\s*data: null,\s*/g, "")));
   check("…whatever the ledger's mode: the guard sits outside the mode check",
     guardIdx < body.indexOf("const mode = ledgerMode();"));
   check("every preview a turn makes is added to its set",

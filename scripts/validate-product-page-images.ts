@@ -21,6 +21,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -42,7 +43,7 @@ const FILES = [
 ];
 
 /* Strip comments so a guard cannot trip on its own documentation. */
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const code = (src: string) => stripComments(src);
 
 /** Every <img …> tag's src expression, in source order. */
 function imgSrcs(src: string): string[] {

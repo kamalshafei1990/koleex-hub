@@ -24,6 +24,7 @@ import {
   formatTurnReport,
 } from "../src/lib/server/ai/observability/turn-trace";
 import { newCallId } from "../src/lib/voice/session";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -37,7 +38,6 @@ function check(label: string, cond: boolean) {
   }
 }
 const read = (p: string) => readFileSync(p, "utf8");
-const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 console.log("\n── 1. Ids ──");
 {

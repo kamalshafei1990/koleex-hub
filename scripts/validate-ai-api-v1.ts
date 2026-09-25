@@ -19,6 +19,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -35,7 +36,7 @@ function check(label: string, cond: boolean) {
 const V1_ROOT = "src/app/api/v1/ai";
 const LEGACY_ROOT = "src/app/api/ai";
 const read = (p: string) => readFileSync(p, "utf8");
-const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const strip = (s: string) => stripComments(s);
 
 function routeFiles(root: string): string[] {
   const out: string[] = [];

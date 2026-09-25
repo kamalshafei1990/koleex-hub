@@ -22,13 +22,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
 const ok = (m: string) => console.log(`  ✓ ${m}`);
 const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}${why ? `\n      ${why}` : ""}`); };
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const code = (src: string) => stripComments(src);
 
 /* Excluded WITH A REASON. Adding a name here is a decision, not a shortcut. */
 const EXCLUDED_COLUMNS: Record<string, string> = {

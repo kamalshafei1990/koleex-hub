@@ -35,6 +35,7 @@ import {
 } from "../src/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "../src/lib/server/ai/core/canned-replies";
 import { conversationTitle } from "../src/lib/server/ai/conversation-title";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -66,9 +67,6 @@ const transport = read(TRANSPORT);
    mistaken for an import. Every purity check below runs on stripped code —
    this is the lesson from the audit-Issue-2 false positive, where /redact/i
    matched the word "requiredAction" and reported an open issue as fixed. */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-}
 const decideCode = stripComments(decide);
 const cannedCode = stripComments(canned);
 
@@ -275,7 +273,7 @@ check("world facts: the route treats one as live information", /isWorldFactQuery
    validate:ai-hub-connector §6, where the connector can be imported. */
 {
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
-  const body = route.replace(/\/\*[\s\S]*?\*\//g, "");
+  const body = stripComments(route, { line: "keep" });
   check("general lane: the tool list is asked for ONLY on the general lane", /const generalTools = fastLane === "general" \? generalLaneTools\(ctx\) : null;/.test(body));
   check("general lane: the tools ride the first call only when offered, with toolChoice auto", /\.\.\.\(generalTools \? \{ tools: generalTools, toolChoice: "auto" as const \} : \{\}\)/.test(body));
   check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && generalTools && out\.response\.toolCalls\.length > 0\)/.test(body));

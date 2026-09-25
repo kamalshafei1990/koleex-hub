@@ -14,6 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { createTenantCache, cacheKey } from "../src/lib/server/ai/cache/tenant-cache";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -119,7 +120,7 @@ console.log("\n── 3. Bounded memory: serverless has no durable RAM ──");
 console.log("\n── 4. The knowledge search uses it, correctly ──");
 {
   const src = readFileSync("src/lib/server/ai-knowledge.ts", "utf8");
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(src);
 
   check("searchApprovedUnits consults the cache", /approvedSearchCache\.get\(tenantId,/.test(code));
   check("and writes through it with the tenant, not a composed string", /approvedSearchCache\.set\(tenantId,/.test(code));
@@ -152,7 +153,7 @@ console.log("\n── 5. No bare cache may creep back in beside it ──");
    that IS keyed correctly. */
 {
   const src = readFileSync("src/lib/server/ai-knowledge.ts", "utf8");
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = stripComments(src);
   const maps = [...code.matchAll(/const (\w+)\s*=\s*new Map</g)].map((m) => m[1]);
   /* qaCache predates this phase and IS tenant-keyed — it stores by
      `tenantId ?? "platform"`. It is named here rather than pattern-matched, so

@@ -30,6 +30,7 @@ import {
   MIN_DELAY_MS,
   MIN_CHUNK_CHARS,
 } from "../src/lib/server/ai/streaming/reveal";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -44,8 +45,6 @@ function check(label: string, cond: boolean) {
 }
 
 const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
-const stripComments = (t: string) =>
-  t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const routeCode = stripComments(route);
 
 /* The pre-5A constants, kept so the improvement is a MEASURED difference

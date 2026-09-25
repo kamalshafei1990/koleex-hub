@@ -24,6 +24,7 @@ import {
   FRESHNESS_COLUMNS, FRESH_NEW, FRESH_PRICE, FRESH_UPDATED, FRESH_WINDOW_DAYS,
   foldFreshness, freshnessBadges, freshnessBits,
 } from "../src/lib/products-freshness";
+import { stripComments } from "./lib/strip-comments";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -73,7 +74,7 @@ const route = fs.readFileSync(path.join(ROOT, routePath), "utf8");
 const access = fs.readFileSync(path.join(ROOT, "src/lib/server/product-access.ts"), "utf8");
 
 /* Strip comments so a guard cannot trip on its own documentation. */
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const code = (src: string) => stripComments(src);
 
 const folds = (src: string) => (code(src).match(/foldFreshness\(/g) ?? []).length;
 expect(folds(route) >= 2, `${routePath} folds rows on both list paths (paged + unpaged) — ${folds(route)} call site(s)`,

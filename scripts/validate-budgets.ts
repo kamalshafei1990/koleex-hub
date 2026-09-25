@@ -32,6 +32,7 @@ import { listSchemas } from "../src/lib/product-schema/index";
 import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "../src/lib/product-schema/spec-i18n";
 import { MACHINE_KINDS } from "../src/lib/machine-kinds";
 import { FACETS, isValidFacet, FACET_I18N } from "../src/lib/product-facets";
+import { stripComments } from "./lib/strip-comments";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -466,9 +467,7 @@ console.log("\nE. Warm-start seeding (no double layout)");
      a comment that NAMES the banned class — which is exactly what the code
      explaining why it was removed has to do — failed the build. A guard you
      cannot document around is a guard someone eventually deletes. */
-  const cardBody = (cardStart < 0 ? "" : pl.slice(cardStart, cardEnd > 0 ? cardEnd : undefined))
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const cardBody = stripComments(cardStart < 0 ? "" : pl.slice(cardStart, cardEnd > 0 ? cardEnd : undefined), { line: "all" });
   if (cardStart < 0) bad("card", "ProductCard not found — did it move or get renamed?");
   !cardBody.includes("animate-pulse")
     ? ok("card reserves space without animating")
@@ -549,8 +548,7 @@ console.log("\nE. Warm-start seeding (no double layout)");
    in a browser — matching a selector is not the same as painting. */
 console.log("\nF. Aurora CSS state rules (specificity, not appearance)");
 {
-  const css = fs.readFileSync(path.join(ROOT, "src/app/globals.css"), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const css = stripComments(fs.readFileSync(path.join(ROOT, "src/app/globals.css"), "utf8"), { lang: "css" });
   const STATES = [":focus-within", ":focus-visible", ":focus", ":hover", ":active", ":checked"];
   const TAGS = "input|textarea|select|button|a|summary|label";
 

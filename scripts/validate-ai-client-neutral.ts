@@ -22,6 +22,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { resourceRef, type ResourceKind } from "../src/lib/server/ai/core/resource-ref";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -132,7 +133,7 @@ console.log("\n── 2. The quotation draft is resolvable by any client ──"
      so the negative test (deleting the actual use) still passed. Anchored on
      `.review_url` instead, which a type declaration cannot produce. */
   const readers = clientFiles.filter((f) =>
-    /\.review_url\b/.test(readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")),
+    /\.review_url\b/.test(stripComments(readFileSync(f, "utf8"))),
   );
   check(
     `a client component still READS review_url, which is why it is kept (${readers.map((f) => f.split("/").pop()).join(", ") || "none"})`,

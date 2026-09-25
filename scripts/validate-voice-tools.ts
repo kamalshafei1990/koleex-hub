@@ -53,6 +53,7 @@ import {
 } from "../src/lib/server/ai/voice/session-config";
 import { capQuestionsToBudget } from "../src/lib/server/ai-knowledge";
 import { describeFetchFailure } from "../src/lib/server/ai/voice/fetch-cause";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -903,7 +904,7 @@ console.log("\n── 5. The browser is a courier, not an authority (source read
      search provider itself, every permission check and every audit row would
      be optional. */
   check("the client calls no external service of its own",
-    !/https?:\/\//.test(client.replace(/\/\*[\s\S]*?\*\//g, "")));
+    !/https?:\/\//.test(stripComments(client, { line: "keep" })));
 
   const route = readFileSync("src/app/api/ai/voice/tool/route.ts", "utf8");
   check("the route checks the allow-list before dispatching anything",

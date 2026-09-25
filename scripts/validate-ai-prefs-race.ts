@@ -66,6 +66,7 @@
 
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -79,7 +80,7 @@ function check(label: string, cond: boolean) {
   }
 }
 
-const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const strip = (t: string) => stripComments(t);
 
 /* The three known writers, named individually. A path list rather than a glob
    so a NEW writer in a new file is not silently absorbed into the count. */
