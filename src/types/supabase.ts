@@ -1091,10 +1091,13 @@ export interface CalendarViewEvent extends CalendarEventRow {
   project_task_id?: string;
   leave_request_id?: string;
   /** Report deadlines: the report type, a day inside its period, and the
-   *  report to open (the one sent, or the draft started). */
-  report_key?: "daily" | "weekly" | "monthly";
+   *  report to open (the one sent, or the draft started). One an event asked
+   *  for also carries its request and what it is about. */
+  report_key?: string;
   report_date?: string;
   report_id?: string;
+  report_request?: string;
+  report_subject?: string;
 }
 
 export type CalendarAttendeeStatus = "invited" | "accepted" | "declined";

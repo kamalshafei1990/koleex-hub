@@ -392,4 +392,33 @@ export const reportsT: Translations = {
   "tpl.hr_exit_interview.s.liked": { en: "What they liked", zh: "喜欢的方面", ar: "اللي كان عاجبه" },
   "tpl.hr_exit_interview.s.improve": { en: "What we should improve", zh: "需要改进的地方", ar: "اللي نحسنه" },
   "tpl.hr_exit_interview.s.return": { en: "Would they come back?", zh: "是否愿意回来？", ar: "ممكن يرجع؟" },
+
+  "tpl.return_plan.name": { en: "Return plan", zh: "返岗计划", ar: "خطة الرجوع من الإجازة" },
+  "tpl.return_plan.desc": { en: "Your first day back: what you missed, your priorities, and the help you need.", zh: "返岗第一天：错过了什么、优先事项、需要的帮助。", ar: "أول يوم بعد الإجازة: فاتك إيه، وأولوياتك، ومحتاج مساعدة في إيه." },
+  "tpl.return_plan.s.away": { en: "While you were away", zh: "休假期间", ar: "وانت في الإجازة" },
+  "tpl.return_plan.s.catch_up": { en: "What you are catching up on", zh: "需要跟进的事项", ar: "هتلحق إيه" },
+  "tpl.return_plan.s.priorities": { en: "Your priorities this week", zh: "本周优先事项", ar: "أولوياتك الأسبوع ده" },
+  "tpl.return_plan.s.help": { en: "Help you need", zh: "需要的帮助", ar: "محتاج مساعدة في إيه" },
+
+  "tpl.attendance_note.name": { en: "Late or absence note", zh: "迟到/缺勤说明", ar: "توضيح تأخير أو غياب" },
+  "tpl.attendance_note.desc": { en: "A short note on a late or missed day: why, and how the work was covered.", zh: "对迟到或缺勤的简短说明：原因，以及工作如何安排。", ar: "كلمتين عن يوم تأخير أو غياب: ليه، والشغل اتغطى إزاي." },
+  "tpl.attendance_note.s.what": { en: "The day", zh: "日期与情况", ar: "اليوم" },
+  "tpl.attendance_note.s.reason": { en: "Why", zh: "原因", ar: "السبب" },
+  "tpl.attendance_note.s.covered": { en: "How the work was covered", zh: "工作如何安排", ar: "الشغل اتغطى إزاي" },
+  "tpl.attendance_note.s.correction": { en: "If the record is wrong, what is right", zh: "如记录有误，正确情况是", ar: "لو التسجيل غلط، الصح إيه" },
+
+  "tpl.probation_review.name": { en: "Probation review", zh: "试用期评估", ar: "تقييم فترة الاختبار" },
+  "tpl.probation_review.desc": { en: "Before a probation ends: how they did and your recommendation. Confidential, for HR.", zh: "试用期结束前：表现如何及你的建议。保密，发送给人事。", ar: "قبل ما فترة الاختبار تخلص: عمل إيه، ورأيك. سري، للـ HR." },
+  "tpl.probation_review.s.employee": { en: "Employee", zh: "员工", ar: "الموظف" },
+  "tpl.probation_review.s.performance": { en: "How they did", zh: "工作表现", ar: "أداؤه كان عامل إزاي" },
+  "tpl.probation_review.s.strengths": { en: "Strengths", zh: "优点", ar: "نقاط القوة" },
+  "tpl.probation_review.s.concerns": { en: "Concerns", zh: "需要改进之处", ar: "ملاحظات أو مخاوف" },
+  "tpl.probation_review.s.recommendation": { en: "Recommendation: confirm, extend or end", zh: "建议：转正、延长或终止", ar: "رأيك: تثبيت، تمديد، ولا إنهاء" },
+
+  /* The facts an event's report starts with (Phase 3D), in the writer's language. */
+  "req.leave": { en: "Leave {from}–{to} ({days} days)", zh: "休假 {from}–{to}（{days} 天）", ar: "إجازة من {from} لحد {to} ({days} أيام)" },
+  "req.visit": { en: "Visit {from}–{to}", zh: "来访 {from}–{to}", ar: "زيارة من {from} لحد {to}" },
+  "req.late": { en: "Late on {day}: in at {time}, {min} min late", zh: "{day} 迟到：{time} 打卡，迟到 {min} 分钟", ar: "تأخير يوم {day}: دخلت الساعة {time}، متأخر {min} دقيقة" },
+  "req.absent": { en: "Absent on {day}: no clock-in", zh: "{day} 缺勤：无打卡记录", ar: "غياب يوم {day}: مفيش تسجيل حضور" },
+  "req.probation": { en: "{name} — probation ends {day}", zh: "{name} — 试用期于 {day} 结束", ar: "{name} — فترة الاختبار بتخلص {day}" },
 };

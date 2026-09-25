@@ -204,7 +204,9 @@ export function summarize(rows: BoardRow[]): BoardSummary {
 }
 
 export interface DueItem {
-  key: ObligationKey;
+  /** The report type: daily / weekly / monthly, or the one an event asked
+   *  for (Phase 3D). */
+  key: string;
   periodKey: string;
   /** A day inside the period — what "Write it now" creates the report for. */
   date: string;
@@ -212,6 +214,9 @@ export interface DueItem {
   state: "due" | "missing";
   /** A draft already started for it. */
   draftId?: string;
+  /** Asked for by an event: the request, and what it is about. */
+  request?: string;
+  subject?: string;
 }
 
 /** What the person owes now: what is missing from the last week (oldest

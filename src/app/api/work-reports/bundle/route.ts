@@ -61,7 +61,7 @@ export async function GET(req: Request) {
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
      (warning, exit interview) needs HR·create. */
-  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.hrOnly || hrCreate === null).map((tpl) => tpl.key);
+  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && (!tpl.hrOnly || hrCreate === null)).map((tpl) => tpl.key);
   const nameOf = new Map(people.map((p) => [p.id, p]));
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
 

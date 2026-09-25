@@ -43,6 +43,11 @@
  *      calendar down, "write it" opens once, and the Home greeting's line
  *      costs no request, stays inside the quote's space and out of the Home
  *      bundle, and never says a report is due once it is sent.
+ *   §15 reports events ask for (Phase 3D) — every deadline on the writer's
+ *      own calendar (leave, a finished customer meeting or visit, a late or
+ *      absent day as HR's sheet reads it, a probation ending), asked once,
+ *      cancelled only when its event stopped being true, a report linked to
+ *      its request and stamped on its first send, nudged once per kind.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -71,6 +76,9 @@ import { REPORT_DUE_WORDS, reportDueLine } from "../src/lib/home/report-due-line
 import type { HomeDueItem } from "../src/lib/home/report-due";
 import { calendarT } from "../src/lib/translations/calendar";
 import { dayLanes } from "../src/lib/calendar-utils";
+import {
+  EVENT_TEMPLATE, eventDue, prefillSections, requestIdOf, requestIsOwed, requestNudges, requestState, requestSubject, type RequestFacts, type RequestRow,
+} from "../src/lib/reports/events";
 import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
@@ -168,7 +176,7 @@ console.log("\n§3 templates and their words");
   for (const [k, e] of Object.entries(reportsT)) if (holes(e.en ?? "") !== holes(e.zh ?? "") || holes(e.en ?? "") !== holes(e.ar ?? "")) missing.push(`${k}: placeholders differ between languages`);
   expect(missing.length === 0, `${REPORT_TEMPLATES.length} templates, every name / description / section in en, zh and ar`, [...new Set(missing)].slice(0, 12).join(", "));
   const phase1 = ["daily", "weekly_plan", "weekly", "monthly", "customer_visit", "supplier_visit", "decision_memo", "escalation", "handover", "free", "hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview"];
-  eq(REPORT_TEMPLATES.map((t) => t.key), phase1, "Phase 1 ships the approved ten + the four HR types, in that order");
+  eq(REPORT_TEMPLATES.map((t) => t.key), [...phase1, "return_plan", "attendance_note", "probation_review"], "Phase 1 ships the approved ten + the four HR types, then the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -874,21 +882,21 @@ console.log("\n§13 reminders and escalation");
   /* The job, as its code states it. */
   const NU = "src/lib/server/reports/nudges.ts";
   rule("a nudge is CLAIMED in the ledger before anyone is told", NU,
-    (c) => { const claim = c.indexOf('from("work_report_nudges")'); const tell = c.indexOf("await notifyLite("); return claim > 0 && tell > claim && /ignoreDuplicates: true/.test(c) && /const mine = planned\.filter\(\(n\) => won\.has\(/.test(c) ? [] : ["a notification can go out without a claim"]; },
-    (src) => src.replace("const mine = planned.filter((n) => won.has(`${n.authorId}|${n.key}|${n.periodKey}|${n.kind}`));", "const mine = planned;"));
+    (c) => { const claim = c.indexOf('from("work_report_nudges")'); const tell = c.indexOf("await notifyLite("); return claim > 0 && tell > claim && /ignoreDuplicates: true/.test(c) && /mine = planned\.filter\(\(n\) => won\.has\(/.test(c) ? [] : ["a notification can go out without a claim"]; },
+    (src) => src.replace("mine = planned.filter((n) => won.has(`${n.authorId}|${n.key}|${n.periodKey}|${n.kind}`));", "mine = planned;"));
   rule("a preview claims and sends nothing", NU,
-    (c) => (/if \(opts\.dryRun\) \{ run\.planned!\.push\(\.\.\.planned\); return; \}/.test(c) ? [] : ["a dry run can claim or send"]),
-    (src) => src.replace("if (opts.dryRun) { run.planned!.push(...planned); return; }", "if (opts.dryRun) { run.planned!.push(...planned); }"));
+    (c) => (/if \(opts\.dryRun\) \{ run\.planned!\.push\(\.\.\.planned, \.\.\.planReq\); return; \}/.test(c) ? [] : ["a dry run can claim or send"]),
+    (src) => src.replace("if (opts.dryRun) { run.planned!.push(...planned, ...planReq); return; }", "if (opts.dryRun) { run.planned!.push(...planned, ...planReq); }"));
   rule("nothing is sent before tracking starts, and either switch pauses its kind", NU,
     (c) => (/if \(!settings\.trackingFrom \|\| \(!settings\.reminders && !settings\.escalations\)\) return;/.test(c) && /n\.kind === "reminder" && !settings\.reminders/.test(c) && /n\.kind === "escalation" && !settings\.escalations/.test(c) ? [] : ["a paused kind can still be sent"]),
     (src) => src.replace('if (n.kind === "escalation" && !settings.escalations) continue;', ""));
   rule("an escalation never goes to the author themself", NU,
-    (c) => (/\.filter\(\(x\) => x !== o\.accountId\)/.test(c) ? [] : ["the author can be told about their own report as the manager"]),
-    (src) => src.replace(".filter((x) => x !== o.accountId)", ""));
+    (c) => (/const escalateTo = \(author: string\) => \{ const m = tree\.chainOf\(author\)\[0\]; return \(m \? \[m\] : admins\)\.filter\(\(x\) => x !== author\); \};/.test(c) && (c.match(/escalateTo\(/g) ?? []).length >= 2 ? [] : ["the author can be told about their own report as the manager"]),
+    (src) => src.replace(".filter((x) => x !== author)", ""));
   const CR = "src/app/api/cron/report-reminders/route.ts";
   rule("the job's answer carries counts, never a name", CR,
-    (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations \}/.test(c) ? [] : ["the job can answer with names"]),
-    (src) => src.replace("return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations }", "return NextResponse.json({ ok: true, ...run }"));
+    (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations, asked: events\.created, cancelled: events\.cancelled \}/.test(c) ? [] : ["the job can answer with names"]),
+    (src) => src.replace("return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations, asked: events.created, cancelled: events.cancelled }", "return NextResponse.json({ ok: true, ...run, events }"));
   rule("the preview is a signed-in super admin's only", CR,
     (c) => (/const auth = await requireAuth\(req\);[\s\S]*?if \(!auth\.is_super_admin\) return NextResponse\.json\(\{ error: "forbidden" \}, \{ status: 403 \}\);[\s\S]*?dryRun: true/.test(c) ? [] : ["the preview is open"]),
     (src) => src.replace('if (!auth.is_super_admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });', ""));
@@ -946,8 +954,8 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
   /* The route and the Calendar, as their code states them. */
   const EV = "src/app/api/calendar/events/route.ts";
   rule("a Reports failure leaves the rest of the calendar standing", EV,
-    (c) => (/await loadDeadlines\(auth\.tenant_id, accountId, w\.from, w\.to\)\.catch\(/.test(c) ? [] : ["the report mirror can fail the whole calendar"]),
-    (src) => src.replace(/\.catch\(\(e: unknown\) => \{\n\s*console\.error\("\[api\/calendar\/events\] report deadlines:"[\s\S]*?return \[\];\n\s*\}\)/, ""));
+    (c) => (/loadDeadlines\(auth\.tenant_id, accountId, w\.from, w\.to\)\.catch\(failed\(/.test(c) && /loadRequestDeadlines\(accountId, w\.from, w\.to\)\.catch\(failed\(/.test(c) && /const failed = \(what: string\) => \(e: unknown\) => \{[\s\S]*?return \[\];/.test(c) ? [] : ["the report mirror can fail the whole calendar"]),
+    (src) => src.replace('.catch(failed("report requests"))', ""));
   rule("a draft's id rides only on its author's own calendar", EV,
     (c) => (/report_id: d\.reportId \|\| \(viewingOwn \? d\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a draft can be linked from someone else's calendar"]),
     (src) => src.replace("(viewingOwn ? d.draftId : undefined)", "d.draftId"));
@@ -969,7 +977,7 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     (src) => src.replace("events={shownEvents}", "events={events}"));
   const RA = "src/components/reports/app/ReportsApp.tsx";
   rule("\"write it\" starts once: the link's parameters go before the report starts, and it replaces the stop", RA,
-    (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key, [^\n]*\{ replace: true \}\);/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /REPORT_TEMPLATES\.some\(\(x\) => x\.key === key\)/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
+    (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key,[\s\S]*?replace: true/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /url\.searchParams\.delete\("request"\);/.test(m[1]) && /REPORT_TEMPLATES\.some\(\(x\) => x\.key === key\)/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
     (src) => src.replace('      window.history.replaceState(window.history.state, "", url.toString());\n      if (!REPORT_TEMPLATES', "      if (!REPORT_TEMPLATES"));
 
   /* Side by side: the daily and the weekly fall due at the same moment every
@@ -1048,6 +1056,145 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
   const calKeys = ["report.daily", "report.weekly", "report.monthly", "report.sent", "report.late", "report.missing"];
   const badCal = calKeys.filter((k) => (["en", "zh", "ar"] as const).some((l) => !calendarT[k]?.[l]));
   expect(badCal.length === 0, "the calendar's report words speak en / zh / ar", badCal.join(", "));
+}
+
+/* ── §15 reports events ask for ────────────────────────────────────────── */
+console.log("\n§15 reports that events ask for");
+{
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8, "Africa/Cairo": 3 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(["2026-10-01", "2026-10-02"]), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-09-21" };
+  const eg: PersonClock = { weekend: [5, 6], holidays: new Set(), leave: new Set(), tz: "Africa/Cairo", workEnd: "17:00", from: "2026-09-21" };
+  const leaveDays = (from: string, to: string) => { const out = new Set<string>(); for (let d = from; d <= to; d = new Date(Date.parse(`${d}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)) out.add(d); return out; };
+  const onLeave = (c: PersonClock, from: string, to: string): PersonClock => ({ ...c, leave: leaveDays(from, to) });
+
+  /* What each event asks for. */
+  eq(EVENT_TEMPLATE, { leave_handover: "handover", leave_return: "return_plan", crm_meeting: "customer_visit", invitation_visit: "customer_visit", attendance: "attendance_note", probation: "probation_review" },
+    "leave → handover and return plan, a customer meeting or visit → a visit report, a late/absent day → a note, a probation → the manager's review");
+
+  /* Leave: 12–16 Oct in Shanghai. */
+  const leave: RequestFacts = { rule: "leave_handover", from: "2026-10-12", to: "2026-10-16", days: 5 };
+  const cnLeave = onLeave(cn, "2026-10-12", "2026-10-16");
+  eq(eventDue(leave, cnLeave, "2026-10-08T02:00:00.000Z", clock), { day: "2026-10-09", at: "2026-10-09T10:00:00.000Z" }, "the handover is due at the end of the last working day before the leave (Friday 18:00)");
+  eq(eventDue(leave, cnLeave, "2026-10-09T08:30:00.000Z", clock), null, "asked 90 minutes before that deadline it is too late to ask — no handover request");
+  eq(eventDue({ ...leave, from: "2026-10-05", to: "2026-10-09" }, onLeave(cn, "2026-10-05", "2026-10-09"), "2026-09-28T01:00:00.000Z", clock)?.day, "2026-09-30",
+    "a leave after the 1–2 October holidays and the weekend is handed over on Wednesday 30 September");
+  eq(eventDue({ ...leave, rule: "leave_return" }, cnLeave, "2026-10-19T01:00:00.000Z", clock), { day: "2026-10-19", at: "2026-10-19T10:00:00.000Z" }, "the return plan is due at the end of the first working day back (Monday)");
+  eq(eventDue({ ...leave, rule: "leave_return" }, cnLeave, "2026-10-19T09:30:00.000Z", clock)?.day, "2026-10-20", "asked with half an hour left, it moves to the next working day — never due within the hour");
+
+  /* A customer meeting or visit. */
+  const crm: RequestFacts = { rule: "crm_meeting", customer: "ACME", contact: "Mr. Li", title: "Demo", day: "2026-09-25" };
+  eq(eventDue(crm, cn, "2026-09-25T09:00:00.000Z", clock), { day: "2026-09-28", at: "2026-09-28T10:00:00.000Z" }, "a Friday meeting's visit report is due Monday 18:00 in Shanghai");
+  eq(eventDue({ ...crm, day: "2026-09-24" }, eg, "2026-09-24T12:00:00.000Z", clock), { day: "2026-09-27", at: "2026-09-27T14:00:00.000Z" }, "a Thursday meeting in Cairo: Sunday 17:00, past the Friday–Saturday weekend");
+  eq(eventDue({ rule: "invitation_visit", customer: "Delegation", from: "2026-09-10", to: "2026-09-24" }, cn, "2026-09-25T01:00:00.000Z", clock)?.day, "2026-09-25",
+    "visitors who left on Thursday: the report is due Friday, the next working day");
+
+  /* A late or absent day. */
+  const late: RequestFacts = { rule: "attendance", kind: "late", day: "2026-09-24", clockIn: "09:40", lateMin: 25 };
+  eq(eventDue(late, cn, "2026-09-24T02:00:00.000Z", clock), { day: "2026-09-24", at: "2026-09-24T10:00:00.000Z" }, "a late morning's note is due the same evening");
+  eq(eventDue(late, cn, "2026-09-24T09:30:00.000Z", clock)?.day, "2026-09-25", "noticed at 17:30, it is due the next working day");
+  eq(eventDue({ rule: "attendance", kind: "absent", day: "2026-09-23" }, cn, "2026-09-24T00:30:00.000Z", clock)?.day, "2026-09-24", "an absence (read the day after) is due that working day");
+
+  /* A probation ending on Friday 23 October. */
+  const prob: RequestFacts = { rule: "probation", employee: "Nancy", endDay: "2026-10-23" };
+  eq(eventDue(prob, cn, "2026-10-09T02:00:00.000Z", clock), { day: "2026-10-16", at: "2026-10-16T10:00:00.000Z" }, "the review is due a week before the probation ends");
+  eq(eventDue(prob, cn, "2026-10-19T02:00:00.000Z", clock)?.day, "2026-10-19", "asked late, it is due the soonest working day…");
+  eq(eventDue(prob, cn, "2026-10-24T02:00:00.000Z", clock), null, "…and never after the probation has ended");
+
+  /* What lists say, and what a report starts with. */
+  eq([requestSubject(leave), requestSubject(crm), requestSubject(late), requestSubject(prob)], ["12/10–16/10", "ACME", "24/09", "Nancy"], "a list line is a name or the dates, in no language");
+  const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? "";
+  const ar = (k: string) => (reportsT[k]?.ar as string | undefined) ?? "";
+  eq(prefillSections(leave, en), { notes: "Leave 12/10–16/10 (5 days)" }, "a handover starts with the leave's dates");
+  eq(prefillSections(crm, en), { who: "ACME — Mr. Li", purpose: "Demo (25/09)" }, "a visit report starts with the customer, the contact and the meeting");
+  eq(prefillSections({ rule: "invitation_visit", customer: "Visitor Co", visitor: "Ahmed", from: "2026-09-10", to: "2026-09-24", exhibition: "Canton Fair" }, en),
+    { who: "Visitor Co — Ahmed", purpose: "Visit 10/09–24/09 · Canton Fair" }, "an invitation's report starts with who came, when, and the fair");
+  eq(prefillSections(late, en), { what: "Late on 24/09: in at 09:40, 25 min late" }, "a late note starts with the day and the clock-in");
+  eq(prefillSections({ rule: "attendance", kind: "absent", day: "2026-09-23" }, en), { what: "Absent on 23/09: no clock-in" }, "an absence note says there was no clock-in");
+  eq(prefillSections(prob, en), { employee: "Nancy — probation ends 23/10" }, "a probation review names the person and the end date");
+  eq(prefillSections(leave, ar), { notes: "إجازة من 12/10 لحد 16/10 (5 أيام)" }, "and in the writer's language");
+
+  /* A request's life. */
+  const row = (o: Partial<RequestRow>): RequestRow => ({
+    id: "r1", template_key: "customer_visit", rule_key: "crm_meeting", subject: "ACME", event_day: "2026-09-25", due_day: "2026-09-28", due_at: "2026-09-28T10:00:00.000Z",
+    status: "open", sent_at: null, report_id: null, reminded_at: null, escalated_at: null, created_at: "2026-09-25T09:00:00.000Z", ...o,
+  });
+  eq([
+    requestState(row({ sent_at: "2026-09-28T09:00:00.000Z" }), "2026-09-29T00:00:00.000Z"), requestState(row({ sent_at: "2026-09-28T11:00:00.000Z" }), "2026-09-29T00:00:00.000Z"),
+    requestState(row({}), "2026-09-28T11:00:00.000Z"), requestState(row({}), "2026-09-28T09:00:00.000Z"), requestState(row({ status: "cancelled" }), "2026-09-28T09:00:00.000Z"),
+  ], ["sent", "late", "missing", "due", "cancelled"], "sent on time, sent late, missing, still due, cancelled");
+  eq([
+    requestIsOwed(row({}), "2026-09-26T00:00:00.000Z"), requestIsOwed(row({}), "2026-09-24T00:00:00.000Z"), requestIsOwed(row({}), "2026-09-30T00:00:00.000Z"),
+    requestIsOwed(row({}), "2026-10-20T00:00:00.000Z"), requestIsOwed(row({ sent_at: "2026-09-28T09:00:00.000Z" }), "2026-09-28T09:30:00.000Z"),
+  ], [true, false, true, false, false], "\"Due from you\" lists it three days ahead and two weeks after, never once sent");
+  const kinds = (r: RequestRow, now: string) => requestNudges(r, cn, now, clock).map((n) => n.kind);
+  eq(kinds(row({}), "2026-09-28T09:10:00.000Z"), ["reminder"], "reminded an hour before its deadline");
+  eq(kinds(row({ created_at: "2026-09-28T08:40:00.000Z" }), "2026-09-28T09:10:00.000Z"), [], "not when it was asked less than 90 minutes before — the ask said so");
+  eq(kinds(row({ reminded_at: "2026-09-28T09:00:00.000Z" }), "2026-09-28T09:10:00.000Z"), [], "a reminder already claimed is never sent again");
+  eq(kinds(row({}), "2026-09-29T10:00:00.000Z"), ["escalation"], "missing: the manager hears at the end of the next working day");
+  eq(kinds(row({ sent_at: "2026-09-28T09:00:00.000Z" }), "2026-09-29T10:00:00.000Z"), [], "a sent one is never nudged");
+  eq(kinds(row({ status: "cancelled" }), "2026-09-29T10:00:00.000Z"), [], "nor a cancelled one");
+  eq([requestIdOf("req:0f9c7c2e-1b7a-4b5e-9a4e-2f0f3a9b8c7d"), requestIdOf("2026-09-25"), requestIdOf("req:../../x")], ["0f9c7c2e-1b7a-4b5e-9a4e-2f0f3a9b8c7d", null, null], "a report knows its request only by a well-formed req:<id>");
+
+  /* The job, the routes and the reads, as their code states them. */
+  const EVS = "src/lib/server/reports/events.ts";
+  rule("each request is created once, and only what this run inserted is announced", EVS,
+    (c) => { const up = c.indexOf('from("work_report_requests")\n      .upsert('); const tell = c.indexOf("await announce(tenantId, rows, clocks, now);"); return up > 0 && tell > up && /onConflict: "rule_key,source_key,account_id", ignoreDuplicates: true/.test(c) ? [] : ["a request can be asked twice"]; },
+    (src) => src.replace('{ onConflict: "rule_key,source_key,account_id", ignoreDuplicates: true }', '{ onConflict: "rule_key,source_key,account_id" }'));
+  rule("a source that failed to read never cancels anything", EVS,
+    (c) => (/try \{ candidates\.push\(\.\.\.\(await read\(\)\)\); rules\.forEach\(\(r\) => scanned\.add\(r\)\); \}/.test(c) && /\.in\("rule_key", Array\.from\(scanned\)\)/.test(c) ? [] : ["a failed read can cancel requests"]),
+    (src) => src.replace("try { candidates.push(...(await read())); rules.forEach((r) => scanned.add(r)); }", "rules.forEach((r) => scanned.add(r)); try { candidates.push(...(await read())); }"));
+  rule("a request is cancelled only open, unsent and inside its source's window", EVS,
+    (c) => (/\.filter\(\(r\) => inWindow\(r\.rule_key, String\(r\.event_day\)\.slice\(0, 10\), today\)\)/.test(c) && /update\(\{ status: "cancelled", updated_at: now \}\)\.in\("id", gone\.map\(\(r\) => r\.id\)\)\.eq\("status", "open"\)\.is\("sent_at", null\)/.test(c) ? [] : ["an old or a sent request can be cancelled"]),
+    (src) => src.replace("\n      .filter((r) => inWindow(r.rule_key, String(r.event_day).slice(0, 10), today));", ";"));
+  rule("super admins owe nothing an event asks, except a probation review", EVS,
+    (c) => (/if \(writer\.isSuperAdmin && c\.rule !== "probation"\) continue;/.test(c) ? [] : ["a super admin can be asked for event reports"]),
+    (src) => src.replace('    if (writer.isSuperAdmin && c.rule !== "probation") continue;\n', ""));
+  rule("late and absent days are read through HR's sheet, the one reading of attendance", EVS,
+    (c) => (/await buildAttendanceSheet\(\{ employeeId: o\.employeeId/.test(c) && !/hr_attendance_records/.test(c) ? [] : ["attendance is read a second way"]),
+    (src) => src.replace("await buildAttendanceSheet({ employeeId: o.employeeId", "await (supabaseServer.from(\"hr_attendance_records\") as never as typeof buildAttendanceSheet)({ employeeId: o.employeeId"));
+  rule("nothing is asked before tracking starts; a stand-in start date is for dry runs only", EVS,
+    (c) => (/const trackingFrom = opts\.dryRun && opts\.trackingFrom \? opts\.trackingFrom : t\.tracking_from/.test(c) && /if \(!trackingFrom\) continue;/.test(c) ? [] : ["events can be asked for before the owner starts tracking"]),
+    (src) => src.replace("const trackingFrom = opts.dryRun && opts.trackingFrom ? opts.trackingFrom : t.tracking_from", "const trackingFrom = opts.trackingFrom ? opts.trackingFrom : t.tracking_from"));
+  rule("a report sent for a request stamps its first send, for its own writer only", EVS,
+    (c) => (/update\(\{ sent_at: at \}\)\.eq\("id", id\)\.eq\("account_id", authorId\)\.is\("sent_at", null\)/.test(c) ? [] : ["a later version can move the on-time stamp, or another person's request can be stamped"]),
+    (src) => src.replace('update({ sent_at: at }).eq("id", id).eq("account_id", authorId).is("sent_at", null)', 'update({ sent_at: at }).eq("id", id)'));
+  const WR = "src/app/api/work-reports/route.ts";
+  rule("a report starts from a request only if it is the viewer's own, open one for that type", WR,
+    (c) => (/select\("id, template_key, event_day, prefill, status"\)\s*\.eq\("id", body\.request\)\.eq\("account_id", auth\.account_id\)\.maybeSingle\(\)/.test(c) && /if \(!r \|\| r\.status !== "open" \|\| r\.template_key !== tpl\.key\) return NextResponse\.json\(\{ error: "not_found" \}, \{ status: 404 \}\);/.test(c) ? [] : ["anyone's request can start a report"]),
+    (src) => src.replace('.eq("id", body.request).eq("account_id", auth.account_id).maybeSingle()', '.eq("id", body.request).maybeSingle()'));
+  rule("one report per request: a second start opens the same one", WR,
+    (c) => { const a = c.indexOf('.eq("period_key", periodKey)'); const b = c.indexOf("if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });", a); const d = c.indexOf("return createDraft(auth, tpl, { start: day, end: day, key: periodKey }"); return a > 0 && b > a && d > b ? [] : ["a request can collect several reports"]; },
+    (src) => src.replace("    if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });\n    const lang", "    const lang"));
+  rule("a request-only type (the probation review) never starts on its own", WR,
+    (c) => (/if \(tpl\.requestOnly\) return NextResponse\.json\(\{ error: "request_only" \}, \{ status: 403 \}\);/.test(c) ? [] : ["anyone can write a probation review about anyone"]),
+    (src) => src.replace('  if (tpl.requestOnly) return NextResponse.json({ error: "request_only" }, { status: 403 });\n', ""));
+  rule("sending marks the request sent", "src/app/api/work-reports/[id]/submit/route.ts",
+    (c) => { const send = c.indexOf('.update({ status: "submitted"'); const mark = c.indexOf("await markRequestSent(report.period_key, report.id, auth.account_id, now);"); return send > 0 && mark > send ? [] : ["a request stays owed after its report is sent"]; },
+    (src) => src.replace("  await markRequestSent(report.period_key, report.id, auth.account_id, now);\n", ""));
+  rule("a request's nudges are claimed on its row, and a super admin writer is never escalated", "src/lib/server/reports/nudges.ts",
+    (c) => (/update\(\{ reminded_at: now \}\)\.eq\("id", n\.requestId!\)\.is\("reminded_at", null\)/.test(c) && /update\(\{ escalated_at: now, escalated_to: n\.recipients \}\)\.eq\("id", n\.requestId!\)\.is\("escalated_at", null\)/.test(c) && /n\.kind === "escalation" && \(!settings\.escalations \|\| isAdmin\.has\(r\.account_id\)\)/.test(c) ? [] : ["a request can be nudged twice, or a super admin escalated"]),
+    (src) => src.replace('.update({ reminded_at: now }).eq("id", n.requestId!).is("reminded_at", null)', '.update({ reminded_at: now }).eq("id", n.requestId!)'));
+  rule("the job asks for event reports before it nudges", "src/app/api/cron/report-reminders/route.ts",
+    (c) => { const a = c.indexOf("const events = await runReportEvents();"); const b = c.indexOf("const run = await runReportNudges();"); return a > 0 && b > a ? [] : ["a request asked now waits a run for its reminder"]; },
+    (src) => src.replace("  const events = await runReportEvents();\n  const run = await runReportNudges();", "  const run = await runReportNudges();\n  const events = await runReportEvents();"));
+  rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
+    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && \(!tpl\.hrOnly \|\| hrCreate === null\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
+    (src) => src.replace("!tpl.requestOnly && (!tpl.hrOnly || hrCreate === null)", "(!tpl.hrOnly || hrCreate === null)"));
+  rule("a confidential request is never linked from someone else's calendar", "src/app/api/calendar/events/route.ts",
+    (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
+    (src) => src.replace("(viewingOwn || !reportTemplate(r.template_key)?.confidential ? r.report_id : null)", "r.report_id"));
+  rule("what a person owes includes their requests even with no routine report", "src/lib/server/reports/obligations.ts",
+    (c) => (/const \[routine, asked\] = await Promise\.all\(\[loadRoutineDue\(auth, me, trackingFrom, now\), loadRequestsDue\(me\.accountId, now\)\]\);/.test(c) ? [] : ["event requests are dropped for someone with no daily"]),
+    (src) => src.replace("loadRequestsDue(me.accountId, now)]", "Promise.resolve([] as DueItem[])]"));
+  const mig = read("supabase/migrations/20260925_reports_event_requests.sql");
+  expect(/UNIQUE \(rule_key, source_key, account_id\)/.test(mig) && /ALTER TABLE work_report_requests ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig) && !/\bDROP\b/i.test(mig),
+    "a request is one row per rule × event × person, RLS-on with no policy, and the migration only adds");
+  eq(classifyNotificationActivity("report_request"), "reports_activity", "the ask rides the Work reports switch the writer owns");
+  const newKeys = ["customer_visit", "handover", "return_plan", "attendance_note", "probation_review"];
+  expect(newKeys.every((k) => ["en", "zh", "ar"].every((l) => !!(calendarT[`report.${k}`] as Record<string, string> | undefined)?.[l])), "the calendar names every report an event asks for, in three languages");
+  expect(["return_plan", "attendance_note", "probation_review"].every((k) => reportTemplate(k)) && reportTemplate("probation_review")!.confidential && reportTemplate("probation_review")!.requestOnly === true && reportTemplate("probation_review")!.recipients === "hr",
+    "the three new types exist; the probation review is confidential, for HR, and request-only");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

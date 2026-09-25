@@ -96,34 +96,40 @@ export default function ReportsApp() {
   /* A new report — or, for a day / week / month that already has one, that
      one (the server returns it), so "Write it now" on an owed report opens
      the draft already started. */
-  const start = useCallback(async (key: string, date?: string, opts?: { replace?: boolean }) => {
-    setCreating(date ? `${key}|${date}` : key);
+  const start = useCallback(async (key: string, date?: string, opts?: { replace?: boolean; request?: string }) => {
+    setCreating(opts?.request ?? (date ? `${key}|${date}` : key));
     setCreateError(null);
-    const res = await createReport(key, date ?? localToday());
+    const res = await createReport(key, date ?? localToday(), opts?.request ? { request: opts.request, lang } : undefined);
     setCreating(null);
     if (res.ok) {
       if (opts?.replace) router.replace(`/reports/${res.data.id}`);
       else router.push(`/reports/${res.data.id}`);
     } else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
-  }, [router, t]);
+  }, [router, t, lang]);
 
-  /* /reports?write=<type>&date=<day> — "write it" from the Calendar or the
-     Home greeting (Phase 3C) opens that day's, week's or month's report
-     (the draft already started, if there is one). The parameters go first,
-     so Back or a refresh never starts it twice, and the report REPLACES
-     this stop in the history: Back returns to where the tap came from. Read
-     once the navigation has committed (the ?tab= trap above). */
+  /* /reports?write=<type>&date=<day>[&request=<id>] — "write it" from the
+     Calendar, the Home greeting (Phase 3C) or an event's notification (3D)
+     opens that day's, week's or month's report, or the one the event asked
+     for (the draft already started, if there is one). The parameters go
+     first, so Back or a refresh never starts it twice, and the report
+     REPLACES this stop in the history: Back returns to where the tap came
+     from. Read once the navigation has committed (the ?tab= trap above). */
   useEffect(() => {
     void Promise.resolve().then(() => {
       const url = new URL(window.location.href);
       const key = url.searchParams.get("write");
       if (!key) return;
       const date = url.searchParams.get("date");
+      const request = url.searchParams.get("request");
       url.searchParams.delete("write");
       url.searchParams.delete("date");
+      url.searchParams.delete("request");
       window.history.replaceState(window.history.state, "", url.toString());
       if (!REPORT_TEMPLATES.some((x) => x.key === key)) return;
-      void start(key, date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, { replace: true });
+      void start(key, date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, {
+        replace: true,
+        request: request && /^[0-9a-f-]{36}$/i.test(request) ? request : undefined,
+      });
     });
   }, [start]);
 
@@ -180,11 +186,13 @@ export default function ReportsApp() {
 
 /* ── Home: what to write, and what arrived ─────────────────────────────── */
 
+type StartFn = (key: string, date?: string, opts?: { request?: string }) => void;
+
 function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
   t: T; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
-  onStart: (key: string, date?: string) => void; onOpenInbox: () => void;
+  onStart: StartFn; onOpenInbox: () => void;
 }) {
-  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly).map((x) => x.key)), [bundle]);
+  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly).map((x) => x.key)), [bundle]);
   const due = bundle?.due ?? [];
   return (
     <div className="space-y-4">
@@ -247,8 +255,9 @@ function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
 
 /* ── Due from you (Phase 3A): what is missing, then what falls due soon ── */
 
-function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating: string | null; onStart: (key: string, date?: string) => void }) {
-  const when = (d: DueItem) => d.key === "daily" ? dmyDate(d.periodKey)
+function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating: string | null; onStart: StartFn }) {
+  /* What an event asked for (Phase 3D) says what it is about instead. */
+  const when = (d: DueItem) => d.request ? (d.subject ?? "") : d.key === "daily" ? dmyDate(d.periodKey)
     : d.key === "weekly" ? (() => { const p = periodFor("weekly", d.date); return periodLabel(p.start, p.end); })()
     : `${d.periodKey.slice(5, 7)}/${d.periodKey.slice(0, 4)}`;
   return (
@@ -256,7 +265,7 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
       <h2 id="kx-rep-due" className="text-[14px] font-semibold text-[var(--text-primary)]">{t("due.title")}</h2>
       <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {due.map((d) => {
-          const busy = creating === `${d.key}|${d.date}`;
+          const busy = creating === (d.request ?? `${d.key}|${d.date}`);
           return (
             <li key={`${d.key}|${d.periodKey}`} className={`flex items-center gap-3 rounded-xl border p-3 ${d.state === "missing" ? "border-red-500/30 bg-red-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"}`}>
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={d.key} size={14} /></span>
@@ -266,7 +275,7 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
                   {d.state === "missing" ? t("due.missing") : t("due.by").replace("{when}", dmyTime(d.dueAt))}
                 </span>
               </span>
-              <button type="button" disabled={!!creating} onClick={() => onStart(d.key, d.date)}
+              <button type="button" disabled={!!creating} onClick={() => onStart(d.key, d.date, d.request ? { request: d.request } : undefined)}
                 className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
                 {busy && <SpinnerIcon size={11} />}{d.draftId ? t("due.continue") : t("due.write")}
               </button>

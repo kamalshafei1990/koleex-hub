@@ -17,13 +17,17 @@
 import { useEffect, useState } from "react";
 
 export interface HomeDueItem {
-  key: "daily" | "weekly" | "monthly";
+  /** daily / weekly / monthly, or the report an event asked for (Phase 3D). */
+  key: string;
   periodKey: string;
   /** A day inside the period — what "write it" creates the report for. */
   date: string;
   dueAt: string;
   state: "due" | "missing";
   draftId?: string;
+  /** Asked for by an event: the request, and what it is about. */
+  request?: string;
+  subject?: string;
 }
 export interface HomeDueLine { text: string; href: string }
 type Build = (items: HomeDueItem[], lang: string) => HomeDueLine | null;

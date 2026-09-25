@@ -18,6 +18,7 @@ import { requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { listPeople, loadOrgTree, type OrgTree, type PersonLite } from "@/lib/server/reports/core";
 import { loadPolicyRows, loadWorkCalendar, pickPolicy, resolveEmployeeCountries, wallClockToIso } from "@/lib/server/work-calendar";
 import { isoWeekKey } from "@/lib/reports/templates";
+import { EVENT_LIMITS, REQUEST_COLS, requestIsOwed, requestState, type RequestRow, type RequestState } from "@/lib/reports/events";
 import {
   OBLIGATION_KEYS, addDays, boardRow, deadlinesIn, dueList, effectiveObliged, mondayOf, summarize, weekDays,
   type BoardRow, type BoardSummary, type Clock, type Deadline, type DueItem, type ObligationKey, type Obliged, type PersonClock, type Sent,
@@ -198,7 +199,8 @@ export async function loadBoard(auth: ServerAuthContext, anyDay: string): Promis
   return { week: { key: isoWeekKey(monday), start: monday, days }, trackingFrom, canSetUp: setUp, rows, summary: summarize(rows) };
 }
 
-/** What the viewer owes now (the Reports home's "Due from you"). */
+/** What the viewer owes now (the Reports home's "Due from you", the Home
+ *  greeting): the routine reports, then what events asked them for. */
 export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promise<DueItem[]> {
   const [t, trackingFrom] = await Promise.all([tree ?? loadOrgTree(auth.tenant_id), loadTrackingFrom(auth.tenant_id)]);
   /* Before tracking starts nothing is owed — the person and their calendar
@@ -206,9 +208,15 @@ export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promis
   if (!trackingFrom) return [];
   const [me] = await loadOwners(t, new Set([auth.account_id]));
   if (!me) return [];
+  const now = new Date().toISOString();
+  const [routine, asked] = await Promise.all([loadRoutineDue(auth, me, trackingFrom, now), loadRequestsDue(me.accountId, now)]);
+  return [...routine, ...asked].sort((a, b) => (a.state !== b.state ? (a.state === "missing" ? -1 : 1) : Date.parse(a.dueAt) - Date.parse(b.dueAt)));
+}
+
+async function loadRoutineDue(auth: ServerAuthContext, me: Owner, trackingFrom: string, now: string): Promise<DueItem[]> {
   const obliged = effectiveObliged(me, me.exceptions);
   if (!obliged.daily && !obliged.weekly && !obliged.monthly) return [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = now.slice(0, 10);
   const from = addDays(today, -45);
   const to = addDays(today, 10);
   const [clocks, { sent, drafts }] = await Promise.all([
@@ -218,7 +226,28 @@ export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promis
   const clock = clocks.get(me.accountId);
   if (!clock) return [];
   const key = (k: ObligationKey, pk: string) => `${me.accountId}|${k}|${pk}`;
-  return dueList({ obliged, clock }, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, new Date().toISOString(), obligationClock);
+  return dueList({ obliged, clock }, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, now, obligationClock);
+}
+
+/** The requests events made of this person (Phase 3D) that "Due from you"
+ *  lists: due within a few days, or missing for up to two weeks. */
+async function loadRequestsDue(accountId: string, now: string): Promise<DueItem[]> {
+  const t = Date.parse(now);
+  const { data, error } = await supabaseServer.from("work_report_requests").select(REQUEST_COLS)
+    .eq("account_id", accountId).eq("status", "open").is("sent_at", null)
+    .gte("due_at", new Date(t - EVENT_LIMITS.missingDays * 86_400_000).toISOString())
+    .lte("due_at", new Date(t + EVENT_LIMITS.soonDays * 86_400_000).toISOString()).limit(50);
+  if (error) { console.error("[reports] requests due:", error.message); return []; }
+  const rows = ((data ?? []) as RequestRow[]).filter((r) => requestIsOwed(r, now));
+  if (!rows.length) return [];
+  const { data: drafts } = await supabaseServer.from("work_reports").select("id, period_key")
+    .eq("author_account_id", accountId).eq("status", "draft").in("period_key", rows.map((r) => `req:${r.id}`));
+  const draftOf = new Map(((drafts ?? []) as Array<{ id: string; period_key: string }>).map((d) => [d.period_key, d.id]));
+  return rows.map((r) => ({
+    key: r.template_key, periodKey: `req:${r.id}`, date: String(r.event_day).slice(0, 10), dueAt: r.due_at,
+    state: requestState(r, now) === "missing" ? "missing" : "due",
+    draftId: draftOf.get(`req:${r.id}`), request: r.id, subject: r.subject,
+  }));
 }
 
 /** One person's report deadlines whose moment falls in [fromIso, toIso) —
@@ -243,6 +272,23 @@ export async function loadDeadlines(tenantId: string | null, accountId: string, 
   if (!clock) return [];
   const key = (k: ObligationKey, pk: string) => `${me.accountId}|${k}|${pk}`;
   return deadlinesIn({ obliged, clock }, fromIso, toIso, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, new Date().toISOString(), obligationClock);
+}
+
+/** What events asked one person for (Phase 3D) whose deadline falls in
+ *  [fromIso, toIso) — the calendar shows them beside the routine reports.
+ *  Cancelled ones never; a sent one keeps its place, marked sent or late. */
+export async function loadRequestDeadlines(accountId: string, fromIso: string, toIso: string): Promise<Array<RequestRow & { state: RequestState; draftId?: string }>> {
+  const { data, error } = await supabaseServer.from("work_report_requests").select(REQUEST_COLS)
+    .eq("account_id", accountId).eq("status", "open").gte("due_at", fromIso).lt("due_at", toIso).limit(500);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as RequestRow[];
+  const owed = rows.filter((r) => !r.sent_at);
+  const { data: drafts } = owed.length
+    ? await supabaseServer.from("work_reports").select("id, period_key").eq("author_account_id", accountId).eq("status", "draft").in("period_key", owed.map((r) => `req:${r.id}`))
+    : { data: [] as Array<{ id: string; period_key: string }> };
+  const draftOf = new Map(((drafts ?? []) as Array<{ id: string; period_key: string }>).map((d) => [d.period_key, d.id]));
+  const now = new Date().toISOString();
+  return rows.map((r) => ({ ...r, state: requestState(r, now), draftId: r.sent_at ? undefined : draftOf.get(`req:${r.id}`) }));
 }
 
 export interface SetupRow { person: PersonLite; isSuperAdmin: boolean; hasTeam: boolean; defaults: Obliged; exceptions: Partial<Obliged> }

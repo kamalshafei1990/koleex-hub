@@ -94,8 +94,10 @@ async function call<T>(url: string, init?: RequestInit): Promise<Result<T>> {
 export const fetchReportsBundle = () => call<ReportsBundle>("/api/work-reports/bundle");
 export const fetchReport = (id: string) => call<ReportDetail>(`/api/work-reports/${id}`);
 
-export const createReport = (templateKey: string, date: string, title?: string) =>
-  call<{ id: string; existing: boolean }>("/api/work-reports", { method: "POST", body: JSON.stringify({ template_key: templateKey, date, title }) });
+/** `request`: start the report an event asked for (Phase 3D) — it opens
+ *  with the event's facts, worded in `lang`. */
+export const createReport = (templateKey: string, date: string, opts?: { title?: string; request?: string; lang?: string }) =>
+  call<{ id: string; existing: boolean }>("/api/work-reports", { method: "POST", body: JSON.stringify({ template_key: templateKey, date, ...opts }) });
 
 /** `keepalive` lets the last save finish while the tab is closing. */
 export const saveDraft = (id: string, patch: { title?: string; date?: string; sections?: ReportSectionValue[]; to?: string[]; cc?: string[]; confidential?: boolean }, opts?: { keepalive?: boolean }) =>

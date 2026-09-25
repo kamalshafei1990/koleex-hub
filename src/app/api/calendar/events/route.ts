@@ -6,7 +6,8 @@ import { requireAuth, requireModuleAccess, requireModuleAction, type ServerAuthC
 import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
 import { sanitizeEventInput } from "@/lib/server/calendar-access";
-import { loadDeadlines } from "@/lib/server/reports/obligations";
+import { loadDeadlines, loadRequestDeadlines } from "@/lib/server/reports/obligations";
+import { reportTemplate } from "@/lib/reports/templates";
 import { reportsT } from "@/lib/translations/reports";
 import type { CalendarViewEvent } from "@/types/supabase";
 
@@ -280,11 +281,36 @@ async function leaveMirror(auth: ServerAuthContext, accountId: string, w: Window
  *  draft is only ever its author's to open, so its id rides on their own
  *  calendar only. */
 async function reportMirror(auth: ServerAuthContext, accountId: string, viewingOwn: boolean, w: Window): Promise<CalendarViewEvent[]> {
-  const items = await loadDeadlines(auth.tenant_id, accountId, w.from, w.to).catch((e: unknown) => {
-    console.error("[api/calendar/events] report deadlines:", e instanceof Error ? e.message : e);
+  const failed = (what: string) => (e: unknown) => {
+    console.error(`[api/calendar/events] ${what}:`, e instanceof Error ? e.message : e);
     return [];
-  });
-  return items.map((d) => mirrorRow({
+  };
+  const [items, asked] = await Promise.all([
+    loadDeadlines(auth.tenant_id, accountId, w.from, w.to).catch(failed("report deadlines")),
+    loadRequestDeadlines(accountId, w.from, w.to).catch(failed("report requests")),
+  ]);
+  const color = (state: string) => state === "sent" || state === "late" ? MUTED : state === "missing" ? DANGER : ACCENT;
+  /* What events asked for (Phase 3D) sits beside the routine reports, named
+     with what it is about. A confidential one (a probation review) is never
+     linked from someone else's calendar. */
+  const requests = asked.map((r) => mirrorRow({
+    id: `request:${r.id}`,
+    accountId, tenantId: auth.tenant_id,
+    title: `${(reportsT[`tpl.${r.template_key}.name`]?.en as string | undefined) ?? "Report"} · ${r.subject}`,
+    description: null,
+    start_at: r.due_at,
+    end_at: new Date(Date.parse(r.due_at) + 30 * 60_000).toISOString(),
+    all_day: false,
+    color: color(r.state),
+    event_type: "reminder",
+    source: "report",
+    source_kind: r.state,
+    extra: {
+      report_key: r.template_key, report_date: String(r.event_day).slice(0, 10), report_request: r.id, report_subject: r.subject,
+      report_id: (viewingOwn || !reportTemplate(r.template_key)?.confidential ? r.report_id : null) || (viewingOwn ? r.draftId : undefined) || undefined,
+    },
+  }));
+  return [...requests, ...items.map((d) => mirrorRow({
     id: `report:${d.key}:${d.periodKey}`,
     accountId, tenantId: auth.tenant_id,
     title: (reportsT[`tpl.${d.key}.name`]?.en as string | undefined) ?? "Report",
@@ -297,7 +323,7 @@ async function reportMirror(auth: ServerAuthContext, accountId: string, viewingO
     source: "report",
     source_kind: d.state,
     extra: { report_key: d.key, report_date: d.date, report_id: d.reportId || (viewingOwn ? d.draftId : undefined) || undefined },
-  }));
+  }))];
 }
 
 /** A dated item's [start, end] as YYYY-MM-DD, or null when it has no date or

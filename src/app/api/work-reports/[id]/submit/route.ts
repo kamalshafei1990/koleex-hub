@@ -15,6 +15,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { missingSections, normalizeSections, reportTemplate } from "@/lib/reports/templates";
 import { REPORT_COLS, listPeople, loadForViewer, requireReportsUser, type ReportRow } from "@/lib/server/reports/core";
 import { notifyReportSubmitted } from "@/lib/server/reports/notify";
+import { markRequestSent } from "@/lib/server/reports/events";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await supabaseServer.from("work_reports").update({ superseded: true, updated_at: now })
       .eq("id", report.previous_id).eq("author_account_id", auth.account_id);
   }
+  /* Written for what an event asked (Phase 3D): the request is now sent. */
+  await markRequestSent(report.period_key, report.id, auth.account_id, now);
 
   const people = await listPeople(auth.tenant_id);
   const authorName = people.find((p) => p.id === auth.account_id)?.name ?? "A colleague";

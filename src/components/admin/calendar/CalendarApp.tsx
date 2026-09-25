@@ -86,7 +86,7 @@ function reportHref(e: CalendarViewEvent, own: boolean): string {
   if (!own) return "/reports?tab=compliance";
   if (sent) return "/reports?tab=mine";
   if ((e.source_kind === "due" || e.source_kind === "missing") && e.report_key && e.report_date) {
-    return `/reports?write=${e.report_key}&date=${e.report_date}`;
+    return `/reports?write=${e.report_key}&date=${e.report_date}${e.report_request ? `&request=${e.report_request}` : ""}`;
   }
   return "/reports";
 }
@@ -179,7 +179,8 @@ export default function CalendarApp() {
     if (e.source !== "report" || !e.report_key) return e;
     const k = e.source_kind;
     const state = k === "sent" || k === "late" || k === "missing" ? ` · ${t(`report.${k}`)}` : "";
-    return { ...e, title: `${t(`report.${e.report_key}`)}${state}` };
+    const about = e.report_subject ? ` · ${e.report_subject}` : "";
+    return { ...e, title: `${t(`report.${e.report_key}`, e.title)}${about}${state}` };
   }), [events, t]);
 
   /* A guest's calendar changes when the organizer moves or cancels a

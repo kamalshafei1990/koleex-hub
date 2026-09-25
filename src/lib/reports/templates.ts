@@ -45,6 +45,9 @@ export interface ReportTemplateDef {
   hrOnly?: boolean;
   /** The free report takes the author's own title. */
   customTitle?: boolean;
+  /** Only an event asks for it (Phase 3D: the probation review): never
+   *  offered in the list, and the server starts one only from its request. */
+  requestOnly?: boolean;
 }
 
 const t = (id: string, kind: ReportSectionKind, required = false): ReportSectionDef => ({ id, kind, required });
@@ -82,6 +85,15 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("incident", "text", true), t("rule", "text"), t("action", "text", true)] },
   { key: "hr_exit_interview", family: "hr", icon: "users", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, hrOnly: true,
     sections: [t("employee", "text", true), t("reasons", "list", true), t("liked", "list"), t("improve", "list"), t("return", "text")] },
+  /* ── Asked for by events (Phase 3D, owner's picks 25 Sep 2026) ──
+     Anyone may also start the first two themselves; the probation review
+     only ever comes from its request, to the employee's manager. */
+  { key: "return_plan", family: "work", icon: "arrow-left", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [t("away", "text"), t("catch_up", "list", true), t("priorities", "list", true), t("help", "text")] },
+  { key: "attendance_note", family: "work", icon: "fingerprint", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [t("what", "text"), t("reason", "text", true), t("covered", "text"), t("correction", "text")] },
+  { key: "probation_review", family: "hr", icon: "award", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, requestOnly: true,
+    sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
 export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "memos", "hr"];

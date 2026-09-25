@@ -13,6 +13,12 @@ export const REPORT_DUE_WORDS: Record<string, Record<Lang, string>> = {
   daily: { en: "daily report", zh: "日报", ar: "تقريرك اليومي" },
   weekly: { en: "weekly report", zh: "周报", ar: "تقريرك الأسبوعي" },
   monthly: { en: "monthly report", zh: "月报", ar: "تقريرك الشهري" },
+  customer_visit: { en: "customer visit report", zh: "客户拜访报告", ar: "تقرير زيارة العميل" },
+  handover: { en: "handover", zh: "工作交接", ar: "تسليم الشغل" },
+  return_plan: { en: "return plan", zh: "返岗计划", ar: "خطة الرجوع من الإجازة" },
+  attendance_note: { en: "late or absence note", zh: "迟到/缺勤说明", ar: "توضيح التأخير أو الغياب" },
+  probation_review: { en: "probation review", zh: "试用期评估", ar: "تقييم فترة الاختبار" },
+  report: { en: "report", zh: "报告", ar: "التقرير" },
   today: { en: "Your {report} is due today at {time}", zh: "你的{report}今天 {time} 截止", ar: "{report} مطلوب اليوم قبل {time}" },
   on: { en: "Your {report} is due {date} at {time}", zh: "你的{report}于 {date} {time} 截止", ar: "{report} مطلوب يوم {date} قبل {time}" },
   missing: { en: "Your {report} for {period} is missing", zh: "你的{report}（{period}）尚未提交", ar: "{report} عن {period} لم يُرسل بعد" },
@@ -30,8 +36,10 @@ const addDay = (ymd: string, n: number) => {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 };
 
-/** The period a missing report was for, the way the Reports app writes it. */
+/** The period a missing report was for, the way the Reports app writes it;
+ *  for one an event asked for, what it is about. */
 function periodText(d: HomeDueItem): string {
+  if (d.request) return d.subject ?? "";
   if (d.key === "daily") return dm(d.periodKey);
   if (d.key === "weekly") return `${dm(d.date)}–${dm(addDay(d.date, 6))}`;
   return `${d.periodKey.slice(5, 7)}/${d.periodKey.slice(0, 4)}`;
@@ -48,17 +56,20 @@ export function reportDueLine(items: HomeDueItem[], lang: string, now = Date.now
   if (items.length > 1) return { text: `${w("many").replace("{n}", String(items.length))} — ${w("open")}`, href: "/reports" };
   const d = items[0];
   const at = new Date(d.dueAt);
+  const name = w(d.key in REPORT_DUE_WORDS ? d.key : "report");
+  /* One an event asked for names what it is about beside the report. */
+  const report = d.request && d.subject ? `${name} (${d.subject})` : name;
   let lead: string;
   if (d.state === "missing" || at.getTime() <= now) {
-    lead = w("missing").replace("{report}", w(d.key)).replace("{period}", periodText(d));
+    lead = w("missing").replace("{report}", d.request ? name : report).replace("{period}", periodText(d));
   } else {
     const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
     lead = at.toDateString() === new Date(now).toDateString()
-      ? w("today").replace("{report}", w(d.key)).replace("{time}", time)
-      : w("on").replace("{report}", w(d.key)).replace("{date}", `${pad(at.getDate())}/${pad(at.getMonth() + 1)}`).replace("{time}", time);
+      ? w("today").replace("{report}", report).replace("{time}", time)
+      : w("on").replace("{report}", report).replace("{date}", `${pad(at.getDate())}/${pad(at.getMonth() + 1)}`).replace("{time}", time);
   }
   return {
     text: `${lead} — ${w(d.draftId ? "finish" : "write")}`,
-    href: d.draftId ? `/reports/${d.draftId}` : `/reports?write=${d.key}&date=${d.date}`,
+    href: d.draftId ? `/reports/${d.draftId}` : `/reports?write=${d.key}&date=${d.date}${d.request ? `&request=${d.request}` : ""}`,
   };
 }
