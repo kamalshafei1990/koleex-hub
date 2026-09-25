@@ -1,14 +1,15 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   inbox — client helpers for `inbox_messages` (+ the membership-request
-   review action the /inbox page performs).
+   inbox — client helpers for `inbox_messages`: the feed, the unread count,
+   realtime, and the read / archive state of your own rows.
 
    This module is the seam between the UI (NotificationBell, /inbox) and
    the gated inbox routes. Reads go through /api/inbox/feed, writes through
    /api/inbox/mutate; both are session-scoped server-side, so no account id
-   the client passes is ever trusted. Membership requests are CREATED by the
-   public /api/support/membership-request route, never from here.
+   the client passes is ever trusted. Nothing here SENDS a notification: the
+   Hub's writers do that server-side (lib/notification-types), and the mail
+   client that sent them from the browser was retired with Koleex Mail.
 
    All calls are resilient: a network trip returns an empty list / a stub
    failure so the always-mounted bell never throws.
@@ -16,15 +17,11 @@
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { cachedGet, invalidateCachedGet } from "./client-cache";
-import { uploadToStorage } from "./storage-client";
 import { isTransientFetch, warnOnce } from "./util/transient-fetch";
 import type {
-  AccountRow,
   InboxMessageRow,
   InboxMessageWithSender,
 } from "@/types/supabase";
-
-const MEMBERSHIP_REQUESTS = "membership_requests";
 
 /* RLS realtime-lockdown P2: every WRITE to inbox_messages goes through the
    gated /api/inbox/mutate route (service-role, session-scoped) so the table's
@@ -40,7 +37,7 @@ async function inboxMutate(payload: Record<string, unknown>): Promise<{ ok: bool
     });
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok) {
-      /* markRead / markAllRead / archive / send all change the unread count —
+      /* markRead / markUnread / archive all change the unread count —
          drop the coalesced copy so the next recount is fresh. */
       invalidateCachedGet("/api/inbox/feed"); // unread + unreadTasks + messages
       return { ok: true, data: j };
@@ -87,46 +84,7 @@ function isMissingTable(message: string): boolean {
   );
 }
 
-/* ── Membership requests ─────────────────────────────────────────────── */
-
-export async function updateMembershipRequestStatus(
-  id: string,
-  status: "approved" | "rejected" | "archived",
-  reviewedBy: string,
-): Promise<boolean> {
-  const { error } = await supabase
-    .from(MEMBERSHIP_REQUESTS)
-    .update({
-      status,
-      reviewed_by: reviewedBy,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-  if (error) {
-    console.error("[Inbox] Update membership request:", error.message);
-    return false;
-  }
-  return true;
-}
-
 /* ── Inbox messages ──────────────────────────────────────────────────── */
-
-/** List everything in a user's inbox that isn't archived, newest first. */
-export async function fetchInboxMessages(
-  accountId: string,
-  options: { includeArchived?: boolean; limit?: number; slim?: boolean } = {},
-): Promise<InboxMessageWithSender[]> {
-  const { includeArchived = false, limit = 100, slim = false } = options;
-  void accountId; // recipient scope comes from the session server-side
-  const params: Record<string, string> = { limit: String(limit) };
-  if (includeArchived) params.archived = "1";
-  /* slim: badge/bell projection — no sender avatar (base64 data-URIs blow the
-     payload ~12×), metadata trimmed to { type }. Use for any surface that does
-     not render the avatar or attachments. */
-  if (slim) params.slim = "1";
-  const data = await inboxFeed<InboxMessageWithSender[]>("messages", params);
-  return data ?? [];
-}
 
 /** Same request, but a FAILED fetch is `null`, not `[]`. A list that is
  *  already on screen must survive a dropped connection: turning a failure
@@ -259,14 +217,6 @@ export async function markMessageRead(id: string): Promise<boolean> {
   return r.ok;
 }
 
-/** Clear `read_at` so the message shows up as unread again. Used by the
- *  list row's "mark unread" hover action. */
-export async function markMessageUnread(id: string): Promise<boolean> {
-  const r = await inboxMutate({ action: "markUnread", id });
-  if (!r.ok) console.error("[Inbox] Mark unread:", r.error);
-  return r.ok;
-}
-
 /** Several rows in ONE request — a folded group, or a tab's "mark all
  *  read" (never one request per row). */
 export async function markMessagesRead(ids: string[]): Promise<boolean> {
@@ -286,19 +236,6 @@ export async function markMessagesUnread(ids: string[]): Promise<boolean> {
 export async function archiveMessages(ids: string[]): Promise<boolean> {
   if (ids.length === 0) return true;
   const r = await inboxMutate({ action: "archive", ids });
-  if (!r.ok) console.error("[Inbox] Archive:", r.error);
-  return r.ok;
-}
-
-export async function markAllRead(accountId: string): Promise<boolean> {
-  void accountId; // identity comes from the session server-side
-  const r = await inboxMutate({ action: "markAllRead" });
-  if (!r.ok) console.error("[Inbox] Mark all read:", r.error);
-  return r.ok;
-}
-
-export async function archiveMessage(id: string): Promise<boolean> {
-  const r = await inboxMutate({ action: "archive", id });
   if (!r.ok) console.error("[Inbox] Archive:", r.error);
   return r.ok;
 }
@@ -325,138 +262,3 @@ export interface InboxProductRef {
   image: string | null;
 }
 
-/** Upload a file to the shared `media` storage bucket under an
- *  `inbox-attachments/` prefix. Returns the structured record ready to
- *  be embedded in `inbox_messages.metadata.attachments`. */
-export async function uploadInboxAttachment(
-  file: File,
-): Promise<InboxAttachment | null> {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filePath = `inbox-attachments/${Date.now()}_${safeName}`;
-  const result = await uploadToStorage("media", filePath, file, {
-    cacheControl: "3600",
-  });
-  if (!result.ok) {
-    console.error("[Inbox] Attachment upload:", result.error);
-    return null;
-  }
-  /* `media` is a public bucket, so this is unreachable today — but an
-     attachment with no URL is not an attachment, so refuse it rather than
-     persist a null. */
-  if (result.data.publicUrl === null) {
-    console.error("[Inbox] Attachment upload: bucket has no public URL");
-    return null;
-  }
-  return {
-    name: file.name,
-    url: result.data.publicUrl,
-    file_path: result.data.path,
-    size: file.size,
-    type: file.type || "application/octet-stream",
-  };
-}
-
-/** Send a direct message from one account to another. Accepts optional
- *  `metadata` for attachments, product references, or any future structured
- *  payload — the column is JSONB so we can evolve the shape without
- *  migrations. */
-export async function sendMessage(input: {
-  senderId: string;
-  recipientId: string;
-  subject: string;
-  body: string;
-  link?: string | null;
-  metadata?: Record<string, unknown>;
-}): Promise<{ ok: true; message: InboxMessageRow } | { ok: false; error: string }> {
-  void input.senderId; // sender comes from the session server-side
-  const r = await inboxMutate({
-    action: "send",
-    recipientId: input.recipientId,
-    subject: input.subject,
-    body: input.body,
-    link: input.link ?? null,
-    metadata: input.metadata ?? {},
-  });
-  if (!r.ok) {
-    console.error("[Inbox] Send message:", r.error);
-    return { ok: false, error: r.error ?? "Send failed" };
-  }
-  return { ok: true, message: (r.data as { message: InboxMessageRow }).message };
-}
-
-/** Fan out one message to every active account matching a role name
- *  (e.g. "Sales" to reach everyone in sales). Returns the count actually
- *  inserted. Accepts the same optional `metadata` payload as sendMessage. */
-export async function broadcastToRole(input: {
-  senderId: string;
-  roleName: string;
-  subject: string;
-  body: string;
-  link?: string | null;
-  excludeSelf?: boolean;
-  metadata?: Record<string, unknown>;
-}): Promise<number> {
-  void input.senderId; // sender + recipient resolution happen server-side
-  const r = await inboxMutate({
-    action: "broadcastToRole",
-    roleName: input.roleName,
-    subject: input.subject,
-    body: input.body,
-    link: input.link ?? null,
-    excludeSelf: input.excludeSelf ?? false,
-    metadata: input.metadata ?? {},
-  });
-  if (!r.ok) {
-    console.error("[Inbox] Broadcast:", r.error);
-    return 0;
-  }
-  return ((r.data as { count?: number }).count) ?? 0;
-}
-
-/** Accounts that can receive messages — used by the compose picker.
- *  Only internal users (not customers / suppliers). */
-export async function fetchMessageableAccounts(): Promise<
-  Array<{
-    id: string;
-    username: string;
-    full_name: string | null;
-    name_alt: string | null;
-    avatar_url: string | null;
-    role_name: string | null;
-  }>
-> {
-  const { data, error } = await supabase
-    .from("accounts")
-    .select(
-      `
-      id,
-      username,
-      avatar_url,
-      person:people ( full_name, name_alt, avatar_url ),
-      role:roles ( name )
-      `,
-    )
-    .eq("user_type", "internal")
-    .eq("status", "active")
-    .order("username");
-  if (error) {
-    console.error("[Inbox] Fetch recipients:", error.message);
-    return [];
-  }
-  type Row = AccountRow & {
-    person: { full_name: string; name_alt: string | null; avatar_url: string | null } | Array<{ full_name: string; name_alt: string | null; avatar_url: string | null }> | null;
-    role: { name: string } | Array<{ name: string }> | null;
-  };
-  return (data as unknown as Row[]).map((row) => {
-    const person = Array.isArray(row.person) ? row.person[0] ?? null : row.person;
-    const role = Array.isArray(row.role) ? row.role[0] ?? null : row.role;
-    return {
-      id: row.id,
-      username: row.username,
-      full_name: person?.full_name ?? null,
-      name_alt: person?.name_alt ?? null,
-      avatar_url: row.avatar_url ?? person?.avatar_url ?? null,
-      role_name: role?.name ?? null,
-    };
-  });
-}

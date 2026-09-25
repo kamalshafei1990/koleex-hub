@@ -552,7 +552,7 @@ export const accountsT: Translations = {
   "acc.mod.Translator":            { en: "Translator",                  zh: "翻译",              ar: "المترجم" },
   "acc.mod.Database":              { en: "Database",                    zh: "数据库",             ar: "قاعدة البيانات" },
   "acc.mod.Commercial Policy":     { en: "Commercial Policy",           zh: "商务政策",           ar: "السياسة التجارية" },
-  "acc.mod.Mail":                  { en: "Mail",                        zh: "邮件",              ar: "البريد" },
+  "acc.mod.Mail":                  { en: "Notifications",               zh: "通知",              ar: "الإشعارات" },
   "acc.mod.Products":              { en: "Products",                    zh: "产品",              ar: "المنتجات" },
   "acc.mod.Products > Categories": { en: "Product categories & subcategories", zh: "产品分类与子分类", ar: "فئات المنتجات والفئات الفرعية" },
   "acc.mod.Products > Brands":     { en: "Brand management",            zh: "品牌管理",           ar: "إدارة العلامات التجارية" },

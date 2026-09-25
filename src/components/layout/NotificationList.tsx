@@ -28,6 +28,7 @@ import { APP_REGISTRY } from "@/lib/navigation";
 import { NotificationBody, NotificationSubject, useRenderedNotification } from "@/components/layout/NotificationText";
 import { defOf, sectionize, type DaySection, type ViewRow } from "@/lib/notification-view";
 import { partsText, templateParts } from "@/lib/notification-templates";
+import { dmy } from "@/lib/discuss-time";
 import type { Lang } from "@/lib/i18n";
 
 export type ListRow = ViewRow & {
@@ -37,6 +38,22 @@ export type ListRow = ViewRow & {
 };
 
 type TFn = (key: string, fallback?: string) => string;
+
+/** "5m ago" … "3d ago", then the date — day first, always (owner rule;
+ *  toLocaleDateString() took the browser's locale and printed 9/18/2026).
+ *  `t` is hubT's (notif.justNow / minAgo / hourAgo / dayAgo). */
+export function notifTimeAgo(iso: string, t: TFn): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.floor((Date.now() - then) / 60_000);
+  if (minutes < 1) return t("notif.justNow");
+  if (minutes < 60) return t("notif.minAgo").replace("{n}", String(minutes));
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("notif.hourAgo").replace("{n}", String(hours));
+  const days = Math.floor(hours / 24);
+  if (days < 7) return t("notif.dayAgo").replace("{n}", String(days));
+  return dmy(new Date(iso), true);
+}
 
 export interface ListActions<R extends ListRow> {
   onOpen: (row: R) => void;
@@ -110,8 +127,8 @@ function RowActions<R extends ListRow>({
 }
 
 function Row<R extends ListRow>({
-  row, lang, tHub, tUi, time, actions,
-}: { row: R; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R> }) {
+  row, lang, tHub, tUi, time, actions, selected = false,
+}: { row: R; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selected?: boolean }) {
   const unread = !row.read_at;
   const who = senderName(row);
   /* Second line: the body — or, when there is none, who sent it. A name is
@@ -122,9 +139,10 @@ function Row<R extends ListRow>({
       <div
         role="button"
         tabIndex={0}
+        aria-current={selected || undefined}
         onClick={() => actions.onOpen(row)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); actions.onOpen(row); } }}
-        className="group/row relative flex cursor-pointer gap-3 px-4 py-2.5 outline-none transition-colors hover:bg-[var(--bg-surface-hover)] focus-visible:bg-[var(--bg-surface-hover)]"
+        className={`group/row relative flex cursor-pointer gap-3 px-4 py-2.5 outline-none transition-colors hover:bg-[var(--bg-surface-hover)] focus-visible:bg-[var(--bg-surface-hover)] ${selected ? "bg-[var(--bg-surface-active)]" : ""}`}
       >
         <UnreadDot on={unread} />
         <AppGlyph meta={row.metadata} tHub={tHub} />
@@ -148,9 +166,10 @@ function Row<R extends ListRow>({
 }
 
 function Group<R extends ListRow>({
-  rows, digestTitle, lang, tHub, tUi, time, actions,
-}: { rows: R[]; digestTitle: string | null; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R> }) {
-  const [open, setOpen] = useState(false);
+  rows, digestTitle, lang, tHub, tUi, time, actions, selectedId,
+}: { rows: R[]; digestTitle: string | null; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selectedId?: string | null }) {
+  /* Opens by itself when the selected row is inside it (a deep link). */
+  const [open, setOpen] = useState(() => !!selectedId && rows.some((r) => r.id === selectedId));
   const latest = rows[0];
   const unread = rows.some((r) => !r.read_at);
   const who = senderName(latest);
@@ -192,7 +211,7 @@ function Group<R extends ListRow>({
       {open && (
         <ul className="border-s border-[var(--border-faint)] ms-[34px] mb-1">
           {rows.map((r) => (
-            <Row key={r.id} row={r} lang={lang} tHub={tHub} tUi={tUi} time={time} actions={actions} />
+            <Row key={r.id} row={r} lang={lang} tHub={tHub} tUi={tUi} time={time} actions={actions} selected={r.id === selectedId} />
           ))}
         </ul>
       )}
@@ -201,8 +220,8 @@ function Group<R extends ListRow>({
 }
 
 export function NotificationSections<R extends ListRow>({
-  rows, lang, tHub, tUi, time, actions,
-}: { rows: R[]; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R> }) {
+  rows, lang, tHub, tUi, time, actions, selectedId = null,
+}: { rows: R[]; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selectedId?: string | null }) {
   const sections = sectionize(rows);
   return (
     <>
@@ -214,7 +233,7 @@ export function NotificationSections<R extends ListRow>({
           <ul>
             {items.map((it) =>
               it.kind === "row" ? (
-                <Row key={it.row.id} row={it.row} lang={lang} tHub={tHub} tUi={tUi} time={time} actions={actions} />
+                <Row key={it.row.id} row={it.row} lang={lang} tHub={tHub} tUi={tUi} time={time} actions={actions} selected={it.row.id === selectedId} />
               ) : (
                 <Group
                   key={it.key}
@@ -225,6 +244,7 @@ export function NotificationSections<R extends ListRow>({
                   tUi={tUi}
                   time={time}
                   actions={actions}
+                  selectedId={selectedId}
                 />
               ),
             )}

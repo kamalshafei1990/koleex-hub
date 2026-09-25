@@ -8,9 +8,14 @@ import "server-only";
    key could forge / delete / mark-read anyone's notifications cross-tenant).
 
    Identity is ALWAYS the signed-in session account — never client-supplied:
-     · read-state changes (markRead/markUnread/archive/markAllRead) only ever
-       touch rows where recipient_account_id = the caller.
-     · send / broadcast / notify stamp sender_account_id = the caller.
+   read-state changes (markRead / markUnread / archive, one row or several)
+   only ever touch rows where recipient_account_id = the caller.
+
+   Nothing here SENDS. The send / broadcastToRole / notify actions served the
+   Koleex Mail composer, retired 26/09/2026 with the mail itself — and
+   `notify` let any signed-in account write a notification into ANY account,
+   no tenant check. Notifications are written server-side by the Hub's own
+   writers (lib/notification-types lists every one).
 
    Reads stay on the (still public) SELECT path for the notification bell's
    realtime until P3; those are recipient-filtered client-side already.
@@ -19,17 +24,11 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 const INBOX = "inbox_messages";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Body =
-  | { action: "markRead" | "markUnread" | "archive"; id?: string; ids?: string[] }
-  | { action: "markAllRead" }
-  | { action: "send"; recipientId: string; subject: string; body: string; link?: string | null; metadata?: Record<string, unknown> }
-  | { action: "broadcastToRole"; roleName: string; subject: string; body: string; link?: string | null; excludeSelf?: boolean; metadata?: Record<string, unknown> }
-  | { action: "notify"; recipientIds: string[]; subject: string; body: string; link?: string | null; category?: string; metadata?: Record<string, unknown> };
+type Body = { action: "markRead" | "markUnread" | "archive"; id?: string; ids?: string[] };
 
 export async function POST(req: Request) {
   const auth = await requireAuth();
@@ -66,89 +65,6 @@ export async function POST(req: Request) {
           if (error) throw new Error(error.message);
         }
         return NextResponse.json({ ok: true });
-      }
-
-      case "markAllRead": {
-        const { error } = await supabaseServer
-          .from(INBOX)
-          .update({ read_at: new Date().toISOString() })
-          .eq("recipient_account_id", me)
-          .is("read_at", null);
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true });
-      }
-
-      case "send": {
-        if (!body.recipientId || !body.subject) return NextResponse.json({ error: "recipientId + subject required" }, { status: 400 });
-        const { data, error } = await supabaseServer
-          .from(INBOX)
-          .insert({
-            recipient_account_id: body.recipientId,
-            sender_account_id: me,
-            category: "message",
-            subject: body.subject,
-            body: body.body,
-            link: body.link ?? null,
-            metadata: body.metadata ?? {},
-          })
-          .select("*")
-          .single();
-        if (error) throw new Error(error.message);
-        await emitPings([{ topic: rtTopic.inbox(body.recipientId) }]);
-        return NextResponse.json({ ok: true, message: data });
-      }
-
-      case "broadcastToRole": {
-        if (!body.roleName || !body.subject) return NextResponse.json({ error: "roleName + subject required" }, { status: 400 });
-        /* Resolve recipients server-side (tenant-scoped) — the client never
-           supplies the recipient list. */
-        const { data: recipients, error: recErr } = await supabaseServer
-          .from("accounts")
-          .select("id, role:roles(id,name)")
-          .eq("status", "active")
-          .eq("tenant_id", auth.tenant_id);
-        if (recErr) throw new Error(recErr.message);
-        const target = (recipients ?? []).filter((row) => {
-          const r = row as { id: string; role: { name?: string } | Array<{ name?: string }> | null };
-          const role = Array.isArray(r.role) ? r.role[0] : r.role;
-          if (!role?.name) return false;
-          if (body.excludeSelf && r.id === me) return false;
-          return role.name.toLowerCase() === body.roleName.toLowerCase();
-        });
-        if (target.length === 0) return NextResponse.json({ ok: true, count: 0 });
-        const rows = target.map((row) => ({
-          recipient_account_id: (row as { id: string }).id,
-          sender_account_id: me,
-          category: "message" as const,
-          subject: body.subject,
-          body: body.body,
-          link: body.link ?? null,
-          metadata: body.metadata ?? {},
-        }));
-        const { error: insErr } = await supabaseServer.from(INBOX).insert(rows);
-        if (insErr) throw new Error(insErr.message);
-        await emitPings(target.map((row) => ({ topic: rtTopic.inbox((row as { id: string }).id) })));
-        return NextResponse.json({ ok: true, count: rows.length });
-      }
-
-      case "notify": {
-        /* Fan-out used by todo assignment etc. Sender = caller; recipients as
-           given (dedup, drop self). */
-        const ids = Array.from(new Set((body.recipientIds ?? []).filter(Boolean))).filter((id) => id !== me);
-        if (ids.length === 0) return NextResponse.json({ ok: true, count: 0 });
-        const rows = ids.map((rid) => ({
-          recipient_account_id: rid,
-          sender_account_id: me,
-          category: body.category ?? "task",
-          subject: body.subject,
-          body: body.body,
-          link: body.link ?? null,
-          metadata: body.metadata ?? {},
-        }));
-        const { error } = await supabaseServer.from(INBOX).insert(rows);
-        if (error) throw new Error(error.message);
-        await emitPings(ids.map((rid) => ({ topic: rtTopic.inbox(rid) })));
-        return NextResponse.json({ ok: true, count: rows.length });
       }
 
       default:

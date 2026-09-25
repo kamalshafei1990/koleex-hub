@@ -59,7 +59,7 @@ import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import SoftwareCenterIcon from "@/components/icons/ui/DownloadIcon";
-import MailIcon from "@/components/icons/MailIcon";
+import BellIcon from "@/components/icons/ui/BellIcon";
 import KoleexOrbIcon from "@/components/ai/KoleexOrbIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
@@ -297,7 +297,11 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
-  { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: MailIcon,      route: "/inbox",            active: true  },
+  /* The notification center (Koleex Mail retired 26/09/2026). `name` stays
+     "Mail": it IS the permission module's name (permission-modules.ts), and
+     every role's saved row for this app is keyed on it — the words people
+     see come from app.inbox. */
+  { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: BellIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   /* Brands is NOT an app — it lives inside Database → Visual Library
      (/database/brands). Intentionally not registered here. */

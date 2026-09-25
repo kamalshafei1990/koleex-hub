@@ -60,9 +60,8 @@ import { useSkin } from "@/lib/appearance";
 import { hubT } from "@/lib/translations/hub";
 import { notifUiT } from "@/lib/translations/notif-ui";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
-import { NotificationSections, NotificationSkeleton, type ListActions } from "@/components/layout/NotificationList";
+import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
-import { dmy } from "@/lib/discuss-time";
 import {
   classifyInboxActivity,
   playAppSound,
@@ -84,22 +83,6 @@ const POLL_INTERVAL_MS = 60_000;
 const FEED_LIMIT = 300;
 
 type TFn = (key: string, fallback?: string) => string;
-
-function timeAgo(iso: string, t: TFn): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diff = Date.now() - then;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return t("notif.justNow");
-  if (minutes < 60) return t("notif.minAgo").replace("{n}", String(minutes));
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t("notif.hourAgo").replace("{n}", String(hours));
-  const days = Math.floor(hours / 24);
-  if (days < 7) return t("notif.dayAgo").replace("{n}", String(days));
-  /* Day first, always (owner rule). toLocaleDateString() took the BROWSER's
-     locale and printed 9/18/2026 on an en-US machine. */
-  return dmy(new Date(iso), true);
-}
 
 /** Resolve the best label for a Discuss channel row, mirroring the
  *  same fallback chain the sidebar uses: explicit name → DM partner's
@@ -828,7 +811,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                 lang={lang}
                 tHub={t}
                 tUi={tUi}
-                time={(iso) => timeAgo(iso, t)}
+                time={(iso) => notifTimeAgo(iso, t)}
                 actions={listActions}
               />
             )}
