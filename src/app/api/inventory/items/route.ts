@@ -17,7 +17,7 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 import { listInventoryItems } from "@/lib/inventory/queries";
 import { createInventoryItem, getItemTypeRequiresProduct } from "@/lib/inventory/items";
 import type { CreateItemInput } from "@/lib/inventory/types";
-import { getUserExperience } from "@/lib/experience";
+import { canSeeCostData } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -29,27 +29,24 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   try {
-    /* PERF: fetch the item list and the caller's cost-visibility in PARALLEL
-       (independent reads) instead of one after the other. */
-    const [items, experience] = await Promise.all([
-      listInventoryItems({
-        tenantId: auth.tenant_id,
-        search: url.searchParams.get("q") ?? undefined,
-        typeId: url.searchParams.get("type_id") ?? undefined,
-        status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
-        limit: Number(url.searchParams.get("limit")) || 200,
-      }),
-      getUserExperience(auth),
-    ]);
-    /* Role-based cost masking — strip cost_price / avg_cost / inventory_value
-       on the wire for roles that aren't allowed to see them. */
-    const masked = experience.can_see_cost_data
+    const items = await listInventoryItems({
+      tenantId: auth.tenant_id,
+      search: url.searchParams.get("q") ?? undefined,
+      typeId: url.searchParams.get("type_id") ?? undefined,
+      status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
+      limit: Number(url.searchParams.get("limit")) || 200,
+    });
+    /* Cost masking — strip cost_price / avg_cost / inventory_value on the wire
+       unless the role may see cost data (its «private records» switch; no
+       read needed, the session context carries it). */
+    const canSeeCost = canSeeCostData(auth);
+    const masked = canSeeCost
       ? items
       : items.map((it) => ({ ...it, cost_price: null, avg_cost: 0, inventory_value: 0 }));
     /* Short browser cache so revisiting the list is instant; SWR refreshes it
        in the background. Cost masking is per-user and the cache is `private`. */
     return NextResponse.json(
-      { items: masked, can_see_cost_data: experience.can_see_cost_data },
+      { items: masked, can_see_cost_data: canSeeCost },
       { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=120" } },
     );
   } catch (e) {

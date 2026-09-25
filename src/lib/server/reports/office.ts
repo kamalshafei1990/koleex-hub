@@ -34,9 +34,10 @@ import "server-only";
      correction   with HR·edit: an attendance correction still pending
      finance      the approvals queue's own rule: through its door
                   (lib/approvals/gate — internal, Finance · create) AND an
-                  approver (super admin, CEO or accountant): an expense or
-                  payment submitted for approval — a bill or a journal entry
-                  only for whoever sees cost data
+                  approver («Finance Approvals» in Roles, or a super admin):
+                  an expense or payment submitted for approval — a bill or a
+                  journal entry only for whoever sees cost data (the role's
+                  «private records» switch)
      to-do        a task they assigned that is waiting for their approval
      report       a report sent to them (To) that asks for their review
    A kind that cannot be read fails the whole block — said as such, never
@@ -45,8 +46,8 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
-import { getUserExperience } from "@/lib/experience";
-import { COST_SENSITIVE_KINDS, canApprove, listPending } from "@/lib/approvals";
+import { canApproveFinance, canSeeCostData } from "@/lib/experience";
+import { COST_SENSITIVE_KINDS, listPending } from "@/lib/approvals";
 import { requireApprovalsAccess } from "@/lib/approvals/gate";
 import { feedWindow, loadCalendarFeed } from "@/lib/server/calendar-feed";
 import { accountTimezone } from "@/lib/server/calendar-notify";
@@ -184,19 +185,20 @@ async function reportsWaiting(auth: ServerAuthContext): Promise<DecisionItem[]> 
 
 /** Everything that waits for the viewer's decision, across the apps. */
 export async function loadDecisions(auth: ServerAuthContext): Promise<DecisionItem[]> {
-  const [me, hrEdit, exp, financeDoor] = await Promise.all([
+  const [me, hrEdit, approver, financeDoor] = await Promise.all([
     myEmployeeId(auth),
     requireModuleAction(auth, "HR", "edit").then((d) => d === null),
-    getUserExperience(auth),
+    canApproveFinance(auth),
     requireApprovalsAccess(auth, "create").then((d) => d === null),
   ]);
-  /* Only whoever may decide it: the queue's door (Finance · create) and an approver. */
-  const finance = financeDoor && canApprove(exp.dashboard_role, exp.is_super_admin);
+  /* Only whoever may decide it: the queue's door (Finance · create) and an
+     approver («Finance Approvals» in Roles, or a super admin). */
+  const finance = financeDoor && approver;
   const parts = await Promise.all([
     leaveWaiting(auth, me, hrEdit),
     hrEdit ? overtimeWaiting() : Promise.resolve([]),
     hrEdit ? correctionsWaiting() : Promise.resolve([]),
-    finance ? financeWaiting(auth, exp.can_see_cost_data) : Promise.resolve([]),
+    finance ? financeWaiting(auth, canSeeCostData(auth)) : Promise.resolve([]),
     todosWaiting(auth),
     reportsWaiting(auth),
   ]);

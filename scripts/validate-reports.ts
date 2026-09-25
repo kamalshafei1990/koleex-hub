@@ -2258,8 +2258,14 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes('.eq("account_id", auth.account_id).eq("role", "to")') && c.includes('.eq("status", "submitted").eq("review_required", true).eq("superseded", false)') ? [] : ["any report counts as waiting"]),
     (src) => src.replace('.eq("status", "submitted").eq("review_required", true).eq("superseded", false)', '.eq("status", "submitted")'));
   rule("finance waits only for whoever may decide it — the queue's door and an approver — never with a draft", OF,
-    (c) => (c.includes('requireApprovalsAccess(auth, "create").then((d) => d === null),') && c.includes("const finance = financeDoor && canApprove(exp.dashboard_role, exp.is_super_admin);") && c.includes('i.status !== "draft" && (costs || !COST_SENSITIVE_KINDS.has(i.kind))') ? [] : ["anyone sees the finance queue, or its drafts"]),
-    (src) => src.replace("const finance = financeDoor && canApprove(", "const finance = canApprove("));
+    (c) => (c.includes('requireApprovalsAccess(auth, "create").then((d) => d === null),') && c.includes("canApproveFinance(auth),") && c.includes("const finance = financeDoor && approver;") && c.includes('i.status !== "draft" && (costs || !COST_SENSITIVE_KINDS.has(i.kind))') ? [] : ["anyone sees the finance queue, or its drafts"]),
+    (src) => src.replace("const finance = financeDoor && approver;", "const finance = approver;"));
+  /* The approver is «Finance Approvals» in Roles (src/lib/experience) — it
+     used to be a guess from the department's name, which let "Executive
+     Office" or "Project Management" read the queue's amounts here. */
+  rule("…and the approver is «Finance Approvals», a bill or journal only with cost data", OF,
+    (c) => (c.includes("const finance = financeDoor && approver;") && c.includes("finance ? financeWaiting(auth, canSeeCostData(auth)) : Promise.resolve([]),") ? [] : ["the finance queue waits for someone who is not an approver"]),
+    (src) => src.replace("const finance = financeDoor && approver;", "const finance = financeDoor;"));
   rule("…and a draft never counts as waiting", OF,
     (c) => (c.includes('i.status !== "draft" && (costs || !COST_SENSITIVE_KINDS.has(i.kind))') ? [] : ["a draft waits for a decision"]),
     (src) => src.replace('i.status !== "draft" && (costs', "(costs"));

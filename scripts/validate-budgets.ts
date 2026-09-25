@@ -871,8 +871,8 @@ console.log("\nJ. Authorization inputs");
     expSrc.slice(expSrc.indexOf("export async function getUserExperience")));
   readsPrefs
     ? bad("getUserExperience reads preferences",
-          "dashboard_role gates cost/bank/profit — it must derive from HR department + is_super_admin only")
-    : ok("no authorization decision reads accounts.preferences", "role derives from HR department");
+          "cost/bank/profit/approving must come from Roles & Permissions only (src/lib/experience) — never a preference")
+    : ok("no authorization decision reads accounts.preferences", "visibility comes from Roles & Permissions");
 
   const toolsDir = path.join(ROOT, "src/lib/server/ai-agent/tools");
   const TOOL_NO_MODULE_OK = new Set(["getUserPermissions"]);

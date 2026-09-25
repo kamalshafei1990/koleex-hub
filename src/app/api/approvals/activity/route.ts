@@ -8,7 +8,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserExperience } from "@/lib/experience";
+import { canSeeCostData } from "@/lib/experience";
 import { listActivity, isApprovalEntity, visibleKinds } from "@/lib/approvals";
 import { requireApprovalsAccess } from "@/lib/approvals/gate";
 
@@ -29,10 +29,9 @@ export async function GET(req: Request) {
   const asked = Math.trunc(Number(url.searchParams.get("limit")));
   const limit = asked > 0 ? Math.min(asked, ACTIVITY_LIMIT_MAX) : 50;
 
-  const exp = await getUserExperience(auth);
   const rows = await listActivity(auth.tenant_id, {
     entity: entity ?? undefined, entityId: entityId ?? undefined, limit,
-    kinds: visibleKinds(exp.can_see_cost_data),
+    kinds: visibleKinds(canSeeCostData(auth)),
   });
   return NextResponse.json({ items: rows });
 }

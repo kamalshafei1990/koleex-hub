@@ -11,7 +11,11 @@
    (E) dead AppHomeMenu import removed from FinanceHome;
    (F) the approvals queue (/api/approvals/**) lets in internal accounts with
        the Finance module only, before anything is read, and a decision stays
-       in the caller's tenant and is claimed before it is applied.
+       in the caller's tenant and is claimed before it is applied;
+   (G) cost data, bank balances, profit and approving come from Roles &
+       Permissions only (never the department's name), and the executive
+       snapshot and the operational reports open only to internal accounts
+       with Finance.
    Run: tsx scripts/validate-finance-perf.ts */
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -119,9 +123,9 @@ function handlers(c: string): Array<{ verb: string; body: string }> {
 }
 const bodyOf = (c: string, verb: string) => handlers(c).find((h) => h.verb === verb)?.body ?? "";
 
-/* Reads of the queue, the activity log, the caller's finance flags or the
-   request body. None may run before the door has said yes. */
-const APPROVALS_DATA = /\b(listPending|listActivity|transitionApproval|getUserExperience)\(|\bsupabaseServer\.|\breq\.json\(/;
+/* Reads of the queue, the activity log, the caller's finance permissions or
+   the request body. None may run before the door has said yes. */
+const APPROVALS_DATA = /\b(listPending|listActivity|transitionApproval|getUserExperience|canApproveFinance|canSeeBankAndProfit)\(|\bsupabaseServer\.|\breq\.json\(/;
 /** requireAuth → requireApprovalsAccess(view for GET, create for writes) →
  *  return if denied, in that order, before any read. Order within the handler,
  *  never adjacency, so an unrelated line added in between does not trip it. */
@@ -208,10 +212,11 @@ rule("can_approve asks the same door the POST will", ROUTE, (c) => {
   const get = bodyOf(c, "GET");
   const p: string[] = [];
   if (!/requireApprovalsAccess\(auth, "create"\)/.test(get)) p.push("GET does not ask the POST's door");
-  if (!/can_approve: canApprove\(exp\.dashboard_role, exp\.is_super_admin\) && moveDenied === null/.test(get)) p.push("can_approve is not canApprove AND the POST's door");
+  if (!/^\s*canApproveFinance\(auth\),/m.test(get)) p.push("GET does not ask «Finance Approvals»");
+  if (!/can_approve: approver && moveDenied === null/.test(get)) p.push("can_approve is not «Finance Approvals» AND the POST's door");
   return p;
 }, [
-  { label: "can_approve from the department alone", caught: /can_approve is not canApprove AND/,
+  { label: "can_approve from the approver row alone", caught: /can_approve is not «Finance Approvals» AND/,
     mutate: (s) => once(s, " && moveDenied === null", "") },
 ]);
 
@@ -221,18 +226,18 @@ rule("a decision is checked before the write", ROUTE, (c) => {
   if (writeAt < 0) return ["POST no longer calls transitionApproval"];
   const p: string[] = [];
   const knownAt = post.search(/!isApprovalEntity\(body\.entity\) \|\| !isApprovalAction\(body\.action\)/);
-  const costAt = post.search(/COST_SENSITIVE_KINDS\.has\(body\.entity\) && !exp\.can_see_cost_data/);
-  const approverAt = post.search(/\(body\.action === "approve" \|\| body\.action === "reject"\) && !canApprove\(exp\.dashboard_role, exp\.is_super_admin\)/);
+  const costAt = post.search(/COST_SENSITIVE_KINDS\.has\(body\.entity\) && !canSeeCostData\(auth\)/);
+  const approverAt = post.search(/\(body\.action === "approve" \|\| body\.action === "reject"\) && !\(await canApproveFinance\(auth\)\)/);
   if (knownAt < 0 || knownAt > writeAt) p.push("entity and action are not checked against the known lists before the write");
   if (costAt < 0 || costAt > writeAt) p.push("a role that cannot see cost data can move a bill or journal");
-  if (approverAt < 0 || approverAt > writeAt) p.push("approve and reject do not both need canApprove before the write");
+  if (approverAt < 0 || approverAt > writeAt) p.push("approve and reject do not both need «Finance Approvals» before the write");
   if (!/tenantId: auth\.tenant_id/.test(post)) p.push("the tenant does not come from the session");
   return p;
 }, [
-  { label: "reject without the approver check", caught: /approve and reject do not both need canApprove/,
+  { label: "reject without the approver check", caught: /approve and reject do not both need «Finance Approvals»/,
     mutate: (s) => once(s, '(body.action === "approve" || body.action === "reject")', '(body.action === "approve")') },
   { label: "a bill moved by a role that cannot see it", caught: /cannot see cost data can move/,
-    mutate: (s) => once(s, "COST_SENSITIVE_KINDS.has(body.entity) && !exp.can_see_cost_data", "false") },
+    mutate: (s) => once(s, "COST_SENSITIVE_KINDS.has(body.entity) && !canSeeCostData(auth)", "false") },
   { label: "the tenant taken from the body", caught: /the tenant does not come from the session/,
     mutate: (s) => once(s, "tenantId: auth.tenant_id", "tenantId: String(body.tenantId)") },
   { label: "any string accepted as an entity", caught: /not checked against the known lists/,
@@ -240,7 +245,7 @@ rule("a decision is checked before the write", ROUTE, (c) => {
 ]);
 
 rule("the queue and its activity hide what the caller cannot see", ROUTE, (c) =>
-  /const kinds = new Set\(visibleKinds\(exp\.can_see_cost_data\)\);/.test(bodyOf(c, "GET")) &&
+  /const kinds = new Set\(visibleKinds\(canSeeCostData\(auth\)\)\);/.test(bodyOf(c, "GET")) &&
   /items: items\.filter\(\(i\) => kinds\.has\(i\.kind\)\)/.test(bodyOf(c, "GET"))
     ? [] : ["the queue shows kinds the caller cannot see"], [
   { label: "the queue unfiltered", caught: /the queue shows kinds/,
@@ -252,13 +257,13 @@ rule("the activity is capped and filtered like the queue", ACTIVITY, (c) => {
   const max = Number(/const ACTIVITY_LIMIT_MAX = (\d+);/.exec(c)?.[1]);
   if (!(max > 0 && max <= 500)) p.push("no sane ACTIVITY_LIMIT_MAX");
   if (!/Math\.min\(asked, ACTIVITY_LIMIT_MAX\)/.test(get)) p.push("the limit is not capped");
-  if (!/kinds: visibleKinds\(exp\.can_see_cost_data\)/.test(get)) p.push("the activity shows kinds the caller cannot see");
+  if (!/kinds: visibleKinds\(canSeeCostData\(auth\)\)/.test(get)) p.push("the activity shows kinds the caller cannot see");
   return p;
 }, [
   { label: "an uncapped limit", caught: /the limit is not capped/,
     mutate: (s) => once(s, "Math.min(asked, ACTIVITY_LIMIT_MAX)", "asked") },
   { label: "every kind to every role", caught: /the activity shows kinds/,
-    mutate: (s) => once(s, "    kinds: visibleKinds(exp.can_see_cost_data),\n", "") },
+    mutate: (s) => once(s, "    kinds: visibleKinds(canSeeCostData(auth)),\n", "") },
 ]);
 
 rule("the cost-sensitive kinds are one list, applied in the query", LIB, (c) => {
@@ -302,6 +307,208 @@ rule("a transition stays in the tenant and claims the row", LIB, (c) => {
     mutate: (s) => once(s, "  if ((upd.data ?? []).length === 0) {", "  if (false) {") },
   { label: "the lookup before the own-key check", caught: /not behind isApprovalEntity/,
     mutate: (s) => once(s, "  if (!isApprovalEntity(input.entity)) return", "  if (!input.entity) return") },
+]);
+
+// ── (G) cost, bank, profit and approving come from Roles & Permissions ──
+/* `dashboard_role` — a label guessed from koleex_employees.department by
+   keyword regexes tried in order — decided who saw cost data, bank balances
+   and profit and who approved: "Executive Office" → ceo, "Administration &
+   Office" → marketing (`\bad`), "Project Management" → ceo (`manag`). A
+   text field HR fills in, and the Roles page said nothing about it. The
+   role-mode preview also re-read the super admin's own account row and showed
+   every role with super-admin visibility (found 25 Sep 2026; owner's pick
+   26 Sep). What holds the replacement: cost is the role's «private records»
+   switch, bank + profit is «Bank & Profit», approving is «Finance Approvals»,
+   and the two routes that only checked a sign-in now pass the finance-numbers
+   door (internal + Finance) first. Same shape as §F: each rule passes on the
+   real file and catches a copy broken for the reason it names. */
+const EXP = "src/lib/experience/index.ts";
+const PMOD = "src/lib/permission-modules.ts";
+const INV = "src/app/api/inventory/items/route.ts";
+const WSP = "src/app/api/finance/workspace/route.ts";
+const EXEC = "src/app/api/executive/snapshot/route.ts";
+const OPS = "src/app/api/reports/operational/route.ts";
+/** An exported function's text, from its signature to its closing brace. */
+function fnBody(c: string, name: string): string {
+  const at = c.search(new RegExp(`^export (?:async )?function ${name}\\(`, "m"));
+  if (at < 0) return "";
+  const end = c.indexOf("\n}\n", at);
+  return c.slice(at, end < 0 ? undefined : end);
+}
+
+rule("cost, bank, profit and approving come from Roles & Permissions — never the department", EXP, (c) => {
+  const p: string[] = [];
+  if (/\bdepartment\b/.test(c)) p.push("the experience layer reads the department");
+  if (/\bpreferences\b/.test(c)) p.push("the experience layer reads a preference");
+  if (/\.from\(|\bsupabaseServer\b/.test(c)) p.push("the experience layer reads a row itself instead of the session context and requireModuleAccess");
+  if (!c.includes('import { BANK_PROFIT_MODULE, FINANCE_APPROVALS_MODULE } from "@/lib/permission-modules";')) p.push("the rows' names do not come from the Roles registry");
+  if (!/^export function canSeeCostData\(auth: ServerAuthContext\): boolean \{\s*return canViewPrivate\(auth\);\s*$/.test(fnBody(c, "canSeeCostData"))) p.push("cost is not the role's «private records» switch alone");
+  if (!/^export async function canSeeBankAndProfit\(auth: ServerAuthContext\): Promise<boolean> \{\s*return auth\.is_super_admin \|\| \(await requireModuleAccess\(auth, BANK_PROFIT_MODULE\)\) === null;\s*$/.test(fnBody(c, "canSeeBankAndProfit"))) p.push("bank and profit do not ask «Bank & Profit» alone");
+  if (!/^export async function canApproveFinance\(auth: ServerAuthContext\): Promise<boolean> \{\s*return auth\.is_super_admin \|\| \(await requireModuleAccess\(auth, FINANCE_APPROVALS_MODULE\)\) === null;\s*$/.test(fnBody(c, "canApproveFinance"))) p.push("approving does not ask «Finance Approvals» alone");
+  const door = fnBody(c, "requireFinanceNumbers");
+  const refuseAt = door.search(/^\s*if \(auth\.user_type !== "internal"\) \{\s*return NextResponse\.json\(/m);
+  const financeAt = door.search(/^\s*return requireModuleAccess\(auth, "Finance"\);/m);
+  if (refuseAt < 0) p.push("the finance-numbers door lets a non-internal account in");
+  if (financeAt < 0) p.push("the finance-numbers door does not ask Finance");
+  else if (refuseAt > financeAt) p.push("the finance-numbers door asks Finance before refusing a non-internal account");
+  const all = fnBody(c, "getUserExperience");
+  for (const line of ["canSeeBankAndProfit(auth),", "canApproveFinance(auth),", "can_see_cost_data: canSeeCostData(auth),", "can_see_bank_balances: bankAndProfit,", "can_see_profit: bankAndProfit,", "can_approve: approve,", "is_super_admin: auth.is_super_admin,"]) {
+    if (!all.includes(line)) { p.push("getUserExperience does not report the helpers' answers"); break; }
+  }
+  return p;
+}, [
+  { label: "an approver by the department's name again", caught: /the experience layer reads the department/,
+    mutate: (s) => once(s, "export async function canApproveFinance(auth: ServerAuthContext): Promise<boolean> {\n",
+      'export async function canApproveFinance(auth: ServerAuthContext): Promise<boolean> {\n  if (/exec|manag/i.test(auth.department ?? "")) return true;\n') },
+  { label: "a preview that re-reads the super admin's own row", caught: /reads a row itself/,
+    mutate: (s) => once(s, "export async function getUserExperience(auth: ServerAuthContext): Promise<UserExperience> {\n",
+      'export async function getUserExperience(auth: ServerAuthContext): Promise<UserExperience> {\n  const { data: row } = await supabaseServer.from("accounts").select("is_super_admin").eq("id", auth.account_id).maybeSingle();\n') },
+  { label: "cost for everyone", caught: /cost is not the role's «private records» switch/,
+    mutate: (s) => once(s, "  return canViewPrivate(auth);\n", "  return true;\n") },
+  { label: "bank and profit behind the approvals row", caught: /bank and profit do not ask «Bank & Profit»/,
+    mutate: (s) => once(s, "requireModuleAccess(auth, BANK_PROFIT_MODULE)", "requireModuleAccess(auth, FINANCE_APPROVALS_MODULE)") },
+  { label: "an approver without the row", caught: /approving does not ask «Finance Approvals»/,
+    mutate: (s) => once(s, "return auth.is_super_admin || (await requireModuleAccess(auth, FINANCE_APPROVALS_MODULE)) === null;", "return true;") },
+  { label: "a customer through the finance-numbers door", caught: /lets a non-internal account in/,
+    mutate: (s) => once(s, 'if (auth.user_type !== "internal") {', 'if (auth.user_type === "nobody") {') },
+  { label: "profit reported from the cost switch", caught: /getUserExperience does not report/,
+    mutate: (s) => once(s, "    can_see_profit: bankAndProfit,\n", "    can_see_profit: canSeeCostData(auth),\n") },
+]);
+
+rule("«Bank & Profit» and «Finance Approvals» are Roles rows, right under Finance", PMOD, (c) => {
+  const p: string[] = [];
+  if (!c.includes('export const BANK_PROFIT_MODULE = "Bank & Profit";')) p.push("«Bank & Profit» is not named in the registry");
+  if (!c.includes('export const FINANCE_APPROVALS_MODULE = "Finance Approvals";')) p.push("«Finance Approvals» is not named in the registry");
+  const at = c.indexOf("export const CAPABILITY_MODULES");
+  const list = at < 0 ? "" : c.slice(at, c.indexOf("];", at));
+  if (!list.includes('{ name: BANK_PROFIT_MODULE, app: "Finance" }')) p.push("«Bank & Profit» is not a Roles row under Finance");
+  if (!list.includes('{ name: FINANCE_APPROVALS_MODULE, app: "Finance" }')) p.push("«Finance Approvals» is not a Roles row under Finance");
+  return p;
+}, [
+  { label: "the approvals row dropped", caught: /«Finance Approvals» is not a Roles row/,
+    mutate: (s) => once(s, '  { name: FINANCE_APPROVALS_MODULE, app: "Finance" },\n', "") },
+  { label: "bank & profit filed under another app", caught: /«Bank & Profit» is not a Roles row under Finance/,
+    mutate: (s) => once(s, '{ name: BANK_PROFIT_MODULE, app: "Finance" }', '{ name: BANK_PROFIT_MODULE, app: "Reports" }') },
+]);
+
+/* The executive snapshot and the operational reports checked only a sign-in:
+   any account, a customer login included, read the revenue, receivables, top
+   customers and the sales / customers / suppliers reports. requireAuth →
+   requireFinanceNumbers → return, in that order, before anything is built. */
+const NUMBERS_DATA = /\b(build\w+Report|buildExecutiveSnapshot|canSeeBankAndProfit|getUserExperience)\(|\bsupabaseServer\./;
+function numbersDoorProblems(c: string): string[] {
+  const p: string[] = [];
+  const hs = handlers(c);
+  if (hs.length === 0) p.push("no handlers found");
+  for (const { verb, body } of hs) {
+    const bounceAt = body.search(/^\s*if \(auth instanceof NextResponse\) return auth;/m);
+    const gateAt = body.search(/^\s*const denied = await requireFinanceNumbers\(auth\);/m);
+    const deniedAt = body.search(/^\s*if \(denied\) return denied;/m);
+    const dataAt = body.search(NUMBERS_DATA);
+    if (!/^\s*const auth = await requireAuth\(\);/m.test(body) || bounceAt < 0) p.push(`${verb} does not stop at requireAuth`);
+    if (gateAt < 0) { p.push(`${verb} does not call requireFinanceNumbers`); continue; }
+    if (deniedAt < 0) { p.push(`${verb} ignores the door's answer`); continue; }
+    if (!(bounceAt < gateAt && gateAt < deniedAt)) p.push(`${verb}: requireAuth → door → return is out of order`);
+    if (dataAt >= 0 && dataAt < deniedAt) p.push(`${verb} reads before the door has said yes`);
+  }
+  return p;
+}
+for (const r of [EXEC, OPS]) {
+  const p = numbersDoorProblems(code(read(r)));
+  check(`${r}: every handler passes the finance-numbers door before it reads${p.length ? ` — ${p.join("; ")}` : ""}`, p.length === 0);
+}
+rule("the finance-numbers door bites on the executive snapshot", EXEC, numbersDoorProblems, [
+  { label: "the snapshot for anyone signed in", caught: /GET does not call requireFinanceNumbers/,
+    mutate: (s) => once(s, "  const denied = await requireFinanceNumbers(auth);\n  if (denied) return denied;\n", "") },
+  { label: "the snapshot built before the door", caught: /GET reads before the door/,
+    mutate: (s) => once(s, "  const denied = await requireFinanceNumbers(auth);\n",
+      "  const early = await buildExecutiveSnapshot(auth.tenant_id);\n  const denied = await requireFinanceNumbers(auth);\n") },
+]);
+rule("the finance-numbers door bites on the operational reports", OPS, numbersDoorProblems, [
+  { label: "a door that is commented out", caught: /GET does not call requireFinanceNumbers/,
+    mutate: (s) => once(s, "  const denied = await requireFinanceNumbers(auth);", "  // const denied = await requireFinanceNumbers(auth);") },
+  { label: "a door whose answer is ignored", caught: /GET ignores the door's answer/,
+    mutate: (s) => once(s, "  if (denied) return denied;\n", "") },
+]);
+
+rule("the inventory list masks cost unless the «private records» switch", INV, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/const canSeeCost = canSeeCostData\(auth\);/.test(get)) p.push("the inventory list does not ask canSeeCostData");
+  if (!/const masked = canSeeCost\s*\?\s*items\s*:\s*items\.map\(\(it\) => \(\{ \.\.\.it, cost_price: null, avg_cost: 0, inventory_value: 0 \}\)\);/.test(get)) p.push("the inventory list does not mask cost_price, avg_cost and inventory_value");
+  if (!/\{ items: masked, can_see_cost_data: canSeeCost \}/.test(get)) p.push("the inventory list sends unmasked items");
+  return p;
+}, [
+  { label: "cost for every Inventory viewer", caught: /does not ask canSeeCostData/,
+    mutate: (s) => once(s, "const canSeeCost = canSeeCostData(auth);", "const canSeeCost = true;") },
+  { label: "the average cost left on the wire", caught: /does not mask cost_price, avg_cost and inventory_value/,
+    mutate: (s) => once(s, "cost_price: null, avg_cost: 0, inventory_value: 0", "cost_price: null, inventory_value: 0") },
+]);
+
+rule("the workspace hides bank balances unless «Bank & Profit»", WSP, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/^\s*canSeeBankAndProfit\(auth\),/m.test(get)) p.push("the workspace does not ask «Bank & Profit»");
+  if (!/if \(!bankAndProfit\) \{\s*snapshot\.banks = snapshot\.banks\.map\(\(b\) => \(\{ \.\.\.b, current_balance: 0 \}\)\);/.test(get)) p.push("the workspace sends bank balances to every Finance viewer");
+  if (!/can_see_bank_balances: bankAndProfit,\s*can_see_profit: bankAndProfit,/.test(get)) p.push("the workspace reports other flags than it applied");
+  return p;
+}, [
+  { label: "balances for every Finance viewer", caught: /sends bank balances to every Finance viewer/,
+    mutate: (s) => once(s, "if (!bankAndProfit) {", "if (false) {") },
+]);
+
+rule("the executive snapshot hides profit, cash and the inventory value by the Roles answers", EXEC, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/^\s*canSeeBankAndProfit\(auth\),/m.test(get)) p.push("the snapshot does not ask «Bank & Profit»");
+  if (!/const cost = canSeeCostData\(auth\);/.test(get)) p.push("the snapshot does not ask canSeeCostData");
+  const bp = /if \(!bankAndProfit\) \{([\s\S]*?)\n    \}/.exec(get)?.[1] ?? "";
+  for (const f of ["kpis.gross_profit.value = 0", "kpis.net_profit.value = 0", "m.gross_profit = 0", "m.net_profit = 0", "m.cogs = 0", "kpis.cash_position.value = 0"]) {
+    if (!bp.includes(f)) p.push(`the snapshot shows ${f.replace(/ = 0$/, "")} without «Bank & Profit»`);
+  }
+  const cb = /if \(!cost\) \{([\s\S]*?)\n    \}/.exec(get)?.[1] ?? "";
+  for (const f of ["kpis.inventory.value = 0", "inventory_intel.highest_value = []"]) {
+    if (!cb.includes(f)) p.push(`the snapshot shows ${f.replace(/ = (0|\[\])$/, "")} without cost data`);
+  }
+  if (!/can_see_profit: bankAndProfit,\s*can_see_cost_data: cost,\s*can_see_bank_balances: bankAndProfit,/.test(get)) p.push("the snapshot reports other flags than it applied");
+  return p;
+}, [
+  { label: "the cash position for everyone", caught: /shows kpis\.cash_position\.value without «Bank & Profit»/,
+    mutate: (s) => once(s, "      snapshot.kpis.cash_position.value = 0;\n", "") },
+  { label: "the inventory value for everyone", caught: /shows kpis\.inventory\.value without cost data/,
+    mutate: (s) => once(s, "      snapshot.kpis.inventory.value = 0;\n", "") },
+]);
+
+rule("the operational cost reports need the «private records» switch", OPS, (c) =>
+  /if \(RESTRICTED\.has\(kind\) && !canSeeCostData\(auth\)\) \{/.test(bodyOf(c, "GET")) &&
+  /const RESTRICTED = new Set\(\["purchases", "expenses", "inventory"\]\);/.test(c)
+    ? [] : ["a cost report is open without cost data"], [
+  { label: "the inventory report without the switch", caught: /a cost report is open/,
+    mutate: (s) => once(s, '["purchases", "expenses", "inventory"]', '["purchases", "expenses"]') },
+]);
+
+/* Hub-wide: the guess's names are gone from every source file, so it cannot
+   come back somewhere this section does not list. A comment may tell the
+   story; code may not use it. */
+const GUESS = /\b(dashboard_role|DashboardRole|inferDashboardRole|DEPARTMENT_KEYWORDS)\b/;
+const guessProblems = (c: string) => { const m = GUESS.exec(c); return m ? [`uses ${m[1]}`] : []; };
+function sourcesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const ent of fs.readdirSync(R(dir), { withFileTypes: true })) {
+    const rel = `${dir}/${ent.name}`;
+    if (ent.isDirectory()) out.push(...sourcesUnder(rel));
+    else if (/\.(ts|tsx)$/.test(ent.name)) out.push(rel);
+  }
+  return out;
+}
+const SOURCES = sourcesUnder("src");
+const guessUsers = SOURCES.filter((f) => { const raw = read(f); return GUESS.test(raw) && guessProblems(code(raw)).length > 0; });
+check(`no source file decides from the department guess (${SOURCES.length} files)${guessUsers.length ? ` — ${guessUsers.join(", ")}` : ""}`,
+  SOURCES.length > 500 && guessUsers.length === 0);
+rule("the department guess cannot come back", EXEC, guessProblems, [
+  { label: "a route that reads dashboard_role again", caught: /uses dashboard_role/,
+    mutate: (s) => once(s, "    const cost = canSeeCostData(auth);\n",
+      '    const cost = canSeeCostData(auth) || (auth as { dashboard_role?: string }).dashboard_role === "ceo";\n') },
 ]);
 
 console.log(`\n${pass} passed, ${fail} failed`);

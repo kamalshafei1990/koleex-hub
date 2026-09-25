@@ -13,9 +13,9 @@ import "server-only";
 
    Who may use it is decided at the route layer: ./gate.ts lets in internal
    accounts with the Finance module (view to read, create to move an item);
-   src/lib/experience adds the approver predicate (CEO / Accountant / super
-   admin approve and reject) and hides the cost-sensitive kinds below from
-   roles that cannot see cost data.
+   src/lib/experience answers the rest from Roles & Permissions — «Finance
+   Approvals» to approve and reject, the role's «private records» switch to
+   see (and so to move) the cost-sensitive kinds below.
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -290,13 +290,4 @@ export async function listActivity(tenantId: string, opts: {
     ...r,
     actor_label: r.actor_id ? nameMap.get(r.actor_id) ?? r.actor_id.slice(0, 8) : null,
   }));
-}
-
-/* ─── Permission helper ─── */
-
-import type { DashboardRole } from "@/lib/experience";
-
-export function canApprove(role: DashboardRole, isSuperAdmin: boolean): boolean {
-  if (isSuperAdmin) return true;
-  return role === "ceo" || role === "accountant";
 }

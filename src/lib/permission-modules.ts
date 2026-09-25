@@ -50,10 +50,17 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    an override grants "Report Templates". Reports 5B (owner's pick, 25 Sep
    2026): "CEO Office" — starting the CEO office's report types, and reading
    inside them the follow-up numbers per department, the birthdays and work
-   anniversaries, and the invited visitors. */
+   anniversaries, and the invited visitors. Finance (owner's pick, 26 Sep
+   2026): "Bank & Profit" — seeing bank balances, the cash position and
+   profit; "Finance Approvals" — approving and rejecting in the approvals
+   queue. Both used to follow from the department's name (src/lib/experience). */
+export const BANK_PROFIT_MODULE = "Bank & Profit";
+export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
+  { name: BANK_PROFIT_MODULE, app: "Finance" },
+  { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */
