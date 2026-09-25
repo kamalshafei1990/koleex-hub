@@ -28,6 +28,15 @@ export type WritingLang = "en" | "zh" | "ar";
 export const AI_WRITE_SECTIONS: Record<string, string[]> = {
   weekly: ["summary"],
   monthly: ["summary"],
+  /* 5A: from what the team sent in the report's days — read by the server. */
+  team_summary: ["summary"],
+};
+
+/** A type whose "write" material the SERVER gathers (5A: the team's reports
+ *  — the author's page never carries other people's reports to send back). */
+export const serverMaterial = (t: string | ReportTemplateDef | null | undefined): boolean => {
+  const tpl = asTemplate(t);
+  return !!tpl && behaviourKey(tpl) === "team_summary";
 };
 
 export const AI_LIMITS = {
@@ -129,8 +138,8 @@ export function checkAiRequest(t: string | ReportTemplateDef | null, body: Parti
   if (body.lang !== "en" && body.lang !== "zh" && body.lang !== "ar") return "bad_lang";
   if (body.action === "write") {
     if (!canWrite(tpl, body.section)) return "not_writable";
-    if (typeof body.material !== "string" || !body.material.trim()) return "no_material";
-    if (body.material.length > AI_LIMITS.material + 2) return "too_long";
+    if (!serverMaterial(tpl) && (typeof body.material !== "string" || !body.material.trim())) return "no_material";
+    if (typeof body.material === "string" && body.material.length > AI_LIMITS.material + 2) return "too_long";
   } else {
     if (typeof body.text !== "string" || body.text.trim().length < AI_LIMITS.tidyMin) return "too_short";
     if (body.text.length > AI_LIMITS.tidy) return "too_long";

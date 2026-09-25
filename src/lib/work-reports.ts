@@ -7,6 +7,7 @@
 import type { ReportDataValue, ReportSectionValue, ReportTemplateDef } from "@/lib/reports/templates";
 import type { CustomDef, CustomTemplateHead } from "@/lib/reports/custom-templates";
 import type { TemplateHead, TemplateWords } from "@/lib/reports/template-words";
+import type { TeamPersonFacts } from "@/lib/reports/team";
 import type { Translations } from "@/lib/i18n";
 import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
@@ -204,6 +205,19 @@ export const saveObligations = (body: { trackingFrom?: string | null; reminders?
  *  (nothing is sent). */
 export interface NudgePreview { planned?: Array<{ key: string; periodKey: string; kind: "reminder" | "escalation"; dueAt: string; authorName: string; recipients: string[] }> }
 export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
+
+/* ── The team summary (5A) ── */
+export interface TeamSummaryResult {
+  /** Koleex AI's summary; empty when nobody sent a report in those days. */
+  text: string;
+  /** Reports read (the newest first) of `total` sent; `truncated` when some did not fit. */
+  reports: number; total: number; truncated: boolean;
+  people: number; facts: TeamPersonFacts[];
+  /** False until report counting starts: nothing is late or missing yet. */
+  tracking: boolean;
+}
+export const fetchTeamSummary = (from: string, to: string, lang: string) =>
+  call<TeamSummaryResult>("/api/work-reports/team-summary", { method: "POST", body: JSON.stringify({ from, to, lang }) });
 
 /* ── The template builder (4E) ── */
 export interface TemplateRights { view: boolean; create: boolean; edit: boolean; delete: boolean }

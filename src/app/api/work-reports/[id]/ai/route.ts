@@ -32,7 +32,9 @@ import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_LIMITS, checkAiRequest, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
+import { AI_LIMITS, checkAiRequest, serverMaterial, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
+import { rangeLabel, teamFactsText, teamRange } from "@/lib/reports/team";
+import { TEAM_SYSTEM, loadTeamMaterial, teamInstruction } from "@/lib/server/reports/team";
 import { behaviourKey } from "@/lib/reports/templates";
 import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
@@ -95,6 +97,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const fence = newFenceId();
+  let teamPrompt: { system: string; user: string } | null = null;
+  /* A team summary (5A) is written from what the team SENT in the report's
+     days — the server reads it; the page sends no material. */
+  if (ask.action === "write" && serverMaterial(tpl)) {
+    const range = teamRange(row.period_start, row.period_end ?? row.period_start);
+    if (!range) return NextResponse.json({ error: "no_material" }, { status: 400 });
+    let team;
+    try { team = await loadTeamMaterial(auth, range.from, range.to); }
+    catch (e) { console.error("[reports.ai] team:", e instanceof Error ? e.message : e); return NextResponse.json({ error: "failed" }, { status: 500 }); }
+    if (!team.included) return NextResponse.json({ error: "no_material" }, { status: 400 });
+    teamPrompt = {
+      system: TEAM_SYSTEM + AI_PROVENANCE_RULE,
+      user: teamInstruction({ kind: "section", lang: ask.lang, period: rangeLabel(range.from, range.to), people: team.facts.people.length, material: team.text, facts: teamFactsText(team.facts.people, team.facts.tracking), fence }),
+    };
+  }
   const section = en(`tpl.${tpl.key}.s.${ask.section}`);
   const type = en(`tpl.${tpl.key}.name`);
   const period = row.period_start && row.period_end && row.period_start !== row.period_end ? `${row.period_start} to ${row.period_end}` : (row.period_start ?? "");
@@ -128,7 +145,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), DEADLINE_MS));
   const out = await Promise.race([
     chatWithTools({
-      messages: [{ role: "system", content: SYSTEM }, { role: "user", content: instruction }],
+      messages: teamPrompt
+        ? [{ role: "system", content: teamPrompt.system }, { role: "user", content: teamPrompt.user }]
+        : [{ role: "system", content: SYSTEM }, { role: "user", content: instruction }],
       maxTokens,
       temperature: 0.2,
       modelClass: "GENERAL",

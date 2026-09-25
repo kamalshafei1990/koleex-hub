@@ -48,11 +48,20 @@
    type as it was when the report was started, so editing the type changes
    only the reports started after. The Marketing group is theirs until the
    Marketing app brings its own reports.
+
+   Phase 5A (owner's picks, 25 Sep 2026): the manager and the team. The
+   team summary — Koleex AI reads what the team sent (everyone under the
+   manager, at every level; a super admin: everyone) and the manager sends
+   it up — with the team's numbers: its reports (sent, late, missing), its
+   attendance (late, absent, leave days — the manager sees his own team's)
+   and its work (project tasks and the to-dos someone assigned; a person's
+   own to-dos stay private). And the 1-on-1 minutes and the promotion or
+   bonus recommendation. Only someone with a team starts these (teamOnly).
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
+export type ReportFamily = "work" | "team" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -68,18 +77,21 @@ export type ReportColumnType = "text" | "number" | "money" | "date";
 export type ReportDataSource =
   | "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables"
   | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables"
-  | "expenses";
+  | "expenses"
+  | "team_reports" | "team_attendance" | "team_workload";
 export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "quotations", "orders", "invoices", "quotes_waiting", "receivables",
   "purchase_orders", "receipts", "shortages", "pos_late", "payables",
   "expenses",
+  "team_reports", "team_attendance", "team_workload",
 ];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
 /** Who a new report goes to before the author changes anything:
  *  manager = the author's direct manager (the owner when there is none) ·
  *  hr = HR reviewers · manager_hr = both. */
-export type ReportDefaultRecipients = "manager" | "hr" | "manager_hr";
+/** none (5A): the writer picks — a 1-on-1 goes to the person it was with. */
+export type ReportDefaultRecipients = "manager" | "hr" | "manager_hr" | "none";
 
 export interface ReportSectionDef {
   id: string;
@@ -119,6 +131,9 @@ export interface ReportTemplateDef {
   /** Only people with HR·create may start one (a warning, an exit
    *  interview). Everyone else never sees it offered. */
   hrOnly?: boolean;
+  /** Only someone with a team (anyone under them) — or a super admin —
+   *  starts it (5A: the team summary, a 1-on-1, a recommendation). */
+  teamOnly?: boolean;
   /** The free report takes the author's own title. */
   customTitle?: boolean;
   /** Only an event asks for it (Phase 3D: the probation review): never
@@ -460,6 +475,29 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
       t("issues", "text"),
       b("customer_sign", "signature", {}, true),
     ] },
+  /* ── The manager and the team (Phase 5A, owner's picks 25 Sep 2026):
+     only someone with a team starts these ── */
+  { key: "team_summary", family: "team", icon: "users", cadence: null, range: true, teamOnly: true, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      t("summary", "text", true), t("attention", "list"), t("decisions", "list"),
+      b("reports", "data", { source: "team_reports" }), b("work", "data", { source: "team_workload" }), b("attendance", "data", { source: "team_attendance" }),
+      t("next", "list"),
+    ] },
+  { key: "one_on_one", family: "team", icon: "handshake", cadence: null, teamOnly: true, recipients: "none", reviewRequired: false, confidential: true,
+    sections: [
+      t("discussed", "text", true), t("wins", "list"), t("challenges", "list"),
+      b("actions", "table", { columns: [{ id: "action", type: "text" }, { id: "owner", type: "text" }, { id: "due", type: "date" }], summary: "none" }),
+      t("support", "text"), t("feedback", "text"),
+    ] },
+  { key: "promotion_recommendation", family: "team", icon: "award", cadence: null, teamOnly: true, recipients: "manager_hr", reviewRequired: true, confidential: true,
+    sections: [
+      t("employee", "text", true),
+      b("recommendation", "choice", { options: ["promotion", "raise", "bonus", "new_role", "other"] }, true),
+      t("current", "text"), t("proposed", "text"), t("justification", "text", true), t("achievements", "list"),
+      b("rating", "score", { points: [{ id: "performance", weight: 30 }, { id: "reliability", weight: 20 }, { id: "teamwork", weight: 15 }, { id: "initiative", weight: 15 }, { id: "skills", weight: 20 }] }, true),
+      t("effective", "text"),
+      b("sign", "signature", {}),
+    ] },
   /* ── Memos ── */
   { key: "decision_memo", family: "memos", icon: "gavel", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
     sections: [t("background", "text", true), t("options", "list", true), t("recommendation", "text", true), t("deadline", "text")] },
@@ -489,7 +527,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
@@ -531,6 +569,9 @@ export interface ReportDataValue {
   truncated?: boolean;
   /** The read failed — said as such, never shown as "nothing". */
   failed?: boolean;
+  /** The team's reports before counting starts (5A): nothing is late or
+   *  missing yet — said as such. */
+  untracked?: boolean;
 }
 export interface ReportSectionValue {
   id: string;

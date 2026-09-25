@@ -19,6 +19,12 @@ import "server-only";
      pos_late        their orders past the expected delivery, not delivered
      payables        their supplier bills with money still to pay
      expenses        their own expenses dated in a trip's days (4D; not rejected)
+     team_reports / team_attendance / team_workload
+                     (5A) the AUTHOR's TEAM over the report's days — its
+                     reports, attendance and work, one row per person
+                     (src/lib/server/reports/team.ts); no app gate: the
+                     author's own team decides, and without one the block is
+                     empty
 
    Called only for the author (the draft's GET and its date move, and the
    send, which freezes the answer into the report). Each source needs its
@@ -37,7 +43,9 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
 import { REPORT_LIMITS, periodFor, rangeEnd, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
 import { templateOf } from "@/lib/reports/custom-templates";
-import { DATA_MODULE } from "@/lib/reports/report-data";
+import { DATA_MODULE, isTeamSource, type TeamSource } from "@/lib/reports/report-data";
+import { teamRows } from "@/lib/reports/team";
+import { loadTeamFacts, loadTeamScope } from "@/lib/server/reports/team";
 
 const LIMIT = REPORT_LIMITS.dataRows;
 const DAY = 86_400_000;
@@ -109,7 +117,7 @@ function sentDay(q: Q): string | null {
   return day(q.issue_date) ?? day(q.created_at);
 }
 
-const READ: Record<ReportDataSource, (c: Ctx) => Promise<ReportDataRow[]>> = {
+const READ: Record<Exclude<ReportDataSource, TeamSource>, (c: Ctx) => Promise<ReportDataRow[]>> = {
   async quotations(c) {
     let q = supabaseServer.from("quotations")
       .select("id, quote_no, status, currency, total, issue_date, company:doc->>companyName, customer:doc->>customerName")
@@ -258,8 +266,25 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
     : { start: row.period_start ?? today, end: row.period_end ?? row.period_start ?? today };
   const c: Ctx = { me: auth.account_id, tenant: auth.tenant_id ?? null, start: period.start, end: period.end, today };
   const sources = Array.from(new Set(secs.map((s) => s.source!)));
+  /* The team's numbers (5A): read once for every team block of the report. */
+  const teamParts = { reports: sources.includes("team_reports"), attendance: sources.includes("team_attendance"), workload: sources.includes("team_workload") };
+  const teamP = sources.some(isTeamSource)
+    ? loadTeamScope(auth).then((scope) => loadTeamFacts(auth, scope, period.start, period.end, teamParts))
+    : null;
   const answers = new Map(await Promise.all(sources.map(async (src): Promise<[ReportDataSource, ReportDataValue]> => {
     const capturedAt = now.toISOString();
+    if (isTeamSource(src)) {
+      try {
+        const team = await teamP!;
+        if (src === "team_reports" && !team.tracking) return [src, { source: src, rows: [], capturedAt, untracked: true }];
+        const rows = teamRows(src, team.people);
+        return [src, rows.length > LIMIT ? { source: src, rows: rows.slice(0, LIMIT), capturedAt, truncated: true } : { source: src, rows, capturedAt }];
+      } catch (e) {
+        console.error(`[reports] team numbers ${src}:`, e instanceof Error ? e.message : e);
+        const unread: ReportDataValue = { source: src, rows: [], capturedAt, failed: true };
+        return [src, unread];
+      }
+    }
     if (await requireModuleAccess(auth, DATA_MODULE[src])) return [src, { source: src, rows: [], capturedAt, denied: true }];
     try {
       const rows = await READ[src](c);

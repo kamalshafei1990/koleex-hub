@@ -509,8 +509,8 @@ function dataCell(t: T, source: ReportDataSource, r: ReportDataRow, c: DataColum
  *  glance (`asOf`: the day the numbers were taken). */
 function dataTone(r: ReportDataRow, c: DataColumn, asOf: string): string {
   const v = r.cells[c.id];
-  if ((c.id === "overdue" || c.id === "late") && Number(v) > 0) return "font-semibold text-red-500";
-  if (c.id === "missing" && Number(v) > 0) return "font-semibold text-amber-500";
+  if ((c.id === "overdue" || c.id === "late" || c.id === "missed" || c.id === "overdue_work" || c.id === "absent") && Number(v) > 0) return "font-semibold text-red-500";
+  if ((c.id === "missing" || c.id === "sent_late" || c.id === "late_days") && Number(v) > 0) return "font-semibold text-amber-500";
   if (c.id === "days" && Number(v) >= 14) return "font-semibold text-amber-500";
   if (c.id === "valid" && typeof v === "string" && v < asOf) return "font-semibold text-red-500";
   return "text-[var(--text-primary)]";
@@ -523,6 +523,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   if (!data) return <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
   if (data.denied) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataNoAccess").replace("{app}", DATA_MODULE[data.source])}</p>;
   if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;
+  if (data.untracked) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataUntracked")}</p>;
   const foot = (
     <p className="text-[11px] text-[var(--text-faint)] tabular-nums">
       {composing ? t("blk.dataLive") : t("blk.dataAsOf").replace("{at}", dmyTime(data.capturedAt))}

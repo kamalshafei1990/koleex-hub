@@ -39,7 +39,7 @@ import {
 } from "@/lib/reports/templates";
 import { carryRulesFor, type CarryGroup } from "@/lib/reports/carry";
 import { appRulesFor, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
-import { toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
+import { serverMaterial, toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
 import {
   commentOnReport, decideReport, deleteDraft, dmyDate, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
   type ReportDetail, type ReportPerson, type ReportRecipient,
@@ -296,6 +296,9 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
   };
   const write = (sid: string) => {
     const d = draftRef.current;
+    /* A team summary (5A): the server reads what the team sent — the page
+       sends none of it back. */
+    if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }
     const heading = (g: CarryGroup) => (g.app ? t(`feed.g.${g.section}`) : `${t(`tpl.${g.from}.s.${g.section}`)} (${tplName(t, g.from)})`);
     const material = writeMaterial(
       [...carry.groups, ...feedGroups].map((g) => ({ heading: heading(g), group: g })),

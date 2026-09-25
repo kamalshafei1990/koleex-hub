@@ -9,7 +9,8 @@
    owed — and (4C) their purchase orders and receipts in the period, the
    items still short on a partly received order, the orders past their
    delivery date, the supplier bills still to pay — and (4D) their own
-   expenses in a trip's days. The server computes the
+   expenses in a trip's days — and (5A) a manager's TEAM: its reports,
+   attendance and work, one row per person. The server computes the
    rows (src/lib/server/reports/report-data.ts) — fresh every time a draft
    opens, frozen into the report when it is sent — so a reader sees exactly
    what the author saw, and no figure is typed.
@@ -23,7 +24,14 @@ import { entityHref } from "./link-targets";
 export type DataColumnType = "text" | "money" | "number" | "date" | "status";
 export interface DataColumn { id: string; type: DataColumnType }
 
+/** The team's numbers (5A): one row per person, keyed by their account. */
+export const TEAM_SOURCES = ["team_reports", "team_attendance", "team_workload"] as const;
+export type TeamSource = (typeof TEAM_SOURCES)[number];
+export const isTeamSource = (s: string): s is TeamSource => (TEAM_SOURCES as readonly string[]).includes(s);
+
 const NO: DataColumn = { id: "no", type: "text" };
+const PERSON: DataColumn = { id: "person", type: "text" };
+const n = (id: string): DataColumn => ({ id, type: "number" });
 const CUSTOMER: DataColumn = { id: "customer", type: "text" };
 const SUPPLIER: DataColumn = { id: "supplier", type: "text" };
 
@@ -39,13 +47,18 @@ export const DATA_COLUMNS: Record<ReportDataSource, DataColumn[]> = {
   pos_late: [NO, SUPPLIER, { id: "expected", type: "date" }, { id: "late", type: "number" }, { id: "amount", type: "money" }, { id: "status", type: "status" }],
   payables: [NO, SUPPLIER, { id: "due", type: "date" }, { id: "overdue", type: "number" }, { id: "balance", type: "money" }],
   expenses: [{ id: "title", type: "text" }, { id: "category", type: "text" }, { id: "date", type: "date" }, { id: "amount", type: "money" }, { id: "status", type: "status" }],
+  team_reports: [PERSON, n("owed"), n("on_time"), n("sent_late"), n("missed")],
+  team_attendance: [PERSON, n("present"), n("late_days"), n("absent"), n("leave_days")],
+  team_workload: [PERSON, n("open_work"), n("overdue_work"), n("done_work")],
 };
 
-/** The app a source belongs to — the author must hold it (requireModuleAccess). */
+/** The app a source belongs to — the author must hold it (requireModuleAccess).
+ *  The team's numbers need no app: the author's own team decides (5A). */
 export const DATA_MODULE: Record<ReportDataSource, string> = {
   quotations: "Quotations", quotes_waiting: "Quotations", orders: "Orders", invoices: "Invoices", receivables: "Invoices",
   purchase_orders: "Purchase", receipts: "Purchase", shortages: "Purchase", pos_late: "Purchase", payables: "Purchase",
   expenses: "Expenses",
+  team_reports: "Reports", team_attendance: "Reports", team_workload: "Reports",
 };
 
 /** What a row opens: the document in its own app — a quotation or an
@@ -60,6 +73,9 @@ export function dataRowHref(source: ReportDataSource, key: string): string | nul
     case "receipts": return "/purchase/receipts";
     case "payables": return "/purchase/bills";
     case "expenses": return "/finance/expenses";
+    /* A person's reports on the compliance board; attendance and work
+       open nothing (the manager may hold neither HR nor Projects). */
+    case "team_reports": return "/reports?tab=compliance";
     default: return null;
   }
 }

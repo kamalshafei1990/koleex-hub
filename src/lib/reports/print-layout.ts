@@ -229,6 +229,7 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
         if (!d) return { sid: s.id, paras: [] };
         if (d.denied) return { sid: s.id, paras: [{ text: word("blk.dataNoAccess").replace("{app}", DATA_MODULE[d.source]), bullet: false }] };
         if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };
+        if (d.untracked) return { sid: s.id, paras: [{ text: word("blk.dataUntracked"), bullet: false }] };
         const asOf = { text: word("blk.dataAsOf").replace("{at}", dmyHm(d.capturedAt)), bullet: false };
         if (!d.rows.length) return { sid: s.id, paras: [{ text: word(`blk.de.${d.source}`), bullet: false }, asOf] };
         const cols = DATA_COLUMNS[d.source];

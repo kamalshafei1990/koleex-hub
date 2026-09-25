@@ -16,7 +16,8 @@
    Phase 4E: the types made in the template builder ride it too (named, for
    "Write a report"), and the builder itself — the Templates tab, for super
    admins and whoever holds "Report Templates" in Roles — loads its own code
-   only when it is opened.
+   only when it is opened. Phase 5A: the Team tab opens with the team
+   summary (Koleex AI over what the team sent), its own chunk too.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -41,6 +42,7 @@ import { CARD, ReportRowItem, TemplateIcon, tplName, type T } from "./shared";
 const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
 const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
 const TemplatesTab = dynamic(() => import("./TemplatesTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
+const TeamSummary = dynamic(() => import("./TeamSummary"), { ssr: false, loading: () => <div className={`${CARD} mb-4 grid place-items-center py-10`}><SpinnerIcon size={16} /></div> });
 
 type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
 const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
@@ -186,6 +188,7 @@ export default function ReportsApp() {
 
         <div key={tab} className="kx-tab-in">
           {tab === "home" && <Home t={t} lang={lang} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
+          {tab === "team" && bundle?.me.hasTeam && <TeamSummary t={t} lang={lang} />}
           {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} lang={lang} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
           {tab === "compliance" && <ComplianceTab t={t} lang={lang} />}
           {tab === "library" && <Library t={t} bundle={bundle} />}

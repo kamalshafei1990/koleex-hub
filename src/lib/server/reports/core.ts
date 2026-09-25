@@ -69,10 +69,13 @@ export function requireReportsUser(auth: ServerAuthContext): NextResponse | null
 }
 
 /** May this person START a report of this type? HR-only types (a warning,
- *  an exit interview) need HR·create; every other type is open to staff. */
+ *  an exit interview) need HR·create; a team type (5A: the team summary, a
+ *  1-on-1, a recommendation) needs a team — anyone under them — or a super
+ *  admin; every other type is open to staff. */
 export async function canStartTemplate(tpl: ReportTemplateDef, auth: ServerAuthContext): Promise<boolean> {
-  if (!tpl.hrOnly) return true;
-  return (await requireModuleAction(auth, "HR", "create")) === null;
+  if (tpl.hrOnly && (await requireModuleAction(auth, "HR", "create")) !== null) return false;
+  if (tpl.teamOnly && !auth.is_super_admin && !(await loadOrgTree(auth.tenant_id)).descendantsOf(auth.account_id).length) return false;
+  return true;
 }
 
 type EmpLite = { id: string; account_id: string | null; person_id: string | null; manager_id: string | null };
@@ -205,6 +208,8 @@ export async function superAdminIds(tenantId: string | null): Promise<string[]> 
 /** Who a new report of this type is addressed to before the author changes
  *  anything. Never the author themself. */
 export async function defaultRecipients(tpl: ReportTemplateDef, auth: ServerAuthContext, tree?: OrgTree): Promise<string[]> {
+  /* The writer picks (5A: a 1-on-1 goes to the person it was with). */
+  if (tpl.recipients === "none") return [];
   const me = auth.account_id;
   const wantsManager = tpl.recipients === "manager" || tpl.recipients === "manager_hr";
   const wantsHr = tpl.recipients === "hr" || tpl.recipients === "manager_hr";

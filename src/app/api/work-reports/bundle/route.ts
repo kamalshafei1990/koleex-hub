@@ -68,12 +68,13 @@ export async function GET(req: Request) {
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
-     (warning, exit interview) needs HR·create. A hidden built-in is not
-     offered (4E); its old reports stay where they are. */
-  const hiddenSet = new Set(hidden);
-  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)).map((tpl) => tpl.key);
-  const nameOf = new Map(people.map((p) => [p.id, p]));
+     (warning, exit interview) needs HR·create; a team type (5A) needs a
+     team. A hidden built-in is not offered (4E); its old reports stay where
+     they are. */
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
+  const hiddenSet = new Set(hidden);
+  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam)).map((tpl) => tpl.key);
+  const nameOf = new Map(people.map((p) => [p.id, p]));
 
   return NextResponse.json({
     me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam, board: hasTeam || hrView === null, templates: builder === null },
@@ -91,7 +92,7 @@ export async function GET(req: Request) {
       };
     }),
     templates,
-    custom: custom.filter((c) => !c.hrOnly || hrCreate === null),
+    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam)),
     people: people.filter((p) => p.id !== me),
     library: { hr: hrView === null, finance: finance === null, tasks: todo === null },
   }, { headers: { "Cache-Control": "private, no-store" } });

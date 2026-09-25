@@ -63,7 +63,7 @@ const blankDoc = (): TemplateDoc => ({
   key: null,
   def: {
     family: "work", icon: "document", cadence: null, range: false, recipients: "manager", reviewRequired: false,
-    confidential: false, urgent: false, customTitle: false, hrOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
+    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
   },
   words: {},
 });
@@ -492,13 +492,14 @@ function Editor({ t, lang, doc, onClose }: { t: T; lang: Lang; doc: TemplateDoc;
             <div>
               <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{t("tb.to")}</p>
               <Seg value={def.recipients} label={t("tb.to")} onChange={(v) => patch({ recipients: v })}
-                options={(["manager", "hr", "manager_hr"] as const).map((v) => ({ value: v, label: t(`tb.to.${v}`) }))} />
+                options={(["manager", "hr", "manager_hr", "none"] as const).map((v) => ({ value: v, label: t(`tb.to.${v}`) }))} />
             </div>
             <Switch on={def.reviewRequired} label={t("tb.review")} hint={t("tb.reviewHint")} onChange={(v) => patch({ reviewRequired: v })} />
             <Switch on={def.confidential} label={t("composer.confidential")} hint={t("tb.confidentialHint")} onChange={(v) => patch({ confidential: v })} />
             <Switch on={def.urgent} label={t("tb.urgent")} hint={t("tb.urgentHint")} onChange={(v) => patch({ urgent: v })} />
             <Switch on={def.customTitle} label={t("tb.ownTitle")} hint={t("tb.ownTitleHint")} onChange={(v) => patch({ customTitle: v })} />
             <Switch on={def.hrOnly} label={t("tb.hrOnly")} hint={t("tb.hrOnlyHint")} onChange={(v) => patch({ hrOnly: v })} />
+            <Switch on={def.teamOnly} label={t("tb.teamOnly")} hint={t("tb.teamOnlyHint")} onChange={(v) => patch({ teamOnly: v })} />
           </section>
         </aside>
       </div>
