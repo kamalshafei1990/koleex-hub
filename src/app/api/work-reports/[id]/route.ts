@@ -7,7 +7,8 @@ import "server-only";
           and what THIS viewer may do with it. Opening it as a recipient marks
           it read and clears the reader's own notification. The author's
           draft also carries the suggestions from their earlier reports
-          (yesterday's plan, the week's dailies…), so the composer paints
+          (yesterday's plan, the week's dailies…) and their own work in the
+          apps around the period (appFeed), so the composer paints
           complete — no second request, nothing shifting in later. Photos
           and files come as ids only; their bytes are fetched through
           /api/files/report/<id>, which applies this same read rule.
@@ -27,6 +28,7 @@ import { REPORT_LIMITS, normalizeSections, periodFor, reportTemplate } from "@/l
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { loadCarry } from "@/lib/server/reports/carry";
+import { loadAppFeed } from "@/lib/server/reports/app-feed";
 import { loadAttachmentRows, removeUnreferenced, toClientAttachment, type AttachmentRow } from "@/lib/server/reports/attachments";
 
 export const dynamic = "force-dynamic";
@@ -71,9 +73,11 @@ export async function GET(req: Request, { params }: Params) {
   const isAuthor = access === "author";
   const isTo = mine?.role === "to";
   const open = row.status === "submitted";
-  /* One more read, and only for the author's own draft — the only screen
+  /* One more wave, and only for the author's own draft — the only screen
      that shows them. */
-  const carry = isAuthor && row.status === "draft" ? await loadCarry(row, auth) : undefined;
+  const [carry, appFeed] = isAuthor && row.status === "draft"
+    ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth)])
+    : [undefined, undefined];
 
   return NextResponse.json({
     report: {
@@ -99,6 +103,7 @@ export async function GET(req: Request, { params }: Params) {
     },
     people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
     carry,
+    appFeed,
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(toClientAttachment),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

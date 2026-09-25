@@ -21,6 +21,10 @@
  *   §8 carry-over (Phase 2A) — which earlier reports feed a new one, that a
  *      suggestion is offered once and never cut, that it is only ever the
  *      author's own text, and that nothing lands in a report by itself.
+ *   §10 fill from the apps (Phase 2B) — every rule points at real sections,
+ *      a fact lands on the author's OWN calendar day (a 10 pm Shanghai meeting
+ *      is not the UTC day), open work counts when due, words follow the
+ *      language, and a fact is offered once per list.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -38,6 +42,9 @@ import {
 } from "../src/lib/reports/templates";
 import { reportsT } from "../src/lib/translations/reports";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
+import {
+  APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
+} from "../src/lib/reports/app-feed";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
 } from "../src/lib/reports/attachments";
@@ -235,9 +242,9 @@ console.log("\n§5 routes");
   rule("send refuses a report with nobody to send it to", `${API}/[id]/submit/route.ts`,
     (c) => (/no_recipients/.test(c) ? [] : ["no recipient check"]),
     (s) => s.replace(/if \(!recipients\.some[^\n]*\n/, "\n"));
-  rule("only the author's own draft carries suggestions", `${API}/[id]/route.ts`,
-    (c) => (/const carry = isAuthor && row\.status === "draft" \? await loadCarry\(row, auth\) : undefined;/.test(c) ? [] : ["carry is not gated on the author's draft"]),
-    (s) => s.replace('isAuthor && row.status === "draft" ? await loadCarry', "true ? await loadCarry"));
+  rule("only the author's own draft carries suggestions (earlier reports and the apps)", `${API}/[id]/route.ts`,
+    (c) => (/const \[carry, appFeed\] = isAuthor && row\.status === "draft"\s*\? await Promise\.all\(\[loadCarry\(row, auth\), loadAppFeed\(row, auth\)\]\)\s*: \[undefined, undefined\];/.test(c) ? [] : ["the suggestions are not gated on the author's draft"]),
+    (s) => s.replace('isAuthor && row.status === "draft"\n    ? await Promise.all', "true\n    ? await Promise.all"));
   rule("the carry route answers the author of a draft only", `${API}/[id]/carry/route.ts`,
     (c) => (/loaded\.access !== "author"/.test(c) && /loaded\.row\.status !== "draft"/.test(c) ? [] : ["the carry route does not check author + draft"]),
     (s) => s.replace('if (!loaded || loaded.access !== "author")', "if (!loaded)"));
@@ -548,6 +555,104 @@ console.log("\n§9 photos and files");
   const need = ["attach.title", "attach.hint", "attach.addPhotos", "attach.addFiles", "attach.caption", "attach.remove", "attach.retry", "attach.uploading", "attach.waitUpload",
     "attach.errType", "attach.errSize", "attach.errPhoto", "attach.errMax", "attach.errUpload", "attach.download", "attach.close", "attach.prev", "attach.next", "attach.of", "print.attachments"];
   expect(need.every((k) => !!reportsT[k]), "every photos-and-files word exists (their three languages are checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
+}
+
+/* ── §10 fill from the apps ────────────────────────────────────────────── */
+console.log("\n§10 fill from the apps");
+{
+  const bad: string[] = [];
+  for (const [key, rules] of Object.entries(APP_RULES)) {
+    const tpl = reportTemplate(key);
+    if (!tpl) { bad.push(`${key}: unknown template`); continue; }
+    for (const r of rules) {
+      if (!r.to.length) bad.push(`${key}.${r.group}: goes nowhere`);
+      for (const sid of r.to) {
+        const sec = tpl.sections.find((x) => x.id === sid);
+        if (!sec) bad.push(`${key}.${sid}: no such section`);
+      }
+      for (const src of r.sources) if (!APP_SOURCES.includes(src)) bad.push(`${key}.${r.group}: unknown source ${src}`);
+      if (!reportsT[`feed.g.${r.group}`]) bad.push(`feed.g.${r.group}: no words`);
+    }
+  }
+  for (const src of APP_SOURCES) if (!reportsT[`feed.src.${src}`]) bad.push(`feed.src.${src}: no words`);
+  expect(bad.length === 0, `${Object.keys(APP_RULES).length} report types fill from the apps; every rule points at real sections and has its words`, bad.join("; "));
+  eq(Object.keys(APP_RULES).sort(), ["daily", "monthly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly and monthly fill from the apps; memos and visits start blank");
+  eq(feedSources("free"), [], "a free report reads no app");
+  eq(feedSources("monthly"), ["tasks", "quotations", "invoices", "orders"], "the monthly reads only what it can use");
+
+  /* The author's own day. Shanghai is UTC+8 (480), Cairo UTC+3 (180). */
+  eq(localDay("2026-09-25T14:30:00.000Z", 480), "2026-09-25", "14:30 UTC is still the 25th in Shanghai");
+  eq(localDay("2026-09-25T17:30:00.000Z", 480), "2026-09-26", "17:30 UTC is already the 26th in Shanghai");
+  eq(localDay("2026-09-25T22:30:00.000Z", 180), "2026-09-26", "22:30 UTC is the 26th in Cairo");
+  eq(localDay("2026-09-24T21:30:00.000Z", -300), "2026-09-24", "and the 24th in New York");
+  eq(localDay("2026-09-30", 480), "2026-09-30", "a due DATE is a day everywhere");
+  const day = periodFor("daily", "2026-09-25");
+  eq(nextPeriod("daily", day), { start: "2026-09-26", end: "2026-09-26", key: "2026-09-26" }, "after a day comes tomorrow");
+  eq(nextPeriod("weekly", periodFor("weekly", "2026-09-25")).key, "2026-W40", "after a week comes next week");
+  eq(feedWindow("daily", day), { from: "2026-09-24T00:00:00.000Z", to: "2026-09-28T00:00:00.000Z" }, "the server reads a day either side of today and tomorrow, so every timezone is in");
+
+  const rec = (x: Partial<AppRecord> & Pick<AppRecord, "source" | "state" | "at" | "title">): AppRecord => ({ id: x.title, ...x });
+  const recs: AppRecord[] = [
+    rec({ source: "calendar", state: "scheduled", at: "2026-09-25T02:00:00.000Z", end: "2026-09-25T03:00:00.000Z", title: "Supplier call" }),
+    rec({ source: "calendar", state: "scheduled", at: "2026-09-25T17:00:00.000Z", title: "Late call (26th in Shanghai)" }),
+    rec({ source: "calendar", state: "scheduled", at: "2026-09-26T01:00:00.000Z", title: "Tomorrow's visit" }),
+    rec({ source: "todos", state: "done", at: "2026-09-25T09:00:00.000Z", title: "Sent the samples" }),
+    rec({ source: "todos", state: "open", at: "2026-09-20", title: "Overdue: customs papers" }),
+    rec({ source: "todos", state: "open", at: "2026-09-26", title: "Due tomorrow: pay deposit" }),
+    rec({ source: "todos", state: "open", at: "2026-10-05", title: "Due next month" }),
+    rec({ source: "quotations", state: "done", at: "2026-09-25T06:00:00.000Z", title: "QU-26-0012", who: "Nour Textiles" }),
+    rec({ source: "invoices", state: "done", at: "2026-09-18T06:00:00.000Z", title: "INV-26-0003", who: "Nour Textiles" }),
+  ];
+  const w = { period: day, next: nextPeriod("daily", day) };
+  const titles = (g: string) => recordsFor(APP_RULES.daily.find((r) => r.group === g)!, recs, w, 480).map((r) => r.title);
+  eq(titles("meetings"), ["Supplier call"], "today's meetings: a late UTC meeting that is tomorrow in Shanghai is not today's");
+  eq(titles("done"), ["QU-26-0012", "Sent the samples"], "what was finished or issued today, in the order of the day, nothing from last week");
+  eq(titles("open"), ["Overdue: customs papers"], "still open: due by today, overdue included — not tomorrow's, not next month's");
+  eq(titles("tomorrow"), ["Due tomorrow: pay deposit", "Late call (26th in Shanghai)", "Tomorrow's visit"], "tomorrow: what falls due first, then tomorrow's meetings by the clock (the late UTC call is 01:00 there)");
+
+  const fmt = (lang: "en" | "ar" | "zh"): FeedFormatter => ({
+    t: (k) => reportsT[k]?.[lang] ?? k,
+    time: (iso) => new Date(Date.parse(iso) + 480 * 60_000).toISOString().slice(11, 16),
+    day: (ymd) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`,
+    tzOffsetMin: 480,
+  });
+  eq(formatAppRecord(recs[0], fmt("en")), { text: "10:00–11:00 Supplier call", tag: "Calendar · 10:00–11:00" }, "a meeting reads with its time on the author's clock");
+  eq(formatAppRecord(recs[7], fmt("en")).text, "Quotation QU-26-0012 to Nour Textiles", "a quotation reads as a sentence");
+  eq(formatAppRecord(recs[7], fmt("ar")).text, "عرض سعر QU-26-0012 لـ Nour Textiles", "and in Arabic for an Arabic writer");
+  eq(formatAppRecord(recs[7], fmt("zh")).text, "向 Nour Textiles 发出报价单 QU-26-0012", "and in Chinese for a Chinese writer");
+  eq(formatAppRecord({ ...recs[7], who: null }, fmt("en")).text, "Quotation QU-26-0012", "without a customer it still reads");
+  eq(formatAppRecord(rec({ source: "tasks", state: "done", at: "2026-09-25T09:00:00.000Z", title: "Upload catalogue", who: "JOOKE launch" }), fmt("en")).text, "JOOKE launch: Upload catalogue", "a project task reads with its project");
+  eq(formatAppRecord(rec({ source: "crm", state: "scheduled", at: "2026-09-25T02:00:00.000Z", title: "Price review", who: "Nour Textiles", kind: "visit" }), fmt("en")).text, "Visit with Nour Textiles: Price review", "a customer visit reads with its customer");
+  eq(formatAppRecord(rec({ source: "crm", state: "done", at: "2026-09-25T02:00:00.000Z", title: "Follow-up", who: "Nour", kind: "fax" }), fmt("en")).text, "Activity with Nour: Follow-up", "an activity type with no words reads as an activity");
+
+  const groups = buildFeedGroups("daily", day, [...recs, recs[3]], fmt("en"));
+  eq(groups.map((g) => `${g.section}>${g.to.join("|")}`), ["meetings>meetings", "done>done", "open>pending", "tomorrow>tomorrow"], "a daily's lists land in its meetings, done, pending and tomorrow sections");
+  eq(groups.find((g) => g.section === "done")?.items.length, 2, "a fact repeated in the feed is offered once");
+  expect(groups.every((g) => g.app && g.items.every((i) => !i.paragraph && !!i.tag)), "every app suggestion is one line with its source tag");
+  eq(buildFeedGroups("customer_visit", day, recs, fmt("en")), [], "a visit report gets no app lists");
+
+  /* The server's reads: the viewer's own, gated by each app's module. */
+  const FEED = "src/lib/server/reports/app-feed.ts";
+  rule("every app read is pinned to the viewer (or to ids the viewer's own rows gave)", FEED,
+    (c) => {
+      const reads = c.split("supabaseServer.from(").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf(";") > 0 ? chunk.indexOf(";") : chunk.length));
+      /* The to-do reads go through `mine`, which must itself be the viewer's:
+         their own assignments, or what they created and kept. */
+      const mineDef = /const mine = assigned\.length[\s\S]*?;/.exec(c)?.[0] ?? "";
+      const mineOk = (mineDef.match(/created_by_account_id\.eq\.\$\{c\.me\}/g) ?? []).length === 2 && /koleex_todo_assignees"\)\.select\("todo_id"\)\s*\.eq\("account_id", c\.me\)/.test(c);
+      const loose = reads.filter((r) => !/c\.me\b/.test(r) && !/\.in\("id", invitedIds\)/.test(r) && !/\.in\("resource_id", res\)/.test(r) && !(mineOk && /\.or\(mine\)/.test(r)));
+      return reads.length >= 12 && loose.length === 0 ? [] : [`${loose.length} read(s) not pinned to the viewer: ${loose.map((l) => l.slice(0, 40)).join(" | ")}`];
+    },
+    (src) => src.replace('.select(EVENT_COLS).eq("account_id", c.me).is("recurrence", null)', '.select(EVENT_COLS).is("recurrence", null)'));
+  rule("an app is read only when the viewer holds its module", FEED,
+    (c) => (/await requireModuleAccess\(auth, FEED_MODULE\[s\]\)\) === null \? s : null/.test(c) && /allowed\.filter\(\(s\): s is AppSource => !!s\)\.map/.test(c) ? [] : ["the module gate is missing"]),
+    (src) => src.replace("allowed.filter((s): s is AppSource => !!s).map", "sources.map"));
+  const modules = /export const FEED_MODULE: Record<AppSource, string> = \{([\s\S]*?)\};/.exec(code(read(FEED)))?.[1] ?? "";
+  expect(APP_SOURCES.every((src) => new RegExp(`\\b${src}: "`).test(modules)), "every app source names the module that gates it", modules);
+  expect(/neq\("status", "declined"\)/.test(code(read(FEED))), "a declined invitation is not the author's meeting");
+  const nextWeek = rec({ source: "planning", state: "open", at: "2026-09-29T01:00:00.000Z", title: "Trade fair booth" });
+  eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).map((g) => g.section), ["meetings", "done", "next"], "a weekly gets the week's meetings, what was done, and next week");
+  eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).find((g) => g.section === "next")?.items.map((i) => i.text), ["Trade fair booth"], "next week holds only what falls in it (a due date on 05/10 is not next week's)");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

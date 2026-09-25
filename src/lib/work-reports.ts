@@ -7,6 +7,7 @@
 import type { ReportSectionValue } from "@/lib/reports/templates";
 import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
+import type { AppRecord } from "@/lib/reports/app-feed";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -63,6 +64,9 @@ export interface ReportDetail {
   carry?: CarryGroup[];
   /** Photos and files, in order (ids only — see reportFileUrl). */
   attachments?: ReportAttachment[];
+  /** The author's draft only: their own work in the apps around the period
+   *  (raw facts; the composer picks the days and words them). */
+  appFeed?: AppRecord[];
 }
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; extra?: Record<string, unknown> };
@@ -141,7 +145,7 @@ export const deleteReportAttachment = (id: string, attId: string) =>
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string) =>
-  call<{ carry: CarryGroup[] }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}`);
+  call<{ carry: CarryGroup[]; appFeed: AppRecord[] }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}`);
 
 /** The browser's own calendar day (not the UTC one). */
 export const localToday = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

@@ -105,6 +105,9 @@ export interface CarryItem {
   paragraph: boolean;
   /** The day or period start of the report it came from. */
   date: string | null;
+  /** Display only: where a suggestion from the apps came from ("Calendar ·
+   *  10:00"). Never compared, never inserted. */
+  tag?: string;
 }
 
 export interface CarryGroup {
@@ -116,6 +119,9 @@ export interface CarryGroup {
   /** The earlier reports that gave items, oldest first. */
   sources: Array<{ id: string; start: string | null; end: string | null }>;
   items: CarryItem[];
+  /** A group of suggestions from the apps (app-feed.ts): `section` is then
+   *  the rule's group ("meetings", "done"…), not a report section. */
+  app?: boolean;
 }
 
 /** One line as a person means it: no bullet or number in front, spaces and

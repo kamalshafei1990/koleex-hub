@@ -1,6 +1,6 @@
 import type { Translations } from "@/lib/i18n";
 
-/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; photos and files 2C). Template strings follow
+/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; apps 2B; photos and files 2C). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
    template key and section has all three languages. */
 export const reportsT: Translations = {
@@ -91,6 +91,37 @@ export const reportsT: Translations = {
   "carry.waiting":  { en: "{n} not added yet", zh: "还有 {n} 项未添加", ar: "{n} لسه ما اتضافوش" },
   "carry.allAdded": { en: "Everything here is in your report", zh: "这些内容都已加入报告", ar: "كل ده اتضاف لتقريرك" },
   "carry.full":     { en: "No room left in {section}.", zh: "「{section}」已满。", ar: "مفيش مكان فاضي في «{section}»." },
+
+  /* Phase 2B — fill from the apps: the author's own work in the Hub,
+     offered as suggestions. */
+  "feed.title":       { en: "From your work in the Hub", zh: "来自你在系统中的工作", ar: "من شغلك على الهب" },
+  "feed.hint":        { en: "Your calendar, to-dos, tasks and documents for this period. Tap to add; nothing is added by itself.", zh: "本期间你的日程、待办、任务和单据。点选即可添加，不会自动添加。", ar: "التقويم والمهام والمستندات بتاعتك في الفترة دي. دوس عشان تضيف، مفيش حاجة بتتضاف لوحدها." },
+  "feed.g.meetings":  { en: "Meetings in your calendar", zh: "日程中的会议", ar: "الاجتماعات اللي في تقويمك" },
+  "feed.g.done":      { en: "What you finished or issued", zh: "你完成或开出的", ar: "اللي خلّصته أو أصدرته" },
+  "feed.g.open":      { en: "Still open and due", zh: "仍未完成且已到期", ar: "لسه مفتوح وميعاده جه" },
+  "feed.g.tomorrow":  { en: "Tomorrow", zh: "明天", ar: "بكرة" },
+  "feed.g.due":       { en: "Due this week", zh: "本周到期", ar: "ميعاده الأسبوع ده" },
+  "feed.g.next":      { en: "Coming next week", zh: "下周安排", ar: "جاي الأسبوع الجاي" },
+  "feed.src.calendar":   { en: "Calendar", zh: "日程", ar: "التقويم" },
+  "feed.src.todos":      { en: "To-do", zh: "待办", ar: "المهام" },
+  "feed.src.tasks":      { en: "Project", zh: "项目", ar: "مشروع" },
+  "feed.src.planning":   { en: "Planning", zh: "计划", ar: "التخطيط" },
+  "feed.src.quotations": { en: "Quotation", zh: "报价单", ar: "عرض سعر" },
+  "feed.src.invoices":   { en: "Invoice", zh: "发票", ar: "فاتورة" },
+  "feed.src.orders":     { en: "Order", zh: "订单", ar: "طلبية" },
+  "feed.src.crm":        { en: "Customers", zh: "客户", ar: "العملاء" },
+  "feed.fmt.quotations":      { en: "Quotation {number} to {who}", zh: "向 {who} 发出报价单 {number}", ar: "عرض سعر {number} لـ {who}" },
+  "feed.fmt.quotations.bare": { en: "Quotation {number}", zh: "报价单 {number}", ar: "عرض سعر {number}" },
+  "feed.fmt.invoices":        { en: "Invoice {number} to {who}", zh: "向 {who} 开具发票 {number}", ar: "فاتورة {number} لـ {who}" },
+  "feed.fmt.invoices.bare":   { en: "Invoice {number}", zh: "发票 {number}", ar: "فاتورة {number}" },
+  "feed.fmt.orders":          { en: "Order {number} for {who}", zh: "{who} 的订单 {number}", ar: "طلبية {number} لـ {who}" },
+  "feed.fmt.orders.bare":     { en: "Order {number}", zh: "订单 {number}", ar: "طلبية {number}" },
+  "feed.fmt.crm":             { en: "{kind} with {who}: {title}", zh: "与 {who} 的{kind}：{title}", ar: "{kind} مع {who}: {title}" },
+  "feed.crm.call":    { en: "Call", zh: "电话", ar: "مكالمة" },
+  "feed.crm.meeting": { en: "Meeting", zh: "会议", ar: "اجتماع" },
+  "feed.crm.visit":   { en: "Visit", zh: "拜访", ar: "زيارة" },
+  "feed.crm.email":   { en: "Email", zh: "邮件", ar: "إيميل" },
+  "feed.crm.other":   { en: "Activity", zh: "活动", ar: "نشاط" },
 
   /* Phase 2C — photos and files. */
   "attach.title":      { en: "Photos and files", zh: "照片和文件", ar: "الصور والملفات" },

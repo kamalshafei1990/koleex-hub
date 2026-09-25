@@ -30,12 +30,15 @@ const SMALL_BTN =
 
 const dayMonth = (ymd: string | null) => (ymd ? dmyDate(ymd).slice(0, 5) : "");
 
-export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
+export default function CarryCard({ t, tpl, groups, texts, onPlace, variant = "reports" }: {
   t: T;
   tpl: ReportTemplateDef;
   groups: CarryGroup[];
   texts: Record<string, string>;
   onPlace: (sectionId: string, value: string) => void;
+  /** reports = "From your earlier reports" · apps = "From your work in the
+   *  Hub" (Phase 2B) — same card, same taps, its own heading. */
+  variant?: "reports" | "apps";
 }) {
   const waitingAll = groups.reduce((n, g) => n + g.items.filter((i) => !isPlaced(i, texts, g.to)).length, 0);
   /* Open while something waits; after that, the author's own toggle. */
@@ -48,6 +51,8 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
   const target = (sid: string) => t(`tpl.${tpl.key}.s.${sid}`);
   const noRoom = (sid: string) => setNote(t("carry.full").replace("{section}", target(sid)));
   const expand = (key: string) => setExpanded((s) => new Set(s).add(key));
+  const titleId = `kx-carry-title-${variant}`;
+  const bodyId = `kx-carry-body-${variant}`;
 
   const placeOne = (item: CarryItem, sid: string) => {
     const next = insertInto(texts[sid] ?? "", item, kindOf(sid));
@@ -72,22 +77,22 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
   };
 
   return (
-    <section className={`${CARD} p-4`} aria-labelledby="kx-carry-title">
+    <section className={`${CARD} p-4`} aria-labelledby={titleId}>
       <div className="flex items-start gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><RrIcon name="clock" size={14} /></span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><RrIcon name={variant === "apps" ? "calendar" : "clock"} size={14} /></span>
         <div className="min-w-0 flex-1">
-          <h2 id="kx-carry-title" className="text-[13px] font-semibold text-[var(--text-primary)]">{t("carry.title")}</h2>
+          <h2 id={titleId} className="text-[13px] font-semibold text-[var(--text-primary)]">{t(variant === "apps" ? "feed.title" : "carry.title")}</h2>
           <p className="text-[11.5px] text-[var(--text-dim)]">
-            {open ? t("carry.hint") : waitingAll ? t("carry.waiting").replace("{n}", String(waitingAll)) : t("carry.allAdded")}
+            {open ? t(variant === "apps" ? "feed.hint" : "carry.hint") : waitingAll ? t("carry.waiting").replace("{n}", String(waitingAll)) : t("carry.allAdded")}
           </p>
         </div>
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="kx-carry-body" className={SMALL_BTN}>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls={bodyId} className={SMALL_BTN}>
           {open ? t("carry.hide") : t("carry.show")}
         </button>
       </div>
 
       {open && (
-        <div id="kx-carry-body" className="mt-4 space-y-4">
+        <div id={bodyId} className="mt-4 space-y-4">
           {groups.map((g) => {
             const key = `${g.from}.${g.section}`;
             const many = g.sources.length > 1;
@@ -97,15 +102,15 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
             const waiting = g.items.filter((i) => !isPlaced(i, texts, g.to)).length;
             const first = g.sources[0];
             const last = g.sources[g.sources.length - 1];
-            const when = many
-              ? `${periodLabel(first.start, last.end)} (${g.sources.length})`
+            const when = g.app || !first ? ""
+              : many ? `${periodLabel(first.start, last.end)} (${g.sources.length})`
               : reportTemplate(g.from)?.cadence === "daily" ? dmyDate(first.start) : periodLabel(first.start, first.end);
             return (
               <div key={key}>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                   <p className="min-w-0 text-[12px] font-semibold text-[var(--text-secondary)]">
-                    {t(`tpl.${g.from}.s.${g.section}`)}
-                    <span className="ms-1.5 font-normal text-[var(--text-faint)] tabular-nums">· {tplName(t, g.from)} · {when}</span>
+                    {g.app ? t(`feed.g.${g.section}`) : t(`tpl.${g.from}.s.${g.section}`)}
+                    {!g.app && <span className="ms-1.5 font-normal text-[var(--text-faint)] tabular-nums">· {tplName(t, g.from)} · {when}</span>}
                   </p>
                   {waiting >= 2 && (
                     <button type="button" onClick={() => placeAll(g)} className={SMALL_BTN}>
@@ -127,7 +132,8 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
                               : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] hover:border-[var(--border-focus)]"}`}>
                             <span className={`shrink-0 ${placed ? "text-emerald-500" : "text-[var(--text-dim)]"}`}><RrIcon name={placed ? "check" : "plus"} size={10} /></span>
                             <span className="truncate">{item.text}</span>
-                            {many && item.date && <span className="shrink-0 text-[10.5px] text-[var(--text-faint)] tabular-nums">{dayMonth(item.date)}</span>}
+                            {item.tag ? <span className="shrink-0 text-[10.5px] text-[var(--text-faint)] tabular-nums">{item.tag}</span>
+                              : many && item.date && <span className="shrink-0 text-[10.5px] text-[var(--text-faint)] tabular-nums">{dayMonth(item.date)}</span>}
                           </button>
                         </li>
                       );
@@ -139,7 +145,7 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace }: {
                       const placed = isPlaced(item, texts, g.to);
                       return (
                         <li key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                          <ItemText text={item.text} paragraph={item.paragraph} placed={placed} tag={many ? dayMonth(item.date) : ""} t={t} />
+                          <ItemText text={item.text} paragraph={item.paragraph} placed={placed} tag={item.tag ?? (many ? dayMonth(item.date) : "")} t={t} />
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             {placed ? (
                               /* The buttons' height, so the row does not jump when they go. */
