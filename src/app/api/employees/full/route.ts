@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { activateChecklist } from "@/lib/server/hr-lifecycle";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { historyRow } from "@/lib/management/position-history";
 import { hashForWrite } from "@/lib/server/password";
 
 /* ── Table names ── */
@@ -503,16 +504,13 @@ export async function POST(req: Request) {
     );
   }
 
-  /* ── Step 5: Position History ── */
-  await supabaseServer.from(HISTORY).insert({
-    position_id: positionId,
-    person_id: person.id,
-    department_id: departmentId,
-    action: "assigned",
-    from_position_id: null,
-    to_position_id: positionId,
-    notes: "Initial assignment on hire",
-  });
+  /* ── Step 5: Position History ── the table's own columns
+     (lib/management/position-history); a failure is loud, never the hire's. */
+  const { error: histErr } = await supabaseServer.from(HISTORY).insert(historyRow({
+    action: "assigned", personId: person.id, departmentId, toPositionId: positionId,
+    notes: "Initial assignment on hire", changedBy: auth.account_id ?? null,
+  }));
+  if (histErr) console.error("[api/employees/full POST history]", histErr.message);
 
   /* ── Step 6 (Optional): Account ── */
   let accountId: string | null = null;
@@ -905,16 +903,14 @@ export async function PUT(req: Request) {
           { status: 500 },
         );
       }
-      await supabaseServer.from(HISTORY).insert({
-        position_id: positionId,
-        person_id: personId,
-        department_id: departmentId,
-        action: current ? "transferred" : "assigned",
-        from_position_id: current?.position_id ?? null,
-        to_position_id: positionId,
-        effective_date: new Date().toISOString().split("T")[0],
-        notes: "Updated via employee form",
-      });
+      /* The table has no effective_date (the insert that named one never
+         landed): the row's created_at is when the move was made. */
+      const { error: histErr } = await supabaseServer.from(HISTORY).insert(historyRow({
+        action: current ? "transferred" : "assigned", personId, departmentId,
+        fromPositionId: current?.position_id ?? null, toPositionId: positionId,
+        notes: "Updated via employee form", changedBy: auth.account_id ?? null,
+      }));
+      if (histErr) console.error("[api/employees/full PATCH history]", histErr.message);
     }
   }
 

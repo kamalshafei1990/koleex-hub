@@ -930,6 +930,16 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting, 
   );
 }
 
+/* A history row as it reads (26 Sep 2026): the change in the screen's
+   language, the day first (25/09/2026), and who made it when the row
+   knows. */
+const HISTORY_WORDS = ["assigned", "transferred", "removed"];
+const historyAction = (a: string, t: (key: string) => string) => (HISTORY_WORDS.includes(a) ? t(`mgmt.act.${a}`) : a);
+const historyDay = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
 /* ═══════════════════════════════════════════════════
    POSITION DETAIL (history + JD)
    ═══════════════════════════════════════════════════ */
@@ -989,9 +999,10 @@ function PositionDetailModal({ open, onClose, position, people, t }: {
                       <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--border-strong)]" />
                       <div className="text-[12px] font-medium text-[var(--text-primary)]">{ctc?.name || "Unknown"}</div>
                       <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-2">
-                        <span className={`capitalize ${h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"}`}>{h.action}</span>
+                        <span className={h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"}>{historyAction(h.action, t)}</span>
                         <span>·</span>
-                        <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                        <span className="tabular-nums">{historyDay(h.created_at)}</span>
+                        {h.changed_by_name && <><span>·</span><span>{t("mgmt.by")} {h.changed_by_name}</span></>}
                       </div>
                       {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                     </div>
@@ -1510,8 +1521,8 @@ function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: 
                   <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-primary)] ${
                     h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
                   }`} />
-                  <div className="text-[12px] font-medium text-[var(--text-primary)] capitalize">{h.action}</div>
-                  <div className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</div>
+                  <div className="text-[12px] font-medium text-[var(--text-primary)]">{historyAction(h.action, t)}</div>
+                  <div className="text-[11px] text-[var(--text-dim)] tabular-nums">{historyDay(h.created_at)}{h.changed_by_name ? ` · ${t("mgmt.by")} ${h.changed_by_name}` : ""}</div>
                   {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                 </div>
               ))}
@@ -1656,11 +1667,12 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
                     h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
                   }`} />
                   <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-semibold capitalize ${
+                    <span className={`text-[11px] font-semibold ${
                       h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"
-                    }`}>{h.action}</span>
+                    }`}>{historyAction(h.action, t)}</span>
                     <span className="text-[11px] text-[var(--text-dim)]">·</span>
-                    <span className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</span>
+                    <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{historyDay(h.created_at)}</span>
+                    {h.changed_by_name && <span className="text-[11px] text-[var(--text-dim)]">· {t("mgmt.by")} {h.changed_by_name}</span>}
                   </div>
                   {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
                 </div>
