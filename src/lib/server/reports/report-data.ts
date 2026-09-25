@@ -18,6 +18,7 @@ import "server-only";
      shortages       items of their open orders received only in part
      pos_late        their orders past the expected delivery, not delivered
      payables        their supplier bills with money still to pay
+     expenses        their own expenses dated in a trip's days (4D; not rejected)
 
    Called only for the author (the draft's GET and its date move, and the
    send, which freezes the answer into the report). Each source needs its
@@ -34,7 +35,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
-import { REPORT_LIMITS, periodFor, reportTemplate, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
+import { REPORT_LIMITS, periodFor, rangeEnd, reportTemplate, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
 import { DATA_MODULE } from "@/lib/reports/report-data";
 
 const LIMIT = REPORT_LIMITS.dataRows;
@@ -74,6 +75,18 @@ async function supplierNames(c: Ctx, ids: Array<string | null>): Promise<Map<str
     let q = supabaseServer.from("contacts").select("id, display_name, company_name, full_name").in("id", part);
     if (c.tenant) q = q.eq("tenant_id", c.tenant);
     for (const r of listOf<{ id: string; display_name: string | null; company_name: string | null; full_name: string | null }>(await q, "suppliers")) out.set(r.id, who(r.company_name, r.display_name, r.full_name));
+  }
+  return out;
+}
+
+/** The expense categories' names, for category ids taken from the author's rows. */
+async function categoryNames(c: Ctx, ids: Array<string | null>): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(ids.filter((x): x is string => !!x)));
+  const out = new Map<string, string>();
+  for (const part of chunks(unique)) {
+    let q = supabaseServer.from("finance_expense_categories").select("id, name").in("id", part);
+    if (c.tenant) q = q.eq("tenant_id", c.tenant);
+    for (const r of listOf<{ id: string; name: string | null }>(await q, "expense categories")) out.set(r.id, r.name ?? "");
   }
   return out;
 }
@@ -216,18 +229,31 @@ const READ: Record<ReportDataSource, (c: Ctx) => Promise<ReportDataRow[]>> = {
       return { key: b.id, currency: b.currency ?? undefined, cells: { no: b.bill_no || b.supplier_invoice_no || "—", supplier: names.get(b.supplier_id ?? "") ?? "", due, overdue: due ? daysFrom(due, c.today) : 0, balance: money(b.balance) } };
     }).sort((a, b) => Number(b.cells.overdue) - Number(a.cells.overdue));
   },
+  async expenses(c) {
+    /* approval_status is plain text; a rejected expense was never spent. */
+    let q = supabaseServer.from("finance_expenses").select("id, title, category_id, expense_date, amount, currency, approval_status")
+      .eq("created_by_account_id", c.me).neq("approval_status", "rejected").gte("expense_date", c.start).lte("expense_date", c.end);
+    if (c.tenant) q = q.eq("tenant_id", c.tenant);
+    type E = { id: string; title: string | null; category_id: string | null; expense_date: string | null; amount: unknown; currency: string | null; approval_status: string | null };
+    const rows = listOf<E>(await q.order("expense_date", { ascending: true }).limit(LIMIT + 1), "expenses");
+    const cats = await categoryNames(c, rows.map((r) => r.category_id));
+    return rows.map((e) => ({ key: e.id, currency: e.currency ?? undefined, cells: {
+      title: e.title || "—", category: cats.get(e.category_id ?? "") ?? "", date: day(e.expense_date), amount: money(e.amount), status: e.approval_status,
+    } }));
+  },
 };
 
 /** The numbers blocks of the author's report, by section id — for the
- *  report's own period, or for `date`'s period when the draft moves. */
-export async function loadReportData(row: Facts, auth: ServerAuthContext, date?: string | null): Promise<Record<string, ReportDataValue>> {
+ *  report's own period, or for `date`'s period when the draft moves (a
+ *  range template — a trip — from `date` to `to`). */
+export async function loadReportData(row: Facts, auth: ServerAuthContext, date?: string | null, to?: string | null): Promise<Record<string, ReportDataValue>> {
   const tpl = reportTemplate(row.template_key);
   const secs = (tpl?.sections ?? []).filter((s) => s.kind === "data" && s.source);
   if (!tpl || !secs.length) return {};
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const period = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? periodFor(tpl.cadence, date)
+    ? (tpl.range ? { start: date, end: rangeEnd(date, to) } : periodFor(tpl.cadence, date))
     : { start: row.period_start ?? today, end: row.period_end ?? row.period_start ?? today };
   const c: Ctx = { me: auth.account_id, tenant: auth.tenant_id ?? null, start: period.start, end: period.end, today };
   const sources = Array.from(new Set(secs.map((s) => s.source!)));

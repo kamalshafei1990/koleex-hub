@@ -534,16 +534,19 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   const totals = dataTotals(data);
   const asOf = data.capturedAt.slice(0, 10);
   const colName = (id: string) => t(`blk.dc.${id}`);
+  /* The first column names the document (its number, or an expense's
+     title) and opens it. */
+  const first = cols[0];
   const docLink = (r: ReportDataRow) => {
     const href = dataRowHref(data.source, r.key);
-    const text = String(r.cells.no ?? "—");
+    const text = String(r.cells[first.id] ?? "—");
     return href
       ? <Link href={href} target={composing ? "_blank" : undefined} rel={composing ? "noopener" : undefined} className="font-semibold text-[var(--text-primary)] underline-offset-2 hover:underline">{text}</Link>
       : <span className="font-semibold text-[var(--text-primary)]">{text}</span>;
   };
   const note = (r: ReportDataRow) => (onNote ? (
     <input value={notes[r.key] ?? ""} onChange={(e) => onNote(r.key, e.target.value)} maxLength={REPORT_LIMITS.item} dir="auto"
-      placeholder={t(`blk.dn.${data.source}`)} aria-label={`${String(r.cells.no ?? "")} — ${t(`blk.dn.${data.source}`)}`} className={`${FIELD} h-8 py-1`} />
+      placeholder={t(`blk.dn.${data.source}`)} aria-label={`${String(r.cells[first.id] ?? "")} — ${t(`blk.dn.${data.source}`)}`} className={`${FIELD} h-8 py-1`} />
   ) : notes[r.key] ? <p className="text-[12.5px] text-[var(--text-secondary)]" dir="auto">{notes[r.key]}</p> : null);
   return (
     <div className="space-y-2">
@@ -579,8 +582,8 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
                 <tr className={def.notes ? "" : "border-b border-[var(--border-subtle)] last:border-0"}>
                   {cols.map((c) => (
                     <td key={c.id} dir={c.type === "text" ? "auto" : "ltr"}
-                      className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.id === "customer" ? "" : "whitespace-nowrap"} ${c.id === "no" ? "" : dataTone(r, c, asOf)}`}>
-                      {c.id === "no" ? docLink(r) : dataCell(t, data.source, r, c)}
+                      className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.type !== "text" || c.id === "no" ? "whitespace-nowrap" : ""} ${c === first ? "" : dataTone(r, c, asOf)}`}>
+                      {c === first ? docLink(r) : dataCell(t, data.source, r, c)}
                     </td>
                   ))}
                 </tr>

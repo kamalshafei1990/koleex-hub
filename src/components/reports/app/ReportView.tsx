@@ -35,7 +35,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
 import {
-  REPORT_LIMITS, blockFileIds, missingSections, periodFor, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
+  REPORT_LIMITS, blockFileIds, missingSections, periodFor, rangeEnd, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
 } from "@/lib/reports/templates";
 import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
 import { APP_RULES, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
@@ -119,7 +119,7 @@ function GrowingTextarea({ value, ...rest }: React.TextareaHTMLAttributes<HTMLTe
   return <textarea ref={ref} value={value} {...rest} />;
 }
 
-type Draft = { title: string; date: string; texts: Record<string, string>; blocks: Record<string, ReportSectionValue>; to: string[]; cc: string[]; confidential: boolean };
+type Draft = { title: string; date: string; dateTo: string; texts: Record<string, string>; blocks: Record<string, ReportSectionValue>; to: string[]; cc: string[]; confidential: boolean };
 
 function toDraft(d: ReportDetail): Draft {
   const texts: Record<string, string> = {};
@@ -133,6 +133,8 @@ function toDraft(d: ReportDetail): Draft {
   return {
     title: d.report.title,
     date: d.report.periodStart ?? "",
+    /* A trip or a visit (4D) spans its own days; any other report, one period. */
+    dateTo: d.report.periodEnd ?? d.report.periodStart ?? "",
     texts,
     blocks,
     to: d.recipients.filter((r) => r.role === "to").map((r) => r.id),
@@ -205,9 +207,9 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     key: detail.report.periodKey ?? "", groups: detail.carry ?? [], feed: detail.appFeed ?? [], data: detail.blockData ?? {},
   }));
   const carryAsk = useRef(0);
-  const moveCarry = useCallback((date: string, key: string) => {
+  const moveCarry = useCallback((date: string, key: string, to?: string) => {
     const n = ++carryAsk.current;
-    void fetchCarry(id, date).then((res) => {
+    void fetchCarry(id, date, to).then((res) => {
       if (res.ok && n === carryAsk.current) setCarry({ key, groups: res.data.carry, feed: res.data.appFeed ?? [], data: res.data.blockData ?? {} });
     });
   }, [id]);
@@ -221,7 +223,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
   }, [tpl, draft.date, carry.feed, t]);
 
   const patchOf = useCallback((d: Draft) => (tpl ? {
-    title: tpl.customTitle ? d.title : undefined, date: d.date || undefined,
+    title: tpl.customTitle ? d.title : undefined, date: d.date || undefined, dateTo: tpl.range ? d.dateTo || undefined : undefined,
     sections: sectionsOf(tpl, d.texts, d.blocks), to: d.to, cc: d.cc, confidential: d.confidential,
   } : null), [tpl]);
 
@@ -424,19 +426,45 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
 
       <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
         <div className={`${CARD} space-y-4 p-4`}>
-          <div>
-            <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
-              {tpl.cadence === "weekly" ? t("period.week") : tpl.cadence === "monthly" ? t("period.month") : tpl.cadence === "daily" ? t("period.day") : t("period.date")}
-            </p>
-            <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
-              if (!iso) return;
-              const key = periodFor(tpl.cadence, iso).key;
-              const moved = !!(CARRY_RULES[tpl.key] || APP_RULES[tpl.key] || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
-              change({ date: iso });
-              if (moved) moveCarry(iso, key);
-            }} />
-            {period && tpl.cadence && tpl.cadence !== "daily" && <p className="mt-1 text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(period.start, period.end)}</p>}
-          </div>
+          {tpl.range ? (
+            /* A trip or a visit (4D): its first and last day; the numbers
+               (the trip's expenses) follow both. */
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{t("period.from")}</p>
+                <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
+                  if (!iso) return;
+                  const to = rangeEnd(iso, draftRef.current.dateTo);
+                  change({ date: iso, dateTo: to });
+                  if (tpl.sections.some((x) => x.kind === "data")) moveCarry(iso, `${iso}|${to}`, to);
+                }} />
+              </div>
+              <div>
+                <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{t("period.to")}</p>
+                <DatePicker id="kx-rep-date-to" value={draft.dateTo} onChange={(iso) => {
+                  if (!iso || !draftRef.current.date) return;
+                  const to = rangeEnd(draftRef.current.date, iso);
+                  change({ dateTo: to });
+                  if (tpl.sections.some((x) => x.kind === "data")) moveCarry(draftRef.current.date, `${draftRef.current.date}|${to}`, to);
+                }} />
+              </div>
+              {draft.date && draft.dateTo && draft.dateTo !== draft.date && <p className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(draft.date, draft.dateTo)}</p>}
+            </div>
+          ) : (
+            <div>
+              <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
+                {tpl.cadence === "weekly" ? t("period.week") : tpl.cadence === "monthly" ? t("period.month") : tpl.cadence === "daily" ? t("period.day") : t("period.date")}
+              </p>
+              <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
+                if (!iso) return;
+                const key = periodFor(tpl.cadence, iso).key;
+                const moved = !!(CARRY_RULES[tpl.key] || APP_RULES[tpl.key] || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
+                change({ date: iso });
+                if (moved) moveCarry(iso, key);
+              }} />
+              {period && tpl.cadence && tpl.cadence !== "daily" && <p className="mt-1 text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(period.start, period.end)}</p>}
+            </div>
+          )}
           <PeopleField t={t} label={t("composer.to")} ids={draft.to} people={people} nameOf={nameOf}
             onChange={(to) => change({ to, cc: draftRef.current.cc.filter((x) => !to.includes(x)) })} hint={t("composer.defaultTo")} />
           <PeopleField t={t} label={t("composer.cc")} ids={draft.cc} people={people.filter((p) => !draft.to.includes(p.id))} nameOf={nameOf}

@@ -1,7 +1,7 @@
 import "server-only";
 
 /* ---------------------------------------------------------------------------
-   GET /api/work-reports/[id]/carry?date=YYYY-MM-DD — the suggestions from
+   GET /api/work-reports/[id]/carry?date=YYYY-MM-DD[&to=YYYY-MM-DD] — the suggestions from
    the author's earlier reports AND their own work in the apps (appFeed) for
    a DRAFT, and its numbers blocks (blockData, Phase 4B), recomputed for
    another day, week or month while the author moves it (the first ones
@@ -28,7 +28,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const loaded = await loadForViewer(id, auth);
   if (!loaded || loaded.access !== "author") return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (loaded.row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
-  const date = new URL(req.url).searchParams.get("date");
-  const [carry, appFeed, blockData] = await Promise.all([loadCarry(loaded.row, auth, date), loadAppFeed(loaded.row, auth, date), loadReportData(loaded.row, auth, date)]);
+  const url = new URL(req.url);
+  const date = url.searchParams.get("date");
+  /* A trip's last day (4D) — the numbers cover its whole span. */
+  const to = url.searchParams.get("to");
+  const [carry, appFeed, blockData] = await Promise.all([loadCarry(loaded.row, auth, date), loadAppFeed(loaded.row, auth, date), loadReportData(loaded.row, auth, date, to)]);
   return NextResponse.json({ carry, appFeed, blockData }, { headers: { "Cache-Control": "private, no-store" } });
 }

@@ -32,11 +32,18 @@
    supplier approval, samples and negotiation; production follow-up, rating,
    risk and stopping a supplier; and the purchasing numbers (the writer's own
    purchase orders, receipts, shortages, late orders and bills to pay).
+
+   Phase 4D (owner's picks, 25 Sep 2026): Logistics (container loading,
+   shipment status, damage and claim, customs), After-sales (service visit,
+   warranty claim, training, spare parts) and Travel, visitors & meetings
+   (trip, delegation visit, minutes, decision log). A trip or a visit spans
+   the days its author picks (`range`); the trip's own expenses come from
+   Finance.
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "quality" | "service" | "memos" | "hr";
+export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -51,10 +58,12 @@ export type ReportColumnType = "text" | "number" | "money" | "date";
  *  sent and still unanswered, the invoices with money still owed. */
 export type ReportDataSource =
   | "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables"
-  | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables";
+  | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables"
+  | "expenses";
 export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "quotations", "orders", "invoices", "quotes_waiting", "receivables",
   "purchase_orders", "receipts", "shortages", "pos_late", "payables",
+  "expenses",
 ];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
@@ -106,6 +115,9 @@ export interface ReportTemplateDef {
   /** Only an event asks for it (Phase 3D: the probation review): never
    *  offered in the list, and the server starts one only from its request. */
   requestOnly?: boolean;
+  /** Its author picks the first and the last day (a trip, a visit — 4D);
+   *  at most REPORT_LIMITS.rangeDays long. */
+  range?: boolean;
 }
 
 const t = (id: string, kind: ReportSectionKind, required = false): ReportSectionDef => ({ id, kind, required });
@@ -315,6 +327,99 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [b("late", "data", { source: "pos_late", notes: true }), t("summary", "text", true)] },
   { key: "payables", family: "suppliers", icon: "file-invoice-dollar", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
     sections: [b("bills", "data", { source: "payables", notes: true }), t("plan", "text", true)] },
+  /* ── Logistics (4D) ── */
+  { key: "container_loading", family: "logistics", icon: "truck-side", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "customer", "product"] }, true),
+      t("container", "text", true),
+      b("checks", "checklist", { points: pts("clean", "undamaged", "packing", "count", "marks", "securing", "photos", "seal") }, true),
+      t("issues", "text"),
+      b("loader_sign", "signature", {}),
+    ] },
+  { key: "shipment_update", family: "logistics", icon: "shipping-fast", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "customer"] }, true),
+      b("status", "choice", { options: ["booked", "loaded", "departed", "in_transit", "arrived", "cleared", "delivered", "delayed"] }, true),
+      t("details", "text"), t("eta", "text", true), t("issues", "list"),
+    ] },
+  { key: "damage_claim", family: "logistics", icon: "gavel", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "supplier", "product", "customer"] }, true),
+      t("what", "text", true),
+      b("items", "table", { columns: [{ id: "item", type: "text" }, { id: "qty", type: "number" }, { id: "value", type: "money" }], summaryOf: ["value"] }, true),
+      b("against", "choice", { options: ["forwarder", "insurer", "supplier", "carrier"] }, true),
+      b("status", "choice", { options: ["preparing", "submitted", "accepted", "rejected", "paid"] }, true),
+      t("notes", "text"),
+    ] },
+  { key: "customs_clearance", family: "logistics", icon: "stamp", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "customer"] }, true),
+      b("documents", "checklist", { points: pts("invoice", "packing_list", "bill", "origin", "conformity", "insurance") }, true),
+      b("costs", "table", { columns: [{ id: "item", type: "text" }, { id: "amount", type: "money" }] }),
+      b("status", "choice", { options: ["waiting_docs", "submitted", "inspection", "cleared", "held"] }, true),
+      t("issues", "text"),
+    ] },
+  /* ── After-sales (4D; installation came with 4A) ── */
+  { key: "service_visit", family: "service", icon: "car-mechanic", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "product", "order"] }, true),
+      t("problem", "text", true), t("work", "list", true),
+      b("parts", "table", { columns: [{ id: "part", type: "text" }, { id: "qty", type: "number" }], summary: "none" }),
+      b("result", "choice", { options: ["fixed", "partly", "not_fixed"] }, true),
+      t("next", "text"),
+      b("customer_sign", "signature", {}),
+    ] },
+  { key: "warranty_claim", family: "service", icon: "receipt", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "product", "order"] }, true),
+      t("serial", "text", true), t("fault", "text", true),
+      b("cause", "choice", { options: ["manufacturing", "misuse", "wear", "transport", "unknown"] }, true),
+      b("decision", "choice", { options: ["covered", "partly", "not_covered"] }, true),
+      t("action", "text"),
+    ] },
+  { key: "customer_training", family: "service", icon: "graduation-cap", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "product"] }, true),
+      b("attendees", "table", { columns: [{ id: "name", type: "text" }, { id: "role", type: "text" }] }, true),
+      b("topics", "checklist", { points: pts("operation", "settings", "maintenance", "safety", "troubleshooting") }, true),
+      b("rating", "score", { points: pts("understanding", "participation", "readiness") }),
+      t("notes", "text"),
+      b("customer_sign", "signature", {}),
+    ] },
+  { key: "spare_parts_request", family: "service", icon: "cog", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "product", "order"] }, true),
+      b("parts", "table", { columns: [{ id: "part", type: "text" }, { id: "code", type: "text" }, { id: "qty", type: "number" }], summary: "none" }, true),
+      b("urgency", "choice", { options: ["normal", "urgent", "machine_down"] }, true),
+      b("payer", "choice", { options: ["warranty", "customer", "company"] }, true),
+      t("notes", "text"),
+    ] },
+  /* ── Travel, visitors & meetings (4D) ── */
+  { key: "trip_report", family: "travel", icon: "plane-departure", cadence: null, recipients: "manager", reviewRequired: false, confidential: false, range: true,
+    sections: [
+      t("destination", "text", true),
+      b("meetings", "table", { columns: [{ id: "date", type: "date" }, { id: "who", type: "text" }, { id: "company", type: "text" }, { id: "outcome", type: "text" }] }, true),
+      t("results", "text", true), t("follow_ups", "list"),
+      b("link", "links", { linkTypes: ["customer", "supplier"] }),
+      b("expenses", "data", { source: "expenses" }),
+    ] },
+  { key: "delegation_visit", family: "travel", icon: "hotel", cadence: null, recipients: "manager", reviewRequired: false, confidential: false, range: true,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "supplier"] }),
+      b("visitors", "table", { columns: [{ id: "name", type: "text" }, { id: "company", type: "text" }, { id: "role", type: "text" }] }, true),
+      t("program", "list"), t("discussed", "text", true), t("outcomes", "list", true), t("next_steps", "list"),
+    ] },
+  { key: "meeting_minutes", family: "travel", icon: "chair-office", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      t("attendees", "list", true), t("agenda", "list"), t("discussion", "text"),
+      b("decisions", "table", { columns: [{ id: "decision", type: "text" }, { id: "owner", type: "text" }, { id: "due", type: "date" }] }, true),
+      t("next_meeting", "text"),
+    ] },
+  { key: "decision_log", family: "travel", icon: "books", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("decisions", "table", { columns: [{ id: "date", type: "date" }, { id: "decision", type: "text" }, { id: "by", type: "text" }, { id: "why", type: "text" }] }, true),
+      t("notes", "text"),
+    ] },
   /* ── Purchasing & suppliers, After-sales: the first users of the Phase 4A
      blocks (the families fill out in their own phases) ── */
   { key: "factory_audit", family: "suppliers", icon: "tools", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
@@ -368,13 +473,13 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "quality", "service", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
 
 /* ── Limits (server-enforced; the composer mirrors them) ── */
-export const REPORT_LIMITS = { title: 200, text: 8000, items: 60, item: 600, comment: 4000, recipients: 30, rows: 50, cell: 200, links: 20, label: 200, signer: 120, dataRows: 100 } as const;
+export const REPORT_LIMITS = { title: 200, text: 8000, items: 60, item: 600, comment: 4000, recipients: 30, rows: 50, cell: 200, links: 20, label: 200, signer: 120, dataRows: 100, rangeDays: 62 } as const;
 
 /* ── Sections as stored ── */
 export type CheckState = "ok" | "issue" | "na";
@@ -676,6 +781,14 @@ export function isoWeekKey(ymd: string): string {
 }
 
 export interface ReportPeriod { start: string; end: string; key: string }
+
+/** A range's last day (4D): never before its first, at most
+ *  REPORT_LIMITS.rangeDays long. */
+export function rangeEnd(start: string, end: string | null | undefined): string {
+  if (!end || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) return start;
+  const max = new Date(Date.parse(`${start}T00:00:00Z`) + (REPORT_LIMITS.rangeDays - 1) * 86_400_000).toISOString().slice(0, 10);
+  return end > max ? max : end;
+}
 
 /** The period a new report of this cadence covers, for a local date. */
 export function periodFor(cadence: ReportCadence, ymd: string): ReportPeriod {

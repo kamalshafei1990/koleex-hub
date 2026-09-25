@@ -8,7 +8,8 @@
    the quotations sent and still unanswered, the invoices with money still
    owed — and (4C) their purchase orders and receipts in the period, the
    items still short on a partly received order, the orders past their
-   delivery date, the supplier bills still to pay. The server computes the
+   delivery date, the supplier bills still to pay — and (4D) their own
+   expenses in a trip's days. The server computes the
    rows (src/lib/server/reports/report-data.ts) — fresh every time a draft
    opens, frozen into the report when it is sent — so a reader sees exactly
    what the author saw, and no figure is typed.
@@ -37,12 +38,14 @@ export const DATA_COLUMNS: Record<ReportDataSource, DataColumn[]> = {
   shortages: [NO, { id: "item", type: "text" }, { id: "ordered", type: "number" }, { id: "received", type: "number" }, { id: "missing", type: "number" }],
   pos_late: [NO, SUPPLIER, { id: "expected", type: "date" }, { id: "late", type: "number" }, { id: "amount", type: "money" }, { id: "status", type: "status" }],
   payables: [NO, SUPPLIER, { id: "due", type: "date" }, { id: "overdue", type: "number" }, { id: "balance", type: "money" }],
+  expenses: [{ id: "title", type: "text" }, { id: "category", type: "text" }, { id: "date", type: "date" }, { id: "amount", type: "money" }, { id: "status", type: "status" }],
 };
 
 /** The app a source belongs to — the author must hold it (requireModuleAccess). */
 export const DATA_MODULE: Record<ReportDataSource, string> = {
   quotations: "Quotations", quotes_waiting: "Quotations", orders: "Orders", invoices: "Invoices", receivables: "Invoices",
   purchase_orders: "Purchase", receipts: "Purchase", shortages: "Purchase", pos_late: "Purchase", payables: "Purchase",
+  expenses: "Expenses",
 };
 
 /** What a row opens: the document in its own app — a quotation or an
@@ -56,6 +59,7 @@ export function dataRowHref(source: ReportDataSource, key: string): string | nul
     case "purchase_orders": case "shortages": case "pos_late": return "/purchase/orders";
     case "receipts": return "/purchase/receipts";
     case "payables": return "/purchase/bills";
+    case "expenses": return "/finance/expenses";
     default: return null;
   }
 }
@@ -64,6 +68,7 @@ export function dataRowHref(source: ReportDataSource, key: string): string | nul
 export const DATA_STATUSES = [
   "draft", "sent", "accepted", "rejected", "expired", "open", "confirmed", "in_production", "shipped", "delivered", "completed", "closed", "cancelled", "paid", "partial", "overdue",
   "pending", "approved", "received", "posted", "void", "issued", "final", "complete", "voided",
+  "submitted", "changes_requested",
 ] as const;
 
 /** A status's word: "partial" is partly RECEIVED on a purchase order or a

@@ -13,8 +13,8 @@ import "server-only";
           paints complete — no second request, nothing shifting in later. Photos
           and files come as ids only; their bytes are fetched through
           /api/files/report/<id>, which applies this same read rule.
-   PATCH  The author edits a DRAFT: { title?, date?, sections?, to?, cc?,
-          confidential? }. A sent report is never edited — a new version is
+   PATCH  The author edits a DRAFT: { title?, date?, dateTo?, sections?, to?,
+          cc?, confidential? } — dateTo only for a trip or a visit (4D). A sent report is never edited — a new version is
           (POST …/revise).
    DELETE The author deletes a DRAFT (its stored files go too, unless an
           earlier version still shows them).
@@ -25,7 +25,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { REPORT_LIMITS, normalizeSections, periodFor, reportLinks, reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
+import { REPORT_LIMITS, normalizeSections, periodFor, rangeEnd, reportLinks, reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
@@ -126,7 +126,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
 
   const body = (await req.json().catch(() => null)) as {
-    title?: unknown; date?: unknown; sections?: unknown; to?: unknown; cc?: unknown; confidential?: unknown;
+    title?: unknown; date?: unknown; dateTo?: unknown; sections?: unknown; to?: unknown; cc?: unknown; confidential?: unknown;
   } | null;
   if (!body) return NextResponse.json({ error: "bad_body" }, { status: 400 });
 
@@ -135,6 +135,12 @@ export async function PATCH(req: Request, { params }: Params) {
   if (typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
     const p = periodFor(tpl.cadence, body.date);
     patch.period_start = p.start; patch.period_end = p.end; patch.period_key = tpl.cadence ? p.key : p.start;
+  }
+  /* A trip or a visit (4D) spans the days its author picks — never before
+     its first day, at most REPORT_LIMITS.rangeDays long. */
+  if (tpl.range && typeof body.dateTo === "string") {
+    const start = (patch.period_start as string | undefined) ?? row.period_start;
+    if (start) patch.period_end = rangeEnd(start, body.dateTo);
   }
   if (body.sections !== undefined) patch.sections = normalizeSections(tpl, body.sections);
   /* A confidential type stays confidential; any other may be raised. */

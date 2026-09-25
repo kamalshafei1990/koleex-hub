@@ -74,7 +74,7 @@ import { fileURLToPath } from "node:url";
 import { stripComments } from "./lib/strip-comments";
 import { reportAccess, type ReportAccessFacts } from "../src/lib/reports/access";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
   type ReportDataValue,
 } from "../src/lib/reports/templates";
 import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, dataRowHref, dataTotals, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
@@ -202,9 +202,10 @@ console.log("\n§3 templates and their words");
   const sales = ["customer_call", "complaint", "lost_deal", "sales_weekly", "sales_monthly", "quote_followup", "collection", "account_plan", "account_review", "competitor_prices", "country_study", "agent_report"];
   const quality = ["pre_shipment", "incoming", "defect_report", "corrective_action", "supplier_return"];
   const suppliers4c = ["supplier_approval", "sample_evaluation", "negotiation", "production_followup", "supplier_performance", "supplier_risk", "supplier_stop", "purchasing_weekly", "purchasing_monthly", "late_pos", "payables"];
-  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
+  const d4 = ["container_loading", "shipment_update", "damage_claim", "customs_clearance", "service_visit", "warranty_claim", "customer_training", "spare_parts_request", "trip_report", "delegation_visit", "meeting_minutes", "decision_log"];
+  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B) and the sixteen Quality / Purchasing types (4C) after the visits, then the three of Phase 4A, and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -1411,9 +1412,9 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   eq(withBlockData([{ id: "quotations" }, { id: "highlights", text: "x" }], { quotations: mixed }).map((x) => !!x.data), [true, false], "a draft's numbers join only their own blocks");
 
   /* Every source complete */
-  expect(REPORT_DATA_SOURCES.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && DATA_COLUMNS[src][0].id === "no" && ["customer", "supplier", "item"].includes(DATA_COLUMNS[src][1].id)),
-    "every numbers source has its columns (the number, then who or what), its app and what a row opens");
-  eq(REPORT_DATA_SOURCES.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase"], "each source is gated by the app it comes from");
+  expect(REPORT_DATA_SOURCES.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && ["no", "title"].includes(DATA_COLUMNS[src][0].id) && ["customer", "supplier", "item", "category"].includes(DATA_COLUMNS[src][1].id)),
+    "every numbers source has its columns (what names the document, then who or what), its app and what a row opens");
+  eq(REPORT_DATA_SOURCES.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase", "Expenses"], "each source is gated by the app it comes from");
 
   /* Quotations and invoices */
   expect(REPORT_LINK_TYPES.includes("quotation") && REPORT_LINK_TYPES.includes("invoice"), "a report can be about a quotation or an invoice");
@@ -1458,7 +1459,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
       /* `part` is only ever a chunk of ids from the author's own rows. */
       const loops = c.split("for (const part of chunks(").length - 1;
       const own = c.split("for (const part of chunks(unique))").length - 1 + c.split("for (const part of chunks(pos.map((p) => p.id)))").length - 1;
-      return reads.length >= 12 && loose.length === 0 && loops === 3 && own === loops && /me: auth\.account_id/.test(c) ? [] : [`${loose.length} of ${reads.length} read(s) not pinned to the author; ${own} of ${loops} chunk loops over the author's own ids`];
+      return reads.length >= 14 && loose.length === 0 && loops === 4 && own === loops && /me: auth\.account_id/.test(c) ? [] : [`${loose.length} of ${reads.length} read(s) not pinned to the author; ${own} of ${loops} chunk loops over the author's own ids`];
     },
     (src) => src.replace('.eq("created_by_account_id", c.me).not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)', '.not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)'));
   rule("a numbers block is read only when its author holds the app it comes from", RD,
@@ -1471,8 +1472,8 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
     (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections })'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
     (src) => src.replace("const sections = withBlockData(typed, await loadReportData(row, auth));", "const sections = typed;"));
   rule("moving the draft to another period asks for its numbers again", `${API}/[id]/carry/route.ts`,
-    (c) => (c.includes("loadReportData(loaded.row, auth, date)") && c.includes("return NextResponse.json({ carry, appFeed, blockData }") ? [] : ["the numbers stay on the old period"]),
-    (src) => src.replace("loadReportData(loaded.row, auth, date)", "Promise.resolve({})"));
+    (c) => (c.includes("loadReportData(loaded.row, auth, date, to)") && c.includes("return NextResponse.json({ carry, appFeed, blockData }") ? [] : ["the numbers stay on the old period"]),
+    (src) => src.replace("loadReportData(loaded.row, auth, date, to)", "Promise.resolve({})"));
   rule("the composer shows the live numbers and re-asks them when the period moves", "src/components/reports/app/ReportView.tsx",
     (c) => (c.includes("live={carry.data[s.id]}") && c.includes('|| tpl.sections.some((x) => x.kind === "data")) && key !==') ? [] : ["the numbers go stale in the composer"]),
     (src) => src.replace(' || tpl.sections.some((x) => x.kind === "data"))', ")"));
@@ -1600,6 +1601,56 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
     (c) => { const a = c.indexOf("own = await loadSectionWords(res.data.report.templateKey);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
     (src) => src.replace("own = await loadSectionWords(res.data.report.templateKey);", "own = {};"));
+}
+
+/* ── §19 logistics, after-sales, travel (Phase 4D) ────────────────────── */
+console.log("\n§19 logistics, after-sales and travel; a trip's days; its expenses");
+{
+  const API = "src/app/api/work-reports";
+  const fam = (f: string) => REPORT_TEMPLATES.filter((t) => t.family === f).map((t) => t.key);
+  eq([fam("logistics"), fam("travel")], [["container_loading", "shipment_update", "damage_claim", "customs_clearance"], ["trip_report", "delegation_visit", "meeting_minutes", "decision_log"]], "the Logistics and Travel families hold their four types each");
+  eq(fam("service"), ["service_visit", "warranty_claim", "customer_training", "spare_parts_request", "installation"], "After-sales holds the four of 4D and the installation of 4A");
+  eq(REPORT_TEMPLATES.filter((t) => t.range).map((t) => t.key), ["trip_report", "delegation_visit"], "only a trip and a delegation visit span days their author picks");
+  expect(REPORT_TEMPLATES.filter((t) => t.range).every((t) => t.cadence === null), "a range is never an obligation's period (no cadence)");
+  /* A range's last day */
+  eq([rangeEnd("2026-09-10", "2026-09-14"), rangeEnd("2026-09-10", "2026-09-01"), rangeEnd("2026-09-10", null), rangeEnd("2026-09-10", "not a date"), rangeEnd("2026-09-10", "2027-01-01")],
+    ["2026-09-14", "2026-09-10", "2026-09-10", "2026-09-10", "2026-11-10"], "a range ends on or after its first day, and at most 62 days later");
+  /* Tables that must never add up, and the claim's value that must */
+  const claim = reportTemplate("damage_claim")!.sections.find((x) => x.id === "items")!;
+  eq(tableSummary(claim, [{ item: "A", qty: "2", value: "300" }, { item: "B", qty: "5", value: "120.5" }]).map((f) => [f.col.id, f.kind, f.value]), [["value", "total", 420.5]], "a damage claim totals the value of what was damaged — never the quantities of different items");
+  expect(["service_visit", "spare_parts_request"].every((k) => tableSummary(reportTemplate(k)!.sections.find((x) => x.id === "parts")!, [{ part: "a", qty: "1" }, { part: "b", qty: "2" }]).length === 0), "parts used or asked for are never added up");
+  /* The trip's expenses */
+  eq([DATA_MODULE.expenses, dataRowHref("expenses", "x"), DATA_COLUMNS.expenses.map((c) => c.id)], ["Expenses", "/finance/expenses", ["title", "category", "date", "amount", "status"]], "a trip's expenses come from the Expenses app, named by their title, and open its list");
+  expect(reportTemplate("trip_report")!.sections.some((s) => s.kind === "data" && s.source === "expenses"), "the trip report carries the author's own expenses");
+  const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? k;
+  const trip = printParagraphs({ templateKey: "trip_report", title: "", sections: [{ id: "expenses", data: { source: "expenses", capturedAt: "2026-09-25T08:00:00Z", rows: [
+    { key: "a", currency: "USD", cells: { title: "Hotel Cairo", category: "Travel", date: "2026-09-12", amount: 240, status: "approved" } },
+    { key: "b", currency: "USD", cells: { title: "Taxi", category: "Travel", date: "2026-09-13", amount: 18.5, status: "submitted" } },
+  ] } }] }, en).find((x) => x.sid === "expenses")!.paras.map((x) => x.text);
+  eq(trip.slice(0, 4), ["Expense · Category · Date · Amount · Status", "Hotel Cairo · Travel · 12/09/2026 · 240 USD · Approved", "Taxi · Travel · 13/09/2026 · 18.5 USD · Submitted", "Total Amount: 258.5 USD"], "a trip's expenses print one line each, and their total per currency");
+  expect(["period.from", "period.to"].every((k) => ["en", "zh", "ar"].every((l) => !!reportsT[k]?.[l as "en"])), "a range's first and last day speak en / zh / ar");
+  expect(reportsT["period.to"]?.en !== reportsT["composer.to"]?.en, "the last day is never called like the recipients' \"To\" beside it");
+
+  /* The code */
+  const RD = "src/lib/server/reports/report-data.ts";
+  rule("a trip's numbers cover its days — from its first to its last", RD,
+    (c) => (c.includes("(tpl.range ? { start: date, end: rangeEnd(date, to) } : periodFor(tpl.cadence, date))") ? [] : ["a trip's numbers cover one day"]),
+    (src) => src.replace("(tpl.range ? { start: date, end: rangeEnd(date, to) } : periodFor(tpl.cadence, date))", "periodFor(tpl.cadence, date)"));
+  rule("the expenses read is the author's own, and never a rejected one", RD,
+    (c) => (c.includes('.eq("created_by_account_id", c.me).neq("approval_status", "rejected").gte("expense_date", c.start).lte("expense_date", c.end)') ? [] : ["someone else's or rejected expenses can show"]),
+    (src) => src.replace('.neq("approval_status", "rejected")', ""));
+  rule("only a range template takes a last day, and the server bounds it", `${API}/[id]/route.ts`,
+    (c) => (c.includes('if (tpl.range && typeof body.dateTo === "string") {') && c.includes("if (start) patch.period_end = rangeEnd(start, body.dateTo);") ? [] : ["any report can take any last day"]),
+    (src) => src.replace('if (tpl.range && typeof body.dateTo === "string") {', 'if (typeof body.dateTo === "string") {'));
+  rule("moving a trip's days asks for its numbers over both", `${API}/[id]/carry/route.ts`,
+    (c) => (c.includes('const to = url.searchParams.get("to");') && c.includes("loadReportData(loaded.row, auth, date, to)") ? [] : ["the numbers ignore the trip's last day"]),
+    (src) => src.replace("loadReportData(loaded.row, auth, date, to)", "loadReportData(loaded.row, auth, date)"));
+  rule("the composer shows From and To for a range, and sends both", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("{tpl.range ? (") && c.includes('<DatePicker id="kx-rep-date-to" value={draft.dateTo}') && c.includes("dateTo: tpl.range ? d.dateTo || undefined : undefined") && c.includes("moveCarry(draftRef.current.date, `${draftRef.current.date}|${to}`, to)") ? [] : ["a trip cannot span its days"]),
+    (src) => src.replace("dateTo: tpl.range ? d.dateTo || undefined : undefined", "dateTo: undefined"));
+  rule("a numbers block names each document by its first column — a number or an expense's title", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (c.includes("const text = String(r.cells[first.id] ?? \"—\");") && c.includes("{c === first ? docLink(r) : dataCell(t, data.source, r, c)}") ? [] : ["an expense row shows no name"]),
+    (src) => src.replace('const text = String(r.cells[first.id] ?? "—");', 'const text = String(r.cells.no ?? "—");'));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

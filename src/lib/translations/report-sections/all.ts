@@ -8,8 +8,10 @@ import visits from "./visits";
 import sales from "./sales";
 import suppliers from "./suppliers";
 import quality from "./quality";
+import logistics from "./logistics";
 import service from "./service";
+import travel from "./travel";
 import memos from "./memos";
 import hr from "./hr";
 
-export const REPORT_SECTION_WORDS: Translations = { ...work, ...visits, ...sales, ...suppliers, ...quality, ...service, ...memos, ...hr };
+export const REPORT_SECTION_WORDS: Translations = { ...work, ...visits, ...sales, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };

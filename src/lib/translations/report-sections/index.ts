@@ -24,7 +24,9 @@ const LOAD: Record<ReportFamily, () => Promise<{ default: Translations }>> = {
   sales: () => import("./sales"),
   suppliers: () => import("./suppliers"),
   quality: () => import("./quality"),
+  logistics: () => import("./logistics"),
   service: () => import("./service"),
+  travel: () => import("./travel"),
   memos: () => import("./memos"),
   hr: () => import("./hr"),
 };

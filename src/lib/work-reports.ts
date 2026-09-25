@@ -103,7 +103,7 @@ export const createReport = (templateKey: string, date: string, opts?: { title?:
   call<{ id: string; existing: boolean }>("/api/work-reports", { method: "POST", body: JSON.stringify({ template_key: templateKey, date, ...opts }) });
 
 /** `keepalive` lets the last save finish while the tab is closing. */
-export const saveDraft = (id: string, patch: { title?: string; date?: string; sections?: ReportSectionValue[]; to?: string[]; cc?: string[]; confidential?: boolean }, opts?: { keepalive?: boolean }) =>
+export const saveDraft = (id: string, patch: { title?: string; date?: string; dateTo?: string; sections?: ReportSectionValue[]; to?: string[]; cc?: string[]; confidential?: boolean }, opts?: { keepalive?: boolean }) =>
   call<{ ok: true; savedAt: string }>(`/api/work-reports/${id}`, { method: "PATCH", body: JSON.stringify(patch), keepalive: opts?.keepalive });
 
 export const deleteDraft = (id: string) => call<{ ok: true }>(`/api/work-reports/${id}`, { method: "DELETE" });
@@ -194,8 +194,8 @@ export interface NudgePreview { planned?: Array<{ key: string; periodKey: string
 export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
-export const fetchCarry = (id: string, date: string) =>
-  call<{ carry: CarryGroup[]; appFeed: AppRecord[]; blockData?: Record<string, ReportDataValue> }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}`);
+export const fetchCarry = (id: string, date: string, to?: string) =>
+  call<{ carry: CarryGroup[]; appFeed: AppRecord[]; blockData?: Record<string, ReportDataValue> }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}${to ? `&to=${encodeURIComponent(to)}` : ""}`);
 
 /** The browser's own calendar day (not the UTC one). */
 export const localToday = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
