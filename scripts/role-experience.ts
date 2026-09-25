@@ -30,6 +30,9 @@
          with the switch; an internal account with no role is refused; a
          super admin passes
      ..  getUserExperience reports the same answers as the helpers
+     ..  the hiding helpers: bank balances, inventory cost, and an order's
+         profit and supplier cost — each with its own flag, what is still
+         owed kept; the «Bank & Profit» door; what is owed on a supplier line
 
    The per-role answer for a real role (a koleex_permissions row) is
    requireModuleAccess's, covered where that helper is; the static guard that
@@ -48,8 +51,11 @@ import {
   getUserExperience,
   hideBankBalances,
   hideInventoryCost,
+  hideOrderFigures,
+  requireBankAndProfit,
   requireFinanceNumbers,
 } from "../src/lib/experience";
+import { supplierOutstanding } from "../src/lib/finance/calc";
 
 let passes = 0;
 let failures = 0;
@@ -160,6 +166,58 @@ async function main() {
     cost.average_cost === 0 && cost.inventory_value === 0 && cost.unit_cost === 0 && cost.last_in_cost === null
       && cost.qty_on_hand === 7 && cost.cost_hidden === true,
     JSON.stringify(cost),
+  );
+
+  /* An order carries both kinds (/api/finance/orders): its profit needs
+     «Bank & Profit», what its suppliers cost the «private records» switch.
+     Each goes to 0 (null stays null) with its own flag; what is still owed —
+     outstanding_payable, and outstanding_amount on each line — stays, or the
+     payables would vanish with the cost. */
+  const order = {
+    order_no: "SO-1", selling_price: 1000, gross_profit: 300, net_profit: 250, net_profit_pct: 25,
+    realized_cash_position: 120, expected_profit: null, total_supplier_cost: 700, paid_supplier_amount: 400,
+    outstanding_payable: 300,
+    suppliers: [{ supplier_name: "Yili", supplier_cost: 700, paid_amount: 400, outstanding_amount: 300 }],
+  };
+  const noProfit = hideOrderFigures(order, { profit: false, cost: true }) as typeof order & { profit_hidden?: boolean; cost_hidden?: boolean };
+  ok(
+    `${String(n++).padStart(2, "0")}  hideOrderFigures without «Bank & Profit» zeroes the profit (null stays null), keeps the cost, says so`,
+    noProfit.gross_profit === 0 && noProfit.net_profit === 0 && noProfit.net_profit_pct === 0 && noProfit.realized_cash_position === 0
+      && noProfit.expected_profit === null && noProfit.profit_hidden === true && noProfit.cost_hidden === undefined
+      && noProfit.total_supplier_cost === 700 && noProfit.suppliers[0].supplier_cost === 700 && noProfit.selling_price === 1000,
+    JSON.stringify(noProfit),
+  );
+  const noCost = hideOrderFigures(order, { profit: true, cost: false }) as typeof order & { profit_hidden?: boolean; cost_hidden?: boolean };
+  ok(
+    `${String(n++).padStart(2, "0")}  hideOrderFigures without the switch zeroes the supplier cost, lines included, keeps what is owed, says so`,
+    noCost.total_supplier_cost === 0 && noCost.paid_supplier_amount === 0 && noCost.suppliers[0].supplier_cost === 0
+      && noCost.suppliers[0].paid_amount === 0 && noCost.suppliers[0].outstanding_amount === 300 && noCost.outstanding_payable === 300
+      && noCost.suppliers[0].supplier_name === "Yili" && noCost.cost_hidden === true && noCost.profit_hidden === undefined
+      && noCost.net_profit === 250 && order.suppliers[0].supplier_cost === 700,
+    JSON.stringify(noCost),
+  );
+  ok(
+    `${String(n++).padStart(2, "0")}  hideOrderFigures with both rights hands the order back untouched`,
+    hideOrderFigures(order, { profit: true, cost: true }) === order,
+  );
+
+  const lockedDoor = await requireBankAndProfit(ctx({ can_view_private: true }), "The financial statements");
+  const lockedBody = lockedDoor ? ((await lockedDoor.json()) as { code?: string }) : null;
+  ok(
+    `${String(n++).padStart(2, "0")}  the «Bank & Profit» door refuses a role without the row (the switch is not enough)`,
+    lockedDoor?.status === 403 && lockedBody?.code === "needs_bank_profit",
+    `status=${lockedDoor?.status ?? "passed"} code=${lockedBody?.code ?? "-"}`,
+  );
+  const saBankDoor = await requireBankAndProfit(ctx({ is_super_admin: true }), "The financial statements");
+  ok(`${String(n++).padStart(2, "0")}  the «Bank & Profit» door lets a super admin in`, saBankDoor === null, `status=${saBankDoor?.status ?? "passed"}`);
+
+  /* What is owed on a line: the server's figure when it sent one (the cost
+     and paid arrive as 0 without the switch), else cost − paid, never below 0. */
+  ok(
+    `${String(n++).padStart(2, "0")}  supplierOutstanding reads the server's outstanding_amount first, else cost − paid (never negative)`,
+    supplierOutstanding({ supplier_cost: 0, paid_amount: 0, outstanding_amount: 300 }) === 300
+      && supplierOutstanding({ supplier_cost: 700, paid_amount: 400 }) === 300
+      && supplierOutstanding({ supplier_cost: 100, paid_amount: 150 }) === 0,
   );
 
   console.log("─".repeat(72));

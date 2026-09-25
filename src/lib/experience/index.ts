@@ -122,6 +122,49 @@ export function hideInventoryCost<T extends object>(row: T): T & { cost_hidden: 
   return out as T & { cost_hidden: true };
 }
 
+/* ── Sales orders (/api/finance/orders) ───────────────────────────────────
+   An order carries both kinds: its profit («Bank & Profit») and what its
+   suppliers cost (the private-records switch). Each goes out as 0 with its
+   own flag. What is still owed to a supplier is a payable, not a cost price
+   — it stays (outstanding_payable, and outstanding_amount on each supplier
+   line), so payables and supplier dues keep adding up. */
+export const ORDER_PROFIT_FIELDS = ["gross_profit", "net_profit", "net_profit_pct", "realized_cash_position", "expected_profit"] as const;
+export const ORDER_COST_FIELDS = ["total_supplier_cost", "paid_supplier_amount"] as const;
+export const ORDER_SUPPLIER_COST_FIELDS = ["supplier_cost", "paid_amount"] as const;
+
+export function hideOrderFigures<T extends object>(order: T, can: { profit: boolean; cost: boolean }): T {
+  if (can.profit && can.cost) return order;
+  const out = { ...order } as Record<string, unknown>;
+  if (!can.profit) {
+    for (const f of ORDER_PROFIT_FIELDS) if (f in out) out[f] = out[f] == null ? null : 0;
+    out.profit_hidden = true;
+  }
+  if (!can.cost) {
+    for (const f of ORDER_COST_FIELDS) if (f in out) out[f] = out[f] == null ? null : 0;
+    if (Array.isArray(out.suppliers)) {
+      out.suppliers = (out.suppliers as Record<string, unknown>[]).map((s) => {
+        const line = { ...s };
+        for (const f of ORDER_SUPPLIER_COST_FIELDS) if (f in line) line[f] = line[f] == null ? null : 0;
+        return line;
+      });
+    }
+    out.cost_hidden = true;
+  }
+  return out as T;
+}
+
+/** The finance screens that ARE profit and cash — the intelligence dashboard
+ *  and the financial statements — open only with «Bank & Profit». A per-field
+ *  mask would leave their alert engines reading zeros as facts ("every
+ *  account near overdraft"), so the whole door closes instead. */
+export async function requireBankAndProfit(auth: ServerAuthContext, what: string): Promise<NextResponse | null> {
+  if (await canSeeBankAndProfit(auth)) return null;
+  return NextResponse.json(
+    { error: `${what} need «Bank & Profit» in Roles & Permissions.`, code: "needs_bank_profit" },
+    { status: 403 },
+  );
+}
+
 export interface UserExperience {
   account_id: string;
   can_see_cost_data: boolean;

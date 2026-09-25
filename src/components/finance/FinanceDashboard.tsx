@@ -156,16 +156,22 @@ export default function FinanceDashboard() {
      Derived, never copied into state: `fresh ?? warm` keeps one source of
      truth and avoids seeding state from an effect, which is the shift this
      codebase lints against. */
+  /* LOCKED = the KPI feed answered 403: this role has no «Bank & Profit»
+     (src/lib/experience, requireBankAndProfit). The page then shows one line
+     instead of the dashboard, and nothing below runs on data — the treasury
+     and health engines would read the zeroed balances as facts ("every
+     account near overdraft") and hand them to the Copilot. */
+  const [locked, setLocked] = useState(false);
   const warmStatic = useWarm<DashboardStatic>("fin:dash:static");
   const [freshStatic, setFreshStatic] = useState<DashboardStatic | null>(null);
-  const stat = freshStatic ?? warmStatic;
+  const stat = locked ? null : (freshStatic ?? warmStatic);
 
   const warmKpi = useWarm<DashboardKpi>(`fin:dash:kpi:${period}`);
   const [freshKpi, setFreshKpi] = useState<{ period: DashboardPeriod; kpi: DashboardKpi | null } | null>(null);
   /* The fresh KPI only counts for the period it was fetched for; on a period
      switch it is stale by definition and the warm value for the NEW period
      takes over until the refetch lands. */
-  const kpi = (freshKpi && freshKpi.period === period ? freshKpi.kpi : null) ?? warmKpi;
+  const kpi = locked ? null : ((freshKpi && freshKpi.period === period ? freshKpi.kpi : null) ?? warmKpi);
 
   const orders = useMemo(() => stat?.orders ?? [], [stat]);
   const payments = useMemo(() => stat?.payments ?? [], [stat]);
@@ -208,6 +214,10 @@ export default function FinanceDashboard() {
     const seq = ++kpiSeq.current;
     try {
       const dashRes = await fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" });
+      if (dashRes.status === 403) {
+        if (seq === kpiSeq.current) { setLocked(true); setFreshKpi({ period: p, kpi: null }); }
+        return;
+      }
       const j = (await dashRes.json().catch(() => ({}))) as { kpi?: DashboardKpi };
       // ignore stale out-of-order period response
       if (seq === kpiSeq.current) {
@@ -352,9 +362,10 @@ export default function FinanceDashboard() {
   );
   useEffect(() => {
     /* Persist the next-memory snapshot after each successful build so
-       the next run can reason about persistence + smooth the health. */
-    if (!loading) saveMemory(businessIntelligence.nextMemory);
-  }, [businessIntelligence, loading]);
+       the next run can reason about persistence + smooth the health.
+       Never from a locked page — that build ran on no data. */
+    if (!loading && !locked) saveMemory(businessIntelligence.nextMemory);
+  }, [businessIntelligence, loading, locked]);
 
   /* Publish proactive Copilot context whenever the operational picture
      changes. FloatingPanel listens and renders these as suggestion
@@ -363,6 +374,7 @@ export default function FinanceDashboard() {
      the cross-module intelligence — correlations first, then events. */
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (locked) return;
     const hints = businessIntelligence.copilotHints.map((h) => ({
       key: h.key,
       text: h.text,
@@ -372,7 +384,22 @@ export default function FinanceDashboard() {
     return () => {
       window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints: [] } }));
     };
-  }, [businessIntelligence]);
+  }, [businessIntelligence, locked]);
+
+  /* After every hook: a locked page is one line and the way back. */
+  if (locked) {
+    return (
+      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="pb-5">
+          <FinanceHeader title={t("dashboard.title", "Financial Intelligence")} subtitle={t("dash.locked", "This view is profit and cash — it opens with «Bank & Profit» in Roles & Permissions.")} />
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+            <RrIcon name="arrow-left" size={10} />
+            <Link href="/finance" className="hover:text-[var(--text-highlight)]">{t("dash.backHome", "Back to Finance Home")}</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -784,6 +811,9 @@ function OperationalView({
         </ChartCard>
       </DashboardSection>
 
+      {/* The bridge needs the supplier cost; without the private-records
+          switch it arrives as 0 (kpi.cost_hidden) and the bridge would lie. */}
+      {!kpi?.cost_hidden && (
       <DashboardSection
         eyebrow={t("dash.section.profitFlow", "Profit flow")}
         title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
@@ -802,6 +832,7 @@ function OperationalView({
           currency={currency}
         />
       </DashboardSection>
+      )}
 
       <DashboardSection
         eyebrow={t("dash.section.detail", "Detail")}
@@ -916,6 +947,9 @@ function ExecutiveView({
             helpId="finance.dso"
             loading={loading}
           />
+          {/* CCC's payables leg divides by the supplier cost — hidden
+              without the private-records switch (kpi.cost_hidden). */}
+          {!kpi?.cost_hidden && (
           <OperationalKpi
             label={t("dash.kpi.ccc", "CCC")}
             value={`${ccc.ccc.toFixed(0)} d`}
@@ -924,6 +958,7 @@ function ExecutiveView({
             helpId="finance.ccc"
             loading={loading}
           />
+          )}
           <OperationalKpi
             label={t("dash.kpi.grossMargin", "Gross margin")}
             value={marginValue}
@@ -985,6 +1020,9 @@ function ExecutiveView({
             }
             severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
           />
+          {/* Shares of supplier cost — with the costs hidden (0) it would
+              read "Diversified supplier base", which nobody measured. */}
+          {!kpi?.cost_hidden && (
           <ConcentrationBar
             label={t("dash.risks.topSupplier", "Top supplier share")}
             party={concentration.topSupplier?.name ?? "—"}
@@ -996,6 +1034,7 @@ function ExecutiveView({
             }
             severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
           />
+          )}
         </div>
       </DashboardSection>
 
@@ -1038,6 +1077,7 @@ function ExecutiveView({
         </ChartCard>
       </DashboardSection>
 
+      {!kpi?.cost_hidden && (
       <DashboardSection
         eyebrow={t("dash.section.profitFlow", "Profit flow")}
         title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
@@ -1054,6 +1094,7 @@ function ExecutiveView({
           currency={currency}
         />
       </DashboardSection>
+      )}
     </>
   );
 }

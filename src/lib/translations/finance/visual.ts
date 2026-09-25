@@ -60,4 +60,8 @@ export const FIN_VISUAL: Translations = {
   "visual.compare.add":        { en: "+ Compare",                       zh: "+ 对比",                  ar: "+ مقارنة" },
   "visual.compare.vs":         { en: "vs",                              zh: "对比",                    ar: "مقابل" },
   "visual.compare.remove":     { en: "Remove comparison",               zh: "移除对比",                ar: "إزالة المقارنة" },
+  /* Shown instead of the statements to a role without «Bank & Profit». */
+  "visual.locked":             { en: "The financial statements open with «Bank & Profit» in Roles & Permissions.",
+                                  zh: "财务报表需要在角色与权限中拥有「Bank & Profit」才能查看。",
+                                  ar: "القوائم المالية تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
 };

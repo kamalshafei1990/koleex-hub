@@ -5,8 +5,16 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { DashboardKpi, DashboardPeriod } from "@/lib/finance/types";
 import { bankLedgerBalances } from "@/lib/finance/bank";
+import { canSeeCostData, requireBankAndProfit } from "@/lib/experience";
 
 /* GET /api/finance/dashboard?period=week|quarter|year
+ *
+ * ACCESS: Finance, then «Bank & Profit» (src/lib/experience) — this feed IS
+ * profit and cash, and the intelligence screen's alert engines read it as
+ * fact, so a caller without the right gets a 403 rather than zeros. Supplier
+ * cost follows the private-records switch: without it total_supplier_cost
+ * and paid_supplier go out as 0 with kpi.cost_hidden. Guarded by
+ * validate:finance-perf §G.
  *
  * Returns a fully-computed KPI snapshot for the chosen period plus a
  * trend series suitable for a sparkline / mini-chart. All numbers are
@@ -57,6 +65,8 @@ export async function GET(req: Request) {
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
+  const denied = await requireBankAndProfit(auth, "The finance dashboard's figures");
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const periodParam = (url.searchParams.get("period") ?? "quarter") as DashboardPeriod;
@@ -518,6 +528,14 @@ export async function GET(req: Request) {
     top_expense_categories,
     expected_vs_realized,
   };
+  /* Supplier cost follows the private-records switch. (Profit is visible
+     here by definition, so a determined reader can still subtract — the
+     same holds for anyone shown revenue and gross profit together.) */
+  if (!canSeeCostData(auth)) {
+    out.total_supplier_cost = 0;
+    out.expected_vs_realized = { ...out.expected_vs_realized, paid_supplier: 0 };
+    out.cost_hidden = true;
+  }
 
   return NextResponse.json({ kpi: out }, {
     headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },

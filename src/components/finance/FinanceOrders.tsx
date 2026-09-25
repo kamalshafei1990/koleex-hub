@@ -20,12 +20,16 @@ import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/Par
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
 import RrIcon from "@/components/ui/RrIcon";
-import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
+import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct, supplierOutstanding } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
 /* Only the namespaces this screen actually reads — see finance.ts. */
 const DICT = { ...FIN_COMMON, ...FIN_ORDERS } as const;
 
+
+/** What a figure shows to a role that may not see it — the Finance
+ *  workspace's mark for the same thing. */
+const HIDDEN = "•••";
 
 const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
   supplier_id: null,
@@ -72,11 +76,16 @@ export default function FinanceOrders() {
     const totalCollected = orders.reduce((s, o) => s + (o.collected_amount ?? 0), 0);
     const totalOutstanding = orders.reduce((s, o) => s + (o.outstanding_receivable ?? 0), 0);
     const avgMargin = totalSelling > 0 ? (totalNet / totalSelling) * 100 : 0;
-    return { totalSelling, totalNet, totalCollected, totalOutstanding, avgMargin };
+    /* The server hides the same figures on every row for one caller. */
+    const profitHidden = orders.some((o) => o.profit_hidden);
+    const costHidden = orders.some((o) => o.cost_hidden);
+    return { totalSelling, totalNet, totalCollected, totalOutstanding, avgMargin, profitHidden, costHidden };
   }, [orders]);
 
   const startNew = () => {
     setDraft({
+      profitHidden: kpi.profitHidden,
+      costHidden: kpi.costHidden,
       order: {
         id: undefined,
         order_no: "",
@@ -93,13 +102,15 @@ export default function FinanceOrders() {
         payment_due_date: "",
         notes: "",
       },
-      suppliers: [{ ...EMPTY_SUPPLIER }],
+      suppliers: kpi.costHidden ? [] : [{ ...EMPTY_SUPPLIER }],
     });
     setView("editor");
   };
 
   const editExisting = (o: FinanceOrder) => {
     setDraft({
+      profitHidden: !!o.profit_hidden,
+      costHidden: !!o.cost_hidden,
       order: {
         id: o.id,
         order_no: o.order_no,
@@ -132,13 +143,24 @@ export default function FinanceOrders() {
 
   const save = async () => {
     if (!draft) return;
-    const body = { order: draft.order, suppliers: draft.suppliers };
+    /* Without the private-records switch the supplier lines are not this
+       caller's to write: the server keeps them as they are on an update and
+       refuses a cost on a new order, so none are sent. */
+    const body = { order: draft.order, suppliers: draft.costHidden ? [] : draft.suppliers };
     const r = await fetch("/api/finance/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (!r.ok) {
+      /* An empty list could not tell the editor the switch is off — the
+         refusal does, and the cost fields go away. */
+      const j = (await r.json().catch(() => null)) as { code?: string } | null;
+      if (j?.code === "needs_private_data") {
+        setDraft({ ...draft, costHidden: true, suppliers: [] });
+        showToast(t("orders.suppliers.costHidden", "Supplier costs are shown and set only with «Can see private data» in Roles & Permissions."), "error");
+        return;
+      }
       showToast(t("orders.err.saveFailed", "Save failed — please try again."), "error");
       return;
     }
@@ -214,10 +236,12 @@ export default function FinanceOrders() {
             <HeroKpiCard
               label={t("orders.kpi.netProfit", "Net Profit")}
               helpId="finance.netProfit"
-              value={kpi.totalNet}
-              unit={baseCurrency}
-              tone={kpi.totalNet >= 0 ? "info" : "negative"}
-              hint={t("orders.kpi.netProfitHint", "Average margin {pct} · tap for Income Statement").replace("{pct}", fmtPct(kpi.avgMargin))}
+              value={kpi.profitHidden ? HIDDEN : kpi.totalNet}
+              unit={kpi.profitHidden ? undefined : baseCurrency}
+              tone={kpi.profitHidden ? "neutral" : kpi.totalNet >= 0 ? "info" : "negative"}
+              hint={kpi.profitHidden
+                ? t("orders.profit.locked", "Profit opens with «Bank & Profit» in Roles & Permissions.")
+                : t("orders.kpi.netProfitHint", "Average margin {pct} · tap for Income Statement").replace("{pct}", fmtPct(kpi.avgMargin))}
               loading={loading}
             />
           </Link>
@@ -298,15 +322,21 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
   const realizedCash = order.realized_cash_position ?? 0;
   const outstandingAR = order.outstanding_receivable ?? 0;
   const outstandingAP = order.outstanding_payable ?? 0;
+  /* What this role may not see arrived as 0 with a flag (src/lib/experience,
+     hideOrderFigures): profit needs «Bank & Profit», supplier cost the
+     private-records switch. Those figures show «•••», and nothing is judged
+     from them — no "Negative margin" read off a zero. */
+  const profitHidden = !!order.profit_hidden;
+  const costHidden = !!order.cost_hidden;
 
   /* Risk signal — drives an inline chip so a junior op can scan the
      list and flag "needs attention now". */
   const today = new Date().toISOString().slice(0, 10);
   const overdue = order.payment_due_date && order.payment_due_date < today && order.payment_status !== "paid";
-  const lowMargin = netPct < 8;
+  const lowMargin = !profitHidden && netPct < 8;
   const heavyAP = sellingPrice > 0 && outstandingAP / sellingPrice > 0.5;
   const risk: "ok" | "watch" | "alert" =
-    overdue || netPct < 0 ? "alert"
+    overdue || (!profitHidden && netPct < 0) ? "alert"
     : lowMargin || heavyAP ? "watch"
     : "ok";
   const riskChip =
@@ -344,11 +374,11 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{t("orders.netProfit.label", "Net profit")}</div>
-            <div className={`text-[22px] font-medium leading-none tabular-nums ${netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-600 dark:text-rose-300"}`}>
-              {fmtMoney(netProfit, ccy, { compact: true })}
+            <div className={`text-[22px] font-medium leading-none tabular-nums ${profitHidden || netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-600 dark:text-rose-300"}`}>
+              {profitHidden ? HIDDEN : fmtMoney(netProfit, ccy, { compact: true })}
             </div>
-            <div className={`mt-1 text-[11px] ${netPct >= 15 ? "text-emerald-600 dark:text-emerald-300" : netPct >= 0 ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300"}`}>
-              {fmtPct(netPct)} {t("orders.margin.suffix", "margin")}
+            <div className={`mt-1 text-[11px] ${profitHidden ? "text-[var(--text-dim)]" : netPct >= 15 ? "text-emerald-600 dark:text-emerald-300" : netPct >= 0 ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300"}`}>
+              {profitHidden ? HIDDEN : fmtPct(netPct)} {t("orders.margin.suffix", "margin")}
             </div>
           </div>
           <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub={t("orders.collected.label", "collected")} />
@@ -366,18 +396,18 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
         {/* A · BOOKED */}
         <Zone label={t("orders.zone.booked", "A · Booked")} subtitle={t("orders.zone.bookedHint", "Accounting picture")}>
           <ZoneRow k={t("orders.zone.revenue", "Revenue")}                v={sellingPrice}                         ccy={ccy} />
-          <ZoneRow k={t("orders.preview.supplierCost", "− Supplier cost")} v={-supplierCost}                       ccy={ccy} negative />
+          <ZoneRow k={t("orders.preview.supplierCost", "− Supplier cost")} v={-supplierCost}                       ccy={ccy} negative display={costHidden ? HIDDEN : undefined} />
           <ZoneRow k={t("orders.zone.expenses", "− Expenses")}            v={-expenses}                             ccy={ccy} negative />
           <ZoneRow k={t("orders.zone.taxRefund", "+ Tax refund")}          v={taxRefund}                             ccy={ccy} positive />
-          <ZoneTotal label={t("orders.zone.grossProfit", "Gross profit")} v={grossProfit} ccy={ccy} tone={grossProfit >= 0 ? "info" : "negative"} />
+          <ZoneTotal label={t("orders.zone.grossProfit", "Gross profit")} v={profitHidden ? null : grossProfit} ccy={ccy} tone={profitHidden || grossProfit >= 0 ? "info" : "negative"} />
         </Zone>
 
         {/* B · REALIZED CASH */}
         <Zone label={t("orders.zone.cash", "B · Realized cash")} subtitle={t("orders.zone.cashHint", "Money that has actually moved")}>
           <ZoneRow k={t("orders.zone.collected", "Collected")}             v={collected}      ccy={ccy} positive />
-          <ZoneRow k={t("orders.zone.paidSupplier", "− Paid supplier")}     v={-paidSupplier} ccy={ccy} negative />
+          <ZoneRow k={t("orders.zone.paidSupplier", "− Paid supplier")}     v={-paidSupplier} ccy={ccy} negative display={costHidden ? HIDDEN : undefined} />
           <ZoneRow k={t("orders.zone.paidExpenses", "− Paid expenses")}     v={-paidExpenses} ccy={ccy} negative />
-          <ZoneTotal label={t("orders.zone.netCash", "Net cash position")} v={realizedCash} ccy={ccy} tone={realizedCash >= 0 ? "info" : "negative"} />
+          <ZoneTotal label={t("orders.zone.netCash", "Net cash position")} v={profitHidden ? null : realizedCash} ccy={ccy} tone={profitHidden || realizedCash >= 0 ? "info" : "negative"} />
         </Zone>
 
         {/* C · EXPOSURE */}
@@ -411,13 +441,19 @@ const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { o
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-xs font-medium text-[var(--text-highlight)]">{s.supplier_name || t("orders.supplier.unnamed", "Unnamed supplier")}</div>
-                      <div className="text-[10px] text-[var(--text-dim)]">{fmtMoney(s.paid_amount, s.currency, { compact: true })} {t("orders.suppliers.of", "of")} {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
+                      <div className="text-[10px] text-[var(--text-dim)]">
+                        {costHidden
+                          ? `${t("orders.zone.apToPay", "AP · to pay")} ${fmtMoney(supplierOutstanding(s), s.currency, { compact: true })}`
+                          : `${fmtMoney(s.paid_amount, s.currency, { compact: true })} ${t("orders.suppliers.of", "of")} ${fmtMoney(s.supplier_cost, s.currency, { compact: true })}`}
+                      </div>
                     </div>
                     <StatusBadge status={s.payment_status} />
                   </div>
+                  {!costHidden && (
                   <div className="mt-1.5">
                     <ProgressBar value={s.paid_amount} max={s.supplier_cost} color={supplierPct >= 100 ? "emerald" : "sky"} />
                   </div>
+                  )}
                 </div>
               );
             })}
@@ -471,13 +507,14 @@ function ZoneRow({
   );
 }
 
-function ZoneTotal({ label, v, ccy, tone }: { label: string; v: number; ccy: string; tone: "info" | "negative" }) {
+/** A zone's total, or «•••» when the figure is hidden from this role (v null). */
+function ZoneTotal({ label, v, ccy, tone }: { label: string; v: number | null; ccy: string; tone: "info" | "negative" }) {
   const cls = tone === "info" ? "text-sky-600 dark:text-sky-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-[var(--border-faint)] pt-2">
       <span className="text-[11px] font-medium text-[var(--text-highlight)]">{label}</span>
       <span className={`text-[14px] font-medium tabular-nums ${cls}`}>
-        {v < 0 ? "−" : ""}{fmtMoney(Math.abs(v), ccy, { compact: true })}
+        {v == null ? HIDDEN : <>{v < 0 ? "−" : ""}{fmtMoney(Math.abs(v), ccy, { compact: true })}</>}
       </span>
     </div>
   );
@@ -540,6 +577,10 @@ function Stat({ label, value, negative, accent }: { label: string; value: string
    preview. The profit preview recomputes live as the operator types.
    ──────────────────────────────────────────────────────────────── */
 interface DraftOrder {
+  /* What this caller may not see (the row's flags, or the list's for a new
+     order). Never sent — save() posts only `order` and `suppliers`. */
+  profitHidden: boolean;
+  costHidden: boolean;
   order: {
     id?: string;
     order_no: string;
@@ -697,7 +738,7 @@ function OrderEditor({
         <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">
           {[
             { n: 1, label: t("orders.step.customer", "Customer & Selling"), done: !!draft.order.customer_id || !!draft.order.customer_name?.trim(), active: !draft.order.customer_id && !draft.order.customer_name?.trim() },
-            { n: 2, label: t("orders.step.suppliers", "Suppliers & Costs"),  done: draft.suppliers.some((s) => s.supplier_cost > 0),                                          active: false },
+            { n: 2, label: t("orders.step.suppliers", "Suppliers & Costs"),  done: draft.costHidden ? draft.suppliers.length > 0 : draft.suppliers.some((s) => s.supplier_cost > 0), active: false },
             { n: 3, label: t("orders.step.tax", "Tax & Charges"),       done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
             { n: 4, label: t("orders.step.save", "Save & Track"),       done: !!draft.order.id,                                                                          active: false },
           ].map((s) => (
@@ -770,6 +811,16 @@ function OrderEditor({
           </SectionCard>
 
           <SectionCard title={t("orders.preview.title", "Profit preview")} subtitle={t("orders.editor.live", "Updates live as you type.")}>
+            {/* The preview IS profit, worked out from the supplier costs: it
+                needs «Bank & Profit», and without the costs (sent as 0) it
+                would be a wrong figure, so neither case draws it. */}
+            {draft.profitHidden || draft.costHidden ? (
+              <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                {draft.profitHidden
+                  ? t("orders.profit.locked", "Profit opens with «Bank & Profit» in Roles & Permissions.")
+                  : t("orders.suppliers.costHidden", "Supplier costs are shown and set only with «Can see private data» in Roles & Permissions.")}
+              </p>
+            ) : (<>
             <PreviewRow label={t("orders.preview.revenue", "Revenue")}            value={sellingPrice} currency={draft.order.currency} accent="emerald" />
             <PreviewRow label={t("orders.preview.supplierCost", "− Supplier cost")}    value={profit.total_supplier_cost} currency={draft.order.currency} accent="rose" negative />
             <div className="my-1.5 border-t border-white/5" />
@@ -784,6 +835,7 @@ function OrderEditor({
             <p className="mt-3 rounded-md bg-white/5 px-2 py-1.5 text-[10px] leading-relaxed text-[var(--text-secondary)]">
               {t("orders.editor.previewNote", "This is the expected profit (booked). The realized cash result is tracked on the order card after save — it uses actual collected payments and paid costs, not a ratio.")}
             </p>
+            </>)}
           </SectionCard>
         </div>
 
@@ -792,11 +844,26 @@ function OrderEditor({
           <SectionCard
             title={t("orders.step2.title", "Step 2 · Suppliers & Costs")}
             subtitle={t("orders.editor.step2.subtitle", "Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live.")}
-            action={
+            action={draft.costHidden ? undefined : (
               <button type="button" onClick={addSupplier} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
-            }
+            )}
           >
-            {draft.suppliers.length === 0 ? (
+            {/* Without the private-records switch the lines are read, not
+                written: who supplies it and whether it is paid, no cost, no
+                add or remove — save() sends none and the server keeps them. */}
+            {draft.costHidden ? (
+              <div className="space-y-2">
+                <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                  {t("orders.suppliers.costHidden", "Supplier costs are shown and set only with «Can see private data» in Roles & Permissions.")}
+                </p>
+                {draft.suppliers.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
+                    <span className="min-w-0 truncate text-sm text-[var(--text-highlight)]">{s.supplier_name || t("orders.supplier.unnamed", "Unnamed supplier")}</span>
+                    <StatusBadge status={s.payment_status} />
+                  </div>
+                ))}
+              </div>
+            ) : draft.suppliers.length === 0 ? (
               <div className="py-6 text-center text-sm text-[var(--text-dim)]">{t("orders.editor.noSuppliers", "No suppliers yet. Click + Add Supplier to record a cost.")}</div>
             ) : (
               <div className="space-y-3">

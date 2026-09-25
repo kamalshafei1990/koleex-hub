@@ -83,6 +83,15 @@ export interface ProfitOutputs {
   customer_paid_share: number;
 }
 
+/** What is still owed on a supplier line. Reads outstanding_amount when the
+ *  server sent it: for a caller without the private-records switch
+ *  supplier_cost and paid_amount arrive as 0 (src/lib/experience), and the
+ *  remainder is then the only true figure on the line. */
+export function supplierOutstanding(s: { supplier_cost?: number | null; paid_amount?: number | null; outstanding_amount?: number | null }): number {
+  if (typeof s.outstanding_amount === "number") return s.outstanding_amount;
+  return Math.max(0, (Number(s.supplier_cost) || 0) - (Number(s.paid_amount) || 0));
+}
+
 export function computeOrderProfit(inputs: ProfitInputs): ProfitOutputs {
   /* ── Profit chain (booked / expected) ────────────────────────── */
   const total_supplier_cost = inputs.suppliers.reduce(

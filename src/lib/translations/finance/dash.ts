@@ -205,4 +205,9 @@ export const FIN_DASH: Translations = {
                                   zh: "{name} 占本{period}全部运营支出的 {pct}%。",
                                   ar: "{name} يمثّل {pct}٪ من الإنفاق التشغيلي {period}." },
   "dash.card.watch":           { en: "Watch",                           zh: "关注",                    ar: "تنبيه" },
+  /* Shown instead of the dashboard to a role without «Bank & Profit» — the
+     feed answers 403 (src/lib/experience, requireBankAndProfit). */
+  "dash.locked":               { en: "This view is profit and cash — it opens with «Bank & Profit» in Roles & Permissions.",
+                                  zh: "此视图涉及利润与现金——需要在角色与权限中拥有「Bank & Profit」才能打开。",
+                                  ar: "هذه الشاشة للأرباح والنقدية — تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
 };

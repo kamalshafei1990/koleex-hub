@@ -547,7 +547,7 @@ rule("the hiding helpers zero every balance and cost field and say so", EXP, (c)
   { label: "an account with no ledger entries shows minus its balance", caught: /bank balance fields miss ledger_difference/,
     mutate: (s) => once(s, '"ledger_balance", "ledger_base", "ledger_difference",', '"ledger_balance", "ledger_base",') },
   { label: "a cost row that does not say it is hidden", caught: /hideInventoryCost does not zero and flag/,
-    mutate: (s) => once(s, "  out.cost_hidden = true;\n", "") },
+    mutate: (s) => once(s, "  out.cost_hidden = true;\n  return out as T & { cost_hidden: true };", "  return out as T & { cost_hidden: true };") },
 ]);
 
 rule("the bank-account list and create keep balances to «Bank & Profit»", BA, (c) => {
@@ -634,6 +634,278 @@ rule("an item's valuation keeps cost to the «private records» switch", VAL_ITE
 }, [
   { label: "the locations unmasked", caught: /leaves a cost in the summary, a location or a movement/,
     mutate: (s) => once(s, "locations: summary.locations.map(hideInventoryCost),", "locations: summary.locations,") },
+]);
+
+/* The same rule on the screens that ARE profit and cash, and on the sales
+   orders (owner, 26 Sep 2026). The intelligence dashboard's feed and the
+   financial statements answer 403 without «Bank & Profit» — a per-field mask
+   would leave their alert engines reading zeros as facts — and each screen
+   turns that 403 into one line, placed after every hook. The treasury feed
+   hides the balances as the bank accounts do. An order hides its profit
+   without «Bank & Profit» and what its suppliers cost without the private-
+   records switch; what is still owed stays, and the engines read it from
+   outstanding_amount, not cost − paid (both 0 once hidden). Can't read →
+   can't write: the editor sends no supplier lines without the switch, the
+   server keeps the lines as they are and refuses a cost, and expected_profit
+   is written only when sent, by «Bank & Profit» (every edit used to null it). */
+const DASH = "src/app/api/finance/dashboard/route.ts";
+const VS_API = "src/app/api/finance/visual-statements/route.ts";
+const TRE = "src/app/api/finance/treasury/route.ts";
+const ORD = "src/app/api/finance/orders/route.ts";
+const ORD_ID = "src/app/api/finance/orders/[id]/route.ts";
+const CALC = "src/lib/finance/calc.ts";
+const FD = "src/components/finance/FinanceDashboard.tsx";
+const VS_UI = "src/components/finance/VisualStatements.tsx";
+const FO = "src/components/finance/FinanceOrders.tsx";
+const FBI = "src/components/finance/FinanceBankImports.tsx";
+const ENGINES = [
+  "src/lib/finance/intelligence.ts",
+  "src/lib/intelligence/events.ts",
+  "src/lib/intelligence/supplier.ts",
+  "src/lib/intelligence/treasury.ts",
+  "src/lib/intelligence/treasury-forecast.ts",
+];
+
+rule("an order hides its profit and its supplier cost, each with its own flag — never what is still owed", EXP, (c) => {
+  const p: string[] = [];
+  const list = (name: string) => /\[([^\]]*)\]/.exec(c.slice(c.indexOf(`export const ${name} =`)))?.[1] ?? "";
+  for (const f of ["gross_profit", "net_profit", "net_profit_pct", "realized_cash_position", "expected_profit"]) {
+    if (!list("ORDER_PROFIT_FIELDS").includes(`"${f}"`)) p.push(`the order profit fields miss ${f}`);
+  }
+  for (const f of ["total_supplier_cost", "paid_supplier_amount"]) {
+    if (!list("ORDER_COST_FIELDS").includes(`"${f}"`)) p.push(`the order cost fields miss ${f}`);
+  }
+  for (const f of ["supplier_cost", "paid_amount"]) {
+    if (!list("ORDER_SUPPLIER_COST_FIELDS").includes(`"${f}"`)) p.push(`the supplier line cost fields miss ${f}`);
+  }
+  if (/outstanding/.test(list("ORDER_PROFIT_FIELDS") + list("ORDER_COST_FIELDS") + list("ORDER_SUPPLIER_COST_FIELDS"))) p.push("what is still owed is hidden as if it were a cost");
+  const h = fnBody(c, "hideOrderFigures");
+  if (!/if \(!can\.profit\) \{\s*for \(const f of ORDER_PROFIT_FIELDS\) if \(f in out\) out\[f\] = out\[f\] == null \? null : 0;\s*out\.profit_hidden = true;\s*\}/.test(h)) p.push("hideOrderFigures does not zero and flag the profit");
+  if (!/if \(!can\.cost\) \{\s*for \(const f of ORDER_COST_FIELDS\) if \(f in out\) out\[f\] = out\[f\] == null \? null : 0;/.test(h)
+    || !/for \(const f of ORDER_SUPPLIER_COST_FIELDS\) if \(f in line\) line\[f\] = line\[f\] == null \? null : 0;/.test(h)
+    || !/out\.cost_hidden = true;/.test(h)) p.push("hideOrderFigures does not zero and flag the supplier cost, lines included");
+  const door = fnBody(c, "requireBankAndProfit");
+  if (!/^\s*if \(await canSeeBankAndProfit\(auth\)\) return null;/m.test(door) || !/code: "needs_bank_profit"/.test(door) || !/status: 403/.test(door)) p.push("requireBankAndProfit does not close without «Bank & Profit»");
+  return p;
+}, [
+  { label: "realized cash left out of the hidden profit", caught: /order profit fields miss realized_cash_position/,
+    mutate: (s) => once(s, '"net_profit_pct", "realized_cash_position", "expected_profit"', '"net_profit_pct", "expected_profit"') },
+  { label: "a hidden profit that does not say so", caught: /does not zero and flag the profit/,
+    mutate: (s) => once(s, "    out.profit_hidden = true;\n", "") },
+  { label: "the supplier lines keep their cost", caught: /does not zero and flag the supplier cost, lines included/,
+    mutate: (s) => once(s, "for (const f of ORDER_SUPPLIER_COST_FIELDS) if (f in line) line[f] = line[f] == null ? null : 0;", "") },
+  { label: "the payable hidden as a cost", caught: /still owed is hidden as if it were a cost/,
+    mutate: (s) => once(s, '["total_supplier_cost", "paid_supplier_amount"]', '["total_supplier_cost", "paid_supplier_amount", "outstanding_payable"]') },
+  { label: "the profit door open to everyone", caught: /requireBankAndProfit does not close/,
+    mutate: (s) => once(s, "  if (await canSeeBankAndProfit(auth)) return null;\n", "  return null;\n") },
+]);
+
+/** requireAuth → Finance → «Bank & Profit» → return, in that order, before
+ *  the handler reads anything. Order, never adjacency. */
+function bankProfitDoorProblems(data: RegExp) {
+  return (c: string): string[] => {
+    const p: string[] = [];
+    const body = bodyOf(c, "GET");
+    if (!body) return ["no GET handler"];
+    const bounceAt = body.search(/^\s*if \(auth instanceof NextResponse\) return auth;/m);
+    const financeAt = body.search(/^\s*if \(deny\) return deny;/m);
+    const gateAt = body.search(/^\s*const denied = await requireBankAndProfit\(auth, "[^"]+"\);/m);
+    const deniedAt = body.search(/^\s*if \(denied\) return denied;/m);
+    const dataAt = body.search(data);
+    if (!/const deny = await requireModuleAccess\(auth, "Finance"\);/.test(body) || financeAt < 0) p.push("GET does not pass Finance first");
+    if (gateAt < 0) { p.push("GET does not ask «Bank & Profit»"); return p; }
+    if (deniedAt < 0) { p.push("GET ignores the «Bank & Profit» answer"); return p; }
+    if (!(bounceAt >= 0 && bounceAt < financeAt && financeAt < gateAt && gateAt < deniedAt)) p.push("GET: requireAuth → Finance → «Bank & Profit» → return is out of order");
+    if (dataAt >= 0 && dataAt < deniedAt) p.push("GET reads before «Bank & Profit» has said yes");
+    return p;
+  };
+}
+
+rule("the dashboard feed opens only with «Bank & Profit», its supplier cost only with the private-records switch", DASH, (c) => {
+  const p = bankProfitDoorProblems(/\bsupabaseServer\.|\bbankLedgerBalances\(/)(c);
+  const body = bodyOf(c, "GET");
+  const maskAt = body.search(/if \(!canSeeCostData\(auth\)\) \{\s*out\.total_supplier_cost = 0;\s*out\.expected_vs_realized = \{ \.\.\.out\.expected_vs_realized, paid_supplier: 0 \};\s*out\.cost_hidden = true;\s*\}/);
+  const sendAt = body.search(/return NextResponse\.json\(\{ kpi: out \}/);
+  if (maskAt < 0 || sendAt < 0 || maskAt > sendAt) p.push("the feed sends the supplier cost to every «Bank & Profit» holder");
+  return p;
+}, [
+  { label: "the dashboard without the «Bank & Profit» door", caught: /does not ask «Bank & Profit»/,
+    mutate: (s) => once(s, "  const denied = await requireBankAndProfit(auth, \"The finance dashboard's figures\");\n  if (denied) return denied;\n", "") },
+  { label: "the supplier cost left in the feed", caught: /sends the supplier cost/,
+    mutate: (s) => once(s, "    out.total_supplier_cost = 0;\n", "") },
+]);
+
+rule("the financial statements open only with «Bank & Profit»", VS_API, bankProfitDoorProblems(/\bbuildVisualSnapshot\(/), [
+  { label: "the statements without the door", caught: /does not ask «Bank & Profit»/,
+    mutate: (s) => once(s, "  const denied = await requireBankAndProfit(auth, \"The financial statements\");\n", "") },
+  { label: "the door asked only after the snapshot is built", caught: /reads before «Bank & Profit» has said yes/,
+    mutate: (s) => once(once(s, "  const denied = await requireBankAndProfit(auth, \"The financial statements\");\n  if (denied) return denied;\n", ""),
+      "      compareEnd,\n    });\n",
+      "      compareEnd,\n    });\n  const denied = await requireBankAndProfit(auth, \"The financial statements\");\n  if (denied) return denied;\n") },
+]);
+
+rule("the treasury feed keeps the balances to «Bank & Profit»", TRE, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/^\s*canSeeBankAndProfit\(auth\),/m.test(get)) p.push("the treasury feed does not ask «Bank & Profit»");
+  if (!/accounts: bankAndProfit \? accounts : accounts\.map\(hideBankBalances\),/.test(get)) p.push("the treasury feed sends the balances to every Finance viewer");
+  return p;
+}, [
+  { label: "the treasury balances unmasked", caught: /sends the balances to every Finance viewer/,
+    mutate: (s) => once(s, "accounts: bankAndProfit ? accounts : accounts.map(hideBankBalances),", "accounts,") },
+]);
+
+rule("an order list hides profit and supplier cost, and a save never writes what the caller could not see", ORD, (c) => {
+  const p: string[] = [];
+  const get = bodyOf(c, "GET"), post = bodyOf(c, "POST");
+  if (!/^\s*canSeeBankAndProfit\(auth\),/m.test(get) || !/const can = \{ profit: bankAndProfit, cost: canSeeCostData\(auth\) \};/.test(get)) p.push("the list does not ask both rights");
+  if (!/return NextResponse\.json\(\{ orders: out\.map\(\(o\) => hideOrderFigures\(o, can\)\) \}\);/.test(get)) p.push("the list sends profit and supplier cost to every Finance viewer");
+  if (!/outstanding_amount: supplierOutstanding\(s\)/.test(get)) p.push("the list's supplier lines lose what is still owed once the cost is hidden");
+  if (!/const can = \{ profit: await canSeeBankAndProfit\(auth\), cost: canSeeCostData\(auth\) \};/.test(post)) p.push("a save does not ask both rights");
+  const refuseAt = post.search(/if \(!can\.cost && suppliers\.some\(\(s\) => \(Number\(s\.supplier_cost\) \|\| 0\) !== 0 \|\| \(Number\(s\.paid_amount\) \|\| 0\) !== 0\)\) \{\s*return NextResponse\.json\(/);
+  const firstWriteAt = post.search(/\.from\("finance_orders"\)/);
+  if (refuseAt < 0 || firstWriteAt < 0 || refuseAt > firstWriteAt) p.push("a supplier cost is set by a caller who cannot see it");
+  const keepAt = post.search(/^\s*if \(!can\.cost\) return NextResponse\.json\(\{ order: hideOrderFigures\(updated, can\) \}\);/m);
+  const replaceAt = post.search(/\.from\("finance_order_suppliers"\)\s*\.delete\(\)/);
+  if (keepAt < 0 || replaceAt < 0 || keepAt > replaceAt) p.push("an edit writes the zeros it was sent over the real supplier costs");
+  const upd = /\.update\(\{([\s\S]*?)\n\s*\}\)/.exec(post)?.[1] ?? "";
+  if (!/const expectedProfit = can\.profit && o\.expected_profit !== undefined \? \{ expected_profit: o\.expected_profit \?\? null \} : \{\};/.test(post)
+    || !/^\s*\.\.\.expectedProfit,$/m.test(upd) || /expected_profit/.test(upd)) p.push("an edit writes expected_profit it was not sent");
+  const ins = /\.from\("finance_orders"\)\s*\.insert\(\{([\s\S]*?)\n\s*\}\)/.exec(post)?.[1] ?? "";
+  if (!/expected_profit: can\.profit \? \(o\.expected_profit \?\? null\) : null,/.test(ins)) p.push("a new order takes expected_profit from a caller without «Bank & Profit»");
+  const answers = [...post.matchAll(/NextResponse\.json\(\{ order: ([^}]*?) \}\)/g)].map((m) => m[1]);
+  if (answers.length < 3 || answers.some((a) => !/^hideOrderFigures\((updated|created), can\)$/.test(a))) p.push("a save answers with the figures");
+  return p;
+}, [
+  { label: "the order list unmasked", caught: /the list sends profit and supplier cost/,
+    mutate: (s) => once(s, "orders: out.map((o) => hideOrderFigures(o, can))", "orders: out") },
+  { label: "a supplier cost accepted from anyone", caught: /a supplier cost is set by a caller who cannot see it/,
+    mutate: (s) => once(s, "if (!can.cost && suppliers.some(", "if (false && suppliers.some(") },
+  { label: "the edit's zeros written over the real costs", caught: /writes the zeros it was sent/,
+    mutate: (s) => once(s, "    if (!can.cost) return NextResponse.json({ order: hideOrderFigures(updated, can) });\n", "") },
+  { label: "expected_profit nulled by every edit again", caught: /writes expected_profit it was not sent/,
+    mutate: (s) => once(s, "        ...expectedProfit,\n", "        expected_profit: o.expected_profit ?? null,\n") },
+  { label: "a new order answered unmasked", caught: /a save answers with the figures/,
+    mutate: (s) => once(s, "NextResponse.json({ order: hideOrderFigures(created, can) })", "NextResponse.json({ order: created })") },
+  { label: "the lines without what is owed", caught: /lose what is still owed/,
+    mutate: (s) => once(s, "suppliers: (o.suppliers ?? []).map((s) => ({ ...s, outstanding_amount: supplierOutstanding(s) })),", "suppliers: o.suppliers ?? [],") },
+]);
+
+rule("one order's detail hides the same figures", ORD_ID, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/return NextResponse\.json\(\{ order: hideOrderFigures\(order, \{ profit: await canSeeBankAndProfit\(auth\), cost: canSeeCostData\(auth\) \}\) \}\);/.test(get)) p.push("the detail sends profit or supplier cost unmasked");
+  if (!/outstanding_amount: supplierOutstanding\(s\)/.test(get)) p.push("the detail's supplier lines lose what is still owed");
+  return p;
+}, [
+  { label: "the order detail unmasked", caught: /the detail sends profit or supplier cost unmasked/,
+    mutate: (s) => once(s, "hideOrderFigures(order, { profit: await canSeeBankAndProfit(auth), cost: canSeeCostData(auth) })", "order") },
+]);
+
+rule("what is owed on a supplier line reads the server's outstanding_amount first", CALC, (c) => {
+  return /^\s*if \(typeof s\.outstanding_amount === "number"\) return s\.outstanding_amount;/m.test(fnBody(c, "supplierOutstanding")) ? [] : ["supplierOutstanding works it out from the hidden cost"];
+}, [
+  { label: "outstanding worked out from the zeros", caught: /works it out from the hidden cost/,
+    mutate: (s) => once(s, '  if (typeof s.outstanding_amount === "number") return s.outstanding_amount;\n', "") },
+]);
+
+/* Cost − paid on a line is 0 − 0 for a caller without the switch: the AP
+   aging and the payment timeline would say nothing is owed. */
+const engineProblems = (c: string) => {
+  const p: string[] = [];
+  if (/supplier_cost[^;\n]*-[^;\n]*paid_amount/.test(c)) p.push("works out what is owed from cost − paid");
+  if (!/\bsupplierOutstanding\(/.test(c)) p.push("does not read supplierOutstanding");
+  return p;
+};
+for (const f of ENGINES) {
+  const p = engineProblems(code(read(f)));
+  check(`${f}: what is owed comes from supplierOutstanding, never cost − paid${p.length ? ` — ${p.join("; ")}` : ""}`, p.length === 0);
+}
+rule("the engines cannot go back to cost − paid", "src/lib/intelligence/supplier.ts", engineProblems, [
+  { label: "the supplier engine's own subtraction", caught: /works out what is owed from cost − paid/,
+    mutate: (s) => once(s, "prev.outstanding += supplierOutstanding(s);", "prev.outstanding += Math.max(0, (Number(s.supplier_cost) || 0) - (Number(s.paid_amount) || 0)); void supplierOutstanding;") },
+]);
+
+/** A component's text, from its signature to its closing brace. */
+function componentBody(c: string, name: string): string {
+  const at = c.search(new RegExp(`^export (?:default )?function ${name}\\(`, "m"));
+  if (at < 0) return "";
+  const end = c.indexOf("\n}\n", at);
+  return c.slice(at, end < 0 ? undefined : end);
+}
+const HOOK_CALL = /\buse[A-Z]\w*\(/;
+
+rule("the intelligence dashboard turns the 403 into one line, after every hook, and runs nothing on it", FD, (c) => {
+  const p: string[] = [];
+  const body = componentBody(c, "FinanceDashboard");
+  const on403 = body.search(/if \(dashRes\.status === 403\) \{\s*if \(seq === kpiSeq\.current\) \{ setLocked\(true\);/);
+  const parseAt = body.search(/await dashRes\.json\(\)/);
+  if (on403 < 0 || parseAt < 0 || on403 > parseAt) p.push("a 403 from the feed does not lock the page");
+  if (!/const stat = locked \? null :/.test(body) || !/const kpi = locked \? null :/.test(body)) p.push("a locked page still draws the cached figures");
+  if (!/if \(!loading && !locked\) saveMemory\(/.test(body) || !/^\s*if \(locked\) return;/m.test(body)) p.push("a locked page still feeds the memory or the Copilot");
+  const lockedAt = body.search(/^\s*if \(locked\) \{\s*return \(/m);
+  if (lockedAt < 0) p.push("the page has no locked state");
+  else if (HOOK_CALL.test(body.slice(lockedAt))) p.push("a hook runs below the locked return");
+  return p;
+}, [
+  { label: "the 403 read as figures", caught: /does not lock the page/,
+    mutate: (s) => once(s, "if (dashRes.status === 403) {", "if (dashRes.status === 499) {") },
+  { label: "the Copilot fed from a locked page", caught: /still feeds the memory or the Copilot/,
+    mutate: (s) => once(s, "    if (locked) return;\n", "") },
+  { label: "a hook added below the locked return", caught: /a hook runs below the locked return/,
+    mutate: (s) => once(s, "    );\n  }\n\n  return (\n    <div className=\"min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]\">\n      <div className=\"pb-5\">\n        <FinanceHeader\n",
+      "    );\n  }\n  const late = useMemo(() => 0, []);\n\n  return (\n    <div className=\"min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]\">\n      <div className=\"pb-5\">\n        <FinanceHeader\n") },
+]);
+
+rule("the statements turn the 403 into one line, after every hook", VS_UI, (c) => {
+  const p: string[] = [];
+  const body = componentBody(c, "StatementsDashboard");
+  const throwAt = body.search(/if \(r\.status === 403\) throw Object\.assign\(new Error\(.*?\{ name: STATEMENTS_LOCKED \}\);/);
+  const genericAt = body.search(/if \(!r\.ok\) throw/);
+  if (throwAt < 0 || genericAt < 0 || throwAt > genericAt) p.push("a 403 shows as a red failure");
+  const lockedAt = body.search(/^\s*if \(loadError instanceof Error && loadError\.name === STATEMENTS_LOCKED\) \{\s*return \(/m);
+  if (lockedAt < 0) p.push("the statements have no locked state");
+  else if (HOOK_CALL.test(body.slice(lockedAt))) p.push("a hook runs below the locked return");
+  return p;
+}, [
+  { label: "the 403 as a failure", caught: /a 403 shows as a red failure/,
+    mutate: (s) => once(s, "if (r.status === 403) throw", "if (r.status === 499) throw") },
+]);
+
+rule("the order screen shows «•••» for what the role may not see, and its editor never sends it back", FO, (c) => {
+  const p: string[] = [];
+  if (!/const HIDDEN = "•••";/.test(c)) p.push("the hidden mark is not «•••»");
+  if (!/const profitHidden = !!order\.profit_hidden;/.test(c) || !/const costHidden = !!order\.cost_hidden;/.test(c)) p.push("the order card does not read the flags");
+  if (!/\{profitHidden \? HIDDEN : fmtMoney\(netProfit, ccy/.test(c) || !/v=\{profitHidden \? null : grossProfit\}/.test(c) || !/v=\{profitHidden \? null : realizedCash\}/.test(c)) p.push("the card prints a hidden profit as a figure");
+  if ((c.match(/display=\{costHidden \? HIDDEN : undefined\}/g) ?? []).length !== 2) p.push("the card prints a hidden supplier cost as a figure");
+  if (!/const lowMargin = !profitHidden && netPct < 8;/.test(c) || !/overdue \|\| \(!profitHidden && netPct < 0\)/.test(c)) p.push("the card judges the margin from a hidden zero");
+  if (!/value=\{kpi\.profitHidden \? HIDDEN : kpi\.totalNet\}/.test(c)) p.push("the Net Profit total prints a hidden profit as a figure");
+  if (!/const body = \{ order: draft\.order, suppliers: draft\.costHidden \? \[\] : draft\.suppliers \};/.test(c)) p.push("the editor posts the masked supplier lines back");
+  const readOnlyAt = c.search(/\{draft\.costHidden \? \(/);
+  const costInputAt = c.search(/value=\{s\.supplier_cost\}/);
+  if (readOnlyAt < 0 || costInputAt < 0 || readOnlyAt > costInputAt) p.push("the editor offers the supplier cost inputs to everyone");
+  const previewAt = c.search(/\{draft\.profitHidden \|\| draft\.costHidden \? \(/);
+  const netRowAt = c.search(/label=\{t\("orders\.preview\.net"/);
+  if (previewAt < 0 || netRowAt < 0 || previewAt > netRowAt) p.push("the editor previews a profit the role may not see");
+  return p;
+}, [
+  { label: "the cost inputs for everyone", caught: /offers the supplier cost inputs to everyone/,
+    mutate: (s) => once(s, "{draft.costHidden ? (", "{false ? (") },
+  { label: "the masked lines posted back", caught: /posts the masked supplier lines back/,
+    mutate: (s) => once(s, "suppliers: draft.costHidden ? [] : draft.suppliers", "suppliers: draft.suppliers") },
+  { label: "a Low-margin chip read off a hidden zero", caught: /judges the margin from a hidden zero/,
+    mutate: (s) => once(s, "const lowMargin = !profitHidden && netPct < 8;", "const lowMargin = netPct < 8;") },
+  { label: "the profit preview for everyone", caught: /previews a profit the role may not see/,
+    mutate: (s) => once(s, "{draft.profitHidden || draft.costHidden ? (", "{false ? (") },
+  { label: "the Net Profit total printed", caught: /Net Profit total prints/,
+    mutate: (s) => once(s, "value={kpi.profitHidden ? HIDDEN : kpi.totalNet}", "value={kpi.totalNet}") },
+]);
+
+rule("the statement-import picker shows «•••» for a hidden balance", FBI, (c) => {
+  return /\{a\.balances_hidden \? "•••" : fmtMoney\(a\.available_balance, a\.currency/.test(c) ? [] : ["the picker prints a hidden balance as 0"];
+}, [
+  { label: "the picker's balance printed", caught: /prints a hidden balance as 0/,
+    mutate: (s) => once(s, '{a.balances_hidden ? "•••" : fmtMoney(a.available_balance, a.currency, { compact: true })}', "{fmtMoney(a.available_balance, a.currency, { compact: true })}") },
 ]);
 
 console.log(`\n${pass} passed, ${fail} failed`);

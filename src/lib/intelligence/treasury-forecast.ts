@@ -31,6 +31,7 @@
    Pure functions only. No fetch, no React, no DB.
    ========================================================================== */
 
+import { supplierOutstanding } from "@/lib/finance/calc";
 import type {
   BankAccount,
   CashMovement,
@@ -308,7 +309,7 @@ function extractEvents(input: ForecastInputs): CashEvent[] {
   /* AP forecasts from order_suppliers. */
   for (const o of input.orders) {
     for (const s of o.suppliers ?? []) {
-      const outstanding = Math.max(0, Number(s.supplier_cost ?? 0) - Number(s.paid_amount ?? 0));
+      const outstanding = supplierOutstanding(s);
       if (outstanding <= 0) continue;
       if (!s.due_date) continue;
       const days = daysFromToday(s.due_date);

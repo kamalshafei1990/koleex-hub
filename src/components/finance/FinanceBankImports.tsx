@@ -300,7 +300,8 @@ export default function FinanceBankImports() {
                           {a.is_primary && <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-600 dark:text-emerald-300">{t("bankImports.primary", "Primary")}</span>}
                         </div>
                         <div className="mt-1 truncate text-[12px] text-[var(--text-secondary)]">{a.account_name}</div>
-                        <div className="mt-1 text-[11px] text-[var(--text-dim)]">{a.currency} · {fmtMoney(a.available_balance, a.currency, { compact: true })}</div>
+                        {/* No «Bank & Profit»: the balance came as 0 with balances_hidden. */}
+                        <div className="mt-1 text-[11px] text-[var(--text-dim)]">{a.currency} · {a.balances_hidden ? "•••" : fmtMoney(a.available_balance, a.currency, { compact: true })}</div>
                       </button>
                     );
                   })}

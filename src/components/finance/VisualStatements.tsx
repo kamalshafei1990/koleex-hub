@@ -215,6 +215,9 @@ function BodySkeleton() {
   );
 }
 
+/** The error name a 403 from the statements feed carries. */
+const STATEMENTS_LOCKED = "NeedsBankProfit";
+
 export function StatementsDashboard() {
   const { t, lang } = useTranslation(FIN_VISUAL);
   const [tab, setTab] = useState<Tab>("income");
@@ -239,6 +242,9 @@ export function StatementsDashboard() {
     callT0Ref.current = typeof performance !== "undefined" ? performance.now() : 0;
     const r = await fetch(`/api/finance/visual-statements?${qs}`, { cache: "no-store" });
     const j = await r.json();
+    /* 403 = no «Bank & Profit» (src/lib/experience): not a failure to show
+       in red, a door this role does not open. */
+    if (r.status === 403) throw Object.assign(new Error(String(j.error ?? "")), { name: STATEMENTS_LOCKED });
     if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
     return j.snapshot as Snapshot;
   }, [qs]);
@@ -251,7 +257,9 @@ export function StatementsDashboard() {
   const { data: snap, loading, error: loadError } =
     useWarmData<Snapshot>(`fin:visual:${qs}`, load);
   const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
-  useEffect(() => { if (loadError) event("finance.dashboard.error"); }, [loadError]);
+  useEffect(() => {
+    if (loadError && !(loadError instanceof Error && loadError.name === STATEMENTS_LOCKED)) event("finance.dashboard.error");
+  }, [loadError]);
 
   /* TIMED ON THE PAINT, NOT ON THE FETCH. first_card_ms used to be recorded
      inside the request, which was the same moment back when the screen had
@@ -317,6 +325,16 @@ export function StatementsDashboard() {
   );
 
   const nextDisabled = isAtOrAfterToday(periodEnd, granularity);
+
+  /* After every hook: a role without «Bank & Profit» sees one calm line in
+     place of the statements — no figures, not even a warm copy of old ones. */
+  if (loadError instanceof Error && loadError.name === STATEMENTS_LOCKED) {
+    return (
+      <ErpPanel className="kx-glass px-5 py-3">
+        <div className="text-[13px] text-[var(--text-dim)]">{t("visual.locked", "The financial statements open with «Bank & Profit» in Roles & Permissions.")}</div>
+      </ErpPanel>
+    );
+  }
 
   return (
     <div className="space-y-5">
