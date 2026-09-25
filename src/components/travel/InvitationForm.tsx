@@ -338,18 +338,18 @@ export default function InvitationForm({ id }: { id?: string }) {
        exactly like Expenses. h-full is for a page that genuinely owns its
        internal panes; this is not one. */
     <div className="min-h-full">
-      {/* pt-12 = 3rem. NOT a round number picked by eye — it is exactly the
-          `+ 3rem` in the frosted ramp's own height,
-          `calc(var(--kx-header-h) + 3rem)` (globals.css). The shell already
-          offsets content by --kx-header-h (56 px), so without this the page
-          starts at 56 and the ramp reaches 104: measured, the Save / Export
-          PDF / Preview / Duplicate row sat from 56 to 88 — entirely inside
-          the frost, before any scrolling. The ramp is pointer-events:none, so
-          the buttons still worked; they were just permanently veiled, which
-          is worse than broken because nothing looks wrong enough to report.
-
-          Notes, which is fine, starts its first control at 136. */}
-      <div className="mx-auto w-full max-w-5xl px-4 pt-12 pb-24 sm:px-6">
+      {/* The Hub shell — width and top padding the same as every app (the
+          owner's fit-the-screen rule). This was pt-12, exactly the `+ 3rem`
+          of a frosted ramp that hung below the header and veiled the action
+          row at rest. That ramp is gone at rest now: the header is solid until
+          you scroll, and nothing paints in the 56–104 px strip (measured
+          25/09, desktop and phone) — so pt-12 had become a gap. If a ramp
+          ever hangs below the header at rest again, fix the ramp; do not pad
+          every app to dodge it.
+          It was max-w-5xl (1024); at the Hub width the four sections sit two
+          across on xl, the rule for a form with 3+ sections, instead of
+          stretching every field to ~700 px. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-24">
         <PageHeader
           title={isNew ? t("action.new") : (letter?.reference ?? t("app.title"))}
           subtitle={isNew ? t("app.subtitle") : form.name}
@@ -412,7 +412,7 @@ export default function InvitationForm({ id }: { id?: string }) {
           </div>
         )}
 
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
           {/* ── who ── */}
           <Section title={t("sec.visitor")}>
             <div className="sm:col-span-2">
@@ -624,7 +624,7 @@ export default function InvitationForm({ id }: { id?: string }) {
           </Section>
 
           {!isNew && (
-            <div className="flex justify-end">
+            <div className="flex justify-end xl:col-span-2">
               <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
                 {t("act.delete")}
               </Button>

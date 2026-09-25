@@ -126,9 +126,12 @@ export default function MeApp() {
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
-      {/* pb-28: the floating AI/Discuss chip parks bottom-right; without this
-          a form's Save button at the end of the page scrolls exactly under it. */}
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-28">
+      {/* The Hub shell — same width and top padding as every app (was 1200
+          wide with pt-6/md:pt-8, 32 px under the header vs the Hub's 16).
+          !pb-28: the floating AI/Discuss chip parks bottom-right; without this
+          a form's Save button at the end of the page scrolls exactly under it.
+          `!` because the compact density layer rewrites .py-6's bottom. */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-28">
         <div className="mb-6">
           <PageHeader
             title={t("hr.me.title")}

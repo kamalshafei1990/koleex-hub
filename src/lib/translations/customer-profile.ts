@@ -8,6 +8,7 @@ export const customerProfileT: Translations = {
   // Not-found + loading
   "notFound.title": { en: "Customer not found", zh: "未找到客户", ar: "لم يتم العثور على العميل" },
   "notFound.back": { en: "Back to customers", zh: "返回客户列表", ar: "العودة إلى العملاء" },
+  "nav.customers": { en: "Customers", zh: "客户", ar: "العملاء" },
 
   // Header
   "header.title": { en: "Customer Profile", zh: "客户资料", ar: "ملف العميل" },

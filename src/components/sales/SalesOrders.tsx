@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import {
   InventoryEmpty,
   Panel,
@@ -145,12 +146,9 @@ export default function SalesOrders() {
         {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/"
-              aria-label="Back to Hub"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              <RrIcon name="arrow-left" size={16} />
+            <Link href="/" aria-label="Back to Hub" className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
             </Link>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
               <RrIcon name="file-invoice" size={16} />

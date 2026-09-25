@@ -109,7 +109,7 @@ export default function OrderDetail({ id }: { id: string }) {
   if (error) {
     return (
       <div className="min-h-full">
-        <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
           <div className={`${CARD} p-8 text-center`}>
             <p className="text-[var(--text-secondary)]">{error}</p>
             <div className="mt-4">
@@ -135,7 +135,10 @@ export default function OrderDetail({ id }: { id: string }) {
 
   return (
     <div className="min-h-full">
-      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-16 sm:px-6 lg:px-8">
+      {/* The Hub shell's top padding (was pt-12, for a frosted ramp that no
+          longer hangs below the header at rest — measured 25/09). !pb-16
+          keeps this page's bottom past the compact density rewrite. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-16">
         <PageHeader
           title={order.order_no}
           subtitle={orderParty(order)}

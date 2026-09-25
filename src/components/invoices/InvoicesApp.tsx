@@ -21,6 +21,7 @@ import { invoicesT } from "@/lib/translations/invoices";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
@@ -496,11 +497,9 @@ function InvoiceDetailView({
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden print:hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
           <div className="flex items-center gap-3 pt-4 pb-3 flex-wrap">
-            <button
-              onClick={onBack}
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-            >
-              <RrIcon name="arrow-left" size={16} />
+            <button type="button" onClick={onBack} aria-label={t("app.title")} className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{t("app.title")}</span>
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-[18px] md:text-[20px] font-bold tracking-tight truncate flex items-center gap-2">

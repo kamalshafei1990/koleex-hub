@@ -21,6 +21,7 @@ import { useSkin } from "@/lib/appearance";
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -250,9 +251,9 @@ export default function AiKnowledgePage() {
       )}
       <div className="relative z-[1] w-full px-4 md:px-8 py-6 space-y-5">
         <div className="flex items-center gap-3 flex-wrap">
-          <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")}
-            className="kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
-            <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
+          <Link href="/ai" aria-label={t("kq.back", "Back to Koleex AI")} className={BACK_CHROME}>
+            <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+            <span className="hidden text-[12px] font-medium sm:inline">Koleex AI</span>
           </Link>
           <BookOpenIcon className="h-5 w-5 text-[var(--text-muted)]" />
           <div className="min-w-0">

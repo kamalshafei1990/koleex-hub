@@ -125,15 +125,17 @@ export default function OrdersApp() {
 
   return (
     /* A flowing list page, so it lives in the Hub scroller — min-h-full, not
-       h-full. pt-12 clears the frosted header ramp, which reaches
-       calc(--kx-header-h + 3rem); without it the first control sits inside
-       the frost, permanently veiled but still clickable, which is worse than
-       broken because nothing looks wrong enough to report. */
+       h-full. The top padding is the Hub shell's, like every other app. It
+       was pt-12, to clear a frosted ramp that reached
+       calc(--kx-header-h + 3rem); the header is solid at rest now and
+       nothing paints in that strip (measured 25/09), so pt-12 had become a
+       gap. If a ramp ever hangs below the header at rest again, fix the ramp
+       — do not pad every app to dodge it. */
     <div className="min-h-full">
       {/* max-w-[1500px] is the Hub shell width. max-w-6xl (1152) left a third
           of a wide display empty — the owner's standing rule is that a page
           fits the screen it is on. */}
-      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-8">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}

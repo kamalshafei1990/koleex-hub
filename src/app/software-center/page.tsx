@@ -113,7 +113,10 @@ function DownloadCenterContent() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-6 lg:px-8 pt-5 md:pt-7 pb-16">
+      {/* The Hub shell — same width and top padding as every app (was 1280
+          wide with pt-5/md:pt-7). !pb-16 keeps this page's own bottom past the
+          compact density layer's rewrite of .py-6. */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-16">
         <PageHeader
           title="Download Center"
           subtitle="Download apps, updates, drivers and installers"

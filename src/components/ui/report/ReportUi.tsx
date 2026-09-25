@@ -27,6 +27,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 
 /* ─── Shell ─────────────────────────────────────────────────── */
 
@@ -47,9 +48,10 @@ export function ReportShell({
       <div className="mx-auto max-w-[1200px] px-4 py-6 print:max-w-none print:px-0 print:py-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
           <div className="flex items-center gap-3">
-            <Link href={backHref} aria-label="Back"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-              <RrIcon name="arrow-left" size={16} />
+            {/* The Hub's back chip. Shared by several screens whose parent
+                differs, so it carries no label rather than a wrong one. */}
+            <Link href={backHref} aria-label="Back" className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
             </Link>
             {icon && (
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">

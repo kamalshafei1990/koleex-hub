@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -364,8 +365,9 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
       {!embedded && (
         <>
           <div className="flex items-center gap-3 mb-1">
-            <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("vl.brands.backHome", "Back to home")}>
-              <ArrowLeftIcon className="h-4 w-4" />
+            <Link href="/" className={BACK_CHROME} aria-label={t("vl.brands.backHome", "Back to home")}>
+              <ArrowLeftIcon size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
             </Link>
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <BrandIcon size={16} />

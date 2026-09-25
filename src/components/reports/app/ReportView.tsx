@@ -34,6 +34,7 @@ import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import {
   REPORT_LIMITS, blockFileIds, missingSections, periodFor, rangeEnd, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
 } from "@/lib/reports/templates";
@@ -95,10 +96,23 @@ export default function ReportView({ id }: { id: string }) {
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
-      <div className="mx-auto w-full max-w-[1100px] px-4 pt-12 pb-28 sm:px-6 lg:px-8">
-        <Link href="/reports" className="mb-4 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-          <span className="inline-block rtl:rotate-180"><RrIcon name="arrow-left" size={13} /></span>{t("reader.back")}
-        </Link>
+      {/* The Hub shell — the same width and top padding as every app (the
+          owner's fit-the-screen rule). It was 1100 wide with pt-12: pt-12
+          cleared a frosted ramp that once hung 3rem below the header, but the
+          header is solid at rest now and nothing paints in that strip
+          (measured 25/09), so the padding had become a gap. !pb-28 keeps this
+          page's own bottom clearance — the compact density layer rewrites
+          .py-6's bottom to 16px otherwise. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-28">
+        {/* The Hub's back control, not a text link — the same chip as every
+            app's "← Hub", in a row above the card as Product Data's record
+            view has it. The arrow keeps its RTL flip; RrIcon does not mirror. */}
+        <div className="mb-3 flex min-w-0 items-center gap-2">
+          <Link href="/reports" aria-label={t("reader.back")} className={BACK_CHROME}>
+            <span className="inline-block rtl:rotate-180"><RrIcon name="arrow-left" size={14} /></span>
+            <span className="hidden text-[12px] font-medium sm:inline">{t("app.title")}</span>
+          </Link>
+        </div>
         {phase === "loading" && <div className={`${CARD} grid place-items-center py-20`}><SpinnerIcon size={20} /></div>}
         {phase === "missing" && <div className={`${CARD} px-6 py-14 text-center text-[13px] text-[var(--text-dim)]`}>{t("reader.notFound")}</div>}
         {phase === "error" && (

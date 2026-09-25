@@ -31,6 +31,7 @@ import type { SoundKey } from "@/lib/sounds/catalog";
 import type { TaskCardState } from "@/components/ai/TaskCard";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ComposerAddMenu from "@/components/ai/ComposerAddMenu";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
@@ -2808,12 +2809,9 @@ export default function KoleexAiApp() {
               <MenuBurgerIcon size={14} />
             </button>
           )}
-          <Link
-            href="/"
-            aria-label={copy.backToHub}
-            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-          >
-            <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
+          <Link href="/" aria-label={copy.backToHub} className={BACK_CHROME}>
+            <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+            <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="kx-ai-bar-title text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug" dir="auto" lang={active?.title ? textLang(active.title) : undefined}>

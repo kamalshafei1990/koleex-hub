@@ -174,11 +174,15 @@ export default function ContractsApp() {
 
   return (
     /* A flowing list page, so it lives in the Hub scroller — min-h-full, not
-       h-full, and pt-12 to clear the frosted header ramp. max-w-[1500px] is
-       the Hub shell width: the owner's standing rule is that a page fits the
-       screen it is on. */
+       h-full. The container is the Hub shell, width AND top padding: the
+       owner's standing rule is that a page fits the screen it is on and sits
+       under the header like every other app. It had pt-12 to clear a frosted
+       ramp that once hung 3rem below the header; the header is solid at rest
+       now and nothing paints in that strip (measured 25/09), so pt-12 had
+       become a gap. !pb-8 keeps this page's own bottom — the compact density
+       layer rewrites .py-6's bottom to 16px otherwise. */
     <div className="min-h-full">
-      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-8">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}

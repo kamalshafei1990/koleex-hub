@@ -11,6 +11,7 @@ import { getTierColor, tierTextStyle, TIER_COLOR_META, TIER_ORDER } from "@/lib/
 import { getCountryByCode } from "@/lib/commercial-policy/countries";
 import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import TabStrip from "@/components/ui/TabStrip";
@@ -9314,8 +9315,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <div className="kx-bar-host px-3 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between sticky top-0 bg-[var(--bg-secondary)] z-10 gap-2">
           <div aria-hidden className="kx-glass-bar" />
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <button onClick={handleBack} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-              <ArrowLeftIcon size={18} className="rtl:rotate-180" />
+            {/* The Hub's back chip, not a bare arrow. No label: the form
+                returns to whichever view opened it. */}
+            <button type="button" onClick={handleBack} aria-label={t("btn.back")} className={BACK_CHROME}>
+              <ArrowLeftIcon size={14} className="rtl:rotate-180" />
             </button>
             <h2 className="text-base md:text-lg font-semibold text-[var(--text-primary)] truncate">
               {filterType

@@ -25,6 +25,7 @@
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { cdnImage } from "@/lib/cdn";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import { useSkin } from "@/lib/appearance";
 import { useWarm, writeWarm } from "@/lib/warm-cache";
 import {
@@ -3333,12 +3334,11 @@ export default function DiscussApp() {
                 permanently; everything else moved into the conversation header
                 or its overflow. */}
             <div className="flex items-center gap-2 mb-2">
-              <Link
-                href="/"
-                className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-                aria-label={t("back")}
-              >
-                <ArrowLeftIcon className="h-4 w-4" />
+              {/* The Hub's back chip — the same "← Hub" every app wears, not a
+                  borderless icon of Discuss's own. */}
+              <Link href="/" className={BACK_CHROME} aria-label={t("back")}>
+                <ArrowLeftIcon size={14} />
+                <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
               </Link>
               <div className="flex-1" />
               <div className="relative">

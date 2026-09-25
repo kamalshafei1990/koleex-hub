@@ -8,6 +8,7 @@ export const CT_BTN: Translations = {
   "btn.save":             { en: "Save",                  zh: "保存",                 ar: "حفظ" },
   "btn.saving":           { en: "Saving...",             zh: "保存中...",             ar: "جارٍ الحفظ..." },
   "btn.cancel":           { en: "Cancel",                zh: "取消",                 ar: "إلغاء" },
+  "btn.back":             { en: "Back",                  zh: "返回",                 ar: "رجوع" },
   "btn.delete":           { en: "Delete",                zh: "删除",                 ar: "حذف" },
   "btn.edit":             { en: "Edit",                  zh: "编辑",                 ar: "تعديل" },
   "btn.add":              { en: "Add",                   zh: "添加",                 ar: "إضافة" },

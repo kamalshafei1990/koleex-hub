@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import FormModal from "@/components/kds/FormModal";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import KdsEmptyState from "@/components/kds/EmptyState";
 import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
@@ -1382,9 +1383,13 @@ function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: 
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
+        {/* Phone-only back out of the detail pane: the Hub's back chip, not a
+            text link — the same control as every app's "← Hub" (w-fit: the
+            chip is `flex`, and this sits in a block). Same at the three
+            department panes below. */}
         <button onClick={onClose}
-          className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-          <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+          aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+          <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
         </button>
         <div className="flex items-center gap-4">
           <Avatar src={person.avatar} name={person.name} size={56} />
@@ -2131,8 +2136,8 @@ export default function ManagementPage() {
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
               </button>
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shadow-sm">
@@ -2155,8 +2160,8 @@ export default function ManagementPage() {
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                aria-label={t("mgmt.back")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.back")}</span>
               </button>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
@@ -2233,8 +2238,8 @@ export default function ManagementPage() {
           <>
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => setMobileShowDetail(false)}
-                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.allDepartments")}
+                aria-label={t("mgmt.allDepartments")} className={`${BACK_CHROME} mb-3 w-fit md:hidden`}>
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /><span className="hidden text-[12px] font-medium sm:inline">{t("mgmt.allDepartments")}</span>
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">

@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import { SectionHeader } from "@/components/knowledge/product-coding/primitives";
 import {
   DivisionStrip,
@@ -92,12 +93,9 @@ function PageInner() {
       {/* ── Breadcrumb bar ─────────────────────────────────────────── */}
       <div className="border-b border-[var(--border-faint)] no-print">
         <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-4 flex items-center gap-3">
-          <Link
-            href="/knowledge"
-            aria-label={t("nav.back")}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
-          >
-            <ArrowLeftIcon className={`h-4 w-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+          <Link href="/knowledge" aria-label={t("nav.back")} className={BACK_CHROME}>
+            <ArrowLeftIcon size={14} className={dir === "rtl" ? "rotate-180" : undefined} />
+            <span className="hidden text-[12px] font-medium sm:inline">{t("nav.knowledge")}</span>
           </Link>
           <div className="flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
             <Link href="/knowledge" className="hover:text-[var(--text-primary)]">

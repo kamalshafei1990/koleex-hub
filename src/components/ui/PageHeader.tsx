@@ -28,6 +28,7 @@ import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 
 /* Sliding-pill geometry — change in one place. */
 const TAB_WIDTH_LG = 148;
@@ -96,9 +97,11 @@ function parentPath(pathname: string): string {
 /* Exported so a screen that deliberately does NOT take the full hero still
    wears the same back control. Product Data's record view is the case: its
    identity strip is slim on purpose, to keep the tabs from being pushed down
-   the page, but "slim" was never a reason for a different-looking control. */
-export const BACK_CHROME =
-  "kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5";
+   the page, but "slim" was never a reason for a different-looking control.
+   The string itself lives in ./back-chrome (no imports) so a screen WITHOUT
+   PageHeader can use it without pulling this module's navigation map in;
+   re-exported here so every existing import keeps working. */
+export { BACK_CHROME };
 
 export default function PageHeader({
   title,

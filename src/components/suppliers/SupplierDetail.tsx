@@ -22,6 +22,7 @@ import { CT_CS } from "@/lib/translations/contacts/cs";
 import { CT_NEG } from "@/lib/translations/contacts/neg";
 import { CT_SD } from "@/lib/translations/contacts/sd";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
@@ -470,9 +471,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 crumbs jump straight to Home or the Suppliers app. */}
             {!embedded && (
               <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
-                <button type="button" onClick={() => router.back()}
-                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" /> {t("sd.back", "Back")}
+                <button type="button" onClick={() => router.back()} aria-label={t("sd.back", "Back")} className={BACK_CHROME}>
+                  <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+                  <span className="hidden text-[12px] font-medium sm:inline">{t("sd.back", "Back")}</span>
                 </button>
                 <span className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
                 <button type="button" onClick={() => router.push("/")} className="transition-colors hover:text-[var(--text-primary)]">{t("sd.home", "Home")}</button>
@@ -487,9 +488,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <div className="flex items-center gap-2 min-w-0">
               {onBack ? (
                 <button type="button" onClick={() => onBack()} aria-label={t("sd.backToOverview", "Back to overview")} title={t("sd.backToOverview", "Back to overview")}
-                  className="flex items-center gap-1.5 shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
-                  <span className="hidden sm:inline">{t("sd.overview", "Overview")}</span>
+                  className={BACK_CHROME}>
+                  <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+                  <span className="hidden text-[12px] font-medium sm:inline">{t("sd.overview", "Overview")}</span>
                 </button>
               ) : null}
               <div className="inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)] p-0.5 text-[10.5px] font-medium">

@@ -166,7 +166,12 @@ export default function ReportsApp() {
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
-      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-28 sm:px-6 lg:px-8">
+      {/* The Hub shell's top padding, not pt-12: pt-12 cleared a frosted ramp
+          that once hung 3rem below the header; the header is solid at rest
+          now and nothing paints in that strip (measured 25/09), so it had
+          become a gap. !pb-28 keeps the bottom clearance the compact density
+          layer would otherwise rewrite to 16px. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-28">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}

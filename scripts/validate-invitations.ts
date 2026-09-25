@@ -306,11 +306,19 @@ for (const f of [
   const src = fs.readFileSync(R(f), "utf8");
   ok(`${f.split("/").pop()} — no private scroller on the app root`,
     !/className="h-full overflow-y-auto"/.test(src));
-  /* The shell offsets content by --kx-header-h (56px) but the ramp reaches
-     calc(--kx-header-h + 3rem) = 104px. Without the extra 3rem the first
-     control lands inside the frost before any scrolling. */
-  ok(`${f.split("/").pop()} — content starts below the frosted ramp (pt-12)`,
-    /px-4 pt-12 pb-/.test(src));
+  /* THE HUB SHELL, NOT pt-12. This check used to demand pt-12: the frosted
+     ramp once hung 3rem below the header (to 104 px) and veiled the first row
+     before any scrolling. It no longer does — the header is solid at rest and
+     nothing paints in the 56–104 px strip (measured 25/09, desktop and phone)
+     — so pt-12 had become the gap the owner flagged ("a big gap between the
+     button and main header"), and the 896–1152 px widths broke his
+     fit-the-screen rule. The page now wears the same shell as every app. If a
+     ramp ever hangs below the header at rest again, fix the ramp; do not pad
+     every app to dodge it. Only className strings are read for pt-12 — the
+     page's own comment explains the history and must not trip this. */
+  ok(`${f.split("/").pop()} — sits in the Hub shell (1500 wide, py-6 md:py-8, no pt-12)`,
+    /max-w-\[1500px\] px-4 md:px-6 lg:px-8 py-6 md:py-8/.test(src) &&
+    !/className="[^"]*\bpt-12\b[^"]*"/.test(src));
 }
 
 /* The wordmark is 6.7:1, so height drives width: 12mm made it 80mm — 47% of

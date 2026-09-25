@@ -355,7 +355,11 @@ export default function ShippingApp() {
           AI dock is `fixed bottom-6 end-6`, and with only pb-8 the last route
           chip rendered underneath it. In the wide layout the rail is a right
           column and clears it on its own. */}
-      <div ref={hostRef} className={`mx-auto w-full max-w-[1500px] px-4 pt-12 sm:px-6 lg:px-8 ${wide ? "pb-8" : "pb-24"}`}>
+      {/* Top padding is the Hub shell's (was pt-12, for a frosted ramp that no
+          longer hangs below the header at rest — measured 25/09). The bottom
+          is `!` so the compact density layer cannot rewrite the dock
+          clearance above to 16px. */}
+      <div ref={hostRef} className={`mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 ${wide ? "!pb-8" : "!pb-24"}`}>
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}
