@@ -31,11 +31,13 @@ type Pending = { key: string; name: string; image: boolean; preview: string | nu
 
 const BTN = "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 text-[12.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] disabled:opacity-50";
 
-export default function AttachmentsEditor({ t, reportId, initial, onBusy }: {
+export default function AttachmentsEditor({ t, reportId, initial, onBusy, hide }: {
   t: T;
   reportId: string;
   initial: ReportAttachment[];
   onBusy: (busy: boolean) => void;
+  /** Shown in place by a block (a checklist photo, a signature — Phase 4A). */
+  hide?: ReadonlySet<string>;
 }) {
   const [items, setItems] = useState<ReportAttachment[]>(initial);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -146,8 +148,9 @@ export default function AttachmentsEditor({ t, reportId, initial, onBusy }: {
     else setProblem(t("err.generic"));
   };
 
-  const photos = items.filter((a) => a.image);
-  const files = items.filter((a) => !a.image);
+  const listed = hide?.size ? items.filter((a) => !hide.has(a.id)) : items;
+  const photos = listed.filter((a) => a.image);
+  const files = listed.filter((a) => !a.image);
   const pendingPhotos = pending.filter((p) => p.image);
   const pendingFiles = pending.filter((p) => !p.image);
   const full = items.length + pending.length >= REPORT_ATTACHMENT_LIMITS.perReport;

@@ -155,6 +155,13 @@ export const captionReportAttachment = (id: string, attId: string, caption: stri
 export const deleteReportAttachment = (id: string, attId: string) =>
   call<{ ok: true }>(`/api/work-reports/${id}/attachments/${attId}`, { method: "DELETE" });
 
+/** One thing a report can be linked to (Phase 4A). */
+export interface LinkHit { id: string; label: string; sub?: string }
+/** Search what a links block can point at; `denied` when the author does not
+ *  have the app that owns that kind of record. */
+export const searchReportLinks = (type: string, q: string) =>
+  call<{ hits: LinkHit[]; denied?: boolean }>(`/api/work-reports/links/search?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}`);
+
 /** Koleex AI on one section of a draft (write / tidy) — a proposal only. */
 export const askReportAi = (id: string, body: AiDraftRequest) =>
   call<{ text: string }>(`/api/work-reports/${id}/ai`, { method: "POST", body: JSON.stringify(body) });

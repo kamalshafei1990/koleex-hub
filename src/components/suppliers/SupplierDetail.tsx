@@ -71,6 +71,7 @@ import RiskSection from "./RiskSection";
 import NegotiationSection from "./NegotiationSection";
 import SourcingSection from "./SourcingSection";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 
 /* Only the namespaces this screen reads — see contacts.ts. */
 const DICT = { ...CT_BADGE, ...CT_CS, ...CT_NEG, ...CT_SD } as const;
@@ -1661,6 +1662,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         <Section id="timeline">
           <TimelineSection supplierId={id} timeline={data.timeline ?? []} onSaved={() => load({ silent: true })} />
         </Section>
+
+        {/* The reports linked to this supplier — visits, factory audits, price
+            comparisons (Reports Phase 4A). */}
+        <ReportsAboutCard type="supplier" id={id} className="scroll-mt-16 mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4" />
 
         {/* Notes */}
         {str(s, "notes") ? (

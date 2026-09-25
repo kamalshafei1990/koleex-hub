@@ -48,6 +48,12 @@
  *      absent day as HR's sheet reads it, a probation ending), asked once,
  *      cancelled only when its event stopped being true, a report linked to
  *      its request and stamped on its first send, nudged once per kind.
+ *   §16 blocks (Phase 4A) — checklist, score, table, links, signature: only
+ *      the template's points / criteria / columns / link types, in range and
+ *      capped; a required block is really filled; the weighted score; links
+ *      kept in step on save, send and a new version; a new version's blocks
+ *      point at its own copies; a record's page lists only what its viewer
+ *      may read; every kind of record searched only by those who own its app.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -61,7 +67,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { reportAccess, type ReportAccessFacts } from "../src/lib/reports/access";
 import {
-  REPORT_FAMILIES, REPORT_LIMITS, REPORT_TEMPLATES, isoWeekKey, missingSections, normalizeSections, periodFor, reportTemplate,
+  REPORT_FAMILIES, REPORT_LIMITS, REPORT_TEMPLATES, blockFileIds, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
 } from "../src/lib/reports/templates";
 import { reportsT } from "../src/lib/translations/reports";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
@@ -85,7 +91,7 @@ import {
 } from "../src/lib/reports/attachments";
 import { NOTIFICATION_ACTIVITIES, classifyNotificationActivity } from "../src/lib/notification-activity";
 import {
-  ATTACH_SID, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, widthUnits, type Measurer, type PrintPara,
+  ATTACH_SID, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, printParagraphs, widthUnits, type Measurer, type PrintPara,
 } from "../src/lib/reports/print-layout";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,7 +101,25 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 const eq = (got: unknown, want: unknown, m: string) => expect(JSON.stringify(got) === JSON.stringify(want), m, `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+/** The file without its comments. Strings are stepped over whole: a bare
+ *  regex read accept="image/*" as a comment opening and dropped the code up
+ *  to the next one — every guard on that file then checked half of it, and
+ *  a "never uses X" guard passed on nothing. */
+const code = (src: string) => {
+  let out = "", i = 0;
+  while (i < src.length) {
+    const ch = src[i], nx = src[i + 1];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      let j = i + 1;
+      while (j < src.length && src[j] !== ch && !(ch !== "`" && src[j] === "\n")) j += src[j] === "\\" ? 2 : 1;
+      out += src.slice(i, j + 1); i = j + 1; continue;
+    }
+    if (ch === "/" && nx === "*") { const end = src.indexOf("*/", i + 2); i = end < 0 ? src.length : end + 2; continue; }
+    if (ch === "/" && nx === "/" && /^\s*$/.test(src.slice(src.lastIndexOf("\n", i - 1) + 1, i))) { const end = src.indexOf("\n", i); i = end < 0 ? src.length : end; continue; }
+    out += ch; i++;
+  }
+  return out;
+};
 
 /** A rule must pass on the real file and fail on the mutation. */
 function rule(name: string, file: string, check: (c: string) => string[], mutate: (src: string) => string) {
@@ -176,7 +200,9 @@ console.log("\n§3 templates and their words");
   for (const [k, e] of Object.entries(reportsT)) if (holes(e.en ?? "") !== holes(e.zh ?? "") || holes(e.en ?? "") !== holes(e.ar ?? "")) missing.push(`${k}: placeholders differ between languages`);
   expect(missing.length === 0, `${REPORT_TEMPLATES.length} templates, every name / description / section in en, zh and ar`, [...new Set(missing)].slice(0, 12).join(", "));
   const phase1 = ["daily", "weekly_plan", "weekly", "monthly", "customer_visit", "supplier_visit", "decision_memo", "escalation", "handover", "free", "hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview"];
-  eq(REPORT_TEMPLATES.map((t) => t.key), [...phase1, "return_plan", "attendance_note", "probation_review"], "Phase 1 ships the approved ten + the four HR types, then the three that events ask for (Phase 3D), in that order");
+  const withBlocks = [...phase1.slice(0, 6), "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
+  eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
+    "Phase 1's ten + four HR types, the three that use the Phase 4A blocks after the visits, and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -236,7 +262,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 13, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations)`);
+  expect(files.length === 15, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -1170,8 +1196,8 @@ console.log("\n§15 reports that events ask for");
     (c) => (/if \(tpl\.requestOnly\) return NextResponse\.json\(\{ error: "request_only" \}, \{ status: 403 \}\);/.test(c) ? [] : ["anyone can write a probation review about anyone"]),
     (src) => src.replace('  if (tpl.requestOnly) return NextResponse.json({ error: "request_only" }, { status: 403 });\n', ""));
   rule("sending marks the request sent", "src/app/api/work-reports/[id]/submit/route.ts",
-    (c) => { const send = c.indexOf('.update({ status: "submitted"'); const mark = c.indexOf("await markRequestSent(report.period_key, report.id, auth.account_id, now);"); return send > 0 && mark > send ? [] : ["a request stays owed after its report is sent"]; },
-    (src) => src.replace("  await markRequestSent(report.period_key, report.id, auth.account_id, now);\n", ""));
+    (c) => { const send = c.indexOf('.update({ status: "submitted"'); const mark = c.indexOf("markRequestSent(report.period_key, report.id, auth.account_id, now)"); return send > 0 && mark > send ? [] : ["a request stays owed after its report is sent"]; },
+    (src) => src.replace("    markRequestSent(report.period_key, report.id, auth.account_id, now),\n", ""));
   rule("a request's nudges are claimed on its row, and a super admin writer is never escalated", "src/lib/server/reports/nudges.ts",
     (c) => (/update\(\{ reminded_at: now \}\)\.eq\("id", n\.requestId!\)\.is\("reminded_at", null\)/.test(c) && /update\(\{ escalated_at: now, escalated_to: n\.recipients \}\)\.eq\("id", n\.requestId!\)\.is\("escalated_at", null\)/.test(c) && /n\.kind === "escalation" && \(!settings\.escalations \|\| isAdmin\.has\(r\.account_id\)\)/.test(c) ? [] : ["a request can be nudged twice, or a super admin escalated"]),
     (src) => src.replace('.update({ reminded_at: now }).eq("id", n.requestId!).is("reminded_at", null)', '.update({ reminded_at: now }).eq("id", n.requestId!)'));
@@ -1195,6 +1221,150 @@ console.log("\n§15 reports that events ask for");
   expect(newKeys.every((k) => ["en", "zh", "ar"].every((l) => !!(calendarT[`report.${k}`] as Record<string, string> | undefined)?.[l])), "the calendar names every report an event asks for, in three languages");
   expect(["return_plan", "attendance_note", "probation_review"].every((k) => reportTemplate(k)) && reportTemplate("probation_review")!.confidential && reportTemplate("probation_review")!.requestOnly === true && reportTemplate("probation_review")!.recipients === "hr",
     "the three new types exist; the probation review is confidential, for HR, and request-only");
+}
+
+/* ── §16 blocks ────────────────────────────────────────────────────────── */
+console.log("\n§16 blocks: checklist, score, table, links, signature");
+{
+  const audit = reportTemplate("factory_audit")!;
+  const pc = reportTemplate("price_comparison")!;
+  const inst = reportTemplate("installation")!;
+  const U1 = "0f9c7c2e-1b7a-4b5e-9a4e-2f0f3a9b8c7d", U2 = "1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d";
+  const norm = (tpl: typeof audit, raw: unknown[]) => normalizeSections(tpl, raw);
+  const byId = (xs: ReturnType<typeof norm>, id: string) => xs.find((x) => x.id === id)!;
+
+  /* Checklist */
+  const checks = byId(norm(audit, [{ id: "checks", checks: {
+    licence: { state: "ok" }, capacity: { state: "maybe", note: "  fine  " }, samples: { state: "issue", note: "x".repeat(700), photo: U1 },
+    safety: { photo: "not-a-uuid" }, ghost: { state: "ok" },
+  } }]), "checks");
+  eq(Object.keys(checks.checks ?? {}), ["licence", "capacity", "samples"], "a checklist keeps only its own points, and drops one that says nothing");
+  eq([checks.checks!.licence.state, checks.checks!.capacity.state, checks.checks!.capacity.note], ["ok", undefined, "fine"], "an unknown state is dropped; a note is trimmed");
+  eq([checks.checks!.samples.note!.length, checks.checks!.samples.photo], [REPORT_LIMITS.item, U1], "a note is capped; a photo is an attachment id");
+  /* Score */
+  const rating = byId(norm(audit, [{ id: "rating", scores: { quality: 5, capacity: 4, price: 3, delivery: 4, communication: 5, extra: 5 } }]), "rating");
+  eq(rating.scores, { quality: 5, capacity: 4, price: 3, delivery: 4, communication: 5 }, "a score keeps only its criteria");
+  eq(byId(norm(audit, [{ id: "rating", scores: { quality: 6, capacity: 0, price: 2.5, delivery: "4" } }]), "rating").scores, {}, "a score is a whole number from 1 to 5, nothing else");
+  eq(scoreAverage(audit.sections.find((x) => x.id === "rating")!, rating), 4.3, "the overall weighs each criterion (30/20/20/15/15): 4.25 → 4.3");
+  eq(scoreAverage(audit.sections.find((x) => x.id === "rating")!, { id: "rating", scores: { quality: 4 } }), 4, "an unscored criterion is left out, never counted as zero");
+  /* Table */
+  const offers = byId(norm(pc, [{ id: "offers", currency: "BTC", rows: [
+    { supplier: " Acme ", price: "1,250.50", moq: "100", lead: "30 days", terms: "30% deposit" }, {}, { price: "abc" },
+    ...Array.from({ length: 60 }, (_, i) => ({ supplier: `S${i}` })),
+  ] }]), "offers");
+  eq(offers.rows![0], { supplier: "Acme", price: "1250.50", moq: "100", terms: "30% deposit" }, "a money cell loses its commas, a non-number is dropped, text is trimmed");
+  eq([offers.rows!.length, offers.currency], [REPORT_LIMITS.rows, "USD"], "empty rows go, at most 50 rows, an unknown currency falls back to USD");
+  eq(columnTotal([{ price: "1250.5" }, { price: "10" }, { price: "" }], "price"), 1260.5, "a column adds up");
+  eq([cellNumber("1,180.00"), cellNumber(" 42 "), cellNumber("30 days"), cellNumber("1.23456")], ["1180.00", "42", null, null],
+    "a figure is read one way everywhere: commas and spaces out, up to 4 decimals, words are no number");
+  /* A comparison shows each column's lowest and whose it is — adding up
+     competing offers means nothing (owner-visible bug caught in the 4A test). */
+  const pcOffers = pc.sections.find((x) => x.id === "offers")!;
+  eq(pcOffers.summary, "lowest", "the price comparison's offers table shows each column's lowest, never a total");
+  eq(tableSummary(pcOffers, [{ supplier: "A", price: "125.5", moq: "100", lead: "30" }, { supplier: "B", price: "118", moq: "200", lead: "45" }, { supplier: "C", price: "131", moq: "1,000", lead: "20" }])
+    .map((f) => [f.col.id, f.kind, f.value, f.who, f.row]), [["price", "lowest", 118, "B", 1], ["moq", "lowest", 100, "A", 0], ["lead", "lowest", 20, "C", 2]],
+    "each figure's lowest, whose it is and its row (a typed comma read the way the server stores it)");
+  eq(tableSummary(pcOffers, [{ supplier: "A", price: "125.5" }, { supplier: "B", terms: "T/T" }]), [], "one offer with a figure is no comparison: nothing under the table");
+  eq(tableSummary({ ...pcOffers, summary: undefined }, [{ price: "10" }, { price: "2.5" }, { price: "x" }]).map((f) => [f.col.id, f.kind, f.value]), [["price", "total", 12.5]],
+    "a table without a summary kind adds up each column two or more rows fill");
+  /* Links */
+  const links = byId(norm(audit, [{ id: "link", links: [
+    { type: "supplier", id: "s1", label: "Acme" }, { type: "supplier", id: "s1", label: "dup" }, { type: "customer", id: "c1", label: "not allowed here" },
+    { type: "product", id: "p1" }, ...Array.from({ length: 30 }, (_, i) => ({ type: "product", id: `p${i + 2}`, label: "x" })),
+  ] }]), "link");
+  eq([links.links!.length, links.links![0], links.links![1]], [REPORT_LIMITS.links, { type: "supplier", id: "s1", label: "Acme" }, { type: "product", id: "p1", label: "p1" }],
+    "links: only the kinds the section allows, no duplicate, at most 20, a missing name falls back to the id");
+  /* Signature */
+  eq(byId(norm(inst, [{ id: "customer_sign", signature: { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00Z" } }]), "customer_sign").signature,
+    { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00.000Z", version: 1 }, "a signature is an attachment, a name, the moment and the version it was signed on");
+  eq(byId(norm(inst, [{ id: "customer_sign", signature: { file: "x", name: "a", at: "now" } }]), "customer_sign").signature, null, "a signature without a real file or moment is none");
+
+  /* Required blocks are really filled. */
+  const empty = norm(inst, []);
+  eq(missingSections(inst, empty), ["link", "work", "checks", "customer_sign"], "an empty installation misses its links, work, checks and signature");
+  const partial = norm(inst, [{ id: "checks", checks: { delivered: { state: "ok" } } }]);
+  expect(missingSections(inst, partial).includes("checks"), "a checklist with one point answered is not filled — every point must be");
+  const allChecked = Object.fromEntries(inst.sections.find((x) => x.id === "checks")!.points!.map((pt) => [pt.id, { state: "na" }]));
+  const full = norm(inst, [{ id: "link", links: [{ type: "customer", id: "c1", label: "C" }] }, { id: "work", items: ["Installed"] }, { id: "checks", checks: allChecked },
+    { id: "customer_sign", signature: { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00Z" } }]);
+  eq(missingSections(inst, full), [], "every point answered (N/A counts), a link, the work and a signature: it can be sent");
+
+  /* Photos in place, links, a new version. */
+  const withFiles = [{ id: "checks", checks: { a: { state: "issue", photo: U1 } } }, { id: "customer_sign", signature: { file: U2, name: "x", at: "2026-09-25T08:00:00.000Z", version: 1 } }] as ReturnType<typeof norm>;
+  eq([...blockFileIds(withFiles)].sort(), [U1, U2].sort(), "a block's photo and signature are shown in place, not in the photos list");
+  eq(remapBlockFiles(withFiles, new Map([[U1, "n1"], [U2, "n2"]])).map((x) => x.checks?.a?.photo ?? x.signature?.file), ["n1", "n2"], "a new version points its blocks at its own copies");
+  eq(reportLinks([{ id: "a", links: [{ type: "supplier", id: "s1", label: "A" }] }, { id: "b", links: [{ type: "supplier", id: "s1", label: "A" }, { type: "product", id: "p1", label: "P" }] }]).length, 2, "a record linked twice counts once");
+
+  /* Printing. */
+  const pr = printParagraphs({ templateKey: "factory_audit", title: "", sections: [
+    { id: "checks", checks: { licence: { state: "ok" }, samples: { state: "issue", note: "colour off" } } },
+    { id: "rating", scores: { quality: 4 } },
+  ] }, (k) => (reportsT[k]?.en as string | undefined) ?? k);
+  eq(pr.find((x) => x.sid === "checks")!.paras.map((x) => x.text), ["✓ Business licence and certificates", "✗ Samples match the specification — colour off"], "a checklist prints answered points with their mark and note");
+  eq(pr.find((x) => x.sid === "rating")!.paras.map((x) => x.text), ["Quality: 4 / 5", "Overall: 4 / 5"], "a score prints each criterion and the overall");
+  const signed = paginateReport({ templateKey: "installation", title: "", sections: [{ id: "customer_sign", signature: { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00.000Z", version: 1 } }] }, 0);
+  expect(signed.flatMap((sh) => sh.cards).some((c) => c.signature?.file === U2), "a signature prints in its own box");
+
+  /* The words. */
+  const lacking: string[] = [];
+  for (const tpl of REPORT_TEMPLATES) for (const sec of tpl.sections) {
+    for (const pt of sec.points ?? []) for (const l of ["en", "zh", "ar"] as const) if (!reportsT[`tpl.${tpl.key}.s.${sec.id}.i.${pt.id}`]?.[l]) lacking.push(`${tpl.key}.${sec.id}.i.${pt.id}.${l}`);
+    for (const c of sec.columns ?? []) for (const l of ["en", "zh", "ar"] as const) if (!reportsT[`tpl.${tpl.key}.s.${sec.id}.c.${c.id}`]?.[l]) lacking.push(`${tpl.key}.${sec.id}.c.${c.id}.${l}`);
+  }
+  for (const f of REPORT_FAMILIES) for (const l of ["en", "zh", "ar"] as const) if (!reportsT[`family.${f}`]?.[l]) lacking.push(`family.${f}.${l}`);
+  expect(lacking.length === 0, "every checklist point, score criterion, table column and family speaks en / zh / ar", lacking.slice(0, 10).join(", "));
+
+  /* The routes and the pages, as their code states them. */
+  rule("a save rewrites the report's links only when they changed", "src/app/api/work-reports/[id]/route.ts",
+    (c) => (/if \(patch\.sections\) await syncReportLinks\(row\.id, auth\.tenant_id, reportLinks\(row\.sections\), reportLinks\(patch\.sections as ReportSectionValue\[\]\)\);/.test(c) ? [] : ["a record's page can miss a report"]),
+    (src) => src.replace("  if (patch.sections) await syncReportLinks(row.id, auth.tenant_id, reportLinks(row.sections), reportLinks(patch.sections as ReportSectionValue[]));\n", ""));
+  rule("sending rewrites the links whole, so a failed save cannot leave a record short", "src/app/api/work-reports/[id]/submit/route.ts",
+    (c) => (/syncReportLinks\(report\.id, report\.tenant_id, null, reportLinks\(sections\)\)/.test(c) ? [] : ["links are not re-synced on send"]),
+    (src) => src.replace("syncReportLinks(report.id, report.tenant_id, null, reportLinks(sections)),", ""));
+  rule("a new version copies its links and points its blocks at its own attachments", "src/app/api/work-reports/[id]/revise/route.ts",
+    (c) => (/syncReportLinks\(newId, row\.tenant_id, null, reportLinks\(row\.sections\)\)/.test(c) && /update\(\{ sections: remapBlockFiles\(row\.sections, fileMap\) \}\)/.test(c) ? [] : ["a new version's photos or links point at the old one"]),
+    (src) => src.replace("update({ sections: remapBlockFiles(row.sections, fileMap) })", "update({ sections: row.sections })"));
+  rule("attachment copies are matched to their originals by the object they share", "src/lib/server/reports/attachments.ts",
+    (c) => (/const newByPath = new Map\(/.test(c) && /for \(const r of rows\) \{ const n = newByPath\.get\(r\.storage_path\); if \(n\) ids\.set\(r\.id, n\); \}/.test(c) ? [] : ["copies are matched by position"]),
+    (src) => src.replace("for (const r of rows) { const n = newByPath.get(r.storage_path); if (n) ids.set(r.id, n); }", ""));
+  rule("a record's page lists only what its viewer may read — the report's own rule, the latest version", "src/lib/server/reports/links.ts",
+    (c) => (/\.filter\(\(r\) => reportAccess\(\{/.test(c) && /\.in\("id", ids\)\.eq\("superseded", false\)/.test(c) ? [] : ["a link can show a report its viewer may not read"]),
+    (src) => src.replace(".filter((r) => reportAccess({", ".filter((r) => r && ({"));
+  const LS = "src/app/api/work-reports/links/search/route.ts";
+  rule("each kind of record is searched only by those who have its app", LS,
+    (c) => (/const MODULE: Partial<Record<ReportLinkType, string>> = \{ customer: "Customers", supplier: "Suppliers", order: "Orders" \};/.test(c) && /if \(mod && \(await requireModuleAccess\(auth, mod\)\)\) return NextResponse\.json\(\{ hits: \[\], denied: true \}/.test(c) ? [] : ["anyone can list customers, suppliers or orders"]),
+    (src) => src.replace("if (mod && (await requireModuleAccess(auth, mod))) return", "if (false) return"));
+  rule("the typed text never reaches a filter with the characters PostgREST reads", LS,
+    (c) => (/\.replace\(\/\[,\(\)%\*\\\\\]\/g, " "\)/.test(c) ? [] : ["a comma or bracket can break or widen the search"]),
+    (src) => src.replace('.replace(/[,()%*\\\\]/g, " ")', ""));
+  rule("products are linked as the catalogue shows them: active only", LS,
+    (c) => (/from\("products"\)\.select\("id, product_name, brand"\)\.eq\("status", "active"\)/.test(c) ? [] : ["drafts and retired products can be linked"]),
+    (src) => src.replace('.eq("status", "active")', ""));
+  rule("a report with blocks opens once their code is here — the page lays out once", "src/components/reports/app/ReportView.tsx",
+    (c) => { const a = c.indexOf('const mod = await import("./ReportBlocks");'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks arrive"]; },
+    (src) => src.replace('try { const mod = await import("./ReportBlocks"); setBlocks(() => mod); } catch { setPhase("error"); return; }', 'void import("./ReportBlocks").then((mod) => setBlocks(() => mod));'));
+  rule("the card on other apps' pages carries no Reports dictionary and asks only once the page is quiet", "src/components/reports/ReportsAboutCard.tsx",
+    (c) => (!/translations\/reports/.test(c) && /whenNetworkQuiet\(/.test(c) && /if \(res\.status === 401 \|\| res\.status === 403\) \{ setHidden\(true\); return; \}/.test(c) ? [] : ["the card is heavy, early, or shows outside Reports"]),
+    (src) => src.replace('import { whenNetworkQuiet } from "@/lib/net-idle";', 'import { whenNetworkQuiet } from "@/lib/net-idle";\nimport { reportsT } from "@/lib/translations/reports";'));
+  rule("on a product page the card is staff only, and never printed", "src/components/product-preview/ProductPreview.tsx",
+    (c) => (/\{audience === "internal" && productId && \(\s*<ReportsAboutCard type="product" id=\{productId\} className="print:hidden/.test(c) ? [] : ["customers, the public or the printout see internal reports"]),
+    (src) => src.replace('{audience === "internal" && productId && (', "{productId && ("));
+  rule("the figures under a table are the one tableSummary — the editor and the reader", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (/function TableTotals\([\s\S]*?const figures = tableSummary\(def, rows\);/.test(c) && !/columnTotal\(/.test(c) ? [] : ["the screen can add up competing offers"]),
+    (src) => src.replace("const figures = tableSummary(def, rows);", "const figures = (def.columns ?? []).map((col) => ({ col, kind: \"total\" as const, value: 0, row: -1, who: \"\" }));"));
+  rule("the printed table shows the same figures as the screen", "src/lib/reports/print-layout.ts",
+    (c) => (/const figures = tableSummary\(s, rows\);/.test(c) && !/columnTotal\(/.test(c) ? [] : ["the print can add up competing offers"]),
+    (src) => src.replace("const figures = tableSummary(s, rows);", "const figures = [] as ReturnType<typeof tableSummary>;"));
+  rule("a saved figure is parsed by the same cellNumber the editor reads", "src/lib/reports/templates.ts",
+    (c) => (/else \{ const n = cellNumber\(cell\); if \(n !== null\) row\[c\.id\] = n; \}/.test(c) ? [] : ["the server and the editor can read a figure differently"]),
+    (src) => src.replace("else { const n = cellNumber(cell); if (n !== null) row[c.id] = n; }", "else row[c.id] = cell;"));
+  rule("on a phone the checklist answers and the score sit full width under the point, the same on every card", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (/className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"/.test(c) && /h-9 flex-1 px-2\.5 text-\[12px\] font-semibold transition-colors sm:h-8 sm:flex-none/.test(c)
+      && /className="flex flex-col gap-1\.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2"/.test(c) ? [] : ["the answers jump around from card to card on a phone"]),
+    (src) => src.replace("flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between", "flex flex-wrap items-center justify-between gap-2"));
+  const lm = read("supabase/migrations/20260925_reports_links.sql");
+  expect(/REFERENCES work_reports\(id\) ON DELETE CASCADE/.test(lm) && /ALTER TABLE work_report_links ENABLE ROW LEVEL SECURITY/.test(lm) && !/CREATE POLICY/i.test(lm) && /CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order'\)\)/.test(lm),
+    "a link row goes with its report, is RLS-on with no policy, and points at the four kinds only");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

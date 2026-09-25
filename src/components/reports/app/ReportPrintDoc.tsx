@@ -21,9 +21,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
-import { reportTemplate } from "@/lib/reports/templates";
+import { blockFileIds, reportTemplate } from "@/lib/reports/templates";
 import {
-  ATTACH_SID, LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, PHOTO_BOX_PX, PHOTO_CAPTION_PX, PHOTO_ROW_GAP_PX, PHOTO_ROW_PX, cutByHeight, paginateReport,
+  ATTACH_SID, LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, PHOTO_BOX_PX, PHOTO_CAPTION_PX, PHOTO_ROW_GAP_PX, PHOTO_ROW_PX, SIGN_BOX_PX, SIGN_PX, cutByHeight, paginateReport,
   type Measurer, type PrintAttachments, type PrintPara, type PrintSheet,
 } from "@/lib/reports/print-layout";
 import { reportFileUrl, sizeLabel } from "@/lib/reports/attachments";
@@ -89,10 +89,23 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
   const bulletRef = useRef<HTMLDivElement>(null);
   const bulletTextRef = useRef<HTMLSpanElement>(null);
   const [sheets, setSheets] = useState<PrintSheet[] | null>(null);
-  const att = useMemo<PrintAttachments>(() => ({
-    photos: (attachments ?? []).filter((a) => a.image).map((a) => ({ id: a.id, caption: a.caption })),
-    files: (attachments ?? []).filter((a) => !a.image).map((a) => ({ text: `${a.name} · ${sizeLabel(a.size)}`, bullet: true })),
-  }), [attachments]);
+  /* A checklist photo (Phase 4A) prints with the photos, its point as the
+     caption; the signature prints in its own box, never as a photo. */
+  const att = useMemo<PrintAttachments>(() => {
+    const inBlocks = blockFileIds(report.sections);
+    const checkPhotos = (tpl?.sections ?? []).filter((s) => s.kind === "checklist").flatMap((s) => {
+      const v = report.sections.find((x) => x.id === s.id);
+      return (s.points ?? []).flatMap((pt) => {
+        const c = v?.checks?.[pt.id];
+        const label = reportsT[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.[lang] ?? reportsT[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.en ?? pt.id;
+        return c?.photo ? [{ id: c.photo, caption: c.note ? `${label} — ${c.note}` : label }] : [];
+      });
+    });
+    return {
+      photos: [...checkPhotos, ...(attachments ?? []).filter((a) => a.image && !inBlocks.has(a.id)).map((a) => ({ id: a.id, caption: a.caption }))],
+      files: (attachments ?? []).filter((a) => !a.image && !inBlocks.has(a.id)).map((a) => ({ text: `${a.name} · ${sizeLabel(a.size)}`, bullet: true })),
+    };
+  }, [attachments, report.sections, report.templateKey, tpl, lang]);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -101,9 +114,10 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
       if (cancelled || !plain || !bullet || !bulletText) return;
       const m = domMeasurer(plain, bullet, bulletText);
       const reviewPx = report.decidedBy ? LINE_PX + (note ? m.height({ text: note, bullet: false }) : 0) : 0;
-      setSheets(paginateReport(report, reviewPx, m, att));
+      setSheets(paginateReport(report, reviewPx, m, att, t));
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` follows `lang`, already a dependency through `font`
   }, [report, note, font, att]);
   /* Ready once every photo has loaded or failed — capped, so one photo that
      never answers cannot hold the print forever. */
@@ -194,7 +208,20 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
             </CardView>
           ) : (
             <CardView key={ci} head={`${t(`tpl.${report.templateKey}.s.${card.sid}`)}${card.cont ? ` · ${t("print.cont")}` : ""}`}>
-              {card.empty ? (
+              {card.signature ? (
+                <div style={{ height: SIGN_PX, boxSizing: "border-box" }}>
+                  <div style={{ height: SIGN_BOX_PX, width: 240, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request-authorised file on paper */}
+                    <img data-kx-report-photo src={reportFileUrl(card.signature.file)} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+                  </div>
+                  <div dir="auto" style={{ marginTop: 8, fontSize: 10.5, lineHeight: `${LINE_PX}px`, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {t("blk.signedBy").replace("{name}", card.signature.name || "—")}
+                  </div>
+                  <div style={{ fontSize: 10.5, lineHeight: `${LINE_PX}px`, color: C.soft, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    {dmyTime(card.signature.at)}{card.signature.version !== report.version ? ` · ${t("blk.signedOn").replace("{v}", String(card.signature.version))}` : ""}
+                  </div>
+                </div>
+              ) : card.empty ? (
                 <div style={{ fontSize: 10.5, lineHeight: `${LINE_PX}px`, color: C.ghost }}>—</div>
               ) : card.paras.map((p, pi) => (
                 <div key={pi} dir="auto" style={paraStyle(p.bullet, pi === 0)}>

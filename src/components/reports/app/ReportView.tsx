@@ -4,8 +4,10 @@
    /reports/[id] — one report. A draft opens for its author as the composer;
    anything sent opens as the reader.
 
-   Composer: the template's sections (text, or one item per line), the
-   period, To / Copy (filled from the type's default readers), Confidential,
+   Composer: the template's sections (text, or one item per line, or a
+   Phase 4A block — checklist, score, table, links, signature, from
+   ReportBlocks), the period, To / Copy (filled from the type's default
+   readers), Confidential,
    and — for the daily / weekly / monthly family — the author's earlier
    reports offered as tap-to-add suggestions (CarryCard; nothing is added
    by itself). Photos and files (AttachmentsEditor): made smaller on the
@@ -31,7 +33,9 @@ import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
-import { REPORT_LIMITS, periodFor, reportTemplate, type ReportSectionValue, type ReportTemplateDef } from "@/lib/reports/templates";
+import {
+  REPORT_LIMITS, blockFileIds, missingSections, periodFor, reportTemplate, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
+} from "@/lib/reports/templates";
 import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
 import { APP_RULES, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
 import { toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
@@ -46,14 +50,27 @@ import AttachmentsView from "./AttachmentsView";
 import { DictStatus, SectionAiButtons, SectionAiProposal, SectionMic, useSectionAi } from "./SectionAi";
 import { dictationSupported, useDictation } from "@/components/ai/useDictation";
 
+/* The Phase 4A blocks' code (ReportBlocks) is its own chunk: only a report
+   whose template has a block fetches it, and that report opens once the
+   chunk is here — the page lays out once, never twice. */
+type BlocksModule = typeof import("./ReportBlocks");
+const isBlock = (kind: ReportSectionKind) => kind !== "text" && kind !== "list";
+const hasBlocks = (tpl: ReportTemplateDef | null) => !!tpl?.sections.some((x) => isBlock(x.kind));
+
 export default function ReportView({ id }: { id: string }) {
   const { t, lang } = useTranslation(reportsT);
   const [detail, setDetail] = useState<ReportDetail | null>(null);
+  const [blocks, setBlocks] = useState<BlocksModule | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
   const load = useCallback(async () => {
     const res = await fetchReport(id);
-    if (res.ok) { setDetail(res.data); setPhase("ready"); }
+    if (res.ok) {
+      if (hasBlocks(reportTemplate(res.data.report.templateKey))) {
+        try { const mod = await import("./ReportBlocks"); setBlocks(() => mod); } catch { setPhase("error"); return; }
+      }
+      setDetail(res.data); setPhase("ready");
+    }
     else setPhase(res.status === 404 ? "missing" : "error");
   }, [id]);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -72,8 +89,8 @@ export default function ReportView({ id }: { id: string }) {
           </div>
         )}
         {phase === "ready" && detail && (detail.can.edit
-          ? <Composer t={t} lang={lang} detail={detail} onSent={load} />
-          : <Reader t={t} lang={lang} detail={detail} onChange={load} />)}
+          ? <Composer t={t} lang={lang} detail={detail} blocks={blocks} onSent={load} />
+          : <Reader t={t} lang={lang} detail={detail} blocks={blocks} onChange={load} />)}
       </div>
     </div>
   );
@@ -94,28 +111,37 @@ function GrowingTextarea({ value, ...rest }: React.TextareaHTMLAttributes<HTMLTe
   return <textarea ref={ref} value={value} {...rest} />;
 }
 
-type Draft = { title: string; date: string; texts: Record<string, string>; to: string[]; cc: string[]; confidential: boolean };
+type Draft = { title: string; date: string; texts: Record<string, string>; blocks: Record<string, ReportSectionValue>; to: string[]; cc: string[]; confidential: boolean };
 
 function toDraft(d: ReportDetail): Draft {
   const texts: Record<string, string> = {};
-  for (const s of d.report.sections) texts[s.id] = s.items ? s.items.join("\n") : (s.text ?? "");
+  const blocks: Record<string, ReportSectionValue> = {};
+  const kinds = new Map((reportTemplate(d.report.templateKey)?.sections ?? []).map((x) => [x.id, x.kind]));
+  for (const s of d.report.sections) {
+    const kind = kinds.get(s.id);
+    if (kind && isBlock(kind)) blocks[s.id] = s;
+    else texts[s.id] = s.items ? s.items.join("\n") : (s.text ?? "");
+  }
   return {
     title: d.report.title,
     date: d.report.periodStart ?? "",
     texts,
+    blocks,
     to: d.recipients.filter((r) => r.role === "to").map((r) => r.id),
     cc: d.recipients.filter((r) => r.role === "cc").map((r) => r.id),
     confidential: d.report.confidential,
   };
 }
 
-function sectionsOf(tpl: ReportTemplateDef, texts: Record<string, string>): ReportSectionValue[] {
-  return tpl.sections.map((s) => s.kind === "list"
-    ? { id: s.id, items: (texts[s.id] ?? "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, REPORT_LIMITS.items) }
-    : { id: s.id, text: (texts[s.id] ?? "").slice(0, REPORT_LIMITS.text) });
+function sectionsOf(tpl: ReportTemplateDef, texts: Record<string, string>, blocks: Record<string, ReportSectionValue>): ReportSectionValue[] {
+  return tpl.sections.map((s) => isBlock(s.kind)
+    ? { ...(blocks[s.id] ?? {}), id: s.id }
+    : s.kind === "list"
+      ? { id: s.id, items: (texts[s.id] ?? "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, REPORT_LIMITS.items) }
+      : { id: s.id, text: (texts[s.id] ?? "").slice(0, REPORT_LIMITS.text) });
 }
 
-function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: ReportDetail; onSent: () => Promise<void> }) {
+function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; detail: ReportDetail; blocks: BlocksModule | null; onSent: () => Promise<void> }) {
   const router = useRouter();
   const tpl = reportTemplate(detail.report.templateKey);
   const id = detail.report.id;
@@ -124,8 +150,12 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  /* A photo or file still on its way: Send waits for it. */
-  const [uploading, setUploading] = useState(false);
+  /* A photo or file still on its way — in the attachments or in a block
+     (a checklist photo, a signature): Send waits for it. */
+  const [attBusy, setAttBusy] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(0);
+  const uploading = attBusy || blockBusy > 0;
+  const bumpBusy = useCallback((busy: boolean) => setBlockBusy((n) => Math.max(0, n + (busy ? 1 : -1))), []);
   /* Koleex AI's proposals, per section (fill, never save). */
   const ai = useSectionAi(detail.report.id, t);
   /* Dictation: one section listens at a time; its words land at the end of
@@ -178,7 +208,7 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
 
   const patchOf = useCallback((d: Draft) => (tpl ? {
     title: tpl.customTitle ? d.title : undefined, date: d.date || undefined,
-    sections: sectionsOf(tpl, d.texts), to: d.to, cc: d.cc, confidential: d.confidential,
+    sections: sectionsOf(tpl, d.texts, d.blocks), to: d.to, cc: d.cc, confidential: d.confidential,
   } : null), [tpl]);
 
   /* One save on the wire at a time, always of the LATEST draft — a slow save
@@ -211,6 +241,9 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
     timer.current = setTimeout(() => { timer.current = null; void flush(); }, 1200);
   }, [flush]);
   const setText = (sid: string, value: string) => change({ texts: { ...draftRef.current.texts, [sid]: value } });
+  const setBlock = (sid: string, value: ReportSectionValue) => change({ blocks: { ...draftRef.current.blocks, [sid]: value } });
+  /* The photos a block shows in place are not listed again under Photos. */
+  const blockFiles = useMemo(() => blockFileIds(Object.values(draft.blocks)), [draft.blocks]);
 
   /* Closing the tab, or leaving for another page: the last change still lands. */
   useEffect(() => {
@@ -247,7 +280,7 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
     const heading = (g: CarryGroup) => (g.app ? t(`feed.g.${g.section}`) : `${t(`tpl.${g.from}.s.${g.section}`)} (${tplName(t, g.from)})`);
     const material = writeMaterial(
       [...carry.groups, ...feedGroups].map((g) => ({ heading: heading(g), group: g })),
-      tpl.sections.filter((x) => x.id !== sid).map((x) => ({ name: sectionName(x.id), text: d.texts[x.id] ?? "" })),
+      tpl.sections.filter((x) => x.id !== sid && !isBlock(x.kind)).map((x) => ({ name: sectionName(x.id), text: d.texts[x.id] ?? "" })),
     );
     const own = [...Object.values(d.texts), ...carry.groups.flatMap((g) => g.items.map((i) => i.text))];
     void ai.run({ action: "write", section: sid, lang: writingLang(own, screenLang as WritingLang), material });
@@ -273,7 +306,7 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
 
   const send = async () => {
     const d = draftRef.current;
-    const missing = tpl.sections.filter((s) => s.required && !(d.texts[s.id] ?? "").trim()).map((s) => sectionName(s.id));
+    const missing = missingSections(tpl, sectionsOf(tpl, d.texts, d.blocks)).map(sectionName);
     if (tpl.customTitle && !d.title.trim()) missing.unshift(t("composer.titleLabel"));
     if (missing.length) { setProblem(`${t("composer.missing")} ${missing.join(" · ")}`); return; }
     if (d.to.length === 0) { setProblem(t("composer.noRecipients")); return; }
@@ -324,7 +357,16 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
           </label>
         )}
 
-        {tpl.sections.map((s) => (
+        {tpl.sections.map((s) => isBlock(s.kind) ? (
+          <div key={s.id} className={`${CARD} block p-4`}>
+            <p className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+              {sectionName(s.id)}
+              {s.required && <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span>}
+            </p>
+            {blocks && <blocks.BlockEditor t={t} tplKey={tpl.key} def={s} value={draft.blocks[s.id] ?? { id: s.id }} reportId={id}
+              version={detail.report.version} onChange={(v) => setBlock(s.id, v)} onBusy={bumpBusy} />}
+          </div>
+        ) : (
           /* A card, not a <label>: its head carries buttons now, and a label
              may hold only the one control it names. */
           <div key={s.id} className={`${CARD} block p-4`}>
@@ -363,7 +405,7 @@ function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: Rep
           </div>
         ))}
 
-        <AttachmentsEditor t={t} reportId={id} initial={detail.attachments ?? []} onBusy={setUploading} />
+        <AttachmentsEditor t={t} reportId={id} initial={detail.attachments ?? []} onBusy={setAttBusy} hide={blockFiles} />
       </div>
 
       <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
@@ -516,7 +558,7 @@ function printReport(id: string, lang: string) {
   f.src = `/reports/${encodeURIComponent(id)}/print?lang=${lang}&_t=${Date.now()}`;
 }
 
-function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: ReportDetail; onChange: () => Promise<void> }) {
+function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; detail: ReportDetail; blocks: BlocksModule | null; onChange: () => Promise<void> }) {
   const router = useRouter();
   const { report, recipients, can } = detail;
   const tpl = reportTemplate(report.templateKey);
@@ -554,6 +596,8 @@ function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: Rep
   const to = recipients.filter((r) => r.role === "to");
   const cc = recipients.filter((r) => r.role === "cc");
   const hasActions = can.decide || can.acknowledge || can.revise;
+  /* The photos a block shows in place (Phase 4A) are not listed again. */
+  const readerBlockFiles = blockFileIds(report.sections);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -594,6 +638,14 @@ function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: Rep
 
         {(tpl?.sections ?? []).map((s) => {
           const v = report.sections.find((x) => x.id === s.id);
+          if (isBlock(s.kind)) {
+            return (
+              <section key={s.id} className={`${CARD} p-4 sm:p-5`}>
+                <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">{t(`tpl.${report.templateKey}.s.${s.id}`)}</h2>
+                {blocks && <blocks.BlockView t={t} tplKey={report.templateKey} def={s} value={v} version={report.version} />}
+              </section>
+            );
+          }
           const items = v?.items ?? [];
           const text = v?.text?.trim() ?? "";
           const empty = s.kind === "list" ? items.length === 0 : !text;
@@ -613,7 +665,7 @@ function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: Rep
           );
         })}
 
-        <AttachmentsView t={t} attachments={detail.attachments ?? []} />
+        <AttachmentsView t={t} attachments={(detail.attachments ?? []).filter((a) => !readerBlockFiles.has(a.id))} />
 
         <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-thread">
           <h2 id="kx-rep-thread" className="mb-3 text-[13px] font-semibold text-[var(--text-primary)]">{t("reader.comments")}</h2>

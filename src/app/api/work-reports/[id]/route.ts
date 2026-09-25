@@ -24,7 +24,8 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { REPORT_LIMITS, normalizeSections, periodFor, reportTemplate } from "@/lib/reports/templates";
+import { REPORT_LIMITS, normalizeSections, periodFor, reportLinks, reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
+import { syncReportLinks } from "@/lib/server/reports/links";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { loadCarry } from "@/lib/server/reports/carry";
@@ -166,6 +167,8 @@ export async function PATCH(req: Request, { params }: Params) {
     console.error("[api/work-reports PATCH]", error.message);
     return NextResponse.json({ error: "Could not save the draft." }, { status: 500 });
   }
+  /* The records it is about (Phase 4A) — rewritten only when they changed. */
+  if (patch.sections) await syncReportLinks(row.id, auth.tenant_id, reportLinks(row.sections), reportLinks(patch.sections as ReportSectionValue[]));
   return NextResponse.json({ ok: true, savedAt: patch.updated_at });
 }
 

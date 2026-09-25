@@ -26,9 +26,17 @@
    inside, a two-line caption band under it), so every row costs the same
    and a row never splits; files follow as one line each. They come after
    the sections and before the review.
+
+   Blocks (Phase 4A) print as measured lines like any text — a checklist
+   point with its mark (✓ ✗ —) and note, each score and the overall, a
+   table's column heads then one line per row and its figures (the totals,
+   or a comparison's lowest — tableSummary, as on screen), each link —
+   so they paginate by the same rule. A checklist photo joins the photo
+   rows, its point as the caption. A signature is one FIXED box (the drawn
+   PNG, the signer and the moment) that never splits.
    --------------------------------------------------------------------------- */
 
-import { reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
+import { reportTemplate, scoreAverage, tableSummary, type ReportSectionValue, type SignatureValue } from "@/lib/reports/templates";
 
 /* 270 mm = 1020 px, minus the sheet's own 24 + 18 px padding, minus air. */
 export const SHEET_PX = 968;
@@ -90,8 +98,9 @@ export function breakPoints(s: string): number[] {
 export type PrintPara = { text: string; bullet: boolean };
 /** One printed photo: which attachment, and its caption. */
 export type PrintPhoto = { id: string; caption: string };
-/** `photos`: the photo rows (two a row) — only on the attachments card. */
-export type PrintCard = { sid: string; cont: boolean; paras: PrintPara[]; empty: boolean; photos?: PrintPhoto[][] };
+/** `photos`: the photo rows (two a row) — only on the attachments card.
+ *  `signature`: a signature block's one fixed box (Phase 4A). */
+export type PrintCard = { sid: string; cont: boolean; paras: PrintPara[]; empty: boolean; photos?: PrintPhoto[][]; signature?: SignatureValue };
 /** `used` is the sheet's planned height in px — never above SHEET_PX. */
 export type PrintSheet = { first: boolean; cards: PrintCard[]; review: boolean; used: number };
 
@@ -132,6 +141,13 @@ export const estimateMeasurer: Measurer = {
 };
 
 export interface PrintInput { templateKey: string; title: string; sections: ReportSectionValue[] }
+/** The words a block prints with (the print page's dictionary). */
+export type PrintWord = (key: string) => string;
+/** A signature box: the drawn signature, then the signer and the moment. */
+export const SIGN_BOX_PX = 90;
+export const SIGN_PX = SIGN_BOX_PX + 8 + 2 * LINE_PX;
+const MARK: Record<string, string> = { ok: "✓", issue: "✗", na: "—" };
+const fmt = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
 
 /* ── Photos and files ──────────────────────────────────────────────────── */
 /** The attachments card's id (never a template section id). */
@@ -143,10 +159,50 @@ export const PHOTO_ROW_PX = PHOTO_BOX_PX + PHOTO_CAPTION_PX + PHOTO_ROW_GAP_PX;
 export interface PrintAttachments { photos: PrintPhoto[]; files: PrintPara[] }
 
 /** The paragraphs of each of the template's sections, as they print. */
-export function printParagraphs(report: PrintInput): Array<{ sid: string; paras: PrintPara[] }> {
+export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k): Array<{ sid: string; paras: PrintPara[]; signature?: SignatureValue }> {
   const tpl = reportTemplate(report.templateKey);
   return (tpl?.sections ?? []).map((s) => {
     const v = report.sections.find((x) => x.id === s.id);
+    const name = (kind: "i" | "c", id: string) => word(`tpl.${report.templateKey}.s.${s.id}.${kind}.${id}`);
+    switch (s.kind) {
+      case "checklist":
+        /* Only what was answered or noted: an untouched point prints nothing. */
+        return { sid: s.id, paras: (s.points ?? []).flatMap((pt) => {
+          const c = v?.checks?.[pt.id];
+          if (!c?.state && !c?.note) return [];
+          return [{ text: `${c.state ? MARK[c.state] : "·"} ${name("i", pt.id)}${c.note ? ` — ${c.note}` : ""}`, bullet: false }];
+        }) };
+      case "score": {
+        const scored = (s.points ?? []).filter((pt) => v?.scores?.[pt.id]);
+        if (!scored.length) return { sid: s.id, paras: [] };
+        const avg = scoreAverage(s, v);
+        return { sid: s.id, paras: [
+          ...scored.map((pt) => ({ text: `${name("i", pt.id)}: ${v!.scores![pt.id]} / 5`, bullet: true })),
+          { text: `${word("blk.overall")}: ${avg} / 5`, bullet: false },
+        ] };
+      }
+      case "table": {
+        const cols = s.columns ?? [];
+        const rows = v?.rows ?? [];
+        if (!rows.length) return { sid: s.id, paras: [] };
+        const cur = v?.currency ?? "USD";
+        const figures = tableSummary(s, rows);
+        return { sid: s.id, paras: [
+          { text: cols.map((c) => `${name("c", c.id)}${c.type === "money" ? ` (${cur})` : ""}`).join(" · "), bullet: false },
+          ...rows.map((r) => ({ text: cols.map((c) => (r[c.id] ? (c.type === "text" ? r[c.id] : fmt(Number(r[c.id]))) : "—")).join(" · "), bullet: true })),
+          ...(figures.length ? [{
+            text: figures.map((f) => `${word(f.kind === "lowest" ? "blk.lowest" : "blk.total")} ${name("c", f.col.id)}: ${fmt(f.value)}${f.col.type === "money" ? ` ${cur}` : ""}${f.who ? ` (${f.who})` : ""}`).join(" · "),
+            bullet: false,
+          }] : []),
+        ] };
+      }
+      case "links":
+        return { sid: s.id, paras: (v?.links ?? []).map((l) => ({ text: `${word(`blk.link.${l.type}`)}: ${l.label}`, bullet: true })) };
+      case "signature":
+        return { sid: s.id, paras: [], ...(v?.signature ? { signature: v.signature } : {}) };
+      default:
+        break;
+    }
     const paras: PrintPara[] = s.kind === "list"
       ? (v?.items ?? []).map((text) => ({ text, bullet: true }))
       : (v?.text ?? "").split("\n").map((l) => l.trimEnd())
@@ -157,7 +213,7 @@ export function printParagraphs(report: PrintInput): Array<{ sid: string; paras:
   });
 }
 
-export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer = estimateMeasurer, att?: PrintAttachments): PrintSheet[] {
+export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer = estimateMeasurer, att?: PrintAttachments, word?: PrintWord): PrintSheet[] {
   const tpl = reportTemplate(report.templateKey);
   const sheets: PrintSheet[] = [];
   const firstUsed = FIRST_HEAD_PX + FOOT_PX + (report.title.trim() && tpl?.customTitle ? TITLE_PX : 0);
@@ -165,7 +221,14 @@ export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer
   const left = () => SHEET_PX - sheet.used;
   const newSheet = () => { sheets.push(sheet); sheet = { first: false, cards: [], review: false, used: CONT_HEAD_PX + FOOT_PX }; };
 
-  for (const { sid, paras } of printParagraphs(report)) {
+  for (const { sid, paras, signature } of printParagraphs(report, word)) {
+    /* A signature: one fixed box that never splits. */
+    if (signature) {
+      if (left() < CARD_PX + SIGN_PX) newSheet();
+      sheet.cards.push({ sid, cont: false, paras: [], empty: false, signature });
+      sheet.used += CARD_PX + SIGN_PX;
+      continue;
+    }
     if (paras.length === 0) {
       if (left() < CARD_PX + LINE_PX) newSheet();
       sheet.cards.push({ sid, cont: false, paras: [], empty: true });

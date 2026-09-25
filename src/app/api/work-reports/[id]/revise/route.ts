@@ -14,6 +14,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { copyAttachments } from "@/lib/server/reports/attachments";
+import { blockFileIds, remapBlockFiles, reportLinks } from "@/lib/reports/templates";
+import { syncReportLinks } from "@/lib/server/reports/links";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +45,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Could not start a new version." }, { status: 500 });
   }
   const newId = (created as { id: string }).id;
-  await Promise.all([
+  const [, fileMap] = await Promise.all([
     recipients.length
       ? supabaseServer.from("work_report_recipients").insert(recipients.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role })))
       : Promise.resolve(null),
     copyAttachments(row.id, newId),
+    syncReportLinks(newId, row.tenant_id, null, reportLinks(row.sections)),
   ]);
+  /* Its blocks (Phase 4A) point at the new version's own copies. */
+  if (fileMap.size && blockFileIds(row.sections).size) {
+    await supabaseServer.from("work_reports").update({ sections: remapBlockFiles(row.sections, fileMap) }).eq("id", newId).eq("status", "draft");
+  }
   return NextResponse.json({ id: newId, existing: false }, { status: 201 });
 }

@@ -31,6 +31,7 @@ import BoxIcon from "@/components/icons/ui/BoxIcon";
 import PurchaseIcon from "@/components/icons/PurchaseIcon";
 import RaisePurchaseOrderDialog from "./RaisePurchaseOrderDialog";
 import { CARD } from "@/components/travel/fields";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import {
   dmy,
   orderMoney,
@@ -318,6 +319,10 @@ export default function OrderDetail({ id }: { id: string }) {
             </div>
           </section>
         )}
+
+        {/* The reports linked to this order — installations, visits
+            (Reports Phase 4A). */}
+        <ReportsAboutCard type="order" id={order.id} className={`${CARD} mt-6 p-4`} />
       </div>
 
       {raisingPo && (

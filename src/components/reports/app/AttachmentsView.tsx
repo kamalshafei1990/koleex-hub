@@ -62,7 +62,7 @@ export default function AttachmentsView({ t, attachments }: { t: T; attachments:
   );
 }
 
-function PhotoViewer({ t, photos, index, onIndex, onClose }: {
+export function PhotoViewer({ t, photos, index, onIndex, onClose }: {
   t: T; photos: ReportAttachment[]; index: number; onIndex: (i: number) => void; onClose: () => void;
 }) {
   const a = photos[index];

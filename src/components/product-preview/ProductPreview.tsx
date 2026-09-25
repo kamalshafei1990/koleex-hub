@@ -45,6 +45,7 @@ import ProductKnowledge from "./ProductKnowledge";
 import ProductMedia from "./ProductMedia";
 import ProductCompare from "./ProductCompare";
 import ProductPriceInternal from "./ProductPriceInternal";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import { formatSpecValue, isEmptyValue, labelForOption, selectedValuesOf, useSpecGlyphs } from "./shared";
 
 interface ProductLocaleText {
@@ -408,6 +409,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             t={t}
           />
           <ProductPriceInternal modelPrices={sections?.modelPrices ?? null} t={t} />
+          {/* Staff only: the reports linked to this product (Reports Phase
+              4A) — never on a customer's or the public page, never printed. */}
+          {audience === "internal" && productId && (
+            <ReportsAboutCard type="product" id={productId} className="print:hidden mt-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" />
+          )}
         </div>
       </div>
     </div>

@@ -64,14 +64,23 @@ export async function removeUnreferenced(paths: Array<string | null | undefined>
   if (error) console.error("[reports] attachment cleanup:", error.message);
 }
 
-/** A new version starts with the same photos and files (same objects). */
-export async function copyAttachments(fromReportId: string, toReportId: string): Promise<void> {
+/** A new version starts with the same photos and files (same objects).
+ *  Returns each old attachment's copy (old id → new id), matched by the
+ *  object they share, so the new version's blocks (a checklist photo, a
+ *  signature — Phase 4A) point at its own copies. */
+export async function copyAttachments(fromReportId: string, toReportId: string): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
   const { data, error } = await supabaseServer.from("work_report_attachments")
-    .select("tenant_id, uploaded_by, storage_path, thumb_path, file_name, mime_type, size_bytes, width, height, caption, position")
+    .select("id, tenant_id, uploaded_by, storage_path, thumb_path, file_name, mime_type, size_bytes, width, height, caption, position")
     .eq("report_id", fromReportId).limit(100);
-  if (error) { console.error("[reports] attachments copy (read):", error.message); return; }
-  if (!data?.length) return;
-  const { error: iErr } = await supabaseServer.from("work_report_attachments")
-    .insert((data as Array<Record<string, unknown>>).map((a) => ({ ...a, report_id: toReportId })));
-  if (iErr) console.error("[reports] attachments copy (write):", iErr.message);
+  if (error) { console.error("[reports] attachments copy (read):", error.message); return ids; }
+  if (!data?.length) return ids;
+  const rows = data as Array<Record<string, unknown> & { id: string; storage_path: string }>;
+  const { data: made, error: iErr } = await supabaseServer.from("work_report_attachments")
+    .insert(rows.map(({ id: _old, ...a }) => { void _old; return { ...a, report_id: toReportId }; }))
+    .select("id, storage_path");
+  if (iErr) { console.error("[reports] attachments copy (write):", iErr.message); return ids; }
+  const newByPath = new Map(((made ?? []) as Array<{ id: string; storage_path: string }>).map((m) => [m.storage_path, m.id]));
+  for (const r of rows) { const n = newByPath.get(r.storage_path); if (n) ids.set(r.id, n); }
+  return ids;
 }

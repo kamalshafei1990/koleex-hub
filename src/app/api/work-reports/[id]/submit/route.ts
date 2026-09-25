@@ -12,7 +12,8 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { missingSections, normalizeSections, reportTemplate } from "@/lib/reports/templates";
+import { missingSections, normalizeSections, reportLinks, reportTemplate } from "@/lib/reports/templates";
+import { syncReportLinks } from "@/lib/server/reports/links";
 import { REPORT_COLS, listPeople, loadForViewer, requireReportsUser, type ReportRow } from "@/lib/server/reports/core";
 import { notifyReportSubmitted } from "@/lib/server/reports/notify";
 import { markRequestSent } from "@/lib/server/reports/events";
@@ -53,8 +54,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await supabaseServer.from("work_reports").update({ superseded: true, updated_at: now })
       .eq("id", report.previous_id).eq("author_account_id", auth.account_id);
   }
-  /* Written for what an event asked (Phase 3D): the request is now sent. */
-  await markRequestSent(report.period_key, report.id, auth.account_id, now);
+  /* Written for what an event asked (Phase 3D): the request is now sent.
+     And the records it is about (4A), rewritten whole on send. */
+  await Promise.all([
+    markRequestSent(report.period_key, report.id, auth.account_id, now),
+    syncReportLinks(report.id, report.tenant_id, null, reportLinks(sections)),
+  ]);
 
   const people = await listPeople(auth.tenant_id);
   const authorName = people.find((p) => p.id === auth.account_id)?.name ?? "A colleague";

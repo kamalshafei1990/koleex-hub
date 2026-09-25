@@ -58,6 +58,7 @@ import {
   type CustomerTier,
 } from "@/lib/customers-admin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -554,6 +555,9 @@ export default function CustomerProfilePage({
                 />
               </div>
             )}
+            {/* The reports linked to this customer (Reports Phase 4A) — under
+                the grid or the empty state, so it shows either way. */}
+            <ReportsAboutCard type="customer" id={id} className={`${panelCls} mt-4`} />
           </div>
         )}
 
