@@ -60,12 +60,19 @@ export const rolesT: Translations = {
   "modal.namePlaceholder": { en: "e.g. Sales Manager",
                              zh: "例如：销售经理",
                              ar: "مثل: مدير المبيعات" },
+  "modal.advanced":     { en: "Advanced — scope overrides",
+                          zh: "高级 — 范围覆盖",
+                          ar: "متقدم — تجاوز النطاقات" },
   "modal.isSA":         { en: "Super Admin role",
                           zh: "超级管理员角色",
                           ar: "دور المسؤول الأعلى" },
-  "modal.isSA.help":    { en: "Bypasses every module + scope check. Grant carefully.",
-                          zh: "绕过所有模块和范围检查。请谨慎授予。",
-                          ar: "يتجاوز كل تحقق للوحدات والنطاقات. امنح بعناية." },
+  /* The old hard-coded line said a super admin sees everything but Private
+     records. Not so: salaries, costs and private to-dos are theirs; only
+     other people's private calendar events still need the private-data
+     switch (src/lib/server/calendar-access.ts). */
+  "modal.isSA.help":    { en: "Passes every app and scope check and sees all data, costs and salaries included. Other people's private calendar events still need «Can see private data». Grant carefully.",
+                          zh: "通过所有应用与范围检查，可查看全部数据，包括成本和薪资。他人的私密日历事件仍需「可查看私密数据」。请谨慎授予。",
+                          ar: "يتجاوز كل تحقق للتطبيقات والنطاقات ويرى كل البيانات، بما فيها التكاليف والرواتب. أما أحداث التقويم الخاصة بالآخرين فتحتاج أيضًا «يرى البيانات الخاصة». امنحه بعناية." },
   "modal.canViewPrivate":
     { en: "Can see private data",
       zh: "可查看私密数据",

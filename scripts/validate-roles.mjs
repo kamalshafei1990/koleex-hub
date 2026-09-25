@@ -76,6 +76,15 @@ const rolesWords = readFileSync("src/lib/translations/roles.ts", "utf8");
 check("the private-data switch reads its words from rolesT, not hard-coded English",
   page.includes('{t("modal.canViewPrivate")}') && page.includes('{t("modal.canViewPrivate.help")}')
   && !/legal discovery|Break-glass: view Private records/.test(page));
+/* The rest of that box too — its header and the Super Admin row were English
+   in every language, and the row said a super admin "sees every record except
+   those marked Private", which is not so (salaries, costs and private to-dos
+   are theirs; only others' private calendar events need the switch). */
+check("the whole Advanced box speaks rolesT — header and Super Admin row included",
+  page.includes('{t("modal.advanced")}') && page.includes('{t("modal.isSA")}') && page.includes('{t("modal.isSA.help")}')
+  && !/Advanced — scope overrides|Bypasses all data scope rules/.test(page)
+  && /"modal\.advanced":/.test(rolesWords)
+  && !/except those marked Private/.test(rolesWords));
 {
   const at = rolesWords.indexOf('"modal.canViewPrivate.help"');
   const help = at < 0 ? "" : rolesWords.slice(at, rolesWords.indexOf("},", at));

@@ -154,11 +154,12 @@ function RoleModal({ open, onClose, role, onSaved }: {
           credit terms, salaries and ID documents inside the apps the role
           already has (src/lib/server/sensitive-columns.ts, src/lib/experience),
           plus private to-dos within its reach (those reads are logged). It
-          stays red when on — the widest data grant a role can carry. Its words
-          come from rolesT (modal.canViewPrivate*); validate:roles holds them. */}
+          stays red when on — the widest data grant a role can carry. Every word
+          in this box comes from rolesT (modal.advanced, modal.isSA*,
+          modal.canViewPrivate*); validate:roles holds them. */}
       <div className="rounded-xl border border-[var(--border-faint)] p-4 space-y-3 bg-[var(--bg-surface-subtle)]">
         <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-dim)]">
-          Advanced — scope overrides
+          {t("modal.advanced")}
         </p>
 
         <label className="flex items-start gap-3 cursor-pointer">
@@ -170,10 +171,10 @@ function RoleModal({ open, onClose, role, onSaved }: {
           />
           <div className="flex-1">
             <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
-              Super Admin
+              {t("modal.isSA")}
             </div>
             <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
-              Bypasses all data scope rules (Own / Dept / All). Sees every record except those marked Private.
+              {t("modal.isSA.help")}
             </div>
           </div>
         </label>
