@@ -2,11 +2,14 @@
    Reports — the built-in types' catalog: every type's sections, its default
    readers and its flags (Phase 1 → 5B; moved out of ./templates.ts in 5C).
 
-   WHO MAY IMPORT THIS: the server, the Reports home (the list of types to
-   write), the template builder and validate:reports. The report page
+   WHO MAY IMPORT THIS: the server, the template builder (its own chunk,
+   loaded when its tab opens) and validate:reports. The report page
    (/reports/[id]) and its print NEVER do — a report arrives with its own type
    from the server (GET /api/work-reports/[id] → `template.def`), so the page
-   the whole team opens every day does not grow with each new type. The
+   the whole team opens every day does not grow with each new type. Nor does
+   the Reports home: it lists the types from their HEADS, ./catalog-heads.ts,
+   generated from this file — ⚠️ after ANY change here run
+   `npm run -s reports:heads` (validate:reports fails until you do). The
    engine's types and helpers stay in ./templates.ts, which this file uses.
    --------------------------------------------------------------------------- */
 
@@ -678,7 +681,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
 
 /** The groups a family's types show under on the Reports home (5C), in
  *  order — each `grp.<family>.<group>`. A builder type has none: it shows
- *  after them. */
+ *  after them. The home reads the copy in ./catalog-heads.ts. */
 export const FAMILY_GROUPS: Partial<Record<ReportFamily, string[]>> = {
   hr: ["hiring", "time", "pay", "performance", "relations", "exit", "records"],
   projects: ["start", "execution", "portfolio", "closure"],

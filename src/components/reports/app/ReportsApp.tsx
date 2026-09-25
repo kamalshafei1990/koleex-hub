@@ -18,6 +18,9 @@
    admins and whoever holds "Report Templates" in Roles — loads its own code
    only when it is opened. Phase 5A: the Team tab opens with the team
    summary (Koleex AI over what the team sent), its own chunk too.
+   5C: the types are listed from their HEADS (lib/reports/catalog-heads —
+   key, family, group, icon, cadence, who is offered it), never the catalog
+   with every type's sections: only the builder's own chunk carries that.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -35,7 +38,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { REPORT_FAMILIES, periodFor } from "@/lib/reports/templates";
-import { FAMILY_GROUPS, REPORT_TEMPLATES, reportTemplate } from "@/lib/reports/catalog";
+import { FAMILY_GROUPS, REPORT_HEADS, reportHead } from "@/lib/reports/catalog-heads";
 import { headWords, isCustomKey } from "@/lib/reports/template-words";
 import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
 import type { DueItem } from "@/lib/reports/obligations";
@@ -144,7 +147,7 @@ export default function ReportsApp() {
       url.searchParams.delete("date");
       url.searchParams.delete("request");
       window.history.replaceState(window.history.state, "", url.toString());
-      if (!REPORT_TEMPLATES.some((x) => x.key === key) && !isCustomKey(key)) return;
+      if (!reportHead(key) && !isCustomKey(key)) return;
       void start(key, date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, {
         replace: true,
         request: request && /^[0-9a-f-]{36}$/i.test(request) ? request : undefined,
@@ -223,11 +226,11 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
 }) {
   /* Before the bundle says what this person may start, only the types
      open to all staff — never a team's or the CEO office's (5B). */
-  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app).map((x) => x.key)), [bundle]);
+  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_HEADS.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app).map((x) => x.key)), [bundle]);
   /* Every type this person may start, by group: the built-ins, then the
      builder's (4E) — each named from the dictionary. */
   const offered = useMemo(() => [
-    ...REPORT_TEMPLATES.filter((x) => allowed.has(x.key)).map((x) => ({ key: x.key, family: x.family, icon: x.icon, group: x.group })),
+    ...REPORT_HEADS.filter((x) => allowed.has(x.key)).map((x) => ({ key: x.key, family: x.family, icon: x.icon, group: x.group })),
     ...(bundle?.custom ?? []).map((c) => ({ key: c.key, family: c.family, icon: c.icon, group: undefined as string | undefined })),
   ], [allowed, bundle?.custom]);
   const due = bundle?.due ?? [];
@@ -318,7 +321,7 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
           const busy = creating === (d.request ?? `${d.key}|${d.date}`);
           return (
             <li key={`${d.key}|${d.periodKey}`} className={`flex items-center gap-3 rounded-xl border p-3 ${d.state === "missing" ? "border-red-500/30 bg-red-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"}`}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon icon={reportTemplate(d.key)?.icon} size={14} /></span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon icon={reportHead(d.key)?.icon} size={14} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, d.key)} <span className="font-normal text-[var(--text-dim)] tabular-nums">· {when(d)}</span></span>
                 <span className={`block text-[11.5px] tabular-nums ${d.state === "missing" ? "text-red-500" : "text-amber-500"}`}>

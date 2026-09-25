@@ -82,6 +82,9 @@
  *
  * Source rules are checked in both directions, like validate:attendance: the
  * real file passes, and a mutated copy that breaks the rule must fail.
+ *   §25 the Reports home lists the types from their HEADS (catalog-heads.ts,
+ *      generated from the catalog) — never the catalog of sections; the
+ *      heads are exactly the catalog's, and stale ones fail.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -103,6 +106,8 @@ import {
   scheduleRows as planRows, skillRows, toOrder, turnoverRows, NO_CATEGORY,
 } from "../src/lib/reports/numbers-5c";
 import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
+import { FAMILY_GROUPS as HEAD_GROUPS, REPORT_HEADS, reportHead } from "../src/lib/reports/catalog-heads";
+import { headOf, renderReportHeads, HEADS_FILE } from "./lib/reports-heads";
 import { CAPABILITY_MODULES } from "../src/lib/permission-modules";
 import { entityHref } from "../src/lib/reports/link-targets";
 import { reportsT as mainWords } from "../src/lib/translations/reports";
@@ -1070,8 +1075,8 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     (src) => src.replace("groupEventsByDay(shownEvents, visibleDays)", "groupEventsByDay(events, visibleDays)"));
   const RA = "src/components/reports/app/ReportsApp.tsx";
   rule("\"write it\" starts once: the link's parameters go before the report starts, and it replaces the stop", RA,
-    (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key,[\s\S]*?replace: true/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /url\.searchParams\.delete\("request"\);/.test(m[1]) && /REPORT_TEMPLATES\.some\(\(x\) => x\.key === key\)/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
-    (src) => src.replace('      window.history.replaceState(window.history.state, "", url.toString());\n      if (!REPORT_TEMPLATES', "      if (!REPORT_TEMPLATES"));
+    (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key,[\s\S]*?replace: true/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /url\.searchParams\.delete\("request"\);/.test(m[1]) && /if \(!reportHead\(key\) && !isCustomKey\(key\)\) return;/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
+    (src) => src.replace('      window.history.replaceState(window.history.state, "", url.toString());\n      if (!reportHead(key)', "      if (!reportHead(key)"));
 
   /* Side by side: the daily and the weekly fall due at the same moment every
      week, so two blocks at one time must never be drawn on top of each other. */
@@ -2308,7 +2313,7 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })") ? [] : ["a copy loses the line under its name"]),
     (src) => src.replace("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })", "copyOfBuiltin(key, { ...reportsT, ...REPORT_SECTION_WORDS })"));
   rule("before the bundle answers, no one is offered an office or a team type", "src/components/reports/app/ReportsApp.tsx",
-    (c) => (c.includes("REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)") ? [] : ["a clerk sees the CEO office's types flash by"]),
+    (c) => (c.includes("REPORT_HEADS.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)") ? [] : ["a clerk sees the CEO office's types flash by"]),
     (src) => src.replace(" && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)", ")"));
   rule("the builder's list knows an office-only type", "src/lib/server/reports/custom-templates.ts",
     (c) => (c.includes("office_only:def->officeOnly") && c.includes('officeOnly: r.office_only === true || r.office_only === "true",') ? [] : ["a builder type loses its office flag in the list"]),
@@ -2337,7 +2342,9 @@ console.log("\n§23 the report page carries no catalog (Phase 5C)");
   };
   /* `virtual`: a file's content as a probe wants it — the shared tree is
      never written to prove a check bites (another session could commit it). */
-  const graph = (entries: string[], virtual: Map<string, string> = new Map()): Set<string> => {
+  /* `lazy`: follow import() too — a chunk loaded later (a tab, a dialog).
+     The page's first load is the static graph alone. */
+  const graph = (entries: string[], virtual: Map<string, string> = new Map(), lazy = true): Set<string> => {
     const seen = new Set<string>();
     const todo = entries.map((e) => path.join(ROOT, e));
     while (todo.length) {
@@ -2347,6 +2354,7 @@ console.log("\n§23 the report page carries no catalog (Phase 5C)");
       const src = code(virtual.get(f) ?? fs.readFileSync(f, "utf8"));
       /* Type-only imports are erased — they carry nothing into the bundle. */
       for (const m of src.matchAll(/(?:^|\n)\s*import\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|(?:^|\n)\s*export\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']/g)) {
+        if (m[2] && !lazy) continue;
         const spec = m[1] ?? m[2] ?? m[3];
         const r = spec ? resolveImport(f, spec) : null;
         if (r && !seen.has(r)) todo.push(r);
@@ -2367,8 +2375,19 @@ console.log("\n§23 the report page carries no catalog (Phase 5C)");
     expect(graph(["src/components/reports/app/ReportView.tsx"], probed).has(CATALOG), "…and a catalog import in a file the page reaches would be caught");
   }
   expect(!/export const REPORT_TEMPLATES/.test(code(read("src/lib/reports/templates.ts"))), "the engine file keeps the types and helpers only — the catalog moved out");
-  const homeGraph = graph(["src/components/reports/app/ReportsApp.tsx"]);
-  expect(homeGraph.has(CATALOG), "the Reports home still names every type from the catalog (the write list, the rows)");
+  /* 5C heads split: the home lists the types from their heads; only the
+     builder — its own chunk, loaded when its tab opens — has every type's
+     sections to copy. */
+  const HOME = "src/components/reports/app/ReportsApp.tsx";
+  const homeStatic = graph([HOME], new Map(), false);
+  expect(homeStatic.size > 20 && !homeStatic.has(CATALOG), `the Reports home never loads the catalog of types, at any depth — its heads are enough (${homeStatic.size} files walked)`);
+  {
+    const rowFile = path.join(ROOT, "src/components/reports/app/ReportRowItem.tsx");
+    const probed = new Map([[rowFile, `import { REPORT_TEMPLATES } from "@/lib/reports/catalog";\nvoid REPORT_TEMPLATES;\n${fs.readFileSync(rowFile, "utf8")}`]]);
+    expect(graph([HOME], probed, false).has(CATALOG), "…and a catalog import in a file the home loads would be caught");
+  }
+  expect(graph([HOME]).has(CATALOG) && code(read("src/components/reports/app/ReportsApp.tsx")).includes('const TemplatesTab = dynamic(() => import("./TemplatesTab")'),
+    "…while the template builder, loaded only when its tab opens, still copies a built-in whole");
   rule("a report comes with the families of its words", `src/app/api/work-reports/[id]/route.ts`,
     (c) => (c.includes("const wordFamilies = sectionFamilies(def?.base ?? row.template_key);") && /\n\s+wordFamilies,\n/.test(c) ? [] : ["the page cannot find its words without the catalog"]),
     (src) => src.replace("const wordFamilies = sectionFamilies(def?.base ?? row.template_key);", "const wordFamilies: string[] = [];"));
@@ -2568,6 +2587,23 @@ console.log("\n§24 HR, Projects, Inventory and Finance: who reads how far, abou
   expect(!!copy && copy.def.payrollOnly && copy.def.sections.find((x) => x.id === "salaries")?.input?.id === "proposed", "a builder copy of a salary review keeps «Payroll Reports» and its typed figure");
   const checked = checkTemplate({ ...copyOfBuiltin("inv_count", reportsT)!.def, sections: copyOfBuiltin("inv_count", reportsT)!.def.sections.filter((x) => x.kind !== "links") }, copyOfBuiltin("inv_count", reportsT)!.words);
   expect(checked.problems.includes("about:count"), "a builder type with a count but no warehouse to pick is refused until it has one");
+}
+
+/* ── §25 the heads of the types (5C heads split) ─────────────────────── */
+console.log("\n§25 the Reports home lists the types from their heads");
+{
+  const file = read(HEADS_FILE);
+  expect(file === renderReportHeads(REPORT_TEMPLATES, FAMILY_GROUPS),
+    "the heads are the catalog's, type by type and flag by flag", `${HEADS_FILE} is stale or edited by hand — run npm run -s reports:heads`);
+  const flipped = REPORT_TEMPLATES.map((x) => (x.key === "hr_offer" ? { ...x, payrollOnly: true } : x));
+  expect(renderReportHeads(flipped, FAMILY_GROUPS) !== file && renderReportHeads(REPORT_TEMPLATES.slice(1), FAMILY_GROUPS) !== file,
+    "…and a flag changed, or a type added or removed, in the catalog makes them stale");
+  expect(REPORT_HEADS.length === REPORT_TEMPLATES.length && REPORT_TEMPLATES.every((x) => JSON.stringify(reportHead(x.key)) === JSON.stringify(headOf(x))),
+    `one head per built-in (${REPORT_HEADS.length}), each its type's own`);
+  expect(!/\bsections\b\s*:/.test(code(file)) && REPORT_HEADS.every((h) => !("sections" in h) && !("recipients" in h)), "no head carries a type's sections or readers");
+  expect(JSON.stringify(HEAD_GROUPS) === JSON.stringify(FAMILY_GROUPS), "the home groups the types as the catalog does");
+  expect(reportHead("hr_offer")?.app === "HR" && reportHead("hr_payroll")?.payrollOnly === true && reportHead("probation_review")?.requestOnly === true && reportHead("c-abcdefghij") === null,
+    "a head keeps who is offered the type (an app, «Payroll Reports», only on request); a builder type has none");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

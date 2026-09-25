@@ -260,7 +260,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "quotations": { chunks: 11, kbytes: 850 },
   /* reports — MEASURED 25/09/2026 at 9 chunks / 608 KB, +12% as every app line
      is. The Reports app home (bundle, lists, template cards); the HR numbers
-     in its Library are a dynamic import and are NOT in this number. */
+     in its Library are a dynamic import and are NOT in this number.
+     26/09/2026: 665 KB after Phase 5C (146 types) → 638 KB once the home
+     listed the types from their heads (lib/reports/catalog-heads, generated)
+     instead of the whole catalog of sections; the builder tab keeps that. */
   "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },

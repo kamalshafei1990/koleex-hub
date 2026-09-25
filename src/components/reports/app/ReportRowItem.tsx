@@ -2,13 +2,13 @@
 
 /* ---------------------------------------------------------------------------
    Reports app — one report in any list (the home, the inbox, my reports, the
-   team). It names a built-in from the catalog, so only the Reports home's
-   lists import it — never the report page (5C: that page carries no catalog).
+   team). It names a built-in from its head (lib/reports/catalog-heads — 5C:
+   the lists carry the heads of the types, never the catalog of sections).
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
-import { reportTemplate } from "@/lib/reports/catalog";
+import { reportHead } from "@/lib/reports/catalog-heads";
 import { pickWord } from "@/lib/reports/template-words";
 import type { Lang } from "@/lib/i18n";
 import { dmyDate, periodLabel, type ReportListRow } from "@/lib/work-reports";
@@ -18,7 +18,7 @@ import { Avatar, Badge, StatusChip, TemplateIcon, tplName, type T } from "./shar
  *  builder type (4E) is named as the report was started with it. */
 export function ReportRowItem({ r, t, lang, showAuthor = true }: { r: ReportListRow; t: T; lang: string; showAuthor?: boolean }) {
   const unread = !!r.myRole && !r.readAt;
-  const builtin = reportTemplate(r.templateKey);
+  const builtin = reportHead(r.templateKey);
   const tpl = builtin ?? (r.tpl ? { cadence: r.tpl.cadence, urgent: r.tpl.urgent } : null);
   const typeName = !builtin && r.tpl ? pickWord(r.tpl.name, lang as Lang) || tplName(t, r.templateKey) : tplName(t, r.templateKey);
   return (

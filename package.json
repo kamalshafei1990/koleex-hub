@@ -91,6 +91,7 @@
     "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",
     "validate:edge-cases": "tsx scripts/edge-cases.ts",
     "validate:reports": "tsx scripts/validate-reports.ts",
+    "reports:heads": "tsx scripts/reports-heads.ts",
     "validate:perf": "NODE_OPTIONS=--conditions=react-server tsx scripts/perf.ts",
     "validate:accounting": "NODE_OPTIONS=--conditions=react-server tsx scripts/accounting.ts",
     "validate:inventory": "NODE_OPTIONS=--conditions=react-server tsx scripts/inventory.ts",
