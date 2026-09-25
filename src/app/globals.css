@@ -3512,7 +3512,41 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    white and in light mode becomes black". At rest the tab's own recipe
    paints it Hub Blue; hover has no business overriding that. Tabs are
    excluded here and governed by the .kx-ph-tabs rules above. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([role="tab"]):not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
+/* ⚠️ A SELECTED CONTROL IS NOT A PRIMARY BUTTON EITHER — third time, so
+   this excludes a CATEGORY, not one more control. Core writes
+   `bg-[var(--bg-inverted)]` for two different things: the primary action
+   ("do this") and the selected state ("you are here"). Aurora repaints the
+   selected state Hub Blue at rest, then this rule read the CLASS on hover
+   and put the solid fill back — white in dark, black in light — under text
+   that is white (dark) or navy (light). Owner, on the Reports "Home" pill:
+   "the selected button hover becomes white and hides the text and icon, and
+   I found it in more than one app." Field tints and tabs above were the same
+   defect one control-type at a time.
+
+   Measured before fixing: a same-origin sweep of all 45 apps, flagging every
+   element this rule matches whose text would sit on the hover fill at under
+   3:1. Eleven elements in nine apps, contrast 1.00 on every one:
+     nav pill  (aria-current + kx-ahm-pill-on)  Reports, Contracts, Orders,
+               Expenses, Notes, Travel, Planning
+     segment   (aria-pressed + kx-seg-on)       Calendar, Planning ×2
+     chip      (kx-chip-on)                     Documents
+   (+2 on Projects — pill and segment — that the sweep caught late because the
+   page had not finished rendering; same recipes, same fix. 13 in 10 apps.)
+   Every one of the thirteen carries one of Aurora's three selection RECIPES —
+   and that is the real criterion, not "selected": the bug exists only where
+   Aurora repainted the rest state and this rule put the old paint back on
+   hover. So it now skips exactly those three classes; a control Aurora left
+   solid at rest keeps the primary hover, which matches its rest look.
+   ARIA was tried first and rejected on measurement: Calendar's and Planning's
+   today-date buttons carry aria-current="date" but are still solid white with
+   black text at rest — their white-plus-halo hover was CORRECT, and an
+   aria-current exclusion silently took it away. Excluding by recipe touches
+   nothing that was working.
+   Written as ONE `:not(:where(…))`, not three more `:not()`s: :where() weighs
+   zero, so the rule keeps exactly the specificity it had and nothing ranked
+   against it moves — see the :not() specificity note on the hover rule below,
+   which is the same trap. A new Aurora selection recipe joins this list. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([role="tab"]):not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):not(:where(.kx-ahm-pill-on, .kx-seg-on, .kx-chip-on)):hover {
   /* NOTHING HERE MAY DARKEN THE BUTTON. Round one pinned the opacity but
      added `0 6px 18px -6px rgba(0,0,0,.45)` — a black drop shadow — and the
      owner said it was still dark, correctly: I had removed one way of dimming
@@ -3524,6 +3558,17 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   background-color: var(--bg-inverted) !important;
   filter: none !important;
   box-shadow: 0 0 0 3px rgba(86, 127, 178, 0.35) !important;
+}
+
+/* …and the selected control still answers the cursor, the way a selected tab
+   does: by deepening its own blue, never by changing colour. A LAYER, not a
+   repaint — background-image sits over whatever the rest recipe painted, so
+   the pill's 10% wash, the segment's 10% wash and the chip's 85% fill each
+   deepen from their own value, and the rings (box-shadow / border) are not
+   touched. 6% is the tab's number, for the same reason: acknowledgement, not
+   a second state. No !important: nothing else paints background-image here. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(.kx-ahm-pill-on, .kx-seg-on, .kx-chip-on):hover {
+  background-image: linear-gradient(rgba(86, 127, 178, 0.06), rgba(86, 127, 178, 0.06));
 }
 
 /* ── EVERY BORDERED CONTROL IN A CONVERTED APP HOVERS THE SAME WAY ──
