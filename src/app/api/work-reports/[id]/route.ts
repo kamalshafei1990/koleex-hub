@@ -8,11 +8,14 @@ import "server-only";
           it read and clears the reader's own notification. The author's
           draft also carries the suggestions from their earlier reports
           (yesterday's plan, the week's dailies…), so the composer paints
-          complete — no second request, nothing shifting in later.
+          complete — no second request, nothing shifting in later. Photos
+          and files come as ids only; their bytes are fetched through
+          /api/files/report/<id>, which applies this same read rule.
    PATCH  The author edits a DRAFT: { title?, date?, sections?, to?, cc?,
           confidential? }. A sent report is never edited — a new version is
           (POST …/revise).
-   DELETE The author deletes a DRAFT.
+   DELETE The author deletes a DRAFT (its stored files go too, unless an
+          earlier version still shows them).
    A report the viewer may not read answers 404, never 403, so a stranger
    cannot learn that it exists.
    --------------------------------------------------------------------------- */
@@ -24,6 +27,7 @@ import { REPORT_LIMITS, normalizeSections, periodFor, reportTemplate } from "@/l
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { loadCarry } from "@/lib/server/reports/carry";
+import { loadAttachmentRows, removeUnreferenced, toClientAttachment, type AttachmentRow } from "@/lib/server/reports/attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +44,12 @@ export async function GET(req: Request, { params }: Params) {
   /* ONE wave: the thread and the newer version are read beside the report
      and thrown away unread if this viewer may not see it — nothing leaves
      before the access check below. */
-  const [loaded, people, commentsRes, newerRes] = await Promise.all([
+  const [loaded, people, commentsRes, newerRes, attachmentsRes] = await Promise.all([
     loadForViewer(id, auth),
     listPeople(auth.tenant_id),
     supabaseServer.from("work_report_comments").select("id, account_id, body, kind, created_at").eq("report_id", id).order("created_at", { ascending: true }).limit(500),
     supabaseServer.from("work_reports").select("id").eq("previous_id", id).order("version", { ascending: false }).limit(1).maybeSingle(),
+    loadAttachmentRows(id),
   ]);
   if (!loaded) return notFound();
   const { row, recipients, access } = loaded;
@@ -94,6 +99,7 @@ export async function GET(req: Request, { params }: Params) {
     },
     people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
     carry,
+    attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(toClientAttachment),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -167,10 +173,14 @@ export async function DELETE(req: Request, { params }: Params) {
   const loaded = await loadForViewer(id, auth);
   if (!loaded || loaded.access !== "author") return notFound();
   if (loaded.row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
+  /* Its files' paths first — the rows go with the report (cascade). */
+  const { data: files } = await supabaseServer.from("work_report_attachments").select("storage_path, thumb_path").eq("report_id", loaded.row.id);
   const { error } = await supabaseServer.from("work_reports").delete().eq("id", loaded.row.id).eq("status", "draft");
   if (error) {
     console.error("[api/work-reports DELETE]", error.message);
     return NextResponse.json({ error: "Could not delete the draft." }, { status: 500 });
   }
+  const paths = ((files ?? []) as { storage_path: string; thumb_path: string | null }[]).flatMap((f) => [f.storage_path, f.thumb_path]);
+  if (paths.length) after(() => removeUnreferenced(paths));
   return NextResponse.json({ ok: true });
 }

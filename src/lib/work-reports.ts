@@ -6,6 +6,7 @@
 
 import type { ReportSectionValue } from "@/lib/reports/templates";
 import type { CarryGroup } from "@/lib/reports/carry";
+import type { ReportAttachment } from "@/lib/reports/attachments";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -60,6 +61,8 @@ export interface ReportDetail {
   people?: ReportPerson[];
   /** The author's draft only: suggestions from their earlier reports. */
   carry?: CarryGroup[];
+  /** Photos and files, in order (ids only — see reportFileUrl). */
+  attachments?: ReportAttachment[];
 }
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; extra?: Record<string, unknown> };
@@ -97,6 +100,45 @@ export const decideReport = (id: string, action: "approve" | "return" | "acknowl
 export const commentOnReport = (id: string, body: string) =>
   call<{ comment: ReportComment }>(`/api/work-reports/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
 export const reviseReport = (id: string) => call<{ id: string; existing: boolean }>(`/api/work-reports/${id}/revise`, { method: "POST" });
+/** One photo or file onto a draft, with upload progress (0..1) — an XHR,
+ *  because fetch cannot report upload progress, and on a slow line "is it
+ *  moving?" is the question. One more try when the connection drops (a
+ *  dropped connection is not a refusal); an HTTP answer is reported as-is. */
+export function uploadReportAttachment(
+  id: string,
+  parts: { file: Blob; name: string; thumb?: Blob | null; width?: number; height?: number },
+  onProgress?: (fraction: number) => void,
+): Promise<Result<{ attachment: ReportAttachment }>> {
+  const once = () => new Promise<Result<{ attachment: ReportAttachment }>>((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/work-reports/${id}/attachments`);
+    xhr.withCredentials = true;
+    xhr.timeout = 120_000;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && e.total) onProgress?.(Math.min(1, e.loaded / e.total)); };
+    xhr.onload = () => {
+      let json: ({ attachment?: ReportAttachment; error?: string } & Record<string, unknown>) | null = null;
+      try { json = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300 && json?.attachment) resolve({ ok: true, data: { attachment: json.attachment } });
+      else resolve({ ok: false, status: xhr.status, error: json?.error ?? `HTTP ${xhr.status}`, extra: json ?? undefined });
+    };
+    xhr.onerror = () => resolve({ ok: false, status: 0, error: "network" });
+    xhr.ontimeout = () => resolve({ ok: false, status: 0, error: "timeout" });
+    const form = new FormData();
+    form.append("file", parts.file, parts.name);
+    form.append("name", parts.name);
+    if (parts.thumb) form.append("thumb", parts.thumb, "thumb.jpg");
+    if (parts.width) form.append("width", String(parts.width));
+    if (parts.height) form.append("height", String(parts.height));
+    xhr.send(form);
+  });
+  return once().then((res) => (!res.ok && res.status === 0 && res.error === "network" ? once() : res));
+}
+
+export const captionReportAttachment = (id: string, attId: string, caption: string) =>
+  call<{ attachment: ReportAttachment }>(`/api/work-reports/${id}/attachments/${attId}`, { method: "PATCH", body: JSON.stringify({ caption }) });
+export const deleteReportAttachment = (id: string, attId: string) =>
+  call<{ ok: true }>(`/api/work-reports/${id}/attachments/${attId}`, { method: "DELETE" });
+
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string) =>
   call<{ carry: CarryGroup[] }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}`);

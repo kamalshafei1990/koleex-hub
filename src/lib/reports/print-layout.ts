@@ -21,6 +21,11 @@
    A list item moves whole — it is at most a few lines — unless it already
    starts a fresh sheet, where moving it again would loop. A head never
    sits alone at a sheet's foot: it takes its first two lines with it.
+
+   Photos (Phase 2C) print two to a row in FIXED boxes (the photo fitted
+   inside, a two-line caption band under it), so every row costs the same
+   and a row never splits; files follow as one line each. They come after
+   the sections and before the review.
    --------------------------------------------------------------------------- */
 
 import { reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
@@ -83,7 +88,10 @@ export function breakPoints(s: string): number[] {
 }
 
 export type PrintPara = { text: string; bullet: boolean };
-export type PrintCard = { sid: string; cont: boolean; paras: PrintPara[]; empty: boolean };
+/** One printed photo: which attachment, and its caption. */
+export type PrintPhoto = { id: string; caption: string };
+/** `photos`: the photo rows (two a row) — only on the attachments card. */
+export type PrintCard = { sid: string; cont: boolean; paras: PrintPara[]; empty: boolean; photos?: PrintPhoto[][] };
 /** `used` is the sheet's planned height in px — never above SHEET_PX. */
 export type PrintSheet = { first: boolean; cards: PrintCard[]; review: boolean; used: number };
 
@@ -125,6 +133,15 @@ export const estimateMeasurer: Measurer = {
 
 export interface PrintInput { templateKey: string; title: string; sections: ReportSectionValue[] }
 
+/* ── Photos and files ──────────────────────────────────────────────────── */
+/** The attachments card's id (never a template section id). */
+export const ATTACH_SID = "__attachments";
+export const PHOTO_BOX_PX = 236;
+export const PHOTO_CAPTION_PX = 30;           // 4 px of air + two lines at 13 px
+export const PHOTO_ROW_GAP_PX = 8;
+export const PHOTO_ROW_PX = PHOTO_BOX_PX + PHOTO_CAPTION_PX + PHOTO_ROW_GAP_PX;
+export interface PrintAttachments { photos: PrintPhoto[]; files: PrintPara[] }
+
 /** The paragraphs of each of the template's sections, as they print. */
 export function printParagraphs(report: PrintInput): Array<{ sid: string; paras: PrintPara[] }> {
   const tpl = reportTemplate(report.templateKey);
@@ -140,7 +157,7 @@ export function printParagraphs(report: PrintInput): Array<{ sid: string; paras:
   });
 }
 
-export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer = estimateMeasurer): PrintSheet[] {
+export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer = estimateMeasurer, att?: PrintAttachments): PrintSheet[] {
   const tpl = reportTemplate(report.templateKey);
   const sheets: PrintSheet[] = [];
   const firstUsed = FIRST_HEAD_PX + FOOT_PX + (report.title.trim() && tpl?.customTitle ? TITLE_PX : 0);
@@ -193,6 +210,34 @@ export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer
       card = { sid, cont: empty ? wasCont : true, paras: [], empty: false };
       sheet.cards.push(card);
       sheet.used += CARD_PX;
+    }
+  }
+
+  /* Photos and files: a card opens only where its first row (or line) fits
+     too, so its head never stands alone; it continues on the next sheet
+     marked "continued". */
+  if (att && (att.photos.length || att.files.length)) {
+    let card: PrintCard | null = null;
+    let opened = 0;
+    const open = (): PrintCard => {
+      const c: PrintCard = { sid: ATTACH_SID, cont: opened++ > 0, paras: [], empty: false, photos: [] };
+      sheet.cards.push(c);
+      sheet.used += CARD_PX;
+      return c;
+    };
+    for (let i = 0; i < att.photos.length; i += 2) {
+      if (left() < PHOTO_ROW_PX + (card ? 0 : CARD_PX)) { newSheet(); card = null; }
+      card = card ?? open();
+      card.photos!.push(att.photos.slice(i, i + 2));
+      sheet.used += PHOTO_ROW_PX;
+    }
+    for (const f of att.files) {
+      const h = m.height(f);
+      const gapIn = (c: PrintCard | null) => (c && (c.paras.length || c.photos!.length) ? PARA_GAP_PX : 0);
+      if (left() < gapIn(card) + h + (card ? 0 : CARD_PX)) { newSheet(); card = null; }
+      card = card ?? open();
+      sheet.used += gapIn(card) + h;
+      card.paras.push(f);
     }
   }
 

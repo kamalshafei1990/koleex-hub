@@ -21,6 +21,10 @@
  *   §8 carry-over (Phase 2A) — which earlier reports feed a new one, that a
  *      suggestion is offered once and never cut, that it is only ever the
  *      author's own text, and that nothing lands in a report by itself.
+ *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
+ *      the bucket; bytes checked before storing; files served only through
+ *      the report's read rule; an object leaves storage only when no version
+ *      shows it; photos print whole, two a row, never past a sheet.
  *
  * Source rules are checked in both directions, like validate:attendance: the
  * real file passes, and a mutated copy that breaks the rule must fail.
@@ -34,9 +38,12 @@ import {
 } from "../src/lib/reports/templates";
 import { reportsT } from "../src/lib/translations/reports";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
+import {
+  REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
+} from "../src/lib/reports/attachments";
 import { NOTIFICATION_ACTIVITIES, classifyNotificationActivity } from "../src/lib/notification-activity";
 import {
-  LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, widthUnits, type Measurer, type PrintPara,
+  ATTACH_SID, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, widthUnits, type Measurer, type PrintPara,
 } from "../src/lib/reports/print-layout";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -187,7 +194,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 8, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry)`);
+  expect(files.length === 10, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -426,6 +433,121 @@ console.log("\n§8 carry-over and roll-ups");
   expect(!isPlaced(item, { summary: "Call the forwarder" }, ["done", "pending"]), "a section it cannot go to does not count");
   expect(isPlaced({ text: "Shipped two containers.\nClosed Yili.", paragraph: true, date: null }, { summary: "Intro\n\nShipped two containers. Closed  Yili." }, ["summary"]),
     "a paragraph is found even after its line breaks moved");
+}
+
+/* ── §9 photos and files ───────────────────────────────────────────────── */
+console.log("\n§9 photos and files");
+{
+  /* One policy: the picker, the route and the bucket. */
+  const runnable = ["image/svg+xml", "text/html", "application/xhtml+xml", "text/javascript", "application/javascript", "application/xml", "text/xml", "application/x-msdownload"];
+  expect(!REPORT_ATTACHMENT_MIME.some((m) => runnable.includes(m)), "nothing that could run in our origin (SVG, HTML, XML, script, program) is accepted");
+  eq(REPORT_ATTACHMENT_LIMITS.bytes, 4 * 1024 * 1024, "4 MB a file: under the platform's 4.5 MB request ceiling, the route that works from China");
+  eq(REPORT_FILE_ACCEPT.split(","), [...REPORT_ATTACHMENT_MIME], "the file picker offers exactly what the route accepts");
+  const mig = read("supabase/migrations/20260925_reports_attachments.sql");
+  const bucket = /VALUES \(\s*'report-attachments', 'report-attachments', (\w+), (\d+),\s*ARRAY\[([\s\S]*?)\]/.exec(mig);
+  expect(!!bucket, "the migration creates the report-attachments bucket");
+  if (bucket) {
+    eq(bucket[1], "false", "the bucket is PRIVATE (no public URL exists for any report file)");
+    eq(Number(bucket[2]), REPORT_ATTACHMENT_LIMITS.bytes, "the bucket's size limit is the policy's");
+    eq([...bucket[3].matchAll(/'([^']+)'/g)].map((m) => m[1]), [...REPORT_ATTACHMENT_MIME], "the bucket's MIME list is the policy's, in order");
+  }
+  expect(/ALTER TABLE work_report_attachments ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig), "the table is RLS-on with no policy (service role only)");
+  expect(/report_id\s+uuid NOT NULL REFERENCES work_reports\(id\) ON DELETE CASCADE/.test(mig), "a report's rows go with it");
+
+  /* The verdict. */
+  eq(checkReportAttachment({ size: 1000, type: "image/jpeg" }), { ok: true }, "a JPEG under 4 MB goes");
+  eq(checkReportAttachment({ size: 1000, type: "Image/JPEG; charset=binary" }), { ok: true }, "the declared type is compared bare and case-free");
+  eq(checkReportAttachment({ size: 1000, type: "image/svg+xml" }).ok, false, "an SVG is refused");
+  eq(checkReportAttachment({ size: 1000, type: "" }).ok, false, "a file with no type is refused");
+  eq(checkReportAttachment({ size: REPORT_ATTACHMENT_LIMITS.bytes + 1, type: "application/pdf" }), { ok: false, reason: "size", max: REPORT_ATTACHMENT_LIMITS.bytes, actual: REPORT_ATTACHMENT_LIMITS.bytes + 1 }, "a PDF over 4 MB is refused before the wait");
+  eq(checkReportAttachment({ size: 0, type: "application/pdf" }), { ok: false, reason: "empty" }, "an empty file is refused");
+
+  /* The bytes. */
+  const b = (...x: number[]) => new Uint8Array([...x, ...new Array(16).fill(0x20)].slice(0, 16));
+  const asc = (str: string) => b(...Array.from(str, (c) => c.charCodeAt(0)));
+  expect(sniffMatches(b(0xff, 0xd8, 0xff, 0xe0), "image/jpeg"), "a JPEG's bytes pass as a JPEG");
+  expect(sniffMatches(b(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a), "image/png"), "a PNG's bytes pass as a PNG");
+  expect(sniffMatches(asc("RIFF    WEBPVP8 "), "image/webp"), "a WebP's bytes pass as a WebP");
+  expect(!sniffMatches(asc("%PDF-1.7"), "image/jpeg"), "a PDF declared as a JPEG is refused");
+  expect(sniffMatches(asc("%PDF-1.7"), "application/pdf"), "a PDF passes as a PDF");
+  expect(!sniffMatches(asc("<html><script>"), "image/png"), "HTML declared as a picture is refused");
+  expect(sniffMatches(b(0x50, 0x4b, 0x03, 0x04), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") && !sniffMatches(b(0x50, 0x4b, 0x03, 0x04), "application/msword"), "a modern Office file is a zip, an old one is not");
+  expect(!sniffMatches(b(0x41, 0x00, 0x42), "text/plain"), "a NUL byte is not text");
+  eq(extensionFor("image/jpeg"), "jpg", "the stored name's extension comes from the checked type");
+  eq(extensionFor("application/x-msdownload"), "bin", "an unknown type gets no executable extension");
+  eq(cleanFileName("../../etc/passwd"), "passwd", "a name loses its folders");
+  eq(cleanFileName(`a${String.fromCharCode(0)}b${String.fromCharCode(0x1b)}c.pdf`), "abc.pdf", "and its control characters");
+  eq(cleanFileName("x".repeat(400)).length, REPORT_ATTACHMENT_LIMITS.name, `and is capped at ${REPORT_ATTACHMENT_LIMITS.name} characters`);
+  eq([reportFileUrl("abc"), reportFileUrl("abc", "thumb"), reportFileUrl("abc", "download")], ["/api/files/report/abc", "/api/files/report/abc/thumb", "/api/files/report/abc?download=1"], "one builder for every file address");
+
+  /* Print: photos whole, two a row, never past a sheet. */
+  const photo = (i: number) => ({ id: `p${i}`, caption: i % 3 === 0 ? "The new overlock line at the Ningbo plant, second floor" : "" });
+  const fileLine = (i: number): PrintPara => ({ text: `Price list ${i} · 1.2 MB`, bullet: true });
+  const longDaily = normalizeSections(reportTemplate("daily")!, [{ id: "done", items: Array.from({ length: 40 }, (_, i) => `Task ${i} finished with the Cairo team and the forwarder`) }]);
+  const cases: Array<{ name: string; key: string; sections: ReturnType<typeof normalizeSections>; photos: number; files: number; review: number }> = [
+    { name: "one photo", key: "customer_visit", sections: normalizeSections(reportTemplate("customer_visit")!, [{ id: "who", text: "Mr Chen" }]), photos: 1, files: 0, review: 0 },
+    { name: "three photos and two files", key: "supplier_visit", sections: normalizeSections(reportTemplate("supplier_visit")!, [{ id: "who", text: "Yili" }]), photos: 3, files: 2, review: 0 },
+    { name: "twenty photos after a long daily, reviewed", key: "daily", sections: longDaily, photos: 20, files: 0, review: 3 * LINE_PX },
+    { name: "files only", key: "free", sections: normalizeSections(reportTemplate("free")!, [{ id: "body", text: "See attached." }]), photos: 0, files: 12, review: 0 },
+  ];
+  for (const c of cases) {
+    const att = { photos: Array.from({ length: c.photos }, (_, i) => photo(i)), files: Array.from({ length: c.files }, (_, i) => fileLine(i)) };
+    const sheets = paginateReport({ templateKey: c.key, title: "", sections: c.sections }, c.review, estimateMeasurer, att);
+    const cards = sheets.flatMap((sh) => sh.cards.filter((k) => k.sid === ATTACH_SID));
+    const printedPhotos = cards.flatMap((k) => (k.photos ?? []).flat().map((p) => p.id));
+    const printedFiles = cards.flatMap((k) => k.paras.map((p) => p.text));
+    const over = sheets.filter((sh) => sh.used > SHEET_PX).length;
+    const rows = cards.flatMap((k) => k.photos ?? []);
+    const hollow = cards.filter((k) => !(k.photos?.length) && !k.paras.length).length;
+    const contOk = cards.every((k, i) => k.cont === (i > 0));
+    const reviewLast = c.review ? sheets[sheets.length - 1].review : true;
+    expect(over === 0 && JSON.stringify(printedPhotos) === JSON.stringify(att.photos.map((p) => p.id)) && JSON.stringify(printedFiles) === JSON.stringify(att.files.map((f) => f.text))
+      && rows.every((r) => r.length >= 1 && r.length <= 2) && hollow === 0 && contOk && reviewLast,
+      `print, ${c.name}: ${sheets.length} sheet(s), every photo and file once and in order, rows of two, none past ${SHEET_PX}px, no empty card, the review last`,
+      `over=${over} photos=${printedPhotos.join(",")} files=${printedFiles.length} hollow=${hollow} cont=${contOk}`);
+  }
+  eq(paginateReport({ templateKey: "free", title: "", sections: normalizeSections(reportTemplate("free")!, [{ id: "body", text: "x" }]) }, 0).flatMap((sh) => sh.cards).some((k) => k.sid === ATTACH_SID), false, "a report without files prints no attachments card");
+}
+
+/* §9 (routes): the rules as the code states them. */
+{
+  const API = "src/app/api/work-reports";
+  rule("adding a file: the author of a draft only", `${API}/[id]/attachments/route.ts`,
+    (c) => (/loaded\.access !== "author"/.test(c) && /row\.status !== "draft"/.test(c) ? [] : ["no author + draft check"]),
+    (s) => s.replace('if (!loaded || loaded.access !== "author")', "if (!loaded)"));
+  rule("adding a file: its bytes are checked BEFORE anything is stored", `${API}/[id]/attachments/route.ts`,
+    (c) => { const sniff = c.indexOf("sniffMatches(await headOf(file)"); const up = c.indexOf(".upload(storagePath"); return sniff > 0 && up > sniff ? [] : ["the upload happens before the byte check"]; },
+    (s) => s.replace("if (!sniffMatches(await headOf(file), mime)) return NextResponse.json({ error: \"bad_type\" }, { status: 415 });", ""));
+  rule("adding a file: a row that cannot be written takes its objects back out", `${API}/[id]/attachments/route.ts`,
+    (c) => (/await bucket\.remove\(\[storagePath/.test(c) ? [] : ["an orphaned object is left in storage"]),
+    (s) => s.replace(/await bucket\.remove\(\[storagePath[^\n]*\n/, "\n"));
+  rule("removing a file: the object follows only if no version still shows it", `${API}/[id]/attachments/[attId]/route.ts`,
+    (c) => (/removeUnreferenced\(\[gone\.storage_path, gone\.thumb_path\]\)/.test(c) ? [] : ["the object is not cleaned up"]),
+    (s) => s.replace("after(() => removeUnreferenced([gone.storage_path, gone.thumb_path]));", ""));
+  rule("the bucket is only ever emptied through the reference check", "src/lib/server/reports/attachments.ts",
+    (c) => { const chk = c.indexOf('.in("storage_path", unique)'); const tchk = c.indexOf('.in("thumb_path", unique)'); const rm = c.indexOf(".remove(gone)"); return chk > 0 && tchk > 0 && rm > chk && rm > tchk && (c.match(/\.remove\(/g) ?? []).length === 1 ? [] : ["a removal skips the reference check"]; },
+    (s) => s.replace(".remove(gone)", ".remove(unique)"));
+  rule("a new version keeps the photos and files", `${API}/[id]/revise/route.ts`,
+    (c) => (/copyAttachments\(row\.id, newId\)/.test(c) ? [] : ["revise drops the attachments"]),
+    (s) => s.replace("copyAttachments(row.id, newId),", ""));
+  rule("a deleted draft's files are cleaned up", `${API}/[id]/route.ts`,
+    (c) => (/after\(\(\) => removeUnreferenced\(paths\)\)/.test(c) ? [] : ["a deleted draft leaves its files"]),
+    (s) => s.replace("if (paths.length) after(() => removeUnreferenced(paths));", ""));
+  rule("a report file is served only through the report's own read rule", "src/app/api/files/[...ref]/route.ts",
+    (c) => (/report: \["report-attachments"\]/.test(c) && /const readable = await loadForViewer\(data\.report_id as string, auth\);\s*if \(!readable\) return null;/.test(c) ? [] : ["the report category does not use loadForViewer"]),
+    (s) => s.replace("if (!readable) return null;", ""));
+  rule("the browser never sees a storage path", "src/lib/server/reports/attachments.ts",
+    (c) => { const m = /export function toClientAttachment[\s\S]*?\n\}/.exec(c); return m && !/storage_path|thumb_path:/.test(m[0].replace("hasThumb: !!r.thumb_path", "")) ? [] : ["toClientAttachment leaks a path"]; },
+    (s) => s.replace("image: isImageMime(r.mime_type), hasThumb: !!r.thumb_path,", "image: isImageMime(r.mime_type), hasThumb: !!r.thumb_path, path: r.storage_path,"));
+  rule("Send waits while a photo is still uploading", "src/components/reports/app/ReportView.tsx",
+    (c) => (/if \(uploading\) \{ setProblem\(t\("attach\.waitUpload"\)\); return; \}/.test(c) && /disabled=\{sending \|\| uploading\}/.test(c) ? [] : ["a report can be sent mid-upload"]),
+    (s) => s.replace('if (uploading) { setProblem(t("attach.waitUpload")); return; }', ""));
+  const ui = ["src/components/reports/app/AttachmentsEditor.tsx", "src/components/reports/app/AttachmentsView.tsx", "src/components/reports/app/ReportPrintDoc.tsx", "src/components/reports/app/ReportView.tsx"];
+  const hard = ui.filter((f) => /["'`]\/api\/files\/report/.test(code(read(f))));
+  expect(hard.length === 0, "no screen writes a file address by hand (reportFileUrl only)", hard.join(", "));
+  const need = ["attach.title", "attach.hint", "attach.addPhotos", "attach.addFiles", "attach.caption", "attach.remove", "attach.retry", "attach.uploading", "attach.waitUpload",
+    "attach.errType", "attach.errSize", "attach.errPhoto", "attach.errMax", "attach.errUpload", "attach.download", "attach.close", "attach.prev", "attach.next", "attach.of", "print.attachments"];
+  expect(need.every((k) => !!reportsT[k]), "every photos-and-files word exists (their three languages are checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

@@ -3,7 +3,8 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    POST /api/work-reports/[id]/revise — the author edits a SENT report as a
    new version (owner decision 4). The new draft copies the text, the
-   recipients and the settings, and points at the one it replaces; that one
+   recipients, the photos and files (the same stored objects) and the
+   settings, and points at the one it replaces; that one
    stays exactly as it was read until the new version is sent. Asking twice
    returns the same open draft.
    --------------------------------------------------------------------------- */
@@ -12,6 +13,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
+import { copyAttachments } from "@/lib/server/reports/attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +43,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Could not start a new version." }, { status: 500 });
   }
   const newId = (created as { id: string }).id;
-  if (recipients.length) {
-    await supabaseServer.from("work_report_recipients").insert(recipients.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role })));
-  }
+  await Promise.all([
+    recipients.length
+      ? supabaseServer.from("work_report_recipients").insert(recipients.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role })))
+      : Promise.resolve(null),
+    copyAttachments(row.id, newId),
+  ]);
   return NextResponse.json({ id: newId, existing: false }, { status: 201 });
 }

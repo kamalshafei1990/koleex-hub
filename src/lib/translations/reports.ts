@@ -1,6 +1,6 @@
 import type { Translations } from "@/lib/i18n";
 
-/* Reports app (Phase 1, 25 Sep 2026; carry-over Phase 2A). Template strings follow
+/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; photos and files 2C). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
    template key and section has all three languages. */
 export const reportsT: Translations = {
@@ -92,6 +92,27 @@ export const reportsT: Translations = {
   "carry.allAdded": { en: "Everything here is in your report", zh: "这些内容都已加入报告", ar: "كل ده اتضاف لتقريرك" },
   "carry.full":     { en: "No room left in {section}.", zh: "「{section}」已满。", ar: "مفيش مكان فاضي في «{section}»." },
 
+  /* Phase 2C — photos and files. */
+  "attach.title":      { en: "Photos and files", zh: "照片和文件", ar: "الصور والملفات" },
+  "attach.hint":       { en: "Photos are made smaller before they upload, so they send fast on a slow connection. Up to 20, 4 MB each.", zh: "照片上传前会自动缩小，网络慢时也能很快发送。最多 20 个，每个不超过 4 MB。", ar: "الصور بتتصغّر قبل ما تترفع، عشان تتبعت بسرعة حتى لو النت بطيء. لحد 20، كل واحد لحد 4 MB." },
+  "attach.addPhotos":  { en: "Add photos", zh: "添加照片", ar: "ضيف صور" },
+  "attach.addFiles":   { en: "Add files", zh: "添加文件", ar: "ضيف ملفات" },
+  "attach.caption":    { en: "Add a caption…", zh: "添加说明…", ar: "اكتب وصف…" },
+  "attach.remove":     { en: "Remove", zh: "移除", ar: "شيل" },
+  "attach.retry":      { en: "Try again", zh: "重试", ar: "جرب تاني" },
+  "attach.uploading":  { en: "Uploading…", zh: "正在上传…", ar: "بيترفع…" },
+  "attach.waitUpload": { en: "Photos and files are still uploading. Send once they are in.", zh: "照片和文件仍在上传，完成后再发送。", ar: "الصور والملفات لسه بتترفع. ابعت بعد ما تخلص." },
+  "attach.errType":    { en: "{name}: this kind of file can't be added. Photos, PDF, Word, Excel, PowerPoint and text files can.", zh: "{name}：无法添加此类文件。可添加照片、PDF、Word、Excel、PowerPoint 和文本文件。", ar: "{name}: النوع ده مينفعش يتضاف. ينفع صور وPDF وWord وExcel وPowerPoint وملفات نصية." },
+  "attach.errSize":    { en: "{name} is larger than 4 MB.", zh: "{name} 超过 4 MB。", ar: "{name} أكبر من 4 MB." },
+  "attach.errPhoto":   { en: "{name}: this photo can't be opened on this device. Try a JPEG or PNG.", zh: "{name}：此设备无法打开这张照片，请改用 JPEG 或 PNG。", ar: "{name}: الصورة دي مش بتفتح على الجهاز ده. جرب JPEG أو PNG." },
+  "attach.errMax":     { en: "A report can carry up to 20 photos and files.", zh: "每份报告最多 20 个照片和文件。", ar: "التقرير يشيل لحد 20 صورة وملف." },
+  "attach.errUpload":  { en: "{name} did not upload. Check your connection and try again.", zh: "{name} 上传失败，请检查网络后重试。", ar: "{name} ما اترفعش. شوف النت وجرب تاني." },
+  "attach.download":   { en: "Download", zh: "下载", ar: "تنزيل" },
+  "attach.close":      { en: "Close", zh: "关闭", ar: "قفل" },
+  "attach.prev":       { en: "Previous photo", zh: "上一张", ar: "الصورة اللي قبلها" },
+  "attach.next":       { en: "Next photo", zh: "下一张", ar: "الصورة اللي بعدها" },
+  "attach.of":         { en: "{n} of {m}", zh: "第 {n} 张，共 {m} 张", ar: "{n} من {m}" },
+
   "reader.from":        { en: "From", zh: "发件人", ar: "من" },
   "reader.to":          { en: "To", zh: "收件人", ar: "إلى" },
   "reader.cc":          { en: "Copy", zh: "抄送", ar: "نسخة" },
@@ -165,6 +186,7 @@ export const reportsT: Translations = {
   "print.status.approved":  { en: "Approved", zh: "已批准", ar: "معتمد" },
   "print.status.returned":  { en: "Returned", zh: "已退回", ar: "مُعاد للمراجعة" },
   "print.button":       { en: "Print", zh: "打印", ar: "اطبع" },
+  "print.attachments":  { en: "Photos and files", zh: "照片和文件", ar: "الصور والملفات" },
 
   /* ── Templates ─────────────────────────────────────────────────────── */
   "tpl.daily.name": { en: "Daily report", zh: "日报", ar: "تقرير يومي" },

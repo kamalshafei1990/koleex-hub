@@ -8,7 +8,8 @@
    period, To / Copy (filled from the type's default readers), Confidential,
    and — for the daily / weekly / monthly family — the author's earlier
    reports offered as tap-to-add suggestions (CarryCard; nothing is added
-   by itself).
+   by itself). Photos and files (AttachmentsEditor): made smaller on the
+   phone, uploaded one at a time; Send waits until they are all in.
    It saves itself a moment after each change — one save on the wire at a
    time, always of the latest text — and once more when the page closes,
    so nothing typed is lost. Send saves first. The server enforces the same
@@ -17,7 +18,8 @@
    Reader: every section in the reader's own language (AutoTranslatedText —
    a report written in Chinese reads in Arabic, with the original one click
    away), who it went to and who read it, the review / acknowledge actions
-   the server allows THIS viewer, and the thread.
+   the server allows THIS viewer, the photos and files (AttachmentsView),
+   and the thread.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -37,6 +39,8 @@ import {
 } from "@/lib/work-reports";
 import { Avatar, Badge, CARD, FIELD, StatusChip, TemplateIcon, tplName, type T } from "./shared";
 import CarryCard from "./CarryCard";
+import AttachmentsEditor from "./AttachmentsEditor";
+import AttachmentsView from "./AttachmentsView";
 
 export default function ReportView({ id }: { id: string }) {
   const { t, lang } = useTranslation(reportsT);
@@ -116,6 +120,8 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /* A photo or file still on its way: Send waits for it. */
+  const [uploading, setUploading] = useState(false);
   const draftRef = useRef(draft);
   const dirty = useRef(false);
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -197,6 +203,7 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
     if (tpl.customTitle && !d.title.trim()) missing.unshift(t("composer.titleLabel"));
     if (missing.length) { setProblem(`${t("composer.missing")} ${missing.join(" · ")}`); return; }
     if (d.to.length === 0) { setProblem(t("composer.noRecipients")); return; }
+    if (uploading) { setProblem(t("attach.waitUpload")); return; }
     setSending(true);
     if (!(await flush())) { setSending(false); setProblem(t("err.saveFailed")); return; }
     const res = await submitReport(id);
@@ -260,6 +267,8 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
             />
           </label>
         ))}
+
+        <AttachmentsEditor t={t} reportId={id} initial={detail.attachments ?? []} onBusy={setUploading} />
       </div>
 
       <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
@@ -297,9 +306,9 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
 
         <div className={`${CARD} space-y-2 p-4`}>
           {problem && <p role="alert" className="text-[12.5px] text-red-500">{problem}</p>}
-          <button type="button" onClick={() => void send()} disabled={sending}
+          <button type="button" onClick={() => void send()} disabled={sending || uploading}
             className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] text-[13px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
-            {sending ? <SpinnerIcon size={14} /> : <RrIcon name="paper-plane" size={14} />}{sending ? t("composer.sending") : t("composer.send")}
+            {sending || uploading ? <SpinnerIcon size={14} /> : <RrIcon name="paper-plane" size={14} />}{sending ? t("composer.sending") : uploading ? t("attach.uploading") : t("composer.send")}
           </button>
           <button type="button" onClick={() => { dirty.current = true; void flush(); }} disabled={save.state === "saving" || sending}
             className="flex h-9 w-full items-center justify-center rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-secondary)] disabled:opacity-60">
@@ -403,7 +412,8 @@ function printReport(id: string, lang: string) {
     const ready = () => {
       const win = f.contentWindow as (Window & { __quotation_pdf_ready__?: boolean }) | null;
       if (win?.__quotation_pdf_ready__) { win.focus(); win.print(); }
-      else if (++tries < 150) setTimeout(ready, 100);
+      /* Up to 30 s: the paper waits for its photos, and on a slow line they take a moment. */
+      else if (++tries < 300) setTimeout(ready, 100);
     };
     ready();
   };
@@ -507,6 +517,8 @@ function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: Rep
             </section>
           );
         })}
+
+        <AttachmentsView t={t} attachments={detail.attachments ?? []} />
 
         <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-thread">
           <h2 id="kx-rep-thread" className="mb-3 text-[13px] font-semibold text-[var(--text-primary)]">{t("reader.comments")}</h2>

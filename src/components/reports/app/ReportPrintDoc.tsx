@@ -4,7 +4,8 @@
    ReportPrintDoc — a work report on the HOUSE sheet (210 × 270 mm), built
    from the quotation's language (feedback_house_document_style): wordmark +
    title, the brand strips, a meta grid with black label cells, then every
-   section as a card with a black head, and the review last.
+   section as a card with a black head, the photos and files (two photos a
+   row, fixed boxes), and the review last.
 
    Labels print in the chosen language; what the author wrote prints as it
    was written (a printed report is the record, not a translation of it).
@@ -12,14 +13,20 @@
    Pagination is COSTED, not assumed (src/lib/reports/print-layout.ts, proved
    by validate:reports): `.quot-a4-doc` clips overflow in silence, so the
    heights the costs assume — head rows, label cells, the strips — are pinned
-   in the markup below. Change one here and change its cost there.
+   in the markup below. Change one here and change its cost there. The
+   paper is "ready" only once the text is dealt AND every photo has loaded
+   (or failed) — a print taken earlier would carry empty boxes.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
 import { reportTemplate } from "@/lib/reports/templates";
-import { LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, cutByHeight, paginateReport, type Measurer, type PrintPara, type PrintSheet } from "@/lib/reports/print-layout";
+import {
+  ATTACH_SID, LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, PHOTO_BOX_PX, PHOTO_CAPTION_PX, PHOTO_ROW_GAP_PX, PHOTO_ROW_PX, cutByHeight, paginateReport,
+  type Measurer, type PrintAttachments, type PrintPara, type PrintSheet,
+} from "@/lib/reports/print-layout";
+import { reportFileUrl, sizeLabel } from "@/lib/reports/attachments";
 import { reportsT } from "@/lib/translations/reports";
 import { dmyTime, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import type { Lang } from "@/lib/i18n";
@@ -69,7 +76,7 @@ function domMeasurer(plain: HTMLElement, bullet: HTMLElement, bulletText: HTMLEl
 
 export default function ReportPrintDoc({ detail, lang, onReady }: { detail: ReportDetail; lang: Lang; onReady?: () => void }) {
   const t = (key: string) => reportsT[key]?.[lang] ?? reportsT[key]?.en ?? key;
-  const { report, recipients, comments } = detail;
+  const { report, recipients, comments, attachments } = detail;
   const tpl = reportTemplate(report.templateKey);
   const decision = report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
   const note = decision?.body.trim() ?? "";
@@ -82,6 +89,10 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
   const bulletRef = useRef<HTMLDivElement>(null);
   const bulletTextRef = useRef<HTMLSpanElement>(null);
   const [sheets, setSheets] = useState<PrintSheet[] | null>(null);
+  const att = useMemo<PrintAttachments>(() => ({
+    photos: (attachments ?? []).filter((a) => a.image).map((a) => ({ id: a.id, caption: a.caption })),
+    files: (attachments ?? []).filter((a) => !a.image).map((a) => ({ text: `${a.name} · ${sizeLabel(a.size)}`, bullet: true })),
+  }), [attachments]);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -90,11 +101,24 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
       if (cancelled || !plain || !bullet || !bulletText) return;
       const m = domMeasurer(plain, bullet, bulletText);
       const reviewPx = report.decidedBy ? LINE_PX + (note ? m.height({ text: note, bullet: false }) : 0) : 0;
-      setSheets(paginateReport(report, reviewPx, m));
+      setSheets(paginateReport(report, reviewPx, m, att));
     })();
     return () => { cancelled = true; };
-  }, [report, note, font]);
-  useEffect(() => { if (sheets) onReady?.(); }, [sheets, onReady]);
+  }, [report, note, font, att]);
+  /* Ready once every photo has loaded or failed — capped, so one photo that
+     never answers cannot hold the print forever. */
+  useEffect(() => {
+    if (!sheets) return;
+    let cancelled = false;
+    const imgs = Array.from(document.querySelectorAll<HTMLImageElement>("img[data-kx-report-photo]"));
+    const loaded = imgs.map((img) => (img.complete ? Promise.resolve() : new Promise<void>((resolve) => {
+      img.addEventListener("load", () => resolve(), { once: true });
+      img.addEventListener("error", () => resolve(), { once: true });
+    })));
+    const cap = new Promise<void>((resolve) => setTimeout(resolve, 25_000));
+    void Promise.race([Promise.all(loaded), cap]).then(() => { if (!cancelled) onReady?.(); });
+    return () => { cancelled = true; };
+  }, [sheets, onReady]);
   const name = t(`tpl.${report.templateKey}.name`);
   const to = recipients.filter((r) => r.role === "to").map((r) => r.name).join(", ");
   const cc = recipients.filter((r) => r.role === "cc").map((r) => r.name).join(", ");
@@ -147,7 +171,28 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
             </div>
           )}
 
-          {sheet.cards.map((card, ci) => (
+          {sheet.cards.map((card, ci) => card.sid === ATTACH_SID ? (
+            <CardView key={ci} head={`${t("print.attachments")}${card.cont ? ` · ${t("print.cont")}` : ""}`}>
+              {(card.photos ?? []).map((row, ri) => (
+                <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, height: PHOTO_ROW_PX, paddingBottom: PHOTO_ROW_GAP_PX, boxSizing: "border-box" }}>
+                  {row.map((ph) => (
+                    <div key={ph.id} style={{ minWidth: 0 }}>
+                      <div style={{ height: PHOTO_BOX_PX, background: C.surface, borderRadius: 8, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request-authorised file on paper */}
+                        <img data-kx-report-photo src={reportFileUrl(ph.id)} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+                      </div>
+                      <div dir="auto" style={{ height: PHOTO_CAPTION_PX, paddingTop: 4, boxSizing: "border-box", fontSize: 9.5, lineHeight: "13px", color: C.soft, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{ph.caption}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {card.paras.map((p, pi) => (
+                <div key={pi} dir="auto" style={paraStyle(true, pi === 0 && !(card.photos?.length))}>
+                  <span style={{ color: C.soft }}>•</span><span style={{ minWidth: 0 }}>{p.text}</span>
+                </div>
+              ))}
+            </CardView>
+          ) : (
             <CardView key={ci} head={`${t(`tpl.${report.templateKey}.s.${card.sid}`)}${card.cont ? ` · ${t("print.cont")}` : ""}`}>
               {card.empty ? (
                 <div style={{ fontSize: 10.5, lineHeight: `${LINE_PX}px`, color: C.ghost }}>—</div>
