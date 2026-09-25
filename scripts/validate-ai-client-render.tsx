@@ -1634,8 +1634,11 @@ console.log("\n── An Arabic opening before an English code block reads right
   /* And the flag-ON branch's own decision. SupabaseGate starts at "checking"
      (a spinner, no children) and reaches "authed" two ways only: the
      confirmed-session hint, before paint, or getCurrentSession() returning a
-     session. No session drops the hint, goes to "redirecting" and leaves for
-     "/". The session is checked again on every navigation, and the hint is
+     session. No session, whether found by that check or announced by
+     onAuthStateChange (a sign-out in another tab), drops the hint, goes to
+     "redirecting" and leaves for "/". The sign-out path sets the state itself
+     because on "/" the redirect changes no pathname and the check would not
+     run again. The session is checked again on every navigation, and the hint is
      written only where a session was just seen, under the same key that
      dropClientSessionHints wipes when the server refuses the cookie. */
   const supabaseGate = gateEnd >= 0 ? gate.slice(gateEnd) : "";
@@ -1643,17 +1646,18 @@ console.log("\n── An Arabic opening before an English code block reads right
   const dropStart = hints.indexOf("export function dropClientSessionHints()");
   const dropHints = dropStart >= 0 ? hints.slice(dropStart, hints.indexOf("\n}", dropStart)) : "";
   const hintKey = /^const AUTHED_HINT_KEY = ("[^"]+");$/m.exec(gate)?.[1];
-  check("  …and SupabaseGate renders children only for a session it has seen, and checks again on every navigation",
+  check("  …and SupabaseGate renders children only for a session it has seen, drops them on sign-out, and checks again on every navigation",
     hintKey !== undefined &&
     /^const SUPABASE_HINT_KEY = ("[^"]+");$/m.exec(hints)?.[1] === hintKey &&
     /^\s*window\.localStorage\.removeItem\(SUPABASE_HINT_KEY\);/m.test(dropHints) &&
     /const \[state, setState\] = useState<"checking" \| "authed" \| "redirecting">\(\s*"checking",?\s*\);/.test(supabaseGate) &&
     /useIsoLayoutEffect\(\(\) => \{\s*try \{\s*if \(localStorage\.getItem\(AUTHED_HINT_KEY\) === "1"\) setState\("authed"\);\s*\} catch \{\s*\}\s*\}, \[\]\);/.test(supabaseGate) &&
     /const \{ getCurrentSession \} = await import\("@\/lib\/auth-client"\);\s*const session = await getCurrentSession\(\);\s*if \(cancelled\) return;\s*if \(session\) \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*setState\("authed"\);\s*\} else \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\}/.test(supabaseGate) &&
-    /unsubscribe = onAuthStateChange\(\(session\) => \{\s*if \(cancelled\) return;\s*if \(!session\) \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*router\.replace\("\/"\);\s*\} else \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*\}\s*\}\);/.test(supabaseGate) &&
+    /unsubscribe = onAuthStateChange\(\(session\) => \{\s*if \(cancelled\) return;\s*if \(!session\) \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\} else \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*\}\s*\}\);/.test(supabaseGate) &&
     /\}, \[router, pathname\]\);/.test(supabaseGate) &&
-    (supabaseGate.match(/\bsetState\b/g) ?? []).length === 4 &&
+    (supabaseGate.match(/\bsetState\b/g) ?? []).length === 5 &&
     (supabaseGate.match(/\bsetState\("authed"\)/g) ?? []).length === 2 &&
+    (supabaseGate.match(/\bsetState\("redirecting"\)/g) ?? []).length === 2 &&
     (gate.match(/\bsetItem\(/g) ?? []).length === 2 &&
     /if \(state !== "authed"\) \{\s*return \(\s*<div className="[^"{}]*">\s*<SpinnerIcon className="[^"{}]*" \/>\s*<\/div>\s*\);\s*\}\s*return <>\{children\}<\/>;\s*\}\s*$/.test(supabaseGate) &&
     (supabaseGate.match(/\bchildren\b/g) ?? []).length === 3);

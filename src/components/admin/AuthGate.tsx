@@ -105,6 +105,10 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (!session) {
           try { localStorage.removeItem(AUTHED_HINT_KEY); } catch { /* ignore */ }
+          /* Take the Hub off screen here, not after the redirect: on "/"
+             itself replace("/") leaves the pathname unchanged, so the check
+             above never re-runs and the page would stay up signed out. */
+          setState("redirecting");
           router.replace("/");
         } else {
           try { localStorage.setItem(AUTHED_HINT_KEY, "1"); } catch { /* ignore */ }
