@@ -37,16 +37,17 @@ import { BACK_CHROME } from "@/components/ui/back-chrome";
 import { DirectoryListSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 import { NotificationBody, NotificationSubject } from "@/components/layout/NotificationText";
 import {
+  DecisionBar,
   NotificationSections,
   NotificationSkeleton,
   notifTimeAgo,
   type ListActions,
 } from "@/components/layout/NotificationList";
+import { decisionOf, type Verdict } from "@/lib/notification-decisions";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
@@ -54,7 +55,6 @@ import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import XCircleIcon from "@/components/icons/ui/XCircleIcon";
 import {
   archiveMessages,
   fetchInboxMessagesOrNull,
@@ -299,10 +299,20 @@ export default function NotificationCenterPage() {
     }
   }
 
+  /* A decision taken on a row or in the reading pane: said, and filed. */
+  function decided(m: Msg, verdict: Verdict) {
+    archiveRows([m]);
+    showToast(
+      verdict === "approve" ? tUi("dec.approved") : decisionOf(m.metadata)?.rejectWord === "return" ? tUi("dec.returned") : tUi("dec.rejected"),
+      "success",
+    );
+  }
+
   const listActions: ListActions<Msg> = {
     onOpen: openRow,
     onSetRead: setRowsRead,
     onArchive: archiveRows,
+    onDecided: decided,
   };
 
   /* Mark read — what the reader is looking at (this view, this app, this
@@ -312,29 +322,6 @@ export default function NotificationCenterPage() {
     setRowsRead(filtered.filter((m) => !m.read_at), true);
   }
   const viewUnread = view === "archive" ? 0 : filtered.filter((m) => !m.read_at).length;
-
-  /* A membership request decided here goes through the reviewers' API: the
-     decision is recorded (who, when, why), and every other reviewer's copy
-     of this notification clears. A refusal needs its reason — the API says
-     so, and the applicant will ask why. */
-  async function decideRequest(m: Msg, status: "approved" | "rejected", note: string): Promise<boolean> {
-    const id = requestIdOf(m);
-    if (!id) { showToast(tUi("mod.noRequest"), "error"); return false; }
-    const res = await fetch(`/api/membership-requests/${id}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note: note || null }),
-    }).catch(() => null);
-    if (!res || !res.ok) {
-      const j = (await res?.json().catch(() => null)) as { error?: string } | null;
-      showToast(j?.error ?? tUi("mod.failed"), "error");
-      return false;
-    }
-    archiveRows([m]);
-    showToast(status === "approved" ? tUi("mod.approved") : tUi("mod.rejected"), "success");
-    return true;
-  }
 
   /* ── Render ─────────────────────────────────────────────────────────── */
   if (accountLoading && !feedAccountId) return <DirectoryListSkeleton label={tHub("notif.title")} />;
@@ -555,7 +542,7 @@ export default function NotificationCenterPage() {
               onToggleRead={() => setRowsRead([selected], !selected.read_at)}
               onArchive={() => archiveRows([selected])}
               onOpenLink={(href) => router.push(href)}
-              onDecide={(status, note) => decideRequest(selected, status, note)}
+              onDecided={(v) => decided(selected, v)}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -577,7 +564,7 @@ export default function NotificationCenterPage() {
 type TFn = (key: string, fallback?: string) => string;
 
 function Detail({
-  msg, lang, tHub, tUi, onToggleRead, onArchive, onOpenLink, onDecide,
+  msg, lang, tHub, tUi, onToggleRead, onArchive, onOpenLink, onDecided,
 }: {
   msg: Msg;
   lang: "en" | "zh" | "ar";
@@ -586,7 +573,7 @@ function Detail({
   onToggleRead: () => void;
   onArchive: () => void;
   onOpenLink: (href: string) => void;
-  onDecide: (status: "approved" | "rejected", note: string) => Promise<boolean>;
+  onDecided: (verdict: Verdict) => void;
 }) {
   const app = appOf(msg);
   const Icon = app?.icon;
@@ -596,10 +583,6 @@ function Detail({
   const attachments = Array.isArray(meta?.attachments) ? (meta!.attachments as InboxAttachment[]) : [];
   const products = Array.isArray(meta?.products) ? (meta!.products as InboxProductRef[]) : [];
   const isRequest = msg.category === "membership_request";
-  const canDecide = isRequest && !msg.archived_at && !!requestIdOf(msg);
-  const [deciding, setDeciding] = useState<"approved" | "rejected" | null>(null);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
   /* The applicant's form, as sent — without the plumbing keys. Only when
      the row has no body: the request's body already IS that form. */
   const requestFields = isRequest && meta && !msg.body
@@ -621,58 +604,7 @@ function Detail({
             <ArchiveIcon className="h-4 w-4" />
           </button>
         )}
-        {canDecide && (
-          <>
-            <span className="mx-1.5 h-5 w-px bg-[var(--border-subtle)]" />
-            <button type="button" data-kx-keep-hover onClick={() => { setDeciding("approved"); setNote(""); }}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 text-[11px] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/25">
-              <CheckCircleIcon className="h-3 w-3" />
-              {tUi("mod.approve")}
-            </button>
-            <button type="button" data-kx-keep-hover onClick={() => { setDeciding("rejected"); setNote(""); }}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/15 px-3 text-[11px] font-semibold text-red-500 transition-colors hover:bg-red-500/25">
-              <XCircleIcon className="h-3 w-3" />
-              {tUi("mod.reject")}
-            </button>
-          </>
-        )}
       </div>
-
-      {deciding && (
-        <div className={`flex shrink-0 flex-col gap-2 border-b border-[var(--border-subtle)] px-6 py-3 ${deciding === "approved" ? "bg-emerald-500/[0.05]" : "bg-red-500/[0.05]"}`}>
-          <p className="text-[11.5px] text-[var(--text-muted)]">{deciding === "approved" ? tUi("mod.approveHint") : tUi("mod.rejectHint")}</p>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder={deciding === "approved" ? tUi("mod.notePh") : tUi("mod.reasonPh")}
-            className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
-          />
-          <div className="flex items-center justify-end gap-1.5">
-            <button type="button" onClick={() => setDeciding(null)} className="h-8 rounded-lg px-3 text-[11px] font-semibold text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]">
-              {tUi("mod.cancel")}
-            </button>
-            <button
-              type="button"
-              disabled={busy || (deciding === "rejected" && !note.trim())}
-              onClick={async () => {
-                setBusy(true);
-                const ok = await onDecide(deciding, note.trim());
-                setBusy(false);
-                if (ok) setDeciding(null);
-              }}
-              className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
-                deciding === "approved"
-                  ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
-                  : "border border-red-500/40 bg-red-500/15 text-red-500 hover:bg-red-500/25"
-              }`}
-            >
-              {deciding === "approved" ? <CheckCircleIcon className="h-3 w-3" /> : <XCircleIcon className="h-3 w-3" />}
-              {deciding === "approved" ? tUi("mod.confirmApprove") : tUi("mod.confirmReject")}
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[780px] px-6 py-8 md:px-10">
@@ -701,6 +633,12 @@ function Detail({
             lang={lang}
             className="whitespace-pre-wrap break-words text-[14px] leading-[1.7] text-[var(--text-secondary)]"
           />
+
+          {!msg.archived_at && (
+            <div className="mt-5 max-w-[520px]">
+              <DecisionBar meta={msg.metadata} tUi={tUi} onDecided={onDecided} large />
+            </div>
+          )}
 
           {msg.link && (
             <button

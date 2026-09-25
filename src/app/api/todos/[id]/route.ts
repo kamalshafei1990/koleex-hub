@@ -69,6 +69,11 @@ export async function PATCH(
   const body = (await req.json()) as {
     updates: Record<string, unknown>;
     newAssigneeIds?: string[];
+    /* "Send back" from a notification: the reason alone. That caller does
+       not hold the task's metadata, and `metadata` replaces the whole
+       column — so the server writes the reason into the task's OWN
+       metadata (below) instead of trusting a partial copy. */
+    rejectionReason?: string;
   };
   let updates: Record<string, unknown> = { ...(body.updates ?? {}) };
   for (const k of SERVER_OWNED) delete updates[k];
@@ -142,6 +147,18 @@ export async function PATCH(
   if (approvalDecision) {
     updates.approved_by_account_id = auth.account_id;
     updates.approved_at = nowIso;
+  }
+
+  if (
+    approvalDecision === "rejected" &&
+    !("metadata" in updates) &&
+    typeof body.rejectionReason === "string" &&
+    body.rejectionReason.trim()
+  ) {
+    updates.metadata = {
+      ...((existing.metadata as Record<string, unknown> | null) ?? {}),
+      rejection: { reason: body.rejectionReason.trim().slice(0, 2000), by: auth.account_id, at: nowIso },
+    };
   }
 
   /* A RETURN MUST CARRY A REASON. Sending work back without saying why just

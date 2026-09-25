@@ -612,6 +612,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     onOpen: (m) => void handleInboxRowClick(m),
     onSetRead: setRowsRead,
     onArchive: archiveRows,
+    /* Decided on the row: its work is done — it leaves the list. */
+    onDecided: (m) => archiveRows([m]),
   };
 
   /* Discuss section: only channels that actually have unread, sorted

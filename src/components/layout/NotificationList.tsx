@@ -28,12 +28,16 @@ import { APP_REGISTRY } from "@/lib/navigation";
 import { NotificationBody, NotificationSubject, useRenderedNotification } from "@/components/layout/NotificationText";
 import { defOf, sectionize, type DaySection, type ViewRow } from "@/lib/notification-view";
 import { partsText, templateParts } from "@/lib/notification-templates";
+import { decide, decisionOf, type Verdict } from "@/lib/notification-decisions";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
 import { dmy } from "@/lib/discuss-time";
 import type { Lang } from "@/lib/i18n";
 
 export type ListRow = ViewRow & {
   body: string | null;
   link: string | null;
+  archived_at?: string | null;
   sender?: { full_name?: string | null; username?: string | null } | null;
 };
 
@@ -59,6 +63,93 @@ export interface ListActions<R extends ListRow> {
   onOpen: (row: R) => void;
   onSetRead: (rows: R[], read: boolean) => void;
   onArchive: (rows: R[]) => void;
+  /** A decision was taken on the row (DecisionBar) — the row's work is done. */
+  onDecided?: (row: R, verdict: Verdict) => void;
+}
+
+/* ── Decide on the notification itself ──────────────────────────────────
+   Approve, or reject / send back, a request the row is about — through the
+   same route the app's own screen uses (lib/notification-decisions), so
+   who-may-decide and what-it-needs stay on the server. Both steps confirm:
+   approving a leave by brushing a row is not a decision. A refusal that
+   needs its reason cannot be sent without one. The bar never lets a click
+   or a keystroke through to the row it sits in. */
+export function DecisionBar({
+  meta, tUi, onDecided, large = false,
+}: { meta: unknown; tUi: TFn; onDecided: (verdict: Verdict) => void; large?: boolean }) {
+  const spec = decisionOf(meta);
+  const [mode, setMode] = useState<Verdict | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!spec) return null;
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const rejectLabel = spec.rejectWord === "return" ? tUi("dec.return") : tUi("mod.reject");
+  const needsReason = mode === "reject" && spec.reasonRequired;
+  const reasonOk = !needsReason || note.trim().length >= Math.max(1, spec.reasonMin);
+  const h = large ? "h-8 px-3 text-[11.5px]" : "h-7 px-2.5 text-[11px]";
+  async function confirm() {
+    if (!mode) return;
+    if (!reasonOk) { setErr(tUi("dec.reasonShort")); return; }
+    setBusy(true);
+    setErr(null);
+    const r = await decide(meta, mode, note);
+    setBusy(false);
+    if (r.ok) { onDecided(mode); return; }
+    setErr(
+      r.code === "forbidden" ? tUi("dec.forbidden")
+      : r.code === "decided" ? tUi("dec.decided")
+      : r.code === "reason" ? tUi("dec.reasonShort")
+      : r.message ?? tUi("dec.failed"),
+    );
+  }
+  return (
+    <div className="mt-2" onClick={stop} onKeyDown={stop}>
+      {!mode ? (
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" data-kx-keep-hover onClick={() => { setMode("approve"); setNote(""); setErr(null); }}
+            className={`flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/12 font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20 ${h}`}>
+            <CheckCircleIcon className="h-3 w-3" />
+            {tUi("mod.approve")}
+          </button>
+          <button type="button" data-kx-keep-hover onClick={() => { setMode("reject"); setNote(""); setErr(null); }}
+            className={`flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 font-semibold text-red-500 transition-colors hover:bg-red-500/20 ${h}`}>
+            <XCircleIcon className="h-3 w-3" />
+            {rejectLabel}
+          </button>
+        </div>
+      ) : (
+        <div className={`space-y-1.5 rounded-lg border p-2 ${mode === "approve" ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-red-500/25 bg-red-500/[0.05]"}`}>
+          {spec.takesNote && (
+            <textarea
+              value={note}
+              onChange={(e) => { setNote(e.target.value); if (err) setErr(null); }}
+              rows={2}
+              autoFocus
+              placeholder={needsReason ? tUi("mod.reasonPh") : tUi("mod.notePh")}
+              className="w-full resize-none rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+            />
+          )}
+          {err && <p role="alert" className="text-[11px] font-medium text-red-500">{err}</p>}
+          <div className="flex items-center justify-end gap-1.5">
+            <button type="button" data-kx-keep-hover onClick={() => { setMode(null); setErr(null); }}
+              className={`whitespace-nowrap rounded-lg font-semibold text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)] ${h}`}>
+              {tUi("mod.cancel")}
+            </button>
+            <button type="button" data-kx-keep-hover onClick={() => void confirm()} disabled={busy || !reasonOk}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border font-semibold transition-colors disabled:opacity-40 ${h} ${
+                mode === "approve"
+                  ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
+                  : "border-red-500/40 bg-red-500/15 text-red-500 hover:bg-red-500/25"
+              }`}>
+              {mode === "approve" ? <CheckCircleIcon className="h-3 w-3" /> : <XCircleIcon className="h-3 w-3" />}
+              {mode === "approve" ? tUi("mod.confirmApprove") : spec.rejectWord === "return" ? tUi("dec.confirmReturn") : tUi("mod.confirmReject")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const SECTION_KEY: Record<DaySection, string> = {
@@ -158,6 +249,9 @@ function Row<R extends ListRow>({
           ) : who ? (
             <p className="mt-0.5 truncate text-[11.5px] text-[var(--text-dim)]">{who}</p>
           ) : null}
+          {actions.onDecided && !row.archived_at && (
+            <DecisionBar meta={row.metadata} tUi={tUi} onDecided={(v) => actions.onDecided!(row, v)} />
+          )}
         </div>
         <RowActions rows={[row]} unread={unread} tUi={tUi} actions={actions} />
       </div>

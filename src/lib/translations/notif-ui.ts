@@ -53,4 +53,16 @@ export const notifUiT: Translations = {
   "mod.rejected":   { en: "Request rejected", zh: "申请已拒绝", ar: "تم رفض الطلب" },
   "mod.failed":     { en: "Couldn't update the request.", zh: "无法更新该申请。", ar: "تعذّر تحديث الطلب." },
   "mod.noRequest":  { en: "This notification is not linked to a request.", zh: "此通知未关联任何申请。", ar: "هذا الإشعار غير مرتبط بطلب." },
+
+  /* Decisions taken on the notification itself (leave, tasks, reports,
+     attendance corrections, overtime, account requests). */
+  "dec.return":     { en: "Send back",      zh: "退回",       ar: "إعادة" },
+  "dec.confirmReturn": { en: "Confirm send back", zh: "确认退回", ar: "تأكيد الإعادة" },
+  "dec.forbidden":  { en: "You can't decide this one", zh: "你无权处理此项", ar: "لا يمكنك البتّ في هذا" },
+  "dec.decided":    { en: "Already decided", zh: "已处理",     ar: "تم البتّ فيه بالفعل" },
+  "dec.reasonShort": { en: "Write the reason first", zh: "请先填写原因", ar: "اكتب السبب أولًا" },
+  "dec.failed":     { en: "Couldn't save the decision", zh: "无法保存该决定", ar: "تعذّر حفظ القرار" },
+  "dec.approved":   { en: "Approved",       zh: "已批准",     ar: "تمت الموافقة" },
+  "dec.rejected":   { en: "Rejected",       zh: "已拒绝",     ar: "تم الرفض" },
+  "dec.returned":   { en: "Sent back",      zh: "已退回",     ar: "تمت الإعادة" },
 };
