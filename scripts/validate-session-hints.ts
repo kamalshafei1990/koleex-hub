@@ -18,6 +18,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { stripComments } from "./lib/strip-comments";
 
 const root = join(import.meta.dirname, "..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -38,16 +39,48 @@ console.log("session-hints");
 
 /* 1. The duplicated key names still match the gate's own constants. A drift
       here is invisible: clearing succeeds, the gate keeps reading the key
-      nobody cleared, and the lockout is back. */
+      nobody cleared, and the lockout is back.
+
+      The gate's constants live in src/components/admin/session-keys.ts since
+      d911bb7a (AdminAuth and AdminAuthGate import them from there), so that
+      is the file session-hints must agree with. Comments stripped, and each
+      name must be declared exactly once per file, so a value quoted in a
+      comment or a second declaration cannot satisfy it. */
+const keys = stripComments(read("src/components/admin/session-keys.ts"));
+const hintsCode = stripComments(hints);
+const declared = (src: string, label: string, exported: boolean) => {
+  const all = src.match(new RegExp(`\\b(const|let|var)\\s+${label}\\b`, "g")) ?? [];
+  const m = new RegExp(`^${exported ? "export " : ""}const ${label} = "([^"]*)";$`, "m").exec(src);
+  return all.length === 1 ? m?.[1] : undefined;
+};
 for (const [label, key] of [
   ["LEGACY_SESSION_KEY", "koleex-admin"],
   ["LEGACY_SESSION_USER_KEY", "koleex-admin-user"],
 ] as const) {
+  const inKeys = declared(keys, label, true);
+  const inHints = declared(hintsCode, label, false);
   check(
-    `${label} is "${key}" in both AdminAuth and session-hints`,
-    gate.includes(`${label} = "${key}"`) && hints.includes(`${label} = "${key}"`),
+    `${label} is "${key}" in both session-keys (the gate's) and session-hints`,
+    inKeys === key && inHints === key,
   );
 }
+
+/* 1b. …and the gate really reads them from session-keys: both AdminAuth (the
+       sign-in screen, which writes both keys) and AdminAuthGate (the
+       signed-in path, which reads LEGACY_SESSION_KEY) import them from
+       "./session-keys" and keep no copy of their own. */
+const gateCode = stripComments(gate);
+const gateLite = stripComments(read("src/components/admin/AdminAuthGate.tsx"));
+const importsKeys = (src: string, names: string[]) => {
+  const imp = /^import \{([^}]*)\} from "\.\/session-keys";$/m.exec(src)?.[1] ?? "";
+  return names.every((n) => new RegExp(`\\b${n}\\b`).test(imp) &&
+    !new RegExp(`\\b(const|let|var)\\s+${n}\\b`).test(src));
+};
+check(
+  "AdminAuth and AdminAuthGate import the keys from ./session-keys, with no copy of their own",
+  importsKeys(gateCode, ["LEGACY_SESSION_KEY", "LEGACY_SESSION_USER_KEY"]) &&
+    importsKeys(gateLite, ["LEGACY_SESSION_KEY"]),
+);
 
 /* 2. The bootstrap 401 must reach the hints — and must NOT fire for a
       deactivated account, where signing in again can never succeed. */
