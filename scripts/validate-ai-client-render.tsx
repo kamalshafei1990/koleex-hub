@@ -41,6 +41,7 @@ import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
 import { textLang, textScript, textDirection, blockDirection } from "../src/lib/text-direction";
 import TaskCard from "../src/components/ai/TaskCard";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -731,7 +732,7 @@ console.log("\n── A DataChannel event is read by its type, not by substring 
      QUOTES the old code, so an assertion run over the raw file matches its
      own explanation and fails on correct source. Assertions are about what
      runs, not about what is written beside it. */
-  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const src = stripComments(raw);
   check("the session-created check parses the event instead of scanning the text",
     !/raw\.includes\("session\.created"\)/.test(src) &&
     /isEventType\(raw, EV_SESSION_CREATED\)/.test(src));
@@ -1590,7 +1591,7 @@ console.log("\n── An Arabic opening before an English code block reads right
   const gate = readFileSync("src/components/admin/AuthGate.tsx", "utf8");
   /* Comments stripped: this page EXPLAINS why the second gate went, so the
      word appears in prose. The pin is about the code. */
-  const aiPage = readFileSync("src/app/ai/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const aiPage = stripComments(readFileSync("src/app/ai/page.tsx", "utf8"), { line: "keep" });
   check("the AI route is still gated — by the shell, which cannot bypass it",
     /const BYPASS_SUFFIXES = \["\/print"\];/.test(shell) &&
     /const BYPASS_PREFIXES = \["\/auth"\];/.test(shell) &&
@@ -1617,7 +1618,7 @@ console.log("\n── An Arabic opening before an English code block reads right
      launch that still moves a stale tab is AppLaunchLink's, and only because
      a soft navigation on a stale bundle fails (its chunks are gone). */
   const watcher = readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
-  const watcherCode = watcher.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const watcherCode = stripComments(watcher, { line: "all" });
   check("the watcher reloads the page in exactly one place — the Update button",
     (watcherCode.match(/location\.reload\(\)/g) ?? []).length === 1 &&
     /const onUpdate = \(\) => \{[\s\S]{0,1400}?window\.location\.reload\(\)/.test(watcherCode) &&
