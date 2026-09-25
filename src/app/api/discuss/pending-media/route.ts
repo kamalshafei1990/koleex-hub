@@ -17,12 +17,19 @@ import "server-only";
      3. `p` has the exact shape Discuss uploads create
         (`<epoch ms>_<random>.<ext>`, uploadDiscussAttachment/uploadDiscussVoice)
         in one of the two private Discuss buckets, and is recent (outbox TTL);
+     3b. the path is BOUND TO THE CALLER: public.discuss_pending_uploads
+        (written by /api/storage/upload and /api/storage/signed-upload, see
+        src/lib/discuss-pending-uploads.ts) records the uploading account and
+        tenant, and both must match the caller. No row → 404. Only when the
+        table does not exist yet (migration 20260929 not applied) does the
+        route fall back to the previous rule, where the unguessable path
+        (never sent to any other client — the serializer strips it) was the
+        only uploader check;
      4. the object is NOT already the media of a message in another channel.
         Once a message references the path, its canonical first-party route
         (with that channel's membership check) is the only way in — so a
         path cannot be used to read media of a conversation the caller has
-        left. Paths never reach any other client (the serializer strips them),
-        so only the uploader can know a pending one.
+        left.
    Same delivery hygiene as /api/files: service-key fetch server-side only,
    Range passthrough (voice seeking), inline only for the safe MIME list,
    nosniff, private no-store-ish cache, never a redirect to storage.
@@ -31,6 +38,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { lookupDiscussUpload } from "@/lib/discuss-pending-uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +77,15 @@ export async function GET(req: Request) {
   if (!bucket || !m || !UUID_RE.test(channelId)) return deny();
   const age = Date.now() - Number(m[1]);
   if (!Number.isFinite(age) || age > MAX_AGE_MS || age < -24 * 60 * 60 * 1000) return deny();
+
+  /* 3b. Bound to the caller (account AND tenant). Fails closed on any lookup
+     error; falls back to the previous rule only if the table is missing. */
+  const binding = await lookupDiscussUpload(bucket, path);
+  if (binding.available) {
+    if (!binding.owner) return deny();
+    if (binding.owner.accountId !== auth.account_id) return deny();
+    if (!auth.tenant_id || binding.owner.tenantId !== auth.tenant_id) return deny();
+  }
 
   /* 2. Active membership of the target conversation, in the caller's tenant. */
   const { data: ch } = await supabaseServer

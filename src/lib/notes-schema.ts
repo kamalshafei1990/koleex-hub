@@ -11,7 +11,10 @@
    touches the DOM at module load.
    --------------------------------------------------------------------------- */
 
-import type { AnyExtension } from "@tiptap/core";
+import { Extension, type AnyExtension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -49,12 +52,98 @@ export const NoteTaskItem = TaskItem.extend({
   },
 });
 
+/* ── Conflict copies ─────────────────────────────────────────────────────
+   A block kept twice by a 3-way merge (notes-merge3) is flagged with the
+   LANGUAGE-NEUTRAL attribute `conflict: true` (HTML: data-conflict="1") —
+   never with label text, which would be frozen in the saver's language.
+   The editor draws the label in the VIEWER's language as a widget
+   decoration; Backspace at the start of the block clears the flag. Older
+   notes whose copies carry a literal italic "Conflict copy:" prefix are
+   left exactly as they are. */
+
+const CONFLICT_BLOCKS = ["paragraph", "heading", "codeBlock"];
+const conflictKey = new PluginKey<{ label: string; set: DecorationSet }>("noteConflictLabel");
+
+function conflictDecorations(doc: PMNode, label: string): DecorationSet {
+  if (!label) return DecorationSet.empty;
+  const decos: Decoration[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    if (node.attrs.conflict) {
+      decos.push(Decoration.widget(pos + 1, () => {
+        const el = document.createElement("span");
+        el.className = "notes-conflict-label";
+        el.contentEditable = "false";
+        el.textContent = `${label} `;
+        el.style.fontStyle = "italic";
+        el.style.opacity = "0.6";
+        el.style.userSelect = "none";
+        return el;
+      }, { side: -1, key: `conflict:${label}`, ignoreSelection: true }));
+    }
+    return false;
+  });
+  return DecorationSet.create(doc, decos);
+}
+
+export const NoteConflictMarker = Extension.create<{ getLabel: (() => string) | null }>({
+  name: "noteConflictMarker",
+  // Ahead of the core keymap, so Backspace clears the flag before joining.
+  priority: 1000,
+  addOptions() {
+    return { getLabel: null };
+  },
+  addGlobalAttributes() {
+    return [{
+      types: CONFLICT_BLOCKS,
+      attributes: {
+        conflict: {
+          default: null,
+          keepOnSplit: false,
+          parseHTML: (el: HTMLElement) => (el.getAttribute("data-conflict") === "1" ? true : null),
+          renderHTML: (attrs: { conflict?: unknown }) => (attrs.conflict ? { "data-conflict": "1" } : {}),
+        },
+      },
+    }];
+  },
+  addKeyboardShortcuts() {
+    return {
+      // Backspace at the very start of a conflict copy drops the flag first.
+      Backspace: ({ editor }) => {
+        const { selection } = editor.state;
+        const $from = selection.$from;
+        if (!selection.empty || $from.parentOffset !== 0 || !$from.parent.attrs.conflict) return false;
+        return editor.commands.updateAttributes($from.parent.type.name, { conflict: null });
+      },
+    };
+  },
+  addProseMirrorPlugins() {
+    const getLabel = this.options.getLabel;
+    if (!getLabel) return []; // server / schema-only use
+    return [new Plugin({
+      key: conflictKey,
+      state: {
+        init: (_cfg, state) => {
+          const label = getLabel();
+          return { label, set: conflictDecorations(state.doc, label) };
+        },
+        apply: (tr, prev, _old, state) => {
+          const label = getLabel();
+          if (!tr.docChanged && label === prev.label) return prev;
+          return { label, set: conflictDecorations(state.doc, label) };
+        },
+      },
+      props: { decorations: (state) => conflictKey.getState(state)?.set ?? null },
+    })];
+  },
+});
+
 /**
  * Schema-bearing extensions. `collab: true` drops StarterKit's own undo
  * history — Collaboration brings a Yjs-aware undo manager instead (the two
  * must never run together).
  */
-export function notesSchemaExtensions(opts: { collab?: boolean } = {}): AnyExtension[] {
+export function notesSchemaExtensions(opts: { collab?: boolean; conflictLabel?: () => string } = {}): AnyExtension[] {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -75,6 +164,7 @@ export function notesSchemaExtensions(opts: { collab?: boolean } = {}): AnyExten
     NoteTaskItem.configure({ nested: true }),
     Link.configure({ openOnClick: false, autolink: true }),
     Image.configure({ inline: false, allowBase64: false, HTMLAttributes: { class: "notes-image" } }),
+    NoteConflictMarker.configure({ getLabel: opts.conflictLabel ?? null }),
   ];
 }
 

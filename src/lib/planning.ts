@@ -647,6 +647,9 @@ export interface AwaySpan {
   /** All-day only: inclusive date keys on the event owner's clock. */
   start_date?: string;
   end_date?: string;
+  /** Only when the viewer could open the event in Calendar anyway (never
+   *  a private one) — decided by the server. */
+  title?: string;
 }
 /** A week's absence overlay: approved HR leave + Calendar out-of-office. */
 export interface WeekAbsence {

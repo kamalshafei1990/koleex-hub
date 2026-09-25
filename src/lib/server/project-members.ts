@@ -15,6 +15,10 @@ import "server-only";
    leaves it (soft-leave, so re-adding revives the same row) unless they
    still reach the project another way — manager, creator or task assignee
    (super admin does not count). A role change never touches the chat.
+   Losing a path WITHOUT a membership change (task reassigned away or
+   deleted, manager replaced) runs the same check through
+   pruneProjectChatSeats — where a project_members row of any role also
+   keeps the seat.
 
    Before the migration is applied the table is missing: reads answer
    { available: false }, writes answer a clear 409, and the automatic sync
@@ -139,26 +143,87 @@ export async function removeProjectMember(
  *  deliberately NOT a path: it is a global override, not project
  *  involvement, so it never keeps anyone in a project chat. On a read
  *  error it answers true (keep the seat) — a spurious "leave" is the worse
- *  failure. */
-async function stillReachesProject(tenantId: string, projectId: string, accountId: string): Promise<boolean> {
-  const [proj, tasks] = await Promise.all([
+ *  failure. One-pair wrapper over stillReachingPairs. */
+export async function stillReachesProject(tenantId: string, projectId: string, accountId: string): Promise<boolean> {
+  const keep = await stillReachingPairs(tenantId, [{ project_id: projectId, account_id: accountId }], false);
+  return keep.has(pairKey(projectId, accountId));
+}
+
+export interface ProjectSeat { project_id: string; account_id: string }
+const pairKey = (projectId: string, accountId: string) => `${projectId}:${accountId}`;
+
+/** Batched stillReachesProject: of the given (project, account) pairs,
+ *  which still reach their project — manager, creator, assignee of a task
+ *  in it, and (with `countMembership`) any project_members row. Three
+ *  queries for any number of pairs. A read error keeps EVERY pair (never a
+ *  spurious leave); a missing project_members table (migration pending)
+ *  just means "no memberships". */
+async function stillReachingPairs(tenantId: string, pairs: ProjectSeat[], countMembership: boolean): Promise<Set<string>> {
+  const keep = new Set<string>();
+  if (pairs.length === 0) return keep;
+  const pids = [...new Set(pairs.map((p) => p.project_id))];
+  const aids = [...new Set(pairs.map((p) => p.account_id))];
+  const all = () => new Set(pairs.map((p) => pairKey(p.project_id, p.account_id)));
+  const [projs, tasks, members] = await Promise.all([
     supabaseServer
       .from("projects")
-      .select("manager_account_id, created_by_account_id")
+      .select("id, manager_account_id, created_by_account_id")
       .eq("tenant_id", tenantId)
-      .eq("id", projectId)
-      .maybeSingle(),
+      .in("id", pids),
     supabaseServer
       .from("project_tasks")
-      .select("id", { count: "exact", head: true })
+      .select("project_id, assignee_account_id")
       .eq("tenant_id", tenantId)
-      .eq("project_id", projectId)
-      .eq("assignee_account_id", accountId),
+      .in("project_id", pids)
+      .in("assignee_account_id", aids)
+      .limit(20000),
+    countMembership
+      ? supabaseServer
+          .from("project_members")
+          .select("project_id, account_id")
+          .eq("tenant_id", tenantId)
+          .in("project_id", pids)
+          .in("account_id", aids)
+      : Promise.resolve({ data: [] as { project_id: string; account_id: string }[], error: null }),
   ]);
-  if (proj.error || tasks.error) return true;
-  const p = proj.data as { manager_account_id: string | null; created_by_account_id: string | null } | null;
-  if (p && (p.manager_account_id === accountId || p.created_by_account_id === accountId)) return true;
-  return (tasks.count ?? 0) > 0;
+  if (projs.error || tasks.error) return all();
+  if (members.error && !tableMissing(members.error)) return all();
+  for (const p of (projs.data ?? []) as { id: string; manager_account_id: string | null; created_by_account_id: string | null }[]) {
+    if (p.manager_account_id) keep.add(pairKey(p.id, p.manager_account_id));
+    if (p.created_by_account_id) keep.add(pairKey(p.id, p.created_by_account_id));
+  }
+  for (const t of (tasks.data ?? []) as { project_id: string; assignee_account_id: string | null }[]) {
+    if (t.assignee_account_id) keep.add(pairKey(t.project_id, t.assignee_account_id));
+  }
+  for (const m of ((members.error ? [] : members.data) ?? []) as { project_id: string; account_id: string }[]) {
+    keep.add(pairKey(m.project_id, m.account_id));
+  }
+  return keep;
+}
+
+/** After someone LOST a path into a project without a membership change —
+ *  a task reassigned away from them (PATCH, bulk assign, AI tool), a task
+ *  of theirs deleted, or the project's manager changed — take their seat
+ *  in the project chat away if they no longer reach the project at all
+ *  (not manager, creator, task assignee, nor a project member of any
+ *  role). Batched: one reachability pass (stillReachingPairs, three
+ *  queries) for every pair, then one soft-leave per account that really
+ *  lost access (removeAccountFromProjectChannel is per account). Call it
+ *  AFTER the write has landed, from after(). Never throws. */
+export async function pruneProjectChatSeats(tenantId: string, seats: ProjectSeat[]): Promise<void> {
+  try {
+    const uniq = new Map<string, ProjectSeat>();
+    for (const s of seats) {
+      if (s.project_id && s.account_id) uniq.set(pairKey(s.project_id, s.account_id), s);
+    }
+    if (uniq.size === 0) return;
+    const keep = await stillReachingPairs(tenantId, [...uniq.values()], true);
+    for (const [k, s] of uniq) {
+      if (!keep.has(k)) await removeAccountFromProjectChannel(tenantId, s.project_id, s.account_id);
+    }
+  } catch (e) {
+    console.error("[project-members] prune chat seats:", e);
+  }
 }
 
 /** Assigning a task to someone makes them a member (role member) if they

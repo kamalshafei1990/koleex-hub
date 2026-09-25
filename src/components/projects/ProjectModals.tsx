@@ -515,7 +515,6 @@ export function TaskFormModal({
   tags,
   allTasks = [],
   readOnly = false,
-  subtasksReadOnly = readOnly,
   onClose,
   onSaved,
 }: {
@@ -527,11 +526,12 @@ export function TaskFormModal({
   allTasks?: TaskRow[];
   /** The caller may not write THIS task (project access "view" and not its
    *  assignee / creator — see TaskRow.can_edit): every field is disabled and
-   *  save / delete / schedule are gone (the write routes would 403). */
+   *  save / delete / schedule are gone (the write routes would 403).
+   *  Also governs the subtasks panel's add row: adding a subtask is a
+   *  write on THIS task (the server gates it with assertTaskWrite on
+   *  parent_task_id), so whoever may edit the task may add subtasks —
+   *  including a viewer on their own task. */
   readOnly?: boolean;
-  /** Adding subtasks is a PROJECT write: a viewer who created this task
-   *  edits it, but cannot add subtasks. Defaults to `readOnly`. */
-  subtasksReadOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -719,7 +719,7 @@ export function TaskFormModal({
       {toastElement}
       {editing && detailTab !== "details" && (
         <div className="px-5 py-4 overflow-y-auto" role="tabpanel">
-          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={subtasksReadOnly} />}
+          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={readOnly} />}
           {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "comments" && <CommentsPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "time" && <TimePanel taskId={editing.id} readOnly={readOnly} />}
@@ -925,7 +925,6 @@ export function FlatTaskFormModal({
       stages={stages}
       tags={tags}
       readOnly={editing.can_edit === false}
-      subtasksReadOnly={editing.can_edit === false || editing.project_access === "view"}
       onClose={onClose}
       onSaved={onSaved}
     />

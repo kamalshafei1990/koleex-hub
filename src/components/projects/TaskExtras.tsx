@@ -16,6 +16,8 @@
    every panel still reads, but its add row, delete buttons and toggles are
    gone — the write routes would answer 403 (project-access.ts
    assertTaskWrite). Subtasks decide per row from each subtask's can_edit.
+   Comment / time-entry delete buttons follow each row's server
+   `can_delete` (author or project moderator — the DELETE routes' rule).
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -183,7 +185,7 @@ export function CommentsPanel({ taskId, readOnly = false }: { taskId: string; re
               <span className="text-[11px] font-semibold text-[var(--text-muted)]">{c.author?.username ?? "—"}</span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-[var(--text-ghost)] tabular-nums">{stamp(c.created_at)}</span>
-                {!readOnly && <button type="button" onClick={() => remove(c.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>}
+                {c.can_delete === true && <button type="button" onClick={() => remove(c.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>}
               </div>
             </div>
             <AutoTranslatedText block text={c.body} className="text-[12.5px] text-[var(--text-primary)] break-words" />
@@ -253,7 +255,7 @@ export function TimePanel({ taskId, readOnly = false }: { taskId: string; readOn
             <span className="text-[10px] text-[var(--text-ghost)]">{e.account?.username ?? ""}</span>
             {e.invoiced_invoice_id ? (
               <span className="text-[10px] font-semibold text-[var(--text-dim)]">{t("x.invoiced")}</span>
-            ) : !readOnly && (
+            ) : e.can_delete === true && (
               <button type="button" onClick={() => remove(e.id)} aria-label={t("tip.delete")} className={`${revealCls} text-[var(--text-dim)] hover:text-rose-400`}><TrashIcon className="h-3 w-3" /></button>
             )}
           </div>
@@ -378,8 +380,9 @@ export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId:
   const done = items.filter((x) => x.status === "done").length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
   /* Each subtask is a task: its own server `can_edit` decides (a viewer
-     still ticks the subtasks they created or hold). `readOnly` = adding
-     one (a project write). */
+     still ticks the subtasks they created or hold). `readOnly` = the
+     PARENT's can_edit is false — adding a subtask is a write on the parent
+     (POST /api/projects/tasks: assertTaskWrite on parent_task_id). */
   const rowEditable = (s: TaskRow) => s.can_edit ?? !readOnly;
   if (loading) return <PanelSpinner />;
   if (loadError) return <PanelError onRetry={load} />;

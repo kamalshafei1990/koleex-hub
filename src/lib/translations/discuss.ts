@@ -530,4 +530,7 @@ export const discussT: Translations = {
   "conv.mutedUnread":        { en: "{n} unread · muted",      zh: "{n} 条未读 · 免打扰",     ar: "{n} غير مقروءة · مكتومة" },
   "with.failed":             { en: "Couldn't open a conversation with those people.", zh: "无法与这些人开始对话。", ar: "تعذر فتح محادثة مع هؤلاء الأشخاص." },
   "with.defaultTitle":       { en: "Group chat",              zh: "群聊",                 ar: "دردشة جماعية" },
+  "send.retryUploadFailed":  { en: "The file didn't upload. Tap Retry to try again.", zh: "文件未上传成功。点击“重试”再试一次。", ar: "لم يُرفع الملف. اضغط «إعادة المحاولة» للمحاولة مجددًا." },
+  "voice.uploadFailedRetry": { en: "Voice note didn't upload. Tap Retry to send it again.", zh: "语音消息未上传成功。点击“重试”再次发送。", ar: "لم تُرفع الرسالة الصوتية. اضغط «إعادة المحاولة» لإرسالها مجددًا." },
+  "send.uploadPending":      { en: "Not uploaded yet — Retry uploads it first.", zh: "尚未上传——点击“重试”会先上传。", ar: "لم يُرفع بعد — «إعادة المحاولة» ترفعه أولًا." },
 };

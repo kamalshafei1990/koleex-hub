@@ -2,9 +2,9 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertProjectAccess, canManageProject, projectAccessLevels } from "@/lib/server/project-access";
+import { assertProjectAccess, canManageProject, projectAccessLevels, viewReason } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
-import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-members";
+import { projectMemberCounts, pruneProjectChatSeats, upsertProjectMembers } from "@/lib/server/project-members";
 import { collectProjectAttachmentPaths, removeTaskAttachmentFiles } from "@/lib/server/project-files";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
@@ -20,7 +20,8 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   if (gate instanceof NextResponse) return gate;
 
   /* `member_count` feeds the Members button; `my_access` (manage | edit |
-     view) lets the board hide what the write gates would refuse. */
+     view) lets the board hide what the write gates would refuse, and
+     `my_access_reason` (viewer | module) says why it is "view". */
   const [{ data, error }, memberCounts, access] = await Promise.all([
     supabaseServer
       .from("projects")
@@ -33,7 +34,10 @@ export async function GET(_req: Request, { params }: RouteCtx) {
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
     projectMemberCounts(auth.tenant_id, [id]),
-    requireModuleAction(auth, "Projects", "edit").then((denied) => projectAccessLevels(auth, [gate], !denied)),
+    requireModuleAction(auth, "Projects", "edit").then(async (denied) => ({
+      canEditModule: !denied,
+      levels: await projectAccessLevels(auth, [gate], !denied),
+    })),
   ]);
   if (error) {
     console.error("[api/projects/:id GET]", error.message);
@@ -41,7 +45,12 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({
-    project: { ...data, member_count: memberCounts.get(id) ?? 0, my_access: access.get(id) ?? "view" },
+    project: {
+      ...data,
+      member_count: memberCounts.get(id) ?? 0,
+      my_access: access.levels.get(id) ?? "view",
+      my_access_reason: viewReason(access.levels.get(id) ?? "view", access.canEditModule),
+    },
   });
 }
 
@@ -106,10 +115,17 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     return NextResponse.json({ error: "Failed to update project" }, { status: 500 });
   }
 
-  /* A (new) manager is always a member with the manager role. */
+  /* A (new) manager is always a member with the manager role. The one
+     replaced leaves the project chat if managing was their last way in
+     (not creator, assignee, nor a member of any role). */
   const newManager = patch.manager_account_id as string | null | undefined;
-  if (newManager && newManager !== gate.manager_account_id) {
-    after(async () => { await upsertProjectMembers(auth, id, [{ account_id: newManager, role: "manager" }]); });
+  const oldManager = gate.manager_account_id;
+  const managerChanged = newManager !== undefined && (newManager ?? null) !== oldManager;
+  if (managerChanged) {
+    after(async () => {
+      if (newManager) await upsertProjectMembers(auth, id, [{ account_id: newManager, role: "manager" }]);
+      if (oldManager) await pruneProjectChatSeats(auth.tenant_id, [{ project_id: id, account_id: oldManager }]);
+    });
   }
   return NextResponse.json({ project: data });
 }

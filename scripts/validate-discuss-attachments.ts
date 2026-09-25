@@ -340,6 +340,67 @@ check("pending: route private cache + nosniff + no redirect",
 check("pending: route zero unwrapped NextResponse.json returns",
   (pendingRoute.match(/return NextResponse\.json\(/g) ?? []).length === 0);
 
+/* ── 12c. UPLOADER BINDING + UNSENT-FILE BYTES + IN-FLIGHT PREVIEWS ───────
+   (Discuss last-limits pass, 2026-09-29)
+     · pending-media serves a path only to the account (and tenant) that
+       uploaded it — recorded by BOTH upload routes (the direct path is bound
+       when its token is signed, since the browser's PUT carries nothing we
+       can trust). The table may be missing: only then the old rule applies.
+     · bytes of never-uploaded files of failed sends live in IndexedDB under
+       the kx: prefix (inside the sign-out wipe), capped per file at the
+       transport limit and ~50MB total, purged with the outbox.
+     · sends still in flight keep their previews across a conversation
+       switch. */
+{
+  const binding = read("src/lib/discuss-pending-uploads.ts");
+  const uploadRoute = read("src/app/api/storage/upload/route.ts");
+  const signedRoute = read("src/app/api/storage/signed-upload/route.ts");
+  const files = read("src/lib/discuss-outbox-files.ts");
+  const migration = read("supabase/migrations/20260929_discuss_pending_uploads.sql");
+  check("bind: pending-media looks up the uploader",
+    /lookupDiscussUpload\(bucket, path\)/.test(pendingRoute));
+  check("bind: pending-media denies another account / tenant / no row",
+    /if \(!binding\.owner\) return deny\(\);/.test(pendingRoute) &&
+    /binding\.owner\.accountId !== auth\.account_id\) return deny\(\);/.test(pendingRoute) &&
+    /binding\.owner\.tenantId !== auth\.tenant_id\) return deny\(\);/.test(pendingRoute));
+  check("bind: lookup fails closed on errors other than a missing table",
+    /if \(isMissingTable\(error\)\) return \{ available: false \};\s*return \{ available: true, owner: null, error: true \};/.test(binding));
+  check("bind: first writer wins (a path is never rebound)",
+    /ignoreDuplicates: true/.test(binding));
+  check("bind: server upload route records the uploader",
+    /recordDiscussUpload\(\{[\s\S]{0,120}accountId: auth\.account_id,[\s\S]{0,40}tenantId: auth\.tenant_id/.test(uploadRoute));
+  check("bind: signed-upload route records the uploader at signing",
+    /recordDiscussUpload\(\{[\s\S]{0,120}accountId: auth\.account_id,[\s\S]{0,40}tenantId: auth\.tenant_id/.test(signedRoute));
+  check("bind: migration is idempotent, RLS on, no policies",
+    /create table if not exists public\.discuss_pending_uploads/.test(migration) &&
+    /enable row level security/.test(migration) && !/create policy/i.test(migration));
+
+  check("idb: keys live under the kx: sign-out prefix",
+    /const FILE_PREFIX = "kx:discuss:outbox-file:"/.test(files) && /const META_PREFIX = "kx:discuss:outbox-meta:"/.test(files));
+  check("idb: same store the sign-out wipe clears",
+    /const DB_NAME = "koleex-cache";/.test(files) && /const STORE = "kv";/.test(files));
+  check("idb: per-file cap = Discuss transport limit, total ~50MB",
+    /DISCUSS_OUTBOX_FILE_MAX_BYTES = DISCUSS_TRANSPORT_MAX_BYTES/.test(files) &&
+    /DISCUSS_OUTBOX_FILES_MAX_TOTAL = 50 \* 1024 \* 1024/.test(files));
+  check("idb: never falls back to localStorage", !/localStorage/.test(files.replace(/\/\*[\s\S]*?\*\//g, "")));
+  check("idb: outbox removal purges the bytes",
+    /for \(const id of drop\) pendingMedia\.delete\(id\);\s*void deleteDiscussOutboxFiles\(accountId, drop\);/.test(outbox));
+  check("idb: TTL-expired outbox entries purge their bytes",
+    /if \(gone\.length > 0\) void deleteDiscussOutboxFiles/.test(outbox));
+  check("idb: pending files never reach the wire payload",
+    /sendDiscussMessageResult\(\{ \.\.\.wireOf\(payload\), authorId: accountId \}\)/.test(app));
+  check("idb: Retry uploads pending files before sending",
+    /const metadata = await uploadPendingFiles\(payload\);[\s\S]{0,1200}sendDiscussMessageResult/.test(app));
+
+  const start = app.indexOf("const handleSelectChannel = useCallback(");
+  const end = start < 0 ? -1 : app.indexOf("}, [", start);
+  const block = end < 0 ? "" : app.slice(start, end);
+  check("inflight: switch keeps previews of sends still in flight",
+    /for \(const id of inFlightRef\.current\) stillFailed\.add\(id\);/.test(block));
+  check("inflight: send settles its in-flight mark",
+    /await sendDiscussMessageResult\(\{ \.\.\.payload, authorId: accountId \}\);\s*inFlightRef\.current\.delete\(clientMsgId\);/.test(app));
+}
+
 /* ── 13. DRAFTS — no storage reference in either direction ─────────────── */
 /* Audited: drafts store TEXT ONLY (saveDraft sends body; restore clears
    attachments; production has 0 draft rows and 0 metadata keys). These

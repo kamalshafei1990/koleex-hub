@@ -530,7 +530,7 @@ function ProjectCard({
             </span>
           )}
           {viewOnly && (
-            <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-dim)] font-semibold inline-flex items-center gap-1" title={t("access.viewOnlyTip")}>
+            <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-dim)] font-semibold inline-flex items-center gap-1" title={t(viewOnlyTipKey(project))}>
               <EyeIcon size={10} aria-hidden /> {t("access.viewOnly")}
             </span>
           )}
@@ -703,10 +703,15 @@ function ProjectDetailView({
   const unstaged = tasksByStage.get(UNSTAGED) ?? [];
 
   /* Multi-select: visual order (Unstaged, then stage columns top→bottom),
-     so a shift-click range is what the user sees between the two cards. */
+     so a shift-click range is what the user sees between the two cards.
+     Only cards the caller may write are selectable: on a view-only project
+     that is the tasks they created or hold (server `can_edit`) — exactly
+     what POST /api/projects/tasks/bulk accepts (ownsTask per task). */
+  const boardViewOnly = project?.my_access === "view";
   const orderedIds = useMemo(
-    () => [UNSTAGED, ...stages.map((s) => s.id)].flatMap((k) => (tasksByStage.get(k) ?? []).map((tk) => tk.id)),
-    [tasksByStage, stages],
+    () => [UNSTAGED, ...stages.map((s) => s.id)].flatMap((k) =>
+      (tasksByStage.get(k) ?? []).filter((tk) => !boardViewOnly || tk.can_edit === true).map((tk) => tk.id)),
+    [tasksByStage, stages, boardViewOnly],
   );
   const selection = useTaskSelection(orderedIds);
   const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
@@ -778,7 +783,15 @@ function ProjectDetailView({
 
       pauseRef.current.reordering = true;
       try {
-        await reorderTasks({ project_id: projectId, stage_id: targetStageId, ordered_ids: col.map((tk) => tk.id), moved_id: draggedId });
+        const res = await reorderTasks({ project_id: projectId, stage_id: targetStageId, ordered_ids: col.map((tk) => tk.id), moved_id: draggedId });
+        /* The server usually writes ONLY the moved card (a position between
+           its neighbours); adopt its real sort_order values at once so the
+           next drag starts from what the server holds. */
+        const pos = res.positions;
+        if (pos) {
+          const before = new Map(snapshot.map((tk) => [tk.id, tk.sort_order]));
+          setTasks((prev) => prev.map((tk) => (order.has(tk.id) ? { ...tk, sort_order: pos[tk.id] ?? before.get(tk.id) ?? tk.sort_order } : tk)));
+        }
         pauseRef.current.reordering = false;
         await refresh();
       } catch (e) {
@@ -939,7 +952,7 @@ function ProjectDetailView({
           selection.selected.has(tk.id) ? "border-[#567FB2]/60 bg-[#567FB2]/5" : "border-[var(--border-subtle)]"
         }`}
       >
-        {!readOnly && <SelectBox checked={selection.selected.has(tk.id)} onToggle={(shift) => selection.toggle(tk.id, shift)} label={`${t("bulk.select")}: ${tk.title}`} />}
+        {canEditTask(tk) && <SelectBox checked={selection.selected.has(tk.id)} onToggle={(shift) => selection.toggle(tk.id, shift)} label={`${t("bulk.select")}: ${tk.title}`} />}
         <span className="w-1 h-4 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[tk.priority] }} />
         <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}><AutoTranslatedText text={tk.title} /></span>
         {due && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? "bg-rose-500/15 text-rose-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"}`}>{due}</span>}
@@ -982,7 +995,7 @@ function ProjectDetailView({
             </div>
             {readOnly && (
               <span
-                title={t("access.viewOnlyTip")}
+                title={t(viewOnlyTipKey(project))}
                 className="h-6 px-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[10.5px] font-semibold text-[var(--text-muted)] inline-flex items-center gap-1 shrink-0"
               >
                 <EyeIcon size={11} aria-hidden />
@@ -1120,7 +1133,7 @@ function ProjectDetailView({
                       onClick={() => openTask(tk)}
                       selected={selection.selected.has(tk.id)}
                       selecting={selecting}
-                      onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
+                      onToggleSelect={canEditTask(tk) ? (shift) => selection.toggle(tk.id, shift) : undefined}
                       draggable={canEditTask(tk)}
                     />
                   ))}
@@ -1175,7 +1188,7 @@ function ProjectDetailView({
                           onClick={() => openTask(tk)}
                           selected={selection.selected.has(tk.id)}
                           selecting={selecting}
-                          onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
+                          onToggleSelect={canEditTask(tk) ? (shift) => selection.toggle(tk.id, shift) : undefined}
                           draggable={canEditTask(tk)}
                         />
                       </div>
@@ -1246,7 +1259,11 @@ function ProjectDetailView({
             <EntityPlanningStrip entityType="project" entityId={project.id} />
           </div>
 
-          {viewMode !== "timeline" && !readOnly && (
+          {/* On a view-only project the bar acts on the caller's own cards
+              (the only selectable ones). Every action it offers — stage
+              move included — is one the bulk route allows on owned tasks
+              of a single project, so nothing here can 403. */}
+          {viewMode !== "timeline" && (!readOnly || orderedIds.length > 0) && (
             <BulkBar
               count={selection.count}
               total={orderedIds.length}
@@ -1281,7 +1298,6 @@ function ProjectDetailView({
           tags={tags}
           allTasks={tasks}
           readOnly={taskModal.editing ? !canEditTask(taskModal.editing) : readOnly}
-          subtasksReadOnly={readOnly}
           onClose={closeTaskModal}
           onSaved={() => { closeTaskModal(); void refresh(); }}
         />
@@ -1405,6 +1421,12 @@ function StageHeader({
       )}
     </div>
   );
+}
+
+/** The "View only" tooltip says WHY (server `my_access_reason`): no edit
+ *  right in the Projects module vs a viewer membership on this project. */
+function viewOnlyTipKey(project: ProjectRow): "access.viewOnlyTip" | "access.viewOnlyTipModule" {
+  return project.my_access_reason === "module" ? "access.viewOnlyTipModule" : "access.viewOnlyTip";
 }
 
 function TaskCard({

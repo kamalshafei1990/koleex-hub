@@ -19,7 +19,7 @@ import { supabaseServer } from "../../supabase-server";
 import { recomputeProjectProgress } from "../../project-progress";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "../../project-task-rules";
 import { assertProjectAccess, canManageProject, involvedProjectsOr, memberRole, ownsTask, type MemberRole } from "../../project-access";
-import { syncProjectMembersFromAssignees, upsertProjectMembers } from "../../project-members";
+import { pruneProjectChatSeats, syncProjectMembersFromAssignees, upsertProjectMembers } from "../../project-members";
 import { notifyTaskAssigned } from "../../project-notify";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
@@ -607,6 +607,16 @@ const deleteProjectTask: ToolDef<
       };
     }
 
+    /* Subtasks cascade with it — their assignees, like this task's, may
+       lose their last way into the project (and so its chat seat). */
+    const { data: subs } = await supabaseServer
+      .from("project_tasks")
+      .select("assignee_account_id")
+      .eq("tenant_id", ctx.auth.tenant_id)
+      .eq("parent_task_id", id);
+    const lostAssignees = [t.assignee_account_id, ...((subs ?? []) as { assignee_account_id: string | null }[]).map((r) => r.assignee_account_id)]
+      .filter((a): a is string => !!a);
+
     const { error } = await supabaseServer
       .from("project_tasks")
       .delete()
@@ -617,6 +627,10 @@ const deleteProjectTask: ToolDef<
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
     await recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
+    if (t.project_id) {
+      const pid = t.project_id;
+      await pruneProjectChatSeats(ctx.auth.tenant_id, lostAssignees.map((account_id) => ({ project_id: pid, account_id })));
+    }
     return {
       ok: true,
       permissionStatus: "allowed",

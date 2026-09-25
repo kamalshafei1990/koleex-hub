@@ -10,8 +10,9 @@
      · an all-day event covers whole local days by its date keys;
      · a timed event covers the part of each day it overlaps.
 
-   Pure and isomorphic. Slices never carry a title: a private event only
-   ever shows as "Out of office" and a time span.
+   Pure and isomorphic. A slice carries a title only when the server sent
+   one (the viewer could open that event in Calendar anyway); otherwise —
+   and always for a private event — it is "Out of office" and a span.
    --------------------------------------------------------------------------- */
 
 import { zonedParts, zonedToUtc } from "@/lib/calendar-tz";
@@ -23,6 +24,8 @@ export interface AwaySlice {
   toMs: number;
   /** Covers the whole day (an all-day event, or a timed one spanning it). */
   full: boolean;
+  /** The event's title, when the server allowed it for this viewer. */
+  title?: string;
 }
 
 /** Instant a wall day starts at in `tz`. */
@@ -48,7 +51,7 @@ export function awayDaySlices(spans: AwaySpan[], days: Date[], tz: string): Map<
   for (const sp of spans) {
     if (sp.all_day && sp.start_date && sp.end_date) {
       for (const b of bounds) {
-        if (sp.start_date <= b.key && b.key <= sp.end_date) add(`${sp.resource_id}|${b.key}`, { fromMs: b.from, toMs: b.to, full: true });
+        if (sp.start_date <= b.key && b.key <= sp.end_date) add(`${sp.resource_id}|${b.key}`, { fromMs: b.from, toMs: b.to, full: true, ...(sp.title ? { title: sp.title } : {}) });
       }
       continue;
     }
@@ -59,7 +62,7 @@ export function awayDaySlices(spans: AwaySpan[], days: Date[], tz: string): Map<
       const from = Math.max(s, b.from);
       const to = Math.min(e, b.to);
       if (to <= from) continue;
-      add(`${sp.resource_id}|${b.key}`, { fromMs: from, toMs: to, full: from <= b.from && to >= b.to });
+      add(`${sp.resource_id}|${b.key}`, { fromMs: from, toMs: to, full: from <= b.from && to >= b.to, ...(sp.title ? { title: sp.title } : {}) });
     }
   }
   for (const list of out.values()) list.sort((a, b) => a.fromMs - b.fromMs);

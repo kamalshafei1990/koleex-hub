@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskComment } from "@/lib/server/project-notify";
-import { assertTaskAccess, assertTaskWrite } from "@/lib/server/project-access";
+import { assertTaskAccess, assertTaskWrite, canModerate, taskEditFlags } from "@/lib/server/project-access";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -27,7 +27,18 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     console.error("[api/projects/tasks/:id/comments GET]", error.message);
     return NextResponse.json({ error: "Failed to load comments" }, { status: 500 });
   }
-  return NextResponse.json({ comments: data ?? [] });
+  /* Per-comment `can_delete`: EXACTLY the DELETE route's rule — the
+     Projects edit action, write access to this task (assertTaskWrite ⇔
+     taskEditFlags.can_edit), and author-or-moderator (canModerate). */
+  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
+  const canWrite = canEditModule && ((await taskEditFlags(auth, [gate.task], true)).get(id)?.can_edit ?? false);
+  const moderator = canModerate(auth, gate.project);
+  return NextResponse.json({
+    comments: ((data ?? []) as { author_account_id: string | null }[]).map((c) => ({
+      ...c,
+      can_delete: canWrite && (c.author_account_id === auth.account_id || moderator),
+    })),
+  });
 }
 
 export async function POST(req: Request, { params }: RouteCtx) {
@@ -60,5 +71,6 @@ export async function POST(req: Request, { params }: RouteCtx) {
   // After the response: ping the task's assignee + followers (inbox + push).
   after(() => notifyTaskComment(auth, id, body));
 
-  return NextResponse.json({ comment: data });
+  /* The author may always delete their own (they just passed the gate). */
+  return NextResponse.json({ comment: { ...data, can_delete: true } });
 }

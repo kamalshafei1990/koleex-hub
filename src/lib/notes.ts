@@ -238,13 +238,23 @@ export type NotePatch = Partial<{
   tags: string[];
 }>;
 
+/** A note's metadata as the client last saw it (for a meta 3-way merge). */
+export type NoteMetaBase = { title?: string; tags?: string[]; color?: string | null };
+
 export type UpdateNoteResult =
   | {
       ok: true;
       updated_at: string | null;
       body_plain?: string;
-      /** A rebase landed: the body the server merged our changes into. */
-      merged?: { body_json: Record<string, unknown>; conflicts: number };
+      /** A rebase landed: the body the server merged our changes into.
+       *  `kept`: blocks we deleted that were kept because someone edited them. */
+      merged?: { body_json: Record<string, unknown>; conflicts: number; kept: number };
+      /** A meta rebase (`metaBase`) landed: the note's resulting title /
+       *  tags / colour, and the fields where the current value was kept. */
+      meta?: { title: string; tags: string[]; color: string | null };
+      metaConflicts?: string[];
+      /** A live save kept blocks someone deleted while we typed in them. */
+      kept?: number;
     }
   | { ok: false; conflict: true; note: NoteFull }
   | { ok: false; conflict: false };
@@ -254,21 +264,21 @@ export type UpdateNoteResult =
  * write conditional — a 409 comes back with the fresh note. `rebaseFrom`
  * (the body our edits started from) turns a body save into a REBASE: the
  * server 3-way merges our changes onto the current note instead of refusing
- * a stale copy; `conflictLabel` marks a block kept twice. `keepalive` lets
- * the request outlive the page (pagehide / tab hidden flush).
+ * a stale copy. `metaBase` (title / tags / colour as we last saw them)
+ * turns a retry's metadata into a 3-way merge: only what we changed is
+ * applied onto the current note. `keepalive` lets the request outlive the
+ * page (pagehide / tab hidden flush).
  */
 export async function updateNote(
   id: string,
   patch: NotePatch,
-  opts: { base?: string | null; keepalive?: boolean; rebaseFrom?: unknown; conflictLabel?: string } = {},
+  opts: { base?: string | null; keepalive?: boolean; rebaseFrom?: unknown; metaBase?: NoteMetaBase } = {},
 ): Promise<UpdateNoteResult> {
   try {
     const payload: Record<string, unknown> = { ...patch };
     if (opts.base) payload.base_updated_at = opts.base;
-    if (opts.rebaseFrom !== undefined) {
-      payload.rebase_from_base = opts.rebaseFrom ?? null;
-      if (opts.conflictLabel) payload.conflict_label = opts.conflictLabel;
-    }
+    if (opts.rebaseFrom !== undefined) payload.rebase_from_base = opts.rebaseFrom ?? null;
+    if (opts.metaBase) payload.meta_base = opts.metaBase;
     const body = JSON.stringify(payload);
     const res = await fetch("/api/notes/" + id, {
       method: "PATCH",
@@ -287,13 +297,39 @@ export async function updateNote(
     const json = (await res.json().catch(() => ({}))) as {
       updated_at?: string | null;
       body_plain?: string;
-      merged?: { body_json?: unknown; conflicts?: unknown };
+      merged?: { body_json?: unknown; conflicts?: unknown; kept?: unknown };
+      meta?: { title?: unknown; tags?: unknown; color?: unknown };
+      meta_conflicts?: unknown;
+      kept?: unknown;
     };
     const merged =
       json.merged && json.merged.body_json && typeof json.merged.body_json === "object"
-        ? { body_json: json.merged.body_json as Record<string, unknown>, conflicts: Number(json.merged.conflicts) || 0 }
+        ? {
+            body_json: json.merged.body_json as Record<string, unknown>,
+            conflicts: Number(json.merged.conflicts) || 0,
+            kept: Number(json.merged.kept) || 0,
+          }
         : undefined;
-    return { ok: true, updated_at: json.updated_at ?? null, body_plain: json.body_plain, ...(merged ? { merged } : {}) };
+    const meta =
+      json.meta && typeof json.meta === "object"
+        ? {
+            title: typeof json.meta.title === "string" ? json.meta.title : "",
+            tags: Array.isArray(json.meta.tags) ? json.meta.tags.filter((x): x is string => typeof x === "string") : [],
+            color: typeof json.meta.color === "string" ? json.meta.color : null,
+          }
+        : undefined;
+    const metaConflicts = Array.isArray(json.meta_conflicts)
+      ? json.meta_conflicts.filter((x): x is string => typeof x === "string")
+      : undefined;
+    const kept = Number(json.kept) || 0;
+    return {
+      ok: true,
+      updated_at: json.updated_at ?? null,
+      body_plain: json.body_plain,
+      ...(merged ? { merged } : {}),
+      ...(meta ? { meta, metaConflicts: metaConflicts ?? [] } : {}),
+      ...(kept ? { kept } : {}),
+    };
   } catch {
     return { ok: false, conflict: false };
   }

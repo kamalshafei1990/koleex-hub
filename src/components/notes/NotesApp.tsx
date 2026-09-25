@@ -72,6 +72,7 @@ import {
   type NotesFolderRow,
   type NoteRow,
   type NoteFull,
+  type NoteMetaBase,
   type NotePatch,
 } from "@/lib/notes";
 import { NOTE_LIMITS, UUID_RE } from "@/lib/notes-policy";
@@ -127,6 +128,11 @@ function bumpBase(map: Map<string, string>, id: string, updatedAt: string | null
 type DeletePrompt =
   | { open: true; kind: "trash" | "purge" | "folder" | "emptyTrash"; id?: string; label?: string }
   | { open: false };
+
+/** A note's title / tags / colour — the base of a meta 3-way merge. */
+function metaOf(n: { title?: string | null; tags?: string[] | null; color?: string | null }): NoteMetaBase {
+  return { title: n.title ?? "", tags: n.tags ?? [], color: n.color ?? null };
+}
 
 export default function NotesApp() {
   const { t } = useTranslation(notesT);
@@ -267,7 +273,7 @@ export default function NotesApp() {
      it any more: a stale save is rebased (merged) rather than reloaded over
      the user's unsaved typing. */
   const [contentVersion] = useState(0);
-  const [titleSignal, setTitleSignal] = useState<{ id: string; title: string; seq: number } | null>(null);
+  const [titleSignal, setTitleSignal] = useState<{ id: string; title: string; seq: number; tags?: string[] } | null>(null);
   const activeNoteIdRef = useRef(activeNoteId);
   const activeNoteRef = useRef(activeNote);
   useEffect(() => {
@@ -281,6 +287,9 @@ export default function NotesApp() {
    *  a stale save is REBASED with it — our changes base → local are merged
    *  onto the newer note server-side instead of being thrown away. */
   const baseBodyRef = useRef<Map<string, unknown>>(new Map());
+  /** Title / tags / colour as this client last saw them saved: a 409 retry
+   *  sends them so the server applies only what WE changed (3-way). */
+  const baseMetaRef = useRef<Map<string, NoteMetaBase>>(new Map());
   const skipFetchRef = useRef<string | null>(null);
 
   const closeNote = useCallback(() => {
@@ -313,7 +322,10 @@ export default function NotesApp() {
         return;
       }
       bumpBase(baseRef.current, n.id, n.updated_at);
-      if (baseRef.current.get(n.id) === n.updated_at) baseBodyRef.current.set(n.id, n.body_json ?? null);
+      if (baseRef.current.get(n.id) === n.updated_at) {
+        baseBodyRef.current.set(n.id, n.body_json ?? null);
+        baseMetaRef.current.set(n.id, metaOf(n));
+      }
       setActiveNote(n);
     });
     return () => { cancelled = true; };
@@ -442,6 +454,7 @@ export default function NotesApp() {
       });
       bumpBase(baseRef.current, n.id, n.updated_at);
       baseBodyRef.current.set(n.id, n.body_json ?? null);
+      baseMetaRef.current.set(n.id, metaOf(n));
       skipFetchRef.current = n.id;
       setActiveNote({ ...n, role: "owner" });
       setActiveNoteId(n.id);
@@ -469,6 +482,7 @@ export default function NotesApp() {
     if (search || debouncedSearch) { setSearch(""); setDebouncedSearch(""); }
     bumpBase(baseRef.current, n.id, n.updated_at);
     baseBodyRef.current.set(n.id, n.body_json ?? null);
+    baseMetaRef.current.set(n.id, metaOf(n));
     skipFetchRef.current = n.id;
     setActiveNote({ ...n, role: "owner" });
     setActiveNoteId(n.id);
@@ -547,6 +561,7 @@ export default function NotesApp() {
         return false;
       }
       if (adopt) bumpBase(baseRef.current, id, res.updated_at);
+      baseMetaRef.current.set(id, { ...(baseMetaRef.current.get(id) ?? {}), title: next });
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, title: next } : n)));
       setActiveNote((cur) => (cur?.id === id ? { ...cur, title: next } : cur));
       if (activeNoteIdRef.current === id) {
@@ -686,9 +701,10 @@ export default function NotesApp() {
       /* 409 — someone saved since our base. Never reload over our unsaved
          typing: re-send it as a REBASE (the server merges our changes
          base → local onto the newer note, keeping both versions of a block
-         both sides changed) and let the editor adopt the merged body. A
-         meta-only save (title / tags / colour — explicit user input) is
-         simply re-sent on the fresh token. */
+         both sides changed) and let the editor adopt the merged body.
+         Title / tags / colour go with their BASE values (meta_base), so the
+         server applies only what we changed: tags merge as a set, and a
+         title someone else changed differently is kept (and reported). */
       let sent: NotePatch = patch;
       let adoptToken = true;
       if (!res.ok && res.conflict) {
@@ -697,19 +713,28 @@ export default function NotesApp() {
         // The auto-title only ever fills an EMPTY title.
         if (updates.title === undefined && (fresh.title ?? "").trim()) delete retry.title;
         sent = retry;
+        const baseMeta = baseMetaRef.current.get(id);
+        const metaBase: NoteMetaBase | undefined =
+          baseMeta && (retry.title !== undefined || retry.tags !== undefined || retry.color !== undefined)
+            ? {
+                ...(retry.title !== undefined && baseMeta.title !== undefined ? { title: baseMeta.title } : {}),
+                ...(retry.tags !== undefined && baseMeta.tags !== undefined ? { tags: baseMeta.tags } : {}),
+                ...(retry.color !== undefined && baseMeta.color !== undefined ? { color: baseMeta.color } : {}),
+              }
+            : undefined;
         if (retry.body_json !== undefined) {
           res = await updateNote(id, retry, {
             base: fresh.updated_at,
             keepalive: opts?.keepalive,
             rebaseFrom: baseBodyRef.current.get(id) ?? null,
-            conflictLabel: t("conflict.copyLabel"),
+            metaBase,
           });
         } else {
           // Our editor body is still the old one unless the body did not
           // change: keep the old token then, so the next body save rebases.
           adoptToken = stableKey(fresh.body_json ?? null) === stableKey(baseBodyRef.current.get(id) ?? null);
           res = Object.keys(retry).length
-            ? await updateNote(id, retry, { base: fresh.updated_at, keepalive: opts?.keepalive })
+            ? await updateNote(id, retry, { base: fresh.updated_at, keepalive: opts?.keepalive, metaBase })
             : { ok: true, updated_at: fresh.updated_at };
         }
         // A second 409 / failure: the edits stay pending and are retried.
@@ -721,11 +746,25 @@ export default function NotesApp() {
 
       if (res.ok) {
         const merged = res.merged;
+        const meta = res.meta;
         if (adoptToken) bumpBase(baseRef.current, id, res.updated_at);
+        // What the note's title / tags / colour are now (as far as we know).
+        {
+          const bm = { ...(baseMetaRef.current.get(id) ?? {}) };
+          if (meta) Object.assign(bm, meta);
+          else {
+            if (sent.title !== undefined) bm.title = sent.title;
+            if (sent.tags !== undefined) bm.tags = sent.tags;
+            if (sent.color !== undefined) bm.color = sent.color;
+          }
+          baseMetaRef.current.set(id, bm);
+        }
         if (merged) baseBodyRef.current.set(id, merged.body_json);
         else if (sent.body_json !== undefined && adoptToken) baseBodyRef.current.set(id, sent.body_json);
         else if (collab && updates.body_json !== undefined) baseBodyRef.current.set(id, updates.body_json);
-        const savedTitle = sent.title;
+        const savedTitle = meta ? meta.title : sent.title;
+        const savedTags = meta ? meta.tags : updates.tags;
+        const savedColor = meta ? meta.color : updates.color;
         const savedBody = merged ? merged.body_json : updates.body_json;
         const nowIso = res.updated_at ?? new Date().toISOString();
         const preview =
@@ -743,8 +782,8 @@ export default function NotesApp() {
                     ...n,
                     title: savedTitle ?? n.title,
                     body_plain: preview ?? n.body_plain,
-                    color: updates.color !== undefined ? updates.color : n.color,
-                    tags: updates.tags ?? n.tags,
+                    color: savedColor !== undefined ? savedColor : n.color,
+                    tags: savedTags ?? n.tags,
                     updated_at: nowIso,
                   }
                 : n,
@@ -755,16 +794,33 @@ export default function NotesApp() {
         void _y; void _b;
         setActiveNote((cur) =>
           cur?.id === id
-            ? { ...cur, ...local, ...(savedBody !== undefined ? { body_json: savedBody } : {}), updated_at: nowIso }
+            ? {
+                ...cur,
+                ...local,
+                ...(meta ? { title: meta.title, tags: meta.tags, color: meta.color } : {}),
+                ...(savedBody !== undefined ? { body_json: savedBody } : {}),
+                updated_at: nowIso,
+              }
             : cur,
         );
         if (updates.tags !== undefined) void refreshTags();
         setSaving("saved");
         savedTimer.current = setTimeout(() => setSaving((s) => (s === "saved" ? "idle" : s)), 1200);
-        if (merged) {
-          showToast(t(merged.conflicts ? "conflict.kept" : "conflict.merged"), "info");
-          return { merged: merged.body_json, conflicts: merged.conflicts };
+        // The editor shows the merged title / tags (ours may have lost).
+        if (meta && activeNoteIdRef.current === id && (sent.title !== undefined || sent.tags !== undefined)) {
+          const differs =
+            (sent.title !== undefined && sent.title !== meta.title) ||
+            (sent.tags !== undefined && stableKey(sent.tags) !== stableKey(meta.tags));
+          if (differs) setTitleSignal((s) => ({ id, title: meta.title, tags: meta.tags, seq: (s?.seq ?? 0) + 1 }));
         }
+        const notices: string[] = [];
+        if (merged) notices.push(t(merged.conflicts ? "conflict.kept" : "conflict.merged"));
+        if (merged?.kept) notices.push(t("conflict.keptEdited"));
+        if (res.kept) notices.push(t("conflict.rescued"));
+        if (res.metaConflicts?.includes("title")) notices.push(t("conflict.titleKept"));
+        if (res.metaConflicts?.includes("color")) notices.push(t("conflict.colorKept"));
+        if (notices.length) showToast(notices.join(" "), "info");
+        if (merged) return { merged: merged.body_json, conflicts: merged.conflicts };
         return "ok";
       }
 
@@ -778,6 +834,7 @@ export default function NotesApp() {
     (fresh: NoteFull) => {
       baseRef.current.set(fresh.id, fresh.updated_at);
       baseBodyRef.current.set(fresh.id, fresh.body_json ?? null);
+      baseMetaRef.current.set(fresh.id, metaOf(fresh));
       setActiveNote((cur) => (cur?.id === fresh.id ? { ...fresh, role: fresh.role ?? cur.role } : cur));
       setNotes((prev) =>
         prev.map((n) =>

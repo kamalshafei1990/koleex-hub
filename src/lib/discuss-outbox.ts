@@ -15,10 +15,15 @@
        survives into another account's session.
      · Every storage access is wrapped: private mode, a full quota or blocked
        site data just means the outbox is not durable, never a crash.
-     · Only UPLOADED attachments are kept (they carry a file_path the server
-       can resolve). Anything else — a blob that never left the browser — is
-       dropped and the entry says so (`attachmentsDropped`), so the bubble can
-       ask the user to add it again. No blob / object URL is ever stored.
+     · Only UPLOADED attachments go into the entry's wire metadata (they
+       carry a file_path the server can resolve). A file that never finished
+       uploading is listed in `pendingFiles` (display fields only) and its
+       BYTES are kept in IndexedDB by discuss-outbox-files.ts; the restored
+       bubble rebuilds its blob preview from there and Retry uploads it
+       before sending. If the bytes cannot be kept (no IndexedDB, over a cap)
+       the file is dropped and the entry says so (`attachmentsDropped`), so
+       the bubble asks the user to add it again. No blob / object URL is ever
+       stored in localStorage.
      · A restored bubble previews its already-uploaded media through
        /api/discuss/pending-media (outboxMediaUrlsFor) — the blob: URL of the
        page that failed is gone after a reload, and the canonical
@@ -30,9 +35,11 @@
        sent message's.
      · An entry leaves the outbox when the server has its client_msg_id (the
        refresh replacement in mergeServerPage / reconcile), when the user
-       deletes it, when the server refuses it for good, or after 7 days.
+       deletes it, when the server refuses it for good, or after 7 days —
+       and its IndexedDB bytes go with it.
    --------------------------------------------------------------------------- */
 
+import { deleteDiscussOutboxFiles } from "@/lib/discuss-outbox-files";
 import type {
   DiscussMessageKind,
   DiscussMessageMetadata,
@@ -44,6 +51,20 @@ const PREFIX = "kx:discuss:outbox:";
 export const DISCUSS_OUTBOX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Hard cap per account so a long offline stretch cannot fill the quota. */
 const MAX_ENTRIES = 100;
+
+/** A file of a failed send that never finished uploading. Its bytes live in
+ *  IndexedDB (discuss-outbox-files.ts) under the same clientMsgId + index. */
+export type DiscussOutboxPendingFile = {
+  /** Canonical media index (attachments 0..n-1, voice n). */
+  index: number;
+  kind: "attachment" | "voice";
+  name: string;
+  type: string;
+  size: number;
+  /** Voice only. */
+  durationMs?: number;
+  waveform?: number[];
+};
 
 export type DiscussOutboxEntry = {
   /** Idempotency key of the send — also the entry's identity. */
@@ -59,6 +80,8 @@ export type DiscussOutboxEntry = {
   threadParentId?: string | null;
   /** The bubble as it was drawn (client-safe `metadata.media` only). */
   display: DiscussMessageWithAuthor;
+  /** Files not uploaded yet whose bytes are kept in IndexedDB. */
+  pendingFiles?: DiscussOutboxPendingFile[];
   /** An attachment could not be kept (never uploaded) — it must be re-added. */
   attachmentsDropped?: boolean;
   /** ms epoch the send was first attempted. */
@@ -107,7 +130,11 @@ export function readDiscussOutbox(accountId: string): DiscussOutboxEntry[] {
   const all = readRaw(accountId);
   const now = Date.now();
   const live = all.filter((e) => isLive(e, now));
-  if (live.length !== all.length) writeRaw(accountId, live);
+  if (live.length !== all.length) {
+    writeRaw(accountId, live);
+    const gone = all.filter((e) => e && !live.includes(e) && typeof e.clientMsgId === "string");
+    if (gone.length > 0) void deleteDiscussOutboxFiles(accountId, gone.map((e) => e.clientMsgId));
+  }
   return live;
 }
 
@@ -134,17 +161,29 @@ function durableMetadata(metadata: DiscussMessageMetadata): {
   return { metadata: next, dropped };
 }
 
-/** Record (or refresh) a failed send. Returns the stored entry. */
+/**
+ * Record (or refresh) a failed send. Returns the stored entry.
+ *
+ * `pendingFiles` (files that never finished uploading) are kept on the entry
+ * only when `filesKept` says their bytes are in IndexedDB; otherwise they are
+ * dropped and the bubble asks for them again after a reload.
+ */
 export function putDiscussOutbox(
   accountId: string,
   entry: Omit<DiscussOutboxEntry, "savedAt" | "attachmentsDropped"> & { savedAt?: number },
+  opts: { filesKept?: boolean } = {},
 ): DiscussOutboxEntry | null {
   if (typeof window === "undefined" || !accountId) return null;
-  const { metadata, dropped } = durableMetadata(entry.metadata);
+  const durable = durableMetadata(entry.metadata);
+  const { metadata } = durable;
+  const pending = Array.isArray(entry.pendingFiles) ? entry.pendingFiles : [];
+  const keepPending = pending.length > 0 && opts.filesKept === true;
+  const dropped = durable.dropped || (pending.length > 0 && !keepPending);
   const media = Array.isArray(entry.display.metadata?.media) ? entry.display.metadata.media : [];
   const stored: DiscussOutboxEntry = {
     ...entry,
     metadata,
+    pendingFiles: keepPending && !durable.dropped ? pending : undefined,
     attachmentsDropped: dropped || undefined,
     /* A dropped attachment is no longer part of the message: draw it
        without, and say so on the bubble. */
@@ -156,7 +195,53 @@ export function putDiscussOutbox(
   };
   const rest = readDiscussOutbox(accountId).filter((e) => e.clientMsgId !== entry.clientMsgId);
   writeRaw(accountId, [...rest, stored]);
+  if (!stored.pendingFiles) void deleteDiscussOutboxFiles(accountId, [entry.clientMsgId]);
   return stored;
+}
+
+/** The stored entry of one send, if it is still in the outbox. */
+export function getDiscussOutboxEntry(accountId: string, clientMsgId: string): DiscussOutboxEntry | null {
+  if (typeof window === "undefined" || !accountId) return null;
+  return readDiscussOutbox(accountId).find((e) => e.clientMsgId === clientMsgId) ?? null;
+}
+
+/**
+ * The pending files of an entry finished uploading (Retry): store the new
+ * wire metadata, clear `pendingFiles` and forget the IndexedDB bytes. No-op
+ * when the entry is gone (sent / deleted meanwhile).
+ */
+export function markDiscussOutboxUploaded(
+  accountId: string,
+  clientMsgId: string,
+  metadata: DiscussMessageMetadata,
+): void {
+  const cur = getDiscussOutboxEntry(accountId, clientMsgId);
+  if (!cur) {
+    void deleteDiscussOutboxFiles(accountId, [clientMsgId]);
+    return;
+  }
+  putDiscussOutbox(accountId, { ...cur, metadata, pendingFiles: undefined });
+}
+
+/** Forget the IndexedDB bytes of a send unless its entry still lists pending
+ *  files (it was sent, deleted or uploaded while the bytes were written). */
+export function deleteOutboxFilesIfSettled(accountId: string, clientMsgId: string): void {
+  const cur = getDiscussOutboxEntry(accountId, clientMsgId);
+  if (!cur || !cur.pendingFiles?.length) void deleteDiscussOutboxFiles(accountId, [clientMsgId]);
+}
+
+/**
+ * The bytes of an entry's pending files could not be kept / found: drop them
+ * (the bubble then asks for the file again). No-op when the entry is gone.
+ */
+export function dropDiscussOutboxFiles(accountId: string, clientMsgId: string): DiscussOutboxEntry | null {
+  const cur = getDiscussOutboxEntry(accountId, clientMsgId);
+  if (!cur) {
+    void deleteDiscussOutboxFiles(accountId, [clientMsgId]);
+    return null;
+  }
+  if (!cur.pendingFiles?.length) return cur;
+  return putDiscussOutbox(accountId, cur, { filesKept: false });
 }
 
 /* ── Pending-media previews ─────────────────────────────────────────────
@@ -198,6 +283,7 @@ export function removeDiscussOutbox(accountId: string, clientMsgIds: Iterable<st
   const drop = new Set(clientMsgIds);
   if (drop.size === 0) return;
   for (const id of drop) pendingMedia.delete(id);
+  void deleteDiscussOutboxFiles(accountId, drop);
   const all = readDiscussOutbox(accountId);
   const next = all.filter((e) => !drop.has(e.clientMsgId));
   if (next.length !== all.length) writeRaw(accountId, next);

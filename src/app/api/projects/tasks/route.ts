@@ -4,7 +4,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { assertProjectAccess, likeTerm, memberProjectIds, taskEditFlags, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, assertTaskWrite, likeTerm, memberProjectIds, taskEditFlags, UUID_RE } from "@/lib/server/project-access";
 import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
@@ -139,8 +139,23 @@ export async function POST(req: Request) {
   if (!body || !projectId || typeof body.title !== "string" || !body.title.trim()) {
     return NextResponse.json({ error: "project_id and title required" }, { status: 400 });
   }
-  const gate = await assertProjectAccess(auth, projectId, { write: true });
-  if (gate instanceof NextResponse) return gate;
+  /* A top-level task is a project write. A SUBTASK is a write on its
+     parent: whoever may edit the parent (assertTaskWrite — project
+     manage/edit, or the parent's own assignee/creator, e.g. a viewer on
+     their own task) may add subtasks under it. The subtask's creator is
+     the caller, so they keep editing it (ownsTask). */
+  const parentId = typeof body.parent_task_id === "string" && body.parent_task_id ? body.parent_task_id : null;
+  if (parentId) {
+    if (!UUID_RE.test(parentId)) return NextResponse.json({ error: "Invalid parent task" }, { status: 400 });
+    const parentGate = await assertTaskWrite(auth, parentId);
+    if (parentGate instanceof NextResponse) return parentGate;
+    if (parentGate.task.project_id !== projectId) {
+      return NextResponse.json({ error: "Parent task is in another project" }, { status: 400 });
+    }
+  } else {
+    const gate = await assertProjectAccess(auth, projectId, { write: true });
+    if (gate instanceof NextResponse) return gate;
+  }
 
   const stages = await loadStages(auth.tenant_id, projectId);
   const checked = await validateTaskWrite({

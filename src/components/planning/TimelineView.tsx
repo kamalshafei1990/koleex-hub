@@ -5,7 +5,15 @@
    open-shifts row); each item sits at its real start and end.
 
      · Day   — the whole day, 64px an hour, opened scrolled to 06:00.
-     · Week  — seven days side by side, 06:00–22:00 each, 14px an hour.
+     · Week  — seven days side by side, 06:00–22:00 each, 14px an hour;
+               or 00:00–24:00 at 10px an hour with "Full day" (?hours=full).
+               While clipped, a day whose out-of-office or items reach
+               outside 06–22 shows a small "+" chip at that edge of the
+               row; clicking it switches to the full day.
+
+   Out-of-office is decorative: a click on the hatch goes through to the
+   track and starts a new item there (the conflict dialog warns on save).
+   Its tooltip lives on a thin strip along its top and on its label.
 
    Times are read on the planner's clock (lib/planning-tz): the Calendar's
    timezone preference when they set one, else the browser's zone — the
@@ -88,6 +96,8 @@ export default function TimelineView({
   leaveCells,
   awayCells,
   awayTip,
+  fullDay = false,
+  onFullDay,
   canWrite,
   onItemClick,
   onMove,
@@ -102,8 +112,12 @@ export default function TimelineView({
   leaveCells: Set<string>;
   /** Calendar out-of-office, `resource|dayKey` → that day's slices (planning-away). */
   awayCells: Map<string, AwaySlice[]>;
-  /** Tooltip text for a day's slices — a time span only, never a title. */
+  /** Tooltip text for a day's slices (a title only when the server sent one). */
   awayTip: (slices: AwaySlice[]) => string;
+  /** Week range: show 00:00–24:00 instead of 06:00–22:00. */
+  fullDay?: boolean;
+  /** Week range: switch to the full day (from an edge chip). */
+  onFullDay?: () => void;
   canWrite: (i: PlanningItem) => boolean;
   onItemClick: (i: PlanningItem) => void;
   onMove: (id: string, patch: TimelinePatch) => void;
@@ -113,9 +127,10 @@ export default function TimelineView({
   const hintId = useId();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const hFrom = range === "day" ? 0 : 6;
-  const hTo = range === "day" ? 24 : 22;
-  const pxPerHour = range === "day" ? 64 : 14;
+  const clipped = range === "week" && !fullDay;
+  const hFrom = clipped ? 6 : 0;
+  const hTo = clipped ? 22 : 24;
+  const pxPerHour = range === "day" ? 64 : clipped ? 14 : 10;
   const dayWidth = (hTo - hFrom) * pxPerHour;
   const totalWidth = dayWidth * days.length;
 
@@ -314,7 +329,7 @@ export default function TimelineView({
   };
 
   const hourTicks = useMemo(() => {
-    const step = range === "day" ? 1 : 3;
+    const step = range === "day" ? 1 : clipped ? 3 : 6;
     const ticks: Array<{ x: number; label: string; major: boolean }> = [];
     days.forEach((_, i) => {
       for (let h = hFrom; h < hTo; h += step) {
@@ -322,7 +337,49 @@ export default function TimelineView({
       }
     });
     return ticks;
-  }, [days, range, hFrom, hTo, dayWidth, pxPerHour]);
+  }, [days, range, clipped, hFrom, hTo, dayWidth, pxPerHour]);
+
+  /* Clipped week: per `row|dayIndex`, what lies outside 06:00–22:00 —
+     out-of-office (a timed slice; a full-day one already fills the day)
+     and items (by their real times, including ones hidden entirely). */
+  const edges = useMemo(() => {
+    const out = new Map<string, { awayBefore: boolean; awayAfter: boolean; itemsBefore: boolean; itemsAfter: boolean }>();
+    if (!clipped) return out;
+    const get = (k: string) => {
+      let v = out.get(k);
+      if (!v) {
+        v = { awayBefore: false, awayAfter: false, itemsBefore: false, itemsAfter: false };
+        out.set(k, v);
+      }
+      return v;
+    };
+    const itemsByRow = new Map<string, Array<{ s: number; e: number }>>();
+    for (const it of items) {
+      const rowId = it.resource_id ?? "__open__";
+      const arr = itemsByRow.get(rowId) ?? [];
+      arr.push({ s: Date.parse(it.start_at), e: Date.parse(it.end_at) });
+      itemsByRow.set(rowId, arr);
+    }
+    for (const row of rows) {
+      for (let i = 0; i < days.length; i++) {
+        const d0 = dayStarts[i];
+        const early = d0 + hFrom * H;
+        const late = d0 + hTo * H;
+        const dayEnd = d0 + 24 * H;
+        for (const { s, e } of itemsByRow.get(row.id) ?? []) {
+          if (s < early && e > d0) get(`${row.id}|${i}`).itemsBefore = true;
+          if (e > late && s < dayEnd) get(`${row.id}|${i}`).itemsAfter = true;
+        }
+        if (!row.resourceId) continue;
+        for (const sl of awayCells.get(`${row.resourceId}|${dayKeys[i]}`) ?? []) {
+          if (sl.full) continue;
+          if (sl.fromMs < early) get(`${row.id}|${i}`).awayBefore = true;
+          if (sl.toMs > late) get(`${row.id}|${i}`).awayAfter = true;
+        }
+      }
+    }
+    return out;
+  }, [clipped, items, rows, days.length, dayStarts, dayKeys, hFrom, hTo, awayCells]);
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -399,7 +456,9 @@ export default function TimelineView({
                   className="relative cursor-copy"
                   style={{ width: totalWidth, height }}
                   onClick={(e) => {
-                    if (e.target !== e.currentTarget) return;
+                    /* The track itself, or a decorative overlay (the
+                       out-of-office hatch's tooltip strip / label). */
+                    if (e.target !== e.currentTarget && !(e.target as HTMLElement).closest("[data-tl-passthrough]")) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
                     const x = rtl ? rect.right - e.clientX : e.clientX - rect.left;
@@ -427,8 +486,11 @@ export default function TimelineView({
                       )}
                     </div>
                   ))}
-                  {/* Calendar out-of-office — hatched at its real hours, with
-                      a tooltip; below the bars so items stay grabbable. */}
+                  {/* Calendar out-of-office — hatched at its real hours. The
+                      hatch lets clicks through to the track (a new item
+                      there; the conflict dialog warns on save); its
+                      tooltip rides on a thin top strip and on the label,
+                      which pass their clicks through too. */}
                   {row.resourceId &&
                     days.map((_, i) => {
                       const slices = awayCells.get(`${row.resourceId}|${dayKeys[i]}`);
@@ -438,22 +500,73 @@ export default function TimelineView({
                         const x1 = sl.full ? (i + 1) * dayWidth : xOf(sl.toMs, i);
                         const left = sl.full ? i * dayWidth : x0;
                         if (x1 - left < 1) return null;
+                        const tip = awayTip([sl]);
                         return (
                           <div
                             key={`away-${dayKeys[i]}-${sl.fromMs}`}
-                            title={awayTip([sl])}
-                            aria-label={awayTip([sl])}
-                            className="absolute top-0 bottom-0 border-x border-dashed border-slate-500/40 cursor-help overflow-hidden"
+                            className="absolute top-0 bottom-0 border-x border-dashed border-slate-500/40 overflow-hidden pointer-events-none"
                             style={{ insetInlineStart: left, width: x1 - left, backgroundImage: AWAY_HATCH }}
                           >
+                            <div
+                              data-tl-passthrough
+                              title={tip}
+                              aria-label={tip}
+                              role="img"
+                              className="absolute top-0 inset-x-0 h-1.5 bg-slate-500/25 cursor-help pointer-events-auto"
+                            />
                             {x1 - left >= 48 && (
-                              <span className="absolute bottom-0.5 start-1 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap pointer-events-none">
+                              <span
+                                data-tl-passthrough
+                                title={tip}
+                                aria-hidden="true"
+                                className="absolute bottom-0.5 start-4 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap cursor-help pointer-events-auto"
+                              >
                                 {t("sched.outOfOffice")}
                               </span>
                             )}
                           </div>
                         );
                       });
+                    })}
+                  {/* Clipped week: "+" chips at a day's edges for what lies
+                      outside 06:00–22:00; a click shows the full day. */}
+                  {clipped &&
+                    days.map((_, i) => {
+                      const ed = edges.get(`${row.id}|${i}`);
+                      if (!ed) return null;
+                      const chip = (side: "before" | "after", away: boolean, its: boolean) => {
+                        if (!away && !its) return null;
+                        const h = side === "before" ? `${pad(hFrom)}:00` : `${pad(hTo)}:00`;
+                        const lines = [
+                          away ? t(side === "before" ? "tl.awayBefore" : "tl.awayAfter").replace("{h}", h) : null,
+                          its ? t(side === "before" ? "tl.itemsBefore" : "tl.itemsAfter").replace("{h}", h) : null,
+                        ].filter(Boolean);
+                        const label = `${lines.join(" · ")} — ${t("tl.expandDay")}`;
+                        return (
+                          <button
+                            key={`edge-${side}-${dayKeys[i]}`}
+                            type="button"
+                            title={label}
+                            aria-label={label}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onFullDay?.();
+                            }}
+                            className={`absolute bottom-0.5 z-[2] h-3.5 w-3 rounded-sm flex items-center justify-center text-[10px] font-bold leading-none outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2] ${
+                              its
+                                ? "bg-[#567FB2]/20 text-[#35598A] dark:text-[#9DBBE0] hover:bg-[#567FB2]/35"
+                                : "bg-slate-500/20 text-slate-600 dark:text-slate-300 hover:bg-slate-500/35"
+                            }`}
+                            style={{
+                              insetInlineStart: side === "before" ? i * dayWidth + 1 : (i + 1) * dayWidth - 13,
+                              ...(away && !its ? { backgroundImage: AWAY_HATCH } : {}),
+                            }}
+                          >
+                            +
+                          </button>
+                        );
+                      };
+                      return [chip("before", ed.awayBefore, ed.itemsBefore), chip("after", ed.awayAfter, ed.itemsAfter)];
                     })}
                   {hourTicks.map((tk) =>
                     tk.major ? null : (

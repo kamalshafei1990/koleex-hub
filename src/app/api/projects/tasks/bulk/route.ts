@@ -21,7 +21,12 @@ import "server-only";
    Stage and status go through reconcileStageStatus exactly like the PATCH
    and reorder routes (closed stage ⇒ done, reopened ⇒ first open stage,
    closed_at / progress stamped). Values are validated by validateTaskWrite.
-   Moved tasks append to the bottom of the target column. */
+   Moved tasks append to the bottom of the target column.
+
+   Chat seats: after "assign" (the previous assignees) and "delete" (the
+   deleted tasks' and their subtasks' assignees), one batched
+   pruneProjectChatSeats pass removes from the project chat whoever no
+   longer reaches the project and is not a member. */
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -37,7 +42,7 @@ import {
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { clearTaskNotifications, notifyTaskAssigned } from "@/lib/server/project-notify";
 import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
-import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
+import { pruneProjectChatSeats, syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 
 const ACTIONS = ["stage", "status", "assign", "due", "priority", "delete"] as const;
 type Action = (typeof ACTIONS)[number];
@@ -104,8 +109,13 @@ export async function POST(req: Request) {
   /* ── Delete ── */
   if (action === "delete") {
     const { data: subs } = await supabaseServer
-      .from("project_tasks").select("id").eq("tenant_id", auth.tenant_id).in("parent_task_id", ids);
-    const allIds = [...new Set([...ids, ...((subs ?? []).map((r) => (r as { id: string }).id))])];
+      .from("project_tasks").select("id, project_id, assignee_account_id").eq("tenant_id", auth.tenant_id).in("parent_task_id", ids);
+    const subRows = (subs ?? []) as { id: string; project_id: string; assignee_account_id: string | null }[];
+    const allIds = [...new Set([...ids, ...subRows.map((r) => r.id)])];
+    /* Assignees of the deleted tasks may lose their last way in. */
+    const lostSeats = [...rows, ...subRows]
+      .filter((r) => r.assignee_account_id)
+      .map((r) => ({ project_id: r.project_id, account_id: r.assignee_account_id as string }));
     const { data: files } = await supabaseServer
       .from("project_task_attachments").select("file_path").eq("tenant_id", auth.tenant_id).in("task_id", allIds);
     const { error: delErr } = await supabaseServer.from("project_tasks").delete().eq("tenant_id", auth.tenant_id).in("id", ids);
@@ -118,6 +128,7 @@ export async function POST(req: Request) {
       await removeTaskAttachmentFiles(paths);
       for (const id of ids) await clearTaskNotifications(id);
       for (const pid of projectIds) await recomputeProjectProgress(auth.tenant_id, pid);
+      await pruneProjectChatSeats(auth.tenant_id, lostSeats);
     });
     return NextResponse.json({ ok: true, deleted: ids.length });
   }
@@ -224,11 +235,19 @@ export async function POST(req: Request) {
 
   if (action === "assign") {
     const who = checked.patch.assignee_account_id as string | null;
-    if (who) {
-      const fresh = rows.filter((r) => r.assignee_account_id !== who);
+    const fresh = rows.filter((r) => r.assignee_account_id !== who);
+    /* Everyone the tasks were taken AWAY from — one batched reachability
+       pass decides who (no other path in, not a member) leaves the chat. */
+    const lostSeats = fresh
+      .filter((r) => r.assignee_account_id)
+      .map((r) => ({ project_id: r.project_id, account_id: r.assignee_account_id as string }));
+    if (who || lostSeats.length > 0) {
       after(async () => {
-        for (const r of fresh) await notifyTaskAssigned(auth, { id: r.id, title: r.title, project_id: r.project_id, due_date: r.due_date, assignee_account_id: who });
-        for (const pid of new Set(fresh.map((r) => r.project_id))) await syncProjectMembersFromAssignees(auth, pid, [who]);
+        if (who) {
+          for (const r of fresh) await notifyTaskAssigned(auth, { id: r.id, title: r.title, project_id: r.project_id, due_date: r.due_date, assignee_account_id: who });
+          for (const pid of new Set(fresh.map((r) => r.project_id))) await syncProjectMembersFromAssignees(auth, pid, [who]);
+        }
+        await pruneProjectChatSeats(auth.tenant_id, lostSeats);
       });
     }
   }

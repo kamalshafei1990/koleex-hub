@@ -13,11 +13,15 @@
      · Same block edited on both sides: merged RECURSIVELY — attrs per key,
        nested containers (lists, quotes, tables) as block sequences, and
        inline content (text + marks, hard breaks) character by character.
-     · A real conflict (overlapping edits in the same text, a block one side
-       deleted while the other edited it, a changed type): BOTH versions are
-       kept — the current block, then the local block right after it, marked
-       with a subtle italic "conflict copy" label. Typed text is never
-       dropped; the caller counts conflicts and tells the user.
+     · A real conflict (overlapping edits in the same text, a changed
+       type): BOTH versions are kept — the current block, then the local
+       block right after it, flagged as a conflict copy with a LANGUAGE-
+       NEUTRAL marker (`attrs.conflict: true` on its first text block; the
+       editor renders the label in the viewer's language). Typed text is
+       never dropped; the caller counts conflicts and tells the user.
+     · Delete vs edit (one side deleted a block the other side edited): the
+       EDIT wins — the edited block is kept (unmarked) and counted in
+       `kept`, so the user is told a deleted block came back.
 
    Pure and dependency-free (runs in the browser and on the server). The
    server normalises all three inputs through the note schema first and
@@ -37,13 +41,14 @@ export interface Merge3Result {
   doc: PMJson;
   /** Blocks kept twice because both sides changed them incompatibly. */
   conflicts: number;
+  /** Blocks one side deleted that were KEPT because the other edited them. */
+  kept: number;
 }
 
 /* Schema facts (src/lib/notes-schema.ts) the merge needs. The server
    re-validates every merged document against the real schema. */
 const INLINE_TYPES = new Set(["text", "hardBreak"]);
 const TEXTBLOCK_TYPES = new Set(["paragraph", "heading", "codeBlock"]);
-const MARKABLE_TEXTBLOCKS = new Set(["paragraph", "heading"]);
 
 /** LCS tables above this many cells fall back to prefix/suffix matching. */
 const MAX_LCS_CELLS = 2_000_000;
@@ -206,25 +211,26 @@ function isInlineSeq(content: PMJson[]): boolean {
   return content.every((n) => INLINE_TYPES.has(n.type ?? ""));
 }
 
-interface Ctx { label: string; conflicts: number }
+interface Ctx { conflicts: number; kept: number }
+
+/** Node attribute that flags a conflict copy (see NoteConflictMarker). */
+export const CONFLICT_ATTR = "conflict";
 
 /**
- * The local block, marked as a conflict copy: an italic label at the start
- * of its first text block (or, for a block without text — an image, a
- * divider — a labelled paragraph before it). A copied to-do item does not
- * keep the link to its task (the current block still has it).
+ * The local block, flagged as a conflict copy: `attrs.conflict = true` on
+ * its first text block (or, for a block without text — an image, a divider
+ * — on an empty paragraph put before it). The flag is language-neutral: the
+ * editor draws the label in the VIEWER's language. A copied to-do item does
+ * not keep the link to its task (the current block still has it).
  */
-function markCopy(node: PMJson, label: string): PMJson[] {
+function markCopy(node: PMJson): PMJson[] {
   const copy = JSON.parse(JSON.stringify(node)) as PMJson;
   let done = false;
   const visit = (n: PMJson) => {
     if (n.attrs && typeof n.attrs.todoId === "string") n.attrs = { ...n.attrs, todoId: null };
     if (done) return;
     if (TEXTBLOCK_TYPES.has(n.type ?? "")) {
-      const tag: PMJson = MARKABLE_TEXTBLOCKS.has(n.type ?? "")
-        ? { type: "text", text: `${label} `, marks: [{ type: "italic" }] }
-        : { type: "text", text: `${label} ` };
-      n.content = [tag, ...(n.content ?? [])];
+      n.attrs = { ...(n.attrs ?? {}), [CONFLICT_ATTR]: true };
       done = true;
       return;
     }
@@ -232,7 +238,7 @@ function markCopy(node: PMJson, label: string): PMJson[] {
   };
   visit(copy);
   if (done) return [copy];
-  return [{ type: "paragraph", content: [{ type: "text", text: label, marks: [{ type: "italic" }] }] }, copy];
+  return [{ type: "paragraph", attrs: { [CONFLICT_ATTR]: true } }, copy];
 }
 
 /** One block changed on both sides: merge it, or keep both versions. */
@@ -263,7 +269,7 @@ function mergeNode(o: PMJson, l: PMJson, c: PMJson, ctx: Ctx): PMJson[] {
     }
   }
   ctx.conflicts += 1;
-  return [c, ...markCopy(l, ctx.label)];
+  return [c, ...markCopy(l)];
 }
 
 /** A region both sides changed differently. */
@@ -275,12 +281,112 @@ function resolveBlocks(o: PMJson[], l: PMJson[], c: PMJson[], ctx: Ctx): PMJson[
   if (o.length === l.length && l.length === c.length) {
     return o.flatMap((ob, i) => mergeNode(ob, l[i], c[i], ctx));
   }
-  // Anything else: the current blocks, then every block only the local side
-  // has, as conflict copies — nothing either side typed is lost.
-  const known = new Set([...o.map(stableKey), ...ck]);
-  const copies = l.filter((x) => !known.has(stableKey(x)));
-  ctx.conflicts += copies.length;
-  return [...c, ...copies.flatMap((x) => markCopy(x, ctx.label))];
+  return mergeRegion(o, l, c, ctx);
+}
+
+/** Plain text of a block (for similarity pairing). */
+function jsonText(n: PMJson): string {
+  if (typeof n.text === "string") return n.text;
+  return (n.content ?? []).map(jsonText).join("");
+}
+
+/**
+ * Pair base blocks with one side's blocks: equal content first (LCS), then,
+ * in the gaps, a SIMILAR block of the same type (≥ 0.5) — an edit of that
+ * block. A base block left unpaired was deleted (or rewritten beyond
+ * recognition) on that side.
+ */
+function pairBlocks(o: PMJson[], x: PMJson[]): Map<number, number> {
+  const out = new Map<number, number>();
+  const eq = matchPairs(o.map(stableKey), x.map(stableKey));
+  let pi = 0;
+  let pj = 0;
+  for (const [ei, ej] of [...eq, [o.length, x.length] as [number, number]]) {
+    let from = pj;
+    for (let i = pi; i < ei; i++) {
+      let best = -1;
+      let bestSim = 0.49;
+      const ot = jsonText(o[i]);
+      for (let j = from; j < ej; j++) {
+        if (x[j].type !== o[i].type) continue;
+        const sim = similarity(ot, jsonText(x[j]));
+        if (sim > bestSim) { bestSim = sim; best = j; }
+      }
+      if (best >= 0) { out.set(i, best); from = best + 1; }
+    }
+    if (ei < o.length) out.set(ei, ej);
+    pi = ei + 1;
+    pj = ej + 1;
+  }
+  return out;
+}
+
+/**
+ * A region both sides changed with different block counts: follow every
+ * base block to its fate on each side (kept / edited / deleted).
+ *   · edited on one side only → that edit; on both → merged (mergeNode);
+ *   · deleted on one side, untouched on the other → deleted;
+ *   · deleted on one side, EDITED on the other → the edit wins: the block
+ *     is kept and counted in `kept` — unless the deleting side put new
+ *     blocks in its place (a rewrite beyond recognition): then both
+ *     versions stay and the local one is flagged as a conflict copy;
+ *   · blocks only one side inserted are kept where they were inserted.
+ */
+function mergeRegion(o: PMJson[], l: PMJson[], c: PMJson[], ctx: Ctx): PMJson[] {
+  const ml = pairBlocks(o, l);
+  const mc = pairBlocks(o, c);
+  const lUsed = new Set(ml.values());
+  const cUsed = new Set(mc.values());
+  const cKeys = new Set(c.map(stableKey));
+  const out: PMJson[] = [];
+  let li = 0;
+  let ci = 0;
+  const nextPartner = (m: Map<number, number>, k: number, len: number) => {
+    for (let q = k + 1; q < o.length; q++) { const v = m.get(q); if (v !== undefined) return v; }
+    return len;
+  };
+  const newIn = (used: Set<number>, from: number, to: number) => {
+    let n = 0;
+    for (let j = from; j < to; j++) if (!used.has(j)) n++;
+    return n;
+  };
+  let flagL = 0; // how many upcoming local inserts are rewrites of a block the current side edited
+  const emit = (lEnd: number, cEnd: number) => {
+    for (; ci < cEnd; ci++) if (!cUsed.has(ci)) out.push(c[ci]);
+    for (; li < lEnd; li++) {
+      if (lUsed.has(li)) continue;
+      if (cKeys.has(stableKey(l[li]))) continue; // both inserted the same block
+      if (flagL > 0) { flagL -= 1; ctx.conflicts += 1; out.push(...markCopy(l[li])); } else out.push(l[li]);
+    }
+  };
+  for (let k = 0; k < o.length; k++) {
+    const lj = ml.get(k);
+    const cj = mc.get(k);
+    emit(lj ?? li, cj ?? ci);
+    const lSame = lj !== undefined && stableKey(l[lj]) === stableKey(o[k]);
+    const cSame = cj !== undefined && stableKey(c[cj]) === stableKey(o[k]);
+    if (lj !== undefined && cj !== undefined) {
+      if (lSame) out.push(c[cj]);
+      else if (cSame) out.push(l[lj]);
+      else out.push(...mergeNode(o[k], l[lj], c[cj], ctx));
+    } else if (lj === undefined && cj !== undefined && !cSame) {
+      // Local deleted it, current edited it: keep the edit.
+      out.push(c[cj]);
+      const rewrites = newIn(lUsed, li, nextPartner(ml, k, l.length));
+      if (rewrites) flagL += rewrites; else ctx.kept += 1;
+    } else if (cj === undefined && lj !== undefined && !lSame) {
+      // Current deleted it, local edited it: keep ours — flagged when the
+      // current side put a rewrite of it in its place.
+      const rewrites = newIn(cUsed, ci, nextPartner(mc, k, c.length));
+      if (rewrites) { ctx.conflicts += 1; emit(li, nextPartner(mc, k, c.length)); out.push(...markCopy(l[lj])); }
+      else { ctx.kept += 1; out.push(l[lj]); }
+    }
+    // Otherwise deleted on one side and untouched (or deleted) on the other.
+    if (lj !== undefined) li = Math.max(li, lj + 1);
+    if (cj !== undefined) ci = Math.max(ci, cj + 1);
+  }
+  emit(l.length, c.length);
+  return out;
 }
 
 function mergeSeq(o: PMJson[], l: PMJson[], c: PMJson[], ctx: Ctx): PMJson[] {
@@ -304,22 +410,97 @@ function asDoc(x: unknown): PMJson {
 }
 
 /**
- * Re-apply the changes `local` made to `base` on top of `current`.
- * `conflictLabel` is the (localised) marker put on conflict copies.
+ * Re-apply the changes `local` made to `base` on top of `current`. Conflict
+ * copies carry the language-neutral CONFLICT_ATTR flag (no label text).
  */
-export function mergeDocs(base: unknown, local: unknown, current: unknown, conflictLabel: string): Merge3Result {
+export function mergeDocs(base: unknown, local: unknown, current: unknown): Merge3Result {
   const b = asDoc(base);
   const l = asDoc(local);
   const c = asDoc(current);
-  const ctx: Ctx = { label: conflictLabel.trim() || "Conflict copy", conflicts: 0 };
-  if (stableKey(l) === stableKey(b)) return { doc: c, conflicts: 0 };
-  if (stableKey(c) === stableKey(b) || stableKey(l) === stableKey(c)) return { doc: l, conflicts: 0 };
+  const ctx: Ctx = { conflicts: 0, kept: 0 };
+  if (stableKey(l) === stableKey(b)) return { doc: c, conflicts: 0, kept: 0 };
+  if (stableKey(c) === stableKey(b) || stableKey(l) === stableKey(c)) return { doc: l, conflicts: 0, kept: 0 };
   const content = mergeSeq(b.content ?? [], l.content ?? [], c.content ?? [], ctx);
   const doc: PMJson = { ...c, type: "doc", content: content.length ? content : [{ type: "paragraph" }] };
-  return { doc, conflicts: ctx.conflicts };
+  return { doc, conflicts: ctx.conflicts, kept: ctx.kept };
+}
+
+/* ── Note metadata (title / tags / colour) ─────────────────────────────── */
+
+export interface NoteMeta {
+  title?: string;
+  tags?: string[];
+  color?: string | null;
+}
+
+export interface MetaMergeResult {
+  /** The fields to write (only those that actually change the note). */
+  apply: NoteMeta;
+  /** Fields both sides changed differently — the current value was kept. */
+  conflicts: Array<"title" | "color">;
+}
+
+/**
+ * 3-way merge of a note's metadata: only the fields the client changed vs
+ * its base are applied onto the current note. Tags merge as a SET (the
+ * client's adds and removes are replayed on the current tags); a title or
+ * colour both sides changed differently keeps the current value and is
+ * reported. A field without a base value falls back to "client wins".
+ */
+export function mergeNoteMeta(
+  base: NoteMeta,
+  local: NoteMeta,
+  current: { title: string; tags: string[]; color: string | null },
+): MetaMergeResult {
+  const apply: NoteMeta = {};
+  const conflicts: MetaMergeResult["conflicts"] = [];
+  const scalar = (k: "title" | "color") => {
+    if (!(k in local)) return;
+    const lv = local[k] ?? (k === "title" ? "" : null);
+    const cv = current[k] ?? (k === "title" ? "" : null);
+    if (lv === cv) return;
+    if (!(k in base)) { (apply as Record<string, unknown>)[k] = lv; return; }
+    const bv = base[k] ?? (k === "title" ? "" : null);
+    if (lv === bv) return; // not changed by the client
+    if (cv === bv) { (apply as Record<string, unknown>)[k] = lv; return; }
+    conflicts.push(k);
+  };
+  scalar("title");
+  scalar("color");
+  if (Array.isArray(local.tags)) {
+    const cur = current.tags ?? [];
+    let next: string[];
+    if (!Array.isArray(base.tags)) next = local.tags;
+    else {
+      const low = (xs: string[]) => new Set(xs.map((x) => x.toLowerCase()));
+      const bl = low(base.tags);
+      const ll = low(local.tags);
+      const removed = new Set([...bl].filter((x) => !ll.has(x)));
+      const added = local.tags.filter((x) => !bl.has(x.toLowerCase()));
+      next = cur.filter((x) => !removed.has(x.toLowerCase()));
+      const have = low(next);
+      for (const x of added) if (!have.has(x.toLowerCase())) { next.push(x); have.add(x.toLowerCase()); }
+    }
+    if (next.length !== cur.length || next.some((x, i) => x !== cur[i])) apply.tags = next;
+  }
+  return { apply, conflicts };
 }
 
 /* ── Character-level diff (for in-place CRDT text updates) ─────────────── */
+
+/**
+ * How much of the SHORTER text survives as a common prefix + suffix (0..1):
+ * an append, an insertion or a trim scores 1, a rewrite ~0. An empty block
+ * against text scores 0.5 (typing into an empty paragraph is an edit).
+ */
+export function similarity(a: string, b: string): number {
+  if (!a || !b) return a === b ? 1 : 0.5;
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let s = 0;
+  while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+  return (p + s) / Math.min(a.length, b.length);
+}
 
 export type CharOp = { op: "eq" | "del" | "ins"; s: string };
 

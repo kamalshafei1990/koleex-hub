@@ -10,8 +10,12 @@ import "server-only";
    `away` reads through loadOutOfOffice (lib/server/planning-conflicts),
    the exact helper the conflict check uses: this tenant's out_of_office
    events of the accounts behind its employee resources, one-offs plus
-   recurring series expanded with their per-occurrence exceptions. It
-   never carries a title (a private event only ever shows as a time span).
+   recurring series expanded with their per-occurrence exceptions. A span
+   carries its `title` ONLY when the caller could open that event in
+   Calendar anyway — the free/busy rule (lib/server/calendar-feed
+   loadBusyBlocks): never a private event; otherwise the caller organizes
+   it, is invited to it, or is a Super Admin. Computed here, server-side;
+   every other span is a bare time span.
    The window is widened a day each side so any planner zone's days are
    covered; the board clips to its own days. A Calendar read failure is
    logged and answers `away: []` — it never hides the leave.
@@ -40,6 +44,8 @@ interface AwayOut {
   /** All-day only: inclusive local date keys on the owner's clock. */
   start_date?: string;
   end_date?: string;
+  /** Only when the caller may read the event (see the header). */
+  title?: string;
 }
 
 export async function GET(req: Request) {
@@ -80,7 +86,10 @@ export async function GET(req: Request) {
   /* Calendar out-of-office, alongside the HR chain. */
   const fromIso = new Date(Date.parse(`${from}T00:00:00Z`) - DAY_MS).toISOString();
   const toIso = new Date(Date.parse(`${to}T00:00:00Z`) + 2 * DAY_MS).toISOString();
-  const awayP: Promise<AwayOut[]> = loadOutOfOffice(auth.tenant_id, accountIds, fromIso, toIso).then(
+  const awayP: Promise<AwayOut[]> = loadOutOfOffice(auth.tenant_id, accountIds, fromIso, toIso, {
+    account_id: auth.account_id,
+    is_super_admin: !!auth.is_super_admin,
+  }).then(
     (byAccount) => {
       const out: AwayOut[] = [];
       for (const [acct, spans] of byAccount) {
@@ -92,6 +101,7 @@ export async function GET(req: Request) {
               end_at: new Date(sp.e).toISOString(),
               all_day: !!sp.days,
               ...(sp.days ? { start_date: sp.days.start, end_date: sp.days.end } : {}),
+              ...(sp.title ? { title: sp.title } : {}),
             });
           }
         }

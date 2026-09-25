@@ -10,10 +10,13 @@ import "server-only";
    Replaces the old client loop that PATCHed every card in the column
    (≈4 queries each via the PATCH route) and then reloaded the whole board
    behind a spinner. Access: the project write gate, or ownership of the
-   moved card (see below). Here: one access check, one membership check, one
-   batched sort_order upsert for the cards whose position actually changed,
-   and one stage/status update for the moved card (with the same
-   stage⇄status rules as the PATCH route). */
+   moved card (see below). Here: one access check, one membership check, a
+   sort_order write for the MOVED card only (a position between its new
+   neighbours; the column is renumbered only when that gap is exhausted
+   AND the caller has project write), and one stage/status update for the
+   moved card (with the same stage⇄status rules as the PATCH route).
+   Response: { moved, positions: { id → sort_order } for every card
+   written }. */
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
 
   /* Project write access, or — for a view-only caller — ownership of the
      MOVED card (ownsTask, the per-task rule every task write route uses).
-     Its neighbours' sort_order shifts only as a consequence of placing it. */
+     Such a caller only ever writes that one card (see step 1). */
   const gate = await assertProjectAccess(auth, projectId, { write: true });
   let ownerOnly = false;
   if (gate instanceof NextResponse) {
@@ -82,13 +85,33 @@ export async function POST(req: Request) {
     }
   }
 
-  /* 1. Positions — only rows whose sort_order changes, in one upsert. The
-        NOT NULL columns ride along unchanged so the INSERT arm validates;
-        every id exists, so only the UPDATE arm ever runs. */
-  const changed = ids
-    .map((id, i) => ({ r: byId.get(id)!, i }))
-    .filter(({ r, i }) => r.sort_order !== i)
-    .map(({ r, i }) => ({ id: r.id, tenant_id: r.tenant_id, project_id: r.project_id, title: r.title, sort_order: i }));
+  /* 1. Position. The moved card alone gets a new sort_order strictly
+        between its new neighbours' (placeMoved) — no other card is
+        written. Only when the gap there is exhausted:
+          · a caller with project write renumbers the column (spaced by
+            GAP, so later drops find room again);
+          · an owner-only caller (view-only project, own card) never
+            touches other cards: the card lands in the nearest slot that
+            still has room (the column ends always do).
+        The NOT NULL columns ride along in the upsert so the INSERT arm
+        validates; every id exists, so only the UPDATE arm ever runs. */
+  const k = ids.indexOf(movedId);
+  const others = ids.filter((id) => id !== movedId).map((id) => byId.get(id)!);
+  const sorts = others.map((r) => Number(r.sort_order) || 0);
+  let writes: { r: (typeof others)[number]; sort: number }[] = [];
+  const movedSort = Number(byId.get(movedId)!.sort_order) || 0;
+  let slot = placeMoved(sorts, k, movedSort);
+  if (slot === null && !ownerOnly) {
+    const column = ids.map((id) => byId.get(id)!);
+    writes = column
+      .map((r, i) => ({ r, sort: (i + 1) * GAP }))
+      .filter(({ r, sort }) => Number(r.sort_order) !== sort);
+  } else {
+    if (slot === null) slot = nearestSlot(sorts, k);
+    const moved0 = byId.get(movedId)!;
+    if (Number(moved0.sort_order) !== slot) writes = [{ r: moved0, sort: slot }];
+  }
+  const changed = writes.map(({ r, sort }) => ({ id: r.id, tenant_id: r.tenant_id, project_id: r.project_id, title: r.title, sort_order: sort }));
   if (changed.length > 0) {
     const { error } = await supabaseServer.from("project_tasks").upsert(changed, { onConflict: "id" });
     if (error) {
@@ -96,6 +119,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to reorder" }, { status: 500 });
     }
   }
+  const positions = Object.fromEntries(changed.map((c) => [c.id as string, c.sort_order]));
 
   /* 2. The moved card's stage (and the status that follows from it). */
   const moved = byId.get(movedId)!;
@@ -126,5 +150,41 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     moved: { id: movedId, stage_id: stageId, status: (movedPatch.status as string | undefined) ?? moved.status },
+    /* id → new sort_order for every card written (usually just the moved one). */
+    positions,
   });
+}
+
+/** Spacing for renumbered columns and for drops at a column end. */
+const GAP = 1024;
+
+/** A sort_order that puts the moved card at index `k` among `sorts` (the
+ *  OTHER cards of the column, top→bottom) without touching them: above
+ *  every card before k and below every card from k on. Integers only (the
+ *  column is not guaranteed fractional). null = no room there. */
+function placeMoved(sorts: number[], k: number, current?: number): number | null {
+  const before = sorts.slice(0, k);
+  const after = sorts.slice(k);
+  const lo = before.length > 0 ? Math.max(...before) : null;
+  const hi = after.length > 0 ? Math.min(...after) : null;
+  /* Already in place (or alone in the column): keep it — nothing to write. */
+  if (current !== undefined && (lo === null || current > lo) && (hi === null || current < hi)) return current;
+  if (lo === null && hi === null) return 0;
+  if (lo === null) return (hi as number) - GAP;
+  if (hi === null) return lo + GAP;
+  if (hi - lo >= 2) return Math.floor((lo + hi) / 2);
+  return null;
+}
+
+/** The slot closest to `k` that still has room (placeMoved not null). The
+ *  two column ends always have room, so this always answers. */
+function nearestSlot(sorts: number[], k: number): number {
+  for (let d = 1; d <= sorts.length; d++) {
+    for (const j of [k - d, k + d]) {
+      if (j < 0 || j > sorts.length) continue;
+      const v = placeMoved(sorts, j);
+      if (v !== null) return v;
+    }
+  }
+  return placeMoved(sorts, sorts.length) ?? 0;
 }

@@ -6,6 +6,9 @@
      · seedStateFromJson — a shared note's one-time Yjs seed from body_json.
      · mergeState        — merge a collaborative client's Yjs state into the
                            stored state (merges commute; nothing is lost).
+                           Typing that reaches a block the stored state
+                           already deleted keeps that block (edit wins over
+                           delete — notes-yjs-rescue).
      · applyBodyToState  — a SINGLE-EDITOR save on a note that already has a
                            Yjs state: the incoming body_json is turned into a
                            Yjs update against the stored state (the XML
@@ -19,7 +22,9 @@
                            (base → local) are 3-way merged onto the current
                            document (notes-merge3), then written like any
                            single-editor save. Nothing typed is dropped; a
-                           real same-block conflict keeps both versions.
+                           real same-block conflict keeps both versions,
+                           and a block the client deleted that someone
+                           edited since its base is kept (and reported).
 
    Every result carries the body DERIVED from the merged document and
    validated against the note schema, so body_json / body_plain always match
@@ -32,7 +37,8 @@ import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import { prosemirrorJSONToYDoc, updateYFragment, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
 import { NOTES_YJS_FIELD, notesSchemaExtensions } from "@/lib/notes-schema";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
-import { charDiff, mergeDocs } from "@/lib/notes-merge3";
+import { charDiff, mergeDocs, similarity } from "@/lib/notes-merge3";
+import { applyRescues, findRescues, otherSideOf, type Rescue } from "@/lib/notes-yjs-rescue";
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -66,7 +72,14 @@ export function seedStateFromJson(bodyJson: unknown): string {
 }
 
 export type MergeResult =
-  | { ok: true; state: string; bodyJson: Record<string, unknown> }
+  | {
+      ok: true;
+      state: string;
+      bodyJson: Record<string, unknown>;
+      /** Blocks the stored state had deleted, kept because this update
+       *  carried concurrent typing inside them (edit wins over delete). */
+      rescued?: number;
+    }
   | { ok: false; error: string };
 
 /** Encode + derive + validate the merged document. */
@@ -87,9 +100,25 @@ export function mergeState(stored: string | null, incomingB64: string): MergeRes
   }
   const doc = new Y.Doc();
   try {
-    if (stored) Y.applyUpdate(doc, b64decode(stored));
-    Y.applyUpdate(doc, b64decode(incomingB64));
-    return finish(doc);
+    const incoming = b64decode(incomingB64);
+    let rescues: Rescue[] = [];
+    if (stored) {
+      Y.applyUpdate(doc, b64decode(stored));
+      // Blocks the stored state deleted while this client was still typing
+      // in them (it had not seen the delete): copy them as the client sees
+      // them BEFORE the merge drops their content, re-insert after.
+      const inc = new Y.Doc();
+      try {
+        Y.applyUpdate(inc, incoming);
+        rescues = findRescues(inc, NOTES_YJS_FIELD, otherSideOf(doc), null);
+      } finally {
+        inc.destroy();
+      }
+    }
+    Y.applyUpdate(doc, incoming);
+    const rescued = rescues.length ? applyRescues(doc, NOTES_YJS_FIELD, rescues) : 0;
+    const done = finish(doc);
+    return done.ok && rescued ? { ...done, rescued } : done;
   } catch (e) {
     console.error("[notes-yjs] merge", e instanceof Error ? e.message : e);
     return { ok: false, error: "Invalid collaborative update" };
@@ -116,20 +145,6 @@ export function mergeState(stored: string | null, incomingB64: string): MergeRes
 
 const MAX_LCS_CELLS = 2_000_000;
 type BindingMeta = Parameters<typeof updateYFragment>[3];
-
-/**
- * How much of the SHORTER text survives as a common prefix + suffix (0..1):
- * an append, an insertion or a trim scores 1, a rewrite ~0. An empty block
- * against text scores 0.5 (typing into an empty paragraph is an edit).
- */
-function similarity(a: string, b: string): number {
-  if (!a || !b) return a === b ? 1 : 0.5;
-  let p = 0;
-  while (p < a.length && p < b.length && a[p] === b[p]) p++;
-  let s = 0;
-  while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
-  return (p + s) / Math.min(a.length, b.length);
-}
 
 /** The plain string of a Y.XmlText (formatting ignored). */
 function yTextString(t: Y.XmlText): string {
@@ -178,7 +193,14 @@ function syncTextInPlace(el: Y.XmlElement, node: PMNode): void {
   });
 }
 
-function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
+/**
+ * Rewrite the fragment to match `pDoc`. `keep` (normalised block keys of
+ * the saving client's BASE document) guards deletions: a block about to be
+ * deleted whose current content is not among them was edited since that
+ * base — it is kept (edit wins over delete) and counted. Returns that count.
+ */
+function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode, keep: Set<string> | null = null): number {
+  let kept = 0;
   const meta: BindingMeta = { mapping: new Map(), isOMark: new Map() };
   const yKids = fragment.toArray();
   const current = ((yDocToProsemirrorJSON(doc, NOTES_YJS_FIELD) as { content?: unknown[] }).content ?? []);
@@ -188,7 +210,7 @@ function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
   const m = pKids.length;
   if (current.length !== n || n * m > MAX_LCS_CELLS || !yKids.every((k) => k instanceof Y.XmlElement)) {
     updateYFragment(doc, fragment, pDoc, meta);
-    return;
+    return 0;
   }
   // Normalise both sides through the schema so equal blocks compare equal.
   const yNodes = current.map((j) => schema().nodeFromJSON(j));
@@ -248,7 +270,10 @@ function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
     let di = 0;
     let ii = 0;
     const until = (d: number, b: number) => {
-      for (; di < d; di++) fragment.delete(pos, 1);
+      for (; di < d; di++) {
+        if (keep && !keep.has(yKeys[dels[di]])) { pos += 1; kept += 1; continue; }
+        fragment.delete(pos, 1);
+      }
       for (; ii < b; ii++) insertBlock(pKids[ins[ii]]);
     };
     for (const [d, b] of pairs) {
@@ -282,10 +307,11 @@ function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
     }
   }
   flush(dels, ins);
+  return kept;
 }
 
 export type BodyToStateResult =
-  | { ok: true; state: string; bodyJson: Record<string, unknown>; update: string }
+  | { ok: true; state: string; bodyJson: Record<string, unknown>; update: string; kept: number }
   | { ok: false; error: string };
 
 /**
@@ -300,7 +326,7 @@ export type BodyToStateResult =
  * the diff was taken never has to bounce just because a peer saved a moment
  * later.
  */
-export function applyBodyToState(stored: string, bodyJson: unknown): BodyToStateResult {
+export function applyBodyToState(stored: string, bodyJson: unknown, base: unknown = null): BodyToStateResult {
   let pNode: PMNode;
   try {
     pNode = schema().nodeFromJSON(bodyJson ?? EMPTY_DOC);
@@ -312,16 +338,30 @@ export function applyBodyToState(stored: string, bodyJson: unknown): BodyToState
     Y.applyUpdate(doc, b64decode(stored));
     const before = Y.encodeStateVector(doc);
     const fragment = doc.getXmlFragment(NOTES_YJS_FIELD);
-    doc.transact(() => syncBlocks(doc, fragment, pNode));
+    const keep = baseBlockKeys(base);
+    let kept = 0;
+    doc.transact(() => { kept = syncBlocks(doc, fragment, pNode, keep); });
     const update = b64encode(Y.encodeStateAsUpdate(doc, before));
     const done = finish(doc);
     if (!done.ok) return done;
-    return { ...done, update };
+    return { ...done, update, kept };
   } catch (e) {
     console.error("[notes-yjs] body→state", e instanceof Error ? e.message : e);
     return { ok: false, error: "Invalid note body" };
   } finally {
     doc.destroy();
+  }
+}
+
+/** Normalised keys of a base document's top-level blocks (null: no guard). */
+function baseBlockKeys(base: unknown): Set<string> | null {
+  if (base === null || base === undefined) return null;
+  try {
+    const out = new Set<string>();
+    schema().nodeFromJSON(base).forEach((c) => { out.add(JSON.stringify(c.toJSON())); });
+    return out;
+  } catch {
+    return null;
   }
 }
 
@@ -337,23 +377,23 @@ export function normalizeBody(json: unknown): Record<string, unknown> | null {
 }
 
 export type RebaseResult =
-  | { ok: true; bodyJson: Record<string, unknown>; conflicts: number }
+  | { ok: true; bodyJson: Record<string, unknown>; conflicts: number; kept: number }
   | { ok: false; error: string };
 
 /** 3-way merge of plain bodies (a note without a Yjs state). */
-export function rebaseBody(current: unknown, base: unknown, local: unknown, conflictLabel: string): RebaseResult {
+export function rebaseBody(current: unknown, base: unknown, local: unknown): RebaseResult {
   const l = normalizeBody(local);
   if (!l) return { ok: false, error: "Invalid note body" };
   // An unreadable base / current still merges (every block then counts as
   // changed, and the local blocks are kept as copies — never dropped).
-  const merged = mergeDocs(normalizeBody(base) ?? base, l, normalizeBody(current) ?? current, conflictLabel);
+  const merged = mergeDocs(normalizeBody(base) ?? base, l, normalizeBody(current) ?? current);
   const bodyJson = normalizeBody(merged.doc);
   if (!bodyJson) return { ok: false, error: "Invalid note body" };
-  return { ok: true, bodyJson, conflicts: merged.conflicts };
+  return { ok: true, bodyJson, conflicts: merged.conflicts, kept: merged.kept };
 }
 
 export type RebaseStateResult =
-  | { ok: true; state: string; bodyJson: Record<string, unknown>; update: string; conflicts: number }
+  | { ok: true; state: string; bodyJson: Record<string, unknown>; update: string; conflicts: number; kept: number }
   | { ok: false; error: string };
 
 /**
@@ -363,24 +403,29 @@ export type RebaseStateResult =
  * matcher as applyBodyToState) — so both the newer saved content and live
  * peers' concurrent edits survive.
  */
-export function rebaseOntoState(stored: string, base: unknown, local: unknown, conflictLabel: string): RebaseStateResult {
+export function rebaseOntoState(stored: string, base: unknown, local: unknown): RebaseStateResult {
   const doc = new Y.Doc();
   let target: Record<string, unknown>;
   let conflicts: number;
+  let kept: number;
   try {
     Y.applyUpdate(doc, b64decode(stored));
     const current = yDocToProsemirrorJSON(doc, NOTES_YJS_FIELD);
-    const r = rebaseBody(current, base, local, conflictLabel);
+    const r = rebaseBody(current, base, local);
     if (!r.ok) return r;
     target = r.bodyJson;
     conflicts = r.conflicts;
+    kept = r.kept;
   } catch (e) {
     console.error("[notes-yjs] rebase", e instanceof Error ? e.message : e);
     return { ok: false, error: "Invalid note body" };
   } finally {
     doc.destroy();
   }
-  const applied = applyBodyToState(stored, target);
+  // Deletions are guarded against the client's base: a block the client
+  // removed that someone edited since is kept (the merge already keeps
+  // those; the guard makes sure no block matcher decision can drop one).
+  const applied = applyBodyToState(stored, target, normalizeBody(base));
   if (!applied.ok) return applied;
-  return { ...applied, conflicts };
+  return { ...applied, conflicts, kept: kept + applied.kept };
 }

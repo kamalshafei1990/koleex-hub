@@ -20,8 +20,8 @@ import "server-only";
        a travel type is the one record of a planned trip;
      · out_of_office  — the person's own Calendar holds an "out of office"
        event overlapping the item (one-offs and recurring series, with their
-       per-occurrence exceptions). Its title is never returned — a private
-       event only ever shows as a time span.
+       per-occurrence exceptions). Its title is never returned here — the
+       board overlay alone asks for titles, under Calendar's read rule.
 
    Queries are bounded by the batch's own window and resources: one items
    query, for leave one resources → employees → leave chain, and for the
@@ -275,8 +275,16 @@ export async function checkPlanningConflicts(
 }
 
 /** One out-of-office span: instants (ms) and, for an all-day event, its
- *  inclusive local date keys on the owner's clock. Never carries a title. */
-export type AwaySpan = { s: number; e: number; days?: { start: string; end: string } };
+ *  inclusive local date keys on the owner's clock. `title` only when a
+ *  `viewer` was passed AND that viewer could open the event in Calendar
+ *  (see loadOutOfOffice) — the conflict check never asks for it. */
+export type AwaySpan = { s: number; e: number; days?: { start: string; end: string }; title?: string };
+
+/** Who is looking — for the title rule of loadOutOfOffice. */
+export interface AwayViewer {
+  account_id: string;
+  is_super_admin: boolean;
+}
 
 /** Out-of-office spans per account in [fromIso, toIso): one-off events plus
  *  recurring series expanded on their owner's clock with their exceptions.
@@ -285,8 +293,15 @@ export type AwaySpan = { s: number; e: number; days?: { start: string; end: stri
  *  (/api/planning/leaves), so both see exactly the same time. Callers pass
  *  only accounts behind this tenant's employee resources. Throws on a read
  *  error — callers log and skip. */
-export async function loadOutOfOffice(tenantId: string, accountIds: string[], fromIso: string, toIso: string): Promise<Map<string, AwaySpan[]>> {
-  const COLS = "id, account_id, start_at, end_at, all_day, recurrence, recurrence_until";
+export async function loadOutOfOffice(
+  tenantId: string,
+  accountIds: string[],
+  fromIso: string,
+  toIso: string,
+  viewer?: AwayViewer,
+): Promise<Map<string, AwaySpan[]>> {
+  /* Titles are only read at all when a viewer asks (the board overlay). */
+  const COLS = `id, account_id, start_at, end_at, all_day, recurrence, recurrence_until${viewer ? ", title, is_private" : ""}`;
   const [oneOff, series] = await Promise.all([
     supabaseServer
       .from("koleex_calendar_events")
@@ -311,21 +326,35 @@ export async function loadOutOfOffice(tenantId: string, accountIds: string[], fr
   ]);
   if (oneOff.error) throw new Error(oneOff.error.message);
   if (series.error) throw new Error(series.error.message);
-  type Ev = { id: string; account_id: string; start_at: string; end_at: string; all_day: boolean | null; recurrence: CalendarRec; recurrence_until: string | null };
-  const rows = [...(oneOff.data ?? []), ...(series.data ?? [])] as Ev[];
+  type Ev = {
+    id: string; account_id: string; start_at: string; end_at: string; all_day: boolean | null;
+    recurrence: CalendarRec; recurrence_until: string | null; title?: string | null; is_private?: boolean | null;
+  };
+  const rows = [...(oneOff.data ?? []), ...(series.data ?? [])] as unknown as Ev[];
   const out = new Map<string, AwaySpan[]>();
   if (rows.length === 0) return out;
 
   const recurring = rows.filter((r) => r.recurrence);
-  const [tzs, exceptions] = await Promise.all([
+  const [tzs, exceptions, readable] = await Promise.all([
     accountTimezones(rows.map((r) => r.account_id)),
     loadExceptions(recurring.map((r) => r.id)),
+    viewer ? readableEventIds(rows, viewer) : Promise.resolve(new Set<string>()),
   ]);
-  const push = (acct: string, startIso: string, endIso: string, allDay: boolean, ownerTz: string) => {
+  /* The Calendar free/busy rule (lib/server/calendar-feed loadBusyBlocks):
+     never a private event; otherwise only when the viewer organizes it, is
+     invited to it, or is a Super Admin. */
+  const titleOf = (r: Ev, override?: string | null): string | undefined => {
+    if (!viewer || r.is_private !== false || !readable.has(r.id)) return undefined;
+    const t = (override || r.title || "").trim();
+    return t ? t.slice(0, 200) : undefined;
+  };
+  const push = (acct: string, startIso: string, endIso: string, allDay: boolean, ownerTz: string, title?: string) => {
     const s = Date.parse(startIso);
     const e = Math.max(Date.parse(endIso), s + 1);
     const arr = out.get(acct) ?? [];
-    arr.push(allDay ? { s, e, days: allDayKeys(startIso, endIso, ownerTz) } : { s, e });
+    const span: AwaySpan = allDay ? { s, e, days: allDayKeys(startIso, endIso, ownerTz) } : { s, e };
+    if (title) span.title = title;
+    arr.push(span);
     out.set(acct, arr);
   };
   const winFrom = new Date(Date.parse(fromIso) - DAY_MS);
@@ -333,12 +362,40 @@ export async function loadOutOfOffice(tenantId: string, accountIds: string[], fr
   for (const r of rows) {
     const ownerTz = tzs.get(r.account_id) ?? "UTC";
     if (!r.recurrence) {
-      push(r.account_id, r.start_at, r.end_at, !!r.all_day, ownerTz);
+      push(r.account_id, r.start_at, r.end_at, !!r.all_day, ownerTz, titleOf(r));
       continue;
     }
     const occ = expandWithExceptions(r.start_at, r.end_at, r.recurrence, r.recurrence_until, winFrom, winTo, exceptions.get(r.id), 400, ownerTz);
-    for (const o of occ) push(r.account_id, o.start.toISOString(), o.end.toISOString(), !!r.all_day, ownerTz);
+    for (const o of occ) push(r.account_id, o.start.toISOString(), o.end.toISOString(), !!r.all_day, ownerTz, titleOf(r, o.override?.title));
   }
+  return out;
+}
+
+/** Ids of these events the viewer could open in Calendar: their own, one
+ *  they are invited to, or any when a Super Admin. Private-ness is checked
+ *  by the caller. One attendee read; a failure reads as "none invited". */
+async function readableEventIds(
+  rows: Array<{ id: string; account_id: string; is_private?: boolean | null }>,
+  viewer: AwayViewer,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const candidates = rows.filter((r) => r.is_private === false);
+  const others: string[] = [];
+  for (const r of candidates) {
+    if (viewer.is_super_admin || r.account_id === viewer.account_id) out.add(r.id);
+    else others.push(r.id);
+  }
+  if (others.length === 0) return out;
+  const { data, error } = await supabaseServer
+    .from("koleex_calendar_event_attendees")
+    .select("event_id")
+    .eq("account_id", viewer.account_id)
+    .in("event_id", [...new Set(others)].slice(0, 500));
+  if (error) {
+    console.error("[planning-conflicts] out-of-office attendees:", error.message);
+    return out;
+  }
+  for (const r of (data ?? []) as Array<{ event_id: string }>) out.add(r.event_id);
   return out;
 }
 

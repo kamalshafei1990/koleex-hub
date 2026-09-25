@@ -7,7 +7,8 @@
 
    Six tabs (kept in ?tab=, so a tab is linkable):
      • Schedule       — week grid by resource or role, or an hour Timeline
-                        (?view=timeline, ?range=week) — Day/Week, drag to
+                        (?view=timeline, ?range=week, ?hours=full) —
+                        Day/Week (Week 06–22 or full day), drag to
                         move / resize (dynamic chunk)
      • Open Shifts    — published, unassigned items — anyone can Take
      • My Planning    — items on the caller's own resource (last 7 days on)
@@ -217,6 +218,30 @@ export default function PlanningApp() {
   const setTlRange = useCallback((r: TlRange) => {
     setTlRangeState(r);
     writeUrlParams({ range: r === "week" ? "week" : null });
+  }, []);
+  /* Week timeline shows 06:00–22:00 unless "Full day" (?hours=full). */
+  const [tlFull, setTlFullState] = useState<boolean>(() => readUrlParam("hours") === "full");
+  const setTlFull = useCallback((on: boolean) => {
+    setTlFullState(on);
+    writeUrlParams({ hours: on ? "full" : null });
+  }, []);
+  /* One-off: drop the pre-merge `planning:leaves:` warm entries (the
+     absence overlay moved to `planning:absence:`) so they stop taking
+     storage budget. */
+  useEffect(() => {
+    for (const store of ["localStorage", "sessionStorage"] as const) {
+      try {
+        const st = window[store];
+        const stale: string[] = [];
+        for (let i = 0; i < st.length; i++) {
+          const k = st.key(i);
+          if (k && (k.startsWith("kx:warm:planning:leaves:") || k.startsWith("planning:leaves:"))) stale.push(k);
+        }
+        for (const k of stale) st.removeItem(k);
+      } catch {
+        /* storage blocked — nothing to clean */
+      }
+    }
   }, []);
   /* Bumped after every successful mutation — My Planning refetches on it. */
   const [version, setVersion] = useState(0);
@@ -752,6 +777,8 @@ export default function PlanningApp() {
                   onMode={setSchedMode}
                   tlRange={tlRange}
                   onTlRange={setTlRange}
+                  tlFull={tlFull}
+                  onTlFull={setTlFull}
                   templates={templates}
                   canWrite={canWrite}
                   onTemplateCreate={handleTemplateCreate}
@@ -913,6 +940,8 @@ function ScheduleView({
   onMode,
   tlRange,
   onTlRange,
+  tlFull,
+  onTlFull,
   templates,
   canWrite,
   onTemplateCreate,
@@ -938,6 +967,8 @@ function ScheduleView({
   onMode: (m: SchedMode) => void;
   tlRange: TlRange;
   onTlRange: (r: TlRange) => void;
+  tlFull: boolean;
+  onTlFull: (on: boolean) => void;
   templates: PlanningTemplate[];
   canWrite: (i: PlanningItem) => boolean;
   onTemplateCreate: (tpl: PlanningTemplate, resourceId: string | null, day: Date) => void | Promise<void>;
@@ -969,10 +1000,17 @@ function ScheduleView({
   /* Calendar out-of-office overlay: resource|dayKey → that day's slices. */
   const awayCells = useMemo(() => awayDaySlices(away, days, tz), [away, days, tz]);
   const awayTip = useCallback(
-    (slices: AwaySlice[]) =>
-      `${t("sched.outOfOffice")} · ${slices
-        .map((sl) => (sl.full ? t("sched.allDay") : awaySliceRange(sl, tz)))
-        .join(", ")}\n${t("sched.outOfOfficeHint")}`,
+    (slices: AwaySlice[]) => {
+      /* A title only rides along when the server allowed it (the viewer
+         could open that event in Calendar); the privacy hint stays for
+         any slice without one. */
+      const parts = slices.map((sl) => {
+        const when = sl.full ? t("sched.allDay") : awaySliceRange(sl, tz);
+        return sl.title ? `${when} — ${sl.title}` : when;
+      });
+      const hint = slices.some((sl) => !sl.title) ? `\n${t("sched.outOfOfficeHint")}` : "";
+      return `${t("sched.outOfOffice")} · ${parts.join(", ")}${hint}`;
+    },
     [t, tz],
   );
 
@@ -1149,6 +1187,18 @@ function ScheduleView({
             </div>
           )}
 
+          {isTimeline && tlRange === "week" && (
+            <button
+              type="button"
+              onClick={() => onTlFull(!tlFull)}
+              aria-pressed={tlFull}
+              title={t("tl.fullDayHint")}
+              className={`${segBtn(tlFull)} border border-[var(--border-subtle)]`}
+            >
+              {t("tl.fullDay")}
+            </button>
+          )}
+
           {!isTimeline && (
           <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5" role="group">
             {(["resource", "role"] as const).map((g) => (
@@ -1261,6 +1311,8 @@ function ScheduleView({
           leaveCells={leaveCells}
           awayCells={awayCells}
           awayTip={awayTip}
+          fullDay={tlFull}
+          onFullDay={() => onTlFull(true)}
           canWrite={canWrite}
           onItemClick={onItemClick}
           onMove={onTimelineMove}

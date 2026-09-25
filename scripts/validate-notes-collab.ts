@@ -210,10 +210,20 @@ console.log("\n[4] wiring");
   ok("the editor hands onRemoteUpdate to useNoteCollab", /useNoteCollab\(\{[\s\S]*?onRemoteUpdate[\s\S]*?\}\)/.test(ed));
 
   const { sf: rsf } = source("src/app/api/notes/[id]/route.ts");
-  for (const name of ["singleEditorBodyPatch", "rebasePatch"]) {
+  for (const name of ["singleEditorBodyPatch", "rebasePatch", "collabPatch"]) {
     const fn = fnNamed(rsf, name);
     ok(`${name} pings after merging a body into a Yjs state`, !!fn && calls(fn, "pingNoteBodyChanged").length === 1);
   }
+
+  // Edit wins over delete on both ends of a Yjs merge (notes-yjs-rescue).
+  const merge = source("src/lib/notes-yjs-merge.ts");
+  const mergeFn = fnNamed(merge.sf, "mergeState");
+  ok("mergeState keeps blocks deleted under concurrent typing (findRescues + applyRescues)",
+    !!mergeFn && calls(mergeFn, "findRescues").length === 1 && calls(mergeFn, "applyRescues").length === 1);
+  const yjsClient = source("src/lib/notes-yjs.ts").text;
+  ok("the browser's applyServerState rescues its own typing before merging a pulled state",
+    /applyServerState\([^)]*\)[^{]*\{[\s\S]*?findRescues\([\s\S]*?this\.doc\.clientID\)[\s\S]*?applyRescues\(/.test(yjsClient));
+  ok("the editor persists + reports rescued blocks after a pull", /rescuedRef\.current\(s\.applyServerState\(j\.state\)\)/.test(ed));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

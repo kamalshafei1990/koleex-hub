@@ -295,6 +295,15 @@ export const planningT: Translations = {
                            ar: "اسحب للنقل، واسحب الحافة لتغيير المدة. تنقل مفاتيح الأسهم بمقدار 15 دقيقة؛ و Shift+السهم يغيّر النهاية." },
   "tl.resize":           { en: "Resize",            zh: "调整时长",           ar: "تغيير المدة" },
   "tl.readOnly":         { en: "View only",         zh: "仅查看",             ar: "عرض فقط" },
+  "tl.fullDay":          { en: "Full day",          zh: "全天",               ar: "اليوم كاملًا" },
+  "tl.fullDayHint":      { en: "Show each day 00:00–24:00 instead of 06:00–22:00",
+                           zh: "每天显示 00:00–24:00，而不是 06:00–22:00",
+                           ar: "عرض كل يوم من 00:00 إلى 24:00 بدلًا من 06:00 إلى 22:00" },
+  "tl.awayBefore":       { en: "+ out of office before {h}", zh: "+ {h} 之前不在办公室", ar: "+ خارج المكتب قبل {h}" },
+  "tl.awayAfter":        { en: "+ out of office after {h}",  zh: "+ {h} 之后不在办公室", ar: "+ خارج المكتب بعد {h}" },
+  "tl.itemsBefore":      { en: "+ items before {h}", zh: "+ {h} 之前有安排",    ar: "+ عناصر قبل {h}" },
+  "tl.itemsAfter":       { en: "+ items after {h}",  zh: "+ {h} 之后有安排",    ar: "+ عناصر بعد {h}" },
+  "tl.expandDay":        { en: "Click to show the full day", zh: "点击显示全天", ar: "انقر لعرض اليوم كاملًا" },
 
   /* Copy last week / publish week */
   "copy.title":          { en: "Copy last week",    zh: "复制上周",           ar: "نسخ الأسبوع الماضي" },

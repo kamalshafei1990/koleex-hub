@@ -34,6 +34,8 @@ import {
   encodeAwarenessUpdate,
   removeAwarenessStates,
 } from "y-protocols/awareness";
+import { NOTES_YJS_FIELD } from "@/lib/notes-schema";
+import { applyRescues, findRescues, otherSideOf, type Rescue } from "@/lib/notes-yjs-rescue";
 
 export interface CollabKeys {
   k: string;
@@ -145,9 +147,31 @@ export class NoteYjsSession {
     this.sendSync1(true, null);
   }
 
-  /** Merge a server state (e.g. after a key refresh). */
-  applyServerState(stateB64: string) {
-    try { Y.applyUpdate(this.doc, fromB64(stateB64), ORIGIN_REMOTE); } catch { /* ignore */ }
+  /** Merge a server state (a body ping, a reconnect, a key refresh).
+   *  Returns how many blocks were kept because we were typing in them
+   *  when the server state deleted them. */
+  applyServerState(stateB64: string): number {
+    try {
+      const update = fromB64(stateB64);
+      // A single-editor save may have DELETED a block this tab is typing
+      // in (unsaved, so the server never saw that typing): copy those
+      // blocks first and re-insert them after the merge — an edit wins
+      // over a delete. Only our own typing counts, so two tabs never both
+      // rescue the same block. The re-insert is a LOCAL change: it reaches
+      // peers over the socket and the caller persists it.
+      let rescues: Rescue[] = [];
+      const srv = new Y.Doc();
+      try {
+        Y.applyUpdate(srv, update);
+        rescues = findRescues(this.doc, NOTES_YJS_FIELD, otherSideOf(srv), this.doc.clientID);
+      } finally {
+        srv.destroy();
+      }
+      Y.applyUpdate(this.doc, update, ORIGIN_REMOTE);
+      return rescues.length ? applyRescues(this.doc, NOTES_YJS_FIELD, rescues) : 0;
+    } catch {
+      return 0;
+    }
   }
 
   /** The channel is subscribed: start talking. Idempotent. */

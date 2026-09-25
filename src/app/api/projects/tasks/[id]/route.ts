@@ -7,7 +7,7 @@ import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { assertTaskAccess, assertTaskWrite, taskEditFlags } from "@/lib/server/project-access";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
-import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
+import { pruneProjectChatSeats, syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -108,6 +108,11 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
       await notifyTaskAssigned(auth, data);
       await syncProjectMembersFromAssignees(auth, prev.project_id, [newAssignee]);
     }
+    /* Reassigned AWAY from someone: if that was their last way into the
+       project (and they are not a member), they leave its chat. */
+    if (prev.assignee_account_id && prev.assignee_account_id !== newAssignee) {
+      await pruneProjectChatSeats(auth.tenant_id, [{ project_id: prev.project_id, account_id: prev.assignee_account_id }]);
+    }
     if (becameDone) await clearTaskNotifications(id);
     await recomputeProjectProgress(auth.tenant_id, prev.project_id);
   });
@@ -129,10 +134,15 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
      (this task and any subtasks cascading with it). */
   const { data: subs } = await supabaseServer
     .from("project_tasks")
-    .select("id")
+    .select("id, assignee_account_id")
     .eq("tenant_id", auth.tenant_id)
     .eq("parent_task_id", id);
-  const taskIds = [id, ...((subs ?? []).map((r) => (r as { id: string }).id))];
+  const subRows = (subs ?? []) as { id: string; assignee_account_id: string | null }[];
+  const taskIds = [id, ...subRows.map((r) => r.id)];
+  /* Their assignees may lose their last way into the project. */
+  const lostSeats = [gate.task.assignee_account_id, ...subRows.map((r) => r.assignee_account_id)]
+    .filter((a): a is string => !!a)
+    .map((account_id) => ({ project_id: gate.task.project_id, account_id }));
   const { data: files } = await supabaseServer
     .from("project_task_attachments")
     .select("file_path")
@@ -153,6 +163,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
     await removeTaskAttachmentFiles(paths);
     await clearTaskNotifications(id);
     await recomputeProjectProgress(auth.tenant_id, gate.task.project_id);
+    await pruneProjectChatSeats(auth.tenant_id, lostSeats);
   });
   return NextResponse.json({ ok: true });
 }

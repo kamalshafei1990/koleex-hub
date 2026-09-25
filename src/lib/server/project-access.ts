@@ -272,10 +272,26 @@ export async function projectAccessLevels(
   return out;
 }
 
+/** WHY a project reads as "view" — returned with the project payload as
+ *  `my_access_reason` so the "View only" badge can say what to fix:
+ *    module — the caller lacks the Projects module's edit action (also
+ *             view-as); membership would not help;
+ *    viewer — the module allows editing, but the caller's only way into
+ *             this project is a viewer membership.
+ *  null for manage / edit. */
+export type ViewReason = "viewer" | "module";
+
+export function viewReason(level: ProjectAccessLevel | undefined, canEditModule: boolean): ViewReason | null {
+  if (level !== "view") return null;
+  return canEditModule ? "viewer" : "module";
+}
+
 /** Per-task `can_edit` for task payloads, so the UI enables exactly what
  *  assertTaskWrite allows: project access manage/edit, or ownsTask. Also
- *  returns the project-level access per task (`project_access`) — the
- *  subtasks panel needs it, since creating a subtask is a project write.
+ *  returns the project-level access per task (`project_access`, e.g. for
+ *  the "you edit this because it is yours" note). Creating a SUBTASK
+ *  follows the parent's can_edit (POST /api/projects/tasks gates it with
+ *  assertTaskWrite on parent_task_id), not the project level.
  *  Batched: one projects read + projectAccessLevels' two queries. */
 export interface TaskEditFlags { can_edit: boolean; project_access: ProjectAccessLevel }
 

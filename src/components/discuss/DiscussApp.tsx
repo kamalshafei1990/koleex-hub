@@ -139,12 +139,21 @@ import { findMentionQuery, normalizeMentions, rankMentionCandidates } from "@/li
 import { setActiveDiscussChannel } from "@/lib/discuss-active-store";
 import {
   clearOutboxMediaUrls,
+  deleteOutboxFilesIfSettled,
+  dropDiscussOutboxFiles,
+  markDiscussOutboxUploaded,
   outboxBubble,
   outboxMediaUrlsFor,
   putDiscussOutbox,
   readDiscussOutbox,
   removeDiscussOutbox,
+  type DiscussOutboxPendingFile,
 } from "@/lib/discuss-outbox";
+import {
+  getDiscussOutboxFiles,
+  pruneDiscussOutboxFiles,
+  putDiscussOutboxFiles,
+} from "@/lib/discuss-outbox-files";
 import { discussAttachmentUrl } from "@/lib/discuss-attachments";
 import {
   createPreviewUrl,
@@ -155,6 +164,7 @@ import {
   releaseAllPreviewUrls,
 } from "@/lib/discuss-object-urls";
 import {
+  checkDiscussUpload,
   DISCUSS_ACCEPT_ATTR,
   DISCUSS_MEDIA_MAX_BYTES,
   mb,
@@ -317,7 +327,52 @@ type PendingSend = {
   metadata: DiscussMessageMetadata;
   replyToMessageId: string | null;
   clientMsgId: string;
+  /** Files that never finished uploading. `blob` is null while the bytes are
+   *  still being read back from IndexedDB after a reload. Retry uploads them
+   *  first; they are never part of the wire payload. */
+  pendingUploads?: PendingUpload[];
 };
+
+type PendingUpload = DiscussOutboxPendingFile & { blob: Blob | null };
+
+/** The wire half of a PendingSend (what the server and the outbox get). */
+function wireOf(p: PendingSend): Omit<PendingSend, "pendingUploads"> {
+  return {
+    channelId: p.channelId,
+    body: p.body,
+    kind: p.kind,
+    metadata: p.metadata,
+    replyToMessageId: p.replyToMessageId,
+    clientMsgId: p.clientMsgId,
+  };
+}
+
+/** Upload a send's pending files; returns the wire metadata with them in, or
+ *  null when any upload fails (nothing is sent then). */
+async function uploadPendingFiles(p: PendingSend): Promise<DiscussMessageMetadata | null> {
+  const metadata: DiscussMessageMetadata = { ...p.metadata };
+  const atts = Array.isArray(p.metadata.attachments) ? [...p.metadata.attachments] : [];
+  const pending = [...(p.pendingUploads ?? [])].sort((a, b) => a.index - b.index);
+  for (const f of pending) {
+    if (!f.blob) return null;
+    if (f.kind === "voice") {
+      const voice = await uploadDiscussVoice({
+        blob: f.blob,
+        durationMs: f.durationMs ?? 0,
+        waveform: f.waveform ?? [],
+      });
+      if (!voice) return null;
+      metadata.voice = voice;
+    } else {
+      const file = new File([f.blob], f.name || "file", { type: f.type || f.blob.type });
+      const res = await uploadDiscussAttachment(file);
+      if (!res.ok) return null;
+      atts.splice(Math.min(f.index, atts.length), 0, res.attachment);
+    }
+  }
+  if (atts.length > 0) metadata.attachments = atts;
+  return metadata;
+}
 
 /** Merge a fresh server page into the list on screen.
  *   · keeps OLDER messages the user paged in ("load older") that fall before
@@ -440,6 +495,14 @@ export default function DiscussApp() {
   /* Failed bubbles restored from the outbox whose attachment never finished
      uploading: the text is kept, the bubble asks for the file again. */
   const [droppedAttachIds, setDroppedAttachIds] = useState<ReadonlySet<string>>(() => new Set());
+  /* Failed bubbles holding a file that has not been uploaded yet (its bytes
+     are in memory / IndexedDB): Retry uploads it before sending. */
+  const [pendingUploadIds, setPendingUploadIds] = useState<ReadonlySet<string>>(() => new Set());
+  /* clientMsgIds of sends still in flight (uploading / awaiting the server).
+     A conversation switch must not release their previews: the bubble comes
+     back from the leave-snapshot, and if the send then fails it becomes a
+     "Not sent" bubble that still needs them. Released when they settle. */
+  const inFlightRef = useRef<Set<string>>(new Set());
   /* @mention autocomplete: the "@query" the caret is in, and the highlighted
      suggestion. `dismissedAt` remembers an Esc so the same "@" stays closed. */
   const [mentionState, setMentionState] = useState<{ start: number; query: string; active: number } | null>(null);
@@ -475,6 +538,12 @@ export default function DiscussApp() {
     },
     [accountId],
   );
+  /* Unsent-file bytes in IndexedDB: drop what expired (outbox TTL) or whose
+     send is no longer in the outbox. Best-effort, no state involved. */
+  useEffect(() => {
+    if (!accountId) return;
+    void pruneDiscussOutboxFiles(accountId, readDiscussOutbox(accountId).map((e) => e.clientMsgId));
+  }, [accountId]);
 
   /* ── Mobile column swap ───────────────────────────────────────── */
   const [mobileView, setMobileView] = useState<"list" | "thread" | "details">(
@@ -737,6 +806,60 @@ export default function DiscussApp() {
       };
       setFailedIds(drop);
       setDroppedAttachIds(drop);
+      setPendingUploadIds(drop);
+    },
+    [accountId],
+  );
+
+  /* Read the IndexedDB bytes of a restored send's never-uploaded files.
+     `bubble` (restore) is put on screen only AFTER its previews exist: the
+     bubble reads previewUrlsFor() during render and the React Compiler
+     memoizes that per client_msg_id, so a preview created after the first
+     paint would never show. */
+  const loadPendingFiles = useCallback(
+    async (clientMsgId: string, bubble?: DiscussMessageWithAuthor): Promise<boolean> => {
+      if (!accountId) return false;
+      const key = `temp_${clientMsgId}`;
+      const files = await getDiscussOutboxFiles(accountId, clientMsgId);
+      const payload = failedPayloadsRef.current.get(key);
+      if (!payload) return true; // sent / deleted meanwhile
+      const show = (b: DiscussMessageWithAuthor) => {
+        if (selectedChannelIdRef.current !== b.channel_id) return;
+        setMessages((prev) =>
+          prev.some((m) => m.id === b.id || m.client_msg_id === clientMsgId) ? prev : [...prev, b],
+        );
+      };
+      if (!payload.pendingUploads?.length) {
+        if (bubble) show(bubble);
+        return true;
+      }
+      const got = new Map((files ?? []).map((f) => [f.index, f.blob] as const));
+      const complete = payload.pendingUploads.every((p) => p.blob || got.has(p.index));
+      if (!complete) {
+        dropDiscussOutboxFiles(accountId, clientMsgId);
+        failedPayloadsRef.current.set(key, { ...payload, pendingUploads: undefined });
+        setPendingUploadIds((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        setDroppedAttachIds((prev) => new Set(prev).add(key));
+        setMessages((prev) =>
+          prev.map((m) => (m.id === key ? { ...m, metadata: { ...(m.metadata ?? {}), media: [] } } : m)),
+        );
+        if (bubble) show({ ...bubble, metadata: { ...(bubble.metadata ?? {}), media: [] } });
+        return false;
+      }
+      const pendingUploads = payload.pendingUploads.map((p) => {
+        if (p.blob) return p;
+        const blob = got.get(p.index) ?? null;
+        if (blob) createPreviewUrl(clientMsgId, p.index, blob);
+        return { ...p, blob };
+      });
+      failedPayloadsRef.current.set(key, { ...payload, pendingUploads });
+      if (bubble) show(bubble);
+      return true;
     },
     [accountId],
   );
@@ -752,15 +875,47 @@ export default function DiscussApp() {
       );
       if (entries.length === 0) return;
       const bubbles = entries.map(outboxBubble);
+      const toLoad: string[] = [];
       for (const e of entries) {
-        failedPayloadsRef.current.set(`temp_${e.clientMsgId}`, {
+        const key = `temp_${e.clientMsgId}`;
+        /* Same session (a failed send, switched away and back): the payload
+           in memory is the current one — it may hold the file bytes or an
+           upload finished since. Keep it. */
+        if (failedPayloadsRef.current.has(key)) continue;
+        const pendingUploads = e.pendingFiles?.length
+          ? e.pendingFiles.map((d) => ({ ...d, blob: null }))
+          : undefined;
+        if (pendingUploads) toLoad.push(e.clientMsgId);
+        failedPayloadsRef.current.set(key, {
           channelId: e.channelId,
           body: e.body,
           kind: e.kind,
           metadata: e.metadata,
           replyToMessageId: e.replyToMessageId,
           clientMsgId: e.clientMsgId,
+          pendingUploads,
         });
+      }
+      const withPending = entries
+        .filter((e) => {
+          const p = failedPayloadsRef.current.get(`temp_${e.clientMsgId}`);
+          return !!p?.pendingUploads?.length;
+        })
+        .map((e) => `temp_${e.clientMsgId}`);
+      if (withPending.length > 0) {
+        setPendingUploadIds((prev) => {
+          const next = new Set(prev);
+          for (const id of withPending) next.add(id);
+          return next;
+        });
+      }
+      /* After a reload the never-uploaded files come back from IndexedDB:
+         rebuild their blob previews and hand the bytes to Retry; the bubble
+         is shown once that is done. Missing bytes (no IndexedDB, over a cap,
+         expired) → today's "add it again". */
+      const loading = new Set(toLoad);
+      for (const b of bubbles) {
+        if (b.client_msg_id && loading.has(b.client_msg_id)) void loadPendingFiles(b.client_msg_id, b);
       }
       setFailedIds((prev) => {
         const next = new Set(prev);
@@ -778,11 +933,13 @@ export default function DiscussApp() {
       setMessages((prev) => {
         const ids = new Set(prev.map((m) => m.id));
         const cmids = new Set(prev.map((m) => m.client_msg_id).filter(Boolean) as string[]);
-        const add = bubbles.filter((b) => !ids.has(b.id) && !cmids.has(b.client_msg_id as string));
+        const add = bubbles.filter(
+          (b) => !ids.has(b.id) && !cmids.has(b.client_msg_id as string) && !loading.has(b.client_msg_id as string),
+        );
         return add.length ? [...prev, ...add] : prev;
       });
     },
-    [accountId],
+    [accountId, loadPendingFiles],
   );
 
   const loadMessages = useCallback(
@@ -1787,6 +1944,9 @@ export default function DiscussApp() {
       const stillFailed = new Set<string>();
       for (const p of failedPayloadsRef.current.values()) stillFailed.add(p.clientMsgId);
       if (accountId) for (const e of readDiscussOutbox(accountId)) stillFailed.add(e.clientMsgId);
+      /* Sends still in flight keep theirs too: they settle later (sent →
+         released in reconcileSent; failed → kept by the rule above). */
+      for (const id of inFlightRef.current) stillFailed.add(id);
       releasePreviewUrlsExcept(stillFailed);
       setThreadTarget(null);
       setReplyTarget(null);
@@ -1953,9 +2113,46 @@ export default function DiscussApp() {
     (tempId: string, payload: PendingSend, display: DiscussMessageWithAuthor) => {
       failedPayloadsRef.current.set(tempId, payload);
       setFailedIds((prev) => new Set(prev).add(tempId));
+      const pending = payload.pendingUploads ?? [];
+      if (pending.length > 0) setPendingUploadIds((prev) => new Set(prev).add(tempId));
+      /* The user may have left and come back while this was in flight: the
+         snapshot painted on return predates the bubble — put it back. */
+      if (selectedChannelIdRef.current === payload.channelId) {
+        setMessages((prev) =>
+          prev.some((m) => m.id === tempId || m.client_msg_id === payload.clientMsgId) ? prev : [...prev, display],
+        );
+      }
       if (accountId) {
-        const stored = putDiscussOutbox(accountId, { ...payload, display });
+        const files = pending.flatMap((p) => (p.blob ? [{ index: p.index, blob: p.blob }] : []));
+        const stored = putDiscussOutbox(
+          accountId,
+          {
+            ...wireOf(payload),
+            pendingFiles: pending.map((p) => ({
+              index: p.index,
+              kind: p.kind,
+              name: p.name,
+              type: p.type,
+              size: p.size,
+              ...(p.durationMs != null ? { durationMs: p.durationMs } : {}),
+              ...(p.waveform ? { waveform: p.waveform } : {}),
+            })),
+            display,
+          },
+          /* Listed as kept now; the bytes follow asynchronously. If they
+             never land, the restore after a reload finds them missing and
+             falls back to "add it again" — this session keeps them in memory. */
+          { filesKept: pending.length > 0 && files.length === pending.length },
+        );
         if (stored?.attachmentsDropped) setDroppedAttachIds((prev) => new Set(prev).add(tempId));
+        if (stored?.pendingFiles?.length) {
+          const cmid = payload.clientMsgId;
+          void putDiscussOutboxFiles(accountId, cmid, files).then((ok) => {
+            /* Sent / deleted / uploaded while the bytes were being written:
+               they are orphans now. */
+            if (ok) deleteOutboxFilesIfSettled(accountId, cmid);
+          });
+        }
       }
     },
     [accountId],
@@ -1974,6 +2171,7 @@ export default function DiscussApp() {
       };
       setFailedIds(drop);
       setDroppedAttachIds(drop);
+      setPendingUploadIds(drop);
       if (accountId) removeDiscussOutbox(accountId, [clientMsgId]);
     },
     [accountId],
@@ -2043,6 +2241,7 @@ export default function DiscussApp() {
       rekeyPreviewUrls(pendingKeyRef.current, clientMsgId);
       pendingKeyRef.current = null;
     }
+    inFlightRef.current.add(clientMsgId);
     const replyToId = replyTarget?.id ?? null;
     const replyPreview = replyTarget
       ? {
@@ -2116,6 +2315,7 @@ export default function DiscussApp() {
       clientMsgId,
     };
     const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
+    inFlightRef.current.delete(clientMsgId);
     const saved = result.row;
 
     if (saved) {
@@ -2173,30 +2373,70 @@ export default function DiscussApp() {
      first attempt actually committed, the server hands back that row. */
   const handleRetrySend = useCallback(
     async (tempId: string) => {
-      const payload = failedPayloadsRef.current.get(tempId);
+      let payload = failedPayloadsRef.current.get(tempId);
       if (!payload || !accountId) return;
+      const clientMsgId = payload.clientMsgId;
+      if (inFlightRef.current.has(clientMsgId)) return; // double tap
       setFailedIds((prev) => {
         const next = new Set(prev);
         next.delete(tempId);
         return next;
       });
-      const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
-      if (result.row) {
-        forgetFailedSend(tempId, payload.clientMsgId);
-        reconcileSent(tempId, result.row, payload.clientMsgId);
-        void loadChannels(true);
-      } else if (result.retryable) {
-        /* Still in the outbox from the first failure — just show it again. */
+      const stillFailed = (key: string, fallback: string) => {
         setFailedIds((prev) => new Set(prev).add(tempId));
-        showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
-      } else {
-        forgetFailedSend(tempId, payload.clientMsgId);
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        releasePreviewUrls(payload.clientMsgId);
-        showError(t("status.failed", "Failed to send"));
+        showError(t(key, fallback));
+      };
+      inFlightRef.current.add(clientMsgId);
+      try {
+        /* Files that never finished uploading go up FIRST (same clientMsgId
+           afterwards, so the send itself stays idempotent). */
+        if (payload.pendingUploads?.length) {
+          if (payload.pendingUploads.some((p) => !p.blob)) {
+            /* Retry tapped before the IndexedDB read finished — read now. */
+            const ok = await loadPendingFiles(clientMsgId);
+            payload = failedPayloadsRef.current.get(tempId);
+            if (!payload) return;
+            if (!ok) {
+              stillFailed("send.attachmentReadd", "The attachment didn't upload — add it again after sending.");
+              return;
+            }
+          }
+          const metadata = await uploadPendingFiles(payload);
+          /* Deleted while uploading → do not send it after all. */
+          if (!failedPayloadsRef.current.has(tempId)) return;
+          if (!metadata) {
+            stillFailed("send.retryUploadFailed", "The file didn't upload. Tap Retry to try again.");
+            return;
+          }
+          payload = { ...payload, metadata, pendingUploads: undefined };
+          failedPayloadsRef.current.set(tempId, payload);
+          markDiscussOutboxUploaded(accountId, clientMsgId, metadata);
+          setPendingUploadIds((prev) => {
+            if (!prev.has(tempId)) return prev;
+            const next = new Set(prev);
+            next.delete(tempId);
+            return next;
+          });
+        }
+        const result = await sendDiscussMessageResult({ ...wireOf(payload), authorId: accountId });
+        if (result.row) {
+          forgetFailedSend(tempId, clientMsgId);
+          reconcileSent(tempId, result.row, clientMsgId);
+          void loadChannels(true);
+        } else if (result.retryable) {
+          /* Still in the outbox from the first failure — just show it again. */
+          stillFailed("send.failedRetry", "Message not sent. Tap Retry to send it again.");
+        } else {
+          forgetFailedSend(tempId, clientMsgId);
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          releasePreviewUrls(clientMsgId);
+          showError(t("status.failed", "Failed to send"));
+        }
+      } finally {
+        inFlightRef.current.delete(clientMsgId);
       }
     },
-    [accountId, reconcileSent, loadChannels, showError, t, forgetFailedSend],
+    [accountId, reconcileSent, loadChannels, showError, t, forgetFailedSend, loadPendingFiles],
   );
 
   const handleDiscardSend = useCallback((tempId: string) => {
@@ -3053,9 +3293,13 @@ export default function DiscussApp() {
 
   /* Voice note: optimistic bubble first (playable from the local blob),
      then upload + send.
-       · Upload failed, or the send was refused for good → remove the bubble,
-         say so, and THROW so the recorder drops back to its preview with the
-         clip intact for its own retry (it used to close as if sent).
+       · Refused by the upload policy, or the send was refused for good →
+         remove the bubble, say so, and THROW so the recorder drops back to
+         its preview with the clip intact (it used to close as if sent).
+       · The UPLOAD failed (network / storage) → the bubble stays as "Not sent
+         · Retry · Delete" holding the clip itself: its bytes are kept in
+         memory and in IndexedDB (discuss-outbox-files.ts), so it survives a
+         reload, and Retry uploads it before sending. The recorder closes.
        · Uploaded but the send failed in a way a retry can fix (network,
          timeout, 5xx) → the clip is already on the server, so the bubble
          stays as "Not sent · Retry · Delete" exactly like a text send (same
@@ -3067,6 +3311,7 @@ export default function DiscussApp() {
       const clientMsgId = crypto.randomUUID();
       const tempId = `temp_${clientMsgId}`;
       createPreviewUrl(clientMsgId, 0, input.blob);
+      inFlightRef.current.add(clientMsgId);
       const optimistic: DiscussMessageWithAuthor = {
         id: tempId,
         channel_id: channelId,
@@ -3103,18 +3348,54 @@ export default function DiscussApp() {
       };
       setMessages((prev) => [...prev, optimistic]);
       const fail = (key: string, fallback: string): never => {
+        inFlightRef.current.delete(clientMsgId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         releasePreviewUrls(clientMsgId);
         showError(t(key, fallback));
         throw new Error(fallback);
       };
 
+      const mime = input.blob.type && input.blob.type.length > 0 ? input.blob.type : "audio/webm";
+      if (!checkDiscussUpload("discuss-voice", { size: input.blob.size, type: mime }).ok) {
+        fail("voice.uploadFailed", "Voice upload failed");
+      }
       const uploaded = await uploadDiscussVoice({
         blob: input.blob,
         durationMs: input.durationMs,
         waveform: input.waveform,
       });
-      if (!uploaded) fail("voice.uploadFailed", "Voice upload failed");
+      if (!uploaded) {
+        /* Never reached Storage: keep the clip on a "Not sent" bubble. */
+        inFlightRef.current.delete(clientMsgId);
+        perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
+        markSendFailed(
+          tempId,
+          {
+            channelId,
+            body: "",
+            kind: "voice",
+            metadata: {},
+            replyToMessageId: null,
+            clientMsgId,
+            pendingUploads: [
+              {
+                index: 0,
+                kind: "voice",
+                name: "voice-note",
+                type: mime,
+                size: input.blob.size,
+                durationMs: input.durationMs,
+                waveform: input.waveform,
+                blob: input.blob,
+              },
+            ],
+          },
+          optimistic,
+        );
+        setVoiceOpen(false);
+        showError(t("voice.uploadFailedRetry", "Voice note didn't upload. Tap Retry to send it again."));
+        return;
+      }
       const payload: PendingSend = {
         channelId,
         body: "",
@@ -3124,6 +3405,7 @@ export default function DiscussApp() {
         clientMsgId,
       };
       const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
+      inFlightRef.current.delete(clientMsgId);
       if (!result.row) {
         if (!result.retryable) fail("status.failed", "Failed to send");
         perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
@@ -3897,6 +4179,7 @@ export default function DiscussApp() {
                     onToggleReaction={handleToggleReaction}
                     failedIds={failedIds}
                     droppedAttachIds={droppedAttachIds}
+                    pendingUploadIds={pendingUploadIds}
                     onRetrySend={handleRetrySend}
                     onDiscardSend={handleDiscardSend}
                     autoTranslate={translatePrefs.auto}
@@ -4489,6 +4772,8 @@ type MessageListProps = {
   failedIds: ReadonlySet<string>;
   /** Failed sends restored without their (never-uploaded) attachment. */
   droppedAttachIds: ReadonlySet<string>;
+  /** Failed sends holding a file not uploaded yet (Retry uploads it first). */
+  pendingUploadIds: ReadonlySet<string>;
   onRetrySend: (tempId: string) => void;
   onDiscardSend: (tempId: string) => void;
   autoTranslate: boolean;
@@ -4619,6 +4904,7 @@ function MessageList(props: MessageListProps) {
             onToggleReaction={props.onToggleReaction}
             failed={props.failedIds.has(row.msg.id)}
             attachmentDropped={props.droppedAttachIds.has(row.msg.id)}
+            uploadPending={props.pendingUploadIds.has(row.msg.id)}
             onRetrySend={props.onRetrySend}
             onDiscardSend={props.onDiscardSend}
             autoTranslate={props.autoTranslate}
@@ -4757,6 +5043,8 @@ type MessageBubbleProps = {
   failed?: boolean;
   /** The failed send lost an attachment that was never uploaded. */
   attachmentDropped?: boolean;
+  /** The failed send holds a file not uploaded yet — Retry uploads it first. */
+  uploadPending?: boolean;
   onRetrySend?: (tempId: string) => void;
   onDiscardSend?: (tempId: string) => void;
   autoTranslate: boolean;
@@ -4857,6 +5145,7 @@ function MessageBubble({
   onToggleReaction,
   failed = false,
   attachmentDropped = false,
+  uploadPending = false,
   onRetrySend,
   onDiscardSend,
   autoTranslate,
@@ -5324,6 +5613,11 @@ function MessageBubble({
         {failed && attachmentDropped && (
           <div className={`mt-0.5 text-[10.5px] text-[var(--text-dim)] ${isSelf ? "text-end" : ""}`}>
             {t("send.attachmentReadd", "The attachment didn't upload — add it again after sending.")}
+          </div>
+        )}
+        {failed && !attachmentDropped && uploadPending && (
+          <div className={`mt-0.5 text-[10.5px] text-[var(--text-dim)] ${isSelf ? "text-end" : ""}`}>
+            {t("send.uploadPending", "Not uploaded yet — Retry uploads it first.")}
           </div>
         )}
       </div>

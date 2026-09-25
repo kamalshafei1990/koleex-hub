@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectAccessLevels, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectAccessLevels, UUID_RE, viewReason } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
 import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-members";
 
@@ -22,7 +22,8 @@ import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-
                    (the CALLER manages / created / holds a task in it),
                    `member_count` (project_members rows — one grouped
                    query) and `my_access` manage|edit|view (the caller's
-                   effective permission, see projectAccessLevels)
+                   effective permission, see projectAccessLevels) with
+                   `my_access_reason` viewer|module|null (why "view")
        counts      { active, on_hold, completed, archived, all } for the
                    filter chips — same scope + search, every status.
 
@@ -173,14 +174,18 @@ export async function GET(req: Request) {
         ]).then(([r, m]) => new Set([...(r.data ?? []).map((x) => (x as { project_id: string }).project_id), ...m]))
       : Promise.resolve(null),
     templatesOnly ? Promise.resolve(new Map<string, number>()) : projectMemberCounts(auth.tenant_id, ids),
-    requireModuleAction(auth, "Projects", "edit").then((denied) => projectAccessLevels(auth, projects, !denied)),
+    requireModuleAction(auth, "Projects", "edit").then(async (denied) => ({
+      canEditModule: !denied,
+      levels: await projectAccessLevels(auth, projects, !denied),
+    })),
   ]);
 
   const out = projects.map((p) => ({
     ...p,
     task_counts: tc.get(p.id) ?? ZERO,
     member_count: memberCounts.get(p.id) ?? 0,
-    my_access: access.get(p.id) ?? "view",
+    my_access: access.levels.get(p.id) ?? "view",
+    my_access_reason: viewReason(access.levels.get(p.id) ?? "view", access.canEditModule),
     involved: mine
       ? p.manager_account_id === auth.account_id || p.created_by_account_id === auth.account_id || mine.has(p.id)
       : true,

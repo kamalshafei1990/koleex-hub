@@ -20,8 +20,11 @@
        it; a STALE save (409) is re-sent as a rebase — the server merges
        our changes onto the newer note (keeping both versions of a block
        both sides changed) and the editor adopts the merged body, with
-       anything typed meanwhile re-applied on top. Unsaved typing is never
-       dropped. A transient fallback keeps retrying and REJOINS — pending
+       anything typed meanwhile re-applied on top (the caret is mapped
+       into the new document, not clamped). A block someone deleted while
+       we were typing in it is kept (edit wins over delete). Conflict
+       copies carry a language-neutral flag; their label is drawn in the
+       viewer's language. Unsaved typing is never dropped. A transient fallback keeps retrying and REJOINS — pending
        edits are saved first, then the editor rebinds.
      • "/" block menu, "[[" note links + Backlinks, checklist → To-do,
        version history, Koleex AI (summary / action items), duplicate,
@@ -63,6 +66,8 @@ import {
 import { NOTES_IMAGE_MIME } from "@/lib/notes-policy";
 import { getTabClientId, useNoteCollab, type NoteUpdate } from "@/lib/note-collab";
 import { mergeDocs, stableKey } from "@/lib/notes-merge3";
+import { mapPosAcrossDocs } from "@/lib/notes-cursor-map";
+import { TextSelection } from "@tiptap/pm/state";
 import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink } from "@/lib/notes-schema";
 import { NoteYjsSession, fetchCollabJoin, peerColor } from "@/lib/notes-yjs";
 import { noteFileName, noteToMarkdown } from "@/lib/notes-markdown";
@@ -261,7 +266,8 @@ export interface NoteEditorProps {
   /** Copy this note into a new one. */
   onDuplicate: () => void;
   /** The title was changed outside the editor (Rename dialog). */
-  titleSignal?: { id: string; title: string; seq: number } | null;
+  /** …or a 409 retry merged title / tags (`tags` present): show the result. */
+  titleSignal?: { id: string; title: string; seq: number; tags?: string[] } | null;
   notify: (msg: string, kind?: "success" | "error" | "info") => void;
 }
 
@@ -309,6 +315,12 @@ const PRINT_CSS = `
   ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: #777; }
   mark { background: #fff3a3; }
 `;
+
+/** Conflict copies print with their label in the printing user's language. */
+function conflictPrintCss(label: string): string {
+  const css = JSON.stringify(`${label} `).replace(/</g, "\\3c ");
+  return `[data-conflict]::before { content: ${css}; font-style: italic; opacity: 0.6; }`;
+}
 
 function countWords(text: string): { words: number; chars: number } {
   const trimmed = text.trim();
@@ -407,6 +419,9 @@ export default function NoteEditor({
   });
 
   const placeholderRef = useRef(`${t("editor.placeholder")}  ${t("slash.hint")}`);
+  /* Conflict copies carry a language-neutral flag; the label is drawn in
+     the viewer's language (NoteConflictMarker reads this lazily). */
+  const conflictLabelRef = useRef(t("conflict.copyLabel"));
   const lastLocalEditAt = useRef(0);
   const countTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -510,7 +525,7 @@ export default function NoteEditor({
      editor is reused across notes, exactly as before. */
   const editor = useEditor({
     extensions: [
-      ...notesSchemaExtensions({ collab: !!activeSession }),
+      ...notesSchemaExtensions({ collab: !!activeSession, conflictLabel: () => conflictLabelRef.current }),
       Placeholder.configure({ placeholder: () => placeholderRef.current }),
       SlashCommand.configure({ getBridge: () => bridgeRef.current, getItems: (q) => slashItemsRef.current(q) }),
       NoteLinkPicker.configure({ getBridge: () => bridgeRef.current, getItems: (q) => linkItemsRef.current(q) }),
@@ -584,24 +599,51 @@ export default function NoteEditor({
       if (!ed || ed.isDestroyed || sessionRef.current || noteIdRef.current !== id) return;
       const now = ed.getJSON();
       const typedSince = stableKey(now) !== stableKey(sent ?? null);
-      const target = typedSince ? mergeDocs(sent, now, merged, t("conflict.copyLabel")).doc : merged;
+      const target = typedSince ? mergeDocs(sent, now, merged).doc : merged;
       if (stableKey(target) === stableKey(now)) return;
+      const oldDoc = ed.state.doc;
       const { from, to } = ed.state.selection;
       try {
         ed.commands.setContent(target as never, { emitUpdate: false });
       } catch {
         return; // malformed — keep what is on screen (still pending)
       }
-      const size = ed.state.doc.content.size;
-      try { ed.commands.setTextSelection({ from: Math.min(from, size), to: Math.min(to, size) }); } catch { /* ignore */ }
+      // Carry the caret over: the block that held it is found in the new
+      // document (same matching as the merge) and the offset inside it is
+      // mapped through a character diff — not merely clamped.
+      try {
+        const doc = ed.state.doc;
+        const nf = mapPosAcrossDocs(oldDoc, doc, from);
+        const nt = to === from ? nf : mapPosAcrossDocs(oldDoc, doc, to);
+        const sel = TextSelection.between(doc.resolve(nf), doc.resolve(Math.max(nf, nt)));
+        ed.view.dispatch(ed.state.tr.setSelection(sel).setMeta("addToHistory", false));
+      } catch { /* ignore */ }
       setCounts(countWords(ed.getText()));
       if (typedSince) queueChange({ body_json: ed.getJSON() });
     };
-  }, [editor, t, queueChange]);
+  }, [editor, queueChange]);
 
-  // Placeholder follows the UI language.
+  /* A pulled server state deleted blocks we were typing in: they were kept
+     (edit wins over delete — NoteYjsSession.applyServerState). Say so, and
+     persist the re-inserted blocks (the change is ours, not a peer's). */
+  const rescuedRef = useRef<(n: number) => void>(() => {});
+  useEffect(() => {
+    rescuedRef.current = (n) => {
+      if (n <= 0) return;
+      notify(t("conflict.rescued"), "info");
+      const s = sessionRef.current;
+      const ed = editor;
+      if (s && s.canWrite && ed && !ed.isDestroyed) {
+        lastLocalEditAt.current = Date.now();
+        queueChange({ body_json: ed.getJSON(), yjs_update: s.encodeState() });
+      }
+    };
+  }, [editor, notify, t, queueChange]);
+
+  // Placeholder + conflict label follow the UI language.
   useEffect(() => {
     placeholderRef.current = `${t("editor.placeholder")}  ${t("slash.hint")}`;
+    conflictLabelRef.current = t("conflict.copyLabel");
     if (editor && !editor.isDestroyed) {
       try { editor.view.dispatch(editor.state.tr); } catch { /* not mounted yet */ }
     }
@@ -654,7 +696,7 @@ export default function NoteEditor({
         const j = await fetchCollabJoin(s.noteId);
         if (!j || !j.available || sessionRef.current !== s) return;
         s.setKeys(j.keys);
-        s.applyServerState(j.state);
+        rescuedRef.current(s.applyServerState(j.state));
       } while (pullAgainRef.current);
     } finally {
       pullingRef.current = false;
@@ -767,7 +809,7 @@ export default function NoteEditor({
           return;
         }
         session.setKeys(j.keys);
-        session.applyServerState(j.state);
+        rescuedRef.current(session.applyServerState(j.state));
       }, Math.max(0, last + 10_000 - Date.now()));
     };
     return () => {
@@ -909,7 +951,7 @@ export default function NoteEditor({
     const tags = tagsDraft.length ? `<div class="note-tags">${tagsDraft.map((x) => `#${escapeHtml(x)}`).join(" ")}</div>` : "";
     const html =
       `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8">` +
-      `<title>${escapeHtml(title)}</title><style>${PRINT_CSS}</style></head><body>` +
+      `<title>${escapeHtml(title)}</title><style>${PRINT_CSS}${conflictPrintCss(t("conflict.copyLabel"))}</style></head><body>` +
       `<h1 class="note-title" dir="auto">${escapeHtml(title)}</h1>${tags}<main dir="auto">${editor.getHTML()}</main></body></html>`;
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
@@ -1063,6 +1105,13 @@ export default function NoteEditor({
   useEffect(() => {
     if (!titleSignal || titleSignal.id !== noteIdRef.current) return;
     const pending = pendingRef.current.get(titleSignal.id);
+    if (titleSignal.tags) {
+      // A merged save result: show it unless newer local edits are queued
+      // (those are saved on top of it next).
+      if (!pending || !("title" in pending)) setTitleDraft(titleSignal.title);
+      if (!pending || !("tags" in pending)) setTagsDraft(titleSignal.tags);
+      return;
+    }
     if (pending && "title" in pending) {
       const rest = { ...pending };
       delete rest.title;

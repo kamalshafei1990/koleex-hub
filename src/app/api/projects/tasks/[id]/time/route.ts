@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertTaskAccess, assertTaskWrite } from "@/lib/server/project-access";
+import { assertTaskAccess, assertTaskWrite, canModerate, taskEditFlags } from "@/lib/server/project-access";
 import { recomputeLoggedHours } from "@/lib/server/project-time";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
@@ -28,7 +28,19 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     console.error("[api/projects/tasks/:id/time GET]", error.message);
     return NextResponse.json({ error: "Failed to load time entries" }, { status: 500 });
   }
-  return NextResponse.json({ entries: data ?? [] });
+  /* Per-entry `can_delete`: EXACTLY the DELETE route's rule — the
+     Projects edit action, write access to this task (assertTaskWrite ⇔
+     taskEditFlags.can_edit), author-or-moderator (canModerate), and never
+     an entry that has been invoiced. */
+  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
+  const canWrite = canEditModule && ((await taskEditFlags(auth, [gate.task], true)).get(id)?.can_edit ?? false);
+  const moderator = canModerate(auth, gate.project);
+  return NextResponse.json({
+    entries: ((data ?? []) as { account_id: string | null; invoiced_invoice_id?: string | null }[]).map((e) => ({
+      ...e,
+      can_delete: canWrite && !e.invoiced_invoice_id && (e.account_id === auth.account_id || moderator),
+    })),
+  });
 }
 
 export async function POST(req: Request, { params }: RouteCtx) {
@@ -68,5 +80,6 @@ export async function POST(req: Request, { params }: RouteCtx) {
   /* logged_hours = Σ minutes / 60 over this task's entries. Awaited — the
      old `void builder` never ran (query builders are lazy). */
   const logged_hours = await recomputeLoggedHours(auth.tenant_id, id);
-  return NextResponse.json({ entry: data, logged_hours });
+  /* A fresh entry is the caller's own and not invoiced — deletable. */
+  return NextResponse.json({ entry: { ...data, can_delete: true }, logged_hours });
 }

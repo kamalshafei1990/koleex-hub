@@ -21,6 +21,7 @@ import {
   rebaseOntoState,
 } from "@/lib/notes-yjs-server";
 import { afterContentSaved } from "@/lib/notes-history-server";
+import { mergeNoteMeta, type NoteMeta } from "@/lib/notes-merge3";
 
 /* GET    /api/notes/[id] — full note including body_json. Owner OR anyone the
                             note is shared with (view/edit) may read; a trashed
@@ -37,7 +38,10 @@ import { afterContentSaved } from "@/lib/notes-history-server";
                             state, base64) instead of body_json. It is MERGED
                             into the stored state and body_json/body_plain
                             are derived from the merge — a merge cannot
-                            conflict, so no base token and no 409.
+                            conflict, so no base token and no 409. Typing
+                            that lands in a block the stored state deleted
+                            keeps the block (`kept` in the response; live
+                            peers are pinged to pull it).
                             SINGLE-EDITOR body save on a note that has a
                             Yjs state (a client that fell back from the
                             live session): body_json is converted into a
@@ -53,9 +57,22 @@ import { afterContentSaved } from "@/lib/notes-history-server";
                             the note's CURRENT body (notes-merge3; for a
                             Yjs note, onto the stored state via the block
                             matcher) — never a 409, nothing typed is lost;
-                            a same-block conflict keeps both versions, the
-                            local one labelled `conflict_label`. Responds
-                            with the merged body + conflict count.
+                            a same-block conflict keeps both versions (the
+                            local one flagged with the language-neutral
+                            `conflict` block attribute — the editor draws
+                            the label in the viewer's language), and a block
+                            the client deleted that someone edited is KEPT.
+                            Responds with the merged body, the conflict
+                            count and the kept count.
+                            META REBASE (title / tags / colour after a 409):
+                            the retry carries `meta_base` (those fields as
+                            the client last saw them). Only the fields the
+                            client changed vs that base are applied onto
+                            the current note; tags merge as a set; a title
+                            or colour both sides changed differently keeps
+                            the current value and is reported in
+                            `meta_conflicts`. Responds with the resolved
+                            `meta`.
                             A body_json save carries a base token (or is a
                             rebase): without one → 400, so no caller can
                             blindly overwrite newer saved content.
@@ -150,18 +167,25 @@ async function collabPatch(
     }
     const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
     if (!saved) continue; // someone saved in between — merge again
-    after(() => afterContentSaved({
-      noteId: id,
-      tenantId: ctx.tenantId,
-      accountId: ctx.accountId,
-      title: saved.title ?? "",
-      bodyJson: merged.bodyJson,
-      bodyChanged: true,
-    }));
+    const kept = merged.rescued ?? 0;
+    after(async () => {
+      // A kept block is new to every live doc (the delete already reached
+      // them): have them pull the stored state.
+      if (kept) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson: merged.bodyJson,
+        bodyChanged: true,
+      });
+    });
     return NextResponse.json({
       ok: true,
       updated_at: saved.updated_at,
       body_plain: body_plain.slice(0, NOTE_LIMITS.preview),
+      ...(kept ? { kept } : {}),
     });
   }
   return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
@@ -259,35 +283,39 @@ async function rebasePatch(
   id: string,
   patch: Record<string, unknown>,
   baseBody: unknown,
-  conflictLabel: string,
+  metaBase: NoteMeta | null,
   collab: boolean,
   ctx: { tenantId: string; accountId: string },
 ): Promise<NextResponse> {
   for (let attempt = 0; attempt < 4; attempt++) {
     const { data: cur, error: readErr } = await supabaseServer
       .from("notes")
-      .select(collab ? "body_json, updated_at, yjs_state" : "body_json, updated_at")
+      .select(collab ? "body_json, updated_at, title, tags, color, yjs_state" : "body_json, updated_at, title, tags, color")
       .eq("id", id)
       .maybeSingle();
     if (readErr || !cur) {
       console.error("[api/notes/[id] PATCH rebase read]", readErr?.message);
       return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
     }
-    const row = cur as unknown as { body_json: unknown; updated_at: string; yjs_state?: string | null };
-    const write: Record<string, unknown> = { ...patch };
+    const row = cur as unknown as MetaRow & { body_json: unknown; yjs_state?: string | null };
+    const meta = resolveMeta(patch, metaBase, row);
+    const write: Record<string, unknown> = { ...meta.patch };
     let bodyJson: Record<string, unknown>;
     let conflicts: number;
+    let kept: number;
     if (row.yjs_state) {
-      const r = rebaseOntoState(row.yjs_state, baseBody, patch.body_json, conflictLabel);
+      const r = rebaseOntoState(row.yjs_state, baseBody, patch.body_json);
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
       bodyJson = r.bodyJson;
       conflicts = r.conflicts;
+      kept = r.kept;
       write.yjs_state = r.state;
     } else {
-      const r = rebaseBody(row.body_json, baseBody, patch.body_json, conflictLabel);
+      const r = rebaseBody(row.body_json, baseBody, patch.body_json);
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
       bodyJson = r.bodyJson;
       conflicts = r.conflicts;
+      kept = r.kept;
     }
     if (JSON.stringify(bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
       return NextResponse.json({ error: "Note is too large" }, { status: 400 });
@@ -319,9 +347,127 @@ async function rebasePatch(
     return NextResponse.json({
       ok: true,
       updated_at: saved.updated_at,
-      merged: { body_json: bodyJson, conflicts },
+      merged: { body_json: bodyJson, conflicts, kept },
       body_plain: (write.body_plain as string).slice(0, NOTE_LIMITS.preview),
+      ...(metaBase ? { meta: meta.resolved, meta_conflicts: meta.conflicts } : {}),
     });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
+/* ── Metadata 3-way merge (a title / tags / colour retry after a 409) ──── */
+
+type MetaRow = { updated_at: string; title: string | null; tags: string[] | null; color: string | null };
+
+/** The client's `meta_base`, validated like the fields themselves (or null). */
+function parseMetaBase(v: unknown): NoteMeta | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const src = v as Record<string, unknown>;
+  const pick: Record<string, unknown> = {};
+  for (const k of ["title", "tags", "color"]) if (k in src) pick[k] = src[k];
+  const r = validateNoteInput(pick, "owner");
+  if (!r.ok) return null;
+  const out: NoteMeta = {};
+  if (r.value.title !== undefined) out.title = r.value.title;
+  if (r.value.tags !== undefined) out.tags = r.value.tags;
+  if (r.value.color !== undefined) out.color = r.value.color;
+  return out;
+}
+
+/**
+ * Apply `metaBase` to a patch against the current row: title / tags /
+ * colour become only what the client changed vs its base (merged onto the
+ * current values). Without a base the patch is used as is.
+ */
+function resolveMeta(
+  patch: Record<string, unknown>,
+  metaBase: NoteMeta | null,
+  row: MetaRow,
+): { patch: Record<string, unknown>; resolved: { title: string; tags: string[]; color: string | null }; conflicts: string[] } {
+  const current = { title: row.title ?? "", tags: row.tags ?? [], color: row.color ?? null };
+  if (!metaBase) {
+    return {
+      patch,
+      resolved: {
+        title: typeof patch.title === "string" ? patch.title : current.title,
+        tags: Array.isArray(patch.tags) ? (patch.tags as string[]) : current.tags,
+        color: "color" in patch ? ((patch.color as string | null) ?? null) : current.color,
+      },
+      conflicts: [],
+    };
+  }
+  const local: NoteMeta = {};
+  if (typeof patch.title === "string") local.title = patch.title;
+  if (Array.isArray(patch.tags)) local.tags = patch.tags as string[];
+  if ("color" in patch) local.color = (patch.color as string | null) ?? null;
+  const m = mergeNoteMeta(metaBase, local, current);
+  const out: Record<string, unknown> = { ...patch };
+  delete out.title;
+  delete out.tags;
+  delete out.color;
+  if (m.apply.title !== undefined) out.title = m.apply.title;
+  if (m.apply.tags !== undefined) out.tags = m.apply.tags.slice(0, NOTE_LIMITS.tags);
+  if (m.apply.color !== undefined) out.color = m.apply.color;
+  return {
+    patch: out,
+    resolved: {
+      title: (out.title as string | undefined) ?? current.title,
+      tags: (out.tags as string[] | undefined) ?? current.tags,
+      color: "color" in out ? ((out.color as string | null) ?? null) : current.color,
+    },
+    conflicts: m.conflicts,
+  };
+}
+
+/**
+ * A metadata-only save re-sent after a 409 with `meta_base`: merge it onto
+ * the note as it is NOW (optimistic loop, like the body writers).
+ */
+async function metaRebasePatch(
+  id: string,
+  patch: Record<string, unknown>,
+  metaBase: NoteMeta,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select("updated_at, title, tags, color, body_json")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH meta read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as unknown as MetaRow & { body_json: unknown };
+    const meta = resolveMeta(patch, metaBase, row);
+    const write = { ...meta.patch };
+    const changed = ["title", "tags", "color"].some((k) => k in write);
+    if (!changed) {
+      // Nothing of ours is left to apply (already there, or conflicts only).
+      return NextResponse.json({ ok: true, updated_at: row.updated_at, meta: meta.resolved, meta_conflicts: meta.conflicts });
+    }
+    const { data, error } = await supabaseServer
+      .from("notes")
+      .update(write)
+      .eq("id", id)
+      .eq("updated_at", row.updated_at)
+      .select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH meta]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    if (!saved) continue; // someone saved in between — merge again
+    after(() => afterContentSaved({
+      noteId: id,
+      tenantId: ctx.tenantId,
+      accountId: ctx.accountId,
+      title: saved.title ?? "",
+      bodyJson: row.body_json,
+      bodyChanged: false,
+    }));
+    return NextResponse.json({ ok: true, updated_at: saved.updated_at, meta: meta.resolved, meta_conflicts: meta.conflicts });
   }
   return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
 }
@@ -394,8 +540,9 @@ export async function PATCH(
       return NextResponse.json({ error: "base_updated_at is required for a body save" }, { status: 400 });
     }
   }
-  const conflictLabel =
-    typeof src.conflict_label === "string" ? src.conflict_label.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  // (`conflict_label` from older clients is ignored: conflict copies carry a
+  // language-neutral flag, labelled by each viewer's editor.)
+  const metaBase = "meta_base" in src ? parseMetaBase(src.meta_base) : null;
 
   /* Only a CONTENT change moves updated_at (the concurrency token and the
      list's recency sort). Organising a note — pin, move to a folder — must
@@ -424,7 +571,15 @@ export async function PATCH(
   /* A stale body save re-sent as a rebase: merge the client's changes onto
      the current note instead of refusing it. */
   if (bodyChanged && rebaseFrom !== undefined) {
-    return rebasePatch(id, patch, rebaseFrom, conflictLabel || "Conflict copy", await notesCollabAvailable(), {
+    return rebasePatch(id, patch, rebaseFrom, metaBase, await notesCollabAvailable(), {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
+  }
+
+  /* A title / tags / colour retry after a 409: 3-way merge the fields. */
+  if (!bodyChanged && metaBase && isContent) {
+    return metaRebasePatch(id, patch, metaBase, {
       tenantId: access.note.tenant_id,
       accountId: auth.account_id,
     });

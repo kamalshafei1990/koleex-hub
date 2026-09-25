@@ -85,9 +85,14 @@ export interface ProjectRow {
   /** The caller's effective permission (list + detail payloads). "view" =
    *  read-only: every write route answers 403, so the UI hides writes. */
   my_access?: ProjectAccess;
+  /** Why `my_access` is "view" (null otherwise): "viewer" = viewer
+   *  membership is the only way in; "module" = no edit right in the
+   *  Projects module. Drives the "View only" tooltip wording. */
+  my_access_reason?: ProjectViewReason | null;
 }
 
 export type ProjectAccess = "manage" | "edit" | "view";
+export type ProjectViewReason = "viewer" | "module";
 
 export interface ProjectTaskCounts {
   open: number;
@@ -436,13 +441,15 @@ export async function saveSavedFilters(filters: SavedTaskFilter[]): Promise<Save
 }
 
 /** One board drop → one request. `orderedIds` is the whole target column
- *  after the drop (including the moved card). */
+ *  after the drop (including the moved card). The server writes only the
+ *  moved card's sort_order when there is room between its new neighbours
+ *  (`positions` lists every card it wrote). */
 export async function reorderTasks(body: {
   project_id: string;
   stage_id: string | null;
   ordered_ids: string[];
   moved_id: string;
-}): Promise<{ moved: { id: string; stage_id: string | null; status: TaskStatus } }> {
+}): Promise<{ moved: { id: string; stage_id: string | null; status: TaskStatus }; positions?: Record<string, number> }> {
   return send("/api/projects/tasks/reorder", "POST", body);
 }
 
@@ -482,6 +489,9 @@ export interface TaskComment {
   created_at: string;
   updated_at: string;
   author?: { id: string; username: string } | null;
+  /** Server-computed: the DELETE route would accept it (author or project
+   *  moderator, with write access to the task). Absent = hide. */
+  can_delete?: boolean;
 }
 export interface ChecklistItem {
   id: string;
@@ -510,6 +520,9 @@ export interface TimeEntry {
   created_at: string;
   invoiced_invoice_id?: string | null;
   account?: { id: string; username: string } | null;
+  /** Server-computed: the DELETE route would accept it (author or project
+   *  moderator, write access to the task, not invoiced). Absent = hide. */
+  can_delete?: boolean;
 }
 export interface TaskAttachment {
   id: string;
