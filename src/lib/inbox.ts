@@ -267,6 +267,29 @@ export async function markMessageUnread(id: string): Promise<boolean> {
   return r.ok;
 }
 
+/** Several rows in ONE request — a folded group, or a tab's "mark all
+ *  read" (never one request per row). */
+export async function markMessagesRead(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const r = await inboxMutate({ action: "markRead", ids });
+  if (!r.ok) console.error("[Inbox] Mark read:", r.error);
+  return r.ok;
+}
+
+export async function markMessagesUnread(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const r = await inboxMutate({ action: "markUnread", ids });
+  if (!r.ok) console.error("[Inbox] Mark unread:", r.error);
+  return r.ok;
+}
+
+export async function archiveMessages(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const r = await inboxMutate({ action: "archive", ids });
+  if (!r.ok) console.error("[Inbox] Archive:", r.error);
+  return r.ok;
+}
+
 export async function markAllRead(accountId: string): Promise<boolean> {
   void accountId; // identity comes from the session server-side
   const r = await inboxMutate({ action: "markAllRead" });

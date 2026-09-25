@@ -102,4 +102,9 @@ export const adminTpl: Translations = {
   "membership_request.s": { en: "Account request · {name}", zh: "账户申请 · {name}", ar: "طلب حساب · {name}" },
   "support_request.s": { en: "Sign-in help · {name}", zh: "登录帮助 · {name}", ar: "مساعدة في تسجيل الدخول · {name}" },
   "support_request.urgent.s": { en: "⚠ Suspected account misuse · {name}", zh: "⚠ 疑似账户被盗用 · {name}", ar: "⚠ اشتباه في إساءة استخدام الحساب · {name}" },
+
+  /* Not a writer's template: the bell and the notification center fold the
+     same audited action by one person on one day into this one line
+     (lib/notification-view — "Delete — product × 6"). */
+  "sa_alert.digest.s": { en: "{action:sa_action} — {entity:sa_entity} × {count}", zh: "{action:sa_action} — {entity:sa_entity} × {count}", ar: "{action:sa_action} — {entity:sa_entity} × {count}" },
 };

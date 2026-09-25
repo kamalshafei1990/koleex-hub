@@ -22,9 +22,10 @@ import { requireAuth } from "@/lib/server/auth";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 const INBOX = "inbox_messages";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Body =
-  | { action: "markRead" | "markUnread" | "archive"; id: string }
+  | { action: "markRead" | "markUnread" | "archive"; id?: string; ids?: string[] }
   | { action: "markAllRead" }
   | { action: "send"; recipientId: string; subject: string; body: string; link?: string | null; metadata?: Record<string, unknown> }
   | { action: "broadcastToRole"; roleName: string; subject: string; body: string; link?: string | null; excludeSelf?: boolean; metadata?: Record<string, unknown> }
@@ -44,17 +45,26 @@ export async function POST(req: Request) {
       case "markRead":
       case "markUnread":
       case "archive": {
-        if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+        /* One row (`id`) or several (`ids`: a folded group, a tab's "mark all
+           read") — one request either way, never one per row. */
+        const ids = Array.from(new Set(body.ids ?? (body.id ? [body.id] : [])));
+        if (ids.length === 0) return NextResponse.json({ error: "id required" }, { status: 400 });
+        if (ids.length > 500 || !ids.every((x) => typeof x === "string" && UUID.test(x))) {
+          return NextResponse.json({ error: "invalid id" }, { status: 400 });
+        }
         const patch =
           body.action === "markRead" ? { read_at: new Date().toISOString() }
           : body.action === "markUnread" ? { read_at: null }
           : { archived_at: new Date().toISOString() };
-        /* Recipient-scoped: you can only change the state of YOUR OWN inbox. */
-        const { error } = await supabaseServer
-          .from(INBOX).update(patch)
-          .eq("id", body.id)
-          .eq("recipient_account_id", me);
-        if (error) throw new Error(error.message);
+        /* Recipient-scoped: you can only change the state of YOUR OWN inbox.
+           Chunked, so a long list never outgrows the request URL. */
+        for (let i = 0; i < ids.length; i += 100) {
+          const { error } = await supabaseServer
+            .from(INBOX).update(patch)
+            .in("id", ids.slice(i, i + 100))
+            .eq("recipient_account_id", me);
+          if (error) throw new Error(error.message);
+        }
         return NextResponse.json({ ok: true });
       }
 
