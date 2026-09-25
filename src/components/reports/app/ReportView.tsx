@@ -406,7 +406,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
               {sectionName(s.id)}
               {s.required && <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span>}
             </p>
-            {blocks && <blocks.BlockEditor t={t} tplKey={tpl.key} def={s} value={draft.blocks[s.id] ?? { id: s.id }} reportId={id}
+            {blocks && <blocks.BlockEditor t={t} lang={lang} tplKey={tpl.key} def={s} value={draft.blocks[s.id] ?? { id: s.id }} reportId={id}
               version={detail.report.version} onChange={(v) => setBlock(s.id, v)} onBusy={bumpBusy} live={carry.data[s.id]} />}
           </div>
         ) : (
@@ -464,7 +464,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
                   const to = rangeEnd(iso, draftRef.current.dateTo);
                   change({ date: iso, dateTo: to });
                   if (tpl.sections.some((x) => x.kind === "data")) moveCarry(iso, `${iso}|${to}`, to);
-                }} />
+                }} lang={lang} />
               </div>
               <div>
                 <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{t("period.to")}</p>
@@ -473,7 +473,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
                   const to = rangeEnd(draftRef.current.date, iso);
                   change({ dateTo: to });
                   if (tpl.sections.some((x) => x.kind === "data")) moveCarry(draftRef.current.date, `${draftRef.current.date}|${to}`, to);
-                }} />
+                }} lang={lang} />
               </div>
               {draft.date && draft.dateTo && draft.dateTo !== draft.date && <p className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(draft.date, draft.dateTo)}</p>}
             </div>
@@ -488,7 +488,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
                 const moved = !!(carryRulesFor(tpl).length || appRulesFor(tpl).length || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
                 change({ date: iso });
                 if (moved) moveCarry(iso, key);
-              }} />
+              }} lang={lang} />
               {period && tpl.cadence && tpl.cadence !== "daily" && <p className="mt-1 text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(period.start, period.end)}</p>}
             </div>
           )}

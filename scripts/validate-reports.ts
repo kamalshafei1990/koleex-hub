@@ -57,9 +57,11 @@
  *   §17 sales & customers (Phase 4B) — a choice keeps only its answers; a
  *      numbers block keeps only the author's notes (the figures are the
  *      server's, pinned to the author, gated by each app, frozen on send);
- *      totals never mix currencies; dates are real days; quotations and
- *      invoices link and open in their editors; the editors' card is quiet
- *      and never printed; the links migration only widens the kinds.
+ *      totals never mix currencies; dates are real days, picked and read
+ *      day first (the Hub's DatePicker, never the browser's mm/dd/yyyy
+ *      date input); quotations and invoices link and open in their editors;
+ *      the editors' card is quiet and never printed; the links migration
+ *      only widens the kinds.
  *   §20 the template builder (Phase 4E) — every built-in copies into a type
  *      the builder's own check accepts, words and all; the check keeps only
  *      what each kind has; a report keeps its type as it was started (never
@@ -1448,6 +1450,32 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   eq(goals.rows, [{ goal: "Double orders", date: "2026-12-31" }, { goal: "Visit" }, { goal: "Other" }], "a date cell is a real day in YYYY-MM-DD — 30 Feb and a typed D/M/Y are dropped");
   eq([cellDate("2026-09-25"), cellDate("2026-13-01"), cellDate(" 2026-09-25 ")], ["2026-09-25", null, "2026-09-25"], "cellDate reads only a real calendar day");
   eq(tableSummary(plan.sections.find((x) => x.id === "goals")!, [{ goal: "a", date: "2026-01-01" }, { goal: "b", date: "2026-02-01" }]), [], "a date column is never added up");
+  /* …and picked the Hub's way: the browser's own date input reads mm/dd/yyyy
+     in an English browser, and dates read day first everywhere (owner). The
+     cell is the Hub's DatePicker — 25/09/2026 as the reader and the print
+     show it, the screen's language, a calendar that floats (a cell is
+     narrower than a month). A `type` that is, or may be, "date" anywhere in
+     the blocks fails. */
+  rule("a table's date cell is the Hub's DatePicker (D/M/Y), never the browser's mm/dd/yyyy date input", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => {
+      const out: string[] = [];
+      if (/\btype=(?:\{[^}]*)?["'`]date["'`]/.test(c)) out.push('a block renders <input type="date">');
+      if (!c.includes('import DatePicker from "@/components/ui/DatePicker";')) out.push("the Hub's DatePicker is not imported");
+      const a = c.indexOf("function TableEditor(");
+      const end = a < 0 ? -1 : c.indexOf("\nfunction ", a + 1);
+      const body = a < 0 ? "" : c.slice(a, end < 0 ? undefined : end);
+      const cell = /c\.type === "date" \?[\s\S]*?(<DatePicker\b[\s\S]*?\/>)/.exec(body)?.[1];
+      if (!cell) out.push("a date column is not the DatePicker");
+      else for (const [need, what] of [
+        [/\bvalue=\{r\[c\.id\] \?\? ""\}/, "its own value"], [/\bonChange=\{\(iso\) => setCell\(ri, c\.id, iso\)\}/, "writing YYYY-MM-DD back"],
+        [/\bformat=\{dmyDate\}/, "D/M/Y as the reader shows it"], [/\blang=\{lang\}/, "the screen's language"], [/\sfloating(?=[\s/>]|=\{true\})/, "its floating calendar"],
+      ] as const) if (!need.test(cell)) out.push(`the date cell lost ${what}`);
+      return out;
+    },
+    (src) => {
+      const m = /<DatePicker id=\{`\$\{uid\}[\s\S]*?\/>/.exec(src);
+      return m ? src.slice(0, m.index) + '<input value={r[c.id] ?? ""} onChange={(e) => setCell(ri, c.id, e.target.value)} type="date" className={`${FIELD} h-9 py-1.5 tabular-nums`} />' + src.slice(m.index + m[0].length) : src;
+    });
 
   /* Totals never mix currencies */
   const mixed: ReportDataValue = { source: "quotations", capturedAt: "2026-09-25T00:00:00Z", rows: [

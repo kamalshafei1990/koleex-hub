@@ -16,11 +16,12 @@
    route); the general photos-and-files list leaves them out.
    --------------------------------------------------------------------------- */
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import DatePicker from "@/components/ui/DatePicker";
 import {
   REPORT_CURRENCIES, REPORT_LIMITS, scoreAverage, tableSummary,
   type CheckState, type ReportDataRow, type ReportDataSource, type ReportDataValue, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
@@ -39,6 +40,8 @@ export { reportBlocksT as BLOCK_WORDS } from "@/lib/translations/report-blocks";
 
 interface EditorProps {
   t: T;
+  /** The screen's language — a date cell's months and its Today / Clear. */
+  lang?: string;
   tplKey: string;
   def: ReportSectionDef;
   value: ReportSectionValue;
@@ -203,7 +206,8 @@ function ScoreEditor({ t, tplKey, def, value, onChange }: EditorProps) {
   );
 }
 
-function TableEditor({ t, tplKey, def, value, onChange }: EditorProps) {
+function TableEditor({ t, lang, tplKey, def, value, onChange }: EditorProps) {
+  const uid = useId();
   const cols = def.columns ?? [];
   const rows = value.rows?.length ? value.rows : [{}];
   const money = cols.some((c) => c.type === "money");
@@ -224,13 +228,32 @@ function TableEditor({ t, tplKey, def, value, onChange }: EditorProps) {
       {rows.map((r, ri) => (
         <div key={ri} className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5 pe-9">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {cols.map((c) => (
+            {cols.map((c) => c.type === "date" ? (
+              /* A date is the Hub's DatePicker — the browser's own date input
+                 showed mm/dd/yyyy in an English browser. The cell reads
+                 25/09/2026 (dmyDate, as the reader and the print do): a
+                 month's name does not fit a phone-width cell in Arabic or
+                 Chinese. It still stores YYYY-MM-DD, and its calendar floats
+                 (a cell is narrower than a month) in the screen's language.
+                 Once filled, a cell too narrow for the date AND the icon
+                 drops the icon, then some padding. The faint inverted tint
+                 on a full-width button is what makes Aurora draw it as a
+                 field (the recessed well its neighbours wear), not a pale
+                 slab. A div with a label FOR the field: a label may hold
+                 only the one control it names. */
+              <div key={c.id} className="@container min-w-0">
+                <label htmlFor={`${uid}-${ri}-${c.id}`} className="mb-0.5 block truncate text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">
+                  {colName(c.id)}
+                </label>
+                <DatePicker id={`${uid}-${ri}-${c.id}`} value={r[c.id] ?? ""} onChange={(iso) => setCell(ri, c.id, iso)} lang={lang} format={dmyDate} placeholder=""
+                  floating heightCls="h-9" className={`!px-3 bg-[var(--bg-inverted)]/[0.02] tabular-nums [&>span]:min-w-0 [&>span]:truncate ${r[c.id] ? "@max-[136px]:[&>svg]:hidden @max-[104px]:!px-2" : ""}`} />
+              </div>
+            ) : (
               <label key={c.id} className="min-w-0">
                 <span className="mb-0.5 block truncate text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">
                   {colName(c.id)}{c.type === "money" ? ` (${currency})` : ""}
                 </span>
-                <input value={r[c.id] ?? ""} onChange={(e) => setCell(ri, c.id, e.target.value)} maxLength={REPORT_LIMITS.cell}
-                  type={c.type === "date" ? "date" : "text"}
+                <input value={r[c.id] ?? ""} onChange={(e) => setCell(ri, c.id, e.target.value)} maxLength={REPORT_LIMITS.cell} type="text"
                   inputMode={c.type === "number" || c.type === "money" ? "decimal" : undefined} dir={c.type === "text" ? "auto" : "ltr"}
                   className={`${FIELD} h-9 py-1.5 ${c.type === "text" ? "" : "tabular-nums"}`} />
               </label>
