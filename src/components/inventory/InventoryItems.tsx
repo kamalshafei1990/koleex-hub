@@ -32,6 +32,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 /* INV-H5C — taxonomy hints for internal-use items. */
 import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
 /* INV-H9 — card-based internal-item picker (replaces dropdown flow). */
@@ -121,9 +122,17 @@ function readItemsSnap(): ItemsSnap | null {
 
 export default function InventoryItems() {
   const { t } = useTranslation(inventoryT);
+  const router = useRouter();
+  /* ?filter=low_stock — the dashboard's and the alert's link: only the items
+     low in some warehouse (lib/inventory/low-stock). Read from the router's
+     params, never window.location (on a client navigation that is still the
+     page we came from). */
+  const lowStock = useSearchParams().get("filter") === "low_stock";
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  /* Seeded synchronously from the mirror — first paint shows the real list. */
-  const snap0 = useRef<ItemsSnap | null>(readItemsSnap());
+  /* Seeded synchronously from the mirror — first paint shows the real list.
+     Never for the low-stock view: the whole catalogue would paint, then
+     shrink to the few low items. */
+  const snap0 = useRef<ItemsSnap | null>(lowStock ? null : readItemsSnap());
   const [rows, setRows] = useState<ItemRow[]>(() => snap0.current?.rows ?? []);
   const [types, setTypes] = useState<ItemType[]>(() => snap0.current?.types ?? []);
   const [warehouses, setWarehouses] = useState<Warehouse[]>(() => snap0.current?.warehouses ?? []);
@@ -170,6 +179,7 @@ export default function InventoryItems() {
       if (searchKey) qs.set("q", searchKey);
       if (filterTypeId) qs.set("type_id", filterTypeId);
       if (filterStatus) qs.set("status", filterStatus);
+      if (lowStock) qs.set("filter", "low_stock");
       const [iRes, tRes, wRes] = await Promise.all([
         fetch(`/api/inventory/items?${qs.toString()}`, { credentials: "include", cache: "no-store" }),
         fetch(`/api/inventory/item-types`, { credentials: "include", cache: "no-store" }),
@@ -187,7 +197,7 @@ export default function InventoryItems() {
       setTypes(nextTypes);
       setWarehouses(nextWh);
       /* Mirror the DEFAULT view only — see the note on the key. */
-      if (!searchKey && !filterTypeId && filterStatus === "active") {
+      if (!searchKey && !filterTypeId && filterStatus === "active" && !lowStock) {
         try {
           window.localStorage.setItem(INV_ITEMS_SNAP_KEY, JSON.stringify({
             rows: nextRows.slice(0, 300), types: nextTypes, warehouses: nextWh,
@@ -199,7 +209,7 @@ export default function InventoryItems() {
     } finally {
       setLoading(false);
     }
-  }, [searchKey, filterTypeId, filterStatus]);
+  }, [searchKey, filterTypeId, filterStatus, lowStock]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -302,6 +312,15 @@ export default function InventoryItems() {
             >
               {t("inv.common.filters", "Filters")} {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
             </button>
+            {lowStock && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 py-1 ps-2.5 pe-1 text-[11.5px] text-amber-500">
+                {t("inv.alert.low_stock", "Low stock items")}
+                <button type="button" onClick={() => router.replace("/inventory/items")} aria-label={`${t("inv.alert.low_stock", "Low stock items")} — ${t("inv.items.clear", "Clear")}`}
+                  className="grid h-5 w-5 place-items-center rounded-full hover:bg-amber-500/15">
+                  <RrIcon name="cross" size={9} />
+                </button>
+              </span>
+            )}
             {filterTypeId && (
               <button
                 onClick={() => setFilterTypeId("")}
@@ -368,9 +387,10 @@ export default function InventoryItems() {
                 <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
                     icon="box-open"
-                    title={searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
-                    hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
-                    action={
+                    /* The low-stock view (26 Sep 2026): nothing low is good news, not an empty catalogue. */
+                    title={lowStock ? t("inv.items.none_low", "Nothing is low in stock") : searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
+                    hint={lowStock ? t("inv.items.none_low_hint", "Every tracked item is above its reorder point (or its minimum, when it has no reorder point).") : searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
+                    action={lowStock ? undefined : (
                       <button
                         onClick={() => setInternalDrawerOpen(true)}
                         className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
@@ -378,7 +398,7 @@ export default function InventoryItems() {
                         <RrIcon name="briefcase" size={11} />
                         {t("inv.add_internal_use")}
                       </button>
-                    }
+                    )}
                   />
                 </td></tr>
               ) : (

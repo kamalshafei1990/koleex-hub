@@ -144,6 +144,7 @@
     "validate:me-hr": "tsx scripts/validate-me-hr.ts",
     "validate:attendance": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-attendance.ts",
     "validate:notification-types": "tsx scripts/validate-notification-types.ts",
+    "validate:low-stock": "tsx scripts/validate-low-stock.ts",
     "validate:position-history": "tsx scripts/validate-position-history.ts",
     "validate:skills": "node scripts/validate-skills.mjs",
     "validate:behavior": "node scripts/validate-behavior.mjs",

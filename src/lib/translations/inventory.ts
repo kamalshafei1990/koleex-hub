@@ -409,6 +409,8 @@ export const inventoryT: Translations = {
 
   /* ── Alert labels ──────────────────────────────────────────── */
   "inv.alert.low_stock":             { en: "Low stock items",       zh: "低库存物料",      ar: "أصناف منخفضة المخزون" },
+  "inv.items.none_low":              { en: "Nothing is low in stock", zh: "没有低库存物料", ar: "لا توجد أصناف منخفضة المخزون" },
+  "inv.items.none_low_hint":         { en: "Every tracked item is above its reorder point (or its minimum, when it has no reorder point).", zh: "所有跟踪库存的物料都高于再订货点（未设再订货点时高于最低库存）。", ar: "كل الأصناف المتابَعة أعلى من حد إعادة الطلب (أو من الحد الأدنى إذا لم يكن لها حد إعادة طلب)." },
   "inv.alert.expired_batches":       { en: "Expired batches",       zh: "过期批次",        ar: "دفعات منتهية" },
   "inv.alert.pending_approvals":     { en: "Pending approvals",     zh: "待审批",          ar: "بانتظار الاعتماد" },
   "inv.alert.pending_transfers":     { en: "Pending transfers",     zh: "待处理调拨",      ar: "تحويلات قيد التنفيذ" },

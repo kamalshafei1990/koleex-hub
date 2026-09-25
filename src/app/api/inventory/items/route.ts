@@ -35,6 +35,8 @@ export async function GET(req: Request) {
       typeId: url.searchParams.get("type_id") ?? undefined,
       status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
       limit: Number(url.searchParams.get("limit")) || 200,
+      /* The dashboard's and the alert's link: only the items low in stock. */
+      lowStock: url.searchParams.get("filter") === "low_stock",
     });
     /* Cost masking — strip cost_price / avg_cost / inventory_value on the wire
        unless the role may see cost data (its «private records» switch; no

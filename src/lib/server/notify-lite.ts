@@ -20,6 +20,7 @@ import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { superAdminAccountIds } from "@/lib/server/sa-notify";
 import { clearUnreadByMeta, supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
+import { isLowStock, lowStockThreshold, type LowStockThreshold } from "@/lib/inventory/low-stock";
 
 export async function notifyLite(opts: {
   tenantId: string | null;
@@ -84,24 +85,34 @@ export async function notifyLite(opts: {
 }
 
 /* Low stock is a STATE, not an event: the alert says "this item is at or
-   under its minimum". It is raised after stock LEAVES a warehouse (once per
-   item+warehouse per 24h so a busy shipping day doesn't spam; a newer one
-   replaces an unread older one), and it is settled when stock COMES BACK
-   above the minimum — otherwise the admins' bells kept shouting about
-   shelves that were refilled days ago. */
+   under its low-stock line". It is raised after stock LEAVES a warehouse
+   (once per item+warehouse per 24h so a busy shipping day doesn't spam; a
+   newer one replaces an unread older one), and it is settled when stock
+   COMES BACK above the line — otherwise the admins' bells kept shouting
+   about shelves that were refilled days ago.
+
+   The line is the ONE rule the dashboard and the Items list use
+   (lib/inventory/low-stock: the reorder point, else the minimum). The read
+   used to ask for a `name` column the items table does not have (it is
+   item_name): it failed, came back empty, and the alert never fired. A
+   failed read now says so in the log and counts as "unknown" — never as
+   "not low", so it neither raises an alert nor settles one. */
+type LowStockLevel = { name: string | null; qty: number; threshold: number; by: LowStockThreshold["by"]; low: boolean };
+
 async function lowStockLevel(
   tenantId: string | null,
   inventoryItemId: string,
   warehouseId: string | null,
-): Promise<{ name: string | null; qty: number; threshold: number } | null> {
-  const { data: item } = await supabaseServer
+): Promise<LowStockLevel | null | "unknown"> {
+  const { data: item, error: itemErr } = await supabaseServer
     .from("inventory_items")
-    .select("id, name, min_stock, reorder_point, track_stock")
+    .select("id, item_name, item_code, min_stock, reorder_point, track_stock")
     .eq("id", inventoryItemId)
     .maybeSingle();
+  if (itemErr) { console.error("[notify-lite] low-stock item read:", itemErr.message); return "unknown"; }
   if (!item) return null;
-  const threshold = Number(item.min_stock ?? item.reorder_point ?? 0);
-  if (!threshold || threshold <= 0 || item.track_stock === false) return null;
+  const limit = lowStockThreshold(item);
+  if (!limit) return null;
 
   let bq = supabaseServer
     .from("inventory_stock_balances")
@@ -109,10 +120,12 @@ async function lowStockLevel(
     .eq("inventory_item_id", inventoryItemId);
   if (tenantId) bq = bq.eq("tenant_id", tenantId);
   if (warehouseId) bq = bq.eq("warehouse_id", warehouseId);
-  const { data: balances } = await bq;
+  const { data: balances, error: balErr } = await bq;
+  if (balErr) { console.error("[notify-lite] low-stock balance read:", balErr.message); return "unknown"; }
   const qty = ((balances ?? []) as Array<{ qty_on_hand: number | null }>)
     .reduce((s, b) => s + (Number(b.qty_on_hand) || 0), 0);
-  return { name: (item.name as string | null) ?? null, qty, threshold };
+  const name = ((item.item_name as string | null) || (item.item_code as string | null) || "").trim() || null;
+  return { name, qty, threshold: limit.at, by: limit.by, low: isLowStock(qty, item) };
 }
 
 /** The alert's own scope: the item, and the warehouse when it was known. */
@@ -129,8 +142,8 @@ export async function checkLowStockAndNotify(
 ): Promise<void> {
   try {
     const level = await lowStockLevel(tenantId, inventoryItemId, warehouseId);
-    if (!level || level.qty > level.threshold) return;
-    const { qty, threshold } = level;
+    if (!level || level === "unknown" || !level.low) return;
+    const { qty, threshold, by } = level;
 
     /* 24h dedupe per item(+warehouse). */
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
@@ -152,11 +165,11 @@ export async function checkLowStockAndNotify(
       recipients: admins,
       senderId: actorId,
       tpl: level.name
-        ? { k: "low_stock_alert", p: { item: level.name, qty, threshold } }
-        : { k: "low_stock_alert.unnamed", p: { qty, threshold } },
+        ? { k: "low_stock_alert", p: { item: level.name, qty, threshold, by } }
+        : { k: "low_stock_alert.unnamed", p: { qty, threshold, by } },
       link: "/inventory/items?filter=low_stock",
       type: "low_stock_alert",
-      metadata: { source: "inventory", item_id: inventoryItemId, warehouse_id: warehouseId, qty, threshold },
+      metadata: { source: "inventory", item_id: inventoryItemId, warehouse_id: warehouseId, qty, threshold, threshold_by: by },
       tag: `lowstock:${inventoryItemId}`,
       supersede: lowStockKey(inventoryItemId, warehouseId),
     });
@@ -166,7 +179,8 @@ export async function checkLowStockAndNotify(
 }
 
 /** Stock came IN (a receipt, a transfer arriving, a voided shipment): if the
- *  item is back above its minimum there, its unread alerts are settled. */
+ *  item is back above its low-stock line there — or no longer has one — its
+ *  unread alerts are settled. A failed read settles nothing. */
 export async function clearLowStockIfRestocked(
   tenantId: string | null,
   inventoryItemId: string,
@@ -180,7 +194,7 @@ export async function clearLowStockIfRestocked(
     const { count } = await open;
     if (!count) return;
     const level = await lowStockLevel(tenantId, inventoryItemId, warehouseId);
-    if (level && level.qty <= level.threshold) return;
+    if (level === "unknown" || (level && level.low)) return;
     await clearUnreadByMeta(key);
   } catch (e) {
     console.error("[notify-lite] low-stock clear", e instanceof Error ? e.message : e);

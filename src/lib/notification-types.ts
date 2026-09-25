@@ -134,7 +134,7 @@ export const NOTIFICATION_TYPES = {
   transfer_cancelled:       { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
   transfer_shipped:         { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
   transfer_received:        { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
-  low_stock_alert:          { app: "inventory", activity: "low_stock", severity: "warning", lifecycle: { kind: "clear", key: "item_id", when: "stock posted IN brings the item back above its minimum (a newer alert also replaces it)" } },
+  low_stock_alert:          { app: "inventory", activity: "low_stock", severity: "warning", lifecycle: { kind: "clear", key: "item_id", when: "stock posted IN brings the item back above its low-stock line — the reorder point, else the minimum (a newer alert also replaces it)" } },
 
   /* ── Commercial & finance ──────────────────────────────────────────── */
   quotation_updated:        { app: "quotations", activity: "quotation_activity", severity: "info", lifecycle: { kind: "supersede", key: "quotation_id" } },

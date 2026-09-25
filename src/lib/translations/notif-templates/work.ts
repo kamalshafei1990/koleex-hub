@@ -19,10 +19,12 @@ const financeCollectUnnamed = { en: "Collect from a party[[: {amount}]]", zh: "�
 const financePay = { en: "Pay {who}[[: {amount}]]", zh: "向 {who} 付款[[：{amount}]]", ar: "دفع إلى {who}[[: {amount}]]" };
 const financePayUnnamed = { en: "Pay a party[[: {amount}]]", zh: "向对方付款[[：{amount}]]", ar: "دفع إلى طرف[[: {amount}]]" };
 
+/* {by}: the line the item crossed — its reorder point, else its minimum
+   (lib/inventory/low-stock, the one rule). */
 const lowStockBody = {
-  en: "On hand {qty} ≤ minimum {threshold}.",
-  zh: "现有库存 {qty} ≤ 最低库存 {threshold}。",
-  ar: "الكمية المتوفرة {qty} ≤ الحد الأدنى {threshold}.",
+  en: "On hand {qty} ≤ {by:low_stock_by} {threshold}.",
+  zh: "现有库存 {qty} ≤ {by:low_stock_by} {threshold}。",
+  ar: "الكمية المتوفرة {qty} ≤ {by:low_stock_by} {threshold}.",
 };
 
 export const workTpl: Translations = {
@@ -109,6 +111,8 @@ export const workTpl: Translations = {
   "low_stock_alert.b": lowStockBody,
   "low_stock_alert.unnamed.s": { en: "Low stock: item", zh: "库存不足：物品", ar: "مخزون منخفض: صنف" },
   "low_stock_alert.unnamed.b": lowStockBody,
+  "enum.low_stock_by.reorder_point": { en: "reorder point", zh: "补货点", ar: "نقطة إعادة الطلب" },
+  "enum.low_stock_by.min_stock": { en: "minimum", zh: "最低库存", ar: "الحد الأدنى" },
 
   /* ── Quotations / Invoices ── */
   "quotation_updated.s": { en: "Quotation [[{no} ]]updated", zh: "报价单[[ {no} ]]已更新", ar: "تم تحديث عرض السعر[[ {no}]]" },
