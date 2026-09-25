@@ -20,10 +20,12 @@ import { reportAccess, type ReportAccess } from "@/lib/reports/access";
 import type { ReportTemplateDef, ReportSectionValue } from "@/lib/reports/templates";
 
 export const REPORT_COLS =
-  "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at";
-/** Lists never carry `sections` — that is the report's whole text. */
+  "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at, template_snapshot";
+/** Lists never carry `sections` — that is the report's whole text. A report
+ *  of a builder type (4E) brings only its type's name, icon and period
+ *  (`tpl_head`, from its snapshot — the name it was written under). */
 export const REPORT_LIST_COLS =
-  "id, template_key, author_account_id, title, period_start, period_end, period_key, status, confidential, review_required, version, superseded, submitted_at, updated_at";
+  "id, template_key, author_account_id, title, period_start, period_end, period_key, status, confidential, review_required, version, superseded, submitted_at, updated_at, tpl_head:template_snapshot->head";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -48,6 +50,8 @@ export interface ReportRow {
   decided_by: string | null;
   created_at: string;
   updated_at: string;
+  /** A builder type's copy, as the report was started with it (4E); null for a built-in. */
+  template_snapshot: unknown;
 }
 
 export interface RecipientRow {

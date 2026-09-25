@@ -34,6 +34,7 @@ export const reportsT: Translations = {
   "family.work":   { en: "Work", zh: "工作", ar: "الشغل" },
   "family.visits": { en: "Visits", zh: "拜访", ar: "الزيارات" },
   "family.sales": { en: "Sales & customers", zh: "销售与客户", ar: "المبيعات والعملاء" },
+  "family.marketing": { en: "Marketing", zh: "市场营销", ar: "التسويق" },
   "family.suppliers": { en: "Purchasing & suppliers", zh: "采购与供应商", ar: "المشتريات والموردين" },
   "family.quality": { en: "Quality", zh: "质量", ar: "الجودة" },
   "family.logistics": { en: "Logistics & shipping", zh: "物流与货运", ar: "اللوجستيات والشحن" },
@@ -571,4 +572,7 @@ export const reportsT: Translations = {
   "blk.de.expenses": { en: "No expenses of yours in these days.", zh: "这些日期内没有你的费用。", ar: "مفيش مصاريف ليك في الأيام دي." },
   "blk.st.submitted": { en: "Submitted", zh: "已提交", ar: "اتقدم" },
   "blk.st.changes_requested": { en: "Changes asked", zh: "要求修改", ar: "مطلوب تعديل" },
+  /* ── Phase 4E: the template builder (its own words: ./report-builder.ts) ── */
+  "nav.templates": { en: "Templates", zh: "模板", ar: "القوالب" },
+  "err.typeGone": { en: "This report type is no longer offered.", zh: "该报告类型已不再提供。", ar: "نوع التقرير ده مبقاش متاح." },
 };

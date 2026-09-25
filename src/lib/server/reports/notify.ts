@@ -16,17 +16,19 @@ import "server-only";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { clearUnreadByMeta, supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import type { ReportRow } from "@/lib/server/reports/core";
-import { reportTemplate } from "@/lib/reports/templates";
+import { pickWord, readSnapshot, templateOf } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
 
 /* Notifications are written once in English — the inbox row is data, and
    every reader's bell already shows it through the auto-translation the
-   inbox uses for free text. The template name keeps its English form here. */
-const nameOf = (key: string) => (reportsT[`tpl.${key}.name`]?.en as string | undefined) ?? "Report";
-const titleOf = (r: ReportRow) => (r.title?.trim() ? r.title.trim() : nameOf(r.template_key));
+   inbox uses for free text. The template name keeps its English form here
+   (a builder type's: as its report was started with it — 4E). */
+const nameOf = (r: ReportRow) =>
+  (reportsT[`tpl.${r.template_key}.name`]?.en as string | undefined) ?? (pickWord(readSnapshot(r.template_snapshot)?.head.name, "en") || "Report");
+const titleOf = (r: ReportRow) => (r.title?.trim() ? r.title.trim() : nameOf(r));
 
 export async function notifyReportSubmitted(r: ReportRow, recipientIds: string[], authorName: string): Promise<void> {
-  const tpl = reportTemplate(r.template_key);
+  const tpl = templateOf(r);
   const urgent = !!tpl?.urgent;
   await notifyLite({
     tenantId: r.tenant_id,

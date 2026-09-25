@@ -35,13 +35,14 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
-import { REPORT_LIMITS, periodFor, rangeEnd, reportTemplate, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
+import { REPORT_LIMITS, periodFor, rangeEnd, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
+import { templateOf } from "@/lib/reports/custom-templates";
 import { DATA_MODULE } from "@/lib/reports/report-data";
 
 const LIMIT = REPORT_LIMITS.dataRows;
 const DAY = 86_400_000;
 
-type Facts = { template_key: string; tenant_id: string | null; period_start: string | null; period_end: string | null };
+type Facts = { template_key: string; template_snapshot?: unknown; tenant_id: string | null; period_start: string | null; period_end: string | null };
 type Ctx = { me: string; tenant: string | null; start: string; end: string; today: string };
 
 const money = (v: unknown): number | null => {
@@ -247,7 +248,7 @@ const READ: Record<ReportDataSource, (c: Ctx) => Promise<ReportDataRow[]>> = {
  *  report's own period, or for `date`'s period when the draft moves (a
  *  range template — a trip — from `date` to `to`). */
 export async function loadReportData(row: Facts, auth: ServerAuthContext, date?: string | null, to?: string | null): Promise<Record<string, ReportDataValue>> {
-  const tpl = reportTemplate(row.template_key);
+  const tpl = templateOf(row);
   const secs = (tpl?.sections ?? []).filter((s) => s.kind === "data" && s.source);
   if (!tpl || !secs.length) return {};
   const now = new Date();

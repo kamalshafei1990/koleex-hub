@@ -14,20 +14,21 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { buildCarry, carryQueryRange, type CarryGroup, type CarrySource } from "@/lib/reports/carry";
-import { periodFor, reportTemplate, type ReportPeriod } from "@/lib/reports/templates";
+import { periodFor, type ReportPeriod } from "@/lib/reports/templates";
+import { templateOf } from "@/lib/reports/custom-templates";
 
-type DraftFacts = { id: string; template_key: string; period_start: string | null; period_end: string | null; period_key: string | null };
+type DraftFacts = { id: string; template_key: string; template_snapshot?: unknown; period_start: string | null; period_end: string | null; period_key: string | null };
 
 /** Suggestions for a draft, for its saved period — or for `date` when the
  *  author is moving it to another day, week or month. */
 export async function loadCarry(row: DraftFacts, auth: ServerAuthContext, date?: string | null): Promise<CarryGroup[]> {
-  const tpl = reportTemplate(row.template_key);
+  const tpl = templateOf(row);
   if (!tpl) return [];
   let period: ReportPeriod | null = null;
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) period = periodFor(tpl.cadence, date);
   else if (row.period_start) period = { start: row.period_start, end: row.period_end ?? row.period_start, key: row.period_key ?? row.period_start };
   if (!period) return [];
-  const range = carryQueryRange(tpl.key, period);
+  const range = carryQueryRange(tpl, period);
   if (!range) return [];
 
   let q = supabaseServer.from("work_reports")
@@ -38,5 +39,5 @@ export async function loadCarry(row: DraftFacts, auth: ServerAuthContext, date?:
   if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
   const { data, error } = await q;
   if (error) { console.error("[reports] carry:", error.message); return []; }
-  return buildCarry(tpl.key, period, (data ?? []) as CarrySource[], { id: row.id, periodKey: period.key });
+  return buildCarry(tpl, period, (data ?? []) as CarrySource[], { id: row.id, periodKey: period.key });
 }

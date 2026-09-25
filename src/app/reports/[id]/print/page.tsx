@@ -14,7 +14,7 @@ import ReportPrintDoc from "@/components/reports/app/ReportPrintDoc";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { fetchReport, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import { reportsT } from "@/lib/translations/reports";
-import { loadSectionWords } from "@/lib/translations/report-sections";
+import { loadReportWords } from "@/lib/translations/report-sections";
 import type { Lang, Translations } from "@/lib/i18n";
 
 export default function ReportPrintPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,9 +29,10 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
     void fetchReport(id).then(async (res) => {
       if (cancelled) return;
       if (!res.ok) { setError(res.status === 404 ? "Report not found." : `Could not load the report (${res.status || "network"}).`); return; }
-      /* The report's own section words (Phase 4C), before the sheets are laid out. */
+      /* The report's own section words (Phase 4C) — a builder type's (4E)
+         come with it — before the sheets are laid out. */
       let own: Translations;
-      try { own = await loadSectionWords(res.data.report.templateKey); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
+      try { own = await loadReportWords(res.data.report.templateKey, res.data.template); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
       if (!cancelled) setData({ detail: res.data, words: { ...reportsT, ...own } });
     });
     return () => { cancelled = true; };
@@ -40,7 +41,7 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (!data) return;
     const { report } = data.detail;
-    const name = reportsT[`tpl.${report.templateKey}.name`]?.[lang] ?? report.templateKey;
+    const name = data.words[`tpl.${report.templateKey}.name`]?.[lang] ?? report.templateKey;
     document.title = `${name} — ${report.author.name} — ${periodLabel(report.periodStart, report.periodEnd).replace(/\//g, "-")}`;
   }, [data, lang]);
 

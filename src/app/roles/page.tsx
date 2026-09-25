@@ -37,7 +37,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
-import { PERMISSION_GROUPS, PERMISSION_MODULES, isOpenAccessModule } from "@/lib/permission-modules";
+import { PERMISSION_GROUPS, PERMISSION_MODULES, capabilityApp, isOpenAccessModule } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { rolesT } from "@/lib/translations/roles";
 import {
@@ -59,8 +59,10 @@ import AppIcon from "@/components/common/AppIcon";
 
 
 const getAppIcon = (moduleName: string) => {
+  /* A capability ("Report Templates") shows the icon of the app it belongs to. */
+  const name = capabilityApp(moduleName) ?? moduleName;
   const app = APP_REGISTRY.find((a) =>
-    a.name === moduleName || a.name.toLowerCase() === moduleName.toLowerCase(),
+    a.name === name || a.name.toLowerCase() === name.toLowerCase(),
   );
   return app?.icon || null;
 };

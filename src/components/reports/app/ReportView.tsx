@@ -29,7 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { reportsT } from "@/lib/translations/reports";
-import { loadSectionWords } from "@/lib/translations/report-sections";
+import { loadReportWords } from "@/lib/translations/report-sections";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -37,8 +37,8 @@ import RrIcon from "@/components/ui/RrIcon";
 import {
   REPORT_LIMITS, blockFileIds, missingSections, periodFor, rangeEnd, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
 } from "@/lib/reports/templates";
-import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
-import { APP_RULES, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
+import { carryRulesFor, type CarryGroup } from "@/lib/reports/carry";
+import { appRulesFor, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
 import { toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
 import {
   commentOnReport, decideReport, deleteDraft, dmyDate, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
@@ -59,6 +59,9 @@ import { dictationSupported, useDictation } from "@/components/ai/useDictation";
 type BlocksModule = typeof import("./ReportBlocks");
 const isBlock = (kind: ReportSectionKind) => kind !== "text" && kind !== "list";
 const hasBlocks = (tpl: ReportTemplateDef | null) => !!tpl?.sections.some((x) => isBlock(x.kind));
+/** The report's own type: a built-in by its key, or a builder type (4E) as
+ *  the report was started with it — it comes with the report. */
+const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? reportTemplate(d.report.templateKey);
 
 export default function ReportView({ id }: { id: string }) {
   const [sectionWords, setSectionWords] = useState<Translations | null>(null);
@@ -73,7 +76,7 @@ export default function ReportView({ id }: { id: string }) {
     if (res.ok) {
       const key = res.data.report.templateKey;
       try {
-        const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);
+        const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);
         if (mod) setBlocks(() => mod);
         setSectionWords(own);
       } catch { setPhase("error"); return; }
@@ -124,7 +127,7 @@ type Draft = { title: string; date: string; dateTo: string; texts: Record<string
 function toDraft(d: ReportDetail): Draft {
   const texts: Record<string, string> = {};
   const blocks: Record<string, ReportSectionValue> = {};
-  const kinds = new Map((reportTemplate(d.report.templateKey)?.sections ?? []).map((x) => [x.id, x.kind]));
+  const kinds = new Map((typeOf(d)?.sections ?? []).map((x) => [x.id, x.kind]));
   for (const s of d.report.sections) {
     const kind = kinds.get(s.id);
     if (kind && isBlock(kind)) blocks[s.id] = s;
@@ -153,7 +156,7 @@ function sectionsOf(tpl: ReportTemplateDef, texts: Record<string, string>, block
 
 function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; detail: ReportDetail; blocks: BlocksModule | null; onSent: () => Promise<void> }) {
   const router = useRouter();
-  const tpl = reportTemplate(detail.report.templateKey);
+  const tpl = typeOf(detail);
   const id = detail.report.id;
   const [draft, setDraft] = useState<Draft>(() => toDraft(detail));
   const [save, setSave] = useState<{ state: "idle" | "saving" | "saved" | "error"; at?: string }>({ state: "idle" });
@@ -185,7 +188,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     locale: dictLang === "ar" ? "ar-EG" : dictLang === "zh" ? "zh-CN" : "en-US",
     onTranscript: (spoken) => {
       const sid = dictFor.current;
-      const kind = sid ? reportTemplate(detail.report.templateKey)?.sections.find((x) => x.id === sid)?.kind : null;
+      const kind = sid ? typeOf(detail)?.sections.find((x) => x.id === sid)?.kind : null;
       if (!sid || !kind) return;
       const current = (draftRef.current.texts[sid] ?? "").replace(/\s+$/, "");
       change({ texts: { ...draftRef.current.texts, [sid]: !current ? spoken : kind === "list" ? `${current}\n${spoken}` : `${current} ${spoken}` } });
@@ -219,7 +222,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     if (!tpl || !draft.date || !carry.feed.length) return [];
     const tz = -new Date().getTimezoneOffset();
     const time = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
-    return buildFeedGroups(tpl.key, periodFor(tpl.cadence, draft.date), carry.feed, { t, time, day: (ymd) => dmyDate(ymd).slice(0, 5), tzOffsetMin: tz });
+    return buildFeedGroups(tpl, periodFor(tpl.cadence, draft.date), carry.feed, { t, time, day: (ymd) => dmyDate(ymd).slice(0, 5), tzOffsetMin: tz });
   }, [tpl, draft.date, carry.feed, t]);
 
   const patchOf = useCallback((d: Draft) => (tpl ? {
@@ -353,7 +356,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-3">
         <header className={`${CARD} flex flex-wrap items-center gap-3 p-4`}>
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={tpl.key} size={16} /></span>
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={tpl.key} icon={tpl.icon} size={16} /></span>
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] font-semibold text-[var(--text-primary)]">{tplName(t, tpl.key)}</h1>
             <p className="text-[12px] text-[var(--text-dim)]">{t(`tpl.${tpl.key}.desc`)}</p>
@@ -398,7 +401,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
                     busyElsewhere={dictation.listening && dictSection !== s.id}
                     onToggle={() => toggleDictation(s.id)} onCycleLang={cycleDictLang} />
                 )}
-                <SectionAiButtons t={t} templateKey={tpl.key} sectionId={s.id} text={draft.texts[s.id] ?? ""} slot={ai.slots[s.id]}
+                <SectionAiButtons t={t} template={tpl} sectionId={s.id} text={draft.texts[s.id] ?? ""} slot={ai.slots[s.id]}
                   onTidy={() => tidy(s.id)} onWrite={() => write(s.id)} />
               </span>
             </div>
@@ -458,7 +461,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
               <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
                 if (!iso) return;
                 const key = periodFor(tpl.cadence, iso).key;
-                const moved = !!(CARRY_RULES[tpl.key] || APP_RULES[tpl.key] || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
+                const moved = !!(carryRulesFor(tpl).length || appRulesFor(tpl).length || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
                 change({ date: iso });
                 if (moved) moveCarry(iso, key);
               }} />
@@ -603,7 +606,7 @@ function printReport(id: string, lang: string) {
 function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; detail: ReportDetail; blocks: BlocksModule | null; onChange: () => Promise<void> }) {
   const router = useRouter();
   const { report, recipients, can } = detail;
-  const tpl = reportTemplate(report.templateKey);
+  const tpl = typeOf(detail);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [returning, setReturning] = useState(false);
@@ -646,7 +649,7 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
       <article className="min-w-0 space-y-3">
         <header className={`${CARD} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={report.templateKey} size={16} /></span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={report.templateKey} icon={tpl?.icon} size={16} /></span>
             <div className="min-w-0 flex-1">
               <h1 className="text-[17px] font-semibold leading-snug text-[var(--text-primary)]">
                 {report.title.trim() ? <AutoTranslatedText text={report.title} plain /> : tplName(t, report.templateKey)}

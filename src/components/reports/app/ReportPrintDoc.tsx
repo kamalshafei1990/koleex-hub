@@ -81,8 +81,9 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
   const { recipients, comments, attachments } = detail;
   /* A draft's numbers blocks (4B) as the server computed them just now; a
      sent report carries them frozen in its sections. */
-  const report = useMemo(() => ({ ...detail.report, sections: withBlockData(detail.report.sections, detail.blockData) }), [detail.report, detail.blockData]);
-  const tpl = reportTemplate(report.templateKey);
+  /* A builder type (4E) comes with its report, as the report was started with it. */
+  const tpl = detail.template?.def ?? reportTemplate(detail.report.templateKey);
+  const report = useMemo(() => ({ ...detail.report, sections: withBlockData(detail.report.sections, detail.blockData), tpl }), [detail.report, detail.blockData, tpl]);
   const decision = report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
   const note = decision?.body.trim() ?? "";
   const dir = lang === "ar" ? "rtl" : "ltr";

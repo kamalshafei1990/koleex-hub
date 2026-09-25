@@ -28,7 +28,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
 import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
 import { feedSources, feedWindow, type AppRecord, type AppSource } from "@/lib/reports/app-feed";
-import { periodFor, reportTemplate, type ReportPeriod } from "@/lib/reports/templates";
+import { periodFor, type ReportPeriod } from "@/lib/reports/templates";
+import { templateOf } from "@/lib/reports/custom-templates";
 
 export const FEED_MODULE: Record<AppSource, string> = {
   calendar: "Calendar", todos: "To-do", tasks: "Projects", planning: "Planning",
@@ -173,14 +174,14 @@ const crm: Loader = async (c) => {
 
 const LOADERS: Record<AppSource, Loader> = { calendar, todos, tasks, planning, quotations, invoices, orders, crm };
 
-type DraftFacts = { template_key: string; period_start: string | null; period_end: string | null; period_key: string | null };
+type DraftFacts = { template_key: string; template_snapshot?: unknown; period_start: string | null; period_end: string | null; period_key: string | null };
 
 /** The viewer's own work in every app the report type reads and the viewer
  *  may open, over the window around the draft's period (or `date`'s). */
 export async function loadAppFeed(row: DraftFacts, auth: ServerAuthContext, date?: string | null): Promise<AppRecord[]> {
-  const tpl = reportTemplate(row.template_key);
+  const tpl = templateOf(row);
   if (!tpl) return [];
-  const sources = feedSources(tpl.key);
+  const sources = feedSources(tpl);
   if (!sources.length) return [];
   let period: ReportPeriod | null = null;
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) period = periodFor(tpl.cadence, date);

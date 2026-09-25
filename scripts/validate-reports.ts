@@ -60,6 +60,12 @@
  *      totals never mix currencies; dates are real days; quotations and
  *      invoices link and open in their editors; the editors' card is quiet
  *      and never printed; the links migration only widens the kinds.
+ *   §20 the template builder (Phase 4E) — every built-in copies into a type
+ *      the builder's own check accepts, words and all; the check keeps only
+ *      what each kind has; a report keeps its type as it was started (never
+ *      re-cleaned); a copy keeps what its built-in knew; every write is
+ *      gated by "Report Templates" and edits never overwrite each other;
+ *      the tracked reports cannot be hidden; the builder rides its own chunk.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -105,6 +111,14 @@ import { NOTIFICATION_ACTIVITIES, classifyNotificationActivity } from "../src/li
 import {
   ATTACH_SID, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, printParagraphs, widthUnits, type Measurer, type PrintPara,
 } from "../src/lib/reports/print-layout";
+import {
+  BUILDER_LIMITS, ICON_CHOICES, SECTION_KINDS, UNHIDEABLE, asReportTemplate, checkTemplate, copyOfBuiltin, copyableBuiltin, hideableBuiltin,
+  newSectionId, nextId, readSnapshot, snapshotOf, templateOf, wordSlots,
+} from "../src/lib/reports/custom-templates";
+import { isCustomKey, pickWord, templateWords } from "../src/lib/reports/template-words";
+import { carryRulesFor } from "../src/lib/reports/carry";
+import { appRulesFor } from "../src/lib/reports/app-feed";
+import { reportBuilderT } from "../src/lib/translations/report-builder";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -265,7 +279,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 15, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search)`);
+  expect(files.length === 17, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -1208,8 +1222,8 @@ console.log("\n§15 reports that events ask for");
     (c) => { const a = c.indexOf("const events = await runReportEvents();"); const b = c.indexOf("const run = await runReportNudges();"); return a > 0 && b > a ? [] : ["a request asked now waits a run for its reminder"]; },
     (src) => src.replace("  const events = await runReportEvents();\n  const run = await runReportNudges();", "  const run = await runReportNudges();\n  const events = await runReportEvents();"));
   rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
-    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && \(!tpl\.hrOnly \|\| hrCreate === null\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
-    (src) => src.replace("!tpl.requestOnly && (!tpl.hrOnly || hrCreate === null)", "(!tpl.hrOnly || hrCreate === null)"));
+    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
+    (src) => src.replace("!tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)", "!hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)"));
   rule("a confidential request is never linked from someone else's calendar", "src/app/api/calendar/events/route.ts",
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
     (src) => src.replace("(viewingOwn || !reportTemplate(r.template_key)?.confidential ? r.report_id : null)", "r.report_id"));
@@ -1344,8 +1358,8 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (c) => (/from\("products"\)\.select\("id, product_name, brand"\)\.eq\("status", "active"\)/.test(c) ? [] : ["drafts and retired products can be linked"]),
     (src) => src.replace('.eq("status", "active")', ""));
   rule("a report opens once its blocks' code and its own words are here — the page lays out once", "src/components/reports/app/ReportView.tsx",
-    (c) => { const a = c.indexOf('const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
-    (src) => src.replace('const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);', 'const mod = null, own = {}; void loadSectionWords(key);'));
+    (c) => { const a = c.indexOf('const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
+    (src) => src.replace('const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);', 'const mod = null, own = {}; void loadReportWords(key, res.data.template);'));
   rule("the card on other apps' pages carries no Reports dictionary and asks only once the page is quiet", "src/components/reports/ReportsAboutCard.tsx",
     (c) => (!/translations\/reports/.test(c) && /whenNetworkQuiet\(/.test(c) && /if \(res\.status === 401 \|\| res\.status === 403\) \{ setHidden\(true\); return; \}/.test(c) ? [] : ["the card is heavy, early, or shows outside Reports"]),
     (src) => src.replace('import { whenNetworkQuiet } from "@/lib/net-idle";', 'import { whenNetworkQuiet } from "@/lib/net-idle";\nimport { reportsT } from "@/lib/translations/reports";'));
@@ -1599,8 +1613,8 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   const leak = allFiles("src").filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("src/app/api/") && !f.startsWith("src/lib/server/") && !f.startsWith("src/lib/translations/report-sections/") && read(f).includes("report-sections/all"));
   expect(leak.length === 0, "no page imports every family's words — only the server does", leak.join(", "));
   rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
-    (c) => { const a = c.indexOf("own = await loadSectionWords(res.data.report.templateKey);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
-    (src) => src.replace("own = await loadSectionWords(res.data.report.templateKey);", "own = {};"));
+    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.report.templateKey, res.data.template);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
+    (src) => src.replace("own = await loadReportWords(res.data.report.templateKey, res.data.template);", "own = {};"));
 }
 
 /* ── §19 logistics, after-sales, travel (Phase 4D) ────────────────────── */
@@ -1651,6 +1665,221 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
   rule("a numbers block names each document by its first column — a number or an expense's title", "src/components/reports/app/ReportBlocks.tsx",
     (c) => (c.includes("const text = String(r.cells[first.id] ?? \"—\");") && c.includes("{c === first ? docLink(r) : dataCell(t, data.source, r, c)}") ? [] : ["an expense row shows no name"]),
     (src) => src.replace('const text = String(r.cells[first.id] ?? "—");', 'const text = String(r.cells.no ?? "—");'));
+}
+
+/* ── §20 the template builder (Phase 4E) ──────────────────────────────── */
+console.log("\n§20 the template builder");
+{
+  const API = "src/app/api/work-reports";
+  const dict = reportsT;
+  /* Every built-in a person starts copies into a type the builder accepts as it is. */
+  const copyBad: string[] = [];
+  for (const t of REPORT_TEMPLATES.filter((x) => copyableBuiltin(x.key))) {
+    const c = copyOfBuiltin(t.key, dict);
+    if (!c) { copyBad.push(`${t.key}: no copy`); continue; }
+    const r = checkTemplate(c.def, c.words);
+    if (r.problems.length) copyBad.push(`${t.key}: ${r.problems.join(",")}`);
+    const shape = (d: { sections: typeof t.sections }) => d.sections.map((x) => [x.id, x.kind, (x.points ?? []).map((p) => `${p.id}:${p.weight ?? 1}`), (x.columns ?? []).map((k) => `${k.id}:${k.type}`), x.options ?? [], x.source ?? "", !!x.required && x.kind !== "data"].join("|"));
+    if (JSON.stringify(shape(r.def)) !== JSON.stringify(shape(t))) copyBad.push(`${t.key}: the check changes its sections`);
+    for (const slot of wordSlots(c.def)) {
+      const w = c.words[slot.key];
+      if (slot.required && !(w?.en && w.zh && w.ar)) copyBad.push(`${t.key}.${slot.key}: not in all three languages`);
+    }
+    if (r.def.base !== t.key || r.def.family !== t.family || r.def.icon !== t.icon || r.def.cadence !== t.cadence) copyBad.push(`${t.key}: settings lost`);
+  }
+  expect(copyBad.length === 0, `every one of the ${REPORT_TEMPLATES.filter((x) => copyableBuiltin(x.key)).length} built-in types a person starts copies whole — the same sections and ids, every word in en / zh / ar`, copyBad.slice(0, 6).join("; "));
+  expect(!copyableBuiltin("probation_review") && !copyOfBuiltin("probation_review", dict) && !copyableBuiltin("nope"), "a type only an event asks for is never copied");
+  eq(UNHIDEABLE.map(hideableBuiltin), [false, false, false], "the daily, weekly and monthly (the compliance board's) are never hidden");
+  expect(hideableBuiltin("decision_memo") && !hideableBuiltin("probation_review"), "any other type a person starts can be hidden; a request-only type cannot");
+  expect(REPORT_TEMPLATES.every((t) => ICON_CHOICES.includes(t.icon)), "every built-in's icon is a builder choice (a copy keeps its own)");
+  eq(SECTION_KINDS.slice().sort(), ["checklist", "choice", "data", "links", "list", "score", "signature", "table", "text"], "the builder offers every block the engine has");
+
+  /* The check keeps only what each kind has */
+  const raw = {
+    family: "nope", icon: "not-an-icon", cadence: "weekly", range: true, recipients: "anyone", base: "probation_review",
+    sections: [
+      { id: "ok", kind: "text", required: true, points: [{ id: "x" }] },
+      { id: "ok", kind: "list" },
+      { id: "Bad-Id", kind: "text" },
+      { id: "k", kind: "weird" },
+      { id: "c", kind: "checklist", points: [{ id: "p1" }, { id: "p1" }, { id: "P2" }, "p3"] },
+      { id: "sc", kind: "score", points: [{ id: "a", weight: 30 }, { id: "b", weight: 0 }, { id: "c", weight: 1.5 }] },
+      { id: "tb", kind: "table", columns: [{ id: "c1", type: "money" }, { id: "c2", type: "bogus" }], summary: "sum", summaryOf: ["c2", "zz", "c1"] },
+      { id: "ln", kind: "links", linkTypes: ["invoice", "planet", "customer"] },
+      { id: "ch", kind: "choice", options: ["o1", "o1", "o2", "O3"] },
+      { id: "dt", kind: "data", source: "quotations", required: true, notes: "yes" },
+    ],
+  };
+  const words = { name: { en: "  A   type ", xx: "no" }, "s.ok": { en: "One" }, "s.c": { zh: "检查" }, "s.c.i.p1": { ar: "بند" }, "s.c.i.p3": { en: "   " }, "s.sc": { en: "S" }, "s.sc.i.a": { en: "A" }, "s.sc.i.b": { en: "B" }, "s.sc.i.c": { en: "C" }, "s.tb": { en: "T" }, "s.tb.c.c1": { en: "Cost" }, "s.tb.c.c2": { en: "Note" }, "s.ln": { en: "L" }, "s.ch": { en: "Ch" }, "s.ch.o.o1": { en: "Yes" }, "s.ch.o.o2": { en: "No" }, "s.dt": { en: "D" }, "s.stray": { en: "dropped" } };
+  const r = checkTemplate(raw, words);
+  eq([r.def.family, r.def.icon, r.def.cadence, r.def.range, r.def.recipients, r.def.base ?? null], ["work", "document", "weekly", false, "manager", null], "an unknown group, icon or reader falls back; a day / week / month is never also a range; only a built-in a person starts is a base");
+  eq(r.def.sections.map((x) => `${x.id}:${x.kind}`), ["ok:text", "c:checklist", "sc:score", "tb:table", "ln:links", "ch:choice", "dt:data"], "a section with a bad or repeated id, or an unknown kind, is dropped");
+  eq(r.def.sections[0], { id: "ok", kind: "text", required: true }, "a text section keeps no points");
+  eq(r.def.sections[1].points, [{ id: "p1" }, { id: "p3" }], "points keep well-formed ids, each once");
+  eq(r.def.sections[2].points, [{ id: "a", weight: 30 }, { id: "b" }, { id: "c" }], "a weight is a whole number above 1 — or none");
+  eq([r.def.sections[3].columns, r.def.sections[3].summary, r.def.sections[3].summaryOf], [[{ id: "c1", type: "money" }, { id: "c2", type: "text" }], "total", ["c1"]], "a column of an unknown type is text; the figures default to totals, of number or money columns only");
+  eq(r.def.sections[4].linkTypes, ["customer", "invoice"], "a links block keeps only real kinds, in their order");
+  eq(r.def.sections[5].options, ["o1", "o2"], "a choice keeps well-formed answers, each once");
+  eq([r.def.sections[6].required, r.def.sections[6].notes ?? false, r.def.sections[6].source], [false, false, "quotations"], "a numbers block is never required (nothing to fill in) and takes notes only when asked");
+  eq(r.words.name, { en: "A type" }, "a word is trimmed, spaces folded, other keys dropped");
+  expect(!("s.stray" in r.words) && !("s.c.i.p3" in r.words), "words the type does not name — and blank ones — are dropped");
+  eq(r.problems, ["s.c.i.p3"], "what is still missing is named: here the point written only in spaces");
+  eq(checkTemplate({ sections: [] }, {}).problems, ["no_sections", "name"], "no section and no name → two problems");
+  eq(checkTemplate({ sections: [{ id: "c", kind: "checklist" }, { id: "t", kind: "table" }, { id: "o", kind: "choice", options: ["o1"] }, { id: "d", kind: "data" }] }, { name: { ar: "س" }, "s.c": { en: "c" }, "s.t": { en: "t" }, "s.o": { en: "o" }, "s.o.o.o1": { en: "x" }, "s.d": { en: "d" } }).problems,
+    ["points:c", "columns:t", "options:o", "source:d"], "a checklist without points, a table without columns, a choice with one answer, numbers from nowhere — each named");
+  const long = checkTemplate({ sections: [{ id: "a", kind: "text" }] }, { name: { en: "n".repeat(500) }, "s.a": { en: "l".repeat(500) }, "s.a.hint": { en: "h".repeat(500) } }).words;
+  eq([long.name.en!.length, long["s.a"].en!.length, long["s.a.hint"].en!.length], [BUILDER_LIMITS.name, BUILDER_LIMITS.label, BUILDER_LIMITS.hint], "a name, a label and a hint are capped");
+  eq(checkTemplate({ sections: Array.from({ length: 30 }, (_, i) => ({ id: `s${i}`, kind: "text" })) }, {}).def.sections.length, BUILDER_LIMITS.sections, `a type holds at most ${BUILDER_LIMITS.sections} sections`);
+
+  /* Words in the reader's language — or the one they were written in */
+  eq([pickWord({ ar: "ع" }, "en"), pickWord({ zh: "中", ar: "ع" }, "en"), pickWord({ en: "E", zh: "中" }, "ar"), pickWord({ zh: "中" }, "ar"), pickWord(undefined, "en")], ["ع", "ع", "E", "中", ""],
+    "a word missing in the reader's language shows as written: English first, then Arabic, then Chinese");
+  eq(templateWords("c-abcdefghij", { name: { ar: "اسم" }, "s.x": { en: "X", zh: "叉" }, desc: { en: "  " } }),
+    { "tpl.c-abcdefghij.name": { en: "اسم", zh: "اسم", ar: "اسم" }, "tpl.c-abcdefghij.s.x": { en: "X", zh: "叉", ar: "X" } }, "a builder type's words sit in the dictionary like a built-in's, every language filled; a blank word is left out");
+  expect(isCustomKey("c-abcdefghij") && !isCustomKey("daily") && !isCustomKey("c-ABCDEFGHIJ") && !isCustomKey("c-abc"), "a builder type's key is c- and ten letters or digits — never a built-in's");
+
+  /* A report keeps its type as it was started */
+  const good = checkTemplate({ family: "marketing", icon: "megaphone", sections: [{ id: "a", kind: "text", required: true }, { id: "b", kind: "checklist", points: [{ id: "p1" }] }] }, { name: { en: "Campaign" }, "s.a": { en: "What" }, "s.b": { en: "Checks" }, "s.b.i.p1": { en: "Posted" } });
+  const snap = snapshotOf(good.def, good.words, 3);
+  eq(snap.head, { name: { en: "Campaign" }, icon: "megaphone", cadence: null, urgent: false }, "the copy carries the head a list shows (name, icon, period, urgent)");
+  const tpl = templateOf({ template_key: "c-abcdefghij", template_snapshot: snap })!;
+  eq([tpl.key, tpl.custom, tpl.version, tpl.family, tpl.sections.map((x) => x.id)], ["c-abcdefghij", true, 3, "marketing", ["a", "b"]], "a builder report's type is its snapshot, at the version it was started with");
+  const later = JSON.parse(JSON.stringify(snap));
+  later.def.sections.push({ id: "Not-Allowed-Today", kind: "text" });
+  expect(readSnapshot(later)!.def.sections.some((x) => x.id === "Not-Allowed-Today"), "a stored copy is read as it was written — a rule added later never changes a report already started");
+  eq([templateOf({ template_key: "c-abcdefghij", template_snapshot: { v: 1, def: { family: "work", sections: [] } } }), templateOf({ template_key: "c-abcdefghij" }), templateOf({ template_key: "nope", template_snapshot: snap })], [null, null, null],
+    "a copy with no sections, a builder key with no copy, an unknown key — no type (the routes answer unknown_template)");
+  expect(templateOf({ template_key: "daily", template_snapshot: snap }) === reportTemplate("daily"), "a built-in is always the built-in, whatever a row carries");
+  const flags = asReportTemplate("c-abcdefghij", { ...good.def, base: "weekly", urgent: true, hrOnly: true, range: true, customTitle: true }, 2);
+  eq([flags.custom, flags.version, flags.base, flags.urgent, flags.hrOnly, flags.range, flags.customTitle], [true, 2, "weekly", true, true, true, true], "a builder type reaches the engine with its flags");
+  eq(normalizeSections(tpl, [{ id: "b", checks: { p1: { state: "ok" }, pX: { state: "issue" } } }, { id: "zz", text: "no" }]).map((x) => x.id + JSON.stringify(x.checks ?? {})), ["a{}", 'b{"p1":{"state":"ok"}}'], "a builder report's sections are cleaned by ITS type — an unknown section or point is dropped");
+
+  /* A copy keeps what its built-in knew */
+  const dailyCopy = asReportTemplate("c-dailycopy1", copyOfBuiltin("daily", dict)!.def, 1);
+  const weeklyCopy = asReportTemplate("c-weeklycop", copyOfBuiltin("weekly", dict)!.def, 1);
+  eq(carryRulesFor(dailyCopy).map((x) => x.from), ["c-dailycopy1", "c-dailycopy1"], "a copy of the daily carries from its OWN earlier reports (yesterday's copy), not the built-in's");
+  eq(carryRulesFor(weeklyCopy).map((x) => x.from), carryRulesFor("weekly").map((x) => x.from), "a copy of the weekly still gathers the week's weekly plan and dailies");
+  const today = periodFor("daily", "2026-09-25");
+  const yCopy = { id: "y1", template_key: "c-dailycopy1", period_start: "2026-09-24", period_end: "2026-09-24", period_key: "2026-09-24", sections: [{ id: "tomorrow", items: ["Call Cairo"] }] };
+  const yBuilt = { ...yCopy, id: "y2", template_key: "daily", sections: [{ id: "tomorrow", items: ["Not mine"] }] };
+  eq(buildCarry(dailyCopy, today, [yCopy, yBuilt], { id: "self" }).flatMap((g) => g.items.map((i) => i.text)), ["Call Cairo"], "yesterday's copy feeds today's copy; the built-in daily does not");
+  eq(buildCarry(asReportTemplate("c-scratch001", good.def, 1), today, [yCopy], { id: "self" }), [], "a type made from nothing carries nothing");
+  eq(appRulesFor(weeklyCopy).length, appRulesFor("weekly").length, "a copy fills from the apps like its built-in");
+  eq(feedSources(dailyCopy), feedSources("daily"), "and reads the same apps");
+  const noSummary = { ...weeklyCopy, sections: weeklyCopy.sections.filter((x) => x.id !== "summary") };
+  expect(canWrite(weeklyCopy, "summary") && !canWrite(noSummary, "summary") && !canWrite(asReportTemplate("c-scratch001", good.def, 1), "a"), "Koleex AI writes a copy's summary like the weekly's — only while the copy keeps it");
+  eq(checkAiRequest(weeklyCopy, { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a write on a copy's summary is accepted");
+
+  /* New ids */
+  /* A stand-in random that never repeats itself within the check. */
+  let n = 0;
+  const rnd = () => ((n++ * 7) % 36) / 36;
+  const id1 = newSectionId([], rnd);
+  expect(/^s[a-z0-9]{4}$/.test(id1) && newSectionId([id1], rnd) !== id1, "a new section's id is random, well formed, and never one the type has");
+  eq([nextId([], "p"), nextId(["p1", "p2"], "p"), nextId(["p2"], "p")], ["p1", "p3", "p1"], "a new point, column or answer takes the next free number");
+
+  /* The builder's words */
+  const tab = read("src/components/reports/app/TemplatesTab.tsx");
+  const used = new Set([...code(tab).matchAll(/t\("(tb\.[a-zA-Z.]+)"/g)].map((m) => m[1]));
+  for (const m of code(tab).matchAll(/t\(`tb\.(k|kd|period|to|fig|col|src)\.\$\{/g)) used.add(`tb.${m[1]}.*`);
+  const lacking: string[] = [];
+  for (const k of used) {
+    if (k.endsWith(".*")) { const pre = k.slice(0, -1); if (!Object.keys(reportBuilderT).some((x) => x.startsWith(pre))) lacking.push(k); continue; }
+    if (!reportBuilderT[k]) lacking.push(k);
+  }
+  for (const kind of SECTION_KINDS) for (const pre of ["tb.k.", "tb.kd."]) if (!reportBuilderT[`${pre}${kind}`]) lacking.push(`${pre}${kind}`);
+  for (const src of REPORT_DATA_SOURCES) if (!reportBuilderT[`tb.src.${src}`]) lacking.push(`tb.src.${src}`);
+  for (const [k, e] of Object.entries(reportBuilderT)) for (const l of ["en", "zh", "ar"] as const) if (typeof e[l] !== "string" || !e[l].trim()) lacking.push(`${k}.${l}`);
+  const holes = (x: string) => (x.match(/\{\w+\}/g) ?? []).sort().join(",");
+  for (const [k, e] of Object.entries(reportBuilderT)) if (holes(e.en) !== holes(e.zh) || holes(e.en) !== holes(e.ar)) lacking.push(`${k}: placeholders differ`);
+  expect(lacking.length === 0, `the builder's ${Object.keys(reportBuilderT).length} words exist in en / zh / ar — every block, every source`, lacking.slice(0, 8).join(", "));
+  const inMain = Object.keys(mainWords).filter((k) => k.startsWith("tb."));
+  expect(inMain.length === 0 && !!mainWords["nav.templates"] && !!mainWords["err.typeGone"] && !!mainWords["family.marketing"], "the builder's words ride with the builder only — every Reports page carries just its tab name", inMain.slice(0, 5).join(", "));
+
+  /* The routes */
+  const LIST = `${API}/templates/route.ts`, ONE = `${API}/templates/[key]/route.ts`;
+  rule("making a type needs Report Templates · create", LIST,
+    (c) => (c.includes("if (!(await templateRights(auth)).create) return forbidden();") ? [] : ["anyone can make a type"]),
+    (src) => src.replace("if (!(await templateRights(auth)).create) return forbidden();", ""));
+  rule("the builder's list needs Report Templates · view", LIST,
+    (c) => (c.includes("if (!can.view) return forbidden();") ? [] : ["anyone can list the types"]),
+    (src) => src.replace("if (!can.view) return forbidden();", ""));
+  rule("a new type is checked by the builder's own rules", LIST,
+    (c) => (c.includes("const { def, words, problems } = checkTemplate(body.def, body.words);") && c.includes('if (problems.length) return NextResponse.json({ error: "invalid", problems }, { status: 400 });') ? [] : ["a type is saved unchecked"]),
+    (src) => src.replace('if (problems.length) return NextResponse.json({ error: "invalid", problems }, { status: 400 });', ""));
+  rule("changing, archiving or hiding needs Report Templates · edit", ONE,
+    (c) => (c.includes("if (!(await templateRights(auth)).edit) return forbidden();") ? [] : ["anyone can change a type"]),
+    (src) => src.replace("if (!(await templateRights(auth)).edit) return forbidden();", ""));
+  rule("deleting needs Report Templates · delete, and only a type no report uses", ONE,
+    (c) => (c.includes("if (!(await templateRights(auth)).delete) return forbidden();") && c.includes('if ((used ?? []).length) return NextResponse.json({ error: "in_use" }, { status: 409 });') ? [] : ["a type in use can be deleted"]),
+    (src) => src.replace('if ((used ?? []).length) return NextResponse.json({ error: "in_use" }, { status: 409 });', ""));
+  rule("two people editing one type never overwrite each other", ONE,
+    (c) => (c.includes('if (body.version !== current.version) return NextResponse.json({ error: "changed", version: current.version }, { status: 409 });') && c.includes('.eq("key", key).eq("version", current.version)') ? [] : ["a stale edit overwrites a newer one"]),
+    (src) => src.replace('.eq("key", key).eq("version", current.version)', '.eq("key", key)'));
+  rule("an edit never changes the built-in a copy came from", ONE,
+    (c) => (c.includes("base: current.def.base };") ? [] : ["an edit can re-point a copy"]),
+    (src) => src.replace("base: current.def.base };", "};"));
+  rule("only a type that can be hidden is hidden", ONE,
+    (c) => (c.includes('if (!hideableBuiltin(key)) return NextResponse.json({ error: "not_hideable" }, { status: 400 });') ? [] : ["the daily can be hidden"]),
+    (src) => src.replace('if (!hideableBuiltin(key)) return NextResponse.json({ error: "not_hideable" }, { status: 400 });', ""));
+  rule("a builder report starts from the type's current, active version — and keeps a copy of it", `${API}/route.ts`,
+    (c) => (c.includes('if (!row || row.status !== "active") return NextResponse.json({ error: "unknown_template" }, { status: 400 });') && c.includes("snapshot = snapshotOf(row.def, row.words, row.version);") && c.includes("template_snapshot: snapshot,") ? [] : ["an archived type starts reports, or a report keeps no copy"]),
+    (src) => src.replace('if (!row || row.status !== "active")', "if (!row)"));
+  rule("a hidden built-in starts no new report — an event's request still does", `${API}/route.ts`,
+    (c) => { const req = c.indexOf("if (body?.request !== undefined) {"); const hid = c.indexOf('if (hidden.includes(tpl.key)) return NextResponse.json({ error: "hidden" }, { status: 403 });'); return req > 0 && hid > req ? [] : ["a hidden type still starts, or blocks an event's request"]; },
+    (src) => src.replace('if (hidden.includes(tpl.key)) return NextResponse.json({ error: "hidden" }, { status: 403 });', ""));
+  rule("a new version of a report keeps the type it was written with", `${API}/[id]/revise/route.ts`,
+    (c) => (c.includes("template_snapshot: row.template_snapshot ?? null,") ? [] : ["a new version loses its type"]),
+    (src) => src.replace("template_snapshot: row.template_snapshot ?? null,", ""));
+  const typed = [`${API}/[id]/route.ts`, `${API}/[id]/submit/route.ts`, `${API}/[id]/ai/route.ts`, "src/lib/server/reports/report-data.ts", "src/lib/server/reports/app-feed.ts", "src/lib/server/reports/carry.ts", "src/lib/server/reports/notify.ts"];
+  for (const f of typed) {
+    rule("a report's type is read from the report (its snapshot for a builder type)", f,
+      (c) => (/templateOf\((row|r)\)/.test(c) && !/reportTemplate\((row|r)\.template_key\)/.test(c) ? [] : ["the type is looked up by key only"]),
+      (src) => src.replace(/templateOf\((row|r)\)/, "reportTemplate($1.template_key)"));
+  }
+  rule("a report's page gets its builder type whole, its words already worded", `${API}/[id]/route.ts`,
+    (c) => (c.includes("template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,") ? [] : ["the page cannot draw a builder report"]),
+    (src) => src.replace("template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,", ""));
+  rule("a report's copy of its type is read with the report; a list brings only its head", "src/lib/server/reports/core.ts",
+    (c) => { const full = /export const REPORT_COLS =\s*"([^"]+)"/.exec(c)?.[1] ?? ""; const slim = /export const REPORT_LIST_COLS =\s*"([^"]+)"/.exec(c)?.[1] ?? ""; return full.includes("template_snapshot") && slim.includes("tpl_head:template_snapshot->head") && !/template_snapshot(,|$)/.test(slim) ? [] : ["the snapshot is missing, or a list carries it whole"]; },
+    (src) => src.replace("tpl_head:template_snapshot->head", "template_snapshot"));
+  rule("the builder's types and the hidden built-ins ride the bundle's one wave", `${API}/bundle/route.ts`,
+    (c) => { const a = c.indexOf("await Promise.all(["); const b = c.indexOf("]);", a); const wave = c.slice(a, b); return a > 0 && wave.includes("loadCustomHeads(t, { activeOnly: true })") && wave.includes("loadHiddenKeys(t)") && wave.includes("requireModuleAccess(auth, TEMPLATES_MODULE)") ? [] : ["the bundle reads the builder in a second trip"]; },
+    (src) => src.replace('loadHiddenKeys(t).catch(quiet("hidden templates", [] as string[]))', "Promise.resolve([] as string[])"));
+
+  /* Roles, the dashboard, the pages */
+  rule("Report Templates is a Roles row, right under Reports", "src/lib/permission-modules.ts",
+    (c) => (c.includes('{ name: "Report Templates", app: "Reports" }') && c.includes("for (const c of CAPABILITY_MODULES) if (c.app === app.name) modules.push(c.name);") ? [] : ["the capability is not governable"]),
+    (src) => src.replace("for (const c of CAPABILITY_MODULES) if (c.app === app.name) modules.push(c.name);", ""));
+  rule("a capability is never open to everyone by default", "src/lib/permission-modules.ts",
+    (c) => (/export const OPEN_ACCESS_MODULES: ReadonlySet<string> = new Set\(\s*APP_REGISTRY\.filter\(\(a\) => a\.openAccess\)\.map\(\(a\) => a\.name\),?\s*\);/.test(c) ? [] : ["open access is no longer the registry's apps only"]),
+    (src) => src.replace("APP_REGISTRY.filter((a) => a.openAccess).map((a) => a.name),", "[...APP_REGISTRY.filter((a) => a.openAccess).map((a) => a.name), ...CAPABILITY_MODULES.map((c) => c.name)],"));
+  rule("the dashboard offers no card for a capability", "src/app/api/dashboard/route.ts",
+    (c) => (c.includes("const DASH_MODULES = PERMISSION_MODULES.filter((m) => capabilityApp(m) === null);") ? [] : ["a capability is a dashboard module"]),
+    (src) => src.replace("const DASH_MODULES = PERMISSION_MODULES.filter((m) => capabilityApp(m) === null);", "const DASH_MODULES = PERMISSION_MODULES;"));
+  for (const f of ["src/app/roles/page.tsx", "src/components/admin/accounts/tabs/AccessRightsTab.tsx"]) {
+    rule("a capability shows its app's icon", f,
+      (c) => (/capabilityApp\(moduleName\) \?\?/.test(c) ? [] : ["the row shows no icon"]),
+      (src) => src.replace(/capabilityApp\(moduleName\) \?\?/, "null ??"));
+  }
+  rule("the builder is its own chunk, opened only by whoever may", "src/components/reports/app/ReportsApp.tsx",
+    (c) => (c.includes('const TemplatesTab = dynamic(() => import("./TemplatesTab")') && c.includes('...(bundle?.me.templates ? [{ key: "templates"') && !/from "\.\/TemplatesTab"/.test(c) ? [] : ["the builder rides every Reports page, or shows to everyone"]),
+    (src) => src.replace('...(bundle?.me.templates ? [{ key: "templates"', '...(true ? [{ key: "templates"'));
+  const pages = ["src/components/reports/app/ReportsApp.tsx", "src/components/reports/app/ReportView.tsx", "src/components/reports/app/shared.tsx", "src/components/reports/app/ReportPrintDoc.tsx", "src/app/reports/[id]/print/page.tsx", "src/components/reports/app/CarryCard.tsx"];
+  const heavy = pages.filter((f) => /reports\/custom-templates"|translations\/report-builder"|from "\.\/TemplatesTab"/.test(code(read(f))));
+  expect(heavy.length === 0, "no report page carries the builder's rules or words — only the small word helpers", heavy.join(", "));
+  rule("the composer and the reader take the type from the report", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? reportTemplate(d.report.templateKey);") && (c.match(/reportTemplate\(/g) ?? []).length === 1 ? [] : ["a builder report is drawn from a type looked up by key"]),
+    (src) => src.replace("const tpl = typeOf(detail);", "const tpl = reportTemplate(detail.report.templateKey);"));
+
+  /* The migration */
+  const mig = read("supabase/migrations/20260925_reports_template_builder.sql");
+  const bare = mig.replace(/--[^\n]*/g, "");
+  expect(/CREATE TABLE IF NOT EXISTS work_report_templates/.test(bare) && /CREATE TABLE IF NOT EXISTS work_report_hidden_templates/.test(bare)
+    && /ALTER TABLE work_reports ADD COLUMN IF NOT EXISTS template_snapshot jsonb;/.test(bare)
+    && /ALTER TABLE work_report_templates ENABLE ROW LEVEL SECURITY;/.test(bare) && /ALTER TABLE work_report_hidden_templates ENABLE ROW LEVEL SECURITY;/.test(bare)
+    && !/\b(DROP|DELETE|TRUNCATE|UPDATE)\b/i.test(bare) && !/CREATE POLICY/i.test(bare) && /CHECK \(key ~ '\^c-\[a-z0-9\]\{10\}\$'\)/.test(bare),
+    "the builder's migration only adds: two server-only tables (RLS on, no policy), one nullable column, the key's shape checked");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

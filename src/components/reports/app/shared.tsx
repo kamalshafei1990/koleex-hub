@@ -13,6 +13,9 @@ import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import { reportTemplate } from "@/lib/reports/templates";
+import { pickWord } from "@/lib/reports/template-words";
+import type { Lang } from "@/lib/i18n";
+import type { RrIconName } from "@/components/ui/RrIcon";
 import { dmyDate, periodLabel, type ReportListRow, type ReportPerson, type ReportStatus } from "@/lib/work-reports";
 
 export type T = (key: string, fallback?: string) => string;
@@ -57,31 +60,34 @@ export function Avatar({ person, size = 28 }: { person: Pick<ReportPerson, "name
   );
 }
 
-export function TemplateIcon({ templateKey, size = 14 }: { templateKey: string; size?: number }) {
-  const tpl = reportTemplate(templateKey);
-  return <RrIcon name={tpl?.icon ?? "document"} size={size} />;
+/** `icon`: a builder type's own (4E) — a built-in's comes from its key. */
+export function TemplateIcon({ templateKey, icon, size = 14 }: { templateKey: string; icon?: RrIconName; size?: number }) {
+  return <RrIcon name={icon ?? reportTemplate(templateKey)?.icon ?? "document"} size={size} />;
 }
 
-/** One report in any list: who, what, which period, and its state. */
-export function ReportRowItem({ r, t, showAuthor = true }: { r: ReportListRow; t: T; showAuthor?: boolean }) {
+/** One report in any list: who, what, which period, and its state. A
+ *  builder type (4E) is named as the report was started with it. */
+export function ReportRowItem({ r, t, lang, showAuthor = true }: { r: ReportListRow; t: T; lang: string; showAuthor?: boolean }) {
   const unread = !!r.myRole && !r.readAt;
-  const tpl = reportTemplate(r.templateKey);
+  const builtin = reportTemplate(r.templateKey);
+  const tpl = builtin ?? (r.tpl ? { cadence: r.tpl.cadence, urgent: r.tpl.urgent } : null);
+  const typeName = !builtin && r.tpl ? pickWord(r.tpl.name, lang as Lang) || tplName(t, r.templateKey) : tplName(t, r.templateKey);
   return (
     <li>
       <Link
         href={`/reports/${r.id}`}
         className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--bg-surface-subtle)] focus-visible:bg-[var(--bg-surface-subtle)] focus-visible:outline-none"
       >
-        <Avatar person={{ name: showAuthor ? r.authorName : tplName(t, r.templateKey), avatar: null }} />
+        <Avatar person={{ name: showAuthor ? r.authorName : typeName, avatar: null }} />
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-1.5">
             {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-[#567FB2]" aria-label={t("badge.unread")} />}
             <span className={`truncate text-[13px] ${unread ? "font-semibold text-[var(--text-primary)]" : "font-medium text-[var(--text-primary)]"}`}>
-              {r.title?.trim() ? <AutoTranslatedText text={r.title} plain /> : tplName(t, r.templateKey)}
+              {r.title?.trim() ? <AutoTranslatedText text={r.title} plain /> : typeName}
             </span>
           </span>
           <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-[var(--text-dim)]">
-            <span className="inline-flex items-center gap-1"><TemplateIcon templateKey={r.templateKey} size={11} />{tplName(t, r.templateKey)}</span>
+            <span className="inline-flex items-center gap-1"><TemplateIcon templateKey={r.templateKey} icon={builtin ? undefined : r.tpl?.icon} size={11} />{typeName}</span>
             {showAuthor && <span className="truncate">· {r.authorName}</span>}
             <span className="tabular-nums">· {tpl?.cadence ? periodLabel(r.periodStart, r.periodEnd) : dmyDate(r.submittedAt ?? r.updatedAt)}</span>
             {r.version > 1 && <span className="tabular-nums">· {t("badge.version")} {r.version}</span>}

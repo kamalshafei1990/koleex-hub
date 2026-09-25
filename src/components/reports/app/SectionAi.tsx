@@ -24,6 +24,7 @@ import { useCallback, useState } from "react";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { AI_LIMITS, canWrite, type AiAction, type AiDraftRequest } from "@/lib/reports/ai-draft";
+import type { ReportTemplateDef } from "@/lib/reports/templates";
 import { askReportAi } from "@/lib/work-reports";
 import type { T } from "./shared";
 
@@ -50,11 +51,11 @@ const AI_BTN =
 
 /** The section head's AI buttons: "Tidy up" once there is something to
  *  tidy, "Write it" where Koleex AI can write the section. */
-export function SectionAiButtons({ t, templateKey, sectionId, text, slot, onTidy, onWrite }: {
-  t: T; templateKey: string; sectionId: string; text: string; slot?: AiSlot;
+export function SectionAiButtons({ t, template, sectionId, text, slot, onTidy, onWrite }: {
+  t: T; template: ReportTemplateDef; sectionId: string; text: string; slot?: AiSlot;
   onTidy: () => void; onWrite: () => void;
 }) {
-  const writable = canWrite(templateKey, sectionId);
+  const writable = canWrite(template, sectionId);
   const tidyable = text.trim().length >= AI_LIMITS.tidyMin;
   if (!writable && !tidyable) return null;
   const busy = !!slot?.busy;

@@ -21,7 +21,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, type ServerAuthContext } from "@/lib/server/auth";
 import { openTodoItems } from "@/lib/todo-open-count";
 import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
-import { isOpenAccessModule, PERMISSION_MODULES } from "@/lib/permission-modules";
+import { capabilityApp, isOpenAccessModule, PERMISSION_MODULES } from "@/lib/permission-modules";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +39,9 @@ type Widget = Record<string, unknown> & { error?: string };
 
    The list covers EVERY governable app (PERMISSION_MODULES — derived from
    APP_REGISTRY), because the Widgets view offers a launcher card per app,
-   not only the apps with data providers. */
-const DASH_MODULES = PERMISSION_MODULES;
+   not only the apps with data providers. A capability ("Report Templates")
+   is not an app: no card, so it is left out. */
+const DASH_MODULES = PERMISSION_MODULES.filter((m) => capabilityApp(m) === null);
 
 async function viewableModules(auth: ServerAuthContext): Promise<Set<string>> {
   if (auth.is_super_admin) return new Set(DASH_MODULES);

@@ -4,7 +4,10 @@
    touches Supabase directly.
    --------------------------------------------------------------------------- */
 
-import type { ReportDataValue, ReportSectionValue } from "@/lib/reports/templates";
+import type { ReportDataValue, ReportSectionValue, ReportTemplateDef } from "@/lib/reports/templates";
+import type { CustomDef, CustomTemplateHead } from "@/lib/reports/custom-templates";
+import type { TemplateHead, TemplateWords } from "@/lib/reports/template-words";
+import type { Translations } from "@/lib/i18n";
 import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
@@ -34,15 +37,21 @@ export interface ReportListRow {
   myRole: "to" | "cc" | null;
   readAt: string | null;
   acknowledgedAt: string | null;
+  /** A builder type (4E): its name, icon and period as the report was started with it. */
+  tpl?: TemplateHead;
 }
 
 export interface ReportsBundle {
-  me: { id: string; managerId: string | null; hasTeam: boolean; board?: boolean };
+  /** templates: may open the template builder (4E). */
+  me: { id: string; managerId: string | null; hasTeam: boolean; board?: boolean; templates?: boolean };
   /** Phase 3A: what this person owes now. */
   due?: DueItem[];
   counts: { unread: number; review: number; drafts: number; sentThisMonth: number };
   latest: ReportListRow[];
+  /** The built-in types this person may start (hidden ones left out — 4E). */
   templates: string[];
+  /** The builder types this person may start, named (4E). */
+  custom?: CustomTemplateHead[];
   people: ReportPerson[];
   library: { hr: boolean; finance: boolean; tasks: boolean };
 }
@@ -74,6 +83,9 @@ export interface ReportDetail {
   /** The author's draft only: its numbers blocks as the server computes
    *  them now, by section id (a sent report has them frozen in its sections). */
   blockData?: Record<string, ReportDataValue>;
+  /** A builder type (4E): the type as this report was started with it, and
+   *  its words as the dictionary holds them (`tpl.<key>.…`). */
+  template?: { def: ReportTemplateDef; words: Translations };
 }
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; extra?: Record<string, unknown> };
@@ -192,6 +204,23 @@ export const saveObligations = (body: { trackingFrom?: string | null; reminders?
  *  (nothing is sent). */
 export interface NudgePreview { planned?: Array<{ key: string; periodKey: string; kind: "reminder" | "escalation"; dueAt: string; authorName: string; recipients: string[] }> }
 export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
+
+/* ── The template builder (4E) ── */
+export interface TemplateRights { view: boolean; create: boolean; edit: boolean; delete: boolean }
+export interface TemplateList { custom: CustomTemplateHead[]; hidden: string[]; can: TemplateRights }
+/** A type in the editor: a builder type whole, or (key null) a built-in as a copy's starting point. */
+export interface TemplateDoc { key: string | null; def: CustomDef; words: TemplateWords; status?: "active" | "archived"; version?: number }
+export const fetchTemplates = () => call<TemplateList>("/api/work-reports/templates");
+export const fetchTemplateDoc = (key: string) => call<TemplateDoc>(`/api/work-reports/templates/${encodeURIComponent(key)}`);
+export const createTemplate = (def: CustomDef, words: TemplateWords) =>
+  call<{ key: string }>("/api/work-reports/templates", { method: "POST", body: JSON.stringify({ def, words }) });
+export const saveTemplate = (key: string, def: CustomDef, words: TemplateWords, version: number) =>
+  call<{ ok: true; version: number }>(`/api/work-reports/templates/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify({ def, words, version }) });
+export const setTemplateStatus = (key: string, status: "active" | "archived") =>
+  call<{ ok: true }>(`/api/work-reports/templates/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify({ status }) });
+export const deleteTemplate = (key: string) => call<{ ok: true }>(`/api/work-reports/templates/${encodeURIComponent(key)}`, { method: "DELETE" });
+export const setBuiltinHidden = (key: string, hidden: boolean) =>
+  call<{ ok: true }>(`/api/work-reports/templates/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify({ hidden }) });
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string, to?: string) =>

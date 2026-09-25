@@ -15,7 +15,7 @@
    validate:reports checks every rule and every scenario below.
    --------------------------------------------------------------------------- */
 
-import { REPORT_LIMITS, reportTemplate, type ReportPeriod, type ReportSectionKind } from "./templates";
+import { REPORT_LIMITS, asTemplate, reportTemplate, type ReportPeriod, type ReportSectionKind, type ReportTemplateDef } from "./templates";
 
 export interface CarryRule {
   /** The earlier report type the items come from. */
@@ -75,10 +75,21 @@ function addDays(ymd: string, days: number): string {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
+/** A type's rules: its own — or, for a builder copy of a built-in (4E),
+ *  that built-in's, where the copy's own earlier reports stand in for the
+ *  built-in's ("yesterday's daily" is yesterday's copy). */
+export function carryRulesFor(t: string | ReportTemplateDef | null | undefined): CarryRule[] {
+  const tpl = asTemplate(t);
+  if (!tpl) return [];
+  if (CARRY_RULES[tpl.key]) return CARRY_RULES[tpl.key];
+  const base = tpl.base ? CARRY_RULES[tpl.base] : undefined;
+  return (base ?? []).map((r) => (r.from === tpl.base ? { ...r, from: tpl.key } : r));
+}
+
 /** The one read the server makes: these types, starting in this range. */
-export function carryQueryRange(templateKey: string, period: ReportPeriod): { templates: string[]; from: string; to: string } | null {
-  const rules = CARRY_RULES[templateKey];
-  if (!rules?.length) return null;
+export function carryQueryRange(t: string | ReportTemplateDef, period: ReportPeriod): { templates: string[]; from: string; to: string } | null {
+  const rules = carryRulesFor(t);
+  if (!rules.length) return null;
   let from = period.start;
   for (const r of rules) {
     const d = addDays(period.start, -(r.window === "previous" ? (r.lookbackDays ?? DEFAULT_LOOKBACK) : OVERLAP_DAYS));
@@ -144,10 +155,11 @@ const newer = (a: CarrySource, b: CarrySource) =>
 /** Which earlier reports feed a report of this type and period, as groups
  *  of suggestions. `self` is the report being written — never its own
  *  source, nor another version of it. */
-export function buildCarry(templateKey: string, period: ReportPeriod, rows: CarrySource[], self: { id: string; periodKey?: string | null }): CarryGroup[] {
-  const tpl = reportTemplate(templateKey);
-  const rules = CARRY_RULES[templateKey];
-  if (!tpl || !rules?.length) return [];
+export function buildCarry(t: string | ReportTemplateDef, period: ReportPeriod, rows: CarrySource[], self: { id: string; periodKey?: string | null }): CarryGroup[] {
+  const tpl = asTemplate(t);
+  const rules = carryRulesFor(tpl);
+  if (!tpl || !rules.length) return [];
+  const templateKey = tpl.key;
 
   /* One report per type and period: an open new version (a draft) and the
      sent one it replaces both exist until the new one is sent — the higher
@@ -165,7 +177,7 @@ export function buildCarry(templateKey: string, period: ReportPeriod, rows: Carr
   const seen = new Set<string>();
   const out: CarryGroup[] = [];
   for (const rule of rules) {
-    const srcSection = reportTemplate(rule.from)?.sections.find((s) => s.id === rule.section);
+    const srcSection = (rule.from === tpl.key ? tpl : reportTemplate(rule.from))?.sections.find((s) => s.id === rule.section);
     const to = rule.to.filter((sid) => tpl.sections.some((s) => s.id === sid));
     if (!srcSection || !to.length) continue;
 

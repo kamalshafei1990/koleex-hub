@@ -14,7 +14,8 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { missingSections, normalizeSections, reportLinks, reportTemplate } from "@/lib/reports/templates";
+import { missingSections, normalizeSections, reportLinks } from "@/lib/reports/templates";
+import { templateOf } from "@/lib/reports/custom-templates";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { REPORT_COLS, listPeople, loadForViewer, requireReportsUser, type ReportRow } from "@/lib/server/reports/core";
 import { notifyReportSubmitted } from "@/lib/server/reports/notify";
@@ -34,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!loaded || loaded.access !== "author") return NextResponse.json({ error: "not_found" }, { status: 404 });
   const { row, recipients } = loaded;
   if (row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
-  const tpl = reportTemplate(row.template_key);
+  const tpl = templateOf(row);
   if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
 
   const typed = normalizeSections(tpl, row.sections);

@@ -13,6 +13,10 @@
    useServerList contract and load only when their tab opens. The Library's
    HR numbers load their own code only when that section is opened, and so
    does the Compliance board (Phase 3A). "Due from you" rides the bundle.
+   Phase 4E: the types made in the template builder ride it too (named, for
+   "Write a report"), and the builder itself — the Templates tab, for super
+   admins and whoever holds "Report Templates" in Roles — loads its own code
+   only when it is opened.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,19 +33,26 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { REPORT_FAMILIES, REPORT_TEMPLATES, periodFor } from "@/lib/reports/templates";
+import { headWords, isCustomKey } from "@/lib/reports/template-words";
 import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
 import type { DueItem } from "@/lib/reports/obligations";
 import { CARD, ReportRowItem, TemplateIcon, tplName, type T } from "./shared";
 
 const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
 const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
+const TemplatesTab = dynamic(() => import("./TemplatesTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
 
-type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library";
-const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library"];
+type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
+const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
 const WARM_KEY = "kx:reports:bundle";
 
 export default function ReportsApp() {
-  const { t, lang } = useTranslation(reportsT);
+  const [bundle, setBundle] = useState<ReportsBundle | null>(null);
+  /* The builder types' names and descriptions (4E) join the dictionary, so
+     "Write a report" names them like any other type. */
+  const custom = bundle?.custom;
+  const words = useMemo(() => (custom?.length ? { ...reportsT, ...headWords(custom) } : reportsT), [custom]);
+  const { t, lang } = useTranslation(words);
   const router = useRouter();
   const [tab, setTabState] = useState<Tab>(() => {
     if (typeof window === "undefined") return "home";
@@ -67,7 +78,6 @@ export default function ReportsApp() {
     } catch { /* no history */ }
   }, []);
 
-  const [bundle, setBundle] = useState<ReportsBundle | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -104,7 +114,7 @@ export default function ReportsApp() {
     if (res.ok) {
       if (opts?.replace) router.replace(`/reports/${res.data.id}`);
       else router.push(`/reports/${res.data.id}`);
-    } else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
+    } else setCreateError(res.error === "not_internal" ? t("err.notInternal") : res.error === "hidden" || res.error === "unknown_template" ? t("err.typeGone") : t("err.generic"));
   }, [router, t, lang]);
 
   /* /reports?write=<type>&date=<day>[&request=<id>] — "write it" from the
@@ -125,7 +135,7 @@ export default function ReportsApp() {
       url.searchParams.delete("date");
       url.searchParams.delete("request");
       window.history.replaceState(window.history.state, "", url.toString());
-      if (!REPORT_TEMPLATES.some((x) => x.key === key)) return;
+      if (!REPORT_TEMPLATES.some((x) => x.key === key) && !isCustomKey(key)) return;
       void start(key, date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, {
         replace: true,
         request: request && /^[0-9a-f-]{36}$/i.test(request) ? request : undefined,
@@ -141,6 +151,7 @@ export default function ReportsApp() {
     ...(bundle?.me.hasTeam ? [{ key: "team", onClick: () => setTab("team"), icon: "users" as const, label: t("nav.team"), active: tab === "team" }] : []),
     ...(bundle?.me.board ? [{ key: "compliance", onClick: () => setTab("compliance"), icon: "badge-check" as const, label: t("nav.compliance"), active: tab === "compliance" }] : []),
     { key: "library", onClick: () => setTab("library"), icon: "books", label: t("nav.library"), active: tab === "library" },
+    ...(bundle?.me.templates ? [{ key: "templates", onClick: () => setTab("templates"), icon: "palette" as const, label: t("nav.templates"), active: tab === "templates" }] : []),
   ];
 
   const [query, setQuery] = useState("");
@@ -174,10 +185,13 @@ export default function ReportsApp() {
         )}
 
         <div key={tab} className="kx-tab-in">
-          {tab === "home" && <Home t={t} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
-          {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
+          {tab === "home" && <Home t={t} lang={lang} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
+          {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} lang={lang} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
           {tab === "compliance" && <ComplianceTab t={t} lang={lang} />}
           {tab === "library" && <Library t={t} bundle={bundle} />}
+          {tab === "templates" && (bundle?.me.templates
+            ? <TemplatesTab t={t} lang={lang} onChanged={() => void reload()} />
+            : <div className={`${CARD} px-5 py-12 text-center text-[13px] text-[var(--text-dim)]`}>{bundle ? t("err.forbidden") : <SpinnerIcon size={18} />}</div>)}
         </div>
       </div>
     </div>
@@ -188,11 +202,17 @@ export default function ReportsApp() {
 
 type StartFn = (key: string, date?: string, opts?: { request?: string }) => void;
 
-function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
-  t: T; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
+function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: {
+  t: T; lang: string; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
   onStart: StartFn; onOpenInbox: () => void;
 }) {
   const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly).map((x) => x.key)), [bundle]);
+  /* Every type this person may start, by group: the built-ins, then the
+     builder's (4E) — each named from the dictionary. */
+  const offered = useMemo(() => [
+    ...REPORT_TEMPLATES.filter((x) => allowed.has(x.key)).map((x) => ({ key: x.key, family: x.family, icon: x.icon })),
+    ...(bundle?.custom ?? []).map((c) => ({ key: c.key, family: c.family, icon: c.icon })),
+  ], [allowed, bundle?.custom]);
   const due = bundle?.due ?? [];
   return (
     <div className="space-y-4">
@@ -203,7 +223,7 @@ function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
         {createError && <p className="mb-3 text-[12.5px] text-red-400">{createError}</p>}
         <div className="space-y-4">
           {REPORT_FAMILIES.map((fam) => {
-            const items = REPORT_TEMPLATES.filter((x) => x.family === fam && allowed.has(x.key));
+            const items = offered.filter((x) => x.family === fam);
             if (!items.length) return null;
             return (
               <div key={fam}>
@@ -218,11 +238,11 @@ function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
                       className="kx-hover-glow group flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-start transition-colors hover:bg-[var(--bg-surface)] disabled:opacity-60"
                     >
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]">
-                        {creating === tpl.key ? <SpinnerIcon size={14} /> : <TemplateIcon templateKey={tpl.key} size={15} />}
+                        {creating === tpl.key ? <SpinnerIcon size={14} /> : <TemplateIcon templateKey={tpl.key} icon={tpl.icon} size={15} />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, tpl.key)}</span>
-                        <span className="mt-0.5 block text-[11.5px] leading-snug text-[var(--text-dim)]">{t(`tpl.${tpl.key}.desc`)}</span>
+                        <span className="mt-0.5 block text-[11.5px] leading-snug text-[var(--text-dim)]">{t(`tpl.${tpl.key}.desc`, "")}</span>
                       </span>
                     </button>
                   ))}
@@ -244,7 +264,7 @@ function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
           <p className="px-3 py-8 text-center text-[13px] text-[var(--text-dim)]">{t("empty.inbox")}</p>
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {bundle.latest.map((r) => <ReportRowItem key={r.id} r={r} t={t} />)}
+            {bundle.latest.map((r) => <ReportRowItem key={r.id} r={r} t={t} lang={lang} />)}
           </ul>
         )}
       </section>
@@ -289,7 +309,7 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
 
 /* ── Inbox / My reports / Team: server-side lists ──────────────────────── */
 
-function ReportList({ t, box, query, accountId }: { t: T; box: "inbox" | "mine" | "team"; query: string; accountId: string | null }) {
+function ReportList({ t, lang, box, query, accountId }: { t: T; lang: string; box: "inbox" | "mine" | "team"; query: string; accountId: string | null }) {
   const list = useServerList<ReportListRow>({
     resource: `work-reports:${box}`,
     endpoint: "/api/work-reports",
@@ -311,7 +331,7 @@ function ReportList({ t, box, query, accountId }: { t: T; box: "inbox" | "mine" 
   return (
     <section className={`${CARD} p-2 sm:p-3`}>
       <ul className="divide-y divide-[var(--border-subtle)]">
-        {list.rows.map((r) => <ReportRowItem key={r.id} r={r} t={t} showAuthor={box !== "mine"} />)}
+        {list.rows.map((r) => <ReportRowItem key={r.id} r={r} t={t} lang={lang} showAuthor={box !== "mine"} />)}
       </ul>
       {(list.page > 1 || list.hasMore) && (
         <div className="flex items-center justify-between gap-2 px-2 pt-3 pb-1 text-[12px]">

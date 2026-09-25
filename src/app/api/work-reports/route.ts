@@ -17,6 +17,10 @@ import "server-only";
         period_key is 'req:<id>', it starts with the event's facts worded in
         `lang`, and a second call returns the same report. A request-only
         type (the probation review) starts from its request or not at all.
+        Phase 4E: a builder type (c-…) starts from its CURRENT version, and
+        the draft keeps a copy of it (template_snapshot) — editing the type
+        later never changes this report. An archived builder type, or a
+        built-in the tenant hides, starts no new report.
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -25,6 +29,8 @@ import { requireAuth, type ServerAuthContext } from "@/lib/server/auth";
 import { applyServerList } from "@/lib/server-list/apply";
 import { parseListParams, type ServerListConfig } from "@/lib/server-list/types";
 import { REPORT_TEMPLATES, REPORT_LIMITS, normalizeSections, periodFor, reportTemplate, type ReportTemplateDef } from "@/lib/reports/templates";
+import { isCustomKey, snapshotOf, type TemplateSnapshot } from "@/lib/reports/custom-templates";
+import { customAsTemplate, loadCustomTemplate, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 import { prefillSections, requestPeriodKey, type RequestFacts } from "@/lib/reports/events";
 import { reportsT } from "@/lib/translations/reports";
 import {
@@ -50,7 +56,7 @@ type ListRow = {
   id: string; template_key: string; author_account_id: string; title: string;
   period_start: string | null; period_end: string | null; period_key: string | null;
   status: string; confidential: boolean; review_required: boolean; version: number; superseded: boolean;
-  submitted_at: string | null; updated_at: string;
+  submitted_at: string | null; updated_at: string; tpl_head?: unknown;
   work_report_recipients?: Array<{ role: string; read_at: string | null; acknowledged_at: string | null }>;
 };
 
@@ -114,6 +120,7 @@ export async function GET(req: Request) {
       status: r.status, confidential: r.confidential, reviewRequired: r.review_required, version: r.version,
       submittedAt: r.submitted_at, updatedAt: r.updated_at,
       myRole: mineRow?.role ?? null, readAt: mineRow?.read_at ?? null, acknowledgedAt: mineRow?.acknowledged_at ?? null,
+      ...(r.tpl_head ? { tpl: r.tpl_head } : {}),
     };
   });
   return NextResponse.json(
@@ -129,7 +136,17 @@ export async function POST(req: Request) {
   if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as { template_key?: unknown; date?: unknown; title?: unknown; request?: unknown; lang?: unknown } | null;
-  const tpl = typeof body?.template_key === "string" ? reportTemplate(body.template_key) : null;
+  /* A builder type (4E): its current version, active only, the tenant's own. */
+  let snapshot: TemplateSnapshot | null = null;
+  let tpl: ReportTemplateDef | null = null;
+  if (isCustomKey(body?.template_key)) {
+    const row = await loadCustomTemplate(auth.tenant_id, body.template_key).catch(() => null);
+    if (!row || row.status !== "active") return NextResponse.json({ error: "unknown_template" }, { status: 400 });
+    tpl = customAsTemplate(row);
+    snapshot = snapshotOf(row.def, row.words, row.version);
+  } else if (typeof body?.template_key === "string") {
+    tpl = reportTemplate(body.template_key);
+  }
   if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
 
   /* From a request (Phase 3D): only the viewer's own, open one, for this type. */
@@ -153,7 +170,12 @@ export async function POST(req: Request) {
   }
 
   if (tpl.requestOnly) return NextResponse.json({ error: "request_only" }, { status: 403 });
-  if (!(await canStartTemplate(tpl, auth))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const [allowed, hidden] = await Promise.all([
+    canStartTemplate(tpl, auth),
+    tpl.custom ? Promise.resolve([] as string[]) : loadHiddenKeys(auth.tenant_id).catch(() => [] as string[]),
+  ]);
+  if (!allowed) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (hidden.includes(tpl.key)) return NextResponse.json({ error: "hidden" }, { status: 403 });
   const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : new Date().toISOString().slice(0, 10);
   const period = periodFor(tpl.cadence, date);
 
@@ -168,16 +190,18 @@ export async function POST(req: Request) {
   }
 
   const title = tpl.customTitle && typeof body?.title === "string" ? body.title.trim().slice(0, REPORT_LIMITS.title) : "";
-  return createDraft(auth, tpl, { start: period.start, end: period.end, key: tpl.cadence ? period.key : period.start }, title, []);
+  return createDraft(auth, tpl, { start: period.start, end: period.end, key: tpl.cadence ? period.key : period.start }, title, [], snapshot);
 }
 
-/** A new draft addressed to the template's default readers. */
-async function createDraft(auth: ServerAuthContext, tpl: ReportTemplateDef, period: { start: string; end: string; key: string }, title: string, sections: unknown) {
+/** A new draft addressed to the template's default readers — a builder
+ *  type's with its copy of the type (4E). */
+async function createDraft(auth: ServerAuthContext, tpl: ReportTemplateDef, period: { start: string; end: string; key: string }, title: string, sections: unknown, snapshot: TemplateSnapshot | null = null) {
   const { data: created, error } = await supabaseServer.from("work_reports").insert({
     tenant_id: auth.tenant_id, template_key: tpl.key, author_account_id: auth.account_id, title,
     period_start: period.start, period_end: period.end, period_key: period.key,
     sections: normalizeSections(tpl, sections), status: "draft",
     confidential: tpl.confidential, review_required: tpl.reviewRequired,
+    template_snapshot: snapshot,
   }).select("id").single();
   if (error || !created) {
     console.error("[api/work-reports POST]", error?.message);

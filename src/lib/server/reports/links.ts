@@ -44,9 +44,11 @@ export async function syncReportLinks(reportId: string, tenantId: string | null,
 export interface AboutRow {
   id: string; templateKey: string; title: string; authorName: string; periodStart: string | null; periodEnd: string | null;
   status: string; confidential: boolean; submittedAt: string | null; updatedAt: string;
+  /** A builder type's name as the report was started with it (4E). */
+  tplName?: Partial<Record<"en" | "zh" | "ar", string>>;
 }
 
-type Row = { id: string; template_key: string; author_account_id: string; title: string; period_start: string | null; period_end: string | null; status: "draft" | "submitted" | "approved" | "returned"; confidential: boolean; superseded: boolean; submitted_at: string | null; updated_at: string };
+type Row = { id: string; template_key: string; author_account_id: string; title: string; period_start: string | null; period_end: string | null; status: "draft" | "submitted" | "approved" | "returned"; confidential: boolean; superseded: boolean; submitted_at: string | null; updated_at: string; tpl_head?: { name?: AboutRow["tplName"] } | null };
 
 /** The reports about one record that THIS viewer may read, newest first —
  *  the latest version of each; a draft only its author's. */
@@ -81,5 +83,6 @@ export async function listReportsAbout(auth: ServerAuthContext, type: ReportLink
       id: r.id, templateKey: r.template_key, title: r.title, authorName: nameOf.get(r.author_account_id) ?? "—",
       periodStart: r.period_start, periodEnd: r.period_end, status: r.status, confidential: r.confidential,
       submittedAt: r.submitted_at, updatedAt: r.updated_at,
+      ...(r.tpl_head?.name ? { tplName: r.tpl_head.name } : {}),
     }));
 }

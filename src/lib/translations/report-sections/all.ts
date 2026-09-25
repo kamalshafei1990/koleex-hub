@@ -6,6 +6,7 @@ import type { Translations } from "@/lib/i18n";
 import work from "./work";
 import visits from "./visits";
 import sales from "./sales";
+import marketing from "./marketing";
 import suppliers from "./suppliers";
 import quality from "./quality";
 import logistics from "./logistics";
@@ -14,4 +15,4 @@ import travel from "./travel";
 import memos from "./memos";
 import hr from "./hr";
 
-export const REPORT_SECTION_WORDS: Translations = { ...work, ...visits, ...sales, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };
+export const REPORT_SECTION_WORDS: Translations = { ...work, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };

@@ -6,7 +6,9 @@ import "server-only";
    templates this person may start, the people a report can go to, which
    number reports the Library may offer (each by its own app's permission),
    and (Phase 3A) what this person owes now — "Due from you" — plus whether
-   they may see the compliance board.
+   they may see the compliance board. Phase 4E: the builder types this
+   person may start (named, for the picker), the built-in types the tenant
+   hides left out of `templates`, and whether they may open the builder.
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -15,15 +17,17 @@ import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/ser
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
 import { REPORT_TEMPLATES } from "@/lib/reports/templates";
 import { loadMyDue } from "@/lib/server/reports/obligations";
+import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 
 export const dynamic = "force-dynamic";
 
 type Row = {
   id: string; template_key: string; author_account_id: string; title: string; period_start: string | null; period_end: string | null;
   period_key: string | null; status: string; confidential: boolean; review_required: boolean; version: number; superseded: boolean;
-  submitted_at: string | null; updated_at: string;
+  submitted_at: string | null; updated_at: string; tpl_head?: unknown;
   work_report_recipients?: Array<{ role: string; read_at: string | null; acknowledged_at: string | null }>;
 };
+const quiet = <T,>(what: string, fallback: T) => (e: unknown): T => { console.error(`[reports] ${what}:`, e instanceof Error ? e.message : e); return fallback; };
 
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
@@ -39,7 +43,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -57,16 +61,22 @@ export async function GET(req: Request) {
     requireModuleAccess(auth, "To-do"),
     /* The org tree is memoised per tenant, so this shares the read above. */
     loadMyDue(auth).catch((e: unknown) => { console.error("[reports] due:", e instanceof Error ? e.message : e); return []; }),
+    /* 4E: the builder's types and the hidden built-ins — the same wave. */
+    loadCustomHeads(t, { activeOnly: true }).catch(quiet("custom templates", [])),
+    loadHiddenKeys(t).catch(quiet("hidden templates", [] as string[])),
+    requireModuleAccess(auth, TEMPLATES_MODULE),
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
-     (warning, exit interview) needs HR·create. */
-  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && (!tpl.hrOnly || hrCreate === null)).map((tpl) => tpl.key);
+     (warning, exit interview) needs HR·create. A hidden built-in is not
+     offered (4E); its old reports stay where they are. */
+  const hiddenSet = new Set(hidden);
+  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)).map((tpl) => tpl.key);
   const nameOf = new Map(people.map((p) => [p.id, p]));
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
 
   return NextResponse.json({
-    me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam, board: hasTeam || hrView === null },
+    me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam, board: hasTeam || hrView === null, templates: builder === null },
     due,
     counts: { unread: unread.count ?? 0, review: review.count ?? 0, drafts: drafts.count ?? 0, sentThisMonth: sent.count ?? 0 },
     latest: ((latest.data ?? []) as Row[]).map((r) => {
@@ -77,9 +87,11 @@ export async function GET(req: Request) {
         periodStart: r.period_start, periodEnd: r.period_end, periodKey: r.period_key, status: r.status, confidential: r.confidential,
         reviewRequired: r.review_required, version: r.version, submittedAt: r.submitted_at, updatedAt: r.updated_at,
         myRole: mine?.role ?? null, readAt: mine?.read_at ?? null, acknowledgedAt: mine?.acknowledged_at ?? null,
+        ...(r.tpl_head ? { tpl: r.tpl_head } : {}),
       };
     }),
     templates,
+    custom: custom.filter((c) => !c.hrOnly || hrCreate === null),
     people: people.filter((p) => p.id !== me),
     library: { hr: hrView === null, finance: finance === null, tasks: todo === null },
   }, { headers: { "Cache-Control": "private, no-store" } });

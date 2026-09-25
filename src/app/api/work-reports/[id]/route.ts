@@ -13,6 +13,8 @@ import "server-only";
           paints complete — no second request, nothing shifting in later. Photos
           and files come as ids only; their bytes are fetched through
           /api/files/report/<id>, which applies this same read rule.
+          A report of a builder type (4E) also brings its type as it was
+          started with — the sections and their words (`template`).
    PATCH  The author edits a DRAFT: { title?, date?, dateTo?, sections?, to?,
           cc?, confidential? } — dateTo only for a trip or a visit (4D). A sent report is never edited — a new version is
           (POST …/revise).
@@ -25,7 +27,8 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { REPORT_LIMITS, normalizeSections, periodFor, rangeEnd, reportLinks, reportTemplate, type ReportSectionValue } from "@/lib/reports/templates";
+import { REPORT_LIMITS, normalizeSections, periodFor, rangeEnd, reportLinks, type ReportSectionValue } from "@/lib/reports/templates";
+import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
@@ -81,6 +84,9 @@ export async function GET(req: Request, { params }: Params) {
   const [carry, appFeed, blockData] = isAuthor && row.status === "draft"
     ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth), loadReportData(row, auth)])
     : [undefined, undefined, undefined];
+  /* A builder type (4E): the version this report was started with. */
+  const snap = row.template_snapshot ? readSnapshot(row.template_snapshot) : null;
+  const custom = snap ? templateOf(row) : null;
 
   return NextResponse.json({
     report: {
@@ -109,6 +115,7 @@ export async function GET(req: Request, { params }: Params) {
     appFeed,
     blockData,
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(toClientAttachment),
+    template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -122,7 +129,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!loaded || loaded.access !== "author") return notFound();
   const { row } = loaded;
   if (row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
-  const tpl = reportTemplate(row.template_key);
+  const tpl = templateOf(row);
   if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
 
   const body = (await req.json().catch(() => null)) as {

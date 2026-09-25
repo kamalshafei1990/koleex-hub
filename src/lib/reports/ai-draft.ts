@@ -17,7 +17,7 @@
    answer back into a section. The route is /api/work-reports/[id]/ai.
    --------------------------------------------------------------------------- */
 
-import { REPORT_LIMITS, reportTemplate, type ReportSectionKind } from "./templates";
+import { REPORT_LIMITS, asTemplate, behaviourKey, type ReportSectionKind, type ReportTemplateDef } from "./templates";
 import type { CarryGroup } from "./carry";
 
 export type AiAction = "write" | "tidy";
@@ -41,7 +41,12 @@ export const AI_LIMITS = {
   perHour: 40,
 } as const;
 
-export const canWrite = (templateKey: string, sectionId: string) => (AI_WRITE_SECTIONS[templateKey] ?? []).includes(sectionId);
+/** A builder copy (4E) writes what its built-in writes, for the sections it kept. */
+export function canWrite(t: string | ReportTemplateDef | null | undefined, sectionId: string): boolean {
+  const tpl = asTemplate(t);
+  if (!tpl || !tpl.sections.some((s) => s.id === sectionId)) return false;
+  return (AI_WRITE_SECTIONS[tpl.key] ?? AI_WRITE_SECTIONS[behaviourKey(tpl)] ?? []).includes(sectionId);
+}
 
 const isCjk = (cp: number) => (cp >= 0x2e80 && cp <= 0x9fff) || (cp >= 0xf900 && cp <= 0xfaff);
 
@@ -116,14 +121,14 @@ export interface AiDraftRequest {
 
 /** Checks a request against the report's template before any model is
  *  asked. Returns the problem, or null. */
-export function checkAiRequest(templateKey: string, body: Partial<AiDraftRequest>): string | null {
-  const tpl = reportTemplate(templateKey);
+export function checkAiRequest(t: string | ReportTemplateDef | null, body: Partial<AiDraftRequest>): string | null {
+  const tpl = asTemplate(t);
   if (!tpl) return "unknown_template";
   if (body.action !== "write" && body.action !== "tidy") return "bad_action";
   if (!body.section || !tpl.sections.some((s) => s.id === body.section)) return "bad_section";
   if (body.lang !== "en" && body.lang !== "zh" && body.lang !== "ar") return "bad_lang";
   if (body.action === "write") {
-    if (!canWrite(templateKey, body.section)) return "not_writable";
+    if (!canWrite(tpl, body.section)) return "not_writable";
     if (typeof body.material !== "string" || !body.material.trim()) return "no_material";
     if (body.material.length > AI_LIMITS.material + 2) return "too_long";
   } else {

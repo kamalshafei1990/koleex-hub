@@ -3,8 +3,9 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    POST /api/work-reports/[id]/revise — the author edits a SENT report as a
    new version (owner decision 4). The new draft copies the text, the
-   recipients, the photos and files (the same stored objects) and the
-   settings, and points at the one it replaces; that one
+   recipients, the photos and files (the same stored objects), the settings
+   and — for a builder type (4E) — the type as the first version was
+   written with, and points at the one it replaces; that one
    stays exactly as it was read until the new version is sent. Asking twice
    returns the same open draft.
    --------------------------------------------------------------------------- */
@@ -38,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     tenant_id: row.tenant_id, template_key: row.template_key, author_account_id: row.author_account_id, title: row.title,
     period_start: row.period_start, period_end: row.period_end, period_key: row.period_key, sections: row.sections,
     status: "draft", confidential: row.confidential, review_required: row.review_required,
-    version: row.version + 1, previous_id: row.id,
+    version: row.version + 1, previous_id: row.id, template_snapshot: row.template_snapshot ?? null,
   }).select("id").single();
   if (error || !created) {
     console.error("[api/work-reports revise]", error?.message);

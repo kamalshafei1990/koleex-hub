@@ -22,6 +22,7 @@ const LOAD: Record<ReportFamily, () => Promise<{ default: Translations }>> = {
   work: () => import("./work"),
   visits: () => import("./visits"),
   sales: () => import("./sales"),
+  marketing: () => import("./marketing"),
   suppliers: () => import("./suppliers"),
   quality: () => import("./quality"),
   logistics: () => import("./logistics"),
@@ -42,4 +43,13 @@ export function sectionFamilies(templateKey: string): ReportFamily[] {
 export async function loadSectionWords(templateKey: string): Promise<Translations> {
   const parts = await Promise.all(sectionFamilies(templateKey).map((f) => LOAD[f]()));
   return Object.assign({}, ...parts.map((p) => p.default)) as Translations;
+}
+
+/** The words a report shows: a built-in's family words — or a builder
+ *  type's own (4E, they come with the report), over the words of the
+ *  built-in it was copied from (its suggestions quote that one's reports). */
+export async function loadReportWords(templateKey: string, custom?: { def: { base?: string }; words: Translations }): Promise<Translations> {
+  if (!custom) return loadSectionWords(templateKey);
+  const base = custom.def.base ? await loadSectionWords(custom.def.base) : {};
+  return { ...base, ...custom.words };
 }

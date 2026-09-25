@@ -39,11 +39,20 @@
    (trip, delegation visit, minutes, decision log). A trip or a visit spans
    the days its author picks (`range`); the trip's own expenses come from
    Finance.
+
+   Phase 4E (owner's picks, 25 Sep 2026): the template builder. Super admins,
+   and anyone granted "Report Templates" in Roles, make their own types — from
+   nothing, or as a copy of a built-in (the original stays) — and hide the
+   built-in types nobody uses. A builder type lives in the database
+   (src/lib/reports/custom-templates.ts); a report of one keeps a copy of the
+   type as it was when the report was started, so editing the type changes
+   only the reports started after. The Marketing group is theirs until the
+   Marketing app brings its own reports.
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
+export type ReportFamily = "work" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -118,6 +127,13 @@ export interface ReportTemplateDef {
   /** Its author picks the first and the last day (a trip, a visit — 4D);
    *  at most REPORT_LIMITS.rangeDays long. */
   range?: boolean;
+  /** 4E: made in the builder — the version a report was started with. */
+  custom?: true;
+  version?: number;
+  /** 4E: the built-in a builder type was copied from. It keeps what that
+   *  one knew how to do — the suggestions from earlier reports, the facts
+   *  from the apps, Koleex AI's summary — for the sections it kept. */
+  base?: string;
 }
 
 const t = (id: string, kind: ReportSectionKind, required = false): ReportSectionDef => ({ id, kind, required });
@@ -473,10 +489,17 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
+/** A built-in by its key, or the type itself (a builder type — 4E — comes
+ *  whole, from its report). */
+export const asTemplate = (t: string | ReportTemplateDef | null | undefined): ReportTemplateDef | null =>
+  typeof t === "string" ? reportTemplate(t) : t ?? null;
+/** The built-in whose suggestions, app facts and AI summary a type uses: its
+ *  own — or, for a builder copy, the one it was copied from. */
+export const behaviourKey = (tpl: Pick<ReportTemplateDef, "key" | "base">): string => tpl.base ?? tpl.key;
 
 /* ── Limits (server-enforced; the composer mirrors them) ── */
 export const REPORT_LIMITS = { title: 200, text: 8000, items: 60, item: 600, comment: 4000, recipients: 30, rows: 50, cell: 200, links: 20, label: 200, signer: 120, dataRows: 100, rangeDays: 62 } as const;

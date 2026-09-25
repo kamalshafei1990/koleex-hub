@@ -33,7 +33,8 @@ import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/r
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
 import { AI_LIMITS, checkAiRequest, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
-import { reportTemplate } from "@/lib/reports/templates";
+import { behaviourKey } from "@/lib/reports/templates";
+import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
 import { REPORT_SECTION_WORDS } from "@/lib/translations/report-sections/all";
 
@@ -59,8 +60,9 @@ const SYSTEM =
   " If the material is thin, say less; never pad." +
   AI_PROVENANCE_RULE;
 
-/* A section's name lives with its family's words (Phase 4C); the server has them all. */
-const en = (key: string) => (reportsT[key] ?? REPORT_SECTION_WORDS[key])?.en ?? key;
+/* A section's name lives with its family's words (Phase 4C); the server has
+   them all — a builder type's (4E) travel with its report. */
+const enOf = (own: Record<string, { en: string }> | null) => (key: string) => (own?.[key] ?? reportsT[key] ?? REPORT_SECTION_WORDS[key])?.en ?? key;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -74,11 +76,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (row.status !== "draft") return NextResponse.json({ error: "not_draft" }, { status: 409 });
 
   const body = (await req.json().catch(() => null)) as Partial<AiDraftRequest> | null;
-  const problem = checkAiRequest(row.template_key, body ?? {});
-  if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  const tpl = templateOf(row);
+  const problem = checkAiRequest(tpl, body ?? {});
+  if (problem || !tpl) return NextResponse.json({ error: problem ?? "unknown_template" }, { status: 400 });
   const ask = body as AiDraftRequest;
-  const tpl = reportTemplate(row.template_key)!;
   const kind = tpl.sections.find((s) => s.id === ask.section)!.kind;
+  const snap = tpl.custom ? readSnapshot(row.template_snapshot) : null;
+  const en = enOf(snap ? templateWords(tpl.key, snap.words) : null);
 
   if (limitMode() !== "off") {
     const hit = await consumeBudget(subjectFor.account(auth.account_id), { bucket: "report_ai", windowSec: 3600, max: AI_LIMITS.perHour });
@@ -100,7 +104,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let instruction: string;
   let maxTokens: number;
   if (ask.action === "write") {
-    const length = tpl.key === "monthly" ? "6 to 12 sentences (at most about 300 words)" : "4 to 8 sentences (at most about 180 words)";
+    const length = behaviourKey(tpl) === "monthly" ? "6 to 12 sentences (at most about 300 words)" : "4 to 8 sentences (at most about 180 words)";
     instruction =
       `Write the "${section}" section of the employee's ${type}${period ? `, covering ${period}` : ""}.` +
       ` Language: ${LANG_NAME[ask.lang]}. Length: ${length}.` +

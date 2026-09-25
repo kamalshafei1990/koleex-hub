@@ -16,6 +16,7 @@ import { requireReportsUser } from "@/lib/server/reports/core";
 import { listReportsAbout } from "@/lib/server/reports/links";
 import { REPORT_LINK_TYPES, type ReportLinkType } from "@/lib/reports/templates";
 import { reportsT } from "@/lib/translations/reports";
+import { pickWord } from "@/lib/reports/custom-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,10 @@ export async function GET(req: Request) {
   const word = (key: string) => ((reportsT[key]?.[lang] ?? reportsT[key]?.en) as string | undefined) ?? "";
   try {
     const rows = await listReportsAbout(auth, type, id);
-    const reports = rows.map((r) => ({ ...r, typeName: word(`tpl.${r.templateKey}.name`) || r.templateKey, statusLabel: word(`status.${r.status}`) || r.status }));
+    /* A builder type (4E) is named as its report was started with it. */
+    const reports = rows.map(({ tplName, ...r }) => ({
+      ...r, typeName: word(`tpl.${r.templateKey}.name`) || pickWord(tplName, lang) || r.templateKey, statusLabel: word(`status.${r.status}`) || r.status,
+    }));
     return NextResponse.json({ reports }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     console.error("[api/work-reports/about]", e instanceof Error ? e.message : e);
