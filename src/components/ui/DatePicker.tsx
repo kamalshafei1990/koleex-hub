@@ -49,6 +49,9 @@ const TODAY_BY_LANG: Record<string, string> = { en: "Today", zh: "今天", ar: "
 const CLEAR_BY_LANG: Record<string, string> = { en: "Clear", zh: "清除", ar: "مسح" };
 /* The empty field's words — the HR forms' own (hr.pickDate). */
 const PICK_BY_LANG: Record<string, string> = { en: "Select date", zh: "选择日期", ar: "اختر التاريخ" };
+/* What a screen reader says for the month arrows. */
+const PREV_BY_LANG: Record<string, string> = { en: "Previous month", zh: "上个月", ar: "الشهر السابق" };
+const NEXT_BY_LANG: Record<string, string> = { en: "Next month", zh: "下个月", ar: "الشهر التالي" };
 
 const WEEKDAYS = WEEKDAYS_BY_LANG.en;
 const MONTHS = MONTHS_BY_LANG.en;
@@ -220,9 +223,11 @@ export default function DatePicker({
           type="button"
           onClick={() => stepMonth(-1)}
           className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)] transition-colors"
-          aria-label="Previous month"
+          aria-label={PREV_BY_LANG[lang] ?? PREV_BY_LANG.en}
         >
-          <AngleLeftIcon className="h-4 w-4" />
+          {/* Mirrored in Arabic, as the Calendar app's month arrows are:
+              "previous" sits on the right there and points right. */}
+          <AngleLeftIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
         <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           {lang === "zh" ? `${view.y}年${months[view.m]}` : `${months[view.m]} ${view.y}`}
@@ -231,9 +236,9 @@ export default function DatePicker({
           type="button"
           onClick={() => stepMonth(1)}
           className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)] transition-colors"
-          aria-label="Next month"
+          aria-label={NEXT_BY_LANG[lang] ?? NEXT_BY_LANG.en}
         >
-          <AngleRightIcon className="h-4 w-4" />
+          <AngleRightIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
       </div>
 
