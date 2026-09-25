@@ -25,7 +25,7 @@ import {
 
 export const obligationClock: Clock = (day, hhmm, tz) => wallClockToIso(day, hhmm, tz);
 
-interface Owner {
+export interface Owner {
   accountId: string;
   employeeId: string;
   isSuperAdmin: boolean;
@@ -36,7 +36,7 @@ interface Owner {
 
 /** Who can owe a report: employees that resolve to an ACTIVE STAFF account
  *  and are not marked as having left. */
-async function loadOwners(tree: OrgTree, only?: Set<string>): Promise<Owner[]> {
+export async function loadOwners(tree: OrgTree, only?: Set<string>): Promise<Owner[]> {
   const members = tree.members().filter((m) => !only || only.has(m.accountId));
   if (!members.length) return [];
   const accountIds = members.map((m) => m.accountId);
@@ -66,15 +66,27 @@ async function loadOwners(tree: OrgTree, only?: Set<string>): Promise<Owner[]> {
   return out;
 }
 
+export interface ReportSettings { trackingFrom: string | null; reminders: boolean; escalations: boolean }
+
+/** The tenant's settings: when counting starts, and the two Phase 3B
+ *  switches (both on unless paused). */
+export async function loadSettings(tenantId: string | null): Promise<ReportSettings> {
+  if (!tenantId) return { trackingFrom: null, reminders: true, escalations: true };
+  const { data } = await supabaseServer.from("work_report_settings").select("tracking_from, reminders, escalations").eq("tenant_id", tenantId).maybeSingle();
+  const row = data as { tracking_from?: string | null; reminders?: boolean | null; escalations?: boolean | null } | null;
+  return {
+    trackingFrom: row?.tracking_from ? String(row.tracking_from).slice(0, 10) : null,
+    reminders: row?.reminders !== false,
+    escalations: row?.escalations !== false,
+  };
+}
+
 export async function loadTrackingFrom(tenantId: string | null): Promise<string | null> {
-  if (!tenantId) return null;
-  const { data } = await supabaseServer.from("work_report_settings").select("tracking_from").eq("tenant_id", tenantId).maybeSingle();
-  const v = (data as { tracking_from?: string | null } | null)?.tracking_from;
-  return v ? String(v).slice(0, 10) : null;
+  return (await loadSettings(tenantId)).trackingFrom;
 }
 
 /** Each owner's calendar and clock over [from, to]. */
-async function loadClocks(tenantId: string | null, owners: Owner[], from: string, to: string, trackingFrom: string | null): Promise<Map<string, PersonClock>> {
+export async function loadClocks(tenantId: string | null, owners: Owner[], from: string, to: string, trackingFrom: string | null): Promise<Map<string, PersonClock>> {
   const [countries, policies, leaveRes] = await Promise.all([
     resolveEmployeeCountries(owners.map((o) => o.employeeId)),
     loadPolicyRows(),
@@ -115,7 +127,7 @@ type SentRow = { id: string; author_account_id: string; template_key: Obligation
 
 /** What was sent (first send per period; the newest version to open) and
  *  which drafts are open, keyed author|type|period. */
-async function loadSent(authorIds: string[], from: string, to: string): Promise<{ sent: Map<string, Sent>; drafts: Map<string, Sent> }> {
+export async function loadSent(authorIds: string[], from: string, to: string): Promise<{ sent: Map<string, Sent>; drafts: Map<string, Sent> }> {
   const sent = new Map<string, Sent>();
   const drafts = new Map<string, Sent>();
   if (!authorIds.length) return { sent, drafts };
@@ -211,8 +223,8 @@ export interface SetupRow { person: PersonLite; isSuperAdmin: boolean; hasTeam: 
 
 /** Who writes what, for the setup screen: every owner, the default and the
  *  exceptions. */
-export async function loadSetup(auth: ServerAuthContext): Promise<{ trackingFrom: string | null; rows: SetupRow[] }> {
-  const [tree, trackingFrom, people] = await Promise.all([loadOrgTree(auth.tenant_id), loadTrackingFrom(auth.tenant_id), listPeople(auth.tenant_id)]);
+export async function loadSetup(auth: ServerAuthContext): Promise<ReportSettings & { rows: SetupRow[] }> {
+  const [tree, settings, people] = await Promise.all([loadOrgTree(auth.tenant_id), loadSettings(auth.tenant_id), listPeople(auth.tenant_id)]);
   const owners = await loadOwners(tree);
   const nameOf = new Map(people.map((p) => [p.id, p]));
   const rows = owners.map((o) => ({
@@ -221,7 +233,7 @@ export async function loadSetup(auth: ServerAuthContext): Promise<{ trackingFrom
     defaults: effectiveObliged(o, {}), exceptions: o.exceptions,
   }));
   rows.sort((a, b) => a.person.name.localeCompare(b.person.name));
-  return { trackingFrom, rows };
+  return { ...settings, rows };
 }
 
 /** The accounts that may carry an exception: the tenant's owners only. */

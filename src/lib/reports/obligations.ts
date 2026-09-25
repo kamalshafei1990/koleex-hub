@@ -234,3 +234,55 @@ export function dueList(p: PersonFacts, sent: SentLookup, drafts: SentLookup, no
   }
   return out.sort((a, b) => (a.state !== b.state ? (a.state === "missing" ? -1 : 1) : ms(a.dueAt) - ms(b.dueAt)));
 }
+
+/* ── Phase 3B: reminders and escalation (owner's rule, 25 Sep 2026) ────────
+   The author is reminded an hour before the deadline; if the report is
+   still missing, their manager is told — the daily 2 hours after the
+   deadline, the weekly and the monthly at the end of the NEXT working day.
+   A nudge acts only inside a window after its moment (a job that was down
+   for a day does not wake everyone with yesterday's news), and each is sent
+   once (the server claims it in work_report_nudges first). */
+export const REMIND_BEFORE_MIN = 60;
+export const ESCALATE_DAILY_AFTER_MIN = 120;
+export const NUDGE_WINDOW_MIN = 6 * 60;
+
+export type NudgeKind = "reminder" | "escalation";
+export interface Nudge { key: ObligationKey; periodKey: string; kind: NudgeKind; at: string; dueAt: string; dueDay: string }
+
+/** When the manager hears of a report still missing. */
+export function escalationAt(c: PersonClock, key: ObligationKey, due: Due, clock: Clock): string | null {
+  if (key === "daily") return new Date(ms(due.at) + ESCALATE_DAILY_AFTER_MIN * 60_000).toISOString();
+  let d = addDays(due.day, 1);
+  for (let i = 0; i < 30; i++, d = addDays(d, 1)) {
+    if (dayKind(c, d) === "work") return clock(d, c.workEnd, c.tz);
+  }
+  return null;
+}
+
+/** Every nudge whose moment has come for this person and is still inside
+ *  its window: an hour before an unsent report's deadline (until the
+ *  deadline), and its escalation (until the window closes). */
+export function nudgesDue(p: PersonFacts, sent: SentLookup, now: string, clock: Clock): Nudge[] {
+  const c = p.clock;
+  if (!c.from) return [];
+  const t = ms(now);
+  const today = localDayOf(now, c.tz);
+  const out: Nudge[] = [];
+  const consider = (key: ObligationKey, periodKey: string, due: Due | null) => {
+    if (!due || due.day < c.from! || sent(key, periodKey)) return;
+    const remindAt = ms(due.at) - REMIND_BEFORE_MIN * 60_000;
+    if (t >= remindAt && t < ms(due.at)) out.push({ key, periodKey, kind: "reminder", at: new Date(remindAt).toISOString(), dueAt: due.at, dueDay: due.day });
+    const esc = escalationAt(c, key, due, clock);
+    if (esc && t >= ms(esc) && t < ms(esc) + NUDGE_WINDOW_MIN * 60_000) out.push({ key, periodKey, kind: "escalation", at: esc, dueAt: due.at, dueDay: due.day });
+  };
+  if (p.obliged.daily) for (let i = 3; i >= 0; i--) { const d = addDays(today, -i); consider("daily", d, dailyDue(c, d, clock)); }
+  if (p.obliged.weekly) {
+    const thisMonday = mondayOf(today);
+    for (const monday of [addDays(thisMonday, -7), thisMonday]) consider("weekly", isoWeekKey(monday), weeklyDue(c, monday, clock));
+  }
+  if (p.obliged.monthly) {
+    const month = monthOf(today);
+    for (const m of [prevMonth(month), month]) consider("monthly", m, monthlyDue(c, m, clock));
+  }
+  return out;
+}

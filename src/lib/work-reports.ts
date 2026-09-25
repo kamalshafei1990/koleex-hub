@@ -161,12 +161,19 @@ export interface ComplianceBoard {
 }
 export interface ObligationSetup {
   trackingFrom: string | null;
+  /** Phase 3B switches. */
+  reminders: boolean;
+  escalations: boolean;
   rows: Array<{ person: ReportPerson; isSuperAdmin: boolean; hasTeam: boolean; defaults: Obliged; exceptions: Partial<Obliged> }>;
 }
 export const fetchCompliance = (day: string) => call<ComplianceBoard>(`/api/work-reports/compliance?week=${encodeURIComponent(day)}`);
 export const fetchObligations = () => call<ObligationSetup>("/api/work-reports/obligations");
-export const saveObligations = (body: { trackingFrom?: string | null; exceptions?: Array<{ accountId: string; key: "daily" | "weekly" | "monthly"; required: boolean | null }> }) =>
+export const saveObligations = (body: { trackingFrom?: string | null; reminders?: boolean; escalations?: boolean; exceptions?: Array<{ accountId: string; key: "daily" | "weekly" | "monthly"; required: boolean | null }> }) =>
   call<ObligationSetup>("/api/work-reports/obligations", { method: "PUT", body: JSON.stringify(body) });
+/** A super admin's preview of who the reminder job would tell right now
+ *  (nothing is sent). */
+export interface NudgePreview { planned?: Array<{ key: string; periodKey: string; kind: "reminder" | "escalation"; dueAt: string; authorName: string; recipients: string[] }> }
+export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string) =>

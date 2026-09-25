@@ -8,6 +8,7 @@ import "server-only";
         (everyone daily + weekly, monthly for managers, super admins exempt)
         and their exceptions; plus when tracking starts.
    PUT  { trackingFrom?: "YYYY-MM-DD" | null,
+          reminders?: boolean, escalations?: boolean,   (Phase 3B switches)
           exceptions?: [{ accountId, key: "daily"|"weekly"|"monthly",
                           required: true | false | null }] }
         null = back to the default (the exception row is deleted). Only the
@@ -40,15 +41,24 @@ export async function PUT(req: Request) {
   const deny = requireReportsUser(auth);
   if (deny) return deny;
   if (!(await canSetUp(auth))) return forbidden();
-  const body = (await req.json().catch(() => null)) as { trackingFrom?: unknown; exceptions?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { trackingFrom?: unknown; reminders?: unknown; escalations?: unknown; exceptions?: unknown } | null;
   if (!body) return NextResponse.json({ error: "bad_body" }, { status: 400 });
 
+  const settings: Record<string, unknown> = {};
   if (body.trackingFrom !== undefined) {
-    if (!auth.tenant_id) return NextResponse.json({ error: "no_tenant" }, { status: 400 });
     const v = body.trackingFrom;
     if (v !== null && (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v))) return NextResponse.json({ error: "bad_date" }, { status: 400 });
+    settings.tracking_from = v;
+  }
+  for (const k of ["reminders", "escalations"] as const) {
+    if (body[k] === undefined) continue;
+    if (typeof body[k] !== "boolean") return NextResponse.json({ error: "bad_body" }, { status: 400 });
+    settings[k] = body[k];
+  }
+  if (Object.keys(settings).length) {
+    if (!auth.tenant_id) return NextResponse.json({ error: "no_tenant" }, { status: 400 });
     const { error } = await supabaseServer.from("work_report_settings")
-      .upsert({ tenant_id: auth.tenant_id, tracking_from: v, updated_by: auth.account_id, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" });
+      .upsert({ tenant_id: auth.tenant_id, ...settings, updated_by: auth.account_id, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" });
     if (error) return NextResponse.json({ error: "Could not save." }, { status: 500 });
   }
 

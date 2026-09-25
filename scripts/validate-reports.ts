@@ -33,6 +33,10 @@
  *      per-person exceptions) and when each report is due on the person's
  *      OWN calendar: Egypt's and China's weeks, holidays, leave, the 3rd
  *      working day, on time vs late, and nothing counted before tracking.
+ *   §13 reminders and escalation (Phase 3B) — the author an hour before, the
+ *      manager 2 hours after a daily / one working day after a weekly or
+ *      monthly, only inside a window, nothing before tracking or once sent,
+ *      each nudge claimed before it is sent, the job's answer names no one.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -54,7 +58,7 @@ import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
 import {
-  boardRow, cellOf, dailyDue, dayKind, defaultObliged, dueList, effectiveObliged, localDayOf, mondayOf, monthlyDue, summarize, weeklyDue,
+  boardRow, cellOf, dailyDue, dayKind, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
   type Clock, type PersonClock, type Sent,
 } from "../src/lib/reports/obligations";
 import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
@@ -831,6 +835,62 @@ console.log("\n§12 who must write what, and when");
   const need = ["nav.compliance", "due.title", "due.missing", "due.by", "due.write", "due.continue", "compliance.title", "compliance.setup", "compliance.notStarted",
     ...["sent", "late", "missing", "due", "upcoming", "off", "leave", "untracked"].map((x) => `compliance.s.${x}`), ...["daily", "weekly", "monthly"].map((x) => `compliance.k.${x}`)];
   expect(need.every((k) => !!reportsT[k]), "every compliance word exists (three languages checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
+}
+
+/* ── §13 reminders and escalation ──────────────────────────────────────── */
+console.log("\n§13 reminders and escalation");
+{
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8, "Africa/Cairo": 3 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(["2026-10-01", "2026-10-02"]), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-09-21" };
+  const who = { obliged: { daily: true, weekly: true, monthly: false }, clock: cn };
+  const none = () => null;
+  const kinds = (now: string, sent: (k: string, pk: string) => Sent | null = none) => nudgesDue(who, sent, now, clock).map((n) => `${n.kind}:${n.key}:${n.periodKey}`);
+
+  /* Friday 25/09, Shanghai: the daily and the weekly are both due at 18:00 (10:00 UTC). */
+  eq(kinds("2026-09-25T08:59:00.000Z"), [], "16:59 there: too early for a reminder");
+  eq(kinds("2026-09-25T09:00:00.000Z"), ["reminder:daily:2026-09-25", "reminder:weekly:2026-W39"], "17:00 there: the daily and the weekly are reminded, an hour before");
+  eq(kinds("2026-09-25T10:30:00.000Z"), [], "after the deadline no reminder is sent — it would come too late to matter");
+  eq(kinds("2026-09-25T12:00:00.000Z"), ["escalation:daily:2026-09-25"], "20:00 there, 2 hours after: the daily reaches the manager");
+  eq(escalationAt(cn, "weekly", { day: "2026-09-25", at: "2026-09-25T10:00:00.000Z" }, clock), "2026-09-28T10:00:00.000Z", "the weekly reaches the manager at the end of the NEXT working day (Monday, past the weekend)");
+  eq(escalationAt(cn, "monthly", { day: "2026-09-30", at: "2026-09-30T10:00:00.000Z" }, clock), "2026-10-05T10:00:00.000Z", "and the monthly past the October holidays and the weekend");
+  eq(kinds("2026-09-28T10:00:00.000Z"), ["escalation:weekly:2026-W39"], "Monday 18:00: last week's weekly, still missing, reaches the manager");
+  eq(kinds("2026-09-25T18:00:00.000Z"), [], "past the 6-hour window the daily escalation is not sent late");
+  eq(kinds("2026-09-25T09:00:00.000Z", (k) => (k === "daily" ? { at: "2026-09-25T08:00:00.000Z", id: "x" } : null)), ["reminder:weekly:2026-W39"], "a report already sent is never nudged");
+  eq(nudgesDue({ ...who, clock: { ...cn, from: null } }, none, "2026-09-25T09:00:00.000Z", clock), [], "nothing at all before tracking starts");
+  eq(nudgesDue({ ...who, clock: { ...cn, from: "2026-09-26" } }, none, "2026-09-25T12:00:00.000Z", clock), [], "nor for a day before the start date");
+  eq(nudgesDue({ obliged: { daily: false, weekly: false, monthly: false }, clock: cn }, none, "2026-09-25T09:00:00.000Z", clock), [], "someone who owes nothing is never nudged");
+
+  /* The job, as its code states it. */
+  const NU = "src/lib/server/reports/nudges.ts";
+  rule("a nudge is CLAIMED in the ledger before anyone is told", NU,
+    (c) => { const claim = c.indexOf('from("work_report_nudges")'); const tell = c.indexOf("await notifyLite("); return claim > 0 && tell > claim && /ignoreDuplicates: true/.test(c) && /const mine = planned\.filter\(\(n\) => won\.has\(/.test(c) ? [] : ["a notification can go out without a claim"]; },
+    (src) => src.replace("const mine = planned.filter((n) => won.has(`${n.authorId}|${n.key}|${n.periodKey}|${n.kind}`));", "const mine = planned;"));
+  rule("a preview claims and sends nothing", NU,
+    (c) => (/if \(opts\.dryRun\) \{ run\.planned!\.push\(\.\.\.planned\); return; \}/.test(c) ? [] : ["a dry run can claim or send"]),
+    (src) => src.replace("if (opts.dryRun) { run.planned!.push(...planned); return; }", "if (opts.dryRun) { run.planned!.push(...planned); }"));
+  rule("nothing is sent before tracking starts, and either switch pauses its kind", NU,
+    (c) => (/if \(!settings\.trackingFrom \|\| \(!settings\.reminders && !settings\.escalations\)\) return;/.test(c) && /n\.kind === "reminder" && !settings\.reminders/.test(c) && /n\.kind === "escalation" && !settings\.escalations/.test(c) ? [] : ["a paused kind can still be sent"]),
+    (src) => src.replace('if (n.kind === "escalation" && !settings.escalations) continue;', ""));
+  rule("an escalation never goes to the author themself", NU,
+    (c) => (/\.filter\(\(x\) => x !== o\.accountId\)/.test(c) ? [] : ["the author can be told about their own report as the manager"]),
+    (src) => src.replace(".filter((x) => x !== o.accountId)", ""));
+  const CR = "src/app/api/cron/report-reminders/route.ts";
+  rule("the job's answer carries counts, never a name", CR,
+    (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations \}/.test(c) ? [] : ["the job can answer with names"]),
+    (src) => src.replace("return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations }", "return NextResponse.json({ ok: true, ...run }"));
+  rule("the preview is a signed-in super admin's only", CR,
+    (c) => (/const auth = await requireAuth\(req\);[\s\S]*?if \(!auth\.is_super_admin\) return NextResponse\.json\(\{ error: "forbidden" \}, \{ status: 403 \}\);[\s\S]*?dryRun: true/.test(c) ? [] : ["the preview is open"]),
+    (src) => src.replace('if (!auth.is_super_admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });', ""));
+  rule("the job checks CRON_SECRET whenever it is set", CR,
+    (c) => (/if \(secret && req\.headers\.get\("authorization"\) !== `Bearer \$\{secret\}`\)/.test(c) ? [] : ["no secret check"]),
+    (src) => src.replace("if (secret && req.headers.get(\"authorization\") !== `Bearer ${secret}`) {", "if (false) {"));
+  const vj = JSON.parse(read("vercel.json")) as { crons?: Array<{ path: string; schedule: string }> };
+  expect(!!vj.crons?.some((c) => c.path === "/api/cron/report-reminders" && /15/.test(c.schedule)), "the job runs every 15 minutes (vercel.json)");
+  const mig = read("supabase/migrations/20260925_reports_nudges.sql");
+  expect(/UNIQUE \(account_id, template_key, period_key, kind\)/.test(mig) && /ALTER TABLE work_report_nudges ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig), "the ledger is one row per person × report × period × kind, RLS-on with no policy");
+  eq(classifyNotificationActivity("report_reminder"), "reports_activity", "a reminder rides the Work reports switch the reader owns");
+  eq(classifyNotificationActivity("report_escalation"), "reports_activity", "so does an escalation");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

@@ -20,7 +20,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DatePicker from "@/components/ui/DatePicker";
 import { addDays } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
-import { dmyDate, dmyTime, fetchCompliance, fetchObligations, localToday, saveObligations, type ComplianceBoard, type ObligationSetup } from "@/lib/work-reports";
+import { dmyDate, dmyTime, fetchCompliance, fetchObligations, localToday, previewNudges, saveObligations, type ComplianceBoard, type NudgePreview, type ObligationSetup } from "@/lib/work-reports";
 import { Avatar, CARD, type T } from "./shared";
 
 const STATE_STYLE: Record<CellState, { cls: string; icon: React.ReactNode }> = {
@@ -223,6 +223,20 @@ function Setup({ t, onChanged }: { t: T; onChanged: () => void }) {
     setBusy(null);
     if (res.ok) { setData(res.data); onChanged(); } else setProblem(true);
   };
+  const saveSwitch = async (key: "reminders" | "escalations", value: boolean) => {
+    setBusy(key); setProblem(false);
+    const res = await saveObligations({ [key]: value });
+    setBusy(null);
+    if (res.ok) setData(res.data); else setProblem(true);
+  };
+  const [preview, setPreview] = useState<NudgePreview | null>(null);
+  const runPreview = async () => {
+    setBusy("preview"); setProblem(false);
+    const res = await previewNudges();
+    setBusy(null);
+    if (res.ok) setPreview(res.data); else setProblem(true);
+  };
+  const nameOf = new Map((data?.rows ?? []).map((r) => [r.person.id, r.person.name]));
 
   return (
     <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-setup">
@@ -236,6 +250,44 @@ function Setup({ t, onChanged }: { t: T; onChanged: () => void }) {
             <div className="w-[170px]"><DatePicker id="kx-rep-setup-from" value={data.trackingFrom ?? ""} onChange={(iso) => void saveStart(iso || null)} /></div>
             {busy === "start" && <SpinnerIcon size={12} />}
             {!data.trackingFrom && <span className="text-[11.5px] text-[var(--text-dim)]">{t("compliance.notStartedShort")}</span>}
+          </div>
+
+          {/* Phase 3B: the two nudges, each can be paused. */}
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {(["reminders", "escalations"] as const).map((k) => (
+              <div key={k} className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t(`nudge.${k}`)}</p>
+                  <p className="mt-0.5 text-[11.5px] text-[var(--text-dim)]">{t(`nudge.${k}Hint`)}</p>
+                </div>
+                <button type="button" role="switch" aria-checked={data[k]} aria-label={t(`nudge.${k}`)} disabled={!!busy} onClick={() => void saveSwitch(k, !data[k])}
+                  className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors duration-200 disabled:opacity-60 ${data[k] ? "bg-emerald-500" : "bg-[var(--bg-surface)] ring-1 ring-inset ring-[var(--border-subtle)]"}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${data[k] ? "start-[22px]" : "start-0.5"}`} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11.5px] text-[var(--text-dim)]">{data.trackingFrom ? t("nudge.live") : t("nudge.notYet")}</p>
+          <div className="mt-2">
+            <button type="button" onClick={() => void runPreview()} disabled={!!busy}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-60">
+              {busy === "preview" ? <SpinnerIcon size={11} /> : <RrIcon name="eye" size={12} />}{t("nudge.preview")}
+            </button>
+            {preview && (
+              <div className="mt-2 rounded-xl border border-[var(--border-subtle)] p-3 text-[12px]">
+                {!preview.planned?.length ? <p className="text-[var(--text-dim)]">{t("nudge.previewNone")}</p> : (
+                  <ul className="space-y-1">
+                    {preview.planned.map((n, i) => (
+                      <li key={i} className="text-[var(--text-secondary)]">
+                        <span className={n.kind === "reminder" ? "text-sky-400" : "text-amber-500"}>{t(`nudge.kind.${n.kind}`)}</span>
+                        {" · "}{n.authorName}{" · "}{t(`tpl.${n.key}.name`)} <span className="tabular-nums text-[var(--text-dim)]">({t("compliance.dueAt").replace("{at}", dmyTime(n.dueAt))})</span>
+                        {n.kind === "escalation" && <> {"→ "}{n.recipients.map((r) => nameOf.get(r) ?? "—").join(", ")}</>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
           <ul className="mt-4 divide-y divide-[var(--border-subtle)]">
             {data.rows.map((r) => (

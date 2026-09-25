@@ -162,6 +162,17 @@ export const reportsT: Translations = {
   "compliance.s.off":       { en: "Day off", zh: "休息日", ar: "إجازة رسمية" },
   "compliance.s.leave":     { en: "On leave", zh: "休假", ar: "في إجازة" },
   "compliance.s.untracked": { en: "Not counted", zh: "不计入", ar: "مش محسوب" },
+  /* Phase 3B — reminders and escalation. */
+  "nudge.reminders":     { en: "Remind the author", zh: "提醒提交人", ar: "فكّر صاحب التقرير" },
+  "nudge.remindersHint": { en: "An hour before the deadline, if the report is not sent yet.", zh: "截止前一小时，如果报告尚未提交。", ar: "قبل الميعاد بساعة، لو التقرير لسه ما اتبعتش." },
+  "nudge.escalations":   { en: "Tell the manager", zh: "通知主管", ar: "بلّغ المدير" },
+  "nudge.escalationsHint": { en: "When it is still missing: the daily 2 hours after the deadline, the weekly and monthly after one working day.", zh: "仍未提交时：日报在截止后 2 小时，周报和月报在一个工作日后。", ar: "لو لسه ناقص: اليومي بعد الميعاد بساعتين، والأسبوعي والشهري بعد يوم شغل." },
+  "nudge.live":          { en: "Counting has started, so these are on: nobody gets the same notification twice.", zh: "已开始统计，提醒已生效：同一通知不会重复发送。", ar: "العدّ بدأ، فدول شغالين: محدش هيوصله نفس الإشعار مرتين." },
+  "nudge.notYet":        { en: "Nothing is sent until counting starts.", zh: "开始统计前不会发送任何通知。", ar: "مفيش حاجة بتتبعت لحد ما العدّ يبدأ." },
+  "nudge.preview":       { en: "Preview now", zh: "立即预览", ar: "معاينة دلوقتي" },
+  "nudge.previewNone":   { en: "Nobody would be told anything right now.", zh: "此刻不会通知任何人。", ar: "مفيش حد هيوصله حاجة دلوقتي." },
+  "nudge.kind.reminder":   { en: "Reminder", zh: "提醒", ar: "تذكير" },
+  "nudge.kind.escalation": { en: "Manager told", zh: "通知主管", ar: "تبليغ المدير" },
 
   /* Phase 2D — Koleex AI and dictation. The assistant is only ever
      "Koleex AI" (standing rule: never the model or its maker). */
