@@ -173,7 +173,7 @@ export const reportBuilderT: Translations = {
   "tb.src.stock_count": { en: "A warehouse's stock, to count", zh: "待盘点的仓库库存", ar: "أصناف المخزن للجرد" },
   "tb.src.stock_writeoffs": { en: "Stock written off in the period", zh: "期间内报损", ar: "الهالك في الفترة" },
   "tb.src.stock_moves": { en: "Stock movements in the period", zh: "期间内库存变动", ar: "حركة المخزن في الفترة" },
-  "tb.src.low_stock": { en: "Stock under its reorder point", zh: "低于再订货点的库存", ar: "الأصناف تحت حد إعادة الطلب" },
+  "tb.src.low_stock": { en: "Low stock (reorder point, else the minimum)", zh: "低库存（再订货点，未设时为最低库存）", ar: "الأصناف الناقصة (حد إعادة الطلب، وإلا الحد الأدنى)" },
   "tb.src.expense_categories": { en: "Spending per category", zh: "按类别的支出", ar: "المصروف لكل بند" },
   "tb.src.company_expenses": { en: "The company's expenses in the period", zh: "期间内公司费用", ar: "مصروفات الشركة في الفترة" },
   "tb.src.cash_position": { en: "Bank balances («Bank & Profit»)", zh: "银行余额（“银行与利润”）", ar: "أرصدة البنوك («البنوك والأرباح»)" },

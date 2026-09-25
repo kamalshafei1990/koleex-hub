@@ -28,7 +28,7 @@ const words: Translations = {
   "tpl.inv_movement.s.summary.hint": { en: "Anything unusual — a big delivery, a shortage, a mistake to fix.", zh: "有无异常——大批到货、短缺或需要更正的错误。", ar: "أي حاجة مش عادية — شحنة كبيرة، نقص، أو غلطة محتاجة تتصلح." },
 
   "tpl.inv_low_stock.s.warehouse": WAREHOUSE,
-  "tpl.inv_low_stock.s.low": { en: "Under the reorder point", zh: "低于再订货点", ar: "تحت حد إعادة الطلب" },
+  "tpl.inv_low_stock.s.low": { en: "Low in stock", zh: "低库存", ar: "الأصناف الناقصة" },
   "tpl.inv_low_stock.s.actions": { en: "What we are doing", zh: "处理措施", ar: "بنعمل إيه" },
   "tpl.inv_low_stock.s.actions.hint": { en: "Purchase orders placed, transfers from another warehouse, or the approval we wait for.", zh: "已下的采购单、从其他仓库调拨，或正在等待的审批。", ar: "أوامر شراء اتعملت، تحويل من مخزن تاني، أو موافقة لسه مستنينها." },
 };

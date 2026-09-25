@@ -10,7 +10,9 @@ import "server-only";
                      they counted beside it (templates.ts DataInputDef)
      stock_writeoffs the stock taken out by adjustment in the days
      stock_moves     every movement in the days
-     low_stock       the stock lines at or under their reorder point
+     low_stock       the stock lines that are low — Inventory's ONE rule
+                     (lib/inventory/low-stock: at or under the reorder point,
+                     else the minimum), the same the alert and the dashboard use
 
    A report NEVER changes stock (owner's pick): a count or a write-off is
    adjusted in Inventory, with its own approval. Voided movements never
@@ -23,6 +25,7 @@ import { canSeeCostData } from "@/lib/experience";
 import type { ReportDataRow } from "@/lib/reports/templates";
 import { DATA_ABOUT, type StockSource } from "@/lib/reports/report-data";
 import { toOrder } from "@/lib/reports/numbers-5c";
+import { isLowStock, lowStockThreshold } from "@/lib/inventory/low-stock";
 
 export interface StockCtx { auth: ServerAuthContext; start: string; end: string; about: (type: "warehouse") => string | null }
 type Answer = { rows: ReportDataRow[]; noCost?: boolean } | "denied" | "about";
@@ -36,7 +39,7 @@ function listOf<T>(res: { data: unknown; error: { message: string } | null }, wh
 }
 const LIMIT = 101;
 
-type Item = { id: string; item_code: string | null; item_name: string | null; unit_of_measure: string | null; reorder_point: unknown; max_stock: unknown; track_stock: boolean | null };
+type Item = { id: string; item_code: string | null; item_name: string | null; unit_of_measure: string | null; reorder_point: number | string | null; min_stock: number | string | null; max_stock: unknown; track_stock: boolean | null };
 
 async function warehouses(auth: ServerAuthContext): Promise<Map<string, string>> {
   let q = supabaseServer.from("inventory_warehouses").select("id, name, code").is("deleted_at", null).limit(500);
@@ -47,7 +50,7 @@ async function warehouses(auth: ServerAuthContext): Promise<Map<string, string>>
 async function items(auth: ServerAuthContext, ids: string[]): Promise<Map<string, Item>> {
   const out = new Map<string, Item>();
   for (const part of chunks(Array.from(new Set(ids)))) {
-    let q = supabaseServer.from("inventory_items").select("id, item_code, item_name, unit_of_measure, reorder_point, max_stock, track_stock").in("id", part).is("deleted_at", null);
+    let q = supabaseServer.from("inventory_items").select("id, item_code, item_name, unit_of_measure, reorder_point, min_stock, max_stock, track_stock").in("id", part).is("deleted_at", null);
     if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
     for (const it of listOf<Item>(await q, "items")) out.set(it.id, it);
   }
@@ -71,10 +74,10 @@ export async function stockData(src: StockSource, x: StockCtx): Promise<Answer> 
     if (src === "low_stock") {
       return { rows: bals.flatMap((b) => {
         const it = its.get(b.inventory_item_id);
-        const reorder = num(it?.reorder_point) ?? 0;
         const onHand = num(b.qty_on_hand) ?? 0;
-        if (!it || it.track_stock === false || reorder <= 0 || onHand > reorder) return [];
-        return [{ key: b.id, cells: { item: it.item_name || it.item_code || "—", warehouse: whs.get(b.warehouse_id) ?? "—", on_hand: onHand, reorder, to_order: toOrder(onHand, reorder, num(it.max_stock)) } }];
+        const limit = lowStockThreshold(it);
+        if (!it || !limit || !isLowStock(onHand, it)) return [];
+        return [{ key: b.id, cells: { item: it.item_name || it.item_code || "—", warehouse: whs.get(b.warehouse_id) ?? "—", on_hand: onHand, reorder: limit.at, to_order: toOrder(onHand, limit.at, num(it.max_stock)) } }];
       }).sort((a, b) => Number(a.cells.on_hand) - Number(b.cells.on_hand)) };
     }
     /* What stock is worth only with the role's cost switch — never shown

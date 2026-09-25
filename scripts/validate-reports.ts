@@ -2546,6 +2546,9 @@ console.log("\n§24 HR, Projects, Inventory and Finance: who reads how far, abou
   rule("an approved count or write-off leaves stock alone — Inventory adjusts it, with its own approval", SD,
     (c) => (!/inventory_stock_(movements|balances)"\)\.(insert|update|upsert)/.test(c) ? [] : ["a report moves stock"]),
     (src) => src.replace('let q = supabaseServer.from("inventory_stock_balances").select(', 'await supabaseServer.from("inventory_stock_balances").update({ qty_on_hand: 0 }); let q = supabaseServer.from("inventory_stock_balances").select('));
+  rule("the low-stock block is Inventory's one rule — the reorder point, else the minimum", SD,
+    (c) => (c.includes("const limit = lowStockThreshold(it);") && c.includes("if (!it || !limit || !isLowStock(onHand, it)) return [];") ? [] : ["the report's low stock differs from the alert's and the dashboard's"]),
+    (src) => src.replace("if (!it || !limit || !isLowStock(onHand, it)) return [];", "if (!it || !limit || onHand > Number(it.reorder_point)) return [];"));
   rule("the 5C numbers are dispatched with the writer's reach, and ask for the record when none is picked", "src/lib/server/reports/report-data.ts",
     (c) => (c.includes('if (got === "about") return [src, { source: src, rows: [], capturedAt, needsAbout: DATA_ABOUT[src]!.type }];') && c.includes('if (isProjectSource(src) && (await requireModuleAccess(auth, "Projects"))) return') && c.includes('if (isStockSource(src) && (await requireModuleAccess(auth, "Inventory"))) return') && c.includes("const about = <T extends ReportSubject>(type: T) => subjectOf(linked, type);") ? [] : ["a block about one record reads everything, or an app's numbers pass without it"]),
     (src) => src.replace('if (isStockSource(src) && (await requireModuleAccess(auth, "Inventory"))) return [src, { source: src, rows: [], capturedAt, denied: true }];', ""));
