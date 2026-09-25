@@ -40,8 +40,8 @@
    currency and the moment the numbers were taken; a date cell is D/M/Y.
    --------------------------------------------------------------------------- */
 
-import { reportTemplate, scoreAverage, tableSummary, type ReportDataRow, type ReportSectionValue, type SignatureValue } from "@/lib/reports/templates";
-import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, dataTotals, type DataColumn } from "@/lib/reports/report-data";
+import { reportTemplate, scoreAverage, tableSummary, type ReportDataRow, type ReportDataSource, type ReportSectionValue, type SignatureValue } from "@/lib/reports/templates";
+import { DATA_COLUMNS, DATA_MODULE, dataTotals, statusWordKey, type DataColumn } from "@/lib/reports/report-data";
 
 /* 270 mm = 1020 px, minus the sheet's own 24 + 18 px padding, minus air. */
 export const SHEET_PX = 968;
@@ -161,12 +161,12 @@ const dmyHm = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.
  *  (إجمالي المبلغ · 金额合计), so the phrase is a pattern, not glued words. */
 const figure = (word: PrintWord, kind: "total" | "lowest", col: string, value: string) =>
   word(kind === "lowest" ? "blk.printLowest" : "blk.printTotal").replace("{col}", col).replace("{value}", value);
-function dataCellText(word: PrintWord, r: ReportDataRow, c: DataColumn): string {
+function dataCellText(word: PrintWord, source: ReportDataSource, r: ReportDataRow, c: DataColumn): string {
   const v = r.cells[c.id];
   if (v === null || v === undefined || v === "") return "—";
   if (c.type === "date") return dmy(String(v));
   if (c.type === "money") return typeof v === "number" ? `${fmt(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
-  if (c.type === "status") return (DATA_STATUSES as readonly string[]).includes(String(v)) ? word(`blk.st.${v}`) : String(v);
+  if (c.type === "status") { const key = statusWordKey(source, String(v)); return key ? word(key) : String(v); }
   return String(v);
 }
 
@@ -227,13 +227,14 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
         const d = v?.data;
         if (!d) return { sid: s.id, paras: [] };
         if (d.denied) return { sid: s.id, paras: [{ text: word("blk.dataNoAccess").replace("{app}", DATA_MODULE[d.source]), bullet: false }] };
+        if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };
         const asOf = { text: word("blk.dataAsOf").replace("{at}", dmyHm(d.capturedAt)), bullet: false };
         if (!d.rows.length) return { sid: s.id, paras: [{ text: word(`blk.de.${d.source}`), bullet: false }, asOf] };
         const cols = DATA_COLUMNS[d.source];
         const totals = dataTotals(d);
         return { sid: s.id, paras: [
           { text: cols.map((c) => word(`blk.dc.${c.id}`)).join(" · "), bullet: false },
-          ...d.rows.map((r) => ({ text: `${cols.map((c) => dataCellText(word, r, c)).join(" · ")}${v?.notes?.[r.key] ? ` — ${v.notes[r.key]}` : ""}`, bullet: true })),
+          ...d.rows.map((r) => ({ text: `${cols.map((c) => dataCellText(word, d.source, r, c)).join(" · ")}${v?.notes?.[r.key] ? ` — ${v.notes[r.key]}` : ""}`, bullet: true })),
           ...(totals.length ? [{ text: totals.map((x) => figure(word, "total", word(`blk.dc.${x.col}`), `${fmt(x.value)} ${x.currency}`)).join(" · "), bullet: false }] : []),
           asOf,
         ] };

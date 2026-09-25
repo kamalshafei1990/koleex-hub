@@ -14,29 +14,34 @@ import ReportPrintDoc from "@/components/reports/app/ReportPrintDoc";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { fetchReport, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import { reportsT } from "@/lib/translations/reports";
-import type { Lang } from "@/lib/i18n";
+import { loadSectionWords } from "@/lib/translations/report-sections";
+import type { Lang, Translations } from "@/lib/i18n";
 
 export default function ReportPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const search = useSearchParams();
   const lang = ((["en", "zh", "ar"] as const).find((l) => l === search.get("lang")) ?? "en") as Lang;
-  const [data, setData] = useState<ReportDetail | null>(null);
+  const [data, setData] = useState<{ detail: ReportDetail; words: Translations } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchReport(id).then((res) => {
+    void fetchReport(id).then(async (res) => {
       if (cancelled) return;
-      if (res.ok) setData(res.data);
-      else setError(res.status === 404 ? "Report not found." : `Could not load the report (${res.status || "network"}).`);
+      if (!res.ok) { setError(res.status === 404 ? "Report not found." : `Could not load the report (${res.status || "network"}).`); return; }
+      /* The report's own section words (Phase 4C), before the sheets are laid out. */
+      let own: Translations;
+      try { own = await loadSectionWords(res.data.report.templateKey); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
+      if (!cancelled) setData({ detail: res.data, words: { ...reportsT, ...own } });
     });
     return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {
     if (!data) return;
-    const name = reportsT[`tpl.${data.report.templateKey}.name`]?.[lang] ?? data.report.templateKey;
-    document.title = `${name} — ${data.report.author.name} — ${periodLabel(data.report.periodStart, data.report.periodEnd).replace(/\//g, "-")}`;
+    const { report } = data.detail;
+    const name = reportsT[`tpl.${report.templateKey}.name`]?.[lang] ?? report.templateKey;
+    document.title = `${name} — ${report.author.name} — ${periodLabel(report.periodStart, report.periodEnd).replace(/\//g, "-")}`;
   }, [data, lang]);
 
   const auto = search.get("auto") === "1";
@@ -60,7 +65,7 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
       <style>{"@media screen { .kx-report-print-scroll { height: 100vh; overflow-y: auto; } }"}</style>
       <div className="kx-report-print-scroll">
         <div className="quot-print-root" style={{ background: "#fff", minHeight: "100vh", padding: 0 }}>
-          <ReportPrintDoc detail={data} lang={lang} onReady={onReady} />
+          <ReportPrintDoc detail={data.detail} words={data.words} lang={lang} onReady={onReady} />
         </div>
       </div>
     </>

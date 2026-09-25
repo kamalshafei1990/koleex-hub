@@ -23,9 +23,9 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
   REPORT_CURRENCIES, REPORT_LIMITS, scoreAverage, tableSummary,
-  type CheckState, type ReportDataRow, type ReportDataValue, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
+  type CheckState, type ReportDataRow, type ReportDataSource, type ReportDataValue, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
 } from "@/lib/reports/templates";
-import { DATA_COLUMNS, DATA_LINK, DATA_MODULE, DATA_STATUSES, dataTotals, type DataColumn } from "@/lib/reports/report-data";
+import { DATA_COLUMNS, DATA_MODULE, dataRowHref, dataTotals, statusWordKey, type DataColumn } from "@/lib/reports/report-data";
 import { reportFileUrl, type ReportAttachment } from "@/lib/reports/attachments";
 import { preparePhoto } from "@/lib/reports/prepare-photo";
 import { deleteReportAttachment, dmyDate, dmyTime, searchReportLinks, uploadReportAttachment, type LinkHit } from "@/lib/work-reports";
@@ -488,16 +488,19 @@ function DataEditor({ t, def, value, live, onChange }: EditorProps) {
   return <DataBlock t={t} def={def} data={live} notes={notes} onNote={def.notes ? setNote : undefined} composing />;
 }
 
-const statusWord = (t: T, s: unknown) => (typeof s === "string" && (DATA_STATUSES as readonly string[]).includes(s) ? t(`blk.st.${s}`) : String(s ?? "—"));
+const statusWord = (t: T, source: ReportDataSource, s: unknown) => {
+  const key = typeof s === "string" ? statusWordKey(source, s) : null;
+  return key ? t(key) : String(s ?? "—");
+};
 
-function dataCell(t: T, r: ReportDataRow, c: DataColumn): string {
+function dataCell(t: T, source: ReportDataSource, r: ReportDataRow, c: DataColumn): string {
   const v = r.cells[c.id];
   if (v === null || v === undefined || v === "") return "—";
   switch (c.type) {
     case "date": return dmyDate(String(v));
     case "money": return typeof v === "number" ? `${num(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
     case "number": return String(v);
-    case "status": return statusWord(t, v);
+    case "status": return statusWord(t, source, v);
     default: return String(v);
   }
 }
@@ -506,7 +509,8 @@ function dataCell(t: T, r: ReportDataRow, c: DataColumn): string {
  *  glance (`asOf`: the day the numbers were taken). */
 function dataTone(r: ReportDataRow, c: DataColumn, asOf: string): string {
   const v = r.cells[c.id];
-  if (c.id === "overdue" && Number(v) > 0) return "font-semibold text-red-500";
+  if ((c.id === "overdue" || c.id === "late") && Number(v) > 0) return "font-semibold text-red-500";
+  if (c.id === "missing" && Number(v) > 0) return "font-semibold text-amber-500";
   if (c.id === "days" && Number(v) >= 14) return "font-semibold text-amber-500";
   if (c.id === "valid" && typeof v === "string" && v < asOf) return "font-semibold text-red-500";
   return "text-[var(--text-primary)]";
@@ -518,6 +522,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
 }) {
   if (!data) return <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
   if (data.denied) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataNoAccess").replace("{app}", DATA_MODULE[data.source])}</p>;
+  if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;
   const foot = (
     <p className="text-[11px] text-[var(--text-faint)] tabular-nums">
       {composing ? t("blk.dataLive") : t("blk.dataAsOf").replace("{at}", dmyTime(data.capturedAt))}
@@ -530,7 +535,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   const asOf = data.capturedAt.slice(0, 10);
   const colName = (id: string) => t(`blk.dc.${id}`);
   const docLink = (r: ReportDataRow) => {
-    const href = entityHref(DATA_LINK[data.source], r.key);
+    const href = dataRowHref(data.source, r.key);
     const text = String(r.cells.no ?? "—");
     return href
       ? <Link href={href} target={composing ? "_blank" : undefined} rel={composing ? "noopener" : undefined} className="font-semibold text-[var(--text-primary)] underline-offset-2 hover:underline">{text}</Link>
@@ -547,13 +552,13 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
           <li key={r.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
             <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
               {docLink(r)}
-              <span className="min-w-0 truncate text-[var(--text-secondary)]" dir="auto">{dataCell(t, r, cols[1])}</span>
+              <span className="min-w-0 truncate text-[var(--text-secondary)]" dir="auto">{dataCell(t, data.source, r, cols[1])}</span>
             </div>
             <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
               {cols.slice(2).map((c) => (
                 <div key={c.id} className="min-w-0">
                   <dt className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">{colName(c.id)}</dt>
-                  <dd className={`truncate text-[12.5px] tabular-nums ${dataTone(r, c, asOf)}`}>{dataCell(t, r, c)}</dd>
+                  <dd className={`truncate text-[12.5px] tabular-nums ${dataTone(r, c, asOf)}`}>{dataCell(t, data.source, r, c)}</dd>
                 </div>
               ))}
             </dl>
@@ -575,7 +580,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
                   {cols.map((c) => (
                     <td key={c.id} dir={c.type === "text" ? "auto" : "ltr"}
                       className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.id === "customer" ? "" : "whitespace-nowrap"} ${c.id === "no" ? "" : dataTone(r, c, asOf)}`}>
-                      {c.id === "no" ? docLink(r) : dataCell(t, r, c)}
+                      {c.id === "no" ? docLink(r) : dataCell(t, data.source, r, c)}
                     </td>
                   ))}
                 </tr>

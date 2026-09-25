@@ -35,6 +35,7 @@ import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
 import { AI_LIMITS, checkAiRequest, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
 import { reportTemplate } from "@/lib/reports/templates";
 import { reportsT } from "@/lib/translations/reports";
+import { REPORT_SECTION_WORDS } from "@/lib/translations/report-sections/all";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -58,7 +59,8 @@ const SYSTEM =
   " If the material is thin, say less; never pad." +
   AI_PROVENANCE_RULE;
 
-const en = (key: string) => reportsT[key]?.en ?? key;
+/* A section's name lives with its family's words (Phase 4C); the server has them all. */
+const en = (key: string) => (reportsT[key] ?? REPORT_SECTION_WORDS[key])?.en ?? key;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);

@@ -77,9 +77,11 @@ import {
   REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
   type ReportDataValue,
 } from "../src/lib/reports/templates";
-import { DATA_COLUMNS, DATA_LINK, DATA_MODULE, DATA_STATUSES, dataTotals, withBlockData } from "../src/lib/reports/report-data";
+import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, dataRowHref, dataTotals, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
 import { entityHref } from "../src/lib/reports/link-targets";
-import { reportsT } from "../src/lib/translations/reports";
+import { reportsT as mainWords } from "../src/lib/translations/reports";
+import { REPORT_SECTION_WORDS } from "../src/lib/translations/report-sections/all";
+import { sectionFamilies } from "../src/lib/translations/report-sections";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
 import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
@@ -111,6 +113,8 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 const eq = (got: unknown, want: unknown, m: string) => expect(JSON.stringify(got) === JSON.stringify(want), m, `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
+/** Every Reports word: the main dictionary and every family's section words (Phase 4C split). */
+const reportsT = { ...mainWords, ...REPORT_SECTION_WORDS };
 /** The file without its comments — the validators' one stripper, which
  *  steps over strings, templates and regexes (a bare regex read
  *  accept="image/*" as a comment opening and dropped the code after it). */
@@ -196,9 +200,11 @@ console.log("\n§3 templates and their words");
   expect(missing.length === 0, `${REPORT_TEMPLATES.length} templates, every name / description / section in en, zh and ar`, [...new Set(missing)].slice(0, 12).join(", "));
   const phase1 = ["daily", "weekly_plan", "weekly", "monthly", "customer_visit", "supplier_visit", "decision_memo", "escalation", "handover", "free", "hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview"];
   const sales = ["customer_call", "complaint", "lost_deal", "sales_weekly", "sales_monthly", "quote_followup", "collection", "account_plan", "account_review", "competitor_prices", "country_study", "agent_report"];
-  const withBlocks = [...phase1.slice(0, 6), ...sales, "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
+  const quality = ["pre_shipment", "incoming", "defect_report", "corrective_action", "supplier_return"];
+  const suppliers4c = ["supplier_approval", "sample_evaluation", "negotiation", "production_followup", "supplier_performance", "supplier_risk", "supplier_stop", "purchasing_weekly", "purchasing_monthly", "late_pos", "payables"];
+  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B) after the visits, then the three of Phase 4A, and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B) and the sixteen Quality / Purchasing types (4C) after the visits, then the three of Phase 4A, and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -1336,9 +1342,9 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
   rule("products are linked as the catalogue shows them: active only", LS,
     (c) => (/from\("products"\)\.select\("id, product_name, brand"\)\.eq\("status", "active"\)/.test(c) ? [] : ["drafts and retired products can be linked"]),
     (src) => src.replace('.eq("status", "active")', ""));
-  rule("a report with blocks opens once their code is here — the page lays out once", "src/components/reports/app/ReportView.tsx",
-    (c) => { const a = c.indexOf('const mod = await import("./ReportBlocks");'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks arrive"]; },
-    (src) => src.replace('try { const mod = await import("./ReportBlocks"); setBlocks(() => mod); } catch { setPhase("error"); return; }', 'void import("./ReportBlocks").then((mod) => setBlocks(() => mod));'));
+  rule("a report opens once its blocks' code and its own words are here — the page lays out once", "src/components/reports/app/ReportView.tsx",
+    (c) => { const a = c.indexOf('const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
+    (src) => src.replace('const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);', 'const mod = null, own = {}; void loadSectionWords(key);'));
   rule("the card on other apps' pages carries no Reports dictionary and asks only once the page is quiet", "src/components/reports/ReportsAboutCard.tsx",
     (c) => (!/translations\/reports/.test(c) && /whenNetworkQuiet\(/.test(c) && /if \(res\.status === 401 \|\| res\.status === 403\) \{ setHidden\(true\); return; \}/.test(c) ? [] : ["the card is heavy, early, or shows outside Reports"]),
     (src) => src.replace('import { whenNetworkQuiet } from "@/lib/net-idle";', 'import { whenNetworkQuiet } from "@/lib/net-idle";\nimport { reportsT } from "@/lib/translations/reports";'));
@@ -1405,9 +1411,9 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   eq(withBlockData([{ id: "quotations" }, { id: "highlights", text: "x" }], { quotations: mixed }).map((x) => !!x.data), [true, false], "a draft's numbers join only their own blocks");
 
   /* Every source complete */
-  expect(REPORT_DATA_SOURCES.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && DATA_LINK[src] && DATA_COLUMNS[src][0].id === "no" && DATA_COLUMNS[src][1].id === "customer"),
-    "every numbers source has its columns (number and customer first), its app and what a row opens");
-  eq(REPORT_DATA_SOURCES.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices"], "each source is gated by the app it comes from");
+  expect(REPORT_DATA_SOURCES.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && DATA_COLUMNS[src][0].id === "no" && ["customer", "supplier", "item"].includes(DATA_COLUMNS[src][1].id)),
+    "every numbers source has its columns (the number, then who or what), its app and what a row opens");
+  eq(REPORT_DATA_SOURCES.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase"], "each source is gated by the app it comes from");
 
   /* Quotations and invoices */
   expect(REPORT_LINK_TYPES.includes("quotation") && REPORT_LINK_TYPES.includes("invoice"), "a report can be about a quotation or an invoice");
@@ -1447,8 +1453,12 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   rule("every numbers read is pinned to the author (or to ids the author's own rows gave)", RD,
     (c) => {
       const reads = c.split("supabaseServer.from(").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf(";") > 0 ? chunk.indexOf(";") : chunk.length));
-      const loose = reads.filter((r) => !/\.eq\("created_by(_account_id)?", c\.me\)/.test(r) && !r.includes('.or(ids.length ? `created_by.eq.${c.me},id.in.(${ids.join(",")})` : `created_by.eq.${c.me}`)'));
-      return reads.length >= 6 && loose.length === 0 && /me: auth\.account_id/.test(c) ? [] : [`${loose.length} of ${reads.length} read(s) not pinned to the author`];
+      const loose = reads.filter((r) => !/\.eq\("created_by(_account_id)?", c\.me\)/.test(r) && !r.includes('.or(ids.length ? `created_by.eq.${c.me},id.in.(${ids.join(",")})` : `created_by.eq.${c.me}`)')
+        && !/\.in\("(po_id|id)", part\)/.test(r));
+      /* `part` is only ever a chunk of ids from the author's own rows. */
+      const loops = c.split("for (const part of chunks(").length - 1;
+      const own = c.split("for (const part of chunks(unique))").length - 1 + c.split("for (const part of chunks(pos.map((p) => p.id)))").length - 1;
+      return reads.length >= 12 && loose.length === 0 && loops === 3 && own === loops && /me: auth\.account_id/.test(c) ? [] : [`${loose.length} of ${reads.length} read(s) not pinned to the author; ${own} of ${loops} chunk loops over the author's own ids`];
     },
     (src) => src.replace('.eq("created_by_account_id", c.me).not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)', '.not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)'));
   rule("a numbers block is read only when its author holds the app it comes from", RD,
@@ -1481,6 +1491,115 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   expect(/BEGIN;[\s\S]*DROP CONSTRAINT IF EXISTS work_report_links_entity_type_check;[\s\S]*ADD CONSTRAINT work_report_links_entity_type_check\s+CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order', 'quotation', 'invoice'\)\);[\s\S]*COMMIT;/.test(sm)
     && (sm.match(/\bDROP\b/g) ?? []).length === 1 && !/\b(DELETE|UPDATE|TRUNCATE|INSERT)\b/i.test(sm),
     "the links migration only widens the kinds to six — drop and add in one transaction, no row touched");
+}
+
+/* ── §18 quality & purchasing (Phase 4C), and each report's own words ─── */
+console.log("\n§18 quality & purchasing, and a report's words loaded with it");
+{
+  const U5 = "33333333-3333-4333-8333-333333333333";
+  const norm = (tpl: NonNullable<ReturnType<typeof reportTemplate>>, raw: unknown[]) => normalizeSections(tpl, raw);
+  const byId = (xs: ReturnType<typeof norm>, id: string) => xs.find((x) => x.id === id)!;
+  const fam = (f: string) => REPORT_TEMPLATES.filter((t) => t.family === f).map((t) => t.key);
+  eq(fam("quality"), ["pre_shipment", "incoming", "defect_report", "corrective_action", "supplier_return"], "the Quality family holds its five types");
+  eq(fam("suppliers").length, 13, "Purchasing & suppliers holds the two of 4A and the eleven of 4C");
+  expect(REPORT_TEMPLATES.filter((t) => ["quality", "suppliers"].includes(t.family)).every((t) => !(OBLIGATION_KEYS as readonly string[]).includes(t.key)), "no quality or purchasing type is owed by anyone");
+
+  /* Tables where adding up means nothing */
+  const incoming = reportTemplate("incoming")!;
+  eq(tableSummary(incoming.sections.find((x) => x.id === "issues")!, [{ item: "A", expected: "10", received: "8" }, { item: "B", expected: "4", received: "4" }]), [], "quantities of different items are never added up (summary none)");
+  const nego = reportTemplate("negotiation")!;
+  eq(tableSummary(nego.sections.find((x) => x.id === "rounds")!, [{ round: "Round 1", offer: "130", target: "110" }, { round: "Round 2", offer: "118", target: "110" }]).map((f) => [f.col.id, f.value, f.who]), [["offer", 118, "Round 2"]],
+    "a negotiation shows its best offer and the round it came in — never a figure for our own target");
+  const ca = byId(norm(reportTemplate("corrective_action")!, [{ id: "actions", rows: [{ action: "Retrain line 2", owner: "Li", due: "2026-10-15", state: "open" }] }]), "actions");
+  eq(ca.rows, [{ action: "Retrain line 2", owner: "Li", due: "2026-10-15", state: "open" }], "a corrective action keeps each action with its owner and date");
+  eq(byId(norm(reportTemplate("pre_shipment")!, [{ id: "result", choice: "fail" }]), "result").choice, "fail", "an inspection's result is one of its answers");
+
+  /* The purchasing numbers */
+  eq(["purchase_orders", "shortages", "pos_late", "receipts", "payables"].map((src) => dataRowHref(src as "receipts", U5)), ["/purchase/orders", "/purchase/orders", "/purchase/orders", "/purchase/receipts", "/purchase/bills"],
+    "a purchasing row opens its list in the Purchase app (it opens no single document by link)");
+  const late: ReportDataValue = { source: "pos_late", capturedAt: "2026-09-25T08:00:00Z", rows: [
+    { key: U5, currency: "CNY", cells: { no: "PO-1", supplier: "Yili", expected: "2026-09-20", late: 5, amount: 70000, status: "confirmed" } },
+    { key: "b", currency: "USD", cells: { no: "PO-2", supplier: "Jack", expected: "2026-09-22", late: 3, amount: 900, status: "approved" } },
+  ] };
+  eq(dataTotals(late), [{ col: "amount", currency: "CNY", value: 70000 }, { col: "amount", currency: "USD", value: 900 }], "late orders total each currency apart");
+  const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? k;
+  const pl = printParagraphs({ templateKey: "late_pos", title: "", sections: [{ id: "late", data: late, notes: { [U5]: "new date 5 Oct" } }] }, en).find((x) => x.sid === "late")!.paras.map((x) => x.text);
+  eq(pl.slice(0, 2), ["No. · Supplier · Expected · Days late · Amount · Status", "PO-1 · Yili · 20/09/2026 · 5 · 70,000 CNY · Confirmed — new date 5 Oct"], "a late order prints with its supplier, days late, amount and the author's note");
+
+  eq([statusWordKey("pos_late", "partial"), statusWordKey("receipts", "partial"), statusWordKey("payables", "partial"), statusWordKey("invoices", "partial"), statusWordKey("quotations", "made-up")],
+    ["blk.st.partial_received", "blk.st.partial_received", "blk.st.partial", "blk.st.partial", null], "\"partial\" is partly received on an order or a receipt, partly paid on an invoice or a bill");
+  expect(["en", "zh", "ar"].every((l) => !!reportsT["blk.st.partial_received"]?.[l as "en"]), "…and both say so in en / zh / ar");
+
+  /* The server */
+  const RD = "src/lib/server/reports/report-data.ts";
+  rule("a shortage is an item received in part — more than nothing, less than ordered", RD,
+    (c) => (c.includes('.in("po_id", part).gt("qty_received", 0)') && c.includes("items.filter((i) => Number(i.qty_received) < Number(i.qty))") ? [] : ["fully received or untouched items read as short"]),
+    (src) => src.replace("items.filter((i) => Number(i.qty_received) < Number(i.qty))", "items"));
+  rule("a late order is past its expected delivery, not delivered, not closed", RD,
+    (c) => (c.includes('.not("status", "in", "(draft,cancelled,received,closed)").is("actual_delivery_date", null).lt("expected_delivery_date", c.today)') ? [] : ["delivered or closed orders read as late"]),
+    (src) => src.replace('.is("actual_delivery_date", null).lt("expected_delivery_date", c.today)', '.lt("expected_delivery_date", c.today)'));
+  rule("ids go to the database a hundred at a time", RD,
+    (c) => (/const chunks = <T,>\(xs: T\[\], n = 100\)/.test(c) && (c.match(/\.in\("/g) ?? []).length === (c.match(/\.in\("(po_id|id)", part\)/g) ?? []).length ? [] : ["a long id list can break the request URL"]),
+    (src) => src.replace('.in("id", part)', '.in("id", unique)'));
+
+  /* The status columns are ENUMS: a value outside the type fails the whole
+     query (22P02: "void" on vendor_bills, caught 25 Sep 2026 — the loader
+     had shown it as "no bills"). The types as the schema reads them. */
+  const ENUMS: Record<string, string[]> = {
+    quotations: ["draft", "sent", "accepted", "rejected", "expired", "cancelled", "final"],
+    invoices: ["draft", "issued", "paid", "cancelled", "sent", "overdue", "partial", "void"],
+    purchase_orders: ["draft", "confirmed", "partial", "received", "closed", "cancelled"],
+    purchase_receipts: ["draft", "partial", "complete", "cancelled", "posted", "voided"],
+    vendor_bills: ["draft", "posted", "partial", "paid", "overdue", "cancelled"],
+  };
+  rule("every status the numbers filter on is a real value of its column's type", RD,
+    (c) => {
+      const bad: string[] = [];
+      for (const chunk of c.split("supabaseServer.from(").slice(1)) {
+        const table = /^"([a-z_]+)"/.exec(chunk)?.[1] ?? "";
+        const body = chunk.slice(0, chunk.indexOf(";") > 0 ? chunk.indexOf(";") : chunk.length);
+        const vals = [...body.matchAll(/\.not\("status", "in", "\(([^)]*)\)"\)/g)].flatMap((m) => m[1].split(","))
+          .concat([...body.matchAll(/\.(?:eq|neq)\("status", "([a-z_]+)"\)/g)].map((m) => m[1]));
+        /* orders.status is plain text: any value is a real one. */
+        if (vals.length && !ENUMS[table] && table !== "orders") bad.push(`${table}: no known type`);
+        for (const v of vals) if (ENUMS[table] && !ENUMS[table].includes(v)) bad.push(`${table}.${v}`);
+      }
+      return bad;
+    },
+    (src) => src.replace('.not("status", "in", "(draft,cancelled,paid)")', '.not("status", "in", "(draft,void,cancelled,paid)")'));
+  rule("a numbers read that fails says so — never passes for nothing", RD,
+    (c) => (c.includes("return [src, { source: src, rows: [], capturedAt, failed: true }];") ? [] : ["a failed read shows as an empty period"]),
+    (src) => src.replace("return [src, { source: src, rows: [], capturedAt, failed: true }];", "return [src, { source: src, rows: [], capturedAt }];"));
+  rule("the screen and the print say a failed read out loud", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (c.includes('if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;') && read("src/lib/reports/print-layout.ts").includes('if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };') ? [] : ["a failed read reads as nothing"]),
+    (src) => src.replace('if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;', ""));
+
+  /* Each report's own words, loaded with it */
+  const secKey = /^tpl\.([a-z_]+)\.s\./;
+  const inMain = Object.keys(mainWords).filter((k) => secKey.test(k));
+  expect(inMain.length === 0, "the dictionary every Reports page carries holds no section words — only names and the UI", inMain.slice(0, 5).join(", "));
+  const misplaced: string[] = [];
+  for (const f of REPORT_FAMILIES) {
+    const words = read(`src/lib/translations/report-sections/${f}.ts`);
+    for (const m of words.matchAll(/"(tpl\.([a-z_]+)\.s\.[^"]+)":/g)) if (reportTemplate(m[2])?.family !== f) misplaced.push(`${m[1]} in ${f}`);
+  }
+  expect(misplaced.length === 0, "each family's words hold only its own templates' sections", misplaced.slice(0, 5).join(", "));
+  const homeless: string[] = [];
+  for (const tpl of REPORT_TEMPLATES) {
+    const words = read(`src/lib/translations/report-sections/${tpl.family}.ts`);
+    for (const sec of tpl.sections) if (!words.includes(`"tpl.${tpl.key}.s.${sec.id}"`)) homeless.push(`${tpl.key}.${sec.id}`);
+  }
+  expect(homeless.length === 0, "every template's sections are worded in its own family's file", homeless.slice(0, 5).join(", "));
+  eq([sectionFamilies("weekly"), sectionFamilies("pre_shipment"), sectionFamilies("negotiation"), sectionFamilies("customer_call")], [["work"], ["quality"], ["suppliers"], ["sales"]],
+    "a report loads its own family's words (the carry-over quotes work reports only)");
+  const idx = read("src/lib/translations/report-sections/index.ts");
+  expect(REPORT_FAMILIES.every((f) => idx.includes(`${f}: () => import("./${f}")`)), "every family's words are their own chunk, loaded on demand");
+  const allFiles = (dir: string): string[] => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? allFiles(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
+  const leak = allFiles("src").filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("src/app/api/") && !f.startsWith("src/lib/server/") && !f.startsWith("src/lib/translations/report-sections/") && read(f).includes("report-sections/all"));
+  expect(leak.length === 0, "no page imports every family's words — only the server does", leak.join(", "));
+  rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
+    (c) => { const a = c.indexOf("own = await loadSectionWords(res.data.report.templateKey);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
+    (src) => src.replace("own = await loadSectionWords(res.data.report.templateKey);", "own = {};"));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

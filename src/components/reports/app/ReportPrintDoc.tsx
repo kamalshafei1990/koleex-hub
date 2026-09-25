@@ -28,9 +28,8 @@ import {
   type Measurer, type PrintAttachments, type PrintPara, type PrintSheet,
 } from "@/lib/reports/print-layout";
 import { reportFileUrl, sizeLabel } from "@/lib/reports/attachments";
-import { reportsT } from "@/lib/translations/reports";
 import { dmyTime, periodLabel, type ReportDetail } from "@/lib/work-reports";
-import type { Lang } from "@/lib/i18n";
+import type { Lang, Translations } from "@/lib/i18n";
 
 const C = { black: "#0A0A0A", ink: "#1A1A1A", soft: "#4B5563", ghost: "#9CA3AF", border: "#E5E7EB", surface: "#F5F5F5" } as const;
 
@@ -75,8 +74,10 @@ function domMeasurer(plain: HTMLElement, bullet: HTMLElement, bulletText: HTMLEl
   return { height, cut: (p, maxPx) => cutByHeight(p, maxPx, height) };
 }
 
-export default function ReportPrintDoc({ detail, lang, onReady }: { detail: ReportDetail; lang: Lang; onReady?: () => void }) {
-  const t = (key: string) => reportsT[key]?.[lang] ?? reportsT[key]?.en ?? key;
+/** `words`: the Reports dictionary with this report's own section words
+ *  (Phase 4C — the print page loads them with the report). */
+export default function ReportPrintDoc({ detail, words, lang, onReady }: { detail: ReportDetail; words: Translations; lang: Lang; onReady?: () => void }) {
+  const t = (key: string) => words[key]?.[lang] ?? words[key]?.en ?? key;
   const { recipients, comments, attachments } = detail;
   /* A draft's numbers blocks (4B) as the server computed them just now; a
      sent report carries them frozen in its sections. */
@@ -101,7 +102,7 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
       const v = report.sections.find((x) => x.id === s.id);
       return (s.points ?? []).flatMap((pt) => {
         const c = v?.checks?.[pt.id];
-        const label = reportsT[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.[lang] ?? reportsT[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.en ?? pt.id;
+        const label = words[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.[lang] ?? words[`tpl.${report.templateKey}.s.${s.id}.i.${pt.id}`]?.en ?? pt.id;
         return c?.photo ? [{ id: c.photo, caption: c.note ? `${label} — ${c.note}` : label }] : [];
       });
     });
@@ -109,7 +110,7 @@ export default function ReportPrintDoc({ detail, lang, onReady }: { detail: Repo
       photos: [...checkPhotos, ...(attachments ?? []).filter((a) => a.image && !inBlocks.has(a.id)).map((a) => ({ id: a.id, caption: a.caption }))],
       files: (attachments ?? []).filter((a) => !a.image && !inBlocks.has(a.id)).map((a) => ({ text: `${a.name} · ${sizeLabel(a.size)}`, bullet: true })),
     };
-  }, [attachments, report.sections, report.templateKey, tpl, lang]);
+  }, [attachments, report.sections, report.templateKey, tpl, lang, words]);
   useEffect(() => {
     let cancelled = false;
     void (async () => {

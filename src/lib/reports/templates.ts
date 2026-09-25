@@ -26,11 +26,17 @@
    THE APPS (`data`): the author's own quotations, orders, invoices, open
    quotes and money still owed, computed by the server — never typed — and
    frozen into the report when it is sent. A table column can be a date.
+
+   Phase 4C (owner's picks, 25 Sep 2026) adds the Quality family and fills
+   Purchasing & suppliers: inspections, defects and corrective action;
+   supplier approval, samples and negotiation; production follow-up, rating,
+   risk and stopping a supplier; and the purchasing numbers (the writer's own
+   purchase orders, receipts, shortages, late orders and bills to pay).
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "service" | "memos" | "hr";
+export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "quality" | "service" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -43,8 +49,13 @@ export type ReportColumnType = "text" | "number" | "money" | "date";
 /** Where a numbers block reads from — always the AUTHOR's own documents:
  *  quotations / orders / invoices in the report's period, the quotations
  *  sent and still unanswered, the invoices with money still owed. */
-export type ReportDataSource = "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables";
-export const REPORT_DATA_SOURCES: ReportDataSource[] = ["quotations", "orders", "invoices", "quotes_waiting", "receivables"];
+export type ReportDataSource =
+  | "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables"
+  | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables";
+export const REPORT_DATA_SOURCES: ReportDataSource[] = [
+  "quotations", "orders", "invoices", "quotes_waiting", "receivables",
+  "purchase_orders", "receipts", "shortages", "pos_late", "payables",
+];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
 /** Who a new report goes to before the author changes anything:
@@ -61,8 +72,12 @@ export interface ReportSectionDef {
   /** table: the columns. */
   columns?: Array<{ id: string; type: ReportColumnType }>;
   /** table: the figures under it — each column's total (the default) or,
-   *  for a comparison of offers, each column's lowest and whose it is. */
-  summary?: "total" | "lowest";
+   *  for a comparison of offers, each column's lowest and whose it is; none
+   *  when adding up means nothing (quantities of different items). */
+  summary?: "total" | "lowest" | "none";
+  /** table: only these columns get a figure (a negotiation's lowest is
+   *  their offer — never our own target). */
+  summaryOf?: string[];
   /** links: what it may point at. */
   linkTypes?: ReportLinkType[];
   /** choice: the answers, in order. */
@@ -188,6 +203,118 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
       b("rating", "score", { points: pts("sales", "coverage", "communication", "payment", "policy") }),
       t("issues", "list"), t("support", "text"),
     ] },
+  /* ── Quality (Phase 4C) ── */
+  { key: "pre_shipment", family: "quality", icon: "box-circle-check", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "supplier", "product"] }, true),
+      b("checks", "checklist", { points: pts("quantity", "packing", "marks", "appearance", "function", "accessories", "manuals", "safety") }, true),
+      b("defects", "table", { columns: [{ id: "defect", type: "text" }, { id: "count", type: "number" }, { id: "level", type: "text" }] }),
+      b("result", "choice", { options: ["pass", "conditional", "fail"] }, true),
+      t("notes", "text"),
+      b("inspector_sign", "signature", {}),
+    ] },
+  { key: "incoming", family: "quality", icon: "box-open", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "supplier", "product"] }, true),
+      b("checks", "checklist", { points: pts("quantity", "packaging", "damage", "labels", "documents", "function") }, true),
+      b("issues", "table", { columns: [{ id: "item", type: "text" }, { id: "expected", type: "number" }, { id: "received", type: "number" }, { id: "note", type: "text" }], summary: "none" }),
+      b("result", "choice", { options: ["accepted", "partial", "rejected"] }, true),
+      t("notes", "text"),
+    ] },
+  { key: "defect_report", family: "quality", icon: "stethoscope", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["product", "supplier", "order", "customer"] }, true),
+      b("severity", "choice", { options: ["minor", "major", "critical"] }, true),
+      t("what", "text", true), t("scope", "text"), t("cause", "text"), t("containment", "list"),
+    ] },
+  { key: "corrective_action", family: "quality", icon: "recycle", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier", "product", "order"] }),
+      t("problem", "text", true), t("root_cause", "text", true),
+      b("actions", "table", { columns: [{ id: "action", type: "text" }, { id: "owner", type: "text" }, { id: "due", type: "date" }, { id: "state", type: "text" }] }, true),
+      t("verification", "text"),
+      b("status", "choice", { options: ["open", "in_progress", "closed"] }, true),
+    ] },
+  { key: "supplier_return", family: "quality", icon: "delivery-truck", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier", "order", "product"] }, true),
+      b("items", "table", { columns: [{ id: "item", type: "text" }, { id: "qty", type: "number" }, { id: "reason", type: "text" }], summary: "none" }, true),
+      b("reason", "choice", { options: ["defect", "wrong_item", "damaged", "excess", "other"] }, true),
+      b("ask", "choice", { options: ["replace", "repair", "refund", "credit"] }, true),
+      t("notes", "text"),
+    ] },
+  /* ── Purchasing & suppliers: sourcing (4C) ── */
+  { key: "supplier_approval", family: "suppliers", icon: "shield-check", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier"] }, true),
+      b("documents", "checklist", { points: pts("licence", "export", "certificates", "bank", "factory", "samples", "references", "terms") }, true),
+      b("rating", "score", { points: pts("quality", "price", "capacity", "communication", "reliability") }, true),
+      b("decision", "choice", { options: ["approve", "trial", "reject"] }, true),
+      t("why", "text", true),
+    ] },
+  { key: "sample_evaluation", family: "suppliers", icon: "flask", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier", "product"] }, true),
+      b("checks", "checklist", { points: pts("spec", "workmanship", "materials", "function", "packaging", "labelling") }, true),
+      b("rating", "score", { points: pts("quality", "finish", "function", "value") }, true),
+      b("decision", "choice", { options: ["approve", "revise", "reject"] }, true),
+      t("comments", "text"),
+    ] },
+  { key: "negotiation", family: "suppliers", icon: "percentage", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier", "product"] }, true),
+      b("rounds", "table", { columns: [{ id: "round", type: "text" }, { id: "date", type: "date" }, { id: "offer", type: "money" }, { id: "target", type: "money" }, { id: "notes", type: "text" }], summary: "lowest", summaryOf: ["offer"] }, true),
+      b("outcome", "choice", { options: ["agreed", "pending", "walked_away"] }, true),
+      t("terms", "text"), t("next_steps", "list"),
+    ] },
+  /* ── Purchasing & suppliers: follow-up and rating (4C) ── */
+  { key: "production_followup", family: "suppliers", icon: "pallet", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["order", "supplier", "product"] }, true),
+      b("stages", "checklist", { points: pts("materials", "parts", "assembly", "testing", "packing", "ready") }),
+      b("progress", "choice", { options: ["on_time", "at_risk", "late"] }, true),
+      t("ready_date", "text", true),
+      b("delay", "choice", { options: ["materials", "capacity", "quality", "holiday", "payment", "other"] }),
+      t("issues", "list"),
+    ] },
+  { key: "supplier_performance", family: "suppliers", icon: "heart-rate", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier"] }, true),
+      b("rating", "score", { points: pts("quality", "delivery", "price", "communication", "service", "documents") }, true),
+      t("incidents", "list"), t("strengths", "list"),
+      b("verdict", "choice", { options: ["keep", "improve", "replace"] }, true),
+      t("actions", "list"),
+    ] },
+  { key: "supplier_risk", family: "suppliers", icon: "flag-alt", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier"] }, true),
+      b("level", "choice", { options: ["low", "medium", "high"] }, true),
+      b("risks", "table", { columns: [{ id: "risk", type: "text" }, { id: "impact", type: "text" }, { id: "mitigation", type: "text" }, { id: "owner", type: "text" }] }, true),
+      t("notes", "text"),
+    ] },
+  { key: "supplier_stop", family: "suppliers", icon: "lock", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["supplier"] }, true),
+      b("reason", "choice", { options: ["quality", "fraud", "delivery", "conduct", "price", "other"] }, true),
+      t("what", "text", true), t("impact", "text"), t("alternative", "text"),
+    ] },
+  /* ── Purchasing numbers from the apps (4C) — the writer's own documents ── */
+  { key: "purchasing_weekly", family: "suppliers", icon: "truck-container", cadence: "weekly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("orders", "data", { source: "purchase_orders" }), b("receipts", "data", { source: "receipts" }),
+      b("shortages", "data", { source: "shortages" }), b("late", "data", { source: "pos_late", notes: true }),
+      t("highlights", "text", true), t("problems", "text"), t("next", "list"),
+    ] },
+  { key: "purchasing_monthly", family: "suppliers", icon: "ship-side", cadence: "monthly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("orders", "data", { source: "purchase_orders" }), b("receipts", "data", { source: "receipts" }),
+      b("shortages", "data", { source: "shortages" }), b("late", "data", { source: "pos_late", notes: true }),
+      t("highlights", "text", true), t("problems", "text"), t("next", "list"),
+    ] },
+  { key: "late_pos", family: "suppliers", icon: "clock", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [b("late", "data", { source: "pos_late", notes: true }), t("summary", "text", true)] },
+  { key: "payables", family: "suppliers", icon: "file-invoice-dollar", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [b("bills", "data", { source: "payables", notes: true }), t("plan", "text", true)] },
   /* ── Purchasing & suppliers, After-sales: the first users of the Phase 4A
      blocks (the families fill out in their own phases) ── */
   { key: "factory_audit", family: "suppliers", icon: "tools", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
@@ -241,7 +368,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "service", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "quality", "service", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
@@ -274,6 +401,8 @@ export interface ReportDataValue {
   denied?: boolean;
   /** More than REPORT_LIMITS.dataRows — the first ones are kept. */
   truncated?: boolean;
+  /** The read failed — said as such, never shown as "nothing". */
+  failed?: boolean;
 }
 export interface ReportSectionValue {
   id: string;
@@ -433,11 +562,13 @@ export interface TableFigure {
  *  whose it is; adding up competing offers means nothing. Only a column
  *  that two or more rows fill: one row's total or lowest is the row. */
 export function tableSummary(def: ReportSectionDef, rows: Array<Record<string, string>> | undefined): TableFigure[] {
+  if (def.summary === "none") return [];
   const list = rows ?? [];
   const nameCol = (def.columns ?? []).find((c) => c.type === "text");
   const out: TableFigure[] = [];
   for (const col of def.columns ?? []) {
     if (col.type !== "number" && col.type !== "money") continue;
+    if (def.summaryOf && !def.summaryOf.includes(col.id)) continue;
     const filled = list.flatMap((r, i) => { const n = cellNumber(r[col.id]); return n === null ? [] : [{ n: Number(n), i }]; });
     if (filled.length < 2) continue;
     if (def.summary === "lowest") {

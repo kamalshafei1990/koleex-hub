@@ -27,8 +27,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Translations } from "@/lib/i18n";
 import { reportsT } from "@/lib/translations/reports";
+import { loadSectionWords } from "@/lib/translations/report-sections";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -52,13 +53,17 @@ import { dictationSupported, useDictation } from "@/components/ai/useDictation";
 
 /* The Phase 4A blocks' code (ReportBlocks) is its own chunk: only a report
    whose template has a block fetches it, and that report opens once the
-   chunk is here — the page lays out once, never twice. */
+   chunk is here — the page lays out once, never twice. The template's own
+   words (sections, points, answers, columns — Phase 4C) come the same way:
+   one chunk per family, asked for with the report. */
 type BlocksModule = typeof import("./ReportBlocks");
 const isBlock = (kind: ReportSectionKind) => kind !== "text" && kind !== "list";
 const hasBlocks = (tpl: ReportTemplateDef | null) => !!tpl?.sections.some((x) => isBlock(x.kind));
 
 export default function ReportView({ id }: { id: string }) {
-  const { t, lang } = useTranslation(reportsT);
+  const [sectionWords, setSectionWords] = useState<Translations | null>(null);
+  const words = useMemo(() => (sectionWords ? { ...reportsT, ...sectionWords } : reportsT), [sectionWords]);
+  const { t, lang } = useTranslation(words);
   const [detail, setDetail] = useState<ReportDetail | null>(null);
   const [blocks, setBlocks] = useState<BlocksModule | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "missing" | "error">("loading");
@@ -66,9 +71,12 @@ export default function ReportView({ id }: { id: string }) {
   const load = useCallback(async () => {
     const res = await fetchReport(id);
     if (res.ok) {
-      if (hasBlocks(reportTemplate(res.data.report.templateKey))) {
-        try { const mod = await import("./ReportBlocks"); setBlocks(() => mod); } catch { setPhase("error"); return; }
-      }
+      const key = res.data.report.templateKey;
+      try {
+        const [mod, own] = await Promise.all([hasBlocks(reportTemplate(key)) ? import("./ReportBlocks") : Promise.resolve(null), loadSectionWords(key)]);
+        if (mod) setBlocks(() => mod);
+        setSectionWords(own);
+      } catch { setPhase("error"); return; }
       setDetail(res.data); setPhase("ready");
     }
     else setPhase(res.status === 404 ? "missing" : "error");
