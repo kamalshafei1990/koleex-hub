@@ -19,6 +19,15 @@
        can resolve). Anything else — a blob that never left the browser — is
        dropped and the entry says so (`attachmentsDropped`), so the bubble can
        ask the user to add it again. No blob / object URL is ever stored.
+     · A restored bubble previews its already-uploaded media through
+       /api/discuss/pending-media (outboxMediaUrlsFor) — the blob: URL of the
+       page that failed is gone after a reload, and the canonical
+       /api/files/discuss/<id>/<i> route needs a message row that does not
+       exist yet. The URL is derived from the stored file_path on read and
+       lives only in memory; it is never written into the entry.
+     · The bubble also carries the entry's mentions / products (safe display
+       fields the server returns too), so @mentions highlight exactly like a
+       sent message's.
      · An entry leaves the outbox when the server has its client_msg_id (the
        refresh replacement in mergeServerPage / reconcile), when the user
        deletes it, when the server refuses it for good, or after 7 days.
@@ -150,20 +159,73 @@ export function putDiscussOutbox(
   return stored;
 }
 
+/* ── Pending-media previews ─────────────────────────────────────────────
+   clientMsgId → canonical media index → /api/discuss/pending-media URL.
+   Indexes mirror discussMediaList(): attachments 0..n-1, voice at n. */
+const pendingMedia = new Map<string, Record<number, string>>();
+
+/** First-party preview URL of an uploaded-but-unsent Discuss object. */
+export function discussPendingMediaUrl(channelId: string, kind: "attachment" | "voice", path: string): string {
+  const q = new URLSearchParams({ c: channelId, b: kind === "voice" ? "v" : "m", p: path });
+  return `/api/discuss/pending-media?${q.toString()}`;
+}
+
+function mediaUrlsOf(entry: Pick<DiscussOutboxEntry, "channelId" | "metadata">): Record<number, string> {
+  const out: Record<number, string> = {};
+  const atts = Array.isArray(entry.metadata.attachments) ? entry.metadata.attachments : [];
+  atts.forEach((a, i) => {
+    if (a && typeof a.file_path === "string" && a.file_path) {
+      out[i] = discussPendingMediaUrl(entry.channelId, "attachment", a.file_path);
+    }
+  });
+  const voicePath = entry.metadata.voice?.path;
+  if (typeof voicePath === "string" && voicePath) {
+    out[atts.length] = discussPendingMediaUrl(entry.channelId, "voice", voicePath);
+  }
+  return out;
+}
+
+/** Preview URLs (by canonical media index) of an outbox bubble's uploaded
+ *  media. Empty for anything that is not an unsent outbox message. */
+export function outboxMediaUrlsFor(clientMsgId: string | null | undefined): Record<number, string> {
+  if (!clientMsgId) return {};
+  return pendingMedia.get(clientMsgId) ?? {};
+}
+
 /** Forget entries by client_msg_id (sent, refused or deleted). */
 export function removeDiscussOutbox(accountId: string, clientMsgIds: Iterable<string>): void {
   if (typeof window === "undefined" || !accountId) return;
   const drop = new Set(clientMsgIds);
   if (drop.size === 0) return;
+  for (const id of drop) pendingMedia.delete(id);
   const all = readDiscussOutbox(accountId);
   const next = all.filter((e) => !drop.has(e.clientMsgId));
   if (next.length !== all.length) writeRaw(accountId, next);
 }
 
+/** Forget every pending-media preview (sign-out / account switch). */
+export function clearOutboxMediaUrls(): void {
+  pendingMedia.clear();
+}
+
 /** The optimistic bubble to put back on screen for an entry. */
 export function outboxBubble(entry: DiscussOutboxEntry): DiscussMessageWithAuthor {
+  if (!entry.attachmentsDropped) {
+    const urls = mediaUrlsOf(entry);
+    if (Object.keys(urls).length > 0) pendingMedia.set(entry.clientMsgId, urls);
+  }
+  const shown = entry.display.metadata ?? {};
+  const metadata: DiscussMessageMetadata = { ...shown };
+  /* Entries saved before the bubble carried these still render them. */
+  if (!Array.isArray(shown.mentions) && Array.isArray(entry.metadata.mentions)) {
+    metadata.mentions = entry.metadata.mentions;
+  }
+  if (!Array.isArray(shown.products) && Array.isArray(entry.metadata.products)) {
+    metadata.products = entry.metadata.products;
+  }
   return {
     ...entry.display,
+    metadata,
     id: `temp_${entry.clientMsgId}`,
     channel_id: entry.channelId,
     client_msg_id: entry.clientMsgId,

@@ -35,7 +35,11 @@ import "server-only";
        caller joining or being removed) so the client refetches its list;
        `members: true` marks a membership change (someone added / removed /
        left, a role change) so the client reloads the member list only then —
-       never after a plain reaction or edit
+       never after a plain reaction or edit. Every membership write in
+       /api/discuss/mutate and lib/server/discuss-project-channel bumps
+       discuss_channels.updated_at (touchChannel), which is what brings the
+       channel into this pass; a channel that joins the caller's list
+       mid-connection gets its member baseline the moment it is added
 
    Delivery latency: poll cadence /2 (~0.5s median) + SSE push ≈ WeChat-feel,
    independent of Supabase websocket reachability. The Supabase broadcast path
@@ -159,18 +163,32 @@ export async function GET(req: Request) {
       /* Active member set per channel, to tell a membership change from an
          edit / reaction (both only touch updated_at). */
       const memberSig = new Map<string, string>();
-      const seedSigs = async (ids: string[]) => {
+      /* Channels whose member baseline could not be taken (a failed seed):
+         their first observed membership is reported as a change rather than
+         silently becoming the baseline — a stale roster is worse than one
+         extra member reload. */
+      const unseeded = new Set<string>();
+      /* `fresh`: the channel just (re)entered the caller's list mid-connection.
+         Its baseline is taken NOW and overwrites any leftover from an earlier
+         stint in the list (left and re-added), which would otherwise compare
+         against a roster from minutes ago. */
+      const seedSigs = async (ids: string[], fresh = false) => {
         if (ids.length === 0) return;
         try {
-          for (const [id, sig] of await memberSigs(ids)) if (!memberSig.has(id)) memberSig.set(id, sig);
-        } catch { /* unseeded channels report their first membership change as a plain chg */ }
+          for (const [id, sig] of await memberSigs(ids)) {
+            if (fresh || !memberSig.has(id)) memberSig.set(id, sig);
+            unseeded.delete(id);
+          }
+        } catch {
+          for (const id of ids) if (fresh || !memberSig.has(id)) unseeded.add(id);
+        }
         try {
           const { data: rows } = await supabaseServer
             .from(CHANNELS)
             .select("id, name, description, archived_at")
             .in("id", ids);
           for (const r of (rows ?? []) as Array<{ id: string; name: string | null; description: string | null; archived_at: string | null }>) {
-            if (!metaSig.has(r.id)) metaSig.set(r.id, sigOf(r));
+            if (fresh || !metaSig.has(r.id)) metaSig.set(r.id, sigOf(r));
           }
         } catch { /* unseeded channels just report their first change as a plain chg */ }
       };
@@ -200,8 +218,17 @@ export async function GET(req: Request) {
             for (const id of next) if (!before.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true, members: true })}\n\n`);
             for (const id of channelIds) if (!after.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true, members: true })}\n\n`);
             const added = next.filter((id) => !before.has(id));
+            /* Left the list: forget its baselines, so a later re-add is
+               seeded from scratch instead of diffed against this roster. */
+            for (const id of channelIds) {
+              if (!after.has(id)) {
+                memberSig.delete(id);
+                metaSig.delete(id);
+                unseeded.delete(id);
+              }
+            }
             channelIds = next;
-            await seedSigs(added);
+            await seedSigs(added, true);
           } catch { /* keep old set */ }
         }
         if (iter % HEARTBEAT_EVERY === 0) send(`: hb ${Date.now()}\n\n`);
@@ -260,6 +287,7 @@ export async function GET(req: Request) {
                reaction burst costs one small read here instead of a member
                reload on every open client. */
             const edited = touchedRows.filter((ch) => {
+              if (unseeded.has(ch.id)) return true;
               const last = ch.last_message_at ? Date.parse(ch.last_message_at) : 0;
               return Date.parse(ch.updated_at) - last > CHANGE_SLACK_MS;
             });
@@ -280,7 +308,9 @@ export async function GET(req: Request) {
               const mSig = members.get(ch.id);
               const prevMSig = memberSig.get(ch.id);
               if (mSig !== undefined) memberSig.set(ch.id, mSig);
-              const membersChanged = mSig !== undefined && prevMSig !== undefined && prevMSig !== mSig;
+              const wasUnseeded = mSig !== undefined && unseeded.delete(ch.id);
+              const membersChanged =
+                mSig !== undefined && (wasUnseeded || (prevMSig !== undefined && prevMSig !== mSig));
               if (upd - last > CHANGE_SLACK_MS || meta || membersChanged) {
                 send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at, ...(meta ? { meta: true } : {}), ...(membersChanged ? { members: true } : {}) })}\n\n`);
                 lastActivity = Date.now();

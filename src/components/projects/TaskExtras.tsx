@@ -11,9 +11,11 @@
    revealed on keyboard focus and are always visible on small (touch)
    screens, where hover does not exist.
 
-   `readOnly` (the caller's project access is "view"): every panel still
-   reads, but its add row, delete buttons and toggles are gone — the write
-   routes would answer 403 (project-access.ts { write: true } gates).
+   `readOnly` (the caller may not write this task — TaskRow.can_edit false;
+   a view-only member keeps edit rights on the tasks they created or hold):
+   every panel still reads, but its add row, delete buttons and toggles are
+   gone — the write routes would answer 403 (project-access.ts
+   assertTaskWrite). Subtasks decide per row from each subtask's can_edit.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -375,6 +377,10 @@ export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId:
 
   const done = items.filter((x) => x.status === "done").length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+  /* Each subtask is a task: its own server `can_edit` decides (a viewer
+     still ticks the subtasks they created or hold). `readOnly` = adding
+     one (a project write). */
+  const rowEditable = (s: TaskRow) => s.can_edit ?? !readOnly;
   if (loading) return <PanelSpinner />;
   if (loadError) return <PanelError onRetry={load} />;
   return (
@@ -385,12 +391,12 @@ export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId:
         {items.map((s) => (
           <div key={s.id} className={`group flex items-center gap-2 px-2.5 py-2 ${card}`}>
             <button
-              type="button" onClick={() => toggle(s)} disabled={readOnly}
+              type="button" onClick={() => toggle(s)} disabled={!rowEditable(s)}
               aria-label={s.status === "done" ? t("task.reopen") : t("task.markDone")} aria-pressed={s.status === "done"}
               className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${s.status === "done" ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"}`}
             ><CheckIcon size={10} /></button>
             <span className={`flex-1 text-[12.5px] ${s.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{s.title}</span>
-            {!readOnly && <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
+            {rowEditable(s) && <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noSubtasks", "No subtasks yet.")} />}

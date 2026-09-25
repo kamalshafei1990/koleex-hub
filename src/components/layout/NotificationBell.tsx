@@ -237,17 +237,24 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   useEffect(() => {
     accountIdRef.current = accountId;
   }, [accountId]);
-  /* Live view of the per-activity notification switches. A ref (updated every
-     render) rather than a closure capture: the realtime subscription below
-     re-subscribes only when accountId changes, and must still see preference
-     edits made mid-session. */
-  const notifPrefsRef = useRef<Record<string, unknown> | undefined>(undefined);
-  notifPrefsRef.current = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
+  /* Live view of the per-activity notification switches. A ref rather than a
+     closure capture: the realtime subscription below re-subscribes only when
+     accountId changes, and must still see preference edits made mid-session.
+     Synced in an effect (refs must not be written during render); the ref is
+     only read from subscription / event callbacks, which run after commit, so
+     they always see the latest committed preferences — same as before. */
+  const notifPrefs = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
+  const notifPrefsRef = useRef<Record<string, unknown> | undefined>(notifPrefs);
+  useEffect(() => {
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
 
   const [open, setOpen] = useState(defaultOpen);
   const [inboxUnread, setInboxUnread] = useState(0);
   const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
-  const [loadingInbox, setLoadingInbox] = useState(false);
+  /* Starts true when the panel mounts open for a signed-in account: the
+     open-effect below fetches straight away. */
+  const [loadingInbox, setLoadingInbox] = useState(() => defaultOpen && !!accountId);
   const [filter, setFilter] = useState<NotifFilter>("all");
   /* Chip labels for the eight activities live in the Settings dictionary. */
   const { t: tAct } = useTranslation(settingsT);
@@ -255,6 +262,32 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   const [discussChannels, setDiscussChannels] = useState<
     DiscussChannelWithState[]
   >([]);
+
+  /* Transitions of the account and of the panel, applied DURING render (the
+     React "adjust state when a prop changes" pattern) instead of as a
+     synchronous setState inside the effects that react to them — which made
+     every sign-out / open / close cost an extra cascading render (and tripped
+     react-hooks/set-state-in-effect). Same outcomes as before:
+       · signed out → inbox count, Discuss rows and the feed are cleared;
+       · panel opened (or the account changed while open) → the feed shows its
+         spinner until the open-effect's fetch lands;
+       · panel closed → the filter resets so a filter left behind cannot hide
+         fresh notifications on the next open.
+     The async fetches themselves stay in the effects below. */
+  const [seen, setSeen] = useState({ accountId, open });
+  if (seen.accountId !== accountId || seen.open !== open) {
+    const accountChanged = seen.accountId !== accountId;
+    const opened = open && !seen.open;
+    const closed = !open && seen.open;
+    setSeen({ accountId, open });
+    if (accountChanged && !accountId) {
+      setInboxUnread(0);
+      setDiscussChannels([]);
+      setMessages([]);
+    }
+    if (closed) setFilter("all");
+    if (open && accountId && (opened || accountChanged)) setLoadingInbox(true);
+  }
   /* Latest list for the realtime handler (per-channel mute check). */
   const discussChannelsRef = useRef<DiscussChannelWithState[]>([]);
   useEffect(() => {
@@ -314,10 +347,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   /* ── Discuss: seed channel list ──────────────────────────────────── */
   const recountDiscuss = useCallback(async () => {
     const aid = accountIdRef.current;
-    if (!aid) {
-      setDiscussChannels([]);
-      return;
-    }
+    /* Signed out: the render-time transition above already emptied the list. */
+    if (!aid) return;
     try {
       const rows = await fetchMyChannels(aid);
       setDiscussChannels(rows);
@@ -510,10 +541,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   /* ── Inbox: poll unread count + fetch on open ────────────────────── */
   useEffect(() => {
-    if (!accountId) {
-      setInboxUnread(0);
-      return;
-    }
+    /* Signed out: the render-time transition above already zeroed the count. */
+    if (!accountId) return;
     let cancelled = false;
     async function tick() {
       const aid = accountIdRef.current;
@@ -595,28 +624,27 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     });
   }, [accountId]);
 
-  const loadInbox = useCallback(async () => {
-    if (!accountId) {
-      setMessages([]);
-      return;
-    }
-    setLoadingInbox(true);
-    const rows = await fetchInboxMessages(accountId, { limit: FEED_LIMIT, slim: true });
-    setMessages(rows);
-    setLoadingInbox(false);
-    const n = await fetchUnreadCount(accountId);
-    setInboxUnread(n);
+  const loadInbox = useCallback(() => {
+    /* Signed out: the feed was cleared by the render-time transition above.
+       The spinner was switched on there too (on open / account change), so
+       this only ever settles state after the network answers. */
+    if (!accountId) return;
+    const aid = accountId;
+    /* State is written only in the continuation (never synchronously in the
+       effect that calls this). */
+    return fetchInboxMessages(aid, { limit: FEED_LIMIT, slim: true }).then(async (rows) => {
+      setMessages(rows);
+      setLoadingInbox(false);
+      const n = await fetchUnreadCount(aid);
+      setInboxUnread(n);
+    });
   }, [accountId]);
 
   useEffect(() => {
-    if (open) {
-      void loadInbox();
-      void recountDiscuss();
-    } else {
-      /* Closing resets the filter so one left behind can't hide fresh
-         notifications on the next open. */
-      setFilter("all");
-    }
+    /* Closing (filter reset) is handled by the render-time transition above. */
+    if (!open) return;
+    void loadInbox();
+    void recountDiscuss();
   }, [open, loadInbox, recountDiscuss]);
 
 

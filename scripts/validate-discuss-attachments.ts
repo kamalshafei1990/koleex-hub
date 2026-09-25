@@ -45,6 +45,8 @@ const readRoute = read("src/app/api/discuss/read/route.ts");
 const stateRoute = read("src/app/api/discuss/state/route.ts");
 const mutateRoute = read("src/app/api/discuss/mutate/route.ts");
 const objectUrls = read("src/lib/discuss-object-urls.ts");
+const outbox = read("src/lib/discuss-outbox.ts");
+const pendingRoute = read("src/app/api/discuss/pending-media/route.ts");
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co"; // fixture host for legacy-URL parsing
 const HOST = "https://example.supabase.co";
@@ -275,18 +277,68 @@ check("objecturl: released on reconcile", /releasePreviewUrls\(clientMsgId\);/.t
    release must run inside handleSelectChannel and before the selection
    changes, but other statements may sit between them (the WeChat redesign put
    setAiChatOpen there, which broke an adjacency-only regex). Statement-anchored
-   (^\s*) so a commented-out call cannot satisfy it. */
+   (^\s*) so a commented-out call cannot satisfy it.
+
+   RULE CHANGE (Discuss limits pass, 2026-09): the switch used to release
+   EVERY preview (releaseAllPreviewUrls). That killed the local playback of a
+   FAILED voice note — a still-live "Not sent · Retry" bubble that is redrawn
+   on return and whose clip may only exist as that Blob. The switch now
+   releases everything EXCEPT the keys of still-failed sends
+   (releasePreviewUrlsExcept), and those are released when the bubble is sent
+   (reconcile / settle), deleted, refused, or on unmount / account switch.
+   So the guard asserts: the switch still releases (no accumulation while
+   browsing), the exemption is built ONLY from failed payloads + the outbox,
+   and the account-switch path releases everything. */
 {
   const start = app.indexOf("const handleSelectChannel = useCallback(");
   const end = start < 0 ? -1 : app.indexOf("}, [", start);
   const selectChannelBlock = end < 0 ? "" : app.slice(start, end);
-  const releaseAt = selectChannelBlock.search(/^\s*releaseAllPreviewUrls\(\);/m);
+  const releaseAt = selectChannelBlock.search(/^\s*releasePreviewUrlsExcept\(stillFailed\);/m);
   const switchAt = selectChannelBlock.search(/^\s*setSelectedChannelId\(/m);
-  check("objecturl: released on conversation switch", releaseAt >= 0 && switchAt > releaseAt);
+  check("objecturl: released on conversation switch (except still-failed sends)", releaseAt >= 0 && switchAt > releaseAt);
+  check("objecturl: switch exemption = failed payloads only",
+    /for \(const p of failedPayloadsRef\.current\.values\(\)\) stillFailed\.add\(p\.clientMsgId\);/.test(selectChannelBlock));
+  check("objecturl: switch exemption = outbox entries only",
+    /for \(const e of readDiscussOutbox\(accountId\)\) stillFailed\.add\(e\.clientMsgId\);/.test(selectChannelBlock));
+  check("objecturl: switch no longer revokes failed previews wholesale",
+    !/^\s*releaseAllPreviewUrls\(\);/m.test(selectChannelBlock));
 }
+check("objecturl: release-except helper releases via the single owner",
+  /export function releasePreviewUrlsExcept[\s\S]{0,300}?releasePreviewUrls\(key\)/.test(objectUrls));
+check("objecturl: account switch releases everything",
+  /\(\) => \(\) => \{\s*releaseAllPreviewUrls\(\);\s*clearOutboxMediaUrls\(\);\s*\},\s*\[accountId\]/.test(app));
+check("objecturl: released on discard", /forgetFailedSend\(tempId, clientMsgId\);\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== tempId\)\);\s*releasePreviewUrls\(clientMsgId\);/.test(app));
+check("objecturl: released when a refresh settles a failed send",
+  /releasePreviewUrls\(id\.replace\(\/\^temp_\/, ""\)\)/.test(app));
 check("objecturl: released on unmount/logout", /useEffect\(\(\) => releaseAllPreviewUrls, \[\]\)/.test(app));
 check("objecturl: never persisted into an attachment record", !/local_preview_url:/.test(app));
 check("objecturl: blob detector present", /startsWith\("blob:"\)/.test(objectUrls));
+
+/* ── 12b. RESTORED "NOT SENT" MEDIA (pending-media route) ─────────────────
+   A failed send restored after a reload has no Blob and no canonical id.
+   Its already-uploaded object previews through /api/discuss/pending-media,
+   which must stay at least as strict as the canonical route. */
+check("pending: url built from the outbox, never persisted into the entry",
+  /export function discussPendingMediaUrl/.test(outbox) && !/pending-media[^\n]*savedAt/.test(outbox));
+check("pending: voice index mirrors discussMediaList (attachments.length)",
+  /out\[atts\.length\] = discussPendingMediaUrl\(entry\.channelId, "voice"/.test(outbox));
+check("pending: bubble falls back to it only after canonical + local",
+  /localPreviews\?\.\[voiceMedia\.index\] \?\?\s*pendingMedia\[voiceMedia\.index\]/.test(app) &&
+  /localPreviews\?\.\[m\.index\] \?\? pendingMedia\[m\.index\]/.test(app));
+check("pending: only temp bubbles consult it", /const pendingMedia = isTemp \? outboxMediaUrlsFor\(msg\.client_msg_id\) : \{\}/.test(app));
+check("pending: route requires auth + Discuss module",
+  /requireAuth\(req\)/.test(pendingRoute) && /requireModuleAccess\(auth, "Discuss"\)/.test(pendingRoute));
+check("pending: route requires ACTIVE membership", /\.is\("left_at", null\)/.test(pendingRoute));
+check("pending: route tenant-scopes the channel", /\.eq\("tenant_id", auth\.tenant_id\)/.test(pendingRoute));
+check("pending: route only serves the two private Discuss buckets",
+  /const BUCKETS: Record<string, string> = \{ m: "discuss-media", v: "discuss-voice" \}/.test(pendingRoute));
+check("pending: route refuses a path already sent elsewhere",
+  /\.contains\("metadata", containment\)/.test(pendingRoute) && /r\.channel_id !== channelId/.test(pendingRoute));
+check("pending: route private cache + nosniff + no redirect",
+  /const CACHE_PRIVATE = "private, max-age=0, must-revalidate"/.test(pendingRoute) &&
+  /"X-Content-Type-Options", "nosniff"/.test(pendingRoute) && !/NextResponse\.redirect/.test(pendingRoute));
+check("pending: route zero unwrapped NextResponse.json returns",
+  (pendingRoute.match(/return NextResponse\.json\(/g) ?? []).length === 0);
 
 /* ── 13. DRAFTS — no storage reference in either direction ─────────────── */
 /* Audited: drafts store TEXT ONLY (saveDraft sends body; restore clears

@@ -233,11 +233,16 @@ let shellChannelsUsed = false;
  *     (bell, home tile, floating panel) leaves it out, WeChat-style; Discuss
  *     still shows this count on the row. A muted row the user manually
  *     marked unread arrives as muted_unread_count 1 with marked_unread
- *     false, so it stays off the badges as well.
+ *     false (and muted_mark_only true), so it stays off the badges as well
+ *     and an unmute can turn it back into the dot.
  *   · linked_project_id — set when the conversation belongs to a Project
  *     (column added by the Projects migration; absent until it is applied). */
 export type DiscussChannelExtras = {
   muted_unread_count?: number;
+  /** A muted row whose muted_unread_count is ONLY a folded manual "unread"
+   *  mark (no real unread message). Lets an unmute put the dot back
+   *  (marked_unread) instead of showing a count of "1". */
+  muted_mark_only?: boolean;
   linked_project_id?: string | null;
 };
 export type DiscussChannelListRow = DiscussChannelWithState & DiscussChannelExtras;

@@ -4,7 +4,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { assertProjectAccess, likeTerm, memberProjectIds, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, likeTerm, memberProjectIds, taskEditFlags, UUID_RE } from "@/lib/server/project-access";
 import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
@@ -32,7 +32,7 @@ const LIST_COLS = `id, project_id, stage_id, parent_task_id,
   tag_ids, blocked_by_task_ids, due_date, start_date, estimated_hours, logged_hours,
   progress_pct, status,
   linked_planning_item_id, linked_entity_type, linked_entity_id, linked_entity_label,
-  sort_order, closed_at, created_at,
+  sort_order, closed_at, created_at, created_by_account_id,
   project:project_id ( id, name, color ),
   stage:stage_id ( id, name, color, is_closed, is_default_new, sort_order ),
   assignee:assignee_account_id ( id, username )`;
@@ -115,7 +115,17 @@ export async function GET(req: Request) {
   }
   /* No max-age: the client always reads this with cache:"no-store", so a
      cacheable header only invited a stale board after a write. */
-  return NextResponse.json({ tasks: data ?? [] });
+  /* Per-task can_edit + project_access (project-access.ts taskEditFlags):
+     a view-only caller still edits the tasks they created or hold. */
+  const rows = (data ?? []) as unknown as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }[];
+  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
+  const flags = await taskEditFlags(auth, rows, canEditModule);
+  return NextResponse.json({
+    tasks: rows.map((r) => {
+      const f = flags.get(r.id);
+      return { ...r, can_edit: f?.can_edit ?? false, project_access: f?.project_access ?? "view" };
+    }),
+  });
 }
 
 export async function POST(req: Request) {
@@ -179,5 +189,7 @@ export async function POST(req: Request) {
     if (who) await syncProjectMembersFromAssignees(auth, projectId, [who]);
   });
 
-  return NextResponse.json({ task: data });
+  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
+  const f = (await taskEditFlags(auth, [data as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }], canEditModule)).get(data.id as string);
+  return NextResponse.json({ task: { ...data, can_edit: f?.can_edit ?? false, project_access: f?.project_access ?? "view" } });
 }

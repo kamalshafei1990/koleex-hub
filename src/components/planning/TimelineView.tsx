@@ -32,6 +32,7 @@ import {
   ITEM_TYPE_LABELS,
   type PlanningItem,
 } from "@/lib/planning";
+import { AWAY_HATCH, type AwaySlice } from "@/lib/planning-away";
 import { fmtDMY } from "@/lib/finance/format";
 
 export interface TimelineRow {
@@ -85,6 +86,8 @@ export default function TimelineView({
   tz,
   conflictIds,
   leaveCells,
+  awayCells,
+  awayTip,
   canWrite,
   onItemClick,
   onMove,
@@ -97,6 +100,10 @@ export default function TimelineView({
   tz: string;
   conflictIds: Set<string>;
   leaveCells: Set<string>;
+  /** Calendar out-of-office, `resource|dayKey` → that day's slices (planning-away). */
+  awayCells: Map<string, AwaySlice[]>;
+  /** Tooltip text for a day's slices — a time span only, never a title. */
+  awayTip: (slices: AwaySlice[]) => string;
   canWrite: (i: PlanningItem) => boolean;
   onItemClick: (i: PlanningItem) => void;
   onMove: (id: string, patch: TimelinePatch) => void;
@@ -420,6 +427,34 @@ export default function TimelineView({
                       )}
                     </div>
                   ))}
+                  {/* Calendar out-of-office — hatched at its real hours, with
+                      a tooltip; below the bars so items stay grabbable. */}
+                  {row.resourceId &&
+                    days.map((_, i) => {
+                      const slices = awayCells.get(`${row.resourceId}|${dayKeys[i]}`);
+                      if (!slices?.length) return null;
+                      return slices.map((sl) => {
+                        const x0 = xOf(sl.fromMs, i);
+                        const x1 = sl.full ? (i + 1) * dayWidth : xOf(sl.toMs, i);
+                        const left = sl.full ? i * dayWidth : x0;
+                        if (x1 - left < 1) return null;
+                        return (
+                          <div
+                            key={`away-${dayKeys[i]}-${sl.fromMs}`}
+                            title={awayTip([sl])}
+                            aria-label={awayTip([sl])}
+                            className="absolute top-0 bottom-0 border-x border-dashed border-slate-500/40 cursor-help overflow-hidden"
+                            style={{ insetInlineStart: left, width: x1 - left, backgroundImage: AWAY_HATCH }}
+                          >
+                            {x1 - left >= 48 && (
+                              <span className="absolute bottom-0.5 start-1 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap pointer-events-none">
+                                {t("sched.outOfOffice")}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      });
+                    })}
                   {hourTicks.map((tk) =>
                     tk.major ? null : (
                       <div

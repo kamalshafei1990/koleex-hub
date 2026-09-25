@@ -199,7 +199,7 @@ export async function checkPlanningConflicts(
   if (accountIds.length > 0) {
     /* The Calendar read runs alongside the HR chain; a failure there is
        logged and skipped (see the header). */
-    const awayP = outOfOffice(tenantId, accountIds, minStart, maxEnd).catch((e: unknown) => {
+    const awayP = loadOutOfOffice(tenantId, accountIds, minStart, maxEnd).catch((e: unknown) => {
       console.error("[planning-conflicts] out of office:", e instanceof Error ? e.message : e);
       return new Map<string, AwaySpan[]>();
     });
@@ -274,12 +274,18 @@ export async function checkPlanningConflicts(
   return { conflicts: out.slice(0, MAX_LISTED_CONFLICTS), total: out.length };
 }
 
-type AwaySpan = { s: number; e: number; days?: { start: string; end: string } };
+/** One out-of-office span: instants (ms) and, for an all-day event, its
+ *  inclusive local date keys on the owner's clock. Never carries a title. */
+export type AwaySpan = { s: number; e: number; days?: { start: string; end: string } };
 
 /** Out-of-office spans per account in [fromIso, toIso): one-off events plus
  *  recurring series expanded on their owner's clock with their exceptions.
- *  An all-day event also carries its date keys (compared per local day). */
-async function outOfOffice(tenantId: string, accountIds: string[], fromIso: string, toIso: string): Promise<Map<string, AwaySpan[]>> {
+ *  An all-day event also carries its date keys (compared per local day).
+ *  Shared by the conflict check and the board's overlay
+ *  (/api/planning/leaves), so both see exactly the same time. Callers pass
+ *  only accounts behind this tenant's employee resources. Throws on a read
+ *  error — callers log and skip. */
+export async function loadOutOfOffice(tenantId: string, accountIds: string[], fromIso: string, toIso: string): Promise<Map<string, AwaySpan[]>> {
   const COLS = "id, account_id, start_at, end_at, all_day, recurrence, recurrence_until";
   const [oneOff, series] = await Promise.all([
     supabaseServer

@@ -29,6 +29,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { NoteYjsSession } from "@/lib/notes-yjs";
+import {
+  NOTE_PING_EVENT,
+  NOTE_YJS_EVENT,
+  buildNotePing,
+  noteTopic,
+  parseNotePing,
+  type NoteUpdate,
+} from "@/lib/note-collab-protocol";
+
+export type { NoteUpdate };
 
 export type CollabStatus = "viewing" | "editing";
 
@@ -40,14 +50,6 @@ export interface NotePeer {
   name: string | null;
   status: CollabStatus;
   at: string;
-}
-
-/* A change PING carries NO note content — just "someone saved, go refetch". */
-export interface NoteUpdate {
-  by: string;
-  at: string;
-  /** The body changed outside the live session (single-editor save). */
-  body?: boolean;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -96,7 +98,7 @@ export function useNoteCollab(opts: {
   const sendY = useCallback((payload: Record<string, unknown>) => {
     const ch = channelRef.current;
     if (!ch) return;
-    try { void ch.send({ type: "broadcast", event: "y", payload }); } catch { /* ignore */ }
+    try { void ch.send({ type: "broadcast", event: NOTE_YJS_EVENT, payload }); } catch { /* ignore */ }
   }, []);
   useEffect(() => {
     yjsRef.current = yjs;
@@ -118,7 +120,7 @@ export function useNoteCollab(opts: {
     const clientId = getTabClientId();
     let subscribedOnce = false;
 
-    const channel = supa.channel(`note:${noteId}`, {
+    const channel = supa.channel(noteTopic(noteId as string), {
       config: { presence: { key: clientId } },
     });
     channelRef.current = channel;
@@ -154,16 +156,11 @@ export function useNoteCollab(opts: {
         syncPeers();
         yjsRef.current?.peerLeft(key);
       })
-      .on("broadcast", { event: "ping" }, ({ payload: p }) => {
-        const u = p as Partial<NoteUpdate>;
-        if (!u || u.by === clientId) return; // ignore our own tab's echo
-        onRemoteRef.current({
-          by: String(u.by ?? ""),
-          at: typeof u.at === "string" ? u.at : new Date().toISOString(),
-          ...(u.body === true ? { body: true } : {}),
-        });
+      .on("broadcast", { event: NOTE_PING_EVENT }, ({ payload: p }) => {
+        const u = parseNotePing(p, clientId); // null: our own tab's echo
+        if (u) onRemoteRef.current(u);
       })
-      .on("broadcast", { event: "y" }, ({ payload: p }) => {
+      .on("broadcast", { event: NOTE_YJS_EVENT }, ({ payload: p }) => {
         void yjsRef.current?.receive(p);
       })
       .subscribe((s) => {
@@ -205,12 +202,8 @@ export function useNoteCollab(opts: {
     try {
       void ch.send({
         type: "broadcast",
-        event: "ping",
-        payload: {
-          by: getTabClientId(),
-          at: new Date().toISOString(),
-          ...(o?.body ? { body: true } : {}),
-        } satisfies NoteUpdate,
+        event: NOTE_PING_EVENT,
+        payload: { ...buildNotePing(getTabClientId(), o) },
       });
     } catch { /* ignore */ }
   }, []);

@@ -895,6 +895,9 @@ function ProjectDetailView({
      (or no Projects edit right): every write gate answers 403, so the
      board hides / disables them. Absent (older payload) = the old UI. */
   const readOnly = project.my_access === "view";
+  /* Per task: a view-only caller still edits the tasks they created or
+     hold (server `can_edit`, the same rule as every task write route). */
+  const canEditTask = (tk: TaskRow) => !readOnly || tk.can_edit === true;
   const canManage = (project.my_access ?? "manage") === "manage";
   const memberCount = project.member_count ?? null;
   const budget = budgetSummary(project, sumLoggedHours(tasks));
@@ -1076,6 +1079,7 @@ function ProjectDetailView({
                 onUpdateDates={updateDates}
                 onOpenTask={openTask}
                 readOnly={readOnly}
+                canEditTask={canEditTask}
               />
             </div>
           )}
@@ -1117,7 +1121,7 @@ function ProjectDetailView({
                       selected={selection.selected.has(tk.id)}
                       selecting={selecting}
                       onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
-                      draggable={!readOnly}
+                      draggable={canEditTask(tk)}
                     />
                   ))}
                 </div>
@@ -1172,7 +1176,7 @@ function ProjectDetailView({
                           selected={selection.selected.has(tk.id)}
                           selecting={selecting}
                           onToggleSelect={readOnly ? undefined : (shift) => selection.toggle(tk.id, shift)}
-                          draggable={!readOnly}
+                          draggable={canEditTask(tk)}
                         />
                       </div>
                     ))}
@@ -1276,7 +1280,8 @@ function ProjectDetailView({
           stages={stages}
           tags={tags}
           allTasks={tasks}
-          readOnly={readOnly}
+          readOnly={taskModal.editing ? !canEditTask(taskModal.editing) : readOnly}
+          subtasksReadOnly={readOnly}
           onClose={closeTaskModal}
           onSaved={() => { closeTaskModal(); void refresh(); }}
         />
@@ -1584,7 +1589,7 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const orderedIds = useMemo(
     () => (["open", "done", "cancelled"] as const)
       .filter((st) => filter.status === "all" || filter.status === st)
-      .flatMap((st) => grouped[st].map((tk) => tk.id)),
+      .flatMap((st) => grouped[st].filter((tk) => tk.can_edit !== false).map((tk) => tk.id)),
     [grouped, filter.status],
   );
   const selection = useTaskSelection(orderedIds);
@@ -1685,6 +1690,8 @@ function FlatTaskRow({
   const projectColor = task.project?.color ?? HUB_BLUE;
   const visibleTags = tags.filter((tg) => task.tag_ids.includes(tg.id)).slice(0, 2);
   const done = task.status === "done";
+  /* Server `can_edit`: false = view-only on this task (every write 403s). */
+  const editable = task.can_edit !== false;
 
   return (
     <div
@@ -1697,14 +1704,16 @@ function FlatTaskRow({
       }`}
     >
       <div className="flex items-start gap-2">
-        <SelectBox checked={selected} onToggle={onToggleSelect} label={`${t("bulk.select")}: ${task.title}`} className="mt-0.5" />
+        {editable && <SelectBox checked={selected} onToggle={onToggleSelect} label={`${t("bulk.select")}: ${task.title}`} className="mt-0.5" />}
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleStatus(done ? "open" : "done"); }}
+          disabled={!editable}
+          title={editable ? undefined : t("access.viewOnly")}
+          onClick={(e) => { e.stopPropagation(); if (editable) onToggleStatus(done ? "open" : "done"); }}
           aria-label={done ? t("task.reopen") : t("task.markDone")}
           aria-pressed={done}
-          className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${
-            done ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"
+          className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-default ${
+            done ? "bg-emerald-500 border-emerald-500 text-white" : `border-[var(--border-color)] text-transparent ${editable ? "hover:border-emerald-400" : ""}`
           }`}
         >
           <CheckIcon size={10} />

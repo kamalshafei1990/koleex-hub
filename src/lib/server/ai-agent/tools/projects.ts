@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "../../supabase-server";
 import { recomputeProjectProgress } from "../../project-progress";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "../../project-task-rules";
-import { assertProjectAccess, canManageProject, involvedProjectsOr, memberRole, type MemberRole } from "../../project-access";
+import { assertProjectAccess, canManageProject, involvedProjectsOr, memberRole, ownsTask, type MemberRole } from "../../project-access";
 import { syncProjectMembersFromAssignees, upsertProjectMembers } from "../../project-members";
 import { notifyTaskAssigned } from "../../project-notify";
 import type { ToolDef, ToolResult } from "../types";
@@ -57,8 +57,9 @@ async function loadVisibleTask(
   const t = (data as TaskRow | null) ?? null;
   if (!t) return null;
   if (ctx.isSuperAdmin) return t;
-  if (t.assignee_account_id === ctx.auth.account_id) return t;
-  if (t.created_by_account_id === ctx.auth.account_id) return t;
+  /* Own task (assignee / creator): editable even with view-only project
+     access — the shared per-task rule (project-access.ts ownsTask). */
+  if (ownsTask(ctx.auth, t)) return t;
   if (t.project_id) {
     const { data: proj } = await supabaseServer
       .from("projects")

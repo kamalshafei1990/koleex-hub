@@ -34,6 +34,7 @@ import { createHash, createHmac } from "node:crypto";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings } from "@/lib/server/realtime-broadcast";
 import { seedStateFromJson } from "@/lib/notes-yjs-merge";
+import { NOTE_PING_EVENT, buildServerBodyPing, noteTopic } from "@/lib/note-collab-protocol";
 import type { NoteRole, NoteShareLite } from "@/lib/notes-server";
 
 /* The pure CRDT operations live in notes-yjs-merge (no DB, testable alone). */
@@ -42,9 +43,14 @@ export {
   b64decode,
   b64encode,
   mergeState,
+  normalizeBody,
+  rebaseBody,
+  rebaseOntoState,
   seedStateFromJson,
   type BodyToStateResult,
   type MergeResult,
+  type RebaseResult,
+  type RebaseStateResult,
 } from "@/lib/notes-yjs-merge";
 
 /* ── Availability (is the yjs_state column there?) ─────────────────────── */
@@ -141,9 +147,11 @@ export function collabKeysFor(
  * Fire-and-forget.
  */
 export async function pingNoteBodyChanged(noteId: string): Promise<void> {
+  // Topic, event and payload come from the shared protocol module — the
+  // listener (note-collab) parses exactly this shape.
   await emitPings([{
-    topic: `note:${noteId}`,
-    event: "ping",
-    payload: { by: "server", at: new Date().toISOString(), body: true },
+    topic: noteTopic(noteId),
+    event: NOTE_PING_EVENT,
+    payload: { ...buildServerBodyPing() },
   }]);
 }

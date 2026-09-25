@@ -637,7 +637,24 @@ export interface LeaveSpan {
   start_date: string;
   end_date: string;
 }
-export async function fetchLeaves(from: string, to: string): Promise<LeaveSpan[]> {
-  const { leaves } = await read<{ leaves: LeaveSpan[] }>(`/api/planning/leaves?from=${from}&to=${to}`);
-  return leaves ?? [];
+/** Calendar out-of-office time on an employee resource. Never carries a
+ *  title — the board shows it as "Out of office" and a time span only. */
+export interface AwaySpan {
+  resource_id: string;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+  /** All-day only: inclusive date keys on the event owner's clock. */
+  start_date?: string;
+  end_date?: string;
+}
+/** A week's absence overlay: approved HR leave + Calendar out-of-office. */
+export interface WeekAbsence {
+  leaves: LeaveSpan[];
+  away: AwaySpan[];
+}
+/** Both overlays in ONE request (from/to are inclusive date keys). */
+export async function fetchWeekAbsence(from: string, to: string): Promise<WeekAbsence> {
+  const r = await read<Partial<WeekAbsence>>(`/api/planning/leaves?from=${from}&to=${to}`);
+  return { leaves: r.leaves ?? [], away: r.away ?? [] };
 }

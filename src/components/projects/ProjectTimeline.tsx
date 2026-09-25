@@ -85,6 +85,7 @@ export default function ProjectTimeline({
   onUpdateDates,
   onOpenTask,
   readOnly = false,
+  canEditTask,
 }: {
   projectId: string;
   /** Rows to draw (already filtered). */
@@ -96,6 +97,9 @@ export default function ProjectTimeline({
   onOpenTask: (task: TaskRow) => void;
   /** Viewer access: bars open the task but never drag, resize or nudge. */
   readOnly?: boolean;
+  /** Per-task override of `readOnly`: a viewer still reschedules the tasks
+   *  they created or hold (server `can_edit`). */
+  canEditTask?: (task: TaskRow) => boolean;
 }) {
   const { t, lang } = useTranslation(projectsT);
   const [zoom, setZoom] = useState<Zoom>("month");
@@ -108,6 +112,8 @@ export default function ProjectTimeline({
   const [view, setView] = useState({ top: 0, height: 600 });
   const px = PX_PER_DAY[zoom];
   const today = todayLocalISO();
+  const locked = (task: TaskRow) => readOnly && !(canEditTask?.(task) ?? false);
+  const anyEditable = !readOnly || tasks.some((tk) => !locked(tk));
 
   useEffect(() => {
     let alive = true;
@@ -271,7 +277,7 @@ export default function ProjectTimeline({
   );
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>, r: Extract<Row, { kind: "task" }>) => {
-    if (e.button !== 0 || readOnly) return;
+    if (e.button !== 0 || locked(r.task)) return;
     const mode = ((e.target as HTMLElement).dataset.mode as DragState["mode"] | undefined) ?? "move";
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag({ id: r.task.id, mode, x0: e.clientX, start0: r.start, end0: r.end, start: r.start, end: r.end, moved: false });
@@ -290,14 +296,14 @@ export default function ProjectTimeline({
   const onPointerUp = (r: Extract<Row, { kind: "task" }>) => {
     const d = drag;
     setDrag(null);
-    if (!d) { if (readOnly) onOpenTask(r.task); return; }
+    if (!d) { if (locked(r.task)) onOpenTask(r.task); return; }
     if (!d.moved) { onOpenTask(r.task); return; }
     commit(r, d.start, d.end);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, r: Extract<Row, { kind: "task" }>) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenTask(r.task); return; }
-    if (readOnly || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    if (locked(r.task) || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
     const step = e.key === "ArrowRight" ? 1 : -1;
     const cur = nudge && nudge.id === r.task.id ? nudge : { id: r.task.id, start: r.start, end: r.end };
@@ -369,7 +375,7 @@ export default function ProjectTimeline({
         <button type="button" onClick={jumpToToday} className="h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]">
           {t("tl.jumpToday")}
         </button>
-        {!readOnly && <p id={`tl-hint-${projectId}`} className="text-[11px] text-[var(--text-dim)] min-w-0">{t("tl.hint")}</p>}
+        {anyEditable && <p id={`tl-hint-${projectId}`} className="text-[11px] text-[var(--text-dim)] min-w-0">{t("tl.hint")}</p>}
       </div>
 
       {rows.length === 0 ? (
@@ -480,6 +486,7 @@ export default function ProjectTimeline({
                 const x = xOf(span.start);
                 const w = (daysBetween(span.start, span.end) + 1) * px;
                 const warn = r.task.status === "open" && conflicts(r.task, span.start);
+                const ro = locked(r.task);
                 const late = r.task.status === "open" && isOverdue(r.task.due_date);
                 const done = r.task.status !== "open";
                 const stageColor = stages.find((s) => s.id === r.task.stage_id)?.color ?? HUB_BLUE;
@@ -506,9 +513,9 @@ export default function ProjectTimeline({
                       onPointerCancel={() => setDrag(null)}
                       onKeyDown={(e) => onKeyDown(e, r)}
                       aria-label={aria}
-                      aria-describedby={readOnly ? undefined : `tl-hint-${projectId}`}
+                      aria-describedby={ro ? undefined : `tl-hint-${projectId}`}
                       title={aria}
-                      className={`group/bar absolute z-[6] rounded-md select-none ${readOnly ? "cursor-pointer" : "touch-none cursor-grab active:cursor-grabbing"} outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2] ${
+                      className={`group/bar absolute z-[6] rounded-md select-none ${ro ? "cursor-pointer" : "touch-none cursor-grab active:cursor-grabbing"} outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2] ${
                         active ? "shadow-lg ring-2 ring-[#567FB2]/60" : ""
                       } ${warn ? "ring-2 ring-rose-400 ring-offset-1 ring-offset-[var(--bg-secondary)]" : late ? "ring-1 ring-rose-400/70" : ""} ${done ? "opacity-50" : ""}`}
                       style={{
@@ -525,8 +532,8 @@ export default function ProjectTimeline({
                         style={{ background: `linear-gradient(to right, rgba(255,255,255,0.28) ${Math.min(100, Math.max(0, r.task.progress_pct ?? 0))}%, transparent 0)` }}
                         aria-hidden
                       />
-                      {!readOnly && <span data-mode="start" className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-s-md opacity-0 group-hover/bar:opacity-100 bg-black/20" aria-hidden />}
-                      {!readOnly && <span data-mode="end" className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-e-md opacity-0 group-hover/bar:opacity-100 bg-black/20" aria-hidden />}
+                      {!ro && <span data-mode="start" className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-s-md opacity-0 group-hover/bar:opacity-100 bg-black/20" aria-hidden />}
+                      {!ro && <span data-mode="end" className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize rounded-e-md opacity-0 group-hover/bar:opacity-100 bg-black/20" aria-hidden />}
                     </button>
                   </div>
                 );

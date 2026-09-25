@@ -3,7 +3,18 @@ import "server-only";
 /* GET /api/planning/leaves?from=YYYY-MM-DD&to=YYYY-MM-DD
    Approved HR leave mapped onto Planning employee resources, so the
    schedule board can block those days visually and flag any item
-   scheduled over someone's leave.
+   scheduled over someone's leave — plus (`away`) the same people's
+   Calendar out-of-office time, in ONE request so the week's overlay and
+   its warm-cache entry stay a single fetch.
+
+   `away` reads through loadOutOfOffice (lib/server/planning-conflicts),
+   the exact helper the conflict check uses: this tenant's out_of_office
+   events of the accounts behind its employee resources, one-offs plus
+   recurring series expanded with their per-occurrence exceptions. It
+   never carries a title (a private event only ever shows as a time span).
+   The window is widened a day each side so any planner zone's days are
+   covered; the board clips to its own days. A Calendar read failure is
+   logged and answers `away: []` — it never hides the leave.
 
    Tenant scope: hr_leave_requests carries no tenant_id, so the query is
    driven FROM the tenant — its employee resources → their accounts → the
@@ -13,10 +24,23 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { loadOutOfOffice } from "@/lib/server/planning-conflicts";
 
 export const dynamic = "force-dynamic";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+
+/** One out-of-office span on a resource, as the board draws it. */
+interface AwayOut {
+  resource_id: string;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+  /** All-day only: inclusive local date keys on the owner's clock. */
+  start_date?: string;
+  end_date?: string;
+}
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -27,7 +51,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
-  if (!from || !to || !DATE_RE.test(from) || !DATE_RE.test(to)) {
+  if (!from || !to || !DATE_RE.test(from) || !DATE_RE.test(to) || from > to) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
   const noStore = { headers: { "Cache-Control": "private, no-store" } };
@@ -43,11 +67,42 @@ export async function GET(req: Request) {
     .eq("type", "employee")
     .not("account_id", "is", null);
   if (resErr) return fail("resources", resErr.message);
-  const accountToResource = new Map(
-    (resources ?? []).map((r) => [r.account_id as string, r.id as string]),
+  /* One account can sit behind more than one employee resource. */
+  const accountToResources = new Map<string, string[]>();
+  for (const r of resources ?? []) {
+    const list = accountToResources.get(r.account_id as string) ?? [];
+    list.push(r.id as string);
+    accountToResources.set(r.account_id as string, list);
+  }
+  const accountIds = [...accountToResources.keys()];
+  if (accountIds.length === 0) return NextResponse.json({ leaves: [], away: [] }, noStore);
+
+  /* Calendar out-of-office, alongside the HR chain. */
+  const fromIso = new Date(Date.parse(`${from}T00:00:00Z`) - DAY_MS).toISOString();
+  const toIso = new Date(Date.parse(`${to}T00:00:00Z`) + 2 * DAY_MS).toISOString();
+  const awayP: Promise<AwayOut[]> = loadOutOfOffice(auth.tenant_id, accountIds, fromIso, toIso).then(
+    (byAccount) => {
+      const out: AwayOut[] = [];
+      for (const [acct, spans] of byAccount) {
+        for (const resource_id of accountToResources.get(acct) ?? []) {
+          for (const sp of spans) {
+            out.push({
+              resource_id,
+              start_at: new Date(sp.s).toISOString(),
+              end_at: new Date(sp.e).toISOString(),
+              all_day: !!sp.days,
+              ...(sp.days ? { start_date: sp.days.start, end_date: sp.days.end } : {}),
+            });
+          }
+        }
+      }
+      return out.sort((a, b) => a.start_at.localeCompare(b.start_at));
+    },
+    (e: unknown) => {
+      console.error("[api/planning/leaves] out of office:", e instanceof Error ? e.message : e);
+      return [];
+    },
   );
-  const accountIds = [...accountToResource.keys()];
-  if (accountIds.length === 0) return NextResponse.json({ leaves: [] }, noStore);
 
   const { data: emps, error: empErr } = await supabaseServer
     .from("koleex_employees")
@@ -59,7 +114,7 @@ export async function GET(req: Request) {
     (emps ?? []).map((e) => [e.id as string, e.account_id as string]),
   );
   const employeeIds = [...empToAccount.keys()];
-  if (employeeIds.length === 0) return NextResponse.json({ leaves: [] }, noStore);
+  if (employeeIds.length === 0) return NextResponse.json({ leaves: [], away: await awayP }, noStore);
 
   const { data: reqs, error: lvErr } = await supabaseServer
     .from("hr_leave_requests")
@@ -73,10 +128,12 @@ export async function GET(req: Request) {
 
   const leaves = (reqs ?? []).flatMap((r) => {
     const acct = empToAccount.get(r.employee_id as string);
-    const resourceId = acct ? accountToResource.get(acct) : null;
-    if (!resourceId) return [];
-    return [{ resource_id: resourceId, start_date: r.start_date, end_date: r.end_date }];
+    return (acct ? accountToResources.get(acct) ?? [] : []).map((resource_id) => ({
+      resource_id,
+      start_date: r.start_date,
+      end_date: r.end_date,
+    }));
   });
 
-  return NextResponse.json({ leaves }, noStore);
+  return NextResponse.json({ leaves, away: await awayP }, noStore);
 }

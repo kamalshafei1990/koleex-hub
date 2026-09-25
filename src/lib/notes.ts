@@ -239,22 +239,37 @@ export type NotePatch = Partial<{
 }>;
 
 export type UpdateNoteResult =
-  | { ok: true; updated_at: string | null; body_plain?: string }
+  | {
+      ok: true;
+      updated_at: string | null;
+      body_plain?: string;
+      /** A rebase landed: the body the server merged our changes into. */
+      merged?: { body_json: Record<string, unknown>; conflicts: number };
+    }
   | { ok: false; conflict: true; note: NoteFull }
   | { ok: false; conflict: false };
 
 /**
  * PATCH a note. Pass `base` (the updated_at this client last saw) to make the
- * write conditional — a 409 comes back with the fresh note. `keepalive` lets
+ * write conditional — a 409 comes back with the fresh note. `rebaseFrom`
+ * (the body our edits started from) turns a body save into a REBASE: the
+ * server 3-way merges our changes onto the current note instead of refusing
+ * a stale copy; `conflictLabel` marks a block kept twice. `keepalive` lets
  * the request outlive the page (pagehide / tab hidden flush).
  */
 export async function updateNote(
   id: string,
   patch: NotePatch,
-  opts: { base?: string | null; keepalive?: boolean } = {},
+  opts: { base?: string | null; keepalive?: boolean; rebaseFrom?: unknown; conflictLabel?: string } = {},
 ): Promise<UpdateNoteResult> {
   try {
-    const body = JSON.stringify(opts.base ? { ...patch, base_updated_at: opts.base } : patch);
+    const payload: Record<string, unknown> = { ...patch };
+    if (opts.base) payload.base_updated_at = opts.base;
+    if (opts.rebaseFrom !== undefined) {
+      payload.rebase_from_base = opts.rebaseFrom ?? null;
+      if (opts.conflictLabel) payload.conflict_label = opts.conflictLabel;
+    }
+    const body = JSON.stringify(payload);
     const res = await fetch("/api/notes/" + id, {
       method: "PATCH",
       credentials: "include",
@@ -269,8 +284,16 @@ export async function updateNote(
       return { ok: false, conflict: true, note: { ...json.note, role: json.role } };
     }
     if (!res.ok) return { ok: false, conflict: false };
-    const json = (await res.json().catch(() => ({}))) as { updated_at?: string | null; body_plain?: string };
-    return { ok: true, updated_at: json.updated_at ?? null, body_plain: json.body_plain };
+    const json = (await res.json().catch(() => ({}))) as {
+      updated_at?: string | null;
+      body_plain?: string;
+      merged?: { body_json?: unknown; conflicts?: unknown };
+    };
+    const merged =
+      json.merged && json.merged.body_json && typeof json.merged.body_json === "object"
+        ? { body_json: json.merged.body_json as Record<string, unknown>, conflicts: Number(json.merged.conflicts) || 0 }
+        : undefined;
+    return { ok: true, updated_at: json.updated_at ?? null, body_plain: json.body_plain, ...(merged ? { merged } : {}) };
   } catch {
     return { ok: false, conflict: false };
   }

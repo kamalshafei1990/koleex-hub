@@ -347,6 +347,7 @@ export const projectsT: Translations = {
 
   /* Viewer (read-only) access */
   "access.viewOnly":     { en: "View only",         zh: "仅查看",            ar: "للعرض فقط" },
-  "access.viewOnlyTip":  { en: "You are a viewer on this project — you can look but not make changes.", zh: "您是此项目的查看者——可以查看但不能更改。", ar: "أنت مشاهد في هذا المشروع — يمكنك الاطلاع دون إجراء تغييرات." },
+  "access.viewOnlyTip":  { en: "You are a viewer on this project — you can look but not make changes, except to tasks you created.", zh: "您是此项目的查看者——可以查看但不能更改，您创建的任务除外。", ar: "أنت مشاهد في هذا المشروع — يمكنك الاطلاع دون إجراء تغييرات، باستثناء المهام التي أنشأتها." },
+  "access.ownTaskEdit":  { en: "You have view-only access to this project, but you can edit this task because you created it or it is assigned to you.", zh: "您对此项目只有查看权限，但由于此任务由您创建或分配给您，您可以编辑它。", ar: "لديك صلاحية العرض فقط في هذا المشروع، لكن يمكنك تعديل هذه المهمة لأنك أنشأتها أو لأنها مسندة إليك." },
   "btn.close":           { en: "Close",             zh: "关闭",              ar: "إغلاق" },
 };

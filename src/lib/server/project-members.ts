@@ -10,9 +10,11 @@ import "server-only";
    is left alone.
 
    Every writer here also mirrors the change into the project's Discuss
-   chat (if one exists): new members join the channel, a removed member
+   chat (if one exists): new members join the channel (a first task
+   assignment makes a member, so assignees join too), a removed member
    leaves it (soft-leave, so re-adding revives the same row) unless they
-   are still the project manager. A role change never touches the chat.
+   still reach the project another way — manager, creator or task assignee
+   (super admin does not count). A role change never touches the chat.
 
    Before the migration is applied the table is missing: reads answer
    { available: false }, writes answer a clear 409, and the automatic sync
@@ -121,18 +123,42 @@ export async function removeProjectMember(
     console.error("[project-members] delete:", error.message);
     return { error: "Failed to remove member", status: 500 };
   }
-  /* The project manager keeps their seat in the chat — the members route
-     already refuses to remove them, this guards any other caller. */
-  const { data: proj } = await supabaseServer
-    .from("projects")
-    .select("manager_account_id")
-    .eq("tenant_id", auth.tenant_id)
-    .eq("id", projectId)
-    .maybeSingle();
-  if ((proj as { manager_account_id: string | null } | null)?.manager_account_id !== accountId) {
+  /* Leave the chat only when the membership row was their LAST way into
+     the project. Someone who still reaches it as manager, creator or task
+     assignee keeps their chat seat (the project stays open to them, so the
+     chat should too). */
+  if (!(await stillReachesProject(auth.tenant_id, projectId, accountId))) {
     await removeAccountFromProjectChannel(auth.tenant_id, projectId, accountId);
   }
   return { ok: true };
+}
+
+/** After a membership row is gone: does <accountId> still reach the project
+ *  by another path — manager, creator, or assignee of any task in it (any
+ *  status; the same involvement rule as project-access.ts)? Super admin is
+ *  deliberately NOT a path: it is a global override, not project
+ *  involvement, so it never keeps anyone in a project chat. On a read
+ *  error it answers true (keep the seat) — a spurious "leave" is the worse
+ *  failure. */
+async function stillReachesProject(tenantId: string, projectId: string, accountId: string): Promise<boolean> {
+  const [proj, tasks] = await Promise.all([
+    supabaseServer
+      .from("projects")
+      .select("manager_account_id, created_by_account_id")
+      .eq("tenant_id", tenantId)
+      .eq("id", projectId)
+      .maybeSingle(),
+    supabaseServer
+      .from("project_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("project_id", projectId)
+      .eq("assignee_account_id", accountId),
+  ]);
+  if (proj.error || tasks.error) return true;
+  const p = proj.data as { manager_account_id: string | null; created_by_account_id: string | null } | null;
+  if (p && (p.manager_account_id === accountId || p.created_by_account_id === accountId)) return true;
+  return (tasks.count ?? 0) > 0;
 }
 
 /** Assigning a task to someone makes them a member (role member) if they
@@ -155,10 +181,14 @@ export async function syncProjectMembersFromAssignees(auth: Auth, projectId: str
       })),
       { onConflict: "project_id,account_id", ignoreDuplicates: true },
     );
-    if (error) {
-      if (!tableMissing(error)) console.error("[project-members] sync:", error.message);
+    if (error && !tableMissing(error)) {
+      console.error("[project-members] sync:", error.message);
       return;
     }
+    /* First assignment ⇒ they join the project chat too (if one exists) —
+       also before the members migration, since the assignment alone
+       already grants project access. addAccountsToProjectChannel is
+       idempotent and never throws. */
     await addAccountsToProjectChannel(auth.tenant_id, projectId, fresh);
   } catch (e) {
     console.error("[project-members] sync:", e);

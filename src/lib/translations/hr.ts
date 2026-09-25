@@ -463,6 +463,7 @@ export const hrT: Translations = {
   "hr.leaveType.breastfeeding":       { en: "Breastfeeding Leave",       zh: "哺乳假",           ar: "إجازة رضاعة" },
   "hr.leaveType.menstrual":           { en: "Menstrual Leave",           zh: "痛经假",           ar: "إجازة الدورة الشهرية" },
   "hr.leaveType.work_injury":         { en: "Work Injury Leave",         zh: "工伤假",           ar: "إجازة إصابة عمل" },
+  "hr.leaveType.business_travel":     { en: "Business Travel",           zh: "出差",             ar: "سفر عمل" },
   "hr.leaveType.medical_appointment": { en: "Medical Appointment Leave", zh: "就医假",           ar: "إجازة موعد طبي" },
   "hr.leaveType.quarantine":          { en: "Quarantine Leave",          zh: "隔离假",           ar: "إجازة حجر صحي" },
   "hr.leaveType.time_off_in_lieu":    { en: "Time Off in Lieu",          zh: "调休",             ar: "إجازة بدل عمل إضافي" },

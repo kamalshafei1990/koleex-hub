@@ -16,9 +16,13 @@
        then send the Yjs state, which the server MERGES (no 409s). Where
        collaboration is unavailable it falls back to the single-editor path
        (a peer's save pings us and we re-fetch). A fallback save on a live
-       note is merged into the Yjs state server-side (409 when stale) and
-       live peers pull it; a transient fallback keeps retrying and REJOINS
-       — pending edits are saved first, then the editor rebinds.
+       note is merged into the Yjs state server-side and live peers pull
+       it; a STALE save (409) is re-sent as a rebase — the server merges
+       our changes onto the newer note (keeping both versions of a block
+       both sides changed) and the editor adopts the merged body, with
+       anything typed meanwhile re-applied on top. Unsaved typing is never
+       dropped. A transient fallback keeps retrying and REJOINS — pending
+       edits are saved first, then the editor rebinds.
      • "/" block menu, "[[" note links + Backlinks, checklist → To-do,
        version history, Koleex AI (summary / action items), duplicate,
        Markdown export, print / PDF, Send to Discuss, a phone keyboard bar
@@ -58,6 +62,7 @@ import {
 } from "@/lib/notes";
 import { NOTES_IMAGE_MIME } from "@/lib/notes-policy";
 import { getTabClientId, useNoteCollab, type NoteUpdate } from "@/lib/note-collab";
+import { mergeDocs, stableKey } from "@/lib/notes-merge3";
 import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink } from "@/lib/notes-schema";
 import { NoteYjsSession, fetchCollabJoin, peerColor } from "@/lib/notes-yjs";
 import { noteFileName, noteToMarkdown } from "@/lib/notes-markdown";
@@ -224,7 +229,9 @@ export type EditorChange = {
   collab?: boolean;
 };
 
-export type SaveResult = "ok" | "error" | "conflict";
+/** "conflict" is kept for callers that cannot merge; the notes app now
+ *  answers a stale save with the MERGED body instead (a rebase). */
+export type SaveResult = "ok" | "error" | "conflict" | { merged: Record<string, unknown>; conflicts: number };
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 export interface NoteEditorProps {
@@ -411,6 +418,8 @@ export default function NoteEditor({
   const inflightRef = useRef<Map<string, Promise<void>>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const broadcastRef = useRef<(o?: { body?: boolean }) => void>(() => {});
+  /** Show a rebased save's merged body (set once the editor exists). */
+  const adoptMergedRef = useRef<(id: string, sent: unknown, merged: Record<string, unknown>) => void>(() => {});
 
   const sendNote = useCallback(async (id: string, keepalive = false): Promise<void> => {
     if (!keepalive) {
@@ -434,14 +443,18 @@ export default function NoteEditor({
             // pings too — this covers a server without realtime config).
             broadcastRef.current({ body: !payload.yjs_update && "body_json" in payload });
           }
-        } else if (res === "error") {
+        } else if (res === "error" || res === "conflict") {
           // Keep the edits: newer pending changes win over the failed ones.
           pendingRef.current.set(id, { ...payload, ...(pendingRef.current.get(id) ?? {}) });
+        } else {
+          // A stale save was REBASED: the server merged our changes onto a
+          // newer version. Show that version (plus anything typed since).
+          if (id === noteIdRef.current) adoptMergedRef.current(id, payload.body_json, res.merged);
         }
-        // "conflict": the parent reloaded the note; these edits are void.
-        // A fallback client is stale because the live session moved on —
-        // try to rejoin it rather than keep saving an old copy.
-        else if (res === "conflict" && id === noteIdRef.current && fallbackRetryRef.current) {
+        // Stale (merged, or refused): a fallback client is behind because
+        // the live session moved on — try to rejoin it rather than keep
+        // saving on the single-editor path.
+        if (res !== "ok" && res !== "error" && id === noteIdRef.current && fallbackRetryRef.current) {
           setJoinTick((n) => n + 1);
         }
       })
@@ -559,6 +572,32 @@ export default function NoteEditor({
   }, [activeSession]);
 
   useEffect(() => () => { if (countTimer.current) clearTimeout(countTimer.current); }, []);
+
+  /* A rebased save came back with the MERGED body (our changes re-applied
+     onto a newer version of the note). A solo editor adopts it; whatever
+     was typed while the save was in flight is merged on top once more
+     (sent → now, onto merged) and queued, so no keystroke is lost. A live
+     editor needs nothing — the merged state reaches it as a Yjs pull. */
+  useEffect(() => {
+    adoptMergedRef.current = (id, sent, merged) => {
+      const ed = editor;
+      if (!ed || ed.isDestroyed || sessionRef.current || noteIdRef.current !== id) return;
+      const now = ed.getJSON();
+      const typedSince = stableKey(now) !== stableKey(sent ?? null);
+      const target = typedSince ? mergeDocs(sent, now, merged, t("conflict.copyLabel")).doc : merged;
+      if (stableKey(target) === stableKey(now)) return;
+      const { from, to } = ed.state.selection;
+      try {
+        ed.commands.setContent(target as never, { emitUpdate: false });
+      } catch {
+        return; // malformed — keep what is on screen (still pending)
+      }
+      const size = ed.state.doc.content.size;
+      try { ed.commands.setTextSelection({ from: Math.min(from, size), to: Math.min(to, size) }); } catch { /* ignore */ }
+      setCounts(countWords(ed.getText()));
+      if (typedSince) queueChange({ body_json: ed.getJSON() });
+    };
+  }, [editor, t, queueChange]);
 
   // Placeholder follows the UI language.
   useEffect(() => {

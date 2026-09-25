@@ -13,7 +13,8 @@ import "server-only";
    Access — the SAME rules as the single-task routes, per task:
      · the project gate with { write: true } (super admin, manager, creator,
        non-viewer member, assignee of a task in it), OR
-     · the task's own assignee / creator (assertTaskAccess's first path).
+     · the task's own assignee / creator (ownsTask — the same per-task rule
+       assertTaskWrite applies, and what `can_edit` in task payloads shows).
    Any task outside the caller's reach fails the WHOLE request (403) —
    nothing is half-applied.
 
@@ -25,7 +26,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
-import { assertProjectAccess, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, ownsTask, UUID_RE } from "@/lib/server/project-access";
 import {
   checkDateOrder,
   loadStages,
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
   const writable = new Set(projectIds.filter((_, i) => !(gates[i] instanceof NextResponse)));
   for (const r of rows) {
     if (writable.has(r.project_id)) continue;
-    if (r.assignee_account_id === auth.account_id || r.created_by_account_id === auth.account_id) continue;
+    if (ownsTask(auth, r)) continue;
     return bad("Forbidden", 403);
   }
 

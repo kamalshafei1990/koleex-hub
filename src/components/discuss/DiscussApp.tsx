@@ -138,7 +138,9 @@ import {
 import { findMentionQuery, normalizeMentions, rankMentionCandidates } from "@/lib/discuss-mentions";
 import { setActiveDiscussChannel } from "@/lib/discuss-active-store";
 import {
+  clearOutboxMediaUrls,
   outboxBubble,
+  outboxMediaUrlsFor,
   putDiscussOutbox,
   readDiscussOutbox,
   removeDiscussOutbox,
@@ -149,6 +151,7 @@ import {
   previewUrlsFor,
   rekeyPreviewUrls,
   releasePreviewUrls,
+  releasePreviewUrlsExcept,
   releaseAllPreviewUrls,
 } from "@/lib/discuss-object-urls";
 import {
@@ -264,9 +267,23 @@ function rowUnread(c: DiscussChannelListRow): number {
 function withMuted(c: DiscussChannelListRow, muted: boolean): DiscussChannelListRow {
   const n = rowUnread(c);
   if (muted) {
-    return { ...c, muted, unread_count: 0, muted_unread_count: n || (c.marked_unread ? 1 : 0), marked_unread: false };
+    const markOnly = n === 0 && c.marked_unread === true;
+    return {
+      ...c,
+      muted,
+      unread_count: 0,
+      muted_unread_count: markOnly ? 1 : n,
+      marked_unread: false,
+      muted_mark_only: markOnly,
+    };
   }
-  return { ...c, muted, unread_count: n, muted_unread_count: 0 };
+  /* Unmuting a chat whose muted "1" was only a manual mark: it is a dot
+     again (marked_unread, no count), exactly what the server read returns
+     for it — not a "1" until the next refresh. */
+  if (c.muted_mark_only && n <= 1) {
+    return { ...c, muted, unread_count: 0, muted_unread_count: 0, marked_unread: true, muted_mark_only: false };
+  }
+  return { ...c, muted, unread_count: n, muted_unread_count: 0, muted_mark_only: false };
 }
 
 /** Undo an optimistic withMuted() from the row as it was before. */
@@ -277,6 +294,7 @@ function restoreMuteCounts(c: DiscussChannelListRow, before: DiscussChannelListR
     unread_count: before.unread_count,
     muted_unread_count: before.muted_unread_count,
     marked_unread: before.marked_unread,
+    muted_mark_only: before.muted_mark_only,
   };
 }
 
@@ -447,6 +465,16 @@ export default function DiscussApp() {
      would keep one user's bytes alive across a session boundary. Safe to call
      repeatedly — releaseAllPreviewUrls() is idempotent. */
   useEffect(() => releaseAllPreviewUrls, []);
+  /* Failed sends keep their previews across conversation switches (see
+     handleSelectChannel), so an ACCOUNT change must drop them explicitly —
+     one account's unsent clip never survives into another's session. */
+  useEffect(
+    () => () => {
+      releaseAllPreviewUrls();
+      clearOutboxMediaUrls();
+    },
+    [accountId],
+  );
 
   /* ── Mobile column swap ───────────────────────────────────────── */
   const [mobileView, setMobileView] = useState<"list" | "thread" | "details">(
@@ -697,6 +725,9 @@ export default function DiscussApp() {
       }
       for (const id of settled) tempIds.add(`temp_${id}`);
       if (settled.length > 0) removeDiscussOutbox(accountId, settled);
+      /* Sent after all: the canonical row renders from the first-party
+         route, so the kept local previews have no reader any more. */
+      for (const id of tempIds) releasePreviewUrls(id.replace(/^temp_/, ""));
       if (tempIds.size === 0) return;
       const drop = (prev: ReadonlySet<string>) => {
         if (![...tempIds].some((id) => prev.has(id))) return prev;
@@ -1034,7 +1065,12 @@ export default function DiscussApp() {
               : existing.last_message,
             /* Muted rows count in muted_unread_count (kept off the badges). */
             unread_count: bump && !existing.muted ? existing.unread_count + 1 : existing.unread_count,
-            muted_unread_count: (existing.muted_unread_count ?? 0) + (bump && existing.muted ? 1 : 0),
+            /* A real message replaces a folded "unread" mark (1 → 1, not 2). */
+            muted_unread_count:
+              bump && existing.muted
+                ? (existing.muted_mark_only ? 0 : existing.muted_unread_count ?? 0) + 1
+                : existing.muted_unread_count ?? 0,
+            muted_mark_only: bump && existing.muted ? false : existing.muted_mark_only,
           };
           const rest = prev.filter((_, i) => i !== idx);
           return [next, ...rest];
@@ -1105,7 +1141,11 @@ export default function DiscussApp() {
               const bump = !(isMine || isSelected || !firstSighting);
               return {
                 unread_count: bump && !existing.muted ? existing.unread_count + 1 : existing.unread_count,
-                muted_unread_count: (existing.muted_unread_count ?? 0) + (bump && existing.muted ? 1 : 0),
+                muted_unread_count:
+                  bump && existing.muted
+                    ? (existing.muted_mark_only ? 0 : existing.muted_unread_count ?? 0) + 1
+                    : existing.muted_unread_count ?? 0,
+                muted_mark_only: bump && existing.muted ? false : existing.muted_mark_only,
               };
             })(),
           };
@@ -1560,7 +1600,7 @@ export default function DiscussApp() {
         }
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === selectedChannelId ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false } : c,
+            c.id === selectedChannelId ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false, muted_mark_only: false } : c,
           ),
         );
         if (typeof window !== "undefined") {
@@ -1740,9 +1780,14 @@ export default function DiscussApp() {
       /* Switching conversations tears down every pending bubble in the old
          one, so their previews have no reader left. Releasing here is what
          stops object URLs accumulating for the whole session as the user
-         browses. (A failed send keeps its text/payload in the outbox and is
-         redrawn on return — only the local preview is gone.) */
-      releaseAllPreviewUrls();
+         browses. EXCEPT a failed send: it is still a live message, redrawn
+         from the outbox on return, and a voice clip / image that only exists
+         as its Blob would lose its local playback. Those are released when
+         the bubble is sent or deleted (or on unmount / account switch). */
+      const stillFailed = new Set<string>();
+      for (const p of failedPayloadsRef.current.values()) stillFailed.add(p.clientMsgId);
+      if (accountId) for (const e of readDiscussOutbox(accountId)) stillFailed.add(e.clientMsgId);
+      releasePreviewUrlsExcept(stillFailed);
       setThreadTarget(null);
       setReplyTarget(null);
       setEditingMessageId(null);
@@ -1763,7 +1808,7 @@ export default function DiscussApp() {
     setProductPickerOpen(false);
     setMentionPickerOpen(false);
     setEmojiPickerOpen(false);
-  }, []);
+  }, [accountId]);
 
   const handleStartDirect = useCallback(
     async (otherId: string) => {
@@ -2021,7 +2066,14 @@ export default function DiscussApp() {
          bubble gets `media` (display fields + canonical index) exactly like a
          server-returned row. The wire `metadata` above is passed separately to
          sendDiscussMessage(). */
-      metadata: { media: optimisticMedia },
+      /* Mentions and products are display-safe (the server returns them on
+         the canonical row too): carrying them lets a pending / "Not sent"
+         bubble highlight @mentions through the same path as a sent one. */
+      metadata: {
+        media: optimisticMedia,
+        ...(sentMentions.length > 0 ? { mentions: sentMentions } : {}),
+        ...(composerProducts.length > 0 ? { products: composerProducts } : {}),
+      },
       edited_at: null,
       deleted_at: null,
       created_at: new Date().toISOString(),
@@ -2590,7 +2642,11 @@ export default function DiscussApp() {
        on unmute) right away, not on the next recount. Muting also takes a
        manual "unread" mark off the badges. */
     if (next) announceUnread(id, 0, false);
-    else announceUnread(id, rowUnread(ch));
+    else {
+      /* Same shape as the row: a mark-only chat comes back as the dot. */
+      const back = withMuted(ch, false);
+      announceUnread(id, back.unread_count ?? 0, back.marked_unread === true);
+    }
     showToast(
       next
         ? t("notif.muted", "Channel muted")
@@ -2666,7 +2722,10 @@ export default function DiscussApp() {
       /* Muting takes a manual "unread" mark off the badges too; unmuting puts
          the row's whole count (including such a mark) back on them. */
       if (next) announceUnread(ch.id, 0, false);
-      else announceUnread(ch.id, rowUnread(ch));
+      else {
+        const back = withMuted(ch, false);
+        announceUnread(ch.id, back.unread_count ?? 0, back.marked_unread === true);
+      }
       showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
     },
     [accountId, showToast, showError, t],
@@ -2679,7 +2738,7 @@ export default function DiscussApp() {
       if (isUnread) {
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === ch.id ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false } : c,
+            c.id === ch.id ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false, muted_mark_only: false } : c,
           ),
         );
         await markChannelRead(ch.id, accountId);
@@ -2693,7 +2752,15 @@ export default function DiscussApp() {
            bell / home badges — the same shape the server read returns. */
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === ch.id ? { ...c, muted_unread_count: Math.max(1, c.muted_unread_count ?? 0), marked_unread: false } : c,
+            c.id === ch.id
+              ? {
+                  ...c,
+                  muted_unread_count: Math.max(1, c.muted_unread_count ?? 0),
+                  marked_unread: false,
+                  /* Only a mark (no real unread): unmuting shows the dot. */
+                  muted_mark_only: (c.muted_unread_count ?? 0) === 0,
+                }
+              : c,
           ),
         );
         await markChannelUnread(ch.id);
@@ -2749,7 +2816,7 @@ export default function DiscussApp() {
     setChannels((prev) =>
       prev.map((c) =>
         rowUnread(c) > 0 || c.marked_unread
-          ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false }
+          ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false, muted_mark_only: false }
           : c,
       ),
     );
@@ -4818,6 +4885,9 @@ function MessageBubble({
      an empty map for every received message, since a recipient must never be
      handed an object: URL. */
   const localPreviews = previewUrlsFor(msg.client_msg_id);
+  /* A "Not sent" bubble restored after a reload has no Blob any more; its
+     already-uploaded media previews through /api/discuss/pending-media. */
+  const pendingMedia = isTemp ? outboxMediaUrlsFor(msg.client_msg_id) : {};
   const attachmentMedia = media.filter((m) => m.kind === "attachment");
   const voiceMedia = media.find((m) => m.kind === "voice") ?? null;
   /* A message that is NOTHING but photos: the picture is the whole payload,
@@ -5120,7 +5190,12 @@ function MessageBubble({
                     first-party route, which re-checks membership on every Range
                     request while seeking. */}
                 <VoicePlaybackBubble
-                  src={discussAttachmentUrl(msg.id, voiceMedia.index) ?? localPreviews?.[voiceMedia.index] ?? null}
+                  src={
+                    discussAttachmentUrl(msg.id, voiceMedia.index) ??
+                    localPreviews?.[voiceMedia.index] ??
+                    pendingMedia[voiceMedia.index] ??
+                    null
+                  }
                   durationMs={voiceMedia.duration_ms ?? 0}
                   waveform={voiceMedia.waveform ?? []}
                 />
@@ -5149,7 +5224,7 @@ function MessageBubble({
                     attachment={m}
                     messageId={msg.id}
                     index={m.index}
-                    localPreviewUrl={localPreviews?.[m.index] ?? null}
+                    localPreviewUrl={localPreviews?.[m.index] ?? pendingMedia[m.index] ?? null}
                     bare={isPhotoOnly}
                     t={t}
                   />

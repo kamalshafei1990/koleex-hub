@@ -17,6 +17,8 @@ import {
   mergeState,
   notesCollabAvailable,
   pingNoteBodyChanged,
+  rebaseBody,
+  rebaseOntoState,
 } from "@/lib/notes-yjs-server";
 import { afterContentSaved } from "@/lib/notes-history-server";
 
@@ -27,7 +29,9 @@ import { afterContentSaved } from "@/lib/notes-history-server";
                             only. Optimistic concurrency: when the body carries
                             `base_updated_at`, the write only lands if the row
                             still has that updated_at; otherwise 409 + the
-                            fresh note so the client can reload it.
+                            fresh note, and the client re-sends its body as
+                            a REBASE (below) — it never reloads over its
+                            unsaved typing.
                             COLLABORATIVE save (shared note, Yjs): the body
                             carries `yjs_update` (the client's full Yjs
                             state, base64) instead of body_json. It is MERGED
@@ -42,6 +46,19 @@ import { afterContentSaved } from "@/lib/notes-history-server";
                             derived from the merge, and the note's live
                             peers are pinged to pull it. Guarded by the
                             base token → a stale copy gets a 409.
+                            REBASE (a stale single-editor save after its
+                            409): body_json + `rebase_from_base` (the body
+                            the client's edits started from). The client's
+                            changes base → body_json are 3-way merged onto
+                            the note's CURRENT body (notes-merge3; for a
+                            Yjs note, onto the stored state via the block
+                            matcher) — never a 409, nothing typed is lost;
+                            a same-block conflict keeps both versions, the
+                            local one labelled `conflict_label`. Responds
+                            with the merged body + conflict count.
+                            A body_json save carries a base token (or is a
+                            rebase): without one → 400, so no caller can
+                            blindly overwrite newer saved content.
                             Every landed content save then (after the
                             response) snapshots a version (≤ 1 / 10 min) and
                             refreshes the note's outgoing links.
@@ -231,6 +248,84 @@ async function singleEditorBodyPatch(
   return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
 }
 
+/**
+ * REBASE a stale single-editor body save (the client got a 409): re-apply
+ * the client's own changes (base → local) on top of the note as it is NOW.
+ * Optimistic loop like the other writers — a racing save just re-merges.
+ * The response carries the merged body so the client can show it (and
+ * keep typing on top of it) without dropping anything.
+ */
+async function rebasePatch(
+  id: string,
+  patch: Record<string, unknown>,
+  baseBody: unknown,
+  conflictLabel: string,
+  collab: boolean,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select(collab ? "body_json, updated_at, yjs_state" : "body_json, updated_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH rebase read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as unknown as { body_json: unknown; updated_at: string; yjs_state?: string | null };
+    const write: Record<string, unknown> = { ...patch };
+    let bodyJson: Record<string, unknown>;
+    let conflicts: number;
+    if (row.yjs_state) {
+      const r = rebaseOntoState(row.yjs_state, baseBody, patch.body_json, conflictLabel);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      bodyJson = r.bodyJson;
+      conflicts = r.conflicts;
+      write.yjs_state = r.state;
+    } else {
+      const r = rebaseBody(row.body_json, baseBody, patch.body_json, conflictLabel);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      bodyJson = r.bodyJson;
+      conflicts = r.conflicts;
+    }
+    if (JSON.stringify(bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
+      return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+    }
+    write.body_json = bodyJson;
+    write.body_plain = extractPlainText(bodyJson);
+
+    let q = supabaseServer.from("notes").update(write).eq("id", id).eq("updated_at", row.updated_at);
+    if (collab && !row.yjs_state) q = q.is("yjs_state", null);
+    const { data, error } = await q.select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH rebase]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    if (!saved) continue; // someone saved (or seeded) in between — merge again
+    const hadState = !!row.yjs_state;
+    after(async () => {
+      if (hadState) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson,
+        bodyChanged: true,
+      });
+    });
+    return NextResponse.json({
+      ok: true,
+      updated_at: saved.updated_at,
+      merged: { body_json: bodyJson, conflicts },
+      body_plain: (write.body_plain as string).slice(0, NOTE_LIMITS.preview),
+    });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -281,6 +376,26 @@ export async function PATCH(
     incoming && typeof incoming === "object" && typeof (incoming as { base_updated_at?: unknown }).base_updated_at === "string"
       ? ((incoming as { base_updated_at: string }).base_updated_at)
       : null;
+  const src = (incoming ?? {}) as Record<string, unknown>;
+  const rebaseFrom = "rebase_from_base" in src ? src.rebase_from_base : undefined;
+  if ("body_json" in patch) {
+    if (rebaseFrom !== undefined) {
+      // The base body is only compared against — validate its shape + size.
+      let size = 0;
+      try { size = JSON.stringify(rebaseFrom ?? null).length; } catch { size = Infinity; }
+      if (rebaseFrom !== null && (typeof rebaseFrom !== "object" || Array.isArray(rebaseFrom))) {
+        return NextResponse.json({ error: "Invalid base body" }, { status: 400 });
+      }
+      if (size > NOTE_LIMITS.bodyJsonBytes) return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+    } else if (!base) {
+      // No token and no base body: the save cannot tell what the client
+      // changed, so it could only overwrite — refuse. (Every caller sends
+      // one: the editor's saves, version restore and the rename dialog.)
+      return NextResponse.json({ error: "base_updated_at is required for a body save" }, { status: 400 });
+    }
+  }
+  const conflictLabel =
+    typeof src.conflict_label === "string" ? src.conflict_label.replace(/\s+/g, " ").trim().slice(0, 60) : "";
 
   /* Only a CONTENT change moves updated_at (the concurrency token and the
      list's recency sort). Organising a note — pin, move to a folder — must
@@ -305,6 +420,15 @@ export async function PATCH(
       { status: 409 },
     );
   };
+
+  /* A stale body save re-sent as a rebase: merge the client's changes onto
+     the current note instead of refusing it. */
+  if (bodyChanged && rebaseFrom !== undefined) {
+    return rebasePatch(id, patch, rebaseFrom, conflictLabel || "Conflict copy", await notesCollabAvailable(), {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
+  }
 
   /* A body save where live co-editing exists: never reset the Yjs state —
      express the body as a Yjs update and merge it. */

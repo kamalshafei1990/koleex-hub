@@ -147,6 +147,15 @@ export interface TaskRow {
   project?: Pick<ProjectRow, "id" | "name" | "color"> | null;
   stage?: Pick<ProjectStage, "id" | "name" | "color" | "is_closed" | "is_default_new" | "sort_order"> | null;
   assignee?: { id: string; username: string } | null;
+  created_by_account_id?: string | null;
+  /** Server-computed (task list / detail / create / update payloads): the
+   *  caller may write THIS task — project access manage/edit, or they are
+   *  its assignee / creator (a view-only member keeps edit rights on the
+   *  tasks they created). Absent on older payloads = follow the project. */
+  can_edit?: boolean;
+  /** The caller's project-level access for the task's project — creating
+   *  a subtask is a project write, so the subtasks panel follows this. */
+  project_access?: ProjectAccess;
 }
 
 export const PRIORITY_COLOR: Record<TaskPriority, string> = {

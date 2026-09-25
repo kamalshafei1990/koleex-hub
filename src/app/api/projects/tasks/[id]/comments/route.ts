@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskComment } from "@/lib/server/project-notify";
-import { assertTaskAccess } from "@/lib/server/project-access";
+import { assertTaskAccess, assertTaskWrite } from "@/lib/server/project-access";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertTaskAccess(auth, id, { write: true });
+  const gate = await assertTaskWrite(auth, id);
   if (gate instanceof NextResponse) return gate;
 
   const { body } = (await req.json().catch(() => ({}))) as { body?: string };

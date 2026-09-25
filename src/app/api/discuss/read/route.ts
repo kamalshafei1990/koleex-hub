@@ -332,6 +332,9 @@ export async function GET(req: Request) {
                  every badge adds marked_unread as 1, and a muted chat must
                  stay off all of them. */
               muted_unread_count: st?.muted ? unreadN || (st?.marked_unread ? 1 : 0) : 0,
+              /* …and says when that 1 is only the mark, so unmuting shows
+                 the dot again instead of a count. */
+              muted_mark_only: !!st?.muted && unreadN === 0 && st?.marked_unread === true,
               last_read_at: st?.last_read_at ?? null,
               muted: st?.muted ?? false,
               notification_pref: st?.notification_pref ?? "all",

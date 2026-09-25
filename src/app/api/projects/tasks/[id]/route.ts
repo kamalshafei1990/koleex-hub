@@ -4,7 +4,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned, clearTaskNotifications } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { assertTaskAccess } from "@/lib/server/project-access";
+import { assertTaskAccess, assertTaskWrite, taskEditFlags } from "@/lib/server/project-access";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
 import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
@@ -50,7 +50,11 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     return NextResponse.json({ error: "Failed to load task" }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ task: data });
+  /* can_edit / project_access: what assertTaskWrite would answer, so the
+     task form enables exactly the writes the server accepts. */
+  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
+  const flags = (await taskEditFlags(auth, [gate.task], canEditModule)).get(id);
+  return NextResponse.json({ task: { ...data, can_edit: flags?.can_edit ?? false, project_access: flags?.project_access ?? "view" } });
 }
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
@@ -59,7 +63,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertTaskAccess(auth, id, { write: true });
+  const gate = await assertTaskWrite(auth, id);
   if (gate instanceof NextResponse) return gate;
   const prev = gate.task;
 
@@ -108,7 +112,8 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     await recomputeProjectProgress(auth.tenant_id, prev.project_id);
   });
 
-  return NextResponse.json({ task: data });
+  const flags = (await taskEditFlags(auth, [prev], true)).get(id);
+  return NextResponse.json({ task: { ...data, can_edit: true, project_access: flags?.project_access ?? "view" } });
 }
 
 export async function DELETE(_req: Request, { params }: RouteCtx) {
@@ -117,7 +122,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "delete");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertTaskAccess(auth, id, { write: true });
+  const gate = await assertTaskWrite(auth, id);
   if (gate instanceof NextResponse) return gate;
 
   /* Collect storage paths BEFORE the cascade removes the attachment rows

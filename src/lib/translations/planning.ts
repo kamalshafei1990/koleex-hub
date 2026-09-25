@@ -30,6 +30,9 @@ export const planningT: Translations = {
   "sched.conflictWarn":  { en: "Double-booked:",    zh: "重复排班：",          ar: "حجز مزدوج:" },
   "sched.conflictWarnTail": { en: "items overlap on the same resource this week — highlighted in red.", zh: "个班次本周在同一资源上重叠——已用红色标出。", ar: "عناصر متداخلة على نفس المورد هذا الأسبوع — مميزة بالأحمر." },
   "sched.onLeave":       { en: "On leave",          zh: "休假中",             ar: "في إجازة" },
+  "sched.outOfOffice":   { en: "Out of office",     zh: "不在办公室",          ar: "خارج المكتب" },
+  "sched.allDay":        { en: "All day",           zh: "全天",               ar: "طوال اليوم" },
+  "sched.outOfOfficeHint": { en: "From their Calendar — details stay private", zh: "来自其日历——详情保密", ar: "من تقويمه — تبقى التفاصيل خاصة" },
 
   /* Super-admin audience lens */
   "sa.viewOwn": { en: "My view",   zh: "我的视图", ar: "عرضي" },

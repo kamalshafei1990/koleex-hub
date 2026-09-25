@@ -22,7 +22,10 @@ import "server-only";
 
    Members (2026-09-26): a project_members row grants access. Role
    'viewer' is READ-ONLY — when viewer membership is the caller's ONLY way
-   in, a gate called with { write: true } answers 403. Until the
+   in, a gate called with { write: true } answers 403 — except that a
+   task's own assignee or creator keeps write access to THAT task whatever
+   their project role (ownsTask / assertTaskWrite; task payloads carry the
+   matching per-task `can_edit` so the UI agrees). Until the
    20260926_projects_additions migration is applied the table is missing;
    every lookup here treats that as "no memberships" (never an error).
    --------------------------------------------------------------------------- */
@@ -136,6 +139,21 @@ export async function assertProjectAccess(
   return forbidden();
 }
 
+/** THE per-task write rule, shared by every task write route (the
+ *  [id] / checklist / comments / time / attachments routes through
+ *  assertTaskWrite, bulk and reorder directly) and by taskEditFlags for the
+ *  UI: a task's own assignee or creator keeps edit rights on THAT task even
+ *  when their project access is view-only (viewer membership, or no
+ *  membership at all). Everything else in the project follows the project
+ *  gate. The Projects module's edit action is checked separately by each
+ *  route (requireModuleAction) — without it nothing is writable. */
+export function ownsTask(
+  auth: Pick<AccessAuth, "account_id">,
+  task: { assignee_account_id: string | null; created_by_account_id: string | null },
+): boolean {
+  return task.assignee_account_id === auth.account_id || task.created_by_account_id === auth.account_id;
+}
+
 /** Load a task the caller may see (tasks-list rule, plus project rule). */
 export async function assertTaskAccess(
   auth: AccessAuth,
@@ -161,16 +179,20 @@ export async function assertTaskAccess(
   const project = (pData as ProjectAccessRow | null) ?? null;
   if (!project) return notFound();
 
-  if (
-    auth.is_super_admin ||
-    task.assignee_account_id === auth.account_id ||
-    task.created_by_account_id === auth.account_id ||
-    managesOrCreated(auth, project)
-  ) {
+  if (auth.is_super_admin || ownsTask(auth, task) || managesOrCreated(auth, project)) {
     return { task, project };
   }
   if ((await memberOrAssignee(auth, project.id, opts)) === "ok") return { task, project };
   return forbidden();
+}
+
+/** The write gate for one task: the project gate with { write: true }, or
+ *  ownsTask. Every task sub-route that mutates goes through this. */
+export function assertTaskWrite(
+  auth: AccessAuth,
+  taskId: string,
+): Promise<{ task: TaskAccessRow; project: ProjectAccessRow } | NextResponse> {
+  return assertTaskAccess(auth, taskId, { write: true });
 }
 
 /** Resolve a stage to its project and apply the project gate. */
@@ -246,6 +268,41 @@ export async function projectAccessLevels(
   for (const id of rest) {
     const role = roleOf.get(id);
     out.set(id, role === "manager" ? "manage" : role === "member" || hasTask.has(id) ? "edit" : "view");
+  }
+  return out;
+}
+
+/** Per-task `can_edit` for task payloads, so the UI enables exactly what
+ *  assertTaskWrite allows: project access manage/edit, or ownsTask. Also
+ *  returns the project-level access per task (`project_access`) — the
+ *  subtasks panel needs it, since creating a subtask is a project write.
+ *  Batched: one projects read + projectAccessLevels' two queries. */
+export interface TaskEditFlags { can_edit: boolean; project_access: ProjectAccessLevel }
+
+export async function taskEditFlags(
+  auth: AccessAuth,
+  tasks: { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id?: string | null }[],
+  canEditModule: boolean,
+): Promise<Map<string, TaskEditFlags>> {
+  const out = new Map<string, TaskEditFlags>();
+  if (tasks.length === 0) return out;
+  const pids = [...new Set(tasks.map((t) => t.project_id))];
+  let levels = new Map<string, ProjectAccessLevel>();
+  if (canEditModule) {
+    const { data } = await supabaseServer
+      .from("projects")
+      .select("id, manager_account_id, created_by_account_id")
+      .eq("tenant_id", auth.tenant_id)
+      .in("id", pids);
+    levels = await projectAccessLevels(auth, (data ?? []) as ProjectAccessRow[], true);
+  }
+  for (const t of tasks) {
+    const level = canEditModule ? levels.get(t.project_id) ?? "view" : "view";
+    const can_edit =
+      canEditModule &&
+      (auth.is_super_admin || level !== "view" ||
+        ownsTask(auth, { assignee_account_id: t.assignee_account_id, created_by_account_id: t.created_by_account_id ?? null }));
+    out.set(t.id, { can_edit, project_access: level });
   }
   return out;
 }

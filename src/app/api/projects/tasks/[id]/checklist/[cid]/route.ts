@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertTaskAccess } from "@/lib/server/project-access";
+import { assertTaskWrite } from "@/lib/server/project-access";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string; cid: string }> };
@@ -13,7 +13,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id, cid } = await params;
-  const gate = await assertTaskAccess(auth, id, { write: true });
+  const gate = await assertTaskWrite(auth, id);
   if (gate instanceof NextResponse) return gate;
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id, cid } = await params;
-  const gate = await assertTaskAccess(auth, id, { write: true });
+  const gate = await assertTaskWrite(auth, id);
   if (gate instanceof NextResponse) return gate;
 
   const { error } = await supabaseServer

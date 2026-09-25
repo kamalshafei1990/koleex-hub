@@ -515,6 +515,7 @@ export function TaskFormModal({
   tags,
   allTasks = [],
   readOnly = false,
+  subtasksReadOnly = readOnly,
   onClose,
   onSaved,
 }: {
@@ -524,9 +525,13 @@ export function TaskFormModal({
   stages: ProjectStage[];
   tags: ProjectTag[];
   allTasks?: TaskRow[];
-  /** The caller's project access is "view": every field is disabled and
+  /** The caller may not write THIS task (project access "view" and not its
+   *  assignee / creator — see TaskRow.can_edit): every field is disabled and
    *  save / delete / schedule are gone (the write routes would 403). */
   readOnly?: boolean;
+  /** Adding subtasks is a PROJECT write: a viewer who created this task
+   *  edits it, but cannot add subtasks. Defaults to `readOnly`. */
+  subtasksReadOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -554,6 +559,9 @@ export function TaskFormModal({
   const [scheduling, setScheduling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("details");
+
+  /* Editable only because it is the caller's own task (view-only project). */
+  const ownEditNote = !readOnly && editing?.can_edit === true && editing.project_access === "view";
 
   const save = async () => {
     if (readOnly || !title.trim() || saving) return;
@@ -711,7 +719,7 @@ export function TaskFormModal({
       {toastElement}
       {editing && detailTab !== "details" && (
         <div className="px-5 py-4 overflow-y-auto" role="tabpanel">
-          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={readOnly} />}
+          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={subtasksReadOnly} />}
           {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "comments" && <CommentsPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "time" && <TimePanel taskId={editing.id} readOnly={readOnly} />}
@@ -721,6 +729,9 @@ export function TaskFormModal({
 
       {/* A disabled fieldset disables every control inside it — the whole
           form reads but cannot change for a viewer. */}
+      {editing && ownEditNote && (
+        <p className="mx-5 mt-3 -mb-1 px-3 py-2 rounded-lg bg-[var(--bg-surface)] text-[11.5px] text-[var(--text-dim)]">{t("access.ownTaskEdit")}</p>
+      )}
       <fieldset disabled={readOnly} className={`min-w-0 px-5 py-4 space-y-3 overflow-y-auto ${editing && detailTab !== "details" ? "hidden" : ""}`}>
         <Field label={t("task.namePh")}>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("task.namePh")} className={inputCls} />
@@ -913,6 +924,8 @@ export function FlatTaskFormModal({
       presetStageId={null}
       stages={stages}
       tags={tags}
+      readOnly={editing.can_edit === false}
+      subtasksReadOnly={editing.can_edit === false || editing.project_access === "view"}
       onClose={onClose}
       onSaved={onSaved}
     />

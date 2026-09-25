@@ -14,6 +14,12 @@
                            so live peers' concurrent edits — which are other
                            CRDT items — survive the merge instead of being
                            wiped by a last-writer-wins overwrite.
+     · rebaseOntoState / rebaseBody — a STALE single-editor save (its base
+                           is older than the note): the client's own changes
+                           (base → local) are 3-way merged onto the current
+                           document (notes-merge3), then written like any
+                           single-editor save. Nothing typed is dropped; a
+                           real same-block conflict keeps both versions.
 
    Every result carries the body DERIVED from the merged document and
    validated against the note schema, so body_json / body_plain always match
@@ -26,6 +32,7 @@ import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import { prosemirrorJSONToYDoc, updateYFragment, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
 import { NOTES_YJS_FIELD, notesSchemaExtensions } from "@/lib/notes-schema";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
+import { charDiff, mergeDocs } from "@/lib/notes-merge3";
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -100,9 +107,12 @@ export function mergeState(stored: string | null, incomingB64: string): MergeRes
    concurrent typing would land in the wrong paragraph. So the top level is
    diffed here first: unchanged blocks are matched by content (LCS) and keep
    their CRDT identity untouched; among the changed ones, a removed block is
-   updated IN PLACE only when a similar block replaces it (then
-   updateYFragment's text diff preserves concurrent typing inside it);
-   everything else is a real delete / insert. */
+   updated IN PLACE when a similar block replaces it, or — failing that —
+   when a block of the same type sits at the same position among the
+   changes (a near-total rewrite of a paragraph is still that paragraph).
+   In-place updates diff the text CHARACTER BY CHARACTER on the existing
+   XmlText (syncTextInPlace), so a live peer's concurrent typing inside the
+   block survives the merge. Everything else is a real delete / insert. */
 
 const MAX_LCS_CELLS = 2_000_000;
 type BindingMeta = Parameters<typeof updateYFragment>[3];
@@ -119,6 +129,53 @@ function similarity(a: string, b: string): number {
   let s = 0;
   while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
   return (p + s) / Math.min(a.length, b.length);
+}
+
+/** The plain string of a Y.XmlText (formatting ignored). */
+function yTextString(t: Y.XmlText): string {
+  let out = "";
+  for (const op of t.toDelta() as Array<{ insert?: unknown }>) if (typeof op.insert === "string") out += op.insert;
+  return out;
+}
+
+/**
+ * Bring the TEXT of a Yjs block to the target block's text with a
+ * character-level diff — inserts and deletes on the existing XmlText, so
+ * every unchanged character keeps its CRDT identity and a peer's concurrent
+ * insertion stays anchored where it was typed. (y-prosemirror's own sync
+ * replaces the whole middle between a common prefix and suffix.) Recurses
+ * into containers whose shape matches; updateYFragment then only has to fix
+ * formatting and structure.
+ */
+function syncTextInPlace(el: Y.XmlElement, node: PMNode): void {
+  if (el.nodeName !== node.type.name) return;
+  const kids = el.toArray();
+  if (node.isTextblock) {
+    let textOnly = true;
+    node.forEach((c) => { if (!c.isText) textOnly = false; });
+    if (!textOnly || kids.length !== 1 || !(kids[0] instanceof Y.XmlText)) return;
+    const yt = kids[0];
+    const target = node.textContent;
+    // A replacement INSERTS before it deletes: the new text is then anchored
+    // to the old text's left neighbour and its first replaced character, so
+    // a peer's concurrent insertion after the replaced range (typing at the
+    // end of the old text) stays after the new text instead of before it.
+    let at = 0;
+    let pendingDel = 0;
+    const dropPending = () => { if (pendingDel) { yt.delete(at, pendingDel); pendingDel = 0; } };
+    for (const op of charDiff(yTextString(yt), target)) {
+      if (op.op === "del") { pendingDel += op.s.length; continue; }
+      if (op.op === "ins") { yt.insert(at, op.s); at += op.s.length; dropPending(); continue; }
+      dropPending();
+      at += op.s.length;
+    }
+    dropPending();
+    return;
+  }
+  if (kids.length !== node.childCount) return;
+  kids.forEach((k, i) => {
+    if (k instanceof Y.XmlElement) syncTextInPlace(k, node.child(i));
+  });
 }
 
 function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
@@ -157,10 +214,12 @@ function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
     pos += 1;
   };
   const flush = (dels: number[], ins: number[]) => {
-    // Order-preserving greedy pairing of similar blocks of the same type.
-    const pairs: Array<[number, number]> = [];
+    // 1. Order-preserving greedy pairing of SIMILAR blocks of the same type
+    //    (pairs hold indexes into `dels` / `ins`).
+    const similar: Array<[number, number]> = [];
     let from = 0;
-    for (const a of dels) {
+    for (let d = 0; d < dels.length; d++) {
+      const a = dels[d];
       let best = -1;
       let bestSim = 0.49; // pair at ≥ 0.5
       for (let b = from; b < ins.length; b++) {
@@ -169,22 +228,39 @@ function syncBlocks(doc: Y.Doc, fragment: Y.XmlFragment, pDoc: PMNode): void {
         const sim = similarity(yNodes[a].textContent, pn.textContent);
         if (sim > bestSim) { bestSim = sim; best = b; }
       }
-      if (best >= 0) { pairs.push([a, best]); from = best + 1; }
+      if (best >= 0) { similar.push([d, best]); from = best + 1; }
+    }
+    // 2. Between those pairs, pair the rest BY POSITION when the types
+    //    match: a near-total rewrite of a paragraph is still that paragraph
+    //    (updated in place, character by character), so a live peer's
+    //    concurrent typing in it survives instead of being deleted with it.
+    const pairs: Array<[number, number]> = [];
+    let pd = 0;
+    let pi = 0;
+    for (const [d, b] of [...similar, [dels.length, ins.length] as [number, number]]) {
+      for (let k = 0; pd + k < d && pi + k < b; k++) {
+        if (pKids[ins[pi + k]].type.name === (yKids[dels[pd + k]] as Y.XmlElement).nodeName) pairs.push([pd + k, pi + k]);
+      }
+      if (d < dels.length) pairs.push([d, b]);
+      pd = d + 1;
+      pi = b + 1;
     }
     let di = 0;
     let ii = 0;
-    const until = (a: number, b: number) => {
-      for (; di < dels.length && dels[di] !== a; di++) fragment.delete(pos, 1);
-      for (; ii < ins.length && ii !== b; ii++) insertBlock(pKids[ins[ii]]);
+    const until = (d: number, b: number) => {
+      for (; di < d; di++) fragment.delete(pos, 1);
+      for (; ii < b; ii++) insertBlock(pKids[ins[ii]]);
     };
-    for (const [a, b] of pairs) {
-      until(a, b);
-      updateYFragment(doc, yKids[a] as Y.XmlElement, pKids[ins[b]], meta);
+    for (const [d, b] of pairs) {
+      until(d, b);
+      const el = yKids[dels[d]] as Y.XmlElement;
+      syncTextInPlace(el, pKids[ins[b]]);
+      updateYFragment(doc, el, pKids[ins[b]], meta);
       pos += 1;
       di += 1;
       ii += 1;
     }
-    until(-1, -1);
+    until(dels.length, ins.length);
   };
 
   let i = 0;
@@ -247,4 +323,64 @@ export function applyBodyToState(stored: string, bodyJson: unknown): BodyToState
   } finally {
     doc.destroy();
   }
+}
+
+/* ── Rebase (a stale single-editor save) ───────────────────────────────── */
+
+/** A body run through the note schema (equal content → equal JSON), or null. */
+export function normalizeBody(json: unknown): Record<string, unknown> | null {
+  try {
+    return schema().nodeFromJSON(json ?? EMPTY_DOC).toJSON() as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+export type RebaseResult =
+  | { ok: true; bodyJson: Record<string, unknown>; conflicts: number }
+  | { ok: false; error: string };
+
+/** 3-way merge of plain bodies (a note without a Yjs state). */
+export function rebaseBody(current: unknown, base: unknown, local: unknown, conflictLabel: string): RebaseResult {
+  const l = normalizeBody(local);
+  if (!l) return { ok: false, error: "Invalid note body" };
+  // An unreadable base / current still merges (every block then counts as
+  // changed, and the local blocks are kept as copies — never dropped).
+  const merged = mergeDocs(normalizeBody(base) ?? base, l, normalizeBody(current) ?? current, conflictLabel);
+  const bodyJson = normalizeBody(merged.doc);
+  if (!bodyJson) return { ok: false, error: "Invalid note body" };
+  return { ok: true, bodyJson, conflicts: merged.conflicts };
+}
+
+export type RebaseStateResult =
+  | { ok: true; state: string; bodyJson: Record<string, unknown>; update: string; conflicts: number }
+  | { ok: false; error: string };
+
+/**
+ * A stale single-editor save on a note with a Yjs state: merge the client's
+ * changes (base → local) onto the document the stored state holds NOW, then
+ * express the result as a Yjs update against that state (the same block
+ * matcher as applyBodyToState) — so both the newer saved content and live
+ * peers' concurrent edits survive.
+ */
+export function rebaseOntoState(stored: string, base: unknown, local: unknown, conflictLabel: string): RebaseStateResult {
+  const doc = new Y.Doc();
+  let target: Record<string, unknown>;
+  let conflicts: number;
+  try {
+    Y.applyUpdate(doc, b64decode(stored));
+    const current = yDocToProsemirrorJSON(doc, NOTES_YJS_FIELD);
+    const r = rebaseBody(current, base, local, conflictLabel);
+    if (!r.ok) return r;
+    target = r.bodyJson;
+    conflicts = r.conflicts;
+  } catch (e) {
+    console.error("[notes-yjs] rebase", e instanceof Error ? e.message : e);
+    return { ok: false, error: "Invalid note body" };
+  } finally {
+    doc.destroy();
+  }
+  const applied = applyBodyToState(stored, target);
+  if (!applied.ok) return applied;
+  return { ...applied, conflicts };
 }

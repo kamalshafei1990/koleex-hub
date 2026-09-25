@@ -9,14 +9,15 @@ import "server-only";
 
    Replaces the old client loop that PATCHed every card in the column
    (≈4 queries each via the PATCH route) and then reloaded the whole board
-   behind a spinner. Here: one access check, one membership check, one
+   behind a spinner. Access: the project write gate, or ownership of the
+   moved card (see below). Here: one access check, one membership check, one
    batched sort_order upsert for the cards whose position actually changed,
    and one stage/status update for the moved card (with the same
    stage⇄status rules as the PATCH route). */
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertProjectAccess, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, ownsTask, UUID_RE } from "@/lib/server/project-access";
 import { loadStages, reconcileStageStatus } from "@/lib/server/project-task-rules";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { clearTaskNotifications } from "@/lib/server/project-notify";
@@ -45,8 +46,15 @@ export async function POST(req: Request) {
   }
   const ids = ordered as string[];
 
+  /* Project write access, or — for a view-only caller — ownership of the
+     MOVED card (ownsTask, the per-task rule every task write route uses).
+     Its neighbours' sort_order shifts only as a consequence of placing it. */
   const gate = await assertProjectAccess(auth, projectId, { write: true });
-  if (gate instanceof NextResponse) return gate;
+  let ownerOnly = false;
+  if (gate instanceof NextResponse) {
+    if (gate.status !== 403) return gate;
+    ownerOnly = true;
+  }
 
   const stages = await loadStages(auth.tenant_id, projectId);
   if (stageId && !stages.some((s) => s.id === stageId)) {
@@ -55,7 +63,7 @@ export async function POST(req: Request) {
 
   const { data: rows, error: readErr } = await supabaseServer
     .from("project_tasks")
-    .select("id, tenant_id, project_id, title, sort_order, stage_id, status")
+    .select("id, tenant_id, project_id, title, sort_order, stage_id, status, assignee_account_id, created_by_account_id")
     .eq("tenant_id", auth.tenant_id)
     .eq("project_id", projectId)
     .in("id", ids);
@@ -66,6 +74,12 @@ export async function POST(req: Request) {
   const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
   if (byId.size !== ids.length) {
     return NextResponse.json({ error: "Task is not in this project" }, { status: 400 });
+  }
+  if (ownerOnly) {
+    const m = byId.get(movedId)!;
+    if (!ownsTask(auth, { assignee_account_id: (m.assignee_account_id as string | null) ?? null, created_by_account_id: (m.created_by_account_id as string | null) ?? null })) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   /* 1. Positions — only rows whose sort_order changes, in one upsert. The

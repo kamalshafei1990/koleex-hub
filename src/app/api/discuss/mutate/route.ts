@@ -221,11 +221,21 @@ export async function POST(req: Request) {
             ? data
             : ((data as { id?: string } | null)?.id ?? null);
         if (resurfacedId) {
-          await supabaseServer
+          const { data: revived } = await supabaseServer
             .from(MEMBERS)
             .update({ left_at: null, hidden_at: null })
             .eq("channel_id", resurfacedId)
-            .eq("account_id", me);
+            .eq("account_id", me)
+            .not("left_at", "is", null)
+            .select("id");
+          /* Clearing a hide alone is not a roster change; only a rejoin is. */
+          await supabaseServer
+            .from(MEMBERS)
+            .update({ hidden_at: null })
+            .eq("channel_id", resurfacedId)
+            .eq("account_id", me)
+            .not("hidden_at", "is", null);
+          if ((revived ?? []).length > 0) await touchChannel(resurfacedId);
         }
         return NextResponse.json({ ok: true, data });
       }
@@ -328,7 +338,9 @@ export async function POST(req: Request) {
           /* Existing conversation for this customer: join it (or rejoin it)
              so opening it actually shows the thread. */
           const revive = await ensureMembers(channelId, [me, ...extra]);
-          if (revive) return bad(revive, 500);
+          if (revive.error) return bad(revive.error, 500);
+          /* Someone joined / rejoined: open clients' rosters must follow. */
+          if (revive.changed) await touchChannel(channelId);
         }
         await emitPings([me, ...extra].map((id) => ({ topic: rtTopic.account(id) })));
         return NextResponse.json({ ok: true, data: channelId });
@@ -384,7 +396,7 @@ export async function POST(req: Request) {
         if ((ch as { kind: string }).kind === "direct") return bad("Cannot add members to a direct message", 400);
         const accountIds = await filterTenantAccounts(p.accountIds, tenantId);
         if (accountIds.length === 0) return NextResponse.json({ ok: true, data: 0 });
-        const err = await ensureMembers(channelId, accountIds);
+        const { error: err } = await ensureMembers(channelId, accountIds);
         if (err) return bad(err, 500);
         /* SSE-only clients (no broadcast from the mainland) learn about the
            membership change from the channel touch — see the stream's `meta`
@@ -570,6 +582,8 @@ export async function POST(req: Request) {
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        /* A soft-leave changes the active roster the others see. */
+        await touchChannel(channelId);
         await emitPings([{ topic: rtTopic.account(me) }]);
         return NextResponse.json({ ok: true });
       }
@@ -957,17 +971,22 @@ export async function POST(req: Request) {
  *  New accounts are inserted as members; accounts that previously left are
  *  revived (left_at / hidden_at cleared) WITHOUT touching their role — an
  *  upsert would have demoted a returning admin to member. Returns an error
- *  message, or null on success. UNIQUE(channel_id, account_id) makes a
+ *  message (or null) and whether the active member set changed — callers
+ *  touch the channel only then, so a no-op re-open does not make every open
+ *  client reload its roster. UNIQUE(channel_id, account_id) makes a
  *  concurrent duplicate insert a no-op (23505), not a failure. */
-async function ensureMembers(channelId: string, accountIds: string[]): Promise<string | null> {
+async function ensureMembers(
+  channelId: string,
+  accountIds: string[],
+): Promise<{ error: string | null; changed: boolean }> {
   const ids = Array.from(new Set(accountIds));
-  if (ids.length === 0) return null;
+  if (ids.length === 0) return { error: null, changed: false };
   const { data: rows, error: selErr } = await supabaseServer
     .from(MEMBERS)
     .select("account_id, left_at")
     .eq("channel_id", channelId)
     .in("account_id", ids);
-  if (selErr) return selErr.message;
+  if (selErr) return { error: selErr.message, changed: false };
   const known = new Map(((rows ?? []) as Array<{ account_id: string; left_at: string | null }>).map((r) => [r.account_id, r.left_at]));
   const toInsert = ids.filter((id) => !known.has(id));
   const toRevive = ids.filter((id) => known.has(id) && known.get(id) !== null);
@@ -975,7 +994,7 @@ async function ensureMembers(channelId: string, accountIds: string[]): Promise<s
     const { error } = await supabaseServer
       .from(MEMBERS)
       .insert(toInsert.map((id) => ({ channel_id: channelId, account_id: id, role: "member" })));
-    if (error && error.code !== "23505") return error.message;
+    if (error && error.code !== "23505") return { error: error.message, changed: false };
   }
   if (toRevive.length) {
     const { error } = await supabaseServer
@@ -983,9 +1002,9 @@ async function ensureMembers(channelId: string, accountIds: string[]): Promise<s
       .update({ left_at: null, hidden_at: null })
       .eq("channel_id", channelId)
       .in("account_id", toRevive);
-    if (error) return error.message;
+    if (error) return { error: error.message, changed: toInsert.length > 0 };
   }
-  return null;
+  return { error: null, changed: toInsert.length > 0 || toRevive.length > 0 };
 }
 
 /** If a group/channel has active members but no active admin, promote the

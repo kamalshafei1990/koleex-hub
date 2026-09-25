@@ -38,7 +38,8 @@
    edge (wallInstant).
 
    DATA. Resources and roles load once per visit through useWarmData (they
-   paint from the last answer instantly); only items + leave are keyed by
+   paint from the last answer instantly); only items + the absence overlay
+   (approved leave AND Calendar out-of-office, one request) are keyed by
    week, so week navigation refetches just those two — and the adjacent
    weeks are prefetched into the warm cache. Mutations are optimistic: the
    board updates at once from the local overlay and rolls back with a toast
@@ -71,6 +72,7 @@ import ConflictDialog from "@/components/planning/ConflictDialog";
 import type { TimelinePatch, TimelineRow } from "@/components/planning/TimelineView";
 import { zonedToUtc } from "@/lib/calendar-tz";
 import { plannerNow, plannerWall, usePlannerTimeZone, wallInstant } from "@/lib/planning-tz";
+import { AWAY_HATCH, awayDaySlices, awaySliceRange, overlapsAway, type AwaySlice } from "@/lib/planning-away";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
@@ -96,7 +98,7 @@ import {
   durationHours,
   fetchItem,
   fetchItems,
-  fetchLeaves,
+  fetchWeekAbsence,
   fetchResources,
   fetchRoles,
   formatRange,
@@ -109,7 +111,9 @@ import {
   startOfWeek,
   takeOpenShift,
   updateItem,
+  type AwaySpan,
   type LeaveSpan,
+  type WeekAbsence,
   type PlanningItem,
   type PlanningResource,
   type PlanningResourceType,
@@ -173,13 +177,15 @@ function writeUrlParams(patch: Record<string, string | null>) {
 }
 
 /* Items are keyed by zone too: the same wall week is a different window of
-   instants in another zone. Leave spans are plain dates. */
+   instants in another zone. The absence overlay (leave dates + Calendar
+   out-of-office instants, one request) is zone-free: the server widens its
+   window a day each side and the board cuts it on its own clock. */
 const itemsKeyFor = (weekStart: Date, tz: string) => `planning:items:${tz}:${dateKey(weekStart)}`;
-const leavesKeyFor = (weekStart: Date) => `planning:leaves:${dateKey(weekStart)}`;
+const leavesKeyFor = (weekStart: Date) => `planning:absence:${dateKey(weekStart)}`;
 const weekItemsLoader = (weekStart: Date, tz: string) => () =>
   fetchItems({ start: wallInstant(weekStart, tz).toISOString(), end: wallInstant(addDays(weekStart, 7), tz).toISOString() });
 const weekLeavesLoader = (weekStart: Date) => () =>
-  fetchLeaves(dateKey(weekStart), dateKey(addDays(weekStart, 6)));
+  fetchWeekAbsence(dateKey(weekStart), dateKey(addDays(weekStart, 6)));
 
 export default function PlanningApp() {
   const { t } = useTranslation(planningT);
@@ -242,8 +248,9 @@ export default function PlanningApp() {
   const loadItems = useMemo(() => weekItemsLoader(weekStart, tz), [weekStart, tz]);
   const loadLeaves = useMemo(() => weekLeavesLoader(weekStart), [weekStart]);
   const itemsQ = useWarmData<PlanningItem[]>(itemsKey, loadItems, DEFAULT_MAX_AGE_MS, ITEMS_STALE_MS);
-  const leavesQ = useWarmData<LeaveSpan[]>(leavesKey, loadLeaves, DEFAULT_MAX_AGE_MS, ITEMS_STALE_MS);
-  const leaves = useMemo(() => leavesQ.data ?? [], [leavesQ.data]);
+  const leavesQ = useWarmData<WeekAbsence>(leavesKey, loadLeaves, DEFAULT_MAX_AGE_MS, ITEMS_STALE_MS);
+  const leaves = useMemo(() => leavesQ.data?.leaves ?? [], [leavesQ.data]);
+  const away = useMemo(() => leavesQ.data?.away ?? [], [leavesQ.data]);
 
   /* Optimistic overlay. It is stamped with the week key AND the server
      answer it was built on: the moment a fresh answer lands (different
@@ -733,6 +740,7 @@ export default function PlanningApp() {
                   resources={resources}
                   roles={roles}
                   leaves={leaves}
+                  away={away}
                   onPrev={() => setAnchor(addDays(weekStart, -7))}
                   onNext={() => setAnchor(addDays(weekStart, 7))}
                   onToday={() => setAnchor(null)}
@@ -893,6 +901,7 @@ function ScheduleView({
   resources,
   roles,
   leaves,
+  away,
   onPrev,
   onNext,
   onToday,
@@ -917,6 +926,7 @@ function ScheduleView({
   resources: PlanningResource[];
   roles: PlanningRole[];
   leaves: LeaveSpan[];
+  away: AwaySpan[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -955,6 +965,16 @@ function ScheduleView({
     }
     return set;
   }, [leaves, dayKeys]);
+
+  /* Calendar out-of-office overlay: resource|dayKey → that day's slices. */
+  const awayCells = useMemo(() => awayDaySlices(away, days, tz), [away, days, tz]);
+  const awayTip = useCallback(
+    (slices: AwaySlice[]) =>
+      `${t("sched.outOfOffice")} · ${slices
+        .map((sl) => (sl.full ? t("sched.allDay") : awaySliceRange(sl, tz)))
+        .join(", ")}\n${t("sched.outOfOfficeHint")}`,
+    [t, tz],
+  );
 
   /* Every day an item covers, computed once per item. */
   const coveredDays = useMemo(() => {
@@ -1009,10 +1029,13 @@ function ScheduleView({
     // Items scheduled over ANY day their resource is on approved leave.
     for (const it of items) {
       if (!it.resource_id || it.status === "cancelled") continue;
-      if ((coveredDays.get(it.id) ?? []).some((dk) => leaveCells.has(`${it.resource_id}|${dk}`))) set.add(it.id);
+      const dks = coveredDays.get(it.id) ?? [];
+      if (dks.some((dk) => leaveCells.has(`${it.resource_id}|${dk}`))) set.add(it.id);
+      // …or over their Calendar out-of-office time.
+      else if (overlapsAway(awayCells, it.resource_id, dks, it.start_at, it.end_at)) set.add(it.id);
     }
     return set;
-  }, [items, leaveCells, coveredDays]);
+  }, [items, leaveCells, awayCells, coveredDays]);
 
   const resourceSub = (r: PlanningResource) =>
     r.description ?? t(`cfg.resources.type.${r.type}`, r.type);
@@ -1236,6 +1259,8 @@ function ScheduleView({
           tz={tz}
           conflictIds={conflictIds}
           leaveCells={leaveCells}
+          awayCells={awayCells}
+          awayTip={awayTip}
           canWrite={canWrite}
           onItemClick={onItemClick}
           onMove={onTimelineMove}
@@ -1282,6 +1307,7 @@ function ScheduleView({
                     {t("sched.onLeave")}
                   </div>
                 )}
+                {awayCells.has(key) && <AwayBadge slices={awayCells.get(key) ?? []} tz={tz} tip={awayTip} />}
                 {cellItems.length > 0 ? (
                   <div className="space-y-1.5">
                     {cellItems.map((it) => (
@@ -1386,6 +1412,7 @@ function ScheduleView({
                       {t("sched.onLeave")}
                     </span>
                   )}
+                  {awayCells.has(key) && <AwayBadge slices={awayCells.get(key) ?? []} tz={tz} tip={awayTip} compact />}
                   {cellItems.map((it) => (
                     <ItemPill key={it.id} item={it} tz={tz} onClick={onItemClick} draggable={droppable} conflict={conflictIds.has(it.id)} />
                   ))}
@@ -1560,6 +1587,34 @@ function MobileItemRow({
 
 /** Week-grid pill. A focusable role="button" (Enter/Space opens) rather than
  *  a <button>: Firefox will not start a drag from a <button>. */
+/* Calendar out-of-office — hatched (AWAY_HATCH), so it never reads as
+   leave (amber, solid). The tooltip names only the time span: a Calendar
+   event's title is private and never reaches the board. */
+function AwayBadge({
+  slices,
+  tz,
+  tip,
+  compact = false,
+}: {
+  slices: AwaySlice[];
+  tz: string;
+  tip: (slices: AwaySlice[]) => string;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation(planningT);
+  const full = slices.some((sl) => sl.full);
+  const label = full ? t("sched.outOfOffice") : `${t("sched.outOfOffice")} ${awaySliceRange(slices[0], tz)}${slices.length > 1 ? " +" : ""}`;
+  return (
+    <span
+      title={tip(slices)}
+      className={`${compact ? "text-[9px] px-1 py-px self-start" : "text-[10px] px-1.5 py-0.5 inline-block mb-1"} max-w-full truncate font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 border border-dashed border-slate-500/50 rounded cursor-help`}
+      style={{ backgroundImage: AWAY_HATCH }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function ItemPill({
   item,
   tz,

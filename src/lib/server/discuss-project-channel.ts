@@ -3,7 +3,10 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    discuss-project-channel — one Discuss group chat per project.
 
-   Owned by the Projects app (the Discuss engineer does not touch this file).
+   Written for the Projects app. Discuss rule it must keep: every write that
+   changes a channel's ACTIVE roster bumps discuss_channels.updated_at
+   (touchChannel) — the SSE stream (/api/discuss/stream) watches updated_at
+   to tell open clients to reload the member list.
    Mirrors the column set that POST /api/discuss/mutate `createChannel`
    writes (kind, name, description, color, created_by, tenant_id) plus
    `linked_project_id` (supabase/migrations/20260926_projects_additions.sql),
@@ -51,8 +54,18 @@ export async function findProjectChannel(tenantId: string, projectId: string): P
   return (data as { id: string } | null)?.id ?? null;
 }
 
+/** Bump the channel's updated_at so SSE clients refresh the roster.
+ *  Best-effort: stream freshness never fails a membership write. */
+async function touchChannel(channelId: string): Promise<void> {
+  try {
+    await supabaseServer.from(CHANNELS).update({ updated_at: new Date().toISOString() }).eq("id", channelId);
+  } catch { /* best-effort */ }
+}
+
 /** Add (or revive) accounts as members of a channel. Returns an error
- *  message or null. Same semantics as the Discuss route's ensureMembers. */
+ *  message or null. Same semantics as the Discuss route's ensureMembers,
+ *  including the roster touch — but only when someone actually joined, so
+ *  re-opening the project chat does not ping every open client. */
 async function ensureMembers(channelId: string, accountIds: string[]): Promise<string | null> {
   const ids = [...new Set(accountIds)];
   if (ids.length === 0) return null;
@@ -77,8 +90,12 @@ async function ensureMembers(channelId: string, accountIds: string[]): Promise<s
       .update({ left_at: null, hidden_at: null })
       .eq("channel_id", channelId)
       .in("account_id", toRevive);
-    if (error) return error.message;
+    if (error) {
+      if (toInsert.length) await touchChannel(channelId);
+      return error.message;
+    }
   }
+  if (toInsert.length || toRevive.length) await touchChannel(channelId);
   return null;
 }
 
@@ -180,6 +197,7 @@ async function promoteIfNoAdmin(channelId: string): Promise<void> {
     const active = (rows ?? []) as { id: string; role: string }[];
     if (active.length === 0 || active.some((r) => r.role === "admin")) return;
     await supabaseServer.from(MEMBERS).update({ role: "admin" }).eq("id", active[0].id);
+    await touchChannel(channelId);
   } catch { /* best-effort */ }
 }
 
@@ -211,7 +229,7 @@ export async function removeAccountFromProjectChannel(tenantId: string, projectI
     }
     await promoteIfNoAdmin(channelId);
     /* Bump updated_at so SSE clients (which watch it) refresh the roster. */
-    await supabaseServer.from(CHANNELS).update({ updated_at: new Date().toISOString() }).eq("id", channelId);
+    await touchChannel(channelId);
     const { data: rest } = await supabaseServer
       .from(MEMBERS)
       .select("account_id")
