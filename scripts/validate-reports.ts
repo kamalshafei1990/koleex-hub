@@ -1047,10 +1047,11 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     eq(["daily", "weekly", "m1", "m2", "m3", "solo"].map((id) => `${lanes.get(id)?.lane}/${lanes.get(id)?.lanes}`), ["0/2", "1/2", "0/2", "1/2", "0/2", "0/1"],
       "two deadlines at one moment sit side by side; a meeting that ends frees its lane; a lone block keeps the full width");
     if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
-    /* Week and Day share one grid (TimeGrid, since 773b0696). */
+    /* Week and Day share one grid (TimeGrid, since 773b0696). A block being
+       dragged draws full width (isPreview); every other block keeps its lane. */
     rule("each timed block takes its lane", "src/components/admin/calendar/TimeGrid.tsx",
-      (c) => (/timed: list\.filter\(\(e\) => !e\.all_day\)/.test(c) && /const lanes = dayLanes\(timed, day, hourHeight\);/.test(c) && /\.\.\.laneStyle\(lanes\.get\(ev\.id\), /.test(c) ? [] : ["blocks at the same time are drawn on top of each other"]),
-      (src) => src.replace(/\.\.\.laneStyle\(lanes\.get\(ev\.id\), [^\n]*\n/, "\n"));
+      (c) => (/timed: list\.filter\(\(e\) => !e\.all_day\)/.test(c) && /const lanes = dayLanes\(timed, day, hourHeight\);/.test(c) && /\.\.\.laneStyle\((isPreview \? undefined : )?lanes\.get\(ev\.id\), /.test(c) ? [] : ["blocks at the same time are drawn on top of each other"]),
+      (src) => src.replace(/\.\.\.laneStyle\((isPreview \? undefined : )?lanes\.get\(ev\.id\), [^\n]*\n/, "\n"));
     const grids = ["src/components/admin/calendar/WeekView.tsx", "src/components/admin/calendar/DayView.tsx"].filter((f) => !/<TimeGrid\b/.test(code(read(f))));
     expect(grids.length === 0, "the Week and Day views draw through that one grid", grids.join(", "));
   }
