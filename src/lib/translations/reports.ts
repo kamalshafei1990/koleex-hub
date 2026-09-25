@@ -1,6 +1,6 @@
 import type { Translations } from "@/lib/i18n";
 
-/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; apps 2B; photos and files 2C; AI + dictation 2D). Template strings follow
+/* Reports app (Phase 1, 25 Sep 2026; phase 2 A–D; obligations 3A). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
    template key and section has all three languages. */
 export const reportsT: Translations = {
@@ -12,6 +12,7 @@ export const reportsT: Translations = {
   "nav.mine":    { en: "My reports", zh: "我的报告", ar: "تقاريري" },
   "nav.library": { en: "Library", zh: "报表库", ar: "المكتبة" },
   "nav.team":    { en: "My team", zh: "我的团队", ar: "فريقي" },
+  "nav.compliance": { en: "Compliance", zh: "提交情况", ar: "الالتزام" },
   "search.placeholder": { en: "Search reports by title, person or text…", zh: "按标题、人员或内容搜索报告…", ar: "دوّر في التقارير بالعنوان أو الشخص أو الكلام…" },
   "action.new": { en: "New report", zh: "新建报告", ar: "تقرير جديد" },
 
@@ -122,6 +123,45 @@ export const reportsT: Translations = {
   "feed.crm.visit":   { en: "Visit", zh: "拜访", ar: "زيارة" },
   "feed.crm.email":   { en: "Email", zh: "邮件", ar: "إيميل" },
   "feed.crm.other":   { en: "Activity", zh: "活动", ar: "نشاط" },
+
+  /* Phase 3A — who must write what, and the compliance board. */
+  "due.title":     { en: "Due from you", zh: "你需要提交的", ar: "المطلوب منك" },
+  "due.missing":   { en: "Missing — the deadline has passed", zh: "未提交——已过截止时间", ar: "ناقص — الميعاد عدّى" },
+  "due.by":        { en: "Due by {when}", zh: "截止 {when}", ar: "مطلوب قبل {when}" },
+  "due.write":     { en: "Write it now", zh: "立即撰写", ar: "اكتبه دلوقتي" },
+  "due.continue":  { en: "Continue", zh: "继续", ar: "كمّله" },
+  "compliance.title":   { en: "Who sent what", zh: "谁提交了什么", ar: "مين بعت إيه" },
+  "compliance.hint":    { en: "Each person on their own calendar: their weekend and holidays, their leave, the end of their working day.", zh: "按每个人自己的日历：周末、节假日、休假和下班时间。", ar: "كل واحد على تقويمه: إجازته الأسبوعية والعطلات وإجازاته وميعاد آخر يوم شغله." },
+  "compliance.prev":    { en: "Previous week", zh: "上一周", ar: "الأسبوع اللي فات" },
+  "compliance.next":    { en: "Next week", zh: "下一周", ar: "الأسبوع الجاي" },
+  "compliance.rate":    { en: "{n}% on time", zh: "准时率 {n}%", ar: "{n}% في الميعاد" },
+  "compliance.person":  { en: "Person", zh: "人员", ar: "الشخص" },
+  "compliance.weekly":  { en: "Weekly", zh: "周报", ar: "أسبوعي" },
+  "compliance.monthly": { en: "Monthly", zh: "月报", ar: "شهري" },
+  "compliance.sentAt":  { en: "sent {at}", zh: "提交于 {at}", ar: "اتبعت {at}" },
+  "compliance.dueAt":   { en: "due {at}", zh: "截止 {at}", ar: "الميعاد {at}" },
+  "compliance.empty":   { en: "Nobody here is expected to send reports.", zh: "这里没有需要提交报告的人。", ar: "مفيش حد هنا مطلوب منه تقارير." },
+  "compliance.notStarted": { en: "Counting has not started: nobody is marked late or missing yet. The board shows who is expected and what was sent.", zh: "尚未开始统计：目前不会有人被标记为迟交或未交。看板显示应提交的人和已提交的内容。", ar: "العدّ لسه ما بدأش: محدش هيتحسب متأخر أو ناقص. اللوحة بتوري مين مطلوب منه وإيه اللي اتبعت." },
+  "compliance.notStartedShort": { en: "Not started", zh: "未开始", ar: "لسه ما بدأش" },
+  "compliance.startOn": { en: "Start counting from", zh: "开始统计日期", ar: "ابدأ العدّ من" },
+  "compliance.start":   { en: "Start", zh: "开始", ar: "ابدأ" },
+  "compliance.setup":   { en: "Who writes what", zh: "谁写哪些报告", ar: "مين يكتب إيه" },
+  "compliance.setupHint": { en: "By default everyone writes the daily and the weekly, managers also the monthly, and super admins nothing. Tap to change it for one person.", zh: "默认所有人写日报和周报，管理者还需写月报，超级管理员无需提交。点击可为个人单独调整。", ar: "افتراضيًا الكل بيكتب اليومي والأسبوعي، والمديرين كمان الشهري، والسوبر أدمن مش مطلوب منه. دوس عشان تغيّر لشخص معين." },
+  "compliance.exempt":  { en: "Super admin — exempt by default", zh: "超级管理员——默认无需提交", ar: "سوبر أدمن — مش مطلوب منه افتراضيًا" },
+  "compliance.manager": { en: "Manager — monthly too", zh: "管理者——还需写月报", ar: "مدير — والشهري كمان" },
+  "compliance.default": { en: "As the default", zh: "按默认", ar: "زي الافتراضي" },
+  "compliance.changed": { en: "Changed for this person", zh: "已为此人单独调整", ar: "متغيّر للشخص ده" },
+  "compliance.k.daily":   { en: "Daily", zh: "日报", ar: "يومي" },
+  "compliance.k.weekly":  { en: "Weekly", zh: "周报", ar: "أسبوعي" },
+  "compliance.k.monthly": { en: "Monthly", zh: "月报", ar: "شهري" },
+  "compliance.s.sent":      { en: "On time", zh: "准时", ar: "في الميعاد" },
+  "compliance.s.late":      { en: "Late", zh: "迟交", ar: "متأخر" },
+  "compliance.s.missing":   { en: "Missing", zh: "未交", ar: "ناقص" },
+  "compliance.s.due":       { en: "Due", zh: "待交", ar: "مطلوب" },
+  "compliance.s.upcoming":  { en: "Not yet", zh: "未到", ar: "لسه" },
+  "compliance.s.off":       { en: "Day off", zh: "休息日", ar: "إجازة رسمية" },
+  "compliance.s.leave":     { en: "On leave", zh: "休假", ar: "في إجازة" },
+  "compliance.s.untracked": { en: "Not counted", zh: "不计入", ar: "مش محسوب" },
 
   /* Phase 2D — Koleex AI and dictation. The assistant is only ever
      "Koleex AI" (standing rule: never the model or its maker). */

@@ -3,8 +3,10 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    GET /api/work-reports/bundle — everything the Reports home needs in ONE
    response: the counts for the KPI band, the latest reports sent to me, the
-   templates this person may start, the people a report can go to, and which
-   number reports the Library may offer (each by its own app's permission).
+   templates this person may start, the people a report can go to, which
+   number reports the Library may offer (each by its own app's permission),
+   and (Phase 3A) what this person owes now — "Due from you" — plus whether
+   they may see the compliance board.
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -12,6 +14,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
 import { REPORT_TEMPLATES } from "@/lib/reports/templates";
+import { loadMyDue } from "@/lib/server/reports/obligations";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +39,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -52,6 +55,8 @@ export async function GET(req: Request) {
     requireModuleAction(auth, "HR", "create"),
     requireModuleAccess(auth, "Finance"),
     requireModuleAccess(auth, "To-do"),
+    /* The org tree is memoised per tenant, so this shares the read above. */
+    loadMyDue(auth).catch((e: unknown) => { console.error("[reports] due:", e instanceof Error ? e.message : e); return []; }),
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
@@ -61,7 +66,8 @@ export async function GET(req: Request) {
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
 
   return NextResponse.json({
-    me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam },
+    me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam, board: hasTeam || hrView === null },
+    due,
     counts: { unread: unread.count ?? 0, review: review.count ?? 0, drafts: drafts.count ?? 0, sentThisMonth: sent.count ?? 0 },
     latest: ((latest.data ?? []) as Row[]).map((r) => {
       const mine = r.work_report_recipients?.[0] ?? null;

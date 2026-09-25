@@ -9,6 +9,7 @@ import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
 import type { AiDraftRequest } from "@/lib/reports/ai-draft";
+import type { BoardRow, BoardSummary, DueItem, Obliged } from "@/lib/reports/obligations";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -36,7 +37,9 @@ export interface ReportListRow {
 }
 
 export interface ReportsBundle {
-  me: { id: string; managerId: string | null; hasTeam: boolean };
+  me: { id: string; managerId: string | null; hasTeam: boolean; board?: boolean };
+  /** Phase 3A: what this person owes now. */
+  due?: DueItem[];
   counts: { unread: number; review: number; drafts: number; sentThisMonth: number };
   latest: ReportListRow[];
   templates: string[];
@@ -147,6 +150,23 @@ export const deleteReportAttachment = (id: string, attId: string) =>
 /** Koleex AI on one section of a draft (write / tidy) — a proposal only. */
 export const askReportAi = (id: string, body: AiDraftRequest) =>
   call<{ text: string }>(`/api/work-reports/${id}/ai`, { method: "POST", body: JSON.stringify(body) });
+
+/* ── Phase 3A: obligations and the compliance board ── */
+export interface ComplianceBoard {
+  week: { key: string; start: string; days: string[] };
+  trackingFrom: string | null;
+  canSetUp: boolean;
+  rows: Array<BoardRow & { person: ReportPerson }>;
+  summary: BoardSummary;
+}
+export interface ObligationSetup {
+  trackingFrom: string | null;
+  rows: Array<{ person: ReportPerson; isSuperAdmin: boolean; hasTeam: boolean; defaults: Obliged; exceptions: Partial<Obliged> }>;
+}
+export const fetchCompliance = (day: string) => call<ComplianceBoard>(`/api/work-reports/compliance?week=${encodeURIComponent(day)}`);
+export const fetchObligations = () => call<ObligationSetup>("/api/work-reports/obligations");
+export const saveObligations = (body: { trackingFrom?: string | null; exceptions?: Array<{ accountId: string; key: "daily" | "weekly" | "monthly"; required: boolean | null }> }) =>
+  call<ObligationSetup>("/api/work-reports/obligations", { method: "PUT", body: JSON.stringify(body) });
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string) =>

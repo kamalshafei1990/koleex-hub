@@ -11,7 +11,8 @@
    sessionStorage so a revisit paints at once. The Inbox / My reports / Team
    lists are server-side (search, filter, paging) through the shared
    useServerList contract and load only when their tab opens. The Library's
-   HR numbers load their own code only when that section is opened.
+   HR numbers load their own code only when that section is opened, and so
+   does the Compliance board (Phase 3A). "Due from you" rides the bundle.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,14 +28,16 @@ import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
-import { REPORT_FAMILIES, REPORT_TEMPLATES } from "@/lib/reports/templates";
-import { createReport, fetchReportsBundle, localToday, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
+import { REPORT_FAMILIES, REPORT_TEMPLATES, periodFor } from "@/lib/reports/templates";
+import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
+import type { DueItem } from "@/lib/reports/obligations";
 import { CARD, ReportRowItem, TemplateIcon, tplName, type T } from "./shared";
 
 const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
+const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
 
-type Tab = "home" | "inbox" | "mine" | "team" | "library";
-const TABS: Tab[] = ["home", "inbox", "mine", "team", "library"];
+type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library";
+const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library"];
 const WARM_KEY = "kx:reports:bundle";
 
 export default function ReportsApp() {
@@ -90,10 +93,13 @@ export default function ReportsApp() {
     return () => { cancelled = true; };
   }, [reload]);
 
-  const start = useCallback(async (key: string) => {
-    setCreating(key);
+  /* A new report — or, for a day / week / month that already has one, that
+     one (the server returns it), so "Write it now" on an owed report opens
+     the draft already started. */
+  const start = useCallback(async (key: string, date?: string) => {
+    setCreating(date ? `${key}|${date}` : key);
     setCreateError(null);
-    const res = await createReport(key, localToday());
+    const res = await createReport(key, date ?? localToday());
     setCreating(null);
     if (res.ok) router.push(`/reports/${res.data.id}`);
     else setCreateError(res.error === "not_internal" ? t("err.notInternal") : t("err.generic"));
@@ -105,6 +111,7 @@ export default function ReportsApp() {
     { key: "inbox", onClick: () => setTab("inbox"), icon: "download", label: t("nav.inbox"), count: counts?.unread || undefined, active: tab === "inbox" },
     { key: "mine", onClick: () => setTab("mine"), icon: "file", label: t("nav.mine"), count: counts?.drafts || undefined, active: tab === "mine" },
     ...(bundle?.me.hasTeam ? [{ key: "team", onClick: () => setTab("team"), icon: "users" as const, label: t("nav.team"), active: tab === "team" }] : []),
+    ...(bundle?.me.board ? [{ key: "compliance", onClick: () => setTab("compliance"), icon: "badge-check" as const, label: t("nav.compliance"), active: tab === "compliance" }] : []),
     { key: "library", onClick: () => setTab("library"), icon: "books", label: t("nav.library"), active: tab === "library" },
   ];
 
@@ -141,6 +148,7 @@ export default function ReportsApp() {
         <div key={tab} className="kx-tab-in">
           {tab === "home" && <Home t={t} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
           {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
+          {tab === "compliance" && <ComplianceTab t={t} lang={lang} />}
           {tab === "library" && <Library t={t} bundle={bundle} />}
         </div>
       </div>
@@ -152,10 +160,13 @@ export default function ReportsApp() {
 
 function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
   t: T; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
-  onStart: (key: string) => void; onOpenInbox: () => void;
+  onStart: (key: string, date?: string) => void; onOpenInbox: () => void;
 }) {
   const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly).map((x) => x.key)), [bundle]);
+  const due = bundle?.due ?? [];
   return (
+    <div className="space-y-4">
+    {due.length > 0 && <DueCard t={t} due={due} creating={creating} onStart={onStart} />}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-write">
         <h2 id="kx-rep-write" className="mb-3 text-[14px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
@@ -208,6 +219,40 @@ function Home({ t, bundle, creating, createError, onStart, onOpenInbox }: {
         )}
       </section>
     </div>
+    </div>
+  );
+}
+
+/* ── Due from you (Phase 3A): what is missing, then what falls due soon ── */
+
+function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating: string | null; onStart: (key: string, date?: string) => void }) {
+  const when = (d: DueItem) => d.key === "daily" ? dmyDate(d.periodKey)
+    : d.key === "weekly" ? (() => { const p = periodFor("weekly", d.date); return periodLabel(p.start, p.end); })()
+    : `${d.periodKey.slice(5, 7)}/${d.periodKey.slice(0, 4)}`;
+  return (
+    <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-due">
+      <h2 id="kx-rep-due" className="text-[14px] font-semibold text-[var(--text-primary)]">{t("due.title")}</h2>
+      <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {due.map((d) => {
+          const busy = creating === `${d.key}|${d.date}`;
+          return (
+            <li key={`${d.key}|${d.periodKey}`} className={`flex items-center gap-3 rounded-xl border p-3 ${d.state === "missing" ? "border-red-500/30 bg-red-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"}`}>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={d.key} size={14} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, d.key)} <span className="font-normal text-[var(--text-dim)] tabular-nums">· {when(d)}</span></span>
+                <span className={`block text-[11.5px] tabular-nums ${d.state === "missing" ? "text-red-500" : "text-amber-500"}`}>
+                  {d.state === "missing" ? t("due.missing") : t("due.by").replace("{when}", dmyTime(d.dueAt))}
+                </span>
+              </span>
+              <button type="button" disabled={!!creating} onClick={() => onStart(d.key, d.date)}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
+                {busy && <SpinnerIcon size={11} />}{d.draftId ? t("due.continue") : t("due.write")}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

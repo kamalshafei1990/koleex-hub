@@ -133,6 +133,9 @@ export interface OrgTree {
   chainOf(accountId: string): string[];
   /** Everyone below an account, at any depth. */
   descendantsOf(accountId: string): string[];
+  /** Every employee that resolves to an account (Phase 3A: who can owe a
+   *  report), with their employee id. */
+  members(): Array<{ accountId: string; employeeId: string }>;
 }
 
 export function loadOrgTree(tenantId: string | null): Promise<OrgTree> {
@@ -147,6 +150,9 @@ async function buildOrgTree(tenantId: string | null): Promise<OrgTree> {
   for (const e of emps) { const a = acc.get(e.id); if (a) empOfAccount.set(a, e); }
   return {
     size: emps.length,
+    members() {
+      return Array.from(empOfAccount.entries()).map(([accountId, e]) => ({ accountId, employeeId: e.id }));
+    },
     chainOf(accountId) {
       const out: string[] = [];
       const seen = new Set<string>();

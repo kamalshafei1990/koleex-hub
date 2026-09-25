@@ -29,6 +29,10 @@
  *      the writing language, bounded material, the answer turned back into a
  *      plain section, a request refused before any model is asked, the
  *      provenance rule in the prompt, and "fill, never save".
+ *   §12 obligations (Phase 3A) — who must write what (the owner's default and
+ *      per-person exceptions) and when each report is due on the person's
+ *      OWN calendar: Egypt's and China's weeks, holidays, leave, the 3rd
+ *      working day, on time vs late, and nothing counted before tracking.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -49,6 +53,10 @@ import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type Ca
 import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
+import {
+  boardRow, cellOf, dailyDue, dayKind, defaultObliged, dueList, effectiveObliged, localDayOf, mondayOf, monthlyDue, summarize, weeklyDue,
+  type Clock, type PersonClock, type Sent,
+} from "../src/lib/reports/obligations";
 import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
@@ -206,7 +214,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 11, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai)`);
+  expect(files.length === 13, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -739,6 +747,90 @@ console.log("\n§11 Koleex AI and dictation");
   const dict = code(read("src/components/reports/app/ReportView.tsx"));
   expect(/locale: dictLang === "ar" \? "ar-EG"/.test(dict), "dictation hears Arabic as Egyptian Arabic");
   expect(/useDictation\(\{/.test(dict) && !/new \(window as/.test(dict) && !/SpeechRecognition\(/.test(dict), "dictation goes through the Hub's one recogniser (useDictation), not a second copy");
+}
+
+/* ── §12 obligations ───────────────────────────────────────────────────── */
+console.log("\n§12 who must write what, and when");
+{
+  /* Who (owner's decision, 25/09/2026). */
+  eq(defaultObliged({ isSuperAdmin: false, hasTeam: false }), { daily: true, weekly: true, monthly: false }, "an employee writes the daily and the weekly");
+  eq(defaultObliged({ isSuperAdmin: false, hasTeam: true }), { daily: true, weekly: true, monthly: true }, "a manager also writes the monthly");
+  eq(defaultObliged({ isSuperAdmin: true, hasTeam: true }), { daily: false, weekly: false, monthly: false }, "a super admin is exempt");
+  eq(effectiveObliged({ isSuperAdmin: false, hasTeam: false }, { daily: false, monthly: true }), { daily: false, weekly: true, monthly: true }, "a per-person exception wins over the default, both ways");
+
+  /* A fixed-offset clock for the proofs: Shanghai +8, Cairo +3. */
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8, "Africa/Cairo": 3 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(["2026-10-01", "2026-10-02"]), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-09-21" };
+  const eg: PersonClock = { weekend: [5, 6], holidays: new Set(), leave: new Set(["2026-09-24"]), tz: "Africa/Cairo", workEnd: "17:00", from: "2026-09-21" };
+
+  eq(mondayOf("2026-09-25"), "2026-09-21", "the week of Friday 25/09 starts Monday 21/09");
+  eq([dayKind(cn, "2026-09-26"), dayKind(cn, "2026-10-01"), dayKind(eg, "2026-09-24"), dayKind(eg, "2026-09-25"), dayKind(eg, "2026-09-27")], ["off", "off", "leave", "off", "work"],
+    "a day is off for the weekend or a holiday, leave for approved leave; Sunday is a working day in Egypt");
+  eq(dailyDue(cn, "2026-09-25", clock), { day: "2026-09-25", at: "2026-09-25T10:00:00.000Z" }, "a Shanghai daily is due at 18:00 there (10:00 UTC)");
+  eq(dailyDue(eg, "2026-09-24", clock), null, "no daily on a day of leave");
+  eq(dailyDue(cn, "2026-09-26", clock), null, "no daily on a Saturday in China");
+  eq(weeklyDue(cn, "2026-09-21", clock)?.day, "2026-09-25", "China's weekly is due Friday, the last working day before the weekend");
+  eq(weeklyDue(eg, "2026-09-21", clock)?.day, "2026-09-23", "Egypt's weekly is due before the Friday–Saturday weekend: Wednesday here, because Thursday is leave");
+  eq(weeklyDue({ ...eg, leave: new Set() }, "2026-09-21", clock)?.day, "2026-09-24", "and Thursday in an ordinary Egyptian week");
+  eq(weeklyDue(cn, "2026-09-28", clock)?.day, "2026-09-30", "a week whose Thursday and Friday are holidays is due Wednesday");
+  eq(weeklyDue({ ...cn, leave: new Set(["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"]) }, "2026-09-21", clock), null, "a week spent on leave asks for no weekly");
+  eq(monthlyDue(cn, "2026-09", clock)?.day, "2026-10-07", "September's monthly: the 3rd working day of October after the 1–2 October holidays and the weekend");
+  eq(monthlyDue(eg, "2026-08", clock)?.day, "2026-09-03", "August's monthly for Egypt: Tuesday 1, Wednesday 2, Thursday 3 September");
+
+  /* States. */
+  const due = { day: "2026-09-25", at: "2026-09-25T10:00:00.000Z" };
+  eq(cellOf({ due, sent: { at: "2026-09-25T09:59:00.000Z", id: "r" }, now: "2026-09-26T00:00:00.000Z", startsAt: null, from: "2026-09-21" }).state, "sent", "sent before the deadline → on time");
+  eq(cellOf({ due, sent: { at: "2026-09-25T10:01:00+00:00", id: "r" }, now: "2026-09-26T00:00:00.000Z", startsAt: null, from: "2026-09-21" }).state, "late", "sent after it → late (database timestamps compared as instants)");
+  eq(cellOf({ due, sent: null, now: "2026-09-25T09:00:00.000Z", startsAt: "2026-09-24T16:00:00.000Z", from: "2026-09-21" }).state, "due", "not sent, deadline ahead → due");
+  eq(cellOf({ due, sent: null, now: "2026-09-25T10:30:00.000Z", startsAt: null, from: "2026-09-21" }).state, "missing", "not sent, deadline passed → missing");
+  eq(cellOf({ due, sent: null, now: "2026-09-20T00:00:00.000Z", startsAt: "2026-09-24T16:00:00.000Z", from: "2026-09-21" }).state, "upcoming", "a day not yet started → upcoming");
+  eq(cellOf({ due, sent: null, now: "2026-09-30T00:00:00.000Z", startsAt: null, from: null }).state, "untracked", "before tracking starts nothing is missing");
+  eq(cellOf({ due, sent: { at: "2026-09-27T00:00:00.000Z", id: "r" }, now: "2026-09-30T00:00:00.000Z", startsAt: null, from: "2026-09-26" }).state, "sent", "and nothing is late: a report sent then is simply sent");
+  eq(cellOf({ due: null, offKind: "leave", sent: null, now: "2026-09-30T00:00:00.000Z", startsAt: null, from: "2026-09-21" }).state, "leave", "leave shows as leave, never missing");
+
+  /* A week on the board, and what a person owes. */
+  const sentMap = new Map<string, Sent>([["daily|2026-09-21", { at: "2026-09-21T09:00:00.000Z", id: "a" }], ["daily|2026-09-22", { at: "2026-09-22T12:00:00.000Z", id: "b" }]]);
+  const lookup = (k: string, pk: string) => sentMap.get(`${k}|${pk}`) ?? null;
+  const row = boardRow({ obliged: { daily: true, weekly: true, monthly: true }, clock: cn }, "2026-09-21", lookup, "2026-09-25T08:00:00.000Z", clock);
+  eq(Object.values(row.daily ?? {}).map((x) => x.state), ["sent", "late", "missing", "missing", "due", "off", "off"], "a Chinese week: on time, late, two missing, today due, the weekend off");
+  eq(row.weekly?.state, "due", "the week's weekly is due Friday");
+  eq(row.monthly?.month, "2026-09", "the monthly shown is the one due next (September's, due in October)");
+  eq(summarize([row]), { expected: 7, onTime: 1, late: 1, missing: 2, due: 3 }, "the week's summary counts what was expected, on time, late, missing and due");
+  eq(boardRow({ obliged: { daily: false, weekly: true, monthly: false }, clock: cn }, "2026-09-21", lookup, "2026-09-25T08:00:00.000Z", clock).daily, null, "someone not obliged to a report gets no cells for it");
+  const owed = dueList({ obliged: { daily: true, weekly: true, monthly: false }, clock: cn }, lookup, () => null, "2026-09-25T08:00:00.000Z", clock);
+  eq(owed.map((x) => `${x.key}:${x.periodKey}:${x.state}`), ["daily:2026-09-23:missing", "daily:2026-09-24:missing", "daily:2026-09-25:due", "weekly:2026-W39:due"],
+    "what a person owes: the missing days oldest first, then today's daily and this week's weekly");
+  eq(localDayOf("2026-09-25T17:30:00.000Z", "Asia/Shanghai"), "2026-09-26", "the day is read on the person's clock");
+
+  /* The server and the routes, as their code states them. */
+  const OB = "src/lib/server/reports/obligations.ts";
+  rule("the board's scope: everyone for a super admin or HR·view, a manager's own people, else no one", OB,
+    (c) => (/const scope = everyone \? undefined : new Set\(tree\.descendantsOf\(auth\.account_id\)\);/.test(c) && /return auth\.is_super_admin \|\| \(await requireModuleAction\(auth, "HR", "view"\)\) === null;/.test(c) ? [] : ["the board's scope is wider than the rule"]),
+    (src) => src.replace("const scope = everyone ? undefined : new Set(tree.descendantsOf(auth.account_id));", "const scope = undefined;"));
+  rule("the board reads whether a report was sent, never its text", OB,
+    (c) => { const sel = /from\("work_reports"\)\s*\.select\("([^"]+)"\)/.exec(c)?.[1] ?? ""; return sel && !/sections|title|search_text/.test(sel) ? [] : ["the board selects report content"]; },
+    (src) => src.replace('.select("id, author_account_id, template_key, period_key, status, submitted_at, superseded, confidential")', '.select("id, author_account_id, template_key, period_key, status, submitted_at, superseded, confidential, sections")'));
+  rule("a confidential report is counted, never linked", OB,
+    (c) => (/if \(!r\.superseded\) cur\.id = r\.confidential \? "" : r\.id;/.test(c) ? [] : ["a confidential report can be linked from the board"]),
+    (src) => src.replace('if (!r.superseded) cur.id = r.confidential ? "" : r.id;', "if (!r.superseded) cur.id = r.id;"));
+  rule("who can owe a report: an ACTIVE STAFF account", OB,
+    (c) => (/a\.status !== "active" \|\| a\.user_type !== "internal"/.test(c) ? [] : ["inactive or non-staff accounts can owe reports"]),
+    (src) => src.replace('if (!a || a.status !== "active" || a.user_type !== "internal") continue;', "if (!a) continue;"));
+  const OR = "src/app/api/work-reports/obligations/route.ts";
+  rule("who-writes-what is read and changed by a super admin or HR·edit only", OR,
+    (c) => ((c.match(/if \(!\(await canSetUp\(auth\)\)\) return forbidden\(\);/g) ?? []).length === 2 && /return auth\.is_super_admin \|\| \(await requireModuleAction\(auth, "HR", "edit"\)\) === null;/.test(code(read(OB))) ? [] : ["a handler skips the setup gate"]),
+    (src) => src.replace(/(export async function PUT[\s\S]*?)if \(!\(await canSetUp\(auth\)\)\) return forbidden\(\);/, "$1"));
+  rule("an exception can only name the tenant's own people", OR,
+    (c) => (/!allowed\.has\(raw\.accountId\)/.test(c) ? [] : ["any account id is accepted"]),
+    (src) => src.replace("!allowed.has(raw.accountId) || ", ""));
+  const ob = read("supabase/migrations/20260925_reports_obligations.sql");
+  expect(/ALTER TABLE work_report_obligations ENABLE ROW LEVEL SECURITY/.test(ob) && /ALTER TABLE work_report_settings ENABLE ROW LEVEL SECURITY/.test(ob) && !/CREATE POLICY/i.test(ob), "both obligation tables are RLS-on with no policy (service role only)");
+  expect(/CHECK \(template_key IN \('daily', 'weekly', 'monthly'\)\)/.test(ob) && /UNIQUE \(account_id, template_key\)/.test(ob), "an exception is one row per person and report type, daily / weekly / monthly only");
+  expect(/const ComplianceTab = dynamic\(\(\) => import\("\.\/ComplianceTab"\)/.test(code(read("src/components/reports/app/ReportsApp.tsx"))), "the compliance board loads only when its tab opens");
+  const need = ["nav.compliance", "due.title", "due.missing", "due.by", "due.write", "due.continue", "compliance.title", "compliance.setup", "compliance.notStarted",
+    ...["sent", "late", "missing", "due", "upcoming", "off", "leave", "untracked"].map((x) => `compliance.s.${x}`), ...["daily", "weekly", "monthly"].map((x) => `compliance.k.${x}`)];
+  expect(need.every((k) => !!reportsT[k]), "every compliance word exists (three languages checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");
