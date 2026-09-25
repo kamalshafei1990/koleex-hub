@@ -994,8 +994,14 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     "a confidential report is counted on the calendar, never linked");
   eq(deadlinesIn({ obliged: { daily: false, weekly: false, monthly: false }, clock: cn }, "2026-09-20T16:00:00.000Z", "2026-09-27T16:00:00.000Z", lookup, drafts, NOW, clock), [], "someone who owes nothing sees no deadline");
 
-  /* The route and the Calendar, as their code states them. */
-  const EV = "src/app/api/calendar/events/route.ts";
+  /* The route and the Calendar, as their code states them. The deadlines
+     are read by the shared calendar feed (lib/server/calendar-feed.ts —
+     the route and Koleex AI both answer from it, since the collab apps
+     audit 773b0696); the route answers from that feed. */
+  const EV = "src/lib/server/calendar-feed.ts";
+  rule("the calendar route answers from the shared feed, deadlines included", "src/app/api/calendar/events/route.ts",
+    (c) => (/const events = await loadCalendarFeed\(auth, accountId, feedWindow\(winFrom, winTo\)\);/.test(c) ? [] : ["the route no longer answers from the feed"]),
+    (src) => src.replace("await loadCalendarFeed(auth, accountId, feedWindow(winFrom, winTo))", "await Promise.resolve([])"));
   rule("a Reports failure leaves the rest of the calendar standing", EV,
     (c) => (/loadDeadlines\(auth\.tenant_id, accountId, w\.from, w\.to\)\.catch\(failed\(/.test(c) && /loadRequestDeadlines\(accountId, w\.from, w\.to\)\.catch\(failed\(/.test(c) && /const failed = \(what: string\) => \(e: unknown\) => \{[\s\S]*?return \[\];/.test(c) ? [] : ["the report mirror can fail the whole calendar"]),
     (src) => src.replace('.catch(failed("report requests"))', ""));
@@ -1003,8 +1009,8 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     (c) => (/report_id: d\.reportId \|\| \(viewingOwn \? d\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a draft can be linked from someone else's calendar"]),
     (src) => src.replace("(viewingOwn ? d.draftId : undefined)", "d.draftId"));
   rule("the deadlines are part of every calendar answer", EV,
-    (c) => (/reportMirror\(auth, accountId, viewingOwn, w\),/.test(c) && /\.\.\.leave, \.\.\.reports\] \}\)/.test(c) ? [] : ["the mirror is computed but not sent"]),
-    (src) => src.replace("...leave, ...reports] })", "...leave] })"));
+    (c) => (/reportMirror\(auth, accountId, viewingOwn, w\),/.test(c) && /\.\.\.leave, \.\.\.reports\];/.test(c) ? [] : ["the mirror is computed but not sent"]),
+    (src) => src.replace("...leave, ...reports];", "...leave];"));
   rule("nothing is read for the calendar before tracking starts", "src/lib/server/reports/obligations.ts",
     (c) => (/if \(!settings\.trackingFrom \|\| addDays\(toIso\.slice\(0, 10\), 1\) < settings\.trackingFrom\) return \[\];/.test(c) ? [] : ["deadlines can show before tracking starts"]),
     (src) => src.replace("if (!settings.trackingFrom || addDays(toIso.slice(0, 10), 1) < settings.trackingFrom) return [];", "if (addDays(toIso.slice(0, 10), 1) < (settings.trackingFrom ?? \"\")) return [];"));
@@ -1016,8 +1022,8 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     (c) => { const a = c.indexOf('if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }'); const b = c.indexOf("if (e.source) return;"); return a > 0 && b > a ? [] : ["a tap on a deadline does nothing"]; },
     (src) => src.replace('    if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }\n', ""));
   rule("the views draw the worded deadlines", CA,
-    (c) => ((c.match(/events=\{shownEvents\}/g) ?? []).length === 3 ? [] : ["a view draws the English fallback"]),
-    (src) => src.replace("events={shownEvents}", "events={events}"));
+    (c) => (/const eventsByDay = useMemo\(\(\) => groupEventsByDay\(shownEvents, visibleDays\)/.test(c) && /const gridProps = \{[\s\S]*?eventsByDay,[\s\S]*?\};/.test(c) && (c.match(/\{\.\.\.gridProps\}/g) ?? []).length === 4 ? [] : ["a view draws the English fallback"]),
+    (src) => src.replace("groupEventsByDay(shownEvents, visibleDays)", "groupEventsByDay(events, visibleDays)"));
   const RA = "src/components/reports/app/ReportsApp.tsx";
   rule("\"write it\" starts once: the link's parameters go before the report starts, and it replaces the stop", RA,
     (c) => { const m = /const key = url\.searchParams\.get\("write"\);([\s\S]*?)void start\(key,[\s\S]*?replace: true/.exec(c); return m && /window\.history\.replaceState\(/.test(m[1]) && /url\.searchParams\.delete\("request"\);/.test(m[1]) && /REPORT_TEMPLATES\.some\(\(x\) => x\.key === key\)/.test(m[1]) ? [] : ["a refresh or Back can start the report again"]; },
@@ -1037,11 +1043,12 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     eq(["daily", "weekly", "m1", "m2", "m3", "solo"].map((id) => `${lanes.get(id)?.lane}/${lanes.get(id)?.lanes}`), ["0/2", "1/2", "0/2", "1/2", "0/2", "0/1"],
       "two deadlines at one moment sit side by side; a meeting that ends frees its lane; a lone block keeps the full width");
     if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
-    for (const f of ["src/components/admin/calendar/WeekView.tsx", "src/components/admin/calendar/DayView.tsx"]) {
-      rule("each timed block takes its lane", f,
-        (c) => (/const lanes = dayLanes\(dayEvents\.filter\(\(e\) => !e\.all_day\), /.test(c) && /\.\.\.laneStyle\(lanes\.get\(ev\.id\), /.test(c) ? [] : ["blocks at the same time are drawn on top of each other"]),
-        (src) => src.replace(/\.\.\.laneStyle\(lanes\.get\(ev\.id\), [^)]*\),\n/, ""));
-    }
+    /* Week and Day share one grid (TimeGrid, since 773b0696). */
+    rule("each timed block takes its lane", "src/components/admin/calendar/TimeGrid.tsx",
+      (c) => (/timed: list\.filter\(\(e\) => !e\.all_day\)/.test(c) && /const lanes = dayLanes\(timed, day, hourHeight\);/.test(c) && /\.\.\.laneStyle\(lanes\.get\(ev\.id\), /.test(c) ? [] : ["blocks at the same time are drawn on top of each other"]),
+      (src) => src.replace(/\.\.\.laneStyle\(lanes\.get\(ev\.id\), [^\n]*\n/, "\n"));
+    const grids = ["src/components/admin/calendar/WeekView.tsx", "src/components/admin/calendar/DayView.tsx"].filter((f) => !/<TimeGrid\b/.test(code(read(f))));
+    expect(grids.length === 0, "the Week and Day views draw through that one grid", grids.join(", "));
   }
 
   /* Home: the greeting's line. */
@@ -1224,7 +1231,7 @@ console.log("\n§15 reports that events ask for");
   rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
     (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
     (src) => src.replace("!tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)", "!hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)"));
-  rule("a confidential request is never linked from someone else's calendar", "src/app/api/calendar/events/route.ts",
+  rule("a confidential request is never linked from someone else's calendar", "src/lib/server/calendar-feed.ts",
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
     (src) => src.replace("(viewingOwn || !reportTemplate(r.template_key)?.confidential ? r.report_id : null)", "r.report_id"));
   rule("what a person owes includes their requests even with no routine report", "src/lib/server/reports/obligations.ts",
