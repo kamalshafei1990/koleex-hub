@@ -101,12 +101,12 @@ export default function ComplianceTab({ t, lang }: { t: T; lang: string }) {
         )}
 
         {board && !board.trackingFrom && (
-          <TrackingBanner t={t} canSetUp={board.canSetUp} onStarted={() => void load(day)} />
+          <TrackingBanner t={t} lang={lang} canSetUp={board.canSetUp} onStarted={() => void load(day)} />
         )}
       </section>
 
       {/* Keyed on the start date, so a start set from the banner shows here too. */}
-      {setupOpen && board?.canSetUp && <Setup key={board.trackingFrom ?? "none"} t={t} onChanged={() => void load(day)} />}
+      {setupOpen && board?.canSetUp && <Setup key={board.trackingFrom ?? "none"} t={t} lang={lang} onChanged={() => void load(day)} />}
 
       <section className={`${CARD} p-2 sm:p-3`}>
         {phase === "loading" && !board ? (
@@ -173,7 +173,7 @@ export default function ComplianceTab({ t, lang }: { t: T; lang: string }) {
   );
 }
 
-function TrackingBanner({ t, canSetUp, onStarted }: { t: T; canSetUp: boolean; onStarted: () => void }) {
+function TrackingBanner({ t, lang, canSetUp, onStarted }: { t: T; lang: string; canSetUp: boolean; onStarted: () => void }) {
   const [date, setDate] = useState(() => localToday());
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState(false);
@@ -189,7 +189,7 @@ function TrackingBanner({ t, canSetUp, onStarted }: { t: T; canSetUp: boolean; o
       {canSetUp && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-[12px] text-[var(--text-dim)]">{t("compliance.startOn")}</span>
-          <div className="w-[170px]"><DatePicker id="kx-rep-track-from" value={date} onChange={(iso) => { if (iso) setDate(iso); }} /></div>
+          <div className="w-[170px]"><DatePicker id="kx-rep-track-from" value={date} onChange={(iso) => { if (iso) setDate(iso); }} lang={lang} /></div>
           <button type="button" onClick={() => void start()} disabled={busy} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--bg-inverted)] px-3 text-[12.5px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
             {busy && <SpinnerIcon size={12} />}{t("compliance.start")}
           </button>
@@ -203,7 +203,7 @@ function TrackingBanner({ t, canSetUp, onStarted }: { t: T; canSetUp: boolean; o
 const KEYS: ObligationKey[] = ["daily", "weekly", "monthly"];
 
 /** Who writes what: the owner's default per person, and the exceptions. */
-function Setup({ t, onChanged }: { t: T; onChanged: () => void }) {
+function Setup({ t, lang, onChanged }: { t: T; lang: string; onChanged: () => void }) {
   const [data, setData] = useState<ObligationSetup | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState(false);
@@ -247,7 +247,7 @@ function Setup({ t, onChanged }: { t: T; onChanged: () => void }) {
         <>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[12.5px]">
             <span className="text-[var(--text-secondary)]">{t("compliance.startOn")}</span>
-            <div className="w-[170px]"><DatePicker id="kx-rep-setup-from" value={data.trackingFrom ?? ""} onChange={(iso) => void saveStart(iso || null)} /></div>
+            <div className="w-[170px]"><DatePicker id="kx-rep-setup-from" value={data.trackingFrom ?? ""} onChange={(iso) => void saveStart(iso || null)} lang={lang} /></div>
             {busy === "start" && <SpinnerIcon size={12} />}
             {!data.trackingFrom && <span className="text-[11.5px] text-[var(--text-dim)]">{t("compliance.notStartedShort")}</span>}
           </div>

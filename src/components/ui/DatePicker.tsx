@@ -47,6 +47,8 @@ const MONTHS_BY_LANG: Record<string, string[]> = {
 };
 const TODAY_BY_LANG: Record<string, string> = { en: "Today", zh: "今天", ar: "اليوم" };
 const CLEAR_BY_LANG: Record<string, string> = { en: "Clear", zh: "清除", ar: "مسح" };
+/* The empty field's words — the HR forms' own (hr.pickDate). */
+const PICK_BY_LANG: Record<string, string> = { en: "Select date", zh: "选择日期", ar: "اختر التاريخ" };
 
 const WEEKDAYS = WEEKDAYS_BY_LANG.en;
 const MONTHS = MONTHS_BY_LANG.en;
@@ -73,7 +75,7 @@ function fmtDisplay(v: string, lang = "en"): string {
 export default function DatePicker({
   value,
   onChange,
-  placeholder = "Select date",
+  placeholder,
   className = "",
   id,
   lang = "en",
@@ -85,6 +87,7 @@ export default function DatePicker({
 }: {
   value: string;
   onChange: (iso: string) => void;
+  /** Shown while empty. Default "Select date" in the field's language. */
   placeholder?: string;
   className?: string;
   id?: string;
@@ -316,7 +319,7 @@ export default function DatePicker({
         aria-expanded={open}
       >
         <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}>
-          {value ? (format ? format(value) : fmtDisplay(value, lang)) : placeholder}
+          {value ? (format ? format(value) : fmtDisplay(value, lang)) : (placeholder ?? PICK_BY_LANG[lang] ?? PICK_BY_LANG.en)}
         </span>
         <CalendarRawIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
       </button>
