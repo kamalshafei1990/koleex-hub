@@ -40,6 +40,7 @@ import {
   GROK_DEFAULT_URL, GROK_DEFAULT_SECRETS_URL, GROK_SECRET_TTL_SEC,
 } from "../src/lib/server/ai/voice/grok";
 import { BUDGETS } from "../src/lib/server/ai/security/rate-limit";
+import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
 const failures: string[] = [];
@@ -70,7 +71,7 @@ process.on("exit", (code) => {
   }
 });
 
-const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const strip = (t: string) => stripComments(t);
 
 const GOOD = {
   AI_VOICE_BASE_URL: "https://example.invalid/api/rtc/v1/realtime",
@@ -296,9 +297,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
-    check("  …and the cron jobs sharing this file survived the edit (ten since attendance joined the finance, tasks, calendar, project and HR ones)",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 10 &&
-      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance"]
+    check("  …and the cron jobs sharing this file survived the edit (eleven since reports joined the attendance, finance, tasks, calendar, project and HR ones)",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 11 &&
+      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance", "/api/cron/report-reminders"]
         .every((p) => (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === p)));
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
@@ -1215,7 +1216,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
 
     check("the region hint is two words and nothing else", parseRegionHint("alt") === "alt" && parseRegionHint("primary") === "primary" && parseRegionHint("cn-north") === null && parseRegionHint("https://x") === null && parseRegionHint("") === null && parseRegionHint(null) === null);
 
-    const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const route = stripComments(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"), { line: "keep" });
     check("both regions are parsed, and voice is off only when NEITHER serves",
       /const primary = parseVoiceConfig\(voiceEnv\(\)\);\s*const alt = parseVoiceConfig\(altVoiceEnv\(\)\);\s*if \(!primary && !alt\)/.test(route));
     /* WHICH REGION FIRST: the hint, then the slot that served last, then the
