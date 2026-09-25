@@ -1611,6 +1611,26 @@ console.log("\n── An Arabic opening before an English code block reads right
     /if \(!useSupabase\) \{\s*return \(\s*<AdminAuthGate>\{children\}<\/AdminAuthGate>\s*\);\s*\}/.test(gateBody) &&
     /return <SupabaseGate>\{children\}<\/SupabaseGate>;/.test(gateBody) &&
     (gateBody.match(/\breturn\b/g) ?? []).length === 2);
+  /* The flag-OFF branch trusts AdminAuthGate, so its own decision is pinned
+     too: it starts at "checking" (the spinner), the ONLY way to "in" is the
+     session flag reading exactly "true" (blocked storage counts as signed
+     out), every other transition goes to "out", "out" hands over to the real
+     AdminAuth (whose loading state is the same spinner), and `children`
+     appears in exactly those two renders. */
+  const adminGate = stripComments(readFileSync("src/components/admin/AdminAuthGate.tsx", "utf8"));
+  const adminGateStart = adminGate.indexOf("export default function AdminAuthGate(");
+  const adminGateBody = adminGateStart >= 0 ? adminGate.slice(adminGateStart) : "";
+  check("  …and AdminAuthGate renders children only once the session flag says signed in",
+    /^import \{ LEGACY_SESSION_KEY \} from "\.\/session-keys";$/m.test(adminGate) &&
+    /^const spinner = \(\) => <BrandLoading [^{}>]*\/>;$/m.test(adminGate) &&
+    /^const AdminAuth = dynamic\(\(\) => import\("\.\/AdminAuth"\), \{ ssr: false, loading: spinner \}\);$/m.test(adminGate) &&
+    /const \[state, setState\] = useState<State>\("checking"\);/.test(adminGateBody) &&
+    /let signedIn = false;\s*try \{\s*signedIn = window\.localStorage\.getItem\(LEGACY_SESSION_KEY\) === "true";\s*\} catch \{\s*\}\s*setState\(signedIn \? "in" : "out"\);/.test(adminGateBody) &&
+    (adminGateBody.match(/\bsignedIn\b/g) ?? []).length === 3 &&
+    (adminGateBody.match(/\bsetState\b/g) ?? []).length === 4 &&
+    (adminGateBody.match(/\bsetState\("out"\)/g) ?? []).length === 2 &&
+    /if \(state === "checking"\) return spinner\(\);\s*if \(state === "out"\) return <AdminAuth>\{children\}<\/AdminAuth>;\s*return <>\{children\}<\/>;\s*\}\s*$/.test(adminGateBody) &&
+    (adminGateBody.match(/\bchildren\b/g) ?? []).length === 4);
   check("  …so the page carries no second gate of its own, and no longer imports one",
     !/AdminAuth/.test(aiPage) && /export default function AiPage\(\) \{\s*return <KoleexAiApp \/>;\s*\}/.test(aiPage));
 
