@@ -149,9 +149,13 @@ function RoleModal({ open, onClose, role, onSaved }: {
 
       {/* ── Advanced role flags ──
           Two orthogonal overrides that bypass the normal scope rules.
-          is_super_admin is safe-ish (still blocked from private records);
-          can_view_private is the break-glass flag — warn the user with a
-          red border + explanation since it's audit-logged. */}
+          is_super_admin bypasses every module and scope check.
+          can_view_private is the role's «private data» switch: cost prices,
+          credit terms, salaries and ID documents inside the apps the role
+          already has (src/lib/server/sensitive-columns.ts, src/lib/experience),
+          plus private to-dos within its reach (those reads are logged). It
+          stays red when on — the widest data grant a role can carry. Its words
+          come from rolesT (modal.canViewPrivate*); validate:roles holds them. */}
       <div className="rounded-xl border border-[var(--border-faint)] p-4 space-y-3 bg-[var(--bg-surface-subtle)]">
         <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-dim)]">
           Advanced — scope overrides
@@ -183,10 +187,10 @@ function RoleModal({ open, onClose, role, onSaved }: {
           />
           <div className="flex-1">
             <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
-              Break-glass: view Private records
+              {t("modal.canViewPrivate")}
             </div>
             <div className={`text-[11px] mt-0.5 ${canViewPrivate ? "text-red-300" : "text-[var(--text-dim)]"}`}>
-              Grants access to records marked Private (personal mail, notes, sensitive HR). Every read is logged to koleex_private_access_log. Grant sparingly — typically only during legal discovery.
+              {t("modal.canViewPrivate.help")}
             </div>
           </div>
         </label>

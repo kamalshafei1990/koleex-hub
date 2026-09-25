@@ -65,6 +65,27 @@ check("non-SA does not even fetch roles", page.includes("if (boot && !isSA) retu
 check("delete disabled while role is in use", page.includes("disabled={(role.accounts_count ?? 0) > 0}"));
 check("dangerous flags surfaced on the row", page.includes("badge.superAdmin") && page.includes("badge.breakGlass"));
 
+/* ── The «private data» switch says what it opens (26 Sep 2026) ──
+   It read "Break-glass: view Private records … Grant sparingly — typically
+   only during legal discovery", hard-coded in English, while it is the lever
+   for cost prices, credit terms and salaries (src/lib/server/sensitive-
+   columns.ts, src/lib/experience). An admin reading "legal discovery" would
+   never grant it to a finance role; one reading "private records" would not
+   guess it shows cost. The words live in rolesT so all three languages show. */
+const rolesWords = readFileSync("src/lib/translations/roles.ts", "utf8");
+check("the private-data switch reads its words from rolesT, not hard-coded English",
+  page.includes('{t("modal.canViewPrivate")}') && page.includes('{t("modal.canViewPrivate.help")}')
+  && !/legal discovery|Break-glass: view Private records/.test(page));
+{
+  const at = rolesWords.indexOf('"modal.canViewPrivate.help"');
+  const help = at < 0 ? "" : rolesWords.slice(at, rolesWords.indexOf("},", at));
+  check("its help names what it opens, in every language, and sends bank + profit to «Bank & Profit»",
+    /cost prices/.test(help) && /salaries/.test(help) && /credit terms/.test(help)
+    && (help.match(/Bank & Profit/g) ?? []).length === 3
+    && !/legal|法律|القانوني|koleex_private_access_log/.test(help),
+    help ? "" : "modal.canViewPrivate.help is gone");
+}
+
 /* ── Registry discipline (standing rule) ── */
 const pm = readFileSync("src/lib/permission-modules.ts", "utf8");
 check("module list derives from APP_REGISTRY", pm.includes("APP_REGISTRY") && pm.includes("SIDEBAR_GROUPS"));
