@@ -133,6 +133,10 @@ const reportsT = { ...mainWords, ...REPORT_SECTION_WORDS };
  *  steps over strings, templates and regexes (a bare regex read
  *  accept="image/*" as a comment opening and dropped the code after it). */
 const code = (src: string) => stripComments(src);
+/** A migration without its comments, read the way Postgres reads them (-- and
+ *  block): a statement commented out no longer passes a check, and a comment
+ *  that names DROP or CREATE POLICY no longer fails an "only adds" one. */
+const migration = (p: string) => stripComments(read(p), { lang: "sql" });
 
 /** A rule must pass on the real file and fail on the mutation. */
 function rule(name: string, file: string, check: (c: string) => string[], mutate: (src: string) => string) {
@@ -394,7 +398,7 @@ console.log("\n§7 wiring");
   expect(/\{ id: "reports",[^}]*route: "\/reports",[^}]*openAccess: true \}/.test(nav), "the app is registered at /reports and open to every employee (the server decides per report)");
   expect(/id: "communication"[\s\S]*?appIds: \[[^\]]*"reports"/.test(nav), "the sidebar lists it under Communication");
   expect(/"app\.reports":/.test(read("src/lib/translations/hub.ts")), "its name is in the Hub dictionary");
-  const mig = read("supabase/migrations/20260925_reports_phase1.sql");
+  const mig = migration("supabase/migrations/20260925_reports_phase1.sql");
   const tables = ["work_reports", "work_report_recipients", "work_report_comments"];
   expect(tables.every((t) => new RegExp(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`).test(mig)) && !/CREATE POLICY/i.test(mig),
     "all three tables are RLS-on with no policy (service role only, through the API)");
@@ -528,7 +532,7 @@ console.log("\n§9 photos and files");
   expect(!REPORT_ATTACHMENT_MIME.some((m) => runnable.includes(m)), "nothing that could run in our origin (SVG, HTML, XML, script, program) is accepted");
   eq(REPORT_ATTACHMENT_LIMITS.bytes, 4 * 1024 * 1024, "4 MB a file: under the platform's 4.5 MB request ceiling, the route that works from China");
   eq(REPORT_FILE_ACCEPT.split(","), [...REPORT_ATTACHMENT_MIME], "the file picker offers exactly what the route accepts");
-  const mig = read("supabase/migrations/20260925_reports_attachments.sql");
+  const mig = migration("supabase/migrations/20260925_reports_attachments.sql");
   const bucket = /VALUES \(\s*'report-attachments', 'report-attachments', (\w+), (\d+),\s*ARRAY\[([\s\S]*?)\]/.exec(mig);
   expect(!!bucket, "the migration creates the report-attachments bucket");
   if (bucket) {
@@ -889,7 +893,7 @@ console.log("\n§12 who must write what, and when");
   rule("an exception can only name the tenant's own people", OR,
     (c) => (/!allowed\.has\(raw\.accountId\)/.test(c) ? [] : ["any account id is accepted"]),
     (src) => src.replace("!allowed.has(raw.accountId) || ", ""));
-  const ob = read("supabase/migrations/20260925_reports_obligations.sql");
+  const ob = migration("supabase/migrations/20260925_reports_obligations.sql");
   expect(/ALTER TABLE work_report_obligations ENABLE ROW LEVEL SECURITY/.test(ob) && /ALTER TABLE work_report_settings ENABLE ROW LEVEL SECURITY/.test(ob) && !/CREATE POLICY/i.test(ob), "both obligation tables are RLS-on with no policy (service role only)");
   expect(/CHECK \(template_key IN \('daily', 'weekly', 'monthly'\)\)/.test(ob) && /UNIQUE \(account_id, template_key\)/.test(ob), "an exception is one row per person and report type, daily / weekly / monthly only");
   expect(/const ComplianceTab = dynamic\(\(\) => import\("\.\/ComplianceTab"\)/.test(code(read("src/components/reports/app/ReportsApp.tsx"))), "the compliance board loads only when its tab opens");
@@ -948,7 +952,7 @@ console.log("\n§13 reminders and escalation");
     (src) => src.replace("if (secret && req.headers.get(\"authorization\") !== `Bearer ${secret}`) {", "if (false) {"));
   const vj = JSON.parse(read("vercel.json")) as { crons?: Array<{ path: string; schedule: string }> };
   expect(!!vj.crons?.some((c) => c.path === "/api/cron/report-reminders" && /15/.test(c.schedule)), "the job runs every 15 minutes (vercel.json)");
-  const mig = read("supabase/migrations/20260925_reports_nudges.sql");
+  const mig = migration("supabase/migrations/20260925_reports_nudges.sql");
   expect(/UNIQUE \(account_id, template_key, period_key, kind\)/.test(mig) && /ALTER TABLE work_report_nudges ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig), "the ledger is one row per person × report × period × kind, RLS-on with no policy");
   eq(classifyNotificationActivity("report_reminder"), "reports_activity", "a reminder rides the Work reports switch the reader owns");
   eq(classifyNotificationActivity("report_escalation"), "reports_activity", "so does an escalation");
@@ -1237,7 +1241,7 @@ console.log("\n§15 reports that events ask for");
   rule("what a person owes includes their requests even with no routine report", "src/lib/server/reports/obligations.ts",
     (c) => (/const \[routine, asked\] = await Promise\.all\(\[loadRoutineDue\(auth, me, trackingFrom, now\), loadRequestsDue\(me\.accountId, now\)\]\);/.test(c) ? [] : ["event requests are dropped for someone with no daily"]),
     (src) => src.replace("loadRequestsDue(me.accountId, now)]", "Promise.resolve([] as DueItem[])]"));
-  const mig = read("supabase/migrations/20260925_reports_event_requests.sql");
+  const mig = migration("supabase/migrations/20260925_reports_event_requests.sql");
   expect(/UNIQUE \(rule_key, source_key, account_id\)/.test(mig) && /ALTER TABLE work_report_requests ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig) && !/\bDROP\b/i.test(mig),
     "a request is one row per rule × event × person, RLS-on with no policy, and the migration only adds");
   eq(classifyNotificationActivity("report_request"), "reports_activity", "the ask rides the Work reports switch the writer owns");
@@ -1386,7 +1390,7 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (c) => (/className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"/.test(c) && /h-9 flex-1 px-2\.5 text-\[12px\] font-semibold transition-colors sm:h-8 sm:flex-none/.test(c)
       && /className="flex flex-col gap-1\.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2"/.test(c) ? [] : ["the answers jump around from card to card on a phone"]),
     (src) => src.replace("flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between", "flex flex-wrap items-center justify-between gap-2"));
-  const lm = read("supabase/migrations/20260925_reports_links.sql");
+  const lm = migration("supabase/migrations/20260925_reports_links.sql");
   expect(/REFERENCES work_reports\(id\) ON DELETE CASCADE/.test(lm) && /ALTER TABLE work_report_links ENABLE ROW LEVEL SECURITY/.test(lm) && !/CREATE POLICY/i.test(lm) && /CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order'\)\)/.test(lm),
     "a link row goes with its report, is RLS-on with no policy, and points at the four kinds only");
 }
@@ -1509,7 +1513,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   rule("a quiet card shows nothing while it asks and nothing when empty", "src/components/reports/ReportsAboutCard.tsx",
     (c) => (c.includes("if (quiet && !rows?.length) return null;") ? [] : ["an empty card sits on every quotation and invoice"]),
     (src) => src.replace("if (quiet && !rows?.length) return null;", ""));
-  const sm = read("supabase/migrations/20260925_reports_links_sales.sql").replace(/--[^\n]*/g, "");
+  const sm = migration("supabase/migrations/20260925_reports_links_sales.sql");
   expect(/BEGIN;[\s\S]*DROP CONSTRAINT IF EXISTS work_report_links_entity_type_check;[\s\S]*ADD CONSTRAINT work_report_links_entity_type_check\s+CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order', 'quotation', 'invoice'\)\);[\s\S]*COMMIT;/.test(sm)
     && (sm.match(/\bDROP\b/g) ?? []).length === 1 && !/\b(DELETE|UPDATE|TRUNCATE|INSERT)\b/i.test(sm),
     "the links migration only widens the kinds to six — drop and add in one transaction, no row touched");
@@ -1880,8 +1884,7 @@ console.log("\n§20 the template builder");
     (src) => src.replace("const tpl = typeOf(detail);", "const tpl = reportTemplate(detail.report.templateKey);"));
 
   /* The migration */
-  const mig = read("supabase/migrations/20260925_reports_template_builder.sql");
-  const bare = mig.replace(/--[^\n]*/g, "");
+  const bare = migration("supabase/migrations/20260925_reports_template_builder.sql");
   expect(/CREATE TABLE IF NOT EXISTS work_report_templates/.test(bare) && /CREATE TABLE IF NOT EXISTS work_report_hidden_templates/.test(bare)
     && /ALTER TABLE work_reports ADD COLUMN IF NOT EXISTS template_snapshot jsonb;/.test(bare)
     && /ALTER TABLE work_report_templates ENABLE ROW LEVEL SECURITY;/.test(bare) && /ALTER TABLE work_report_hidden_templates ENABLE ROW LEVEL SECURITY;/.test(bare)
