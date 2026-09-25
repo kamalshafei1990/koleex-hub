@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
@@ -20,8 +20,51 @@ import UserMenu from "./UserMenu";
    a plain dynamic import that renders immediately) put the inbox + discuss +
    supabase chunks into every page's boot; see NotificationBellGate. */
 import NotificationBellGate from "./NotificationBellGate";
-import TenantPicker from "./TenantPicker";
-import ViewAsPicker from "./ViewAsPicker";
+import ViewAsTrigger from "./view-as-trigger";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { whenPageLoaded } from "@/lib/net-idle";
+/* Super-Admin tools load AFTER the page has loaded — every other person
+   downloaded them on every cold load and never saw them (measured
+   25/09/2026), and loading them before the load event held that event open.
+   The tenant picker already appears late (it waits for its tenant list, and
+   shows only with two or more tenants), so it needs no stand-in; the View-as
+   button gets an identical stand-in so the header cannot shift (ViewAsSlot). */
+const TenantPicker = dynamic(() => import("./TenantPicker"), { ssr: false });
+const ViewAsPicker = lazy(() => import("./ViewAsPicker"));
+
+/** true once the page's load event has fired. */
+function useAfterPageLoad(): boolean {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void whenPageLoaded().then(() => { if (alive) setDone(true); });
+    return () => { alive = false; };
+  }, []);
+  return done;
+}
+
+/** The picker's own rule for showing itself (Super Admin, not already viewing
+ *  as someone), decided here so the stand-in appears exactly when the real
+ *  button would. The real picker loads after the page load, or at once when
+ *  the button is hovered or pressed — a press opens it as soon as it arrives. */
+function ViewAsSlot({ dk }: { dk: boolean }) {
+  const { data } = useMeBootstrap();
+  const loaded = useAfterPageLoad();
+  const [armed, setArmed] = useState(false);
+  const [openAtOnce, setOpenAtOnce] = useState(false);
+  if (!data?.isSuperAdmin || data?.viewingAs) return null;
+  const standIn = (
+    <div className="relative">
+      <ViewAsTrigger dk={dk} onMouseEnter={() => setArmed(true)} onClick={() => { setArmed(true); setOpenAtOnce(true); }} />
+    </div>
+  );
+  if (!loaded && !armed) return standIn;
+  return (
+    <Suspense fallback={standIn}>
+      <ViewAsPicker dk={dk} defaultOpen={openAtOnce} />
+    </Suspense>
+  );
+}
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
 import { APP_REGISTRY } from "@/lib/navigation";
@@ -58,6 +101,7 @@ const languages: { code: Lang; label: string; short: string }[] = [
 
 export default function MainHeader() {
   const pathname = usePathname();
+  const afterLoad = useAfterPageLoad();
 
   /* SOLID BAR AT REST, FROSTED ONCE YOU SCROLL — the owner's call after the
      blur-at-rest defect resisted three fixes on his 17 Pro Max.
@@ -424,13 +468,13 @@ export default function MainHeader() {
             users. Stores the active tenant_id in localStorage; each page
             load, loadScopeContext() reads the override and scopes every
             query accordingly. */}
-        <div className="hidden md:block"><TenantPicker dk={dk} /></div>
+        <div className="hidden md:block">{afterLoad && <TenantPicker dk={dk} />}</div>
 
         {/* View-as picker — Super Admin only. Lets the SA view the
             system as any other user in their tenant (read-only). The
             picker disappears once view-as is active; the persistent
             banner is the only way to exit. */}
-        <div className="hidden md:block"><ViewAsPicker dk={dk} /></div>
+        <div className="hidden md:block"><ViewAsSlot dk={dk} /></div>
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}

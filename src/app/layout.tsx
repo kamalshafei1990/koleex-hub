@@ -5,8 +5,7 @@ import RootShell from "@/components/layout/RootShell";
 import DialogHost from "@/lib/ui-dialog";
 import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
 import Providers from "./providers";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/next";
+import DeferredInsights from "@/components/perf/DeferredInsights";
 import { SKIN_BOOTSTRAP } from "@/lib/appearance";
 
 const inter = Inter({
@@ -127,24 +126,10 @@ export default function RootLayout({
               buttons, the "c" key and openSmartCreate(). Desktop and
               tablet only: it never opens on a phone. */}
           <SmartCreateDrawer />
-          {/* Vercel Speed Insights — real-user Core Web Vitals (LCP/INP/CLS)
-              with P75 percentiles per route. Sends only performance timings +
-              normalized route names; no user content. Dashboard: Vercel →
-              project → Speed Insights (enable once, owner-side). */}
-          <SpeedInsights />
-          {/* Vercel Web Analytics — WHO is using the Hub from WHERE, and how
-              each page performs for them. The question it exists to answer:
-              "would a server closer to mainland China change anything?"
-              Until now there was no number behind that, only opinion.
-
-              Privacy: cookieless; sends the route, the country, the device
-              class and the referrer — never a user id, a name, a form value
-              or any content. The script is served from THIS origin
-              (/_vercel/insights), so it loads wherever the Hub loads,
-              mainland China included. Dashboard: Vercel → project →
-              Analytics (enable once, owner-side); until then the script is
-              a no-op. */}
-          <Analytics />
+          {/* Vercel Speed Insights + Web Analytics — loaded once the page
+              has finished fetching (see DeferredInsights for what each one
+              sends and why it no longer rides the first download). */}
+          <DeferredInsights />
         </Providers>
       </body>
     </html>

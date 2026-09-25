@@ -397,7 +397,11 @@ console.log("\nC. Coverage");
    needs no server, no session and no browser. */
 const BOOT_DOC_MAX_FILES = 22;
 const BOOT_DOC_MAX_KB = 1750;   // measured 2026-08-09: worst is hr at 19 / 1569
-const BOOT_DOC_ENTRY_MAX_KB = 1160;  // measured 2026-08-13: index 14 files / 1048 KB
+/* Re-baselined 2026-09-25: 1036 → 974 KB once the sign-in screen, the QA
+   tooling, the Super-Admin pickers and the Vercel beacons stopped riding the
+   signed-in first download (they load when needed). Left at 1160, all 62 KB
+   could have come back unseen. Was: 2026-08-13, 14 files / 1048 KB. */
+const BOOT_DOC_ENTRY_MAX_KB = 1075;  // measured 2026-09-25: index 14 files / 974 KB, +~10%
 console.log("\nD. Boot document (script tags in the server HTML)");
 {
   const appDir = path.join(NEXT, "server/app");

@@ -28,6 +28,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SESSION_INVALID_EVENT } from "@/lib/session-hints";
 import { noteSignInShown } from "@/lib/perf/client";
+import { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY, LAST_USER_KEY } from "./session-keys";
 import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -176,14 +177,9 @@ const INK_MOTION =
    the tab strip scrolling away is the lesser evil at 300px of height. */
 const MIN_BODY_H = 160;
 
-/* localStorage keys. Using localStorage (not sessionStorage) so the session
-   survives browser restarts — the user only has to sign in again after an
-   explicit Sign Out. */
-export const LEGACY_SESSION_KEY = "koleex-admin";
-export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
-/* Survives sign-out — LEGACY_SESSION_USER_KEY does not. Who you are is worth
-   remembering across a deliberate sign-out; that you were signed in is not. */
-export const LAST_USER_KEY = "koleex-last-user";
+/* The localStorage keys live in ./session-keys (read on every page by the
+   signed-in gate and the user menu); re-exported for existing importers. */
+export { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY, LAST_USER_KEY };
 
 
 /* `title`/`subtitle` used to be required props, but the gate stopped rendering

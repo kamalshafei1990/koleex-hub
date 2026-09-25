@@ -42,7 +42,7 @@ import { setCurrentAccountId, useCurrentAccount } from "@/lib/identity";
 import {
   LEGACY_SESSION_KEY,
   LEGACY_SESSION_USER_KEY,
-} from "@/components/admin/AdminAuth";
+} from "@/components/admin/session-keys";
 
 /* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
    mounted header component never statically imports the supabase client. */

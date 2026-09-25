@@ -14,7 +14,9 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import AdminAuth from "./AdminAuth";
+/* The signed-in path of AdminAuth; the sign-in screen itself loads only when
+   someone is signed out (see AdminAuthGate). */
+import AdminAuthGate from "./AdminAuthGate";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 /* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
    mounted gate never statically imports the supabase client. */
@@ -44,7 +46,7 @@ export default function AuthGate({ children }: Props) {
   // Legacy path: identical behaviour to Phase 1.
   if (!useSupabase) {
     return (
-      <AdminAuth>{children}</AdminAuth>
+      <AdminAuthGate>{children}</AdminAuthGate>
     );
   }
 

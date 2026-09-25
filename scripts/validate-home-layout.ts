@@ -11,7 +11,7 @@
    promises made about Home's speed (no request on an ordinary open, drag
    code only loaded on Edit).
    --------------------------------------------------------------------------- */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { launcherColumns, packAppBands, type AppBand } from "../src/lib/home/app-bands";
 import { appForPath, readHomeAppsPref, seedPins, MY_APPS_MAX, MY_APPS_SEED } from "../src/lib/home/my-apps";
 import { withDefaults, DEFAULT_PREFERENCES } from "../src/lib/access-control";
@@ -133,6 +133,32 @@ check("markHomeInteractive decides with isCountableHomeLoad BEFORE it records",
 const adminAuth = readFileSync("src/components/admin/AdminAuth.tsx", "utf8");
 check("the sign-in gate reports that its form was shown",
   /useEffect\(\(\) => \{ if \(authed === false\) noteSignInShown\(\); \}, \[authed\]\);/.test(adminAuth));
+
+/* Measured 25/09/2026 from the production source maps: the signed-in first
+   download carried the sign-in screen, the QA tooling, the Super-Admin
+   pickers and the Vercel beacons — none of which the first screen runs. Each
+   now loads when it is needed; one static import anywhere puts it back. */
+console.log("── The first download stays lean ──");
+const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(`${dir}/${e.name}`) : /\.(ts|tsx)$/.test(e.name) ? [`${dir}/${e.name}`] : []);
+const srcFiles = walk("src");
+const staticAdminAuth = srcFiles.filter((f) => f !== "src/components/admin/AdminAuthGate.tsx" &&
+  /(^|\n)\s*import\s+[^;]*from\s+["'](@\/components\/admin\/AdminAuth|\.\/AdminAuth)["']/.test(readFileSync(f, "utf8")));
+check("nothing imports the sign-in screen statically (AdminAuthGate loads it when signed out)",
+  staticAdminAuth.length === 0, staticAdminAuth.join(", "));
+const shell = readFileSync("src/components/layout/RootShell.tsx", "utf8");
+check("the QA Open Route highlighter loads only through QaFocusGate",
+  !/from "@\/components\/qa\/QaFocusHighlight"/.test(shell) && /<QaFocusGate \/>/.test(shell));
+const inspector = readFileSync("src/lib/qa/inspector.tsx", "utf8");
+check("the QA inspector overlay loads only when inspect mode starts",
+  !/from "@\/lib\/qa\/types"/.test(inspector) && !/from "\.\/inspector-overlay"/.test(inspector) && /import\("\.\/inspector-overlay"\)/.test(inspector));
+const header = readFileSync("src/components/layout/MainHeader.tsx", "utf8");
+check("the Super-Admin pickers are not in the header's static imports",
+  !/import \w+ from "\.\/(ViewAsPicker|TenantPicker)"/.test(header) && /lazy\(\(\) => import\("\.\/ViewAsPicker"\)\)/.test(header));
+check("the View-as banner does not import the picker", !/from "\.\/ViewAsPicker"/.test(readFileSync("src/components/layout/ViewAsBanner.tsx", "utf8")));
+const rootLayout = readFileSync("src/app/layout.tsx", "utf8");
+check("Vercel Analytics and Speed Insights are deferred (DeferredInsights), not in the root layout",
+  !/from "@vercel\/(analytics|speed-insights)/.test(rootLayout) && /<DeferredInsights \/>/.test(rootLayout));
 
 console.log(`\nhome-layout: ${passed} passed, ${failed} failed.`);
 if (failed) process.exit(1);

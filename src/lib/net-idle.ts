@@ -84,3 +84,13 @@ export function whenNetworkQuiet(opts?: {
     timer = window.setTimeout(tick, 150);
   });
 }
+
+/** Resolves once the document's load event has fired (at once if it
+ *  already has). For work that must not be counted in the page load — a
+ *  script started before `load` holds the load event open until it arrives,
+ *  which is how deferred beacons made nav.cold.load_ms later instead of
+ *  earlier (measured 25/09/2026). */
+export function whenPageLoaded(): Promise<void> {
+  if (typeof window === "undefined" || document.readyState === "complete") return Promise.resolve();
+  return new Promise((resolve) => window.addEventListener("load", () => resolve(), { once: true }));
+}

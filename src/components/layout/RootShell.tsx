@@ -26,7 +26,9 @@ const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButto
    client — lazy so the shell's first paint never waits on or ships them. */
 const FloatingPanel = dynamic(() => import("./FloatingPanel"), { ssr: false });
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
-import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
+/* The QA Open Route highlighter loads only for a page opened from the QA
+   console — see QaFocusGate. */
+import QaFocusGate from "@/components/qa/QaFocusGate";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import DevReload from "@/components/pwa/DevReload";
@@ -379,7 +381,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {panelReady && <ReportIssueButton />}
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
           picked component on arrival (issue dc295123 follow-up). */}
-      <Suspense fallback={null}><QaFocusHighlight /></Suspense>
+      <Suspense fallback={null}><QaFocusGate /></Suspense>
       {/* Headless presence heartbeat + page tracking (Super Admin monitoring). */}
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}

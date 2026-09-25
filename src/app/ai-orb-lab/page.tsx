@@ -1,6 +1,6 @@
 "use client";
 
-import AdminAuth from "@/components/admin/AdminAuth";
+import AdminAuth from "@/components/admin/AdminAuthGate";
 
 /* Dev-only harness for the AIOrb status system. NOT registered in
    APP_REGISTRY — reachable only by typing /ai-orb-lab.

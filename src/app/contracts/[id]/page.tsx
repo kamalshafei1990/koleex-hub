@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import dynamic from "next/dynamic";
-import AdminAuth from "@/components/admin/AdminAuth";
+import AdminAuth from "@/components/admin/AdminAuthGate";
 import PermissionGate from "@/components/layout/PermissionGate";
 import { EditorSkeleton } from "@/components/ui/skeletons/AppShellSkeletons";
 

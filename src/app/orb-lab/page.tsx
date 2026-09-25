@@ -1,6 +1,6 @@
 "use client";
 
-import AdminAuth from "@/components/admin/AdminAuth";
+import AdminAuth from "@/components/admin/AdminAuthGate";
 
 /* Orb Lab — a dev/diagnostic page to preview every KoleexOrb reaction in
    isolation. Force each state and watch the animation, independent of the
