@@ -25,6 +25,10 @@
  *      a fact lands on the author's OWN calendar day (a 10 pm Shanghai meeting
  *      is not the UTC day), open work counts when due, words follow the
  *      language, and a fact is offered once per list.
+ *   §11 Koleex AI + dictation (Phase 2D) — which sections each action serves,
+ *      the writing language, bounded material, the answer turned back into a
+ *      plain section, a request refused before any model is asked, the
+ *      provenance rule in the prompt, and "fill, never save".
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -45,6 +49,7 @@ import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type Ca
 import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
+import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
 } from "../src/lib/reports/attachments";
@@ -201,7 +206,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 10, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment)`);
+  expect(files.length === 11, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -653,6 +658,87 @@ console.log("\n§10 fill from the apps");
   const nextWeek = rec({ source: "planning", state: "open", at: "2026-09-29T01:00:00.000Z", title: "Trade fair booth" });
   eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).map((g) => g.section), ["meetings", "done", "next"], "a weekly gets the week's meetings, what was done, and next week");
   eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).find((g) => g.section === "next")?.items.map((i) => i.text), ["Trade fair booth"], "next week holds only what falls in it (a due date on 05/10 is not next week's)");
+}
+
+/* ── §11 Koleex AI + dictation ─────────────────────────────────────────── */
+console.log("\n§11 Koleex AI and dictation");
+{
+  const bad: string[] = [];
+  for (const [key, ids] of Object.entries(AI_WRITE_SECTIONS)) {
+    const tpl = reportTemplate(key);
+    for (const id of ids) {
+      const sec = tpl?.sections.find((x) => x.id === id);
+      if (!sec) bad.push(`${key}.${id}: no such section`);
+      else if (sec.kind !== "text") bad.push(`${key}.${id}: "write" is for text sections`);
+    }
+  }
+  expect(bad.length === 0, "Koleex AI writes only real text sections", bad.join("; "));
+  expect(canWrite("weekly", "summary") && canWrite("monthly", "summary") && !canWrite("daily", "done") && !canWrite("free", "body"), "it writes the weekly and monthly summaries — everything else it only tidies");
+
+  /* The language the author writes in, not the screen's. */
+  eq(writingLang(["اليوم خلصنا عرض السعر وبعتناه للعميل"], "en"), "ar", "Arabic writing → an Arabic answer, even on an English screen");
+  eq(writingLang(["今天完成了报价单并发送给客户，明天跟进付款"], "ar"), "zh", "Chinese writing → a Chinese answer");
+  eq(writingLang(["Sent the Yili quotation and booked the October container"], "zh"), "en", "English writing → an English answer");
+  eq(writingLang(["QU-12", "ok"], "ar"), "ar", "too little to tell → the screen's language");
+  eq(writingLang(["Meeting with Mr Chen عن الأسعار والشحن للعميل في القاهرة"], "en"), "ar", "a mixed line goes with the script most of it is in");
+
+  /* Material: bounded, headed, the report's own words last. */
+  const g = (texts: string[], paragraph = false) => ({ from: "daily", section: "done", to: ["summary"], sources: [], items: texts.map((text) => ({ text, paragraph, date: null })) });
+  const mat = writeMaterial([{ heading: "Tasks completed (dailies)", group: g(["Priced the Yili order", "Booked the container"]) }], [{ name: "Project status", text: "Catalogue 60%" }, { name: "Empty", text: "  " }]);
+  eq(mat, "## Tasks completed (dailies)\n- Priced the Yili order\n- Booked the container\n\n## Already in this report\n### Project status\nCatalogue 60%", "the material reads as headed lists, then what the report already says (empty sections left out)");
+  const big = writeMaterial([{ heading: "x", group: g(Array.from({ length: 500 }, (_, i) => `Item ${i} `.repeat(8))) }], []);
+  expect(big.length <= AI_LIMITS.material + 2, `the material is capped at ${AI_LIMITS.material} characters`);
+
+  /* The answer back into a section. */
+  eq(toSection("**This week** we closed the Yili order.\n\n\n\nNext: the container.", "text"), "This week we closed the Yili order.\n\nNext: the container.", "Markdown bold and extra blank lines are dropped from a text section");
+  eq(toSection("## Summary\nDone.", "text"), "Summary\nDone.", "a Markdown heading becomes a plain line");
+  eq(toSection("- Call the forwarder\n2) Pay the deposit\n\n• Send samples", "list"), "Call the forwarder\nPay the deposit\nSend samples", "a list answer becomes one item per line, bullets and numbers removed");
+  eq(toSection(Array.from({ length: 80 }, (_, i) => `- item ${i}`).join("\n"), "list").split("\n").length, REPORT_LIMITS.items, `a list answer keeps at most ${REPORT_LIMITS.items} items`);
+  eq(toSection("y".repeat(REPORT_LIMITS.text + 99), "text").length, REPORT_LIMITS.text, `a text answer is capped at ${REPORT_LIMITS.text} characters`);
+
+  /* Refused before any model is asked. */
+  eq(checkAiRequest("weekly", { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a weekly summary with material goes");
+  eq(checkAiRequest("weekly", { action: "write", section: "summary", lang: "en", material: "   " }), "no_material", "nothing to write from → refused");
+  eq(checkAiRequest("daily", { action: "write", section: "done", lang: "en", material: "x" }), "not_writable", "\"write\" on a section it does not serve → refused");
+  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "ar", text: "النت فصل ساعتين والعميل ما ردش" }), null, "tidying a written section goes");
+  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "ar", text: "ok" }), "too_short", "tidying almost nothing → refused");
+  eq(checkAiRequest("daily", { action: "tidy", section: "nope", lang: "en", text: "x".repeat(40) }), "bad_section", "an unknown section → refused");
+  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "fr" as "en", text: "x".repeat(40) }), "bad_lang", "a language the Hub does not speak → refused");
+  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "en", text: "x".repeat(AI_LIMITS.tidy + 1) }), "too_long", "more than a section → refused");
+
+  /* The route, as its code states it. */
+  const AI = "src/app/api/work-reports/[id]/ai/route.ts";
+  rule("Koleex AI answers the author of a draft only", AI,
+    (c) => (/loaded\.access !== "author"/.test(c) && /row\.status !== "draft"/.test(c) ? [] : ["no author + draft check"]),
+    (src) => src.replace('if (!loaded || loaded.access !== "author")', "if (!loaded)"));
+  rule("the request is checked and the budget spent BEFORE any model is asked", AI,
+    (c) => { const chk = c.indexOf("checkAiRequest("); const bud = c.indexOf("consumeBudget("); const ask = c.indexOf("chatWithTools({"); return chk > 0 && bud > chk && ask > bud ? [] : ["the model can be asked before the checks"]; },
+    (src) => src.replace("await consumeBudget(subjectFor.account(auth.account_id)", "await noBudget(subjectFor.account(auth.account_id)"));
+  rule("every prompt carries the provenance rule (Koleex AI, never the model or its maker)", AI,
+    (c) => (/const SYSTEM =[\s\S]*?AI_PROVENANCE_RULE;/.test(c) && /\{ role: "system", content: SYSTEM \}/.test(c) ? [] : ["the system prompt lacks AI_PROVENANCE_RULE"]),
+    (src) => src.replace('  " If the material is thin, say less; never pad." +\n  AI_PROVENANCE_RULE;', '  " If the material is thin, say less; never pad.";'));
+  rule("other people's words go in fenced — data, never instructions", AI,
+    (c) => ((c.match(/fenceUntrusted\(/g) ?? []).length >= 2 ? [] : ["material or text is not fenced"]),
+    (src) => src.replace('fenceUntrusted(ask.material ?? "", "document", "The employee\'s report material: their earlier reports and their records in Koleex Hub", fence)', "(ask.material ?? \"\")"));
+  rule("nothing of the model or its provider reaches the browser", AI,
+    (c) => (/servedBy|out\.model|bodyText|getLastAiError/.test(c) ? ["the route touches provider details"] : []),
+    (src) => src.replace('return NextResponse.json({ text }, {', 'return NextResponse.json({ text, by: out.servedBy }, {'));
+  rule("a cut-off answer is refused, not pasted", AI,
+    (c) => (/finishReason === "length"/.test(c) && /\|\| cut\)/.test(c) ? [] : ["a truncated answer can reach the draft"]),
+    (src) => src.replace("if (!out.ok || !answer || cut) {", "if (!out.ok || !answer) {"));
+  rule("a thinking model's reasoning never becomes report text", AI,
+    (c) => (/replace\(\/<think>\[\\s\\S\]\*\?<\\\/think>\/gi, ""\)/.test(c) ? [] : ["<think> blocks are not stripped"]),
+    (src) => src.replace('.replace(/<think>[\\s\\S]*?<\\/think>/gi, "")', ""));
+  rule("fill, never save: the AI panel only proposes (no save or send from it)", "src/components/reports/app/SectionAi.tsx",
+    (c) => (/saveDraft|submitReport|deleteDraft/.test(c) ? ["the AI panel can save or send"] : (/onApply\(/.test(c) ? [] : ["no apply path"])),
+    (src) => src.replace('import { askReportAi } from "@/lib/work-reports";', 'import { askReportAi, saveDraft } from "@/lib/work-reports";\nvoid saveDraft;'));
+  const aiUi = code(read("src/components/reports/app/SectionAi.tsx"));
+  const aiBtn = /const AI_BTN =\s*"([^"]+)"/.exec(aiUi)?.[1] ?? "";
+  expect(/\bkx-ai-glow\b/.test(aiBtn) && !/\btruncate\b/.test(aiBtn) && /whitespace-nowrap/.test(aiBtn), "every Koleex AI button glows (kx-ai-glow) and is never truncated (the ring is drawn outside the box)");
+  expect(!/deepseek|openai|anthropic|gemini|groq|grok|qwen|claude|gpt/i.test(Object.entries(reportsT).filter(([k]) => k.startsWith("ai.") || k.startsWith("dict.")).map(([, v]) => `${v.en} ${v.zh} ${v.ar}`).join(" ")), "no screen word names a model or its maker — only \"Koleex AI\"");
+  const dict = code(read("src/components/reports/app/ReportView.tsx"));
+  expect(/locale: dictLang === "ar" \? "ar-EG"/.test(dict), "dictation hears Arabic as Egyptian Arabic");
+  expect(/useDictation\(\{/.test(dict) && !/new \(window as/.test(dict) && !/SpeechRecognition\(/.test(dict), "dictation goes through the Hub's one recogniser (useDictation), not a second copy");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

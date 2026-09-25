@@ -8,6 +8,7 @@ import type { ReportSectionValue } from "@/lib/reports/templates";
 import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
+import type { AiDraftRequest } from "@/lib/reports/ai-draft";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -142,6 +143,10 @@ export const captionReportAttachment = (id: string, attId: string, caption: stri
   call<{ attachment: ReportAttachment }>(`/api/work-reports/${id}/attachments/${attId}`, { method: "PATCH", body: JSON.stringify({ caption }) });
 export const deleteReportAttachment = (id: string, attId: string) =>
   call<{ ok: true }>(`/api/work-reports/${id}/attachments/${attId}`, { method: "DELETE" });
+
+/** Koleex AI on one section of a draft (write / tidy) — a proposal only. */
+export const askReportAi = (id: string, body: AiDraftRequest) =>
+  call<{ text: string }>(`/api/work-reports/${id}/ai`, { method: "POST", body: JSON.stringify(body) });
 
 /** The draft's suggestions again, for the day / week / month it is moving to. */
 export const fetchCarry = (id: string, date: string) =>

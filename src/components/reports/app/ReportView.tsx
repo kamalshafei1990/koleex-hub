@@ -34,6 +34,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import { REPORT_LIMITS, periodFor, reportTemplate, type ReportSectionValue, type ReportTemplateDef } from "@/lib/reports/templates";
 import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
 import { APP_RULES, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
+import { toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
 import {
   commentOnReport, decideReport, deleteDraft, dmyDate, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
   type ReportDetail, type ReportPerson, type ReportRecipient,
@@ -42,6 +43,8 @@ import { Avatar, Badge, CARD, FIELD, StatusChip, TemplateIcon, tplName, type T }
 import CarryCard from "./CarryCard";
 import AttachmentsEditor from "./AttachmentsEditor";
 import AttachmentsView from "./AttachmentsView";
+import { DictStatus, SectionAiButtons, SectionAiProposal, SectionMic, useSectionAi } from "./SectionAi";
+import { dictationSupported, useDictation } from "@/components/ai/useDictation";
 
 export default function ReportView({ id }: { id: string }) {
   const { t, lang } = useTranslation(reportsT);
@@ -69,7 +72,7 @@ export default function ReportView({ id }: { id: string }) {
           </div>
         )}
         {phase === "ready" && detail && (detail.can.edit
-          ? <Composer t={t} detail={detail} onSent={load} />
+          ? <Composer t={t} lang={lang} detail={detail} onSent={load} />
           : <Reader t={t} lang={lang} detail={detail} onChange={load} />)}
       </div>
     </div>
@@ -112,7 +115,7 @@ function sectionsOf(tpl: ReportTemplateDef, texts: Record<string, string>): Repo
     : { id: s.id, text: (texts[s.id] ?? "").slice(0, REPORT_LIMITS.text) });
 }
 
-function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: () => Promise<void> }) {
+function Composer({ t, lang, detail, onSent }: { t: T; lang: string; detail: ReportDetail; onSent: () => Promise<void> }) {
   const router = useRouter();
   const tpl = reportTemplate(detail.report.templateKey);
   const id = detail.report.id;
@@ -123,6 +126,32 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
   const [confirmDelete, setConfirmDelete] = useState(false);
   /* A photo or file still on its way: Send waits for it. */
   const [uploading, setUploading] = useState(false);
+  /* Koleex AI's proposals, per section (fill, never save). */
+  const ai = useSectionAi(detail.report.id, t);
+  /* Dictation: one section listens at a time; its words land at the end of
+     that section when the author stops. The spoken language is its own
+     choice (kept on this device), Arabic heard as Egyptian Arabic. */
+  const uiLang = (["en", "zh", "ar"] as const).find((l) => l === lang) ?? "en";
+  const [canDictate] = useState(() => typeof window !== "undefined" && dictationSupported());
+  const [dictLang, setDictLang] = useState<WritingLang>(() => {
+    try { const v = window.localStorage.getItem("kx-report-dict-lang"); if (v === "en" || v === "zh" || v === "ar") return v; } catch { /* storage blocked */ }
+    return writingLang(detail.report.sections.map((x) => x.text ?? (x.items ?? []).join(" ")), uiLang);
+  });
+  const dictFor = useRef<string | null>(null);
+  const [dictSection, setDictSection] = useState<string | null>(null);
+  const [dictProblem, setDictProblem] = useState<{ sid: string; msg: string } | null>(null);
+  const dictation = useDictation({
+    lang: uiLang,
+    locale: dictLang === "ar" ? "ar-EG" : dictLang === "zh" ? "zh-CN" : "en-US",
+    onTranscript: (spoken) => {
+      const sid = dictFor.current;
+      const kind = sid ? reportTemplate(detail.report.templateKey)?.sections.find((x) => x.id === sid)?.kind : null;
+      if (!sid || !kind) return;
+      const current = (draftRef.current.texts[sid] ?? "").replace(/\s+$/, "");
+      change({ texts: { ...draftRef.current.texts, [sid]: !current ? spoken : kind === "list" ? `${current}\n${spoken}` : `${current} ${spoken}` } });
+    },
+    onError: (msg) => { if (dictFor.current) setDictProblem({ sid: dictFor.current, msg }); },
+  });
   const draftRef = useRef(draft);
   const dirty = useRef(false);
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -205,6 +234,42 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
 
   const period = draft.date ? periodFor(tpl.cadence, draft.date) : null;
   const sectionName = (sid: string) => t(`tpl.${tpl.key}.s.${sid}`);
+  const screenLang = (["en", "zh", "ar"] as const).find((l) => l === lang) ?? "en";
+  const kindOf = (sid: string) => tpl.sections.find((x) => x.id === sid)?.kind ?? "text";
+
+  /* Koleex AI answers in the language the author WRITES in. */
+  const tidy = (sid: string) => {
+    const text = draftRef.current.texts[sid] ?? "";
+    void ai.run({ action: "tidy", section: sid, lang: writingLang([text], screenLang as WritingLang), text });
+  };
+  const write = (sid: string) => {
+    const d = draftRef.current;
+    const heading = (g: CarryGroup) => (g.app ? t(`feed.g.${g.section}`) : `${t(`tpl.${g.from}.s.${g.section}`)} (${tplName(t, g.from)})`);
+    const material = writeMaterial(
+      [...carry.groups, ...feedGroups].map((g) => ({ heading: heading(g), group: g })),
+      tpl.sections.filter((x) => x.id !== sid).map((x) => ({ name: sectionName(x.id), text: d.texts[x.id] ?? "" })),
+    );
+    const own = [...Object.values(d.texts), ...carry.groups.flatMap((g) => g.items.map((i) => i.text))];
+    void ai.run({ action: "write", section: sid, lang: writingLang(own, screenLang as WritingLang), material });
+  };
+  const toggleDictation = (sid: string) => {
+    setDictProblem(null);
+    if (dictation.listening) { dictation.stop(); return; }
+    dictFor.current = sid;
+    setDictSection(sid);
+    dictation.start();
+  };
+  const cycleDictLang = () => setDictLang((l) => {
+    const next: WritingLang = l === "en" ? "ar" : l === "ar" ? "zh" : "en";
+    try { window.localStorage.setItem("kx-report-dict-lang", next); } catch { /* storage blocked */ }
+    return next;
+  });
+  const applyAi = (sid: string, mode: "replace" | "append") => {
+    const answer = toSection(ai.slots[sid]?.text ?? "", kindOf(sid));
+    const current = (draftRef.current.texts[sid] ?? "").replace(/\s+$/, "");
+    setText(sid, mode === "append" && current ? `${current}${kindOf(sid) === "list" ? "\n" : "\n\n"}${answer}` : answer);
+    ai.clear(sid);
+  };
 
   const send = async () => {
     const d = draftRef.current;
@@ -260,14 +325,30 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
         )}
 
         {tpl.sections.map((s) => (
-          <label key={s.id} className={`${CARD} block p-4`}>
-            <span className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-[12px] font-semibold text-[var(--text-secondary)]">
-              {sectionName(s.id)}
-              {s.required && <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span>}
-              {s.kind === "list" && <span className="font-normal text-[var(--text-faint)]">· {t("composer.listHint")}</span>}
-            </span>
+          /* A card, not a <label>: its head carries buttons now, and a label
+             may hold only the one control it names. */
+          <div key={s.id} className={`${CARD} block p-4`}>
+            <div className="mb-1.5 flex items-start justify-between gap-2">
+              <label htmlFor={`kx-rep-${s.id}`} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[12px] font-semibold text-[var(--text-secondary)]">
+                {sectionName(s.id)}
+                {s.required && <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span>}
+                {s.kind === "list" && <span className="font-normal text-[var(--text-faint)]">· {t("composer.listHint")}</span>}
+              </label>
+              <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {canDictate && (
+                  <SectionMic t={t} dictLang={dictLang} active={dictation.listening && dictSection === s.id}
+                    busyElsewhere={dictation.listening && dictSection !== s.id}
+                    onToggle={() => toggleDictation(s.id)} onCycleLang={cycleDictLang} />
+                )}
+                <SectionAiButtons t={t} templateKey={tpl.key} sectionId={s.id} text={draft.texts[s.id] ?? ""} slot={ai.slots[s.id]}
+                  onTidy={() => tidy(s.id)} onWrite={() => write(s.id)} />
+              </span>
+            </div>
             <GrowingTextarea
               id={`kx-rep-${s.id}`}
+              /* The author's words set the direction (Arabic reads right to
+                 left on an English screen too), not the screen's language. */
+              dir="auto"
               value={draft.texts[s.id] ?? ""}
               onChange={(e) => setText(s.id, e.target.value)}
               rows={s.kind === "list" ? 4 : 3}
@@ -275,7 +356,11 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
               placeholder={t(`tpl.${tpl.key}.s.${s.id}.hint`, "")}
               className={`${FIELD} min-h-[84px] resize-none overflow-y-auto leading-relaxed`}
             />
-          </label>
+            <DictStatus t={t} listening={dictation.listening && dictSection === s.id} elapsed={dictation.elapsed}
+              problem={dictProblem?.sid === s.id ? dictProblem.msg : null} onClose={() => setDictProblem(null)} />
+            <SectionAiProposal t={t} slot={ai.slots[s.id]} current={draft.texts[s.id] ?? ""}
+              onApply={(mode) => applyAi(s.id, mode)} onClose={() => ai.clear(s.id)} />
+          </div>
         ))}
 
         <AttachmentsEditor t={t} reportId={id} initial={detail.attachments ?? []} onBusy={setUploading} />

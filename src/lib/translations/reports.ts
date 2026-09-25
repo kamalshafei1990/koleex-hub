@@ -1,6 +1,6 @@
 import type { Translations } from "@/lib/i18n";
 
-/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; apps 2B; photos and files 2C). Template strings follow
+/* Reports app (Phase 1, 25 Sep 2026; carry-over 2A; apps 2B; photos and files 2C; AI + dictation 2D). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
    template key and section has all three languages. */
 export const reportsT: Translations = {
@@ -122,6 +122,28 @@ export const reportsT: Translations = {
   "feed.crm.visit":   { en: "Visit", zh: "拜访", ar: "زيارة" },
   "feed.crm.email":   { en: "Email", zh: "邮件", ar: "إيميل" },
   "feed.crm.other":   { en: "Activity", zh: "活动", ar: "نشاط" },
+
+  /* Phase 2D — Koleex AI and dictation. The assistant is only ever
+     "Koleex AI" (standing rule: never the model or its maker). */
+  "ai.write":      { en: "Write it", zh: "帮我写", ar: "اكتبهولي" },
+  "ai.tidy":       { en: "Tidy up", zh: "润色", ar: "رتّبه" },
+  "ai.writeHint":  { en: "Koleex AI writes this from your earlier reports and your work in the Hub", zh: "Koleex AI 会根据你之前的报告和你在系统中的工作撰写", ar: "Koleex AI بيكتبه من تقاريرك اللي فاتت وشغلك على الهب" },
+  "ai.tidyHint":   { en: "Koleex AI says the same thing more clearly, in your language, adding nothing", zh: "Koleex AI 用你的语言把同样的内容写得更清楚，不添加任何内容", ar: "Koleex AI بيقول نفس الكلام بشكل أوضح وبلغتك، من غير ما يزود حاجة" },
+  "ai.working":    { en: "Koleex AI is writing…", zh: "Koleex AI 正在撰写…", ar: "Koleex AI بيكتب…" },
+  "ai.suggests":   { en: "Koleex AI suggests", zh: "Koleex AI 建议", ar: "Koleex AI بيقترح" },
+  "ai.review":     { en: "Read it before you send. Nothing is saved until you choose.", zh: "发送前请先阅读。在你选择之前不会保存任何内容。", ar: "اقراه قبل ما تبعت. مفيش حاجة بتتحفظ إلا لما تختار." },
+  "ai.use":        { en: "Use it", zh: "使用", ar: "استخدمه" },
+  "ai.replace":    { en: "Replace", zh: "替换", ar: "استبدل" },
+  "ai.addBelow":   { en: "Add below", zh: "添加到下方", ar: "ضيفه تحت" },
+  "ai.discard":    { en: "Discard", zh: "放弃", ar: "سيبه" },
+  "ai.noMaterial": { en: "Nothing to write from yet. Write your dailies first, or add items above.", zh: "还没有可用的素材。请先写日报，或添加上面的内容。", ar: "لسه مفيش حاجة يكتب منها. اكتب يومياتك الأول، أو ضيف بنود من فوق." },
+  "ai.tooShort":   { en: "Write a little first, then tidy it up.", zh: "请先写一些内容，再进行润色。", ar: "اكتب شوية الأول، وبعدين رتّبه." },
+  "ai.failed":     { en: "Koleex AI could not write this just now. Try again.", zh: "Koleex AI 暂时无法撰写，请重试。", ar: "Koleex AI ما قدرش يكتبه دلوقتي. جرب تاني." },
+  "ai.busy":       { en: "Koleex AI has written a lot this hour. Try again in a little while.", zh: "Koleex AI 本小时已撰写很多内容，请稍后再试。", ar: "Koleex AI كتب كتير الساعة دي. جرب كمان شوية." },
+  "dict.start":    { en: "Dictate", zh: "语音输入", ar: "إملاء" },
+  "dict.stop":     { en: "Stop dictating", zh: "停止语音输入", ar: "وقّف الإملاء" },
+  "dict.listening":{ en: "Listening… speak, then tap stop", zh: "正在听…说完后点停止", ar: "بسمعك… اتكلم وبعدين دوس وقّف" },
+  "dict.lang":     { en: "Language you speak", zh: "说话的语言", ar: "اللغة اللي هتتكلم بيها" },
 
   /* Phase 2C — photos and files. */
   "attach.title":      { en: "Photos and files", zh: "照片和文件", ar: "الصور والملفات" },

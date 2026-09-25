@@ -128,6 +128,11 @@ export interface DictationHandle {
 
 export function useDictation(opts: {
   lang?: Lang;
+  /** The recogniser's BCP-47 tag when it should differ from what `lang`
+   *  implies — e.g. "ar-EG" for Egyptian speakers (Reports' dictation), or
+   *  speaking one language on a screen set to another. `lang` still picks
+   *  the language of the error messages. Unset: unchanged behaviour. */
+  locale?: string;
   onTranscript: (text: string) => void;
   onError?: (message: string) => void;
 }): DictationHandle {
@@ -177,7 +182,7 @@ export function useDictation(opts: {
   }, []);
 
   /** BCP-47 tag for the recogniser; unset lets the browser pick. */
-  const bcp47 = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : lang === "en" ? "en-US" : "";
+  const bcp47 = opts.locale || (lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : lang === "en" ? "en-US" : "");
 
   const start = useCallback(() => {
     if (recognitionRef.current) return;
