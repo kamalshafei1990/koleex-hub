@@ -57,6 +57,9 @@ export interface CustomDef {
   officeOnly: boolean;
   /** 5C: only super admins and «Payroll Reports» in Roles start it. */
   payrollOnly: boolean;
+  /** 5D: only super admins and «Management Reports» in Roles start it — and
+   *  a reader sees each of its numbers only with that number's own right. */
+  mgmtOnly: boolean;
   /** 5C: the app it needs (HR: HR · view) — or, `orTeam`, a team. A copy
    *  keeps its built-in's; the builder does not set them. */
   app?: ReportApp;
@@ -78,6 +81,7 @@ export interface CustomTemplateHead {
   teamOnly?: boolean;
   officeOnly?: boolean;
   payrollOnly?: boolean;
+  mgmtOnly?: boolean;
   app?: ReportApp;
   orTeam?: boolean;
   name: Word;
@@ -236,6 +240,7 @@ export function checkTemplate(rawDef: unknown, rawWords: unknown): { def: Custom
     teamOnly: d.teamOnly === true,
     officeOnly: d.officeOnly === true,
     payrollOnly: d.payrollOnly === true,
+    mgmtOnly: d.mgmtOnly === true,
     sections,
   };
   if (REPORT_APPS.includes(d.app as ReportApp)) { def.app = d.app as ReportApp; if (d.orTeam === true) def.orTeam = true; }
@@ -285,6 +290,7 @@ export function asReportTemplate(key: string, def: CustomDef, v: number): Report
   if (def.teamOnly) out.teamOnly = true;
   if (def.officeOnly) out.officeOnly = true;
   if (def.payrollOnly) out.payrollOnly = true;
+  if (def.mgmtOnly) out.mgmtOnly = true;
   if (def.app) { out.app = def.app; if (def.orTeam) out.orTeam = true; }
   if (def.range) out.range = true;
   if (def.base) out.base = def.base;
@@ -310,7 +316,7 @@ export function readSnapshot(raw: unknown): TemplateSnapshot | null {
     range: def.range === true, recipients: RECIPIENTS.includes(def.recipients as ReportDefaultRecipients) ? (def.recipients as ReportDefaultRecipients) : "manager",
     reviewRequired: def.reviewRequired === true, confidential: def.confidential === true, urgent: def.urgent === true,
     customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, officeOnly: def.officeOnly === true,
-    payrollOnly: def.payrollOnly === true, sections,
+    payrollOnly: def.payrollOnly === true, mgmtOnly: def.mgmtOnly === true, sections,
   };
   if (REPORT_APPS.includes(def.app as ReportApp)) { clean.app = def.app as ReportApp; if (def.orTeam === true) clean.orTeam = true; }
   if (typeof def.base === "string") clean.base = def.base;
@@ -338,7 +344,7 @@ export function copyOfBuiltin(key: string, dict: Translations): { def: CustomDef
   const def: CustomDef = {
     family: t.family, icon: t.icon, cadence: t.cadence, range: !!t.range,
     recipients: t.recipients, reviewRequired: t.reviewRequired, confidential: t.confidential, urgent: !!t.urgent,
-    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, officeOnly: !!t.officeOnly, payrollOnly: !!t.payrollOnly, base: t.key,
+    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, officeOnly: !!t.officeOnly, payrollOnly: !!t.payrollOnly, mgmtOnly: !!t.mgmtOnly, base: t.key,
     ...(t.app ? { app: t.app, ...(t.orTeam ? { orTeam: true } : {}) } : {}),
     sections: t.sections.map((s) => JSON.parse(JSON.stringify(s)) as ReportSectionDef),
   };

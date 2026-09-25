@@ -186,5 +186,17 @@ export const reportCommonT: Translations = {
   "tpl.fin_cash_flow.name": { en: "Cash flow", zh: "现金流", ar: "التدفق النقدي" },
   "tpl.fin_statements.name": { en: "Financial statements and aging", zh: "财务报表与账龄", ar: "القوائم المالية وأعمار الديون" },
   "tpl.fin_month_close.name": { en: "Month-end close", zh: "月末结账", ar: "تقرير إقفال الشهر" },
+
+  /* ── Phase 5D: Executive, and Compliance & control ── */
+  "tpl.exec_weekly.name": { en: "Weekly executive summary", zh: "每周高管摘要", ar: "الملخص التنفيذي الأسبوعي" },
+  "tpl.exec_dept_kpis.name": { en: "Department KPIs", zh: "部门关键指标", ar: "مؤشرات الأقسام" },
+  "tpl.exec_monthly_review.name": { en: "Monthly business review", zh: "月度经营回顾", ar: "المراجعة الشهرية للشغل" },
+  "tpl.cmp_conflict.name": { en: "Conflict of interest declaration", zh: "利益冲突申报", ar: "إقرار تعارض المصالح" },
+  "tpl.cmp_equipment.name": { en: "Equipment lost or damaged", zh: "设备丢失或损坏", ar: "معدات ضاعت أو باظت" },
+  "tpl.cmp_security.name": { en: "Information security incident", zh: "信息安全事件", ar: "حادثة أمن معلومات" },
+  "tpl.cmp_access_review.name": { en: "Access review", zh: "权限审查", ar: "مراجعة الصلاحيات" },
+  "tpl.cmp_usage.name": { en: "System usage", zh: "系统使用情况", ar: "استخدام النظام" },
+  "tpl.cmp_car_log.name": { en: "Private car used for work", zh: "私车公用记录", ar: "عربية خاصة في الشغل" },
+  "tpl.cmp_contracts.name": { en: "Contract dates", zh: "合同日期", ar: "مواعيد العقود" },
   "err.typeGone": { en: "This report type is no longer offered.", zh: "该报告类型已不再提供。", ar: "نوع التقرير ده مبقاش متاح." },
 };

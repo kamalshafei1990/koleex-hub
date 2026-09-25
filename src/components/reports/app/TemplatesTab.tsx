@@ -68,7 +68,7 @@ const blankDoc = (): TemplateDoc => ({
   key: null,
   def: {
     family: "work", icon: "document", cadence: null, range: false, recipients: "manager", reviewRequired: false,
-    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, officeOnly: false, payrollOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
+    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, officeOnly: false, payrollOnly: false, mgmtOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
   },
   words: {},
 });
@@ -510,6 +510,7 @@ function Editor({ t, lang, doc, onClose }: { t: T; lang: Lang; doc: TemplateDoc;
             <Switch on={def.teamOnly} label={t("tb.teamOnly")} hint={t("tb.teamOnlyHint")} onChange={(v) => patch({ teamOnly: v })} />
             <Switch on={def.officeOnly} label={t("tb.officeOnly")} hint={t("tb.officeOnlyHint")} onChange={(v) => patch({ officeOnly: v })} />
             <Switch on={def.payrollOnly} label={t("tb.payrollOnly")} hint={t("tb.payrollOnlyHint")} onChange={(v) => patch({ payrollOnly: v })} />
+            <Switch on={def.mgmtOnly} label={t("tb.mgmtOnly")} hint={t("tb.mgmtOnlyHint")} onChange={(v) => patch({ mgmtOnly: v })} />
           </section>
         </aside>
       </div>

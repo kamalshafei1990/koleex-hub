@@ -30,12 +30,22 @@ export const AI_WRITE_SECTIONS: Record<string, string[]> = {
   monthly: ["summary"],
   /* 5A: from what the team sent in the report's days — read by the server. */
   team_summary: ["summary"],
+  /* 5D: from what the whole company sent — read by the server. */
+  exec_weekly: ["summary"],
+  exec_monthly_review: ["summary"],
 };
 
-/** A type whose "write" material the SERVER gathers (5A: the team's reports
- *  — the author's page never carries other people's reports to send back). */
+/** 5D: the types written from what the whole COMPANY sent (the executive
+ *  summary and the monthly review — «Management Reports»). */
+export const COMPANY_MATERIAL = ["exec_weekly", "exec_monthly_review"] as const;
+export const companyMaterial = (tpl: ReportTemplateDef | null | undefined): boolean =>
+  !!tpl && (COMPANY_MATERIAL as readonly string[]).includes(behaviourKey(tpl));
+
+/** A type whose "write" material the SERVER gathers (5A: the team's reports;
+ *  5D: the company's — the author's page never carries other people's
+ *  reports to send back). */
 export const serverMaterial = (tpl: ReportTemplateDef | null | undefined): boolean => {
-  return !!tpl && behaviourKey(tpl) === "team_summary";
+  return !!tpl && (behaviourKey(tpl) === "team_summary" || companyMaterial(tpl));
 };
 
 export const AI_LIMITS = {

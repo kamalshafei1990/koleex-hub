@@ -18,7 +18,7 @@ import { listAssignableEmployees, type AssignableEmployee } from "@/lib/server/a
 import { hrReviewerAccountIds } from "@/lib/server/leave-review";
 import { reportAccess, type ReportAccess } from "@/lib/reports/access";
 import type { ReportTemplateDef, ReportSectionValue } from "@/lib/reports/templates";
-import { OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
+import { MGMT_MODULE, OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
 
 export const REPORT_COLS =
   "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at, template_snapshot";
@@ -81,6 +81,8 @@ export async function canStartTemplate(tpl: ReportTemplateDef, auth: ServerAuthC
   /* 5C: salaries need «Payroll Reports»; an HR, Projects, Inventory or
      Finance type its app (HR: HR · view) — or, `orTeam`, a team. */
   if (tpl.payrollOnly && !auth.is_super_admin && (await requireModuleAction(auth, PAYROLL_MODULE, "create")) !== null) return false;
+  /* 5D: the executive and control types need «Management Reports». */
+  if (tpl.mgmtOnly && !auth.is_super_admin && (await requireModuleAction(auth, MGMT_MODULE, "create")) !== null) return false;
   if (tpl.app && !(await hasApp(auth, tpl.app))) {
     if (!tpl.orTeam || !(await loadOrgTree(auth.tenant_id)).descendantsOf(auth.account_id).length) return false;
   }

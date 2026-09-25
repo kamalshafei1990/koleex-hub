@@ -269,7 +269,13 @@ export async function loadFollowups(auth: ServerAuthContext, office: boolean, fr
 
 /** Each account's department: its person's primary active assignment. */
 async function departmentsOf(accountIds: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+  return new Map([...(await departmentsWithIds(accountIds))].map(([a, d]) => [a, d.name]));
+}
+
+/** Each account's department, its id with its name (5D: a department's
+ *  line is keyed by the id). */
+export async function departmentsWithIds(accountIds: string[]): Promise<Map<string, { id: string; name: string }>> {
+  const out = new Map<string, { id: string; name: string }>();
   const accts: Array<{ id: string; person_id: string | null }> = [];
   for (const part of chunks(accountIds)) accts.push(...rows<{ id: string; person_id: string | null }>(await supabaseServer.from("accounts").select("id, person_id").in("id", part), "accounts"));
   const persons = Array.from(new Set(accts.map((a) => a.person_id).filter((p): p is string => !!p)));
@@ -279,8 +285,8 @@ async function departmentsOf(accountIds: string[]): Promise<Map<string, string>>
     supabaseServer.from("koleex_departments").select("id, name").limit(500).then((r) => rows<{ id: string; name: string }>(r, "departments")),
   ]);
   const deptName = new Map(depts.map((d) => [d.id, d.name]));
-  const deptOfPerson = new Map(asg.filter((a) => a.department_id).map((a) => [a.person_id, deptName.get(a.department_id!) ?? ""]));
-  for (const a of accts) { const d = a.person_id ? deptOfPerson.get(a.person_id) : ""; if (d) out.set(a.id, d); }
+  const deptOfPerson = new Map(asg.filter((a) => a.department_id && deptName.get(a.department_id)).map((a) => [a.person_id, { id: a.department_id!, name: deptName.get(a.department_id!)! }]));
+  for (const a of accts) { const d = a.person_id ? deptOfPerson.get(a.person_id) : undefined; if (d) out.set(a.id, d); }
   return out;
 }
 

@@ -34,6 +34,8 @@ const LOAD: Record<ReportFamily, () => Promise<{ default: Translations }>> = {
   projects: () => import("./projects"),
   inventory: () => import("./inventory"),
   finance: () => import("./finance"),
+  executive: () => import("./executive"),
+  compliance: () => import("./compliance"),
 };
 
 /** A report's section words, merged (one chunk per family). The families

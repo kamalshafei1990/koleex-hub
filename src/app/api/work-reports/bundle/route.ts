@@ -16,7 +16,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
 import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
-import { OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
+import { MGMT_MODULE, OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
 import type { ReportTemplateDef } from "@/lib/reports/templates";
 import { loadMyDue } from "@/lib/server/reports/obligations";
 import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office, projects, inventory, expenses, payroll] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office, projects, inventory, expenses, payroll, mgmt, contracts] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -75,6 +75,10 @@ export async function GET(req: Request) {
     requireModuleAccess(auth, "Inventory"),
     requireModuleAccess(auth, "Expenses"),
     requireModuleAction(auth, PAYROLL_MODULE, "create"),
+    /* 5D: «Management Reports» for the executive and control types, and the
+       Contracts app for the contracts' dates. */
+    requireModuleAction(auth, MGMT_MODULE, "create"),
+    requireModuleAccess(auth, "Contracts"),
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
@@ -86,13 +90,15 @@ export async function GET(req: Request) {
   /* 5C: a type's app (HR is HR · view) — or, `orTeam`, a team; salaries
      «Payroll Reports». */
   const hasPayroll = auth.is_super_admin || payroll === null;
+  const hasMgmt = auth.is_super_admin || mgmt === null;
   const apps: Record<NonNullable<ReportTemplateDef["app"]>, boolean> = {
     HR: hrView === null, Projects: projects === null, Inventory: inventory === null, Finance: finance === null, Expenses: expenses === null,
+    Contracts: contracts === null,
   };
   const appOk = (x: { app?: ReportTemplateDef["app"]; orTeam?: boolean }) => !x.app || apps[x.app] || (!!x.orTeam && hasTeam);
   const hiddenSet = new Set(hidden);
   const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam) && (!tpl.officeOnly || hasOffice)
-    && (!tpl.payrollOnly || hasPayroll) && appOk(tpl)).map((tpl) => tpl.key);
+    && (!tpl.payrollOnly || hasPayroll) && (!tpl.mgmtOnly || hasMgmt) && appOk(tpl)).map((tpl) => tpl.key);
   const nameOf = new Map(people.map((p) => [p.id, p]));
 
   return NextResponse.json({
@@ -111,7 +117,7 @@ export async function GET(req: Request) {
       };
     }),
     templates,
-    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam) && (!c.officeOnly || hasOffice) && (!c.payrollOnly || hasPayroll) && appOk(c)),
+    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam) && (!c.officeOnly || hasOffice) && (!c.payrollOnly || hasPayroll) && (!c.mgmtOnly || hasMgmt) && appOk(c)),
     people: people.filter((p) => p.id !== me),
     library: { hr: hrView === null, finance: finance === null, tasks: todo === null },
   }, { headers: { "Cache-Control": "private, no-store" } });

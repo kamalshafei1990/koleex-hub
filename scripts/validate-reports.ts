@@ -88,6 +88,11 @@
  *   §26 the Reports words live one file per place that reads them
  *      (translations/report-ui): each screen imports only its own, never the
  *      union — and never calls a word it did not import.
+ *   §28 Phase 5D — the Executive and Compliance & control types: who starts
+ *      them («Management Reports», the Contracts app, everyone), the numbers
+ *      worked out (never mixing currencies, never guessing a date), each
+ *      block's own right for the writer AND for every reader, Koleex AI
+ *      reading the company only with «Management Reports».
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -103,11 +108,16 @@ import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, LIVE_SOURCES, OFFICE_READS, O
 import {
   BANK_PROFIT_SOURCES, DATA_ABOUT, FINANCE_SOURCES, HR_SOURCES, HR_TEAM_READS, PAYROLL_MODULE, PAYROLL_SOURCES, PROJECT_SOURCES, SOURCE_GROUPS, STOCK_SOURCES,
   blockColumns, blockRows, isFinanceSource, isHrSource, isProjectSource, isStockSource, subjectOf, tagsOf,
+  CONTROL_SOURCES, EXEC_SOURCES, MGMT_MODULE, MGMT_SOURCES, isControlSource, isExecSource, isMgmtSource, readerRight,
 } from "../src/lib/reports/report-data";
 import {
   agingRows, appraisalResultRows, budgetRows, categoryRows, expiryRows, fileGaps, headcountRows, hrKpiRows, movementRows, personDays, projectHealth, riskReasons,
   scheduleRows as planRows, skillRows, toOrder, turnoverRows, NO_CATEGORY,
 } from "../src/lib/reports/numbers-5c";
+import {
+  NO_DEPT_KEY, accessRows, addMonths, attendanceByDept, contractDateRows, deptKpiRows, moneyRows, presentRate, reportsByDept, salesRows, stockRows, usageRows,
+} from "../src/lib/reports/numbers-5d";
+import { COMPANY_MATERIAL, companyMaterial } from "../src/lib/reports/ai-draft";
 import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
 import { FAMILY_GROUPS as HEAD_GROUPS, REPORT_HEADS, reportHead } from "../src/lib/reports/catalog-heads";
 import { headOf, renderReportHeads, HEADS_FILE } from "./lib/reports-heads";
@@ -269,8 +279,9 @@ console.log("\n§3 templates and their words");
   const prj5c = ["prj_proposal", "prj_charter", "prj_plan", "prj_stakeholders", "prj_status", "prj_progress", "prj_budget", "prj_resources", "prj_overdue", "prj_dependencies", "prj_risks",
     "prj_change", "prj_milestone", "prj_acceptance", "prj_quality", "prj_portfolio", "prj_at_risk", "prj_closure", "prj_post_review", "prj_team_eval"];
   const invFin5c = ["inv_count", "inv_writeoff", "inv_movement", "inv_low_stock", "fin_expenses", "fin_petty_cash", "fin_budget", "fin_cash_flow", "fin_statements", "fin_month_close"];
-  eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, ...hr5c, ...prj5c, ...invFin5c, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), and the three that events ask for (Phase 3D), in that order");
+  const execCmp5d = ["exec_weekly", "exec_dept_kpis", "exec_monthly_review", "cmp_conflict", "cmp_equipment", "cmp_security", "cmp_access_review", "cmp_usage", "cmp_car_log", "cmp_contracts"];
+  eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, ...hr5c, ...prj5c, ...invFin5c, ...execCmp5d, "return_plan", "attendance_note", "probation_review"],
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), the ten Executive and Compliance types (5D), and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr" && !t.payrollOnly).every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(REPORT_TEMPLATES.filter((t) => t.payrollOnly).every((t) => t.recipients === "manager" && t.confidential), "a salary type (5C) goes to the writer's manager only, and is confidential");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
@@ -1285,7 +1296,7 @@ console.log("\n§15 reports that events ask for");
     (c) => { const a = c.indexOf("const events = await runReportEvents();"); const b = c.indexOf("const run = await runReportNudges();"); return a > 0 && b > a ? [] : ["a request asked now waits a run for its reminder"]; },
     (src) => src.replace("  const events = await runReportEvents();\n  const run = await runReportNudges();", "  const run = await runReportNudges();\n  const events = await runReportEvents();"));
   rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
-    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\) && \(!tpl\.officeOnly \|\| hasOffice\)\s*&& \(!tpl\.payrollOnly \|\| hasPayroll\) && appOk\(tpl\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
+    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\) && \(!tpl\.officeOnly \|\| hasOffice\)\s*&& \(!tpl\.payrollOnly \|\| hasPayroll\) && \(!tpl\.mgmtOnly \|\| hasMgmt\) && appOk\(tpl\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
     (src) => src.replace("!tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)", "!hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)"));
   rule("a confidential request is never linked from someone else's calendar", "src/lib/server/calendar-feed.ts",
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
@@ -1516,7 +1527,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
 
   /* Every source complete */
   /* The author's own documents; the team's numbers (5A) are checked in §21. */
-  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src) && !isOfficeSource(src) && !isHrSource(src) && !isProjectSource(src) && !isStockSource(src) && !isFinanceSource(src));
+  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src) && !isOfficeSource(src) && !isHrSource(src) && !isProjectSource(src) && !isStockSource(src) && !isFinanceSource(src) && !isExecSource(src) && !isControlSource(src));
   expect(docSources.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && ["no", "title"].includes(DATA_COLUMNS[src][0].id) && ["customer", "supplier", "item", "category"].includes(DATA_COLUMNS[src][1].id)),
     "every numbers source has its columns (what names the document, then who or what), its app and what a row opens");
   eq(docSources.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase", "Expenses"], "each source is gated by the app it comes from");
@@ -1675,7 +1686,7 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
     (src) => src.replace('.not("status", "in", "(draft,cancelled,paid)")', '.not("status", "in", "(draft,void,cancelled,paid)")'));
   rule("a numbers read that fails says so — never passes for nothing", RD,
     (c) => ((c.match(/return \[src, \{ source: src, rows: \[\], capturedAt, failed: true \}\];/g) ?? []).length >= 2 ? [] : ["a failed read shows as an empty period"]),
-    (src) => src.replace("return [src, { source: src, rows: [], capturedAt, failed: true }];", "return [src, { source: src, rows: [], capturedAt }];"));
+    (src) => src.replaceAll("return [src, { source: src, rows: [], capturedAt, failed: true }];", "return [src, { source: src, rows: [], capturedAt }];"));
   rule("the screen and the print say a failed read out loud", "src/components/reports/app/ReportBlocks.tsx",
     (c) => (c.includes('if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;') && read("src/lib/reports/print-layout.ts").includes('if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };') ? [] : ["a failed read reads as nothing"]),
     (src) => src.replace('if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;', ""));
@@ -2083,7 +2094,7 @@ console.log("\n§21 the manager and the team");
     (c) => (c.includes("if (!td || !isAssignedWork(td, l.account_id)) continue;") ? [] : ["a person's own to-dos reach their manager"]),
     (src) => src.replace("if (!td || !isAssignedWork(td, l.account_id)) continue;", "if (!td) continue;"));
   rule("the reports and the numbers reach Koleex AI fenced", TM,
-    (c) => ((c.match(/fenceUntrusted\(/g) ?? []).length >= 2 && c.includes('fenceUntrusted(o.material, "document"') && c.includes('fenceUntrusted(o.facts, "document"') ? [] : ["other people's words go in as instructions"]),
+    (c) => ((c.match(/fenceUntrusted\(o\.material, "document"/g) ?? []).length >= 2 && (c.match(/fenceUntrusted\(o\.facts, "document"/g) ?? []).length >= 2 ? [] : ["other people's words go in as instructions"]),
     (src) => src.replace('fenceUntrusted(o.material, "document", "The team\'s work reports, one per ### heading", o.fence)', "o.material"));
   const TS = `${API}/team-summary/route.ts`;
   rule("a summary is asked only for real days, only by someone with a team, within a budget", TS,
@@ -2099,8 +2110,8 @@ console.log("\n§21 the manager and the team");
     (c) => { const a = c.indexOf("if (!team.included) return NextResponse.json({ text: \"\", ...base }"); const b = c.indexOf("chatWithTools({"); return a > 0 && b > a ? [] : ["the model is asked about nothing"]; },
     (src) => src.replace('  if (!team.included) return NextResponse.json({ text: "", ...base }, { headers: { "Cache-Control": "private, no-store" } });\n', ""));
   rule("a team summary's Write it reads the team on the server", `${API}/[id]/ai/route.ts`,
-    (c) => (c.includes("if (ask.action === \"write\" && serverMaterial(tpl)) {") && c.includes("team = await loadTeamMaterial(auth, range.from, range.to);") ? [] : ["the team summary is written from what the page sends"]),
-    (src) => src.replace("team = await loadTeamMaterial(auth, range.from, range.to);", "team = { included: 0 } as never;"));
+    (c) => (c.includes("if (ask.action === \"write\" && serverMaterial(tpl)) {") && c.includes("team = await loadTeamMaterial(auth, range.from, range.to, company);") ? [] : ["the team summary is written from what the page sends"]),
+    (src) => src.replace("team = await loadTeamMaterial(auth, range.from, range.to, company);", "team = { included: 0 } as never;"));
   rule("the page never sends the team's reports back", "src/components/reports/app/ReportView.tsx",
     (c) => (c.includes('if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }') ? [] : ["the page gathers material for a team summary"]),
     (src) => src.replace('    if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }\n', ""));
@@ -2307,8 +2318,8 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes("if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];") ? [] : ["the writer's queue is frozen into the report"]),
     (src) => src.replace("      if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];\n", ""));
   rule("a sent report's live block is read for the one opening it", `${API5}/[id]/route.ts`,
-    (c) => (c.includes('const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};') && c.includes("const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;") && /\n\s+sections, status: row\.status,/.test(c) ? [] : ["a reader sees the writer's queue, or none"]),
-    (src) => src.replace("const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;", "const sections = row.sections;"));
+    (c) => (c.includes('const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};') && c.includes("const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;") && c.includes("const sections = await gateForReader(row, merged, auth, isAuthor);") && /\n\s+sections, status: row\.status,/.test(c) ? [] : ["a reader sees the writer's queue, or none"]),
+    (src) => src.replace("const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;", "const merged = row.sections;"));
   rule("the live read is for the viewer, and costs nothing on a report without one", RD5,
     (c) => { const a = c.indexOf("export async function loadLiveData("); const body = c.slice(a); return a > 0 && body.includes("if (!secs.length) return {};") && body.includes("decisionRows(await loadDecisions(auth), today)") ? [] : ["every report pays for the live read"]; },
     (src) => src.replace("  if (!secs.length) return {};\n  const capturedAt = new Date().toISOString();", "  const capturedAt = new Date().toISOString();"));
@@ -2587,7 +2598,7 @@ console.log("\n§24 HR, Projects, Inventory and Finance: who reads how far, abou
     (c) => (c.includes("const stored = (xs: ReportLink[]) => xs.filter((l) => STORED_LINK_TYPES.includes(l.type));") && c.includes("const after = stored(afterAll);") ? [] : ["the CHECK refuses the write, and an employee's page could list their HR reports"]),
     (src) => src.replace("const after = stored(afterAll);", "const after = afterAll;"));
   rule("the builder's list keeps a salary or an app type's rule", "src/lib/server/reports/custom-templates.ts",
-    (c) => (c.includes("payroll_only:def->payrollOnly, app:def->>app, or_team:def->orTeam") && c.includes('payrollOnly: r.payroll_only === true || r.payroll_only === "true",') ? [] : ["a builder copy of a salary type is offered to everyone"]),
+    (c) => (c.includes("payroll_only:def->payrollOnly, mgmt_only:def->mgmtOnly, app:def->>app, or_team:def->orTeam") && c.includes('payrollOnly: r.payroll_only === true || r.payroll_only === "true",') && c.includes('mgmtOnly: r.mgmt_only === true || r.mgmt_only === "true",') ? [] : ["a builder copy of a salary type is offered to everyone"]),
     (src) => src.replace('    payrollOnly: r.payroll_only === true || r.payroll_only === "true",\n', ""));
   rule("starting a type checks its app, its team and «Payroll Reports» on the server", "src/lib/server/reports/core.ts",
     (c) => (c.includes('if (tpl.payrollOnly && !auth.is_super_admin && (await requireModuleAction(auth, PAYROLL_MODULE, "create")) !== null) return false;') && c.includes("if (tpl.app && !(await hasApp(auth, tpl.app))) {") ? [] : ["the POST starts a salary type for anyone"]),
@@ -2713,6 +2724,118 @@ console.log("\n§26 each Reports screen downloads only its own words");
     "…and a word from a file the screen never imported is caught");
   expect(problems(SCREENS[4], new Map([[path.join(ROOT, "src/components/reports/app/ReportView.tsx"), read("src/components/reports/app/ReportView.tsx").replace('import { reportPageT } from "@/lib/translations/report-ui/page";\n', "")]])).length > 0,
     "…and so is the page losing its own words");
+}
+
+/* ── §28 Phase 5D: Executive, Compliance & control (26 Sep 2026) ─────── */
+console.log("\n§28 the executive and control types (Phase 5D)");
+{
+  const d5 = REPORT_TEMPLATES.filter((t) => t.family === "executive" || t.family === "compliance");
+  eq(d5.map((t) => t.key), ["exec_weekly", "exec_dept_kpis", "exec_monthly_review", "cmp_conflict", "cmp_equipment", "cmp_security", "cmp_access_review", "cmp_usage", "cmp_car_log", "cmp_contracts"], "ten types: three executive, seven of compliance & control");
+  eq(REPORT_TEMPLATES.filter((t) => t.mgmtOnly).map((t) => t.key), ["exec_weekly", "exec_dept_kpis", "exec_monthly_review", "cmp_access_review", "cmp_usage"],
+    "«Management Reports» starts the executive types, the access review and the system usage — and nothing else");
+  expect(REPORT_TEMPLATES.filter((t) => t.mgmtOnly).every((t) => t.confidential && t.recipients === "manager"), "each of them is confidential, to the writer's manager");
+  expect(reportTemplate("cmp_contracts")?.app === "Contracts" && ["cmp_conflict", "cmp_equipment", "cmp_security", "cmp_car_log"].every((k) => { const t = reportTemplate(k)!; return !t.app && !t.mgmtOnly && !t.hrOnly && !t.officeOnly; }),
+    "the contracts' dates need the Contracts app; anyone declares a conflict, equipment lost, a security incident or a car used for work");
+  expect(reportTemplate("cmp_conflict")?.confidential === true && reportTemplate("cmp_conflict")?.recipients === "manager_hr" && reportTemplate("cmp_security")?.confidential === true && reportTemplate("cmp_security")?.urgent === true,
+    "a conflict of interest reaches HR too; a security incident is confidential and urgent");
+  expect(CAPABILITY_MODULES.some((c) => c.name === MGMT_MODULE && c.app === "Reports"), "«Management Reports» is a Roles row under Reports");
+  eq([...EXEC_SOURCES, ...CONTROL_SOURCES].map((s) => DATA_MODULE[s]), ["Management Reports", "Invoices", "Finance", "Inventory", "HR", "Management Reports", "Management Reports", "Management Reports", "Contracts"],
+    "each new source names the right it needs");
+  eq([...MGMT_SOURCES], ["exec_reports", "dept_kpis", "access_review", "system_usage"], "the numbers about people across the company need «Management Reports» whatever type they sit in");
+  eq((["exec_reports", "dept_kpis", "access_review", "system_usage", "exec_collections", "exec_attendance", "profit_loss", "payroll", "stock_count", "exec_sales", "exec_stock", "contract_dates", "team_reports", "followups"] as const).map((s) => { const r = readerRight(s); return typeof r === "string" ? r : r.module; }),
+    ["mgmt", "mgmt", "mgmt", "mgmt", "finance", "hr", "bank", "payroll", "cost", "Invoices", "Inventory", "Contracts", "mgmt", "office"],
+    "a reader needs each number's own right: the company's people «Management Reports», money the Finance door, bank and profit «Bank & Profit», salaries «Payroll Reports», what stock costs the cost switch");
+  expect(d5.every((t) => t.sections.filter((x) => x.kind === "data").every((x) => !!x.source)) && isExecSource("dept_kpis") && isControlSource("contract_dates") && !isMgmtSource("exec_sales"),
+    "every numbers block names its source");
+
+  /* The numbers, worked out */
+  const sales = salesRows([
+    { metric: "invoices_issued", currency: "usd", amount: 100 }, { metric: "quotations_sent", currency: "EGP", amount: 1000 },
+    { metric: "quotations_sent", currency: "USD", amount: 50.555 }, { metric: "quotations_sent", currency: null, amount: "20" }, { metric: "invoices_issued", currency: "USD", amount: 25 },
+  ]);
+  eq(sales.map((r) => [r.key, r.cells.count, r.cells.amount]), [["quotations_sent:EGP", 1, 1000], ["quotations_sent:USD", 2, 70.56], ["invoices_issued:USD", 2, 125]],
+    "sales: one line per figure and currency — EGP and USD never added together, a missing currency is the default");
+  const money = moneyRows([{ currency: "USD", amount: 40 }], [{ currency: "USD", balance: 100, due: "2026-09-01" }, { currency: "USD", balance: 50, due: "2026-10-30" }, { currency: "CNY", balance: 0, due: "2026-01-01" }], "2026-09-26");
+  eq(money.map((r) => [r.key, r.cells.count, r.cells.amount]), [["payments_received:USD", 1, 40], ["invoices_open:USD", 2, 150], ["invoices_overdue:USD", 1, 100]],
+    "money: what came in, what is still owed, and of it what is past due — a paid invoice is nothing");
+  eq(stockRows({ low: 3, movesIn: 5, movesOut: 2, writeoffs: 1 }).map((r) => [r.key, r.cells.value]), [["items_low", 3], ["moves_in", 5], ["moves_out", 2], ["writeoffs", 1]], "stock: the four figures, in order");
+  expect(["exec_sales", "exec_collections"].every((src) => DATA_COLUMNS[src as "exec_sales"].find((c) => c.id === "amount")?.total === false)
+    && dataTotals({ source: "exec_collections", rows: money, capturedAt: "2026-09-26T00:00:00Z" }).length === 0,
+    "no total under sales or money: a quotation, its order and its invoice can be one sale, and what is past due is part of what is owed");
+  const D1 = "11111111-1111-4111-8111-111111111111", A1 = "66666666-6666-4666-8666-666666666666";
+  const staff = [
+    { deptId: D1, dept: "Sales", attendance: { present: 18, late: 2, absent: 2, leave: 1 }, workload: { open: 3, overdue: 1, done: 4 }, sent: 5 },
+    { deptId: D1, dept: "Sales", attendance: null, workload: { open: 0, overdue: 0, done: 2 }, sent: 0 },
+    { deptId: null, dept: null, attendance: { present: 10, late: 0, absent: 0, leave: 0 }, workload: { open: 0, overdue: 0, done: 0 }, sent: 1 },
+  ];
+  eq(reportsByDept(staff).map((r) => [r.key, r.cells.department, r.cells.people, r.cells.writers, r.cells.sent]), [[D1, "Sales", 2, 1, 5], [NO_DEPT_KEY, "—", 1, 1, 1]],
+    "per department: the people with no department come last, under their own key");
+  eq(attendanceByDept(staff).map((r) => [r.cells.department, r.cells.people, r.cells.present, r.cells.absent]), [["Sales", 1, 18, 2], ["—", 1, 10, 0]], "attendance counts only the people whose sheet was read");
+  eq(deptKpiRows(staff).map((r) => [r.cells.department, r.cells.present_rate, r.cells.done_work, r.cells.overdue_work]), [["Sales", 90, 6, 1], ["—", 100, 0, 0]], "the KPIs: present % of the days present or absent (leave is neither), the work done and overdue");
+  expect(presentRate(0, 0) === null && presentRate(1, 3) === 25, "no day present or absent is no rate, never 0 %");
+  const acc = accessRows([
+    { id: D1, name: "Zed", role: "Staff", rights: ["private_records", "bank_profit"], apps: 5, twoFactor: false, lastLogin: "2026-09-20T10:00:00Z", status: "active" },
+    { id: A1, name: "Amy", role: "Owner", rights: ["super_admin"], apps: null, twoFactor: true, lastLogin: null, status: "active" },
+  ]);
+  eq(acc.map((r) => [r.cells.person, r.cells.rights, r.cells.apps, r.cells.two_factor, r.cells.last_login]), [["Amy", "super_admin", null, "on", null], ["Zed", "bank_profit|private_records", 5, "off", "2026-09-20"]],
+    "the access review: a super admin first (every app, so no count), each account's rights in the review's order, two-step sign-in on or off");
+  eq(usageRows([{ id: D1, name: "Zed", seconds: 0, days: 0, signIns: 0, last: null }, { id: A1, name: "Amy", seconds: 5400, days: 2, signIns: 3, last: "2026-09-25" }]).map((r) => [r.cells.person, r.cells.hours, r.cells.active_days]),
+    [["Amy", 1.5, 2], ["Zed", 0, 0]], "the usage: the most hours first — and who never used it, last, not left out");
+  eq([addMonths("2026-01-31", 1), addMonths("2028-01-31", 1), addMonths("2026-11-15", 3)], ["2026-02-28", "2028-02-29", "2027-02-15"], "a month on from the 31st is the month's last day (a leap February too)");
+  const C1 = "22222222-2222-4222-8222-222222222222", C2 = "33333333-3333-4333-8333-333333333333", C3 = "44444444-4444-4444-8444-444444444444", C4 = "55555555-5555-4555-8555-555555555555";
+  const dates = contractDateRows([
+    { id: C1, no: "KL-1", customer: "A", basis: "after_order", basisDate: "2026-09-01", leadDays: 45, warrantyMonths: 12 },
+    { id: C2, no: "KL-2", customer: "B", basis: "after_lc_opening", basisDate: null, leadDays: 45, warrantyMonths: 60 },
+    { id: C3, no: "KL-3", customer: "C", basis: "after_deposit", basisDate: "2025-09-01", leadDays: 30, warrantyMonths: 13 },
+    { id: C4, no: "KL-4", customer: "D", basis: "after_order", basisDate: "2020-01-01", leadDays: 10, warrantyMonths: 0 },
+  ], "2026-09-26");
+  eq(dates.map((r) => [r.cells.no, r.cells.what, r.cells.date, r.cells.days_left]), [["KL-1", "delivery_due", "2026-10-16", 20], ["KL-3", "warranty_ends", "2026-11-01", 36], ["KL-2", "waiting_lc", null, null]],
+    "contract dates: the lead time from what it counts from, then the warranty; a letter of credit not opened is 'waiting', never a guessed date; nothing due soon is no line");
+
+  /* Who reads what — on the server */
+  const ED = "src/lib/server/reports/exec-data.ts", CD = "src/lib/server/reports/control-data.ts", RD = "src/lib/server/reports/report-data.ts";
+  rule("each executive block checks its own right before it reads", ED,
+    (c) => ((c.match(/if \(!\(await sh\.mgmt\(\)\)\) return "denied";/g) ?? []).length === 2 && c.includes('if ((await requireModuleAction(auth, "HR", "view")) !== null) return "denied";') && c.includes('if ((await requireModuleAccess(auth, "Invoices")) !== null) return "denied";')
+      && c.includes('if ((await requireFinanceNumbers(auth)) !== null) return "denied";') && c.includes('if ((await requireModuleAccess(auth, "Inventory")) !== null) return "denied";') ? [] : ["an executive number is read without its right"]),
+    (src) => src.replace('      if ((await requireFinanceNumbers(auth)) !== null) return "denied";\n', ""));
+  rule("the company's reports are COUNTED — their text never read", ED,
+    (c) => (c.includes('supabaseServer.from("work_reports").select("author_account_id")') && !/from\("work_reports"\)\.select\("[^"]*sections/.test(c) ? [] : ["the executive numbers read the reports' text"]),
+    (src) => src.replace('supabaseServer.from("work_reports").select("author_account_id")', 'supabaseServer.from("work_reports").select("author_account_id, sections")'));
+  rule("the rights and the usage need «Management Reports», the contracts the Contracts app", CD,
+    (c) => ((c.match(/if \(!auth\.is_super_admin && \(await requireModuleAccess\(auth, MGMT_MODULE\)\) !== null\) return "denied";/g) ?? []).length === 2 && c.includes('if (!auth.is_super_admin && (await requireModuleAccess(auth, "Contracts")) !== null) return "denied";') ? [] : ["who holds which right is read without the right"]),
+    (src) => src.replace('if (!auth.is_super_admin && (await requireModuleAccess(auth, "Contracts")) !== null) return "denied";', ""));
+  rule("a right is read as requireModuleAction reads it — the account's own row wins, a hidden module is none", CD,
+    (c) => (c.includes("if (o && o.can_view === false) return false;") && c.includes('const view = typeof o?.can_view === "boolean" ? o.can_view : !!r?.can_view;') ? [] : ["an account's own override is ignored"]),
+    (src) => src.replace("      if (o && o.can_view === false) return false;\n", ""));
+  rule("the executive and control numbers are routed to their own readers", RD,
+    (c) => (c.includes("if (isExecSource(src) || isControlSource(src)) {") && c.includes('const got = isExecSource(src) ? await execData(src, x, execSh!, "—") : await controlData(src, x);') ? [] : ["a 5D source falls through to the writer-only reads"]),
+    (src) => src.replace("if (isExecSource(src) || isControlSource(src)) {", "if (false) {"));
+  rule("a reader of an executive or control type sees each number only with its own right", RD,
+    (c) => (c.includes("if (!tpl?.mgmtOnly || isAuthor || auth.is_super_admin) return sections;") && c.includes("if (!p) { p = readerMay(r, auth).catch(() => false); asked.set(k, p); }")
+      && c.includes("return { ...rest, data: { source: s.data.source, rows: [], capturedAt: s.data.capturedAt, denied: true } };") ? [] : ["a reader without the right sees the stored numbers"]),
+    (src) => src.replace("readerMay(r, auth).catch(() => false)", "readerMay(r, auth).catch(() => true)"));
+  rule("…and the notes and figures written on a hidden block go with it", RD,
+    (c) => (c.includes("const { notes: _notes, inputs: _inputs, ...rest } = s;") ? [] : ["a hidden block's notes still reach the reader"]),
+    (src) => src.replace("const { notes: _notes, inputs: _inputs, ...rest } = s;", "const rest = s;"));
+  rule("starting an executive or control type checks «Management Reports» on the server", "src/lib/server/reports/core.ts",
+    (c) => (c.includes('if (tpl.mgmtOnly && !auth.is_super_admin && (await requireModuleAction(auth, MGMT_MODULE, "create")) !== null) return false;') ? [] : ["the POST starts an executive type for anyone"]),
+    (src) => src.replace('if (tpl.mgmtOnly && !auth.is_super_admin && (await requireModuleAction(auth, MGMT_MODULE, "create")) !== null) return false;', ""));
+  rule("the Write list offers them only with «Management Reports» — built-ins and the builder's alike", "src/app/api/work-reports/bundle/route.ts",
+    (c) => ((c.match(/&& \(!(tpl|c)\.mgmtOnly \|\| hasMgmt\)/g) ?? []).length === 2 && c.includes('requireModuleAction(auth, MGMT_MODULE, "create"),') && c.includes("Contracts: contracts === null,") ? [] : ["an executive type is offered to everyone"]),
+    (src) => src.replace(" && (!c.mgmtOnly || hasMgmt)", ""));
+  const AIR = "src/app/api/work-reports/[id]/ai/route.ts";
+  rule("Koleex AI reads the company's reports only for «Management Reports»", AIR,
+    (c) => (c.includes('if (company && !auth.is_super_admin && (await requireModuleAccess(auth, MGMT_MODULE)) !== null) return NextResponse.json({ error: "forbidden" }, { status: 403 });') ? [] : ["anyone who starts the type reads the whole company's reports"]),
+    (src) => src.replace('    if (company && !auth.is_super_admin && (await requireModuleAccess(auth, MGMT_MODULE)) !== null) return NextResponse.json({ error: "forbidden" }, { status: 403 });\n', ""));
+  expect([...COMPANY_MATERIAL].join() === "exec_weekly,exec_monthly_review" && companyMaterial(reportTemplate("exec_weekly")) && serverMaterial(reportTemplate("exec_monthly_review")) && !companyMaterial(reportTemplate("team_summary"))
+    && AI_WRITE_SECTIONS.exec_weekly?.[0] === "summary", "the executive summary and the monthly review are written from the company's reports, read by the server");
+  rule("the company is everyone on the org tree — and its reports reach Koleex AI through the same filter", "src/lib/server/reports/team.ts",
+    (c) => (c.includes("const scope = company ? await loadCompanyScope(auth) : await loadTeamScope(auth);") && c.includes("return { owners: await loadOwners(tree), names: new Map(people.map((p) => [p.id, p])) };") ? [] : ["the executive summary reads only the writer's team"]),
+    (src) => src.replace("const scope = company ? await loadCompanyScope(auth) : await loadTeamScope(auth);", "const scope = await loadTeamScope(auth);"));
+  const copy5d = copyOfBuiltin("exec_weekly", mainWords);
+  expect(!!copy5d && copy5d.def.mgmtOnly === true && checkTemplate(copy5d.def, copy5d.words).def.mgmtOnly === true, "a builder copy of an executive type keeps «Management Reports»");
+  const writes5d = [ED, CD, "src/lib/reports/numbers-5d.ts"].filter((f) => /\.(insert|update|upsert|delete)\(|\.rpc\(/.test(code(read(f))));
+  expect(writes5d.length === 0, "the executive and control numbers only read", writes5d.join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

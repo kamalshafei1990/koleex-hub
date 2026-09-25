@@ -42,6 +42,20 @@
    take a figure the writer types beside the system's (templates.ts
    DataInputDef): blockColumns / blockRows work out the difference, the
    composer, the reader and the print alike.
+
+   Phase 5D (owner's picks, 26 Sep 2026) adds the executive and control
+   numbers — the company's week or month: the reports each department sent,
+   sales, money in, stock, attendance, each department side by side; who
+   holds which right, who uses the Hub how much, the dates the sales
+   contracts set. Who reads them:
+     «Management Reports»  the reports, the departments, the rights and the
+                           usage (MGMT_SOURCES), whatever type they sit in
+     the week's sales      the Invoices app · money in the Finance app ·
+                           stock Inventory · attendance HR · view ·
+                           contract dates the Contracts app
+   And a READER of an executive or control type (`mgmtOnly`) sees each of
+   its numbers only with that number's own right (readerRight) — the rows
+   stored when it was sent go to no one without it.
    --------------------------------------------------------------------------- */
 
 import type { DataInputDef, ReportDataRow, ReportDataSource, ReportDataValue, ReportLinkType, ReportSectionValue, ReportSubject } from "./templates";
@@ -107,6 +121,19 @@ export const isFinanceSource = (s: string): s is FinanceSource => (FINANCE_SOURC
 /** Bank balances, cash and profit: «Bank & Profit» (the Finance app's row). */
 export const BANK_PROFIT_SOURCES = ["cash_position", "cash_flow", "profit_loss"] as const;
 export const isBankProfitSource = (s: string): boolean => (BANK_PROFIT_SOURCES as readonly string[]).includes(s);
+/** 5D: the company's picture for the executive types. */
+export const EXEC_SOURCES = ["exec_reports", "exec_sales", "exec_collections", "exec_stock", "exec_attendance", "dept_kpis"] as const;
+export type ExecSource = (typeof EXEC_SOURCES)[number];
+export const isExecSource = (s: string): s is ExecSource => (EXEC_SOURCES as readonly string[]).includes(s);
+/** 5D: the control numbers — rights, usage, contract dates. */
+export const CONTROL_SOURCES = ["access_review", "system_usage", "contract_dates"] as const;
+export type ControlSource = (typeof CONTROL_SOURCES)[number];
+export const isControlSource = (s: string): s is ControlSource => (CONTROL_SOURCES as readonly string[]).includes(s);
+export const MGMT_MODULE = "Management Reports";
+/** 5D: numbers that need «Management Reports» (or a super admin), whatever
+ *  type they sit in — about people across the company, or their rights. */
+export const MGMT_SOURCES = ["exec_reports", "dept_kpis", "access_review", "system_usage"] as const;
+export const isMgmtSource = (s: string): boolean => (MGMT_SOURCES as readonly string[]).includes(s);
 
 /** What a block's numbers are about — the one record of that kind its
  *  report links. `required`: nothing is read until one is picked;
@@ -137,7 +164,7 @@ export const DATA_ABOUT: Partial<Record<ReportDataSource, { type: ReportSubject;
 
 /** The sources by the app each comes from — the builder's picker (named
  *  by the families' words). Every source is in exactly one. */
-export const SOURCE_GROUPS: Array<{ id: "sales" | "suppliers" | "travel" | "team" | "office" | "hr" | "projects" | "inventory" | "finance"; sources: ReportDataSource[] }> = [
+export const SOURCE_GROUPS: Array<{ id: "sales" | "suppliers" | "travel" | "team" | "office" | "hr" | "projects" | "inventory" | "finance" | "executive" | "compliance"; sources: ReportDataSource[] }> = [
   { id: "sales", sources: ["quotations", "orders", "invoices", "quotes_waiting", "receivables"] },
   { id: "suppliers", sources: ["purchase_orders", "receipts", "shortages", "pos_late", "payables"] },
   { id: "travel", sources: ["expenses"] },
@@ -147,6 +174,8 @@ export const SOURCE_GROUPS: Array<{ id: "sales" | "suppliers" | "travel" | "team
   { id: "projects", sources: [...PROJECT_SOURCES] },
   { id: "inventory", sources: [...STOCK_SOURCES] },
   { id: "finance", sources: [...FINANCE_SOURCES] },
+  { id: "executive", sources: [...EXEC_SOURCES] },
+  { id: "compliance", sources: [...CONTROL_SOURCES] },
 ];
 
 /** The record a report is about, of one kind: the first of that kind in
@@ -241,6 +270,21 @@ export const DATA_COLUMNS: Record<ReportDataSource, DataColumn[]> = {
   ar_aging: [st("bucket"), n("count"), mo("balance")],
   ap_aging: [st("bucket"), n("count"), mo("balance")],
   month_close: [st("check"), n("count"), st("state")],
+  /* 5D — the executive picture: per department, or one line per figure
+     (in each currency — sales and money are never mixed). A figure's
+     amount is never added to the next one's: a quotation, its order and its
+     invoice can be the same sale, and what is past due is part of what is
+     owed. */
+  exec_reports: [DEPT, n("people"), n("writers"), n("sent")],
+  exec_sales: [st("metric"), n("count"), mo("amount", false)],
+  exec_collections: [st("metric"), n("count"), mo("amount", false)],
+  exec_stock: [st("metric"), n("value")],
+  exec_attendance: [DEPT, n("people"), n("present"), n("late_days"), n("absent"), n("leave_days")],
+  dept_kpis: [DEPT, n("people"), n("present_rate"), n("late_days"), n("absent"), n("sent"), n("done_work"), n("overdue_work")],
+  /* 5D — control */
+  access_review: [PERSON, tx("role"), { id: "rights", type: "tags" }, n("apps"), st("two_factor"), dt("last_login"), st("status")],
+  system_usage: [PERSON, n("hours"), n("active_days"), n("sign_ins"), dt("last_active")],
+  contract_dates: [NO, CUSTOMER, st("what"), dt("date"), n("days_left")],
 };
 
 /** The app a source belongs to — the author must hold it (requireModuleAccess).
@@ -266,6 +310,9 @@ export const DATA_MODULE: Record<ReportDataSource, string> = {
   stock_count: "Inventory", stock_writeoffs: "Inventory", stock_moves: "Inventory", low_stock: "Inventory",
   expense_categories: "Finance", company_expenses: "Finance", cash_position: "Bank & Profit", cash_flow: "Bank & Profit", profit_loss: "Bank & Profit",
   ar_aging: "Finance", ap_aging: "Finance", month_close: "Finance",
+  /* 5D */
+  exec_reports: MGMT_MODULE, exec_sales: "Invoices", exec_collections: "Finance", exec_stock: "Inventory", exec_attendance: "HR", dept_kpis: MGMT_MODULE,
+  access_review: MGMT_MODULE, system_usage: MGMT_MODULE, contract_dates: "Contracts",
 };
 
 /** What a row opens: the document in its own app — a quotation or an
@@ -309,6 +356,12 @@ export function dataRowHref(source: ReportDataSource, key: string): string | nul
     case "stock_count": case "low_stock": return "/inventory/balances";
     case "stock_writeoffs": case "stock_moves": return "/inventory/movements";
     case "ar_aging": case "ap_aging": return "/finance/statements";
+    /* 5D: an account opens in Accounts; a contract its page. */
+    case "access_review": return /^[0-9a-f-]{36}$/i.test(key) ? `/accounts/${encodeURIComponent(key)}` : null;
+    case "contract_dates": {
+      const id = key.split(":")[0];
+      return /^[0-9a-f-]{36}$/i.test(id) ? `/contracts/${encodeURIComponent(id)}` : null;
+    }
     default: return null;
   }
 }
@@ -365,6 +418,13 @@ export const DATA_STATUSES = [
   "opening_cash", "operating", "investing", "financing", "net_cash", "closing_cash",
   "current", "d1_30", "d31_60", "d61_90", "d90_plus",
   "draft_entries", "entries_waiting", "posted_entries", "expenses_unposted", "period_locked", "closing_entry",
+  /* 5D — the company's figures, the rights an account holds, two-factor,
+     an account's state, what a contract date is. */
+  "quotations_sent", "orders_new", "invoices_issued", "payments_received", "invoices_open", "invoices_overdue",
+  "items_low", "moves_in", "moves_out", "writeoffs",
+  "super_admin", "bank_profit", "payroll_reports", "ceo_office", "mgmt_reports", "report_templates", "finance_approvals", "private_records",
+  "on", "off", "deleted", "suspended", "disabled", "invited",
+  "delivery_due", "warranty_ends", "waiting_deposit", "waiting_order", "waiting_lc",
 ] as const;
 
 /** A status's word: "partial" is partly RECEIVED on a purchase order or a
@@ -372,6 +432,23 @@ export const DATA_STATUSES = [
 export function statusWordKey(source: ReportDataSource, status: string): string | null {
   if (status === "partial" && (source === "purchase_orders" || source === "receipts" || source === "pos_late")) return "blk.st.partial_received";
   return (DATA_STATUSES as readonly string[]).includes(status) ? `blk.st.${status}` : null;
+}
+
+/** 5D: what a READER needs to see one numbers block of an executive or
+ *  control type (`mgmtOnly`) — the number's own right, checked for whoever
+ *  opens the report (the server's gateForReader). The rows stored when it
+ *  was sent go to no one without it. */
+export type ReaderRight = "mgmt" | "payroll" | "bank" | "finance" | "hr" | "cost" | "office" | { module: string };
+export function readerRight(src: ReportDataSource): ReaderRight {
+  if (isMgmtSource(src) || isTeamSource(src)) return "mgmt";
+  if (isPayrollSource(src)) return "payroll";
+  if (isBankProfitSource(src)) return "bank";
+  if (isFinanceSource(src) || src === "exec_collections") return "finance";
+  if (isHrSource(src) || src === "exec_attendance") return "hr";
+  /* A stock count carries what each item costs. */
+  if (src === "stock_count") return "cost";
+  if (isOfficeSource(src)) return "office";
+  return { module: DATA_MODULE[src] };
 }
 
 /** A few coded values in one cell ("a|b|c" — 5C). */

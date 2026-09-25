@@ -157,4 +157,16 @@ export const reportDescsT: Translations = {
   "tpl.fin_cash_flow.desc": { en: "The bank balances, and how cash came in and went out in the month.", zh: "银行余额，以及本月现金的流入与流出。", ar: "أرصدة البنوك، وحركة النقدية الداخلة والخارجة في الشهر." },
   "tpl.fin_statements.desc": { en: "Profit and loss, and what customers owe us and we owe suppliers, by age.", zh: "损益，以及客户欠款和应付供应商款项的账龄。", ar: "الأرباح والخسائر، واللي لينا عند العملاء واللي علينا للموردين حسب المدة." },
   "tpl.fin_month_close.desc": { en: "The closing checks and the month's numbers, with the accountant's comment.", zh: "结账检查与本月数字，附会计的说明。", ar: "مراجعات الإقفال وأرقام الشهر، مع تعليق المحاسب." },
+
+  /* ── Phase 5D ── */
+  "tpl.exec_weekly.desc": { en: "The company's week for the CEO: what the departments sent, sales, money in, stock and attendance — confidential.", zh: "为总经理准备的公司一周概况：各部门报告、销售、收款、库存与考勤——保密。", ar: "أسبوع الشركة للمدير العام: الأقسام بعتت إيه، والمبيعات، والفلوس اللي دخلت، والمخزن، والحضور — سري." },
+  "tpl.exec_dept_kpis.desc": { en: "Each department's month side by side: people, attendance, reports and work — confidential.", zh: "各部门本月情况对比：人员、考勤、报告与工作——保密。", ar: "شهر كل قسم جنب بعض: الناس، والحضور، والتقارير، والشغل — سري." },
+  "tpl.exec_monthly_review.desc": { en: "The month in numbers and words: sales, money, profit, people, stock, risks and the decisions needed — confidential.", zh: "用数字和文字回顾本月：销售、资金、利润、人员、库存、风险及待决事项——保密。", ar: "الشهر بالأرقام والكلام: المبيعات، والفلوس، والربح، والناس، والمخزن، والمخاطر، والقرارات المطلوبة — سري." },
+  "tpl.cmp_conflict.desc": { en: "Declare a relative, an interest or outside work that could touch your decisions — or that there is none.", zh: "申报可能影响你决策的亲属、利益或兼职——或声明没有。", ar: "قول لو فيه قريب أو مصلحة أو شغل برّه ممكن يأثر على قراراتك — أو إن مفيش." },
+  "tpl.cmp_equipment.desc": { en: "A laptop, phone, tool or machine lost, damaged or stolen: what, how, and what was done.", zh: "笔记本电脑、手机、工具或机器丢失、损坏或被盗：是什么、经过及处理。", ar: "لابتوب أو موبايل أو عدة أو ماكينة ضاعت أو باظت أو اتسرقت: إيه، حصل إزاي، واتعمل إيه." },
+  "tpl.cmp_security.desc": { en: "A suspicious link, a leaked password, a lost device or data gone out — reported at once, confidential.", zh: "可疑链接、密码泄露、设备丢失或数据外泄——立即上报，保密。", ar: "لينك مشبوه، باسورد اتعرف، جهاز ضاع أو بيانات طلعت — بلّغ على طول، سري." },
+  "tpl.cmp_access_review.desc": { en: "Every account and the sensitive rights it holds, reviewed and signed — confidential.", zh: "每个账户及其敏感权限，逐一审查并签字——保密。", ar: "كل حساب والصلاحيات الحساسة اللي معاه، اتراجع واتمضى — سري." },
+  "tpl.cmp_usage.desc": { en: "Who used the Hub in the month, how many hours and days — confidential.", zh: "本月谁在使用系统、使用了多少小时和天数——保密。", ar: "مين استخدم السيستم في الشهر، كام ساعة وكام يوم — سري." },
+  "tpl.cmp_car_log.desc": { en: "The work trips in your own car this month: where, why, the kilometres and the amount.", zh: "本月用私车办公的行程：去哪里、事由、公里数和金额。", ar: "مشاوير الشغل بعربيتك الشهر ده: فين، ليه، كام كيلو، والمبلغ." },
+  "tpl.cmp_contracts.desc": { en: "The sales contracts' deliveries due and warranties ending soon, and what to do about each.", zh: "销售合同即将到期的交货和保修，以及各项处理。", ar: "تسليمات عقود البيع اللي قرّبت والضمانات اللي بتخلص، وهنعمل إيه في كل واحد." },
 };

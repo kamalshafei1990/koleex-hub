@@ -19,5 +19,7 @@ import hr from "./hr";
 import projects from "./projects";
 import inventory from "./inventory";
 import finance from "./finance";
+import executive from "./executive";
+import compliance from "./compliance";
 
-export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...office, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr, ...projects, ...inventory, ...finance };
+export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...office, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr, ...projects, ...inventory, ...finance, ...executive, ...compliance };

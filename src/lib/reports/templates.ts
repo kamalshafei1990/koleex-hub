@@ -84,7 +84,7 @@
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "team" | "office" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr" | "projects" | "inventory" | "finance";
+export type ReportFamily = "work" | "team" | "office" | "executive" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr" | "projects" | "inventory" | "finance" | "compliance";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -121,7 +121,9 @@ export type ReportDataSource =
   | "project_overview" | "project_done" | "project_overdue" | "project_milestones" | "project_budget" | "project_expenses"
   | "project_team" | "project_blocked" | "project_schedule" | "portfolio" | "projects_at_risk"
   | "stock_count" | "stock_writeoffs" | "stock_moves" | "low_stock"
-  | "expense_categories" | "company_expenses" | "cash_position" | "cash_flow" | "profit_loss" | "ar_aging" | "ap_aging" | "month_close";
+  | "expense_categories" | "company_expenses" | "cash_position" | "cash_flow" | "profit_loss" | "ar_aging" | "ap_aging" | "month_close"
+  | "exec_reports" | "exec_sales" | "exec_collections" | "exec_stock" | "exec_attendance" | "dept_kpis"
+  | "access_review" | "system_usage" | "contract_dates";
 export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "quotations", "orders", "invoices", "quotes_waiting", "receivables",
   "purchase_orders", "receipts", "shortages", "pos_late", "payables",
@@ -136,6 +138,8 @@ export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "project_team", "project_blocked", "project_schedule", "portfolio", "projects_at_risk",
   "stock_count", "stock_writeoffs", "stock_moves", "low_stock",
   "expense_categories", "company_expenses", "cash_position", "cash_flow", "profit_loss", "ar_aging", "ap_aging", "month_close",
+  "exec_reports", "exec_sales", "exec_collections", "exec_stock", "exec_attendance", "dept_kpis",
+  "access_review", "system_usage", "contract_dates",
 ];
 /** 5C: a figure the writer types beside the system's, on every row of a
  *  numbers block — the stock counted beside the stock in the system, the
@@ -156,8 +160,8 @@ export interface DataInputDef {
 }
 /** 5C: who may start a type, beside everyone — the app's own right (HR is
  *  HR · view). */
-export type ReportApp = "HR" | "Projects" | "Inventory" | "Finance" | "Expenses";
-export const REPORT_APPS: ReportApp[] = ["HR", "Projects", "Inventory", "Finance", "Expenses"];
+export type ReportApp = "HR" | "Projects" | "Inventory" | "Finance" | "Expenses" | "Contracts";
+export const REPORT_APPS: ReportApp[] = ["HR", "Projects", "Inventory", "Finance", "Expenses", "Contracts"];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
 /** Who a new report goes to before the author changes anything:
@@ -225,6 +229,12 @@ export interface ReportTemplateDef {
   /** 5C: salaries — only super admins and holders of «Payroll Reports» in
    *  Roles start it. */
   payrollOnly?: boolean;
+  /** 5D: the executive and control types — only super admins and holders of
+   *  «Management Reports» in Roles start them, and a READER sees each of
+   *  their numbers only with that number's own right (report-data
+   *  readerRight): the week's sales with Invoices, the money in with the
+   *  Finance app, the stock with Inventory, attendance with HR · view. */
+  mgmtOnly?: boolean;
   /** The free report takes the author's own title. */
   customTitle?: boolean;
   /** Only an event asks for it (Phase 3D: the probation review): never
@@ -252,7 +262,7 @@ export interface ReportTemplateDef {
 export const REPORT_HEAD_FIELDS = ["key", "family", "group", "icon", "cadence", "urgent"] as const;
 export type ReportTemplateHead = Pick<ReportTemplateDef, (typeof REPORT_HEAD_FIELDS)[number]>;
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr", "projects", "inventory", "finance"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "executive", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr", "projects", "inventory", "finance", "compliance"];
 
 /** The built-in whose suggestions, app facts and AI summary a type uses: its
  *  own — or, for a builder copy, the one it was copied from. */

@@ -59,7 +59,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
+import { requireModuleAccess, requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { REPORT_LIMITS, periodFor, rangeEnd, type ReportDataRow, type ReportDataSource, type ReportDataValue } from "@/lib/reports/templates";
 import { templateOf } from "@/lib/reports/custom-templates";
 import { DATA_MODULE, isTeamSource, type TeamSource } from "@/lib/reports/report-data";
@@ -74,6 +74,10 @@ import { hrData, hrShared } from "@/lib/server/reports/hr-data";
 import { projectData, projectShared } from "@/lib/server/reports/project-data";
 import { stockData } from "@/lib/server/reports/stock-data";
 import { financeData, financeShared } from "@/lib/server/reports/finance-data";
+import { execData, execShared } from "@/lib/server/reports/exec-data";
+import { controlData } from "@/lib/server/reports/control-data";
+import { MGMT_MODULE, OFFICE_MODULE, PAYROLL_MODULE, isControlSource, isExecSource, readerRight, type ControlSource, type ExecSource, type ReaderRight } from "@/lib/reports/report-data";
+import { canSeeBankAndProfit, canSeeCostData, requireFinanceNumbers } from "@/lib/experience";
 
 const LIMIT = REPORT_LIMITS.dataRows;
 const DAY = 86_400_000;
@@ -146,7 +150,7 @@ function sentDay(q: Q): string | null {
 }
 
 type Source5c = HrSource | ProjectSource | StockSource | FinanceSource;
-const READ: Record<Exclude<ReportDataSource, TeamSource | OfficeSource | Source5c>, (c: Ctx) => Promise<ReportDataRow[]>> = {
+const READ: Record<Exclude<ReportDataSource, TeamSource | OfficeSource | Source5c | ExecSource | ControlSource>, (c: Ctx) => Promise<ReportDataRow[]>> = {
   async quotations(c) {
     let q = supabaseServer.from("quotations")
       .select("id, quote_no, status, currency, total, issue_date, company:doc->>companyName, customer:doc->>customerName")
@@ -344,6 +348,8 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
   const hrSh = sources.some(isHrSource) ? hrShared(auth) : null;
   const projSh = sources.some(isProjectSource) ? projectShared(auth) : null;
   const finSh = sources.some(isFinanceSource) ? financeShared(auth) : null;
+  /* 5D: the company read once for every executive block of the report. */
+  const execSh = sources.some(isExecSource) ? execShared(auth, period, { workload: sources.includes("dept_kpis") }) : null;
   const linked = Array.isArray(row.sections) ? (row.sections as ReportSectionValue[]) : [];
   const about = <T extends ReportSubject>(type: T) => subjectOf(linked, type);
   const answers = new Map(await Promise.all(sources.map(async (src): Promise<[ReportDataSource, ReportDataValue]> => {
@@ -379,6 +385,17 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
         return [src, { source: src, rows: [], capturedAt, failed: true }];
       }
     }
+    if (isExecSource(src) || isControlSource(src)) {
+      try {
+        const x = { auth, start: period.start, end: period.end, today };
+        const got = isExecSource(src) ? await execData(src, x, execSh!, "—") : await controlData(src, x);
+        if (got === "denied") return [src, { source: src, rows: [], capturedAt, denied: true }];
+        return [src, got.rows.length > LIMIT ? { source: src, rows: got.rows.slice(0, LIMIT), capturedAt, truncated: true } : { source: src, rows: got.rows, capturedAt }];
+      } catch (e) {
+        console.error(`[reports] 5D numbers ${src}:`, e instanceof Error ? e.message : e);
+        return [src, { source: src, rows: [], capturedAt, failed: true }];
+      }
+    }
     if (isTeamSource(src)) {
       try {
         const team = await teamP!;
@@ -402,6 +419,44 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
     }
   })));
   return Object.fromEntries(secs.map((s) => [s.id, answers.get(s.source!)!]));
+}
+
+/** 5D: a READER of an executive or control type (`mgmtOnly`) sees each of
+ *  its numbers only with that number's own right (report-data readerRight)
+ *  — the rows stored when it was sent go to no one without it, nor the
+ *  notes and figures the writer typed on them; the block says whose right
+ *  it needs. The author sees what they sent; a super admin, everything.
+ *  Every other type is as it always was. */
+export async function gateForReader(row: Facts, sections: ReportSectionValue[], auth: ServerAuthContext, isAuthor: boolean): Promise<ReportSectionValue[]> {
+  const tpl = templateOf(row);
+  if (!tpl?.mgmtOnly || isAuthor || auth.is_super_admin) return sections;
+  const asked = new Map<string, Promise<boolean>>();
+  const may = (r: ReaderRight): Promise<boolean> => {
+    const k = typeof r === "string" ? r : `module:${r.module}`;
+    let p = asked.get(k);
+    /* A failed check is no right — never the stored numbers. */
+    if (!p) { p = readerMay(r, auth).catch(() => false); asked.set(k, p); }
+    return p;
+  };
+  return Promise.all(sections.map(async (s) => {
+    if (!s.data?.source || (await may(readerRight(s.data.source)))) return s;
+    const { notes: _notes, inputs: _inputs, ...rest } = s;
+    void _notes; void _inputs;
+    return { ...rest, data: { source: s.data.source, rows: [], capturedAt: s.data.capturedAt, denied: true } };
+  }));
+}
+
+async function readerMay(r: ReaderRight, auth: ServerAuthContext): Promise<boolean> {
+  switch (r) {
+    case "mgmt": return (await requireModuleAccess(auth, MGMT_MODULE)) === null;
+    case "payroll": return (await requireModuleAction(auth, PAYROLL_MODULE, "create")) === null;
+    case "bank": return (await requireFinanceNumbers(auth)) === null && (await canSeeBankAndProfit(auth));
+    case "finance": return (await requireFinanceNumbers(auth)) === null;
+    case "hr": return (await requireModuleAction(auth, "HR", "view")) === null;
+    case "cost": return (await requireModuleAccess(auth, "Inventory")) === null && canSeeCostData(auth);
+    case "office": return (await requireModuleAction(auth, OFFICE_MODULE, "create")) === null;
+    default: return (await requireModuleAccess(auth, r.module)) === null;
+  }
 }
 
 /** A sent report's LIVE blocks («waiting for your decision», 5B) for the

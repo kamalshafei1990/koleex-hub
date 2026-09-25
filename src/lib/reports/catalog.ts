@@ -51,6 +51,16 @@ const fin = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: 
 const M = { cadence: "monthly" } as const;
 const TEAM = { orTeam: true } as const;
 
+/* ── 5D helpers (owner's picks 26 Sep 2026) ── */
+/** An executive type: «Management Reports» starts it; confidential, to the
+ *  writer's manager — and a reader sees each of its numbers only with that
+ *  number's own right (report-data readerRight). */
+const exe = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "executive", icon, cadence: "weekly", mgmtOnly: true, recipients: "manager", reviewRequired: false, confidential: true, sections, ...more });
+/** A control type: what someone declares, records or reviews. */
+const cmp = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "compliance", icon, cadence: null, recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
+
 export const REPORT_TEMPLATES: ReportTemplateDef[] = [
   /* ── Work: the Executive Assistant JD's reporting system, for everyone ── */
   { key: "daily", family: "work", icon: "calendar", cadence: "daily", recipients: "manager", reviewRequired: false, confidential: false,
@@ -667,6 +677,58 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     b("steps", "checklist", { points: pts("bank_reconciled", "expenses_posted", "invoices_posted", "payroll_posted", "depreciation", "fx_revaluation", "period_locked") }),
     data("pl", "profit_loss"), t("comment", "text", true),
   ]),
+  /* ── Executive (Phase 5D, owner's picks 26 Sep 2026): the company's week
+     and month for the CEO — Koleex AI writes the summary from what the
+     departments sent (never a confidential report), beside the numbers. */
+  exe("exec_weekly", "signal-stream", [
+    t("summary", "text", true),
+    data("reports", "exec_reports"), data("sales", "exec_sales"), data("money", "exec_collections"),
+    data("stock", "exec_stock"), data("attendance", "exec_attendance"),
+    t("wins", "list"), t("risks", "list"), t("decisions", "list"),
+  ]),
+  exe("exec_dept_kpis", "heart-rate", [
+    data("kpis", "dept_kpis", { notes: true }), t("summary", "text", true), t("actions", "list"),
+  ], M),
+  exe("exec_monthly_review", "briefcase", [
+    t("summary", "text", true),
+    data("sales", "exec_sales"), data("money", "exec_collections"), data("pl", "profit_loss"),
+    data("people", "headcount"), data("stock", "exec_stock"),
+    t("highlights", "list"), t("risks", "list"), t("priorities", "list"), t("decisions", "list"),
+  ], M),
+  /* ── Compliance & control (5D): anyone declares a conflict of interest,
+     equipment lost or damaged, a security incident or a private car used
+     for work; the rights and the usage need «Management Reports»; the
+     contracts' dates the Contracts app. */
+  cmp("cmp_conflict", "scale", [
+    b("kind", "choice", { options: ["none", "family", "financial", "outside_work", "gift", "other"] }, true),
+    t("details", "text"), b("parties", "links", { linkTypes: ["customer", "supplier"] }), t("measures", "text"),
+    b("sign", "signature", {}, true),
+  ], { recipients: "manager_hr", confidential: true }),
+  cmp("cmp_equipment", "tools", [
+    b("what", "choice", { options: ["lost", "damaged", "stolen"] }, true),
+    t("item", "text", true), t("when_where", "text", true), t("how", "text", true),
+    b("steps", "checklist", { points: pts("manager_told", "police_report", "insurer_told", "data_wiped", "replacement_asked") }),
+    b("sign", "signature", {}, true),
+  ]),
+  cmp("cmp_security", "shield-check", [
+    b("kind", "choice", { options: ["phishing", "password", "device", "data_leak", "malware", "access", "other"] }, true),
+    t("what", "text", true), t("when", "text"), t("affected", "text"),
+    b("steps", "checklist", { points: pts("password_changed", "signed_out", "device_locked", "admin_told", "customers_told") }),
+    t("prevent", "text"),
+  ], { confidential: true, urgent: true }),
+  cmp("cmp_access_review", "id-badge", [
+    data("accounts", "access_review", { notes: true }), t("changes", "list", true), b("sign", "signature", {}, true),
+  ], { cadence: "monthly", mgmtOnly: true, confidential: true }),
+  cmp("cmp_usage", "computer", [
+    data("usage", "system_usage", { notes: true }), t("summary", "text", true), t("actions", "list"),
+  ], { cadence: "monthly", mgmtOnly: true, confidential: true }),
+  cmp("cmp_car_log", "car-side", [
+    b("trips", "table", { columns: [c("date", "date"), c("from"), c("to"), c("purpose"), c("km", "number"), c("amount", "money")] }, true),
+    t("notes", "text"), b("sign", "signature", {}, true),
+  ], M),
+  cmp("cmp_contracts", "contract", [
+    data("dates", "contract_dates", { notes: true }), t("summary", "text", true), t("actions", "list"),
+  ], { cadence: "monthly", app: "Contracts" }),
   /* ── Asked for by events (Phase 3D, owner's picks 25 Sep 2026) ──
      Anyone may also start the first two themselves; the probation review
      only ever comes from its request, to the employee's manager. */

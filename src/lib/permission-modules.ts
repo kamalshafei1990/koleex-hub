@@ -56,13 +56,18 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    queue. Both used to follow from the department's name (src/lib/experience).
    Reports 5C (owner's pick, 26 Sep 2026): "Payroll Reports" — starting the
    salary report types, and reading salaries inside any report (the payroll
-   summary, the staff cost, the salary review). */
+   summary, the staff cost, the salary review). Reports 5D (owner's pick, 26
+   Sep 2026): "Management Reports" — starting the executive and control
+   report types (the weekly executive summary, the department KPIs, the
+   monthly business review, the access review, the system usage), and
+   reading the company-wide numbers they carry. */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
   { name: "Payroll Reports", app: "Reports" },
+  { name: "Management Reports", app: "Reports" },
   { name: BANK_PROFIT_MODULE, app: "Finance" },
   { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
 ];

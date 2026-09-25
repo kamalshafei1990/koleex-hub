@@ -194,9 +194,18 @@ export async function loadTeamDigests(auth: ServerAuthContext, scope: TeamScope,
   return { digests, total: rows.length };
 }
 
-/** Everything Koleex AI reads for a team summary over those days. */
-export async function loadTeamMaterial(auth: ServerAuthContext, from: string, to: string) {
-  const scope = await loadTeamScope(auth);
+/** 5D: the whole company — everyone on the org tree, the writer too — for
+ *  the executive summary and the monthly review (the route checks
+ *  «Management Reports» first). */
+export async function loadCompanyScope(auth: ServerAuthContext): Promise<TeamScope> {
+  const [tree, people] = await Promise.all([loadOrgTree(auth.tenant_id), listPeople(auth.tenant_id)]);
+  return { owners: await loadOwners(tree), names: new Map(people.map((p) => [p.id, p])) };
+}
+
+/** Everything Koleex AI reads for a team summary over those days — or, 5D,
+ *  for the company's (`company`). */
+export async function loadTeamMaterial(auth: ServerAuthContext, from: string, to: string, company = false) {
+  const scope = company ? await loadCompanyScope(auth) : await loadTeamScope(auth);
   const [facts, reports] = await Promise.all([
     loadTeamFacts(auth, scope, from, to),
     loadTeamDigests(auth, scope, from, to),
@@ -220,6 +229,28 @@ export const TEAM_SYSTEM =
   " Keep every name, number, code (quotation, invoice and order numbers), date and amount exactly as written." +
   " The reports are internal: customer and supplier names in them are the team's own work records — keep them." +
   " Write plainly for a busy manager: no greeting, no sign-off, no Markdown, no headings with #, no emojis.";
+
+export const EXEC_SYSTEM =
+  "You help the CEO of Koleex understand the company's week or month, from the departments' own work reports and the numbers the system keeps." +
+  " Use ONLY the facts you are given. Never invent numbers, names, dates, customers, results or plans." +
+  " Keep every name, number, code (quotation, invoice and order numbers), date and amount exactly as written." +
+  " The reports are internal: customer and supplier names in them are the company's own work records — keep them." +
+  " Write plainly for a busy CEO: no greeting, no sign-off, no Markdown, no headings with #, no emojis.";
+
+/** 5D: the summary section of the weekly executive summary, or of the
+ *  monthly business review, from what the whole company sent. */
+export function execInstruction(o: {
+  monthly: boolean; lang: TeamLang; period: string; people: number; material: string; facts: string; fence: string;
+}): string {
+  const what = o.monthly ? "monthly business review" : "weekly executive summary";
+  const length = o.monthly ? "6 to 12 sentences (at most about 300 words)" : "5 to 10 sentences (at most about 220 words)";
+  return `Write the summary section of the CEO's ${what} for ${o.period}, in ${LANG_NAME[o.lang]}: ${length} —` +
+    " the company's main results, what moved forward in each area (sales, purchasing and operations, finance, people), what is late or stuck, the risks, and what needs the CEO's decision." +
+    " Group by area, not by person; name a person only where a report names them in a result, a problem or a decision. Plain paragraphs only." +
+    ` The company has ${o.people} people.` +
+    fenceUntrusted(o.material, "document", "The departments' work reports, one per ### heading", o.fence) +
+    fenceUntrusted(o.facts, "document", "The company's numbers from Koleex Hub (reports owed and sent, attendance days, open and finished work)", o.fence);
+}
 
 /** The instruction for a team summary: `read` = what the manager reads in
  *  the Team tab; `section` = the "Summary" section of a Team summary report.

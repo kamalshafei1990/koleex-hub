@@ -25,16 +25,17 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { chatWithTools } from "@/lib/server/ai/provider/registry";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_LIMITS, checkAiRequest, serverMaterial, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
+import { AI_LIMITS, checkAiRequest, companyMaterial, serverMaterial, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
 import { rangeLabel, teamFactsText, teamRange } from "@/lib/reports/team";
-import { TEAM_SYSTEM, loadTeamMaterial, teamInstruction } from "@/lib/server/reports/team";
+import { EXEC_SYSTEM, TEAM_SYSTEM, execInstruction, loadTeamMaterial, teamInstruction } from "@/lib/server/reports/team";
+import { MGMT_MODULE } from "@/lib/reports/report-data";
 import { behaviourKey } from "@/lib/reports/templates";
 import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
@@ -103,14 +104,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (ask.action === "write" && serverMaterial(tpl)) {
     const range = teamRange(row.period_start, row.period_end ?? row.period_start);
     if (!range) return NextResponse.json({ error: "no_material" }, { status: 400 });
+    /* 5D: the company's reports — only with «Management Reports» (asked
+       again here: a right taken away since the report was started). */
+    const company = companyMaterial(tpl);
+    if (company && !auth.is_super_admin && (await requireModuleAccess(auth, MGMT_MODULE)) !== null) return NextResponse.json({ error: "forbidden" }, { status: 403 });
     let team;
-    try { team = await loadTeamMaterial(auth, range.from, range.to); }
+    try { team = await loadTeamMaterial(auth, range.from, range.to, company); }
     catch (e) { console.error("[reports.ai] team:", e instanceof Error ? e.message : e); return NextResponse.json({ error: "failed" }, { status: 500 }); }
     if (!team.included) return NextResponse.json({ error: "no_material" }, { status: 400 });
-    teamPrompt = {
-      system: TEAM_SYSTEM + AI_PROVENANCE_RULE,
-      user: teamInstruction({ kind: "section", lang: ask.lang, period: rangeLabel(range.from, range.to), people: team.facts.people.length, material: team.text, facts: teamFactsText(team.facts.people, team.facts.tracking), fence }),
-    };
+    const facts = teamFactsText(team.facts.people, team.facts.tracking);
+    const period = rangeLabel(range.from, range.to);
+    teamPrompt = company
+      ? { system: EXEC_SYSTEM + AI_PROVENANCE_RULE, user: execInstruction({ monthly: behaviourKey(tpl) === "exec_monthly_review", lang: ask.lang, period, people: team.facts.people.length, material: team.text, facts, fence }) }
+      : { system: TEAM_SYSTEM + AI_PROVENANCE_RULE, user: teamInstruction({ kind: "section", lang: ask.lang, period, people: team.facts.people.length, material: team.text, facts, fence }) };
   }
   const section = en(`tpl.${tpl.key}.s.${ask.section}`);
   const type = en(`tpl.${tpl.key}.name`);
