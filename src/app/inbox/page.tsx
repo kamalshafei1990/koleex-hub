@@ -67,6 +67,7 @@ import {
 } from "@/lib/inbox";
 import { useCurrentAccount, useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
 import { readWarmMailFeed, writeWarmMailFeed } from "@/lib/inbox-warm";
+import { cleanInboxBody, cleanInboxSubject } from "@/lib/inbox-display";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { notifUiT } from "@/lib/translations/notif-ui";
@@ -231,6 +232,8 @@ export default function NotificationCenterPage() {
         const hay = [
           m.subject,
           m.body ?? "",
+          cleanInboxSubject(m.subject),
+          cleanInboxBody(m.body),
           r ? partsText(r.subject) : "",
           r?.body ? partsText(r.body) : "",
           m.sender?.full_name ?? "",

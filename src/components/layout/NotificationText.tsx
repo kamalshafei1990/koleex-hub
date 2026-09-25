@@ -15,7 +15,7 @@
 import { useMemo } from "react";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import { renderNotification, type TplPart } from "@/lib/notification-templates";
-import { cleanInboxBody } from "@/lib/inbox-display";
+import { cleanInboxBody, cleanInboxSubject } from "@/lib/inbox-display";
 import type { Lang } from "@/lib/i18n";
 
 function Parts({ parts }: { parts: TplPart[] }) {
@@ -39,7 +39,7 @@ export function NotificationSubject({
 }: { meta: unknown; subject: string; lang: Lang; plain?: boolean }) {
   const r = useRenderedNotification(meta, lang);
   if (r) return <Parts parts={r.subject} />;
-  return <AutoTranslatedText text={subject} plain={plain} />;
+  return <AutoTranslatedText text={cleanInboxSubject(subject)} plain={plain} />;
 }
 
 /** The body, or nothing. `className` goes on the block either way. */

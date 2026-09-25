@@ -33,6 +33,8 @@ import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "../src/lib/product-sc
 import { MACHINE_KINDS } from "../src/lib/machine-kinds";
 import { FACETS, isValidFacet, FACET_I18N } from "../src/lib/product-facets";
 import { stripComments } from "./lib/strip-comments";
+import { notifTemplatesT } from "../src/lib/translations/notif-templates";
+import { notifUiT } from "../src/lib/translations/notif-ui";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -978,6 +980,60 @@ console.log("\nJ. Koleex AI app chunk");
     withMarkdown.length === 0
       ? ok("the markdown renderer is not in the app chunk", "lazy — loads with the first reply")
       : bad("the markdown renderer is back in the app chunk", withMarkdown.join(", "));
+  }
+}
+
+/* ── L. The notification bell's own weight ─────────────────────────────────
+   The header's bell Gate rides every page; the open bell — its list, its
+   words (notif-ui) and every notification's text in three languages
+   (notif-templates) — is fetched by import() the first time the bell is
+   wanted, and statically only by the notification center (/inbox). Section B
+   never sees that lazy chunk, so it is found here by the longest key of each
+   dictionary (a string only it contains). It must stay out of the shared
+   floor and out of every other route's entry, and under its ceiling.
+   Measured 26/09/2026 after phase E (77 types): 81 KB per copy (the bell's
+   and /inbox's); the ceiling is that plus ~12%. The static side — the Gate
+   imports none of it — is validate:notification-types §L. */
+console.log("\nL. Notification bell chunk");
+{
+  const dir = path.join(NEXT, "static", "chunks");
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".js")) : [];
+  const longest = (keys: string[]) => keys.reduce((a, b) => (b.length > a.length ? b : a), "");
+  const markers = [longest(Object.keys(notifTemplatesT)), longest(Object.keys(notifUiT))].map((k) => JSON.stringify(k));
+  const bell = files.filter((f) => {
+    const src = fs.readFileSync(path.join(dir, f), "utf8");
+    return markers.every((m) => src.includes(m));
+  });
+  if (bell.length === 0) {
+    bad("notification bell chunk", `not found by ${markers.join(" + ")} — did the dictionaries or the build move?`);
+  } else {
+    const MAX_KB = 91;
+    const heavy = bell.filter((f) => kb(fs.statSync(path.join(dir, f)).size) > MAX_KB);
+    heavy.length === 0
+      ? ok(`bell words + list: ${bell.length} chunk(s), largest ${Math.max(...bell.map((f) => kb(fs.statSync(path.join(dir, f)).size)))} KB`, `budget ${MAX_KB} KB each`)
+      : bad("bell chunk over budget", heavy.map((f) => `${f} ${kb(fs.statSync(path.join(dir, f)).size)} KB`).join(", ") + ` > ${MAX_KB} KB`);
+    const bm = JSON.parse(fs.readFileSync(path.join(NEXT, "build-manifest.json"), "utf8")) as { rootMainFiles?: string[] };
+    const inFloor = bell.filter((f) => (bm.rootMainFiles ?? []).some((r) => r.endsWith(f)));
+    inFloor.length === 0
+      ? ok("the open bell is not in the shared floor", "every page loads only the Gate")
+      : bad("the open bell is in the shared floor", inFloor.join(", "));
+    /* Which routes declare it at load: the notification center only. */
+    const manifests: string[] = [];
+    const walkM = (d: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) walkM(p);
+        else if (e.name.endsWith("_client-reference-manifest.js")) manifests.push(p);
+      }
+    };
+    walkM(path.join(NEXT, "server", "app"));
+    const declaring = manifests
+      .filter((m) => { const src = fs.readFileSync(m, "utf8"); return bell.some((f) => src.includes(f)); })
+      .map((m) => path.relative(path.join(NEXT, "server", "app"), m).replace(/\/?page_client-reference-manifest\.js$/, "") || "/");
+    const stray = declaring.filter((r) => r !== "inbox");
+    stray.length === 0
+      ? ok("no route but the notification center loads it up front", declaring.length ? `declared by: ${declaring.join(", ")}` : "lazy everywhere")
+      : bad("routes that load the open bell up front", stray.join(", "));
   }
 }
 

@@ -22,6 +22,15 @@
      H  the template travels: a push sent beside a templated row carries it
         (so it is written in the reader's language), and a notifyLite call
         with a template never also hand-writes the subject
+     I  every date a notification shows is D/M/Y: date parameters are made by
+        a day-first formatter (each one proven), the surfaces never format by
+        locale, and no template writes a date of its own
+     J  the words name the app, never a path: no template, parameter or
+        hand-written subject / push title carries a route
+     K  every link a writer stores opens a page that exists in src/app
+     L  the bell stays light: the header's Gate reaches the open bell only
+        through import(), and the bell reads the slim, capped feed
+        (its built weight is measured by validate:budgets §J)
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -288,6 +297,256 @@ for (const f of files) {
 }
 check("every push beside a templated row passes its tpl", untemplatedPush.length === 0, untemplatedPush.join("; "));
 check("no notifyLite call has both a template and a hand-written subject", doubleSubject.length === 0, doubleSubject.join(", "));
+
+/* ── shared: the notification writers and their template parameters ─── */
+const writerFiles = files.filter((f) => {
+  const rel = path.relative(ROOT, f);
+  if (rel === REGISTRY || /translations\/notif-templates|notification-templates\.ts$/.test(rel)) return false;
+  return WRITER.test(stripComments(fs.readFileSync(f, "utf8")));
+});
+/* The text between a `{`, `(` or `[` at `open` and its match. */
+const balanced = (src: string, open: number): string => {
+  let depth = 0, i = open;
+  for (; i < src.length; i++) {
+    if ("{([".includes(src[i])) depth++;
+    else if ("})]".includes(src[i]) && --depth === 0) break;
+  }
+  return src.slice(open + 1, i);
+};
+/* The top-level `key: value` pairs of an object body (shorthand `key` → value = key). */
+const pairs = (body: string): Array<[string, string]> => {
+  const out: Array<[string, string]> = [];
+  let depth = 0, cur = "";
+  const flush = () => {
+    const t = cur.trim(); cur = "";
+    if (!t || t.startsWith("...")) return;
+    const m = t.match(/^["']?(\w+)["']?\s*:\s*([\s\S]+)$/);
+    if (m) out.push([m[1], m[2].trim()]);
+    else if (/^\w+$/.test(t)) out.push([t, t]);
+  };
+  let quote = "";
+  for (const ch of body) {
+    if (quote) { cur += ch; if (ch === quote) quote = ""; continue; }
+    if (ch === '"' || ch === "'" || ch === "`") { quote = ch; cur += ch; continue; }
+    if ("{([".includes(ch)) depth++;
+    else if ("})]".includes(ch)) depth--;
+    if (ch === "," && depth === 0) flush(); else cur += ch;
+  }
+  flush();
+  return out;
+};
+/* Every template parameter object a writer builds: `p: { … }` inside a tpl,
+   or a `const p = { … }` handed to one. */
+const tplParams: Array<{ rel: string; src: string; at: number; key: string; value: string }> = [];
+for (const f of files) {
+  const rel = path.relative(ROOT, f);
+  if (/translations\/notif-templates|notification-templates\.ts$/.test(rel)) continue;
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  if (!/\btpl\b|prepareTpl\(/.test(src)) continue;
+  for (const m of src.matchAll(/(?:\bp:\s*|\bconst p\s*=\s*)\{/g)) {
+    for (const [key, value] of pairs(balanced(src, m.index! + m[0].length - 1))) tplParams.push({ rel, src, at: m.index!, key, value });
+  }
+}
+
+/* ── I: every date a notification shows reads day first ─────────────── */
+console.log("\nI. every date a notification shows reads D/M/Y");
+/* The owner's rule (dates are D/M/Y, everywhere). The audit found three
+   formats in one bell — 9/18/2026 from toLocaleDateString, "Sep 18" on the
+   page, 2026-09-20 inside the text — and not one of them day first. */
+const DATE_KEYS = new Set(["date", "day", "due", "from", "to", "when", "until", "deadline", "expires"]);
+/* A date parameter is made by a day-first formatter, each proven below. */
+const DMY_MAKERS = /\bdmyDate\(|\bfmt\(|\bformatWhen\(|\bw\.when\b|\bspan\(/;
+/* Values that pass for a reason other than their own text. */
+const DATE_OK: Record<string, string> = {
+  "src/app/api/hr/attendance/overtime/route.ts date: only.date": "Decided.date, built with dmyDate(x.rec.date) where the day is decided",
+};
+/* `to` and `from` are also words for a status move ("from draft to sent"):
+   a value that is the transition's status, not a date, is not one. */
+const NOT_A_DATE = /^(to|from|next|prev|nextStatus|prevStatus)$/;
+const rawDates: string[] = [];
+for (const { rel, src, at, key, value } of tplParams) {
+  if (!DATE_KEYS.has(key)) continue;
+  const where = `${rel} ${key}: ${value.replace(/\s+/g, " ").slice(0, 60)}`;
+  if (DATE_OK[`${rel} ${key}: ${value}`]) continue;
+  if (DMY_MAKERS.test(value)) continue;
+  /* A bare name is fine when that name was made by a formatter in this file. */
+  if (/^\w+$/.test(value)) {
+    if (NOT_A_DATE.test(value) && !new RegExp(`\\b(?:const|let)\\s+${value}\\s*=\\s*[^;\\n]*(?:date|_at|Date)\\b`).test(src)) continue;
+    /* The assignment nearest before the use — a file may reuse the name. */
+    const made = [...src.slice(0, at).matchAll(new RegExp(`\\b(?:const|let)\\s+${value}\\s*=\\s*([^;\\n]+)`, "g"))].pop();
+    if (made && DMY_MAKERS.test(made[1])) continue;
+  }
+  rawDates.push(where);
+}
+check("every date parameter a writer stores is made by a day-first formatter", rawDates.length === 0, rawDates.join("; "));
+/* …and each formatter really is day first. */
+const fileSrc = (rel: string) => stripComments(fs.readFileSync(R(rel), "utf8"));
+const dmyBody = fileSrc("src/lib/work-reports.ts").match(/export function dmyDate\([\s\S]*?\n\}/)?.[0] ?? "";
+const planningFmt = fileSrc("src/lib/server/planning-notify.ts").match(/const fmt = [\s\S]*?\n\};/)?.[0] ?? "";
+const calendarWhen = fileSrc("src/lib/server/calendar-notify.ts").match(/function whenParts[\s\S]*?\n\}/)?.[0] ?? "";
+const formatterOk = [
+  ["work-reports dmyDate", /`\$\{m\[3\]\}\/\$\{m\[2\]\}\/\$\{m\[1\]\}`/.test(dmyBody) && /getDate\(\)[^`]*\/\$\{[^`]*getMonth\(\)/.test(dmyBody)],
+  ["planning-notify fmt", /getUTCDate\(\)\)\}\/\$\{p\(d\.getUTCMonth\(\)/.test(planningFmt)],
+  ["calendar-notify whenParts", /"en-GB"/.test(calendarWhen) && /reverse\(\)\.join\("\/"\)/.test(calendarWhen)],
+].filter(([, ok]) => !ok).map(([n]) => n);
+check("each of those formatters writes the day first", formatterOk.length === 0, formatterOk.join(", "));
+/* The surfaces that show a notification never format a date by locale. */
+const SURFACES = [
+  "src/components/layout/NotificationBell.tsx",
+  "src/components/layout/NotificationBellGate.tsx",
+  "src/components/layout/NotificationList.tsx",
+  "src/components/layout/NotificationText.tsx",
+  "src/lib/notification-view.ts",
+  "src/app/inbox/page.tsx",
+];
+const localeDates = SURFACES.filter((f) => /toLocaleDateString|toLocaleTimeString|toLocaleString\(|toDateString\(|Intl\.DateTimeFormat/.test(fileSrc(f)));
+check("the bell and the center never format a date by the browser's locale", localeDates.length === 0, localeDates.join(", "));
+/* Rows stored before the templates keep their writers' ISO dates; the
+   screen shows them day first — the subject and the body both. */
+const nt = fileSrc("src/components/layout/NotificationText.tsx");
+const disp = fileSrc("src/lib/inbox-display.ts");
+check("old rows' stored dates show day first (subject and body)",
+  /text=\{cleanInboxSubject\(subject\)\}/.test(nt) && /text=\{cleanInboxBody\(body\)\}/.test(nt)
+  && /"\$3\/\$2\/\$1"/.test(disp) && /export function cleanInboxBody[\s\S]*?dayFirst\(/.test(disp));
+/* No template writes a date shape of its own. */
+const tplDates = tplKeys.filter((k) => LANGS.some((l) => /\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/.test((notifTemplatesT[k] as Record<string, string>)[l] ?? "")));
+check("no template carries a written-out date", tplDates.length === 0, tplDates.join(", "));
+
+/* ── J: no technical path in the words ──────────────────────────────── */
+console.log("\nJ. a notification names the app, never its path");
+/* The audit found "In Product Data (/product-data)". A route is for the
+   link, which the row carries; the words say the app's name. */
+const PATHISH = /(^|[\s(（"“])\/(?:api\/)?[a-z][\w-]*(?:\/[\w\-[\]]*)*(?=$|[\s).,）"”;:])/;
+const pathTpl = tplKeys.filter((k) => LANGS.some((l) => PATHISH.test((notifTemplatesT[k] as Record<string, string>)[l] ?? "")));
+check("no template shows a path", pathTpl.length === 0, pathTpl.join(", "));
+const routeHoles = tplKeys.filter((k) => /\{(?:route|path|pathname|href)(?::\w+)?\}/.test((notifTemplatesT[k] as Record<string, string>).en ?? ""));
+check("no template has a hole for a route", routeHoles.length === 0, routeHoles.join(", "));
+const routeParams = tplParams.filter(({ key, value }) =>
+  /^(route|path|pathname|href)$/.test(key) || /^["'`]\/[a-z]/.test(value) || /\bpathname\b|\.route\b/.test(value) && !/moduleForRoute/.test(value));
+check("no writer hands a route to a template", routeParams.length === 0, routeParams.map(({ rel, key, value }) => `${rel} ${key}: ${value.slice(0, 40)}`).join("; "));
+/* Words written without a template (push titles, digest bodies) too. */
+const pathWords: string[] = [];
+for (const f of writerFiles) {
+  const rel = path.relative(ROOT, f);
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  for (const m of src.matchAll(/\b(subject|body|title)\s*:\s*(`[^`]*`|"[^"]*")/g)) {
+    const text = m[2].slice(1, -1).replace(/\$\{[^}]*\}/g, "x");
+    if (PATHISH.test(text)) pathWords.push(`${rel} ${m[1]}: ${m[2].slice(0, 50)}`);
+  }
+}
+check("no hand-written subject, body or push title shows a path", pathWords.length === 0, pathWords.join("; "));
+
+const resolveImport = (from: string, spec: string): string | null => {
+  const base = spec.startsWith("@/") ? R(`src/${spec.slice(2)}`) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : null;
+  if (!base) return null;
+  for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts"), path.join(base, "index.tsx")]) if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+  return null;
+};
+
+/* ── K: every link opens a real screen ──────────────────────────────── */
+console.log("\nK. every notification's link opens a screen that exists");
+const APP = R("src/app");
+const isPage = (d: string) => ["page.tsx", "page.ts"].some((p) => fs.existsSync(path.join(d, p)));
+const routeExists = (dir: string, segs: string[]): boolean => {
+  const dirs = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  for (const g of dirs.filter((n) => /^\(.*\)$/.test(n))) if (routeExists(path.join(dir, g), segs)) return true;
+  if (segs.length === 0) {
+    const opt = dirs.find((n) => /^\[\[\.\.\.\w+\]\]$/.test(n));
+    return isPage(dir) || (!!opt && isPage(path.join(dir, opt)));
+  }
+  const [seg, ...rest] = segs;
+  if (dirs.includes(seg) && routeExists(path.join(dir, seg), rest)) return true;
+  const dyn = dirs.find((n) => /^\[\w+\]$/.test(n));
+  if (dyn && seg === "*" && routeExists(path.join(dir, dyn), rest)) return true;
+  if (dyn && !dirs.includes(seg) && routeExists(path.join(dir, dyn), rest)) return true;
+  const all = dirs.find((n) => /^\[\[?\.\.\.\w+\]\]?$/.test(n));
+  return !!all && isPage(path.join(dir, all));
+};
+/* Each literal path a link can take: the literals inside a `link:` / `url:`
+   value, and inside the body of any *Link helper that value calls. */
+/* A helper is looked up where the call can see it: defined in the same file,
+   else in the module it is imported from — never by name across the tree. */
+const helperIn = (file: string, name: string): string[] | null => {
+  const src = stripComments(fs.readFileSync(file, "utf8"));
+  const def = new RegExp(`(?:function\\s+${name}\\s*\\(|(?:const|let)\\s+${name}\\s*=)`).exec(src);
+  if (!def) return null;
+  /* The helper's body: to the end of its statement (arrow) or its block. */
+  const from = def.index;
+  const brace = src.indexOf("{", from);
+  const semi = src.indexOf(";\n", from);
+  const body = brace >= 0 && (semi < 0 || brace < semi) && /function/.test(def[0])
+    ? balanced(src, brace)
+    : src.slice(from, semi < 0 ? from + 400 : semi);
+  return [...body.matchAll(/(["'`])(\/[a-z][^"'`]*)\1/g)].map((x) => x[2]);
+};
+const helperPathsFor = (file: string, name: string): string[] => {
+  const own = helperIn(file, name);
+  if (own) return own;
+  const src = stripComments(fs.readFileSync(file, "utf8"));
+  const imp = new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*["']([^"']+)["']`).exec(src);
+  const target = imp ? resolveImport(file, imp[1]) : null;
+  return target ? helperIn(target, name) ?? [] : [];
+};
+const linkPaths: Array<{ rel: string; p: string }> = [];
+for (const f of writerFiles) {
+  const rel = path.relative(ROOT, f);
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  for (const m of src.matchAll(/\b(?:link|url)\s*:\s*/g)) {
+    /* The value runs to the next top-level comma / closing brace. */
+    let depth = 0, i = m.index! + m[0].length, quote = "";
+    const start = i;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (quote) { if (ch === quote) quote = ""; continue; }
+      if (ch === '"' || ch === "'" || ch === "`") { quote = ch; continue; }
+      if ("{([".includes(ch)) depth++;
+      else if ("})]".includes(ch)) { if (depth === 0) break; depth--; }
+      else if ((ch === "," || ch === "\n") && depth === 0) break;
+    }
+    const value = src.slice(start, i);
+    for (const x of value.matchAll(/(["'`])(\/[a-z][^"'`]*)\1/g)) linkPaths.push({ rel, p: x[2] });
+    for (const x of value.matchAll(/\b(\w*[Ll]ink)\(/g)) for (const p of helperPathsFor(f, x[1])) linkPaths.push({ rel, p });
+  }
+}
+const deadLinks = linkPaths.filter(({ p }) => {
+  const pathOnly = p.split(/[?#]/)[0].replace(/\$\{[^}]*\}/g, "*");
+  const segs = pathOnly.split("/").filter(Boolean);
+  if (segs[0] === "api") return true;
+  return !routeExists(APP, segs);
+}).map(({ rel, p }) => `${p} (${rel})`);
+check(`every link resolves to a page — ${new Set(linkPaths.map((l) => l.p)).size} distinct paths`, linkPaths.length > 20 && deadLinks.length === 0,
+  deadLinks.length ? deadLinks.join("; ") : `only ${linkPaths.length} links found — the scan lost its way`);
+
+/* ── L: the bell stays light ────────────────────────────────────────── */
+console.log("\nL. the bell stays light");
+/* The Gate rides the header on EVERY page. It may reach the bell only
+   through import(): the list, its words, the templates and the decisions
+   load the first time the bell is wanted, never with the page. (Measured on
+   the build output by validate:budgets §J.) */
+const HEAVY = /NotificationBell(?!Gate)\b|NotificationList|NotificationText|notif-ui|notif-templates|notification-templates|notification-decisions|notification-view/;
+const eager = new Set<string>();
+const leaks: string[] = [];
+const visit = (f: string, via: string[]) => {
+  if (eager.has(f)) return;
+  eager.add(f);
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  for (const m of src.matchAll(/^\s*import\s+(?!type\b)(?:[^'";]*?\s+from\s+)?["']([^"']+)["']/gm)) {
+    const target = resolveImport(f, m[1]);
+    if (!target) continue;
+    const rel = path.relative(ROOT, target);
+    if (HEAVY.test(rel)) leaks.push([...via, path.relative(ROOT, f), rel].map((x) => path.basename(x)).join(" → "));
+    else visit(target, [...via, path.relative(ROOT, f)]);
+  }
+};
+visit(R("src/components/layout/NotificationBellGate.tsx"), []);
+check(`the header's Gate reaches no part of the open bell (${eager.size} files load with every page)`, leaks.length === 0, leaks.join("; "));
+/* What the bell asks the server for: the slim rows, never avatars. */
+const feed = fileSrc("src/app/api/inbox/feed/route.ts");
+const slimProj = feed.match(/const projection: string = slim\s*\?\s*`([^`]*)`/)?.[1] ?? "";
+check("the bell's rows are the slim projection — no avatar, no *", !!slimProj && !/avatar_url|\*/.test(slimProj), slimProj ? "" : "slim projection not found");
+check("the feed never answers more than 300 rows", /Math\.min\(Number\(url\.searchParams\.get\("limit"\)\)\s*\|\|\s*\d+,\s*300\)/.test(feed));
+const bellSrc = fileSrc("src/components/layout/NotificationBell.tsx");
+check("the bell asks for slim rows", /fetchInboxMessagesOrNull\(\{[^}]*slim:\s*true/.test(bellSrc));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

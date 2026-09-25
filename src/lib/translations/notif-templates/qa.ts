@@ -9,9 +9,9 @@ export const qaTpl: Translations = {
   /* ── New issue (api/qa/reports POST) ── */
   "qa_issue_assigned.new_issue.s": { en: "New issue: {title:free}", zh: "新问题：{title:free}", ar: "مشكلة جديدة: {title:free}" },
   "qa_issue_assigned.new_issue.b": {
-    en: "{actor} filed \"{title:free}\" on {module}[[ ({route})]].",
-    zh: "{actor} 在 {module}[[（{route}）]]提交了“{title:free}”。",
-    ar: "قدّم {actor} المشكلة \"{title:free}\" في {module}[[ ({route})]].",
+    en: "{actor} filed \"{title:free}\" on {module}.",
+    zh: "{actor} 在 {module} 提交了“{title:free}”。",
+    ar: "قدّم {actor} المشكلة \"{title:free}\" في {module}.",
   },
   "qa_issue_assigned.on_create.s": { en: "Assigned to you: {title:free}", zh: "分配给你：{title:free}", ar: "أُسندت إليك: {title:free}" },
   "qa_issue_assigned.on_create.b": {

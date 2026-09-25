@@ -228,8 +228,9 @@ export async function POST(req: Request) {
       .eq("is_super_admin", true);
     const reporter = auth.username ?? auth.login_email ?? "Someone";
     const moduleLabel = clampStr(body.app_module, 80) ?? moduleForRoute(route);
-    // Translated per reader (translations/notif-templates/qa.ts).
-    const p = { actor: reporter, title, module: moduleLabel, route };
+    /* Translated per reader (translations/notif-templates/qa.ts). The app's
+       name only: the raw route is on the issue itself, never in the text. */
+    const p = { actor: reporter, title, module: moduleLabel };
     await notifyIssue(
       { tenantId: auth.tenant_id, issueId: data.id, actorId: auth.account_id, actorName: auth.username ?? null },
       [
