@@ -17,6 +17,7 @@ import { pickWord } from "@/lib/reports/template-words";
 import type { Lang } from "@/lib/i18n";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { dmyDate, periodLabel, type ReportListRow, type ReportPerson, type ReportStatus } from "@/lib/work-reports";
+import { initialsOf } from "@/lib/discuss/initials";
 
 export type T = (key: string, fallback?: string) => string;
 
@@ -49,7 +50,11 @@ export function Badge({ children, tone = "muted" }: { children: React.ReactNode;
 }
 
 export function Avatar({ person, size = 28 }: { person: Pick<ReportPerson, "name" | "avatar">; size?: number }) {
-  const initials = (person.name || "?").split(/\s+/).filter((w) => !/^(mr|mrs|ms|dr)\.?$/i.test(w)).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  /* The Hub's initials rule (lib/discuss/initials): first + LAST word, so
+     "Mustafa El Anany" is MA, not "ME" — which read as the word "me" on a
+     recipient chip. It also skips punctuation tokens ("Li Wei (Sales)") and
+     handles Arabic/Chinese names. Titles are dropped first, as before. */
+  const initials = initialsOf((person.name || "").split(/\s+/).filter((w) => !/^(mr|mrs|ms|dr)\.?$/i.test(w)).join(" "));
   return person.avatar ? (
     // eslint-disable-next-line @next/next/no-img-element -- avatars are small remote images already sized by the uploader
     <img src={person.avatar} alt="" width={size} height={size} className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />

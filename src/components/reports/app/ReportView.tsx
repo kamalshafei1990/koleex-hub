@@ -568,7 +568,7 @@ function PeopleField({ t, label, ids, people, nameOf, onChange, hint }: {
             <span key={pid} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-0.5 ps-0.5 pe-1 text-[12px] text-[var(--text-primary)]">
               <Avatar person={{ name: p?.name ?? "?", avatar: p?.avatar ?? null }} size={20} />
               <span className="max-w-[140px] truncate">{p?.name ?? "—"}</span>
-              <button type="button" onClick={() => onChange(ids.filter((x) => x !== pid))} aria-label={`${label}: ${p?.name ?? ""} ×`} className="grid h-5 w-5 place-items-center text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+              <button type="button" onClick={() => onChange(ids.filter((x) => x !== pid))} aria-label={`${label}: ${p?.name ?? ""} ×`} className="grid h-5 w-5 place-items-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)]">
                 <RrIcon name="cross" size={9} />
               </button>
             </span>
