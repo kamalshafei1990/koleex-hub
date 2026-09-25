@@ -34,11 +34,13 @@ import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
-import { REPORT_FAMILIES, REPORT_TEMPLATES, periodFor } from "@/lib/reports/templates";
+import { REPORT_FAMILIES, periodFor } from "@/lib/reports/templates";
+import { REPORT_TEMPLATES, reportTemplate } from "@/lib/reports/catalog";
 import { headWords, isCustomKey } from "@/lib/reports/template-words";
 import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
 import type { DueItem } from "@/lib/reports/obligations";
-import { CARD, ReportRowItem, TemplateIcon, tplName, type T } from "./shared";
+import { CARD, TemplateIcon, tplName, type T } from "./shared";
+import { ReportRowItem } from "./ReportRowItem";
 
 const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
 const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
@@ -253,7 +255,7 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
                       className="kx-hover-glow group flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-start transition-colors hover:bg-[var(--bg-surface)] disabled:opacity-60"
                     >
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]">
-                        {creating === tpl.key ? <SpinnerIcon size={14} /> : <TemplateIcon templateKey={tpl.key} icon={tpl.icon} size={15} />}
+                        {creating === tpl.key ? <SpinnerIcon size={14} /> : <TemplateIcon icon={tpl.icon} size={15} />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, tpl.key)}</span>
@@ -303,7 +305,7 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
           const busy = creating === (d.request ?? `${d.key}|${d.date}`);
           return (
             <li key={`${d.key}|${d.periodKey}`} className={`flex items-center gap-3 rounded-xl border p-3 ${d.state === "missing" ? "border-red-500/30 bg-red-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"}`}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={d.key} size={14} /></span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon icon={reportTemplate(d.key)?.icon} size={14} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{tplName(t, d.key)} <span className="font-normal text-[var(--text-dim)] tabular-nums">· {when(d)}</span></span>
                 <span className={`block text-[11.5px] tabular-nums ${d.state === "missing" ? "text-red-500" : "text-amber-500"}`}>

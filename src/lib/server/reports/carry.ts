@@ -14,6 +14,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { buildCarry, carryQueryRange, type CarryGroup, type CarrySource } from "@/lib/reports/carry";
+import { reportTemplate } from "@/lib/reports/catalog";
 import { periodFor, type ReportPeriod } from "@/lib/reports/templates";
 import { templateOf } from "@/lib/reports/custom-templates";
 
@@ -39,5 +40,5 @@ export async function loadCarry(row: DraftFacts, auth: ServerAuthContext, date?:
   if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
   const { data, error } = await q;
   if (error) { console.error("[reports] carry:", error.message); return []; }
-  return buildCarry(tpl, period, (data ?? []) as CarrySource[], { id: row.id, periodKey: period.key });
+  return buildCarry(tpl, period, (data ?? []) as CarrySource[], { id: row.id, periodKey: period.key }, reportTemplate);
 }

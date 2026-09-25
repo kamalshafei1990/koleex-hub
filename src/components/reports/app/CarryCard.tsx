@@ -17,7 +17,7 @@
 import { useState } from "react";
 import RrIcon from "@/components/ui/RrIcon";
 import { insertInto, isPlaced, type CarryGroup, type CarryItem } from "@/lib/reports/carry";
-import { reportTemplate, type ReportTemplateDef } from "@/lib/reports/templates";
+import type { ReportTemplateDef } from "@/lib/reports/templates";
 import { dmyDate, periodLabel } from "@/lib/work-reports";
 import { CARD, tplName, type T } from "./shared";
 import ClampedText from "./ClampedText";
@@ -104,7 +104,7 @@ export default function CarryCard({ t, tpl, groups, texts, onPlace, variant = "r
             const last = g.sources[g.sources.length - 1];
             const when = g.app || !first ? ""
               : many ? `${periodLabel(first.start, last.end)} (${g.sources.length})`
-              : reportTemplate(g.from)?.cadence === "daily" ? dmyDate(first.start) : periodLabel(first.start, first.end);
+              : g.cadence === "daily" ? dmyDate(first.start) : periodLabel(first.start, first.end);
             return (
               <div key={key}>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">

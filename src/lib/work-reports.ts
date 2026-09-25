@@ -4,7 +4,7 @@
    touches Supabase directly.
    --------------------------------------------------------------------------- */
 
-import type { ReportDataValue, ReportSectionValue, ReportTemplateDef } from "@/lib/reports/templates";
+import type { ReportDataValue, ReportFamily, ReportSectionValue, ReportTemplateDef } from "@/lib/reports/templates";
 import type { CustomDef, CustomTemplateHead } from "@/lib/reports/custom-templates";
 import type { TemplateHead, TemplateWords } from "@/lib/reports/template-words";
 import type { TeamPersonFacts } from "@/lib/reports/team";
@@ -84,9 +84,14 @@ export interface ReportDetail {
   /** The author's draft only: its numbers blocks as the server computes
    *  them now, by section id (a sent report has them frozen in its sections). */
   blockData?: Record<string, ReportDataValue>;
-  /** A builder type (4E): the type as this report was started with it, and
-   *  its words as the dictionary holds them (`tpl.<key>.…`). */
-  template?: { def: ReportTemplateDef; words: Translations };
+  /** The report's own type, always (5C: the report page carries no
+   *  catalog) — a built-in's definition, or a builder type (4E) as this
+   *  report was started with it, with its words as the dictionary holds
+   *  them (`tpl.<key>.…`; a built-in's come from its family chunk). */
+  template?: { def: ReportTemplateDef; words?: Translations };
+  /** The families whose section words the page loads (its own, and those
+   *  its carry-over quotes) — worked out by the server. */
+  wordFamilies: ReportFamily[];
 }
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; extra?: Record<string, unknown> };

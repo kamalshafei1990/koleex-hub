@@ -15,7 +15,7 @@
    validate:reports checks every rule and every scenario below.
    --------------------------------------------------------------------------- */
 
-import { REPORT_LIMITS, asTemplate, reportTemplate, type ReportPeriod, type ReportSectionKind, type ReportTemplateDef } from "./templates";
+import { REPORT_LIMITS, type ReportCadence, type ReportPeriod, type ReportSectionKind, type ReportTemplateDef } from "./templates";
 
 export interface CarryRule {
   /** The earlier report type the items come from. */
@@ -78,8 +78,7 @@ function addDays(ymd: string, days: number): string {
 /** A type's rules: its own — or, for a builder copy of a built-in (4E),
  *  that built-in's, where the copy's own earlier reports stand in for the
  *  built-in's ("yesterday's daily" is yesterday's copy). */
-export function carryRulesFor(t: string | ReportTemplateDef | null | undefined): CarryRule[] {
-  const tpl = asTemplate(t);
+export function carryRulesFor(tpl: ReportTemplateDef | null | undefined): CarryRule[] {
   if (!tpl) return [];
   if (CARRY_RULES[tpl.key]) return CARRY_RULES[tpl.key];
   const base = tpl.base ? CARRY_RULES[tpl.base] : undefined;
@@ -87,7 +86,7 @@ export function carryRulesFor(t: string | ReportTemplateDef | null | undefined):
 }
 
 /** The one read the server makes: these types, starting in this range. */
-export function carryQueryRange(t: string | ReportTemplateDef, period: ReportPeriod): { templates: string[]; from: string; to: string } | null {
+export function carryQueryRange(t: ReportTemplateDef, period: ReportPeriod): { templates: string[]; from: string; to: string } | null {
   const rules = carryRulesFor(t);
   if (!rules.length) return null;
   let from = period.start;
@@ -133,6 +132,9 @@ export interface CarryGroup {
   /** A group of suggestions from the apps (app-feed.ts): `section` is then
    *  the rule's group ("meetings", "done"…), not a report section. */
   app?: boolean;
+  /** The earlier report type's cadence (a daily is dated by its day) — the
+   *  server fills it, so the card needs no catalog. */
+  cadence?: ReportCadence;
 }
 
 /** One line as a person means it: no bullet or number in front, spaces and
@@ -154,9 +156,10 @@ const newer = (a: CarrySource, b: CarrySource) =>
 
 /** Which earlier reports feed a report of this type and period, as groups
  *  of suggestions. `self` is the report being written — never its own
- *  source, nor another version of it. */
-export function buildCarry(t: string | ReportTemplateDef, period: ReportPeriod, rows: CarrySource[], self: { id: string; periodKey?: string | null }): CarryGroup[] {
-  const tpl = asTemplate(t);
+ *  source, nor another version of it. `lookup` finds a built-in by its key
+ *  (the catalog — the server's; this file never imports it, so the report
+ *  page that uses the rules above stays light). */
+export function buildCarry(tpl: ReportTemplateDef, period: ReportPeriod, rows: CarrySource[], self: { id: string; periodKey?: string | null }, lookup: (key: string) => ReportTemplateDef | null): CarryGroup[] {
   const rules = carryRulesFor(tpl);
   if (!tpl || !rules.length) return [];
   const templateKey = tpl.key;
@@ -177,7 +180,8 @@ export function buildCarry(t: string | ReportTemplateDef, period: ReportPeriod, 
   const seen = new Set<string>();
   const out: CarryGroup[] = [];
   for (const rule of rules) {
-    const srcSection = (rule.from === tpl.key ? tpl : reportTemplate(rule.from))?.sections.find((s) => s.id === rule.section);
+    const src = rule.from === tpl.key ? tpl : lookup(rule.from);
+    const srcSection = src?.sections.find((s) => s.id === rule.section);
     const to = rule.to.filter((sid) => tpl.sections.some((s) => s.id === sid));
     if (!srcSection || !to.length) continue;
 
@@ -213,7 +217,7 @@ export function buildCarry(t: string | ReportTemplateDef, period: ReportPeriod, 
       }
       if (gave) sources.push({ id: src.id, start: src.period_start, end: src.period_end });
     }
-    if (items.length) out.push({ from: rule.from, section: rule.section, to, sources, items });
+    if (items.length) out.push({ from: rule.from, section: rule.section, to, sources, items, cadence: src?.cadence ?? null });
   }
   return out;
 }

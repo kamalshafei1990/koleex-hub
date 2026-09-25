@@ -40,7 +40,7 @@
    currency and the moment the numbers were taken; a date cell is D/M/Y.
    --------------------------------------------------------------------------- */
 
-import { reportTemplate, scoreAverage, tableSummary, type ReportDataRow, type ReportDataSource, type ReportSectionValue, type ReportTemplateDef, type SignatureValue } from "@/lib/reports/templates";
+import { scoreAverage, tableSummary, type ReportDataRow, type ReportDataSource, type ReportSectionValue, type ReportTemplateDef, type SignatureValue } from "@/lib/reports/templates";
 import { DATA_COLUMNS, DATA_MODULE, dataTotals, statusWordKey, type DataColumn } from "@/lib/reports/report-data";
 
 /* 270 mm = 1020 px, minus the sheet's own 24 + 18 px padding, minus air. */
@@ -146,7 +146,8 @@ export const estimateMeasurer: Measurer = {
 };
 
 /** `tpl`: a builder type (4E) comes whole with its report; a built-in is found by its key. */
-export interface PrintInput { templateKey: string; title: string; sections: ReportSectionValue[]; tpl?: ReportTemplateDef | null }
+/** `tpl`: the report's own type, as the server sent it with the report (the print carries no catalog). */
+export interface PrintInput { templateKey: string; title: string; sections: ReportSectionValue[]; tpl: ReportTemplateDef | null }
 /** The words a block prints with (the print page's dictionary). */
 export type PrintWord = (key: string) => string;
 /** A signature box: the drawn signature, then the signer and the moment. */
@@ -182,7 +183,7 @@ export interface PrintAttachments { photos: PrintPhoto[]; files: PrintPara[] }
 
 /** The paragraphs of each of the template's sections, as they print. */
 export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k): Array<{ sid: string; paras: PrintPara[]; signature?: SignatureValue }> {
-  const tpl = report.tpl ?? reportTemplate(report.templateKey);
+  const tpl = report.tpl ?? null;
   return (tpl?.sections ?? []).map((s) => {
     const v = report.sections.find((x) => x.id === s.id);
     const name = (kind: "i" | "c", id: string) => word(`tpl.${report.templateKey}.s.${s.id}.${kind}.${id}`);
@@ -256,7 +257,7 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
 }
 
 export function paginateReport(report: PrintInput, reviewPx: number, m: Measurer = estimateMeasurer, att?: PrintAttachments, word?: PrintWord): PrintSheet[] {
-  const tpl = report.tpl ?? reportTemplate(report.templateKey);
+  const tpl = report.tpl ?? null;
   const sheets: PrintSheet[] = [];
   const firstUsed = FIRST_HEAD_PX + FOOT_PX + (report.title.trim() && tpl?.customTitle ? TITLE_PX : 0);
   let sheet: PrintSheet = { first: true, cards: [], review: false, used: firstUsed };

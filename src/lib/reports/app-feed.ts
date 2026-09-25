@@ -19,7 +19,7 @@
    Pure; validate:reports checks every rule and every scenario below.
    --------------------------------------------------------------------------- */
 
-import { asTemplate, behaviourKey, periodFor, type ReportCadence, type ReportPeriod, type ReportTemplateDef } from "./templates";
+import { behaviourKey, periodFor, type ReportCadence, type ReportPeriod, type ReportTemplateDef } from "./templates";
 import type { CarryGroup, CarryItem } from "./carry";
 
 export type AppSource = "calendar" | "todos" | "tasks" | "planning" | "quotations" | "invoices" | "orders" | "crm";
@@ -82,13 +82,12 @@ export const APP_RULES: Record<string, AppRule[]> = {
 
 /** A type's rules: its own — or, for a builder copy (4E), its built-in's
  *  (they land only in the sections the copy kept). */
-export function appRulesFor(t: string | ReportTemplateDef | null | undefined): AppRule[] {
-  const tpl = asTemplate(t);
+export function appRulesFor(tpl: ReportTemplateDef | null | undefined): AppRule[] {
   return tpl ? APP_RULES[tpl.key] ?? APP_RULES[behaviourKey(tpl)] ?? [] : [];
 }
 
 /** The sources a report type reads at all — the server skips the rest. */
-export function feedSources(t: string | ReportTemplateDef): AppSource[] {
+export function feedSources(t: ReportTemplateDef): AppSource[] {
   const set = new Set<AppSource>();
   for (const r of appRulesFor(t)) for (const s of r.sources) set.add(s);
   return APP_SOURCES.filter((s) => set.has(s));
@@ -188,8 +187,7 @@ export function formatAppRecord(r: AppRecord, f: FeedFormatter): { text: string;
 
 /** The card's groups for a draft: every rule of its type, the records that
  *  fall on the author's days, each worded, each line offered once. */
-export function buildFeedGroups(t: string | ReportTemplateDef, period: ReportPeriod, records: AppRecord[], f: FeedFormatter): CarryGroup[] {
-  const tpl = asTemplate(t);
+export function buildFeedGroups(tpl: ReportTemplateDef, period: ReportPeriod, records: AppRecord[], f: FeedFormatter): CarryGroup[] {
   const rules = appRulesFor(tpl);
   if (!tpl || !rules.length) return [];
   const window = { period, next: nextPeriod(tpl.cadence, period) };

@@ -17,7 +17,7 @@
    answer back into a section. The route is /api/work-reports/[id]/ai.
    --------------------------------------------------------------------------- */
 
-import { REPORT_LIMITS, asTemplate, behaviourKey, type ReportSectionKind, type ReportTemplateDef } from "./templates";
+import { REPORT_LIMITS, behaviourKey, type ReportSectionKind, type ReportTemplateDef } from "./templates";
 import type { CarryGroup } from "./carry";
 
 export type AiAction = "write" | "tidy";
@@ -34,8 +34,7 @@ export const AI_WRITE_SECTIONS: Record<string, string[]> = {
 
 /** A type whose "write" material the SERVER gathers (5A: the team's reports
  *  — the author's page never carries other people's reports to send back). */
-export const serverMaterial = (t: string | ReportTemplateDef | null | undefined): boolean => {
-  const tpl = asTemplate(t);
+export const serverMaterial = (tpl: ReportTemplateDef | null | undefined): boolean => {
   return !!tpl && behaviourKey(tpl) === "team_summary";
 };
 
@@ -51,8 +50,7 @@ export const AI_LIMITS = {
 } as const;
 
 /** A builder copy (4E) writes what its built-in writes, for the sections it kept. */
-export function canWrite(t: string | ReportTemplateDef | null | undefined, sectionId: string): boolean {
-  const tpl = asTemplate(t);
+export function canWrite(tpl: ReportTemplateDef | null | undefined, sectionId: string): boolean {
   if (!tpl || !tpl.sections.some((s) => s.id === sectionId)) return false;
   return (AI_WRITE_SECTIONS[tpl.key] ?? AI_WRITE_SECTIONS[behaviourKey(tpl)] ?? []).includes(sectionId);
 }
@@ -130,8 +128,7 @@ export interface AiDraftRequest {
 
 /** Checks a request against the report's template before any model is
  *  asked. Returns the problem, or null. */
-export function checkAiRequest(t: string | ReportTemplateDef | null, body: Partial<AiDraftRequest>): string | null {
-  const tpl = asTemplate(t);
+export function checkAiRequest(tpl: ReportTemplateDef | null, body: Partial<AiDraftRequest>): string | null {
   if (!tpl) return "unknown_template";
   if (body.action !== "write" && body.action !== "tidy") return "bad_action";
   if (!body.section || !tpl.sections.some((s) => s.id === body.section)) return "bad_section";

@@ -89,16 +89,16 @@ import { fileURLToPath } from "node:url";
 import { stripComments } from "./lib/strip-comments";
 import { reportAccess, type ReportAccessFacts } from "../src/lib/reports/access";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, scoreAverage, tableSummary,
   type ReportDataValue,
 } from "../src/lib/reports/templates";
+import { REPORT_TEMPLATES, reportTemplate, sectionFamilies } from "../src/lib/reports/catalog";
 import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, LIVE_SOURCES, OFFICE_READS, OFFICE_SOURCES, TEAM_SOURCES, dataRowHref, dataTotals, decisionHref, isOfficeSource, isTeamSource, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
 import { entityHref } from "../src/lib/reports/link-targets";
 import { reportsT as mainWords } from "../src/lib/translations/reports";
 import { reportDescsT } from "../src/lib/translations/report-descs";
 import { reportBlocksT } from "../src/lib/translations/report-blocks";
 import { REPORT_SECTION_WORDS } from "../src/lib/translations/report-sections/all";
-import { sectionFamilies } from "../src/lib/translations/report-sections";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
 import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
@@ -392,7 +392,7 @@ console.log("\n§6 print pagination");
   })();
   const sheetCount: Record<string, number[]> = {};
   for (const [mName, m] of [["estimate", estimateMeasurer], ["measured", browserLike]] as const) for (const c of cases) {
-    const report = { templateKey: c.key, title: c.title, sections: normalizeSections(reportTemplate(c.key)!, c.sections) };
+    const report = { templateKey: c.key, tpl: reportTemplate(c.key), title: c.title, sections: normalizeSections(reportTemplate(c.key)!, c.sections) };
     const sheets = paginateReport(report, 3 * LINE_PX, m);
     (sheetCount[c.name] ??= []).push(sheets.length);
     const over = sheets.filter((s) => s.used > SHEET_PX).map((s) => s.used);
@@ -471,35 +471,35 @@ console.log("\n§8 carry-over and roll-ups");
     { id: "done", items: ["Old news"] },
   ]);
   const older = rep("o", "daily", "2026-09-22", [{ id: "tomorrow", items: ["Stale plan"] }]);
-  const dg = buildCarry("daily", today, [older, yesterday], me);
+  const dg = buildCarry(reportTemplate("daily")!, today, [older, yesterday], me, reportTemplate);
   eq(dg.map((x) => `${x.section}>${x.to.join("|")}`), ["tomorrow>done|pending", "pending>done|pending"], "a daily offers yesterday's plan, then yesterday's pending: done, or still pending?");
   eq(texts(dg), ["Call the forwarder", "Send the Yili quote", "Customs papers"], "only the latest earlier daily speaks, and a line its pending repeats is offered once");
   eq(dg[0].sources.map((x) => x.id), ["y"], "the card names the report the items came from");
-  eq(buildCarry("daily", today, [rep("far", "daily", "2026-09-14", [{ id: "tomorrow", items: ["Too old"] }])], me), [], "a daily more than 10 days back is not offered");
-  eq(buildCarry("daily", today, [rep("self", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Me"] }])], me), [], "a report never feeds itself");
-  eq(buildCarry("daily", today, [rep("same", "daily", "2026-09-25", [{ id: "tomorrow", items: ["Other version of today"] }])], me), [], "nor does another version of the same day");
-  eq(buildCarry("daily", today, [rep("later", "daily", "2026-09-26", [{ id: "tomorrow", items: ["Future"] }])], me), [], "a later daily is not an earlier one");
-  eq(texts(buildCarry("daily", today, [
+  eq(buildCarry(reportTemplate("daily")!, today, [rep("far", "daily", "2026-09-14", [{ id: "tomorrow", items: ["Too old"] }])], me, reportTemplate), [], "a daily more than 10 days back is not offered");
+  eq(buildCarry(reportTemplate("daily")!, today, [rep("self", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Me"] }])], me, reportTemplate), [], "a report never feeds itself");
+  eq(buildCarry(reportTemplate("daily")!, today, [rep("same", "daily", "2026-09-25", [{ id: "tomorrow", items: ["Other version of today"] }])], me, reportTemplate), [], "nor does another version of the same day");
+  eq(buildCarry(reportTemplate("daily")!, today, [rep("later", "daily", "2026-09-26", [{ id: "tomorrow", items: ["Future"] }])], me, reportTemplate), [], "a later daily is not an earlier one");
+  eq(texts(buildCarry(reportTemplate("daily")!, today, [
     rep("v1", "daily", "2026-09-24", [{ id: "tomorrow", items: ["From version 1"] }], { v: 1 }),
     rep("v2", "daily", "2026-09-24", [{ id: "tomorrow", items: ["From version 2"] }], { v: 2 }),
-  ], me)), ["From version 2"], "of two versions of one day (a sent one and its new draft), the newer speaks");
-  eq(buildCarry("daily", today, [rep("old", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Replaced"] }], { sup: true })], me), [], "a replaced version never speaks");
-  eq(texts(buildCarry("daily", today, [rep("junk", "daily", "2026-09-24", [{ id: "tomorrow", items: ["  ", 7, "Real"] }, { id: "tomorrow", text: 9 }])], me)), ["Real"], "blank and non-text lines in an old row are ignored");
+  ], me, reportTemplate)), ["From version 2"], "of two versions of one day (a sent one and its new draft), the newer speaks");
+  eq(buildCarry(reportTemplate("daily")!, today, [rep("old", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Replaced"] }], { sup: true })], me, reportTemplate), [], "a replaced version never speaks");
+  eq(texts(buildCarry(reportTemplate("daily")!, today, [rep("junk", "daily", "2026-09-24", [{ id: "tomorrow", items: ["  ", 7, "Real"] }, { id: "tomorrow", text: 9 }])], me, reportTemplate)), ["Real"], "blank and non-text lines in an old row are ignored");
 
   /* Monday's plan */
   const wk40 = periodFor("weekly", "2026-09-28");
   const lastWeekly = rep("w39", "weekly", "2026-09-21", [{ id: "next_week", items: ["Launch the catalogue", "Visit Ningbo"] }], { end: "2026-09-27", pk: "2026-W39" });
-  eq(texts(buildCarry("weekly_plan", wk40, [lastWeekly], { id: "self", periodKey: wk40.key })), ["Launch the catalogue", "Visit Ningbo"], "Monday's plan offers last week's 'next week' as this week's goals");
+  eq(texts(buildCarry(reportTemplate("weekly_plan")!, wk40, [lastWeekly], { id: "self", periodKey: wk40.key }, reportTemplate)), ["Launch the catalogue", "Visit Ningbo"], "Monday's plan offers last week's 'next week' as this week's goals");
 
   /* Friday's weekly */
   const wk39 = periodFor("weekly", "2026-09-25");
   const day = (d: string, secs: unknown) => rep(`d${d}`, "daily", `2026-09-${d}`, secs);
-  const wg = buildCarry("weekly", wk39, [
+  const wg = buildCarry(reportTemplate("weekly")!, wk39, [
     day("20", [{ id: "meetings", items: ["Last Sunday, outside the week"] }]),
     day("24", [{ id: "meetings", items: ["Call with Mr Chen"] }, { id: "done", items: ["Booked the container"] }, { id: "pending", items: ["Customs papers"] }, { id: "tomorrow", items: ["customs papers", "Pay the forwarder"] }]),
     day("21", [{ id: "meetings", items: ["Kick-off with the Cairo team"] }, { id: "done", items: ["Priced the Yili order"] }, { id: "pending", items: ["Monday pending"] }]),
     rep("plan", "weekly_plan", "2026-09-21", [{ id: "goals", items: ["Close the Yili order"] }], { end: "2026-09-27", pk: "2026-W39" }),
-  ], { id: "self", periodKey: wk39.key });
+  ], { id: "self", periodKey: wk39.key }, reportTemplate);
   const by = Object.fromEntries(wg.map((x) => [`${x.from}.${x.section}`, x]));
   eq(by["weekly_plan.goals"]?.items.map((i) => i.text), ["Close the Yili order"], "the weekly report opens with Monday's goals");
   eq(by["weekly_plan.goals"]?.to, ["summary", "next_week"], "a goal is either reached (the summary) or carried to next week");
@@ -511,23 +511,23 @@ console.log("\n§8 carry-over and roll-ups");
 
   /* the monthly */
   const sep = periodFor("monthly", "2026-09-30");
-  const mg = buildCarry("monthly", sep, [
+  const mg = buildCarry(reportTemplate("monthly")!, sep, [
     rep("w35", "weekly", "2026-08-24", [{ id: "summary", text: "August only" }], { end: "2026-08-30", pk: "2026-W35" }),
     rep("w36", "weekly", "2026-08-31", [{ id: "summary", text: "Crosses into September" }, { id: "projects", items: ["Catalogue 60%"] }], { end: "2026-09-06", pk: "2026-W36" }),
     rep("w39", "weekly", "2026-09-21", [{ id: "summary", text: "Shipped two containers.\nClosed Yili." }, { id: "decisions", items: ["Move to Aliyun"] }], { end: "2026-09-27", pk: "2026-W39" }),
-  ], { id: "self", periodKey: sep.key });
+  ], { id: "self", periodKey: sep.key }, reportTemplate);
   const mb = Object.fromEntries(mg.map((x) => [x.section, x]));
   eq(mb.summary?.items.map((i) => i.text), ["Crosses into September", "Shipped two containers.\nClosed Yili."], "the monthly gathers the month's weekly summaries (a week crossing into it counts), nothing from August");
   expect(!!mb.summary?.items.length && mb.summary.items.every((i) => i.paragraph), "a weekly summary comes as one whole paragraph");
   eq(mb.projects?.items.map((i) => i.text), ["Catalogue 60%"], "and the weeks' project lines");
   eq(mb.decisions?.to, ["summary", "improvements"], "a week's decision goes to the summary or to the plans");
-  eq(buildCarry("customer_visit", periodFor(null, "2026-09-25"), [lastWeekly], { id: "self" }), [], "a visit report starts blank");
+  eq(buildCarry(reportTemplate("customer_visit")!, periodFor(null, "2026-09-25"), [lastWeekly], { id: "self" }, reportTemplate), [], "a visit report starts blank");
 
   /* the one read */
-  eq(carryQueryRange("daily", today), { templates: ["daily"], from: "2026-09-15", to: "2026-09-25" }, "the daily reads 10 days back, in one query");
-  eq(carryQueryRange("weekly", wk39), { templates: ["weekly_plan", "daily"], from: "2026-09-15", to: "2026-09-27" }, "the weekly reads its week (and 6 days before, for a crossing period)");
-  eq(carryQueryRange("monthly", sep), { templates: ["weekly"], from: "2026-08-26", to: "2026-09-30" }, "the monthly reads from 6 days before the month");
-  eq(carryQueryRange("free", today), null, "a free report reads nothing");
+  eq(carryQueryRange(reportTemplate("daily")!, today), { templates: ["daily"], from: "2026-09-15", to: "2026-09-25" }, "the daily reads 10 days back, in one query");
+  eq(carryQueryRange(reportTemplate("weekly")!, wk39), { templates: ["weekly_plan", "daily"], from: "2026-09-15", to: "2026-09-27" }, "the weekly reads its week (and 6 days before, for a crossing period)");
+  eq(carryQueryRange(reportTemplate("monthly")!, sep), { templates: ["weekly"], from: "2026-08-26", to: "2026-09-30" }, "the monthly reads from 6 days before the month");
+  eq(carryQueryRange(reportTemplate("free")!, today), null, "a free report reads nothing");
 
   /* landing in a section */
   const item = { text: "Call the forwarder", paragraph: false, date: null };
@@ -603,7 +603,7 @@ console.log("\n§9 photos and files");
   ];
   for (const c of cases) {
     const att = { photos: Array.from({ length: c.photos }, (_, i) => photo(i)), files: Array.from({ length: c.files }, (_, i) => fileLine(i)) };
-    const sheets = paginateReport({ templateKey: c.key, title: "", sections: c.sections }, c.review, estimateMeasurer, att);
+    const sheets = paginateReport({ templateKey: c.key, tpl: reportTemplate(c.key), title: "", sections: c.sections }, c.review, estimateMeasurer, att);
     const cards = sheets.flatMap((sh) => sh.cards.filter((k) => k.sid === ATTACH_SID));
     const printedPhotos = cards.flatMap((k) => (k.photos ?? []).flat().map((p) => p.id));
     const printedFiles = cards.flatMap((k) => k.paras.map((p) => p.text));
@@ -617,7 +617,7 @@ console.log("\n§9 photos and files");
       `print, ${c.name}: ${sheets.length} sheet(s), every photo and file once and in order, rows of two, none past ${SHEET_PX}px, no empty card, the review last`,
       `over=${over} photos=${printedPhotos.join(",")} files=${printedFiles.length} hollow=${hollow} cont=${contOk}`);
   }
-  eq(paginateReport({ templateKey: "free", title: "", sections: normalizeSections(reportTemplate("free")!, [{ id: "body", text: "x" }]) }, 0).flatMap((sh) => sh.cards).some((k) => k.sid === ATTACH_SID), false, "a report without files prints no attachments card");
+  eq(paginateReport({ templateKey: "free", tpl: reportTemplate("free"), title: "", sections: normalizeSections(reportTemplate("free")!, [{ id: "body", text: "x" }]) }, 0).flatMap((sh) => sh.cards).some((k) => k.sid === ATTACH_SID), false, "a report without files prints no attachments card");
 }
 
 /* §9 (routes): the rules as the code states them. */
@@ -681,8 +681,8 @@ console.log("\n§10 fill from the apps");
   for (const src of APP_SOURCES) if (!reportsT[`feed.src.${src}`]) bad.push(`feed.src.${src}: no words`);
   expect(bad.length === 0, `${Object.keys(APP_RULES).length} report types fill from the apps; every rule points at real sections and has its words`, bad.join("; "));
   eq(Object.keys(APP_RULES).sort(), ["daily", "monthly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly and monthly fill from the apps; memos and visits start blank");
-  eq(feedSources("free"), [], "a free report reads no app");
-  eq(feedSources("monthly"), ["tasks", "quotations", "invoices", "orders"], "the monthly reads only what it can use");
+  eq(feedSources(reportTemplate("free")!), [], "a free report reads no app");
+  eq(feedSources(reportTemplate("monthly")!), ["tasks", "quotations", "invoices", "orders"], "the monthly reads only what it can use");
 
   /* The author's own day. Shanghai is UTC+8 (480), Cairo UTC+3 (180). */
   eq(localDay("2026-09-25T14:30:00.000Z", 480), "2026-09-25", "14:30 UTC is still the 25th in Shanghai");
@@ -729,11 +729,11 @@ console.log("\n§10 fill from the apps");
   eq(formatAppRecord(rec({ source: "crm", state: "scheduled", at: "2026-09-25T02:00:00.000Z", title: "Price review", who: "Nour Textiles", kind: "visit" }), fmt("en")).text, "Visit with Nour Textiles: Price review", "a customer visit reads with its customer");
   eq(formatAppRecord(rec({ source: "crm", state: "done", at: "2026-09-25T02:00:00.000Z", title: "Follow-up", who: "Nour", kind: "fax" }), fmt("en")).text, "Activity with Nour: Follow-up", "an activity type with no words reads as an activity");
 
-  const groups = buildFeedGroups("daily", day, [...recs, recs[3]], fmt("en"));
+  const groups = buildFeedGroups(reportTemplate("daily")!, day, [...recs, recs[3]], fmt("en"));
   eq(groups.map((g) => `${g.section}>${g.to.join("|")}`), ["meetings>meetings", "done>done", "open>pending", "tomorrow>tomorrow"], "a daily's lists land in its meetings, done, pending and tomorrow sections");
   eq(groups.find((g) => g.section === "done")?.items.length, 2, "a fact repeated in the feed is offered once");
   expect(groups.every((g) => g.app && g.items.every((i) => !i.paragraph && !!i.tag)), "every app suggestion is one line with its source tag");
-  eq(buildFeedGroups("customer_visit", day, recs, fmt("en")), [], "a visit report gets no app lists");
+  eq(buildFeedGroups(reportTemplate("customer_visit")!, day, recs, fmt("en")), [], "a visit report gets no app lists");
 
   /* The server's reads: the viewer's own, gated by each app's module. */
   const FEED = "src/lib/server/reports/app-feed.ts";
@@ -755,8 +755,8 @@ console.log("\n§10 fill from the apps");
   expect(APP_SOURCES.every((src) => new RegExp(`\\b${src}: "`).test(modules)), "every app source names the module that gates it", modules);
   expect(/neq\("status", "declined"\)/.test(code(read(FEED))), "a declined invitation is not the author's meeting");
   const nextWeek = rec({ source: "planning", state: "open", at: "2026-09-29T01:00:00.000Z", title: "Trade fair booth" });
-  eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).map((g) => g.section), ["meetings", "done", "next"], "a weekly gets the week's meetings, what was done, and next week");
-  eq(buildFeedGroups("weekly", periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).find((g) => g.section === "next")?.items.map((i) => i.text), ["Trade fair booth"], "next week holds only what falls in it (a due date on 05/10 is not next week's)");
+  eq(buildFeedGroups(reportTemplate("weekly")!, periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).map((g) => g.section), ["meetings", "done", "next"], "a weekly gets the week's meetings, what was done, and next week");
+  eq(buildFeedGroups(reportTemplate("weekly")!, periodFor("weekly", "2026-09-25"), [...recs, nextWeek], fmt("en")).find((g) => g.section === "next")?.items.map((i) => i.text), ["Trade fair booth"], "next week holds only what falls in it (a due date on 05/10 is not next week's)");
 }
 
 /* ── §11 Koleex AI + dictation ─────────────────────────────────────────── */
@@ -772,7 +772,7 @@ console.log("\n§11 Koleex AI and dictation");
     }
   }
   expect(bad.length === 0, "Koleex AI writes only real text sections", bad.join("; "));
-  expect(canWrite("weekly", "summary") && canWrite("monthly", "summary") && !canWrite("daily", "done") && !canWrite("free", "body"), "it writes the weekly and monthly summaries — everything else it only tidies");
+  expect(canWrite(reportTemplate("weekly"), "summary") && canWrite(reportTemplate("monthly"), "summary") && !canWrite(reportTemplate("daily"), "done") && !canWrite(reportTemplate("free"), "body"), "it writes the weekly and monthly summaries — everything else it only tidies");
 
   /* The language the author writes in, not the screen's. */
   eq(writingLang(["اليوم خلصنا عرض السعر وبعتناه للعميل"], "en"), "ar", "Arabic writing → an Arabic answer, even on an English screen");
@@ -796,14 +796,14 @@ console.log("\n§11 Koleex AI and dictation");
   eq(toSection("y".repeat(REPORT_LIMITS.text + 99), "text").length, REPORT_LIMITS.text, `a text answer is capped at ${REPORT_LIMITS.text} characters`);
 
   /* Refused before any model is asked. */
-  eq(checkAiRequest("weekly", { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a weekly summary with material goes");
-  eq(checkAiRequest("weekly", { action: "write", section: "summary", lang: "en", material: "   " }), "no_material", "nothing to write from → refused");
-  eq(checkAiRequest("daily", { action: "write", section: "done", lang: "en", material: "x" }), "not_writable", "\"write\" on a section it does not serve → refused");
-  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "ar", text: "النت فصل ساعتين والعميل ما ردش" }), null, "tidying a written section goes");
-  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "ar", text: "ok" }), "too_short", "tidying almost nothing → refused");
-  eq(checkAiRequest("daily", { action: "tidy", section: "nope", lang: "en", text: "x".repeat(40) }), "bad_section", "an unknown section → refused");
-  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "fr" as "en", text: "x".repeat(40) }), "bad_lang", "a language the Hub does not speak → refused");
-  eq(checkAiRequest("daily", { action: "tidy", section: "blockers", lang: "en", text: "x".repeat(AI_LIMITS.tidy + 1) }), "too_long", "more than a section → refused");
+  eq(checkAiRequest(reportTemplate("weekly"), { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a weekly summary with material goes");
+  eq(checkAiRequest(reportTemplate("weekly"), { action: "write", section: "summary", lang: "en", material: "   " }), "no_material", "nothing to write from → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "write", section: "done", lang: "en", material: "x" }), "not_writable", "\"write\" on a section it does not serve → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "ar", text: "النت فصل ساعتين والعميل ما ردش" }), null, "tidying a written section goes");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "ar", text: "ok" }), "too_short", "tidying almost nothing → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "nope", lang: "en", text: "x".repeat(40) }), "bad_section", "an unknown section → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "fr" as "en", text: "x".repeat(40) }), "bad_lang", "a language the Hub does not speak → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "en", text: "x".repeat(AI_LIMITS.tidy + 1) }), "too_long", "more than a section → refused");
 
   /* The route, as its code states it. */
   const AI = "src/app/api/work-reports/[id]/ai/route.ts";
@@ -1347,13 +1347,13 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
   eq(reportLinks([{ id: "a", links: [{ type: "supplier", id: "s1", label: "A" }] }, { id: "b", links: [{ type: "supplier", id: "s1", label: "A" }, { type: "product", id: "p1", label: "P" }] }]).length, 2, "a record linked twice counts once");
 
   /* Printing. */
-  const pr = printParagraphs({ templateKey: "factory_audit", title: "", sections: [
+  const pr = printParagraphs({ templateKey: "factory_audit", tpl: reportTemplate("factory_audit"), title: "", sections: [
     { id: "checks", checks: { licence: { state: "ok" }, samples: { state: "issue", note: "colour off" } } },
     { id: "rating", scores: { quality: 4 } },
   ] }, (k) => (reportsT[k]?.en as string | undefined) ?? k);
   eq(pr.find((x) => x.sid === "checks")!.paras.map((x) => x.text), ["✓ Business licence and certificates", "✗ Samples match the specification — colour off"], "a checklist prints answered points with their mark and note");
   eq(pr.find((x) => x.sid === "rating")!.paras.map((x) => x.text), ["Quality: 4 / 5", "Overall: 4 / 5"], "a score prints each criterion and the overall");
-  const signed = paginateReport({ templateKey: "installation", title: "", sections: [{ id: "customer_sign", signature: { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00.000Z", version: 1 } }] }, 0);
+  const signed = paginateReport({ templateKey: "installation", tpl: reportTemplate("installation"), title: "", sections: [{ id: "customer_sign", signature: { file: U2, name: "Mr. Li", at: "2026-09-25T08:00:00.000Z", version: 1 } }] }, 0);
   expect(signed.flatMap((sh) => sh.cards).some((c) => c.signature?.file === U2), "a signature prints in its own box");
 
   /* The words. */
@@ -1392,7 +1392,7 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (c) => (/from\("products"\)\.select\("id, product_name, brand"\)\.eq\("status", "active"\)/.test(c) ? [] : ["drafts and retired products can be linked"]),
     (src) => src.replace('.eq("status", "active")', ""));
   rule("a report opens once its blocks' code and its own words are here — the page lays out once", "src/components/reports/app/ReportView.tsx",
-    (c) => { const m = /const \[mod, own, descs\] = await Promise\.all\(\[\s*hasBlocks\(typeOf\(res\.data\)\) \? import\("\.\/ReportBlocks"\) : Promise\.resolve\(null\),\s*loadReportWords\(key, res\.data\.template\),\s*res\.data\.can\.edit \? import\("@\/lib\/translations\/report-descs"\) : Promise\.resolve\(null\),\s*\]\);/.exec(c); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return m && b > m.index ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
+    (c) => { const m = /const \[mod, own, descs\] = await Promise\.all\(\[\s*hasBlocks\(typeOf\(res\.data\)\) \? import\("\.\/ReportBlocks"\) : Promise\.resolve\(null\),\s*loadReportWords\(res\.data\.wordFamilies \?\? \[\], res\.data\.template\?\.words \? \{ words: res\.data\.template\.words \} : undefined\),\s*res\.data\.can\.edit \? import\("@\/lib\/translations\/report-descs"\) : Promise\.resolve\(null\),\s*\]\);/.exec(c); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return m && b > m.index ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
     (src) => src.replace("const [mod, own, descs] = await Promise.all([", "const [mod, own, descs] = [null, {}, null] as const; void Promise.all(["));
   rule("the card on other apps' pages carries no Reports dictionary and asks only once the page is quiet", "src/components/reports/ReportsAboutCard.tsx",
     (c) => (!/translations\/reports/.test(c) && /whenNetworkQuiet\(/.test(c) && /if \(res\.status === 401 \|\| res\.status === 403\) \{ setHidden\(true\); return; \}/.test(c) ? [] : ["the card is heavy, early, or shows outside Reports"]),
@@ -1498,7 +1498,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   expect(!!lost.sections.find((x) => x.id === "link")?.linkTypes?.includes("quotation") && !!complaint.sections.find((x) => x.id === "link")?.linkTypes?.includes("invoice"), "a lost deal links its quotation, a complaint its invoice");
 
   /* Printing */
-  const pr = printParagraphs({ templateKey: "quote_followup", title: "", sections: [
+  const pr = printParagraphs({ templateKey: "quote_followup", tpl: reportTemplate("quote_followup"), title: "", sections: [
     { id: "waiting", data: { source: "quotes_waiting", capturedAt: "2026-09-25T08:00:00Z", rows: [
       { key: U3, currency: "USD", cells: { no: "KL-QU-1", customer: "Acme", sent: "2026-09-01", days: 24, amount: 1000, valid: "2026-10-01" } },
       { key: U4, currency: "USD", cells: { no: "KL-QU-2", customer: "Beta", sent: "2026-09-20", days: 5, amount: 500, valid: null } },
@@ -1508,8 +1508,8 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
   eq(lines.slice(0, 4), ["No. · Customer · Sent · Days waiting · Amount · Valid until", "KL-QU-1 · Acme · 01/09/2026 · 24 · 1,000 USD · 01/10/2026 — call Monday", "KL-QU-2 · Beta · 20/09/2026 · 5 · 500 USD · —", "Total Amount: 1,500 USD"],
     "a numbers block prints its heads, one line per document with the author's note, and the total per currency");
   expect(/^As of \d{2}\/09\/2026 \d{2}:\d{2}$/.test(lines[4] ?? ""), "…and the moment the numbers were taken", lines[4]);
-  eq(printParagraphs({ templateKey: "complaint", title: "", sections: [{ id: "severity", choice: "high" }] }, en).find((x) => x.sid === "severity")!.paras.map((x) => x.text), ["High"], "a choice prints its answer");
-  eq(printParagraphs({ templateKey: "collection", title: "", sections: [{ id: "receivables", data: { source: "receivables", capturedAt: "2026-09-25T08:00:00Z", rows: [], denied: true } }] }, en).find((x) => x.sid === "receivables")!.paras.map((x) => x.text),
+  eq(printParagraphs({ templateKey: "complaint", tpl: reportTemplate("complaint"), title: "", sections: [{ id: "severity", choice: "high" }] }, en).find((x) => x.sid === "severity")!.paras.map((x) => x.text), ["High"], "a choice prints its answer");
+  eq(printParagraphs({ templateKey: "collection", tpl: reportTemplate("collection"), title: "", sections: [{ id: "receivables", data: { source: "receivables", capturedAt: "2026-09-25T08:00:00Z", rows: [], denied: true } }] }, en).find((x) => x.sid === "receivables")!.paras.map((x) => x.text),
     ["These numbers come from Invoices, which you don't have."], "a block its author could not read says so, empty");
 
   /* The words */
@@ -1600,7 +1600,7 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   ] };
   eq(dataTotals(late), [{ col: "amount", currency: "CNY", value: 70000 }, { col: "amount", currency: "USD", value: 900 }], "late orders total each currency apart");
   const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? k;
-  const pl = printParagraphs({ templateKey: "late_pos", title: "", sections: [{ id: "late", data: late, notes: { [U5]: "new date 5 Oct" } }] }, en).find((x) => x.sid === "late")!.paras.map((x) => x.text);
+  const pl = printParagraphs({ templateKey: "late_pos", tpl: reportTemplate("late_pos"), title: "", sections: [{ id: "late", data: late, notes: { [U5]: "new date 5 Oct" } }] }, en).find((x) => x.sid === "late")!.paras.map((x) => x.text);
   eq(pl.slice(0, 2), ["No. · Supplier · Expected · Days late · Amount · Status", "PO-1 · Yili · 20/09/2026 · 5 · 70,000 CNY · Confirmed — new date 5 Oct"], "a late order prints with its supplier, days late, amount and the author's note");
 
   eq([statusWordKey("pos_late", "partial"), statusWordKey("receipts", "partial"), statusWordKey("payables", "partial"), statusWordKey("invoices", "partial"), statusWordKey("quotations", "made-up")],
@@ -1675,8 +1675,8 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   const leak = allFiles("src").filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("src/app/api/") && !f.startsWith("src/lib/server/") && !f.startsWith("src/lib/translations/report-sections/") && read(f).includes("report-sections/all"));
   expect(leak.length === 0, "no page imports every family's words — only the server does", leak.join(", "));
   rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
-    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.report.templateKey, res.data.template);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
-    (src) => src.replace("own = await loadReportWords(res.data.report.templateKey, res.data.template);", "own = {};"));
+    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
+    (src) => src.replace("own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined);", "own = {};"));
 }
 
 /* ── §19 logistics, after-sales, travel (Phase 4D) ────────────────────── */
@@ -1700,7 +1700,7 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
   eq([DATA_MODULE.expenses, dataRowHref("expenses", "x"), DATA_COLUMNS.expenses.map((c) => c.id)], ["Expenses", "/finance/expenses", ["title", "category", "date", "amount", "status"]], "a trip's expenses come from the Expenses app, named by their title, and open its list");
   expect(reportTemplate("trip_report")!.sections.some((s) => s.kind === "data" && s.source === "expenses"), "the trip report carries the author's own expenses");
   const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? k;
-  const trip = printParagraphs({ templateKey: "trip_report", title: "", sections: [{ id: "expenses", data: { source: "expenses", capturedAt: "2026-09-25T08:00:00Z", rows: [
+  const trip = printParagraphs({ templateKey: "trip_report", tpl: reportTemplate("trip_report"), title: "", sections: [{ id: "expenses", data: { source: "expenses", capturedAt: "2026-09-25T08:00:00Z", rows: [
     { key: "a", currency: "USD", cells: { title: "Hotel Cairo", category: "Travel", date: "2026-09-12", amount: 240, status: "approved" } },
     { key: "b", currency: "USD", cells: { title: "Taxi", category: "Travel", date: "2026-09-13", amount: 18.5, status: "submitted" } },
   ] } }] }, en).find((x) => x.sid === "expenses")!.paras.map((x) => x.text);
@@ -1821,14 +1821,14 @@ console.log("\n§20 the template builder");
   const dailyCopy = asReportTemplate("c-dailycopy1", copyOfBuiltin("daily", dict)!.def, 1);
   const weeklyCopy = asReportTemplate("c-weeklycop", copyOfBuiltin("weekly", dict)!.def, 1);
   eq(carryRulesFor(dailyCopy).map((x) => x.from), ["c-dailycopy1", "c-dailycopy1"], "a copy of the daily carries from its OWN earlier reports (yesterday's copy), not the built-in's");
-  eq(carryRulesFor(weeklyCopy).map((x) => x.from), carryRulesFor("weekly").map((x) => x.from), "a copy of the weekly still gathers the week's weekly plan and dailies");
+  eq(carryRulesFor(weeklyCopy).map((x) => x.from), carryRulesFor(reportTemplate("weekly")).map((x) => x.from), "a copy of the weekly still gathers the week's weekly plan and dailies");
   const today = periodFor("daily", "2026-09-25");
   const yCopy = { id: "y1", template_key: "c-dailycopy1", period_start: "2026-09-24", period_end: "2026-09-24", period_key: "2026-09-24", sections: [{ id: "tomorrow", items: ["Call Cairo"] }] };
   const yBuilt = { ...yCopy, id: "y2", template_key: "daily", sections: [{ id: "tomorrow", items: ["Not mine"] }] };
-  eq(buildCarry(dailyCopy, today, [yCopy, yBuilt], { id: "self" }).flatMap((g) => g.items.map((i) => i.text)), ["Call Cairo"], "yesterday's copy feeds today's copy; the built-in daily does not");
-  eq(buildCarry(asReportTemplate("c-scratch001", good.def, 1), today, [yCopy], { id: "self" }), [], "a type made from nothing carries nothing");
-  eq(appRulesFor(weeklyCopy).length, appRulesFor("weekly").length, "a copy fills from the apps like its built-in");
-  eq(feedSources(dailyCopy), feedSources("daily"), "and reads the same apps");
+  eq(buildCarry(dailyCopy, today, [yCopy, yBuilt], { id: "self" }, reportTemplate).flatMap((g) => g.items.map((i) => i.text)), ["Call Cairo"], "yesterday's copy feeds today's copy; the built-in daily does not");
+  eq(buildCarry(asReportTemplate("c-scratch001", good.def, 1), today, [yCopy], { id: "self" }, reportTemplate), [], "a type made from nothing carries nothing");
+  eq(appRulesFor(weeklyCopy).length, appRulesFor(reportTemplate("weekly")).length, "a copy fills from the apps like its built-in");
+  eq(feedSources(dailyCopy), feedSources(reportTemplate("daily")!), "and reads the same apps");
   const noSummary = { ...weeklyCopy, sections: weeklyCopy.sections.filter((x) => x.id !== "summary") };
   expect(canWrite(weeklyCopy, "summary") && !canWrite(noSummary, "summary") && !canWrite(asReportTemplate("c-scratch001", good.def, 1), "a"), "Koleex AI writes a copy's summary like the weekly's — only while the copy keeps it");
   eq(checkAiRequest(weeklyCopy, { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a write on a copy's summary is accepted");
@@ -1901,8 +1901,8 @@ console.log("\n§20 the template builder");
       (src) => src.replace(/templateOf\((row|r)\)/, "reportTemplate($1.template_key)"));
   }
   rule("a report's page gets its builder type whole, its words already worded", `${API}/[id]/route.ts`,
-    (c) => (c.includes("template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,") ? [] : ["the page cannot draw a builder report"]),
-    (src) => src.replace("template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,", ""));
+    (c) => (c.includes("template: def ? (def.custom && snap ? { def, words: templateWords(row.template_key, snap.words) } : { def }) : undefined,") ? [] : ["the page cannot draw a builder report"]),
+    (src) => src.replace("template: def ? (def.custom && snap ? { def, words: templateWords(row.template_key, snap.words) } : { def }) : undefined,", ""));
   rule("a report's copy of its type is read with the report; a list brings only its head", "src/lib/server/reports/core.ts",
     (c) => { const full = /export const REPORT_COLS =\s*"([^"]+)"/.exec(c)?.[1] ?? ""; const slim = /export const REPORT_LIST_COLS =\s*"([^"]+)"/.exec(c)?.[1] ?? ""; return full.includes("template_snapshot") && slim.includes("tpl_head:template_snapshot->head") && !/template_snapshot(,|$)/.test(slim) ? [] : ["the snapshot is missing, or a list carries it whole"]; },
     (src) => src.replace("tpl_head:template_snapshot->head", "template_snapshot"));
@@ -1932,7 +1932,7 @@ console.log("\n§20 the template builder");
   const heavy = pages.filter((f) => /reports\/custom-templates"|translations\/report-builder"|from "\.\/TemplatesTab"/.test(code(read(f))));
   expect(heavy.length === 0, "no report page carries the builder's rules or words — only the small word helpers", heavy.join(", "));
   rule("the composer and the reader take the type from the report", "src/components/reports/app/ReportView.tsx",
-    (c) => (c.includes("const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? reportTemplate(d.report.templateKey);") && (c.match(/reportTemplate\(/g) ?? []).length === 1 ? [] : ["a builder report is drawn from a type looked up by key"]),
+    (c) => (c.includes("const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? null;") && !/reportTemplate\(/.test(c) ? [] : ["a report is drawn from a type looked up by key"]),
     (src) => src.replace("const tpl = typeOf(detail);", "const tpl = reportTemplate(detail.report.templateKey);"));
 
   /* The migration */
@@ -2028,7 +2028,7 @@ console.log("\n§21 the manager and the team");
 
   /* Koleex AI writes a team summary from the server's material */
   expect(serverMaterial(ts) && !serverMaterial(reportTemplate("weekly")) && canWrite(ts, "summary") && !canWrite(ts, "next"), "a team summary's Summary is written from what the SERVER reads, nothing the page sends");
-  eq([checkAiRequest(ts, { action: "write", section: "summary", lang: "ar" }), checkAiRequest("weekly", { action: "write", section: "summary", lang: "ar" })], [null, "no_material"], "a team write needs no material from the page; any other write still does");
+  eq([checkAiRequest(ts, { action: "write", section: "summary", lang: "ar" }), checkAiRequest(reportTemplate("weekly"), { action: "write", section: "summary", lang: "ar" })], [null, "no_material"], "a team write needs no material from the page; any other write still does");
 
   /* The words of the Team tab */
   const tabSrc = code(read("src/components/reports/app/TeamSummary.tsx"));
@@ -2295,6 +2295,70 @@ console.log("\n§22 the CEO office (Phase 5B)");
   rule("the builder's list knows an office-only type", "src/lib/server/reports/custom-templates.ts",
     (c) => (c.includes("office_only:def->officeOnly") && c.includes('officeOnly: r.office_only === true || r.office_only === "true",') ? [] : ["a builder type loses its office flag in the list"]),
     (src) => src.replace('    officeOnly: r.office_only === true || r.office_only === "true",\n', ""));
+}
+
+/* ── §23 the report page carries no catalog (Phase 5C, step 0) ───────── */
+console.log("\n§23 the report page carries no catalog (Phase 5C)");
+{
+  /* Every built-in's sections live in src/lib/reports/catalog.ts. The report
+     page (/reports/[id]) and its print get their own type WITH the report
+     (GET …/[id] → template.def + wordFamilies), so neither may reach the
+     catalog through any import, however indirect — walked, not listed, so a
+     new helper cannot bring it back unseen. */
+  const SRC = path.join(ROOT, "src");
+  const resolveImport = (from: string, spec: string): string | null => {
+    let base: string;
+    if (spec.startsWith("@/")) base = path.join(SRC, spec.slice(2));
+    else if (spec.startsWith(".")) base = path.resolve(path.dirname(from), spec);
+    else return null;
+    for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+      const f = base + ext;
+      if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+    }
+    return null;
+  };
+  /* `virtual`: a file's content as a probe wants it — the shared tree is
+     never written to prove a check bites (another session could commit it). */
+  const graph = (entries: string[], virtual: Map<string, string> = new Map()): Set<string> => {
+    const seen = new Set<string>();
+    const todo = entries.map((e) => path.join(ROOT, e));
+    while (todo.length) {
+      const f = todo.pop()!;
+      if (seen.has(f)) continue;
+      seen.add(f);
+      const src = code(virtual.get(f) ?? fs.readFileSync(f, "utf8"));
+      /* Type-only imports are erased — they carry nothing into the bundle. */
+      for (const m of src.matchAll(/(?:^|\n)\s*import\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|(?:^|\n)\s*export\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']/g)) {
+        const spec = m[1] ?? m[2] ?? m[3];
+        const r = spec ? resolveImport(f, spec) : null;
+        if (r && !seen.has(r)) todo.push(r);
+      }
+    }
+    return seen;
+  };
+  const CATALOG = path.join(ROOT, "src/lib/reports/catalog.ts");
+  const pageGraph = graph(["src/app/reports/[id]/page.tsx", "src/components/reports/app/ReportView.tsx", "src/app/reports/[id]/print/page.tsx"]);
+  expect(pageGraph.size > 20, `the walk reaches the page's modules (${pageGraph.size} files)`);
+  expect(!pageGraph.has(CATALOG), "the report page and its print never import the catalog of types, at any depth",
+    [...pageGraph].filter((f) => f === CATALOG).join(", "));
+  /* …and the walk would see it: a catalog import in a file the page reaches
+     (in memory only) is found. */
+  {
+    const probeFile = path.join(ROOT, "src/components/reports/app/CarryCard.tsx");
+    const probed = new Map([[probeFile, `import { REPORT_TEMPLATES } from "@/lib/reports/catalog";\nvoid REPORT_TEMPLATES;\n${fs.readFileSync(probeFile, "utf8")}`]]);
+    expect(graph(["src/components/reports/app/ReportView.tsx"], probed).has(CATALOG), "…and a catalog import in a file the page reaches would be caught");
+  }
+  expect(!/export const REPORT_TEMPLATES/.test(code(read("src/lib/reports/templates.ts"))), "the engine file keeps the types and helpers only — the catalog moved out");
+  const homeGraph = graph(["src/components/reports/app/ReportsApp.tsx"]);
+  expect(homeGraph.has(CATALOG), "the Reports home still names every type from the catalog (the write list, the rows)");
+  rule("a report comes with the families of its words", `src/app/api/work-reports/[id]/route.ts`,
+    (c) => (c.includes("const wordFamilies = sectionFamilies(def?.base ?? row.template_key);") && /\n\s+wordFamilies,\n/.test(c) ? [] : ["the page cannot find its words without the catalog"]),
+    (src) => src.replace("const wordFamilies = sectionFamilies(def?.base ?? row.template_key);", "const wordFamilies: string[] = [];"));
+  rule("an earlier report's cadence rides its carry group — the card looks nothing up", "src/lib/reports/carry.ts",
+    (c) => (c.includes("cadence: src?.cadence ?? null") ? [] : ["the card must know every type's cadence"]),
+    (src) => src.replace("cadence: src?.cadence ?? null", "cadence: null"));
+  const dg5 = buildCarry(reportTemplate("daily")!, periodFor("daily", "2026-09-25"), [{ id: "y", template_key: "daily", period_start: "2026-09-24", period_end: "2026-09-24", period_key: "2026-09-24", sections: [{ id: "tomorrow", items: ["Call Cairo"] }], version: 1, superseded: false }], { id: "me", periodKey: "2026-09-25" }, reportTemplate);
+  eq(dg5.map((g) => g.cadence), ["daily"], "yesterday's daily is dated by its day — the group says it is a daily");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

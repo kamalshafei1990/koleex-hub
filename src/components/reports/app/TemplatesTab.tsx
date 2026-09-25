@@ -28,9 +28,10 @@ import type { Lang } from "@/lib/i18n";
 import { reportBuilderT } from "@/lib/translations/report-builder";
 import { reportBlocksT } from "@/lib/translations/report-blocks";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES, REPORT_TEMPLATES,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
   type ReportColumnType, type ReportDataSource, type ReportFamily, type ReportLinkType, type ReportSectionDef, type ReportSectionKind,
 } from "@/lib/reports/templates";
+import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
 import {
   BUILDER_LIMITS, ICON_CHOICES, SECTION_KINDS, UNHIDEABLE, checkTemplate, copyableBuiltin, hideableBuiltin, newSectionId, nextId, wordSlots, type CustomDef,
 } from "@/lib/reports/custom-templates";

@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
-import { REPORT_TEMPLATES } from "@/lib/reports/templates";
+import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
 import { OFFICE_MODULE } from "@/lib/reports/report-data";
 import { loadMyDue } from "@/lib/server/reports/obligations";
 import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";

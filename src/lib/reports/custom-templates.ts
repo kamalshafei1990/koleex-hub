@@ -29,10 +29,11 @@ import type { Lang, Translations } from "@/lib/i18n";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { isCustomKey, isWritten, type TemplateHead, type TemplateWords, type Word } from "./template-words";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES, REPORT_TEMPLATES, reportTemplate,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
   type ReportCadence, type ReportColumnType, type ReportDataSource, type ReportDefaultRecipients, type ReportFamily,
   type ReportLinkType, type ReportSectionDef, type ReportSectionKind, type ReportTemplateDef,
 } from "./templates";
+import { REPORT_TEMPLATES, reportTemplate } from "./catalog";
 
 export { CUSTOM_KEY, isCustomKey, pickWord, templateWords, headWords } from "./template-words";
 export type { Word, TemplateWords, TemplateHead } from "./template-words";

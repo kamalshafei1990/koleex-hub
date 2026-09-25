@@ -36,7 +36,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
 import { BACK_CHROME } from "@/components/ui/back-chrome";
 import {
-  REPORT_LIMITS, blockFileIds, missingSections, periodFor, rangeEnd, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
+  REPORT_LIMITS, blockFileIds, missingSections, periodFor, rangeEnd, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
 } from "@/lib/reports/templates";
 import { carryRulesFor, type CarryGroup } from "@/lib/reports/carry";
 import { appRulesFor, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
@@ -60,9 +60,10 @@ import { dictationSupported, useDictation } from "@/components/ai/useDictation";
 type BlocksModule = typeof import("./ReportBlocks");
 const isBlock = (kind: ReportSectionKind) => kind !== "text" && kind !== "list";
 const hasBlocks = (tpl: ReportTemplateDef | null) => !!tpl?.sections.some((x) => isBlock(x.kind));
-/** The report's own type: a built-in by its key, or a builder type (4E) as
- *  the report was started with it — it comes with the report. */
-const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? reportTemplate(d.report.templateKey);
+/** The report's own type — it comes WITH the report (a built-in's
+ *  definition, or a builder type as the report was started with it), so
+ *  this page never carries the catalog of every type (5C). */
+const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? null;
 
 export default function ReportView({ id }: { id: string }) {
   const [sectionWords, setSectionWords] = useState<Translations | null>(null);
@@ -75,14 +76,13 @@ export default function ReportView({ id }: { id: string }) {
   const load = useCallback(async () => {
     const res = await fetchReport(id);
     if (res.ok) {
-      const key = res.data.report.templateKey;
       try {
         /* A built-in type's one-line description (5B) shows only in a
            draft's header — its own chunk, asked for with the words; the
            blocks' own words come with the blocks' code. */
         const [mod, own, descs] = await Promise.all([
           hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null),
-          loadReportWords(key, res.data.template),
+          loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined),
           res.data.can.edit ? import("@/lib/translations/report-descs") : Promise.resolve(null),
         ]);
         if (mod) setBlocks(() => mod);
@@ -380,7 +380,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-3">
         <header className={`${CARD} flex flex-wrap items-center gap-3 p-4`}>
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={tpl.key} icon={tpl.icon} size={16} /></span>
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon icon={tpl.icon} size={16} /></span>
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] font-semibold text-[var(--text-primary)]">{tplName(t, tpl.key)}</h1>
             <p className="text-[12px] text-[var(--text-dim)]">{t(`tpl.${tpl.key}.desc`)}</p>
@@ -681,7 +681,7 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
       <article className="min-w-0 space-y-3">
         <header className={`${CARD} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon templateKey={report.templateKey} icon={tpl?.icon} size={16} /></span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#567FB2]/12 text-[#9DBCE0]"><TemplateIcon icon={tpl?.icon} size={16} /></span>
             <div className="min-w-0 flex-1">
               <h1 className="text-[17px] font-semibold leading-snug text-[var(--text-primary)]">
                 {report.title.trim() ? <AutoTranslatedText text={report.title} plain /> : tplName(t, report.templateKey)}

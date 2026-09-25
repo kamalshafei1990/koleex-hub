@@ -33,7 +33,7 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
       /* The report's own section words (Phase 4C) — a builder type's (4E)
          come with it — before the sheets are laid out. */
       let own: Translations;
-      try { own = await loadReportWords(res.data.report.templateKey, res.data.template); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
+      try { own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
       if (!cancelled) setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } });
     });
     return () => { cancelled = true; };

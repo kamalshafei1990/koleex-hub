@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
-import { blockFileIds, reportTemplate } from "@/lib/reports/templates";
+import { blockFileIds } from "@/lib/reports/templates";
 import { withBlockData } from "@/lib/reports/report-data";
 import {
   ATTACH_SID, LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, PHOTO_BOX_PX, PHOTO_CAPTION_PX, PHOTO_ROW_GAP_PX, PHOTO_ROW_PX, SIGN_BOX_PX, SIGN_PX, cutByHeight, paginateReport,
@@ -82,7 +82,8 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
   /* A draft's numbers blocks (4B) as the server computed them just now; a
      sent report carries them frozen in its sections. */
   /* A builder type (4E) comes with its report, as the report was started with it. */
-  const tpl = detail.template?.def ?? reportTemplate(detail.report.templateKey);
+  /* The type comes with the report (5C: the print carries no catalog). */
+  const tpl = detail.template?.def ?? null;
   const report = useMemo(() => ({ ...detail.report, sections: withBlockData(detail.report.sections, detail.blockData), tpl }), [detail.report, detail.blockData, tpl]);
   const decision = report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
   const note = decision?.body.trim() ?? "";

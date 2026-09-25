@@ -29,6 +29,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { REPORT_LIMITS, normalizeSections, periodFor, rangeEnd, reportLinks, type ReportSectionValue } from "@/lib/reports/templates";
 import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
+import { sectionFamilies } from "@/lib/reports/catalog";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
@@ -89,9 +90,12 @@ export async function GET(req: Request, { params }: Params) {
      waits for THIS viewer, read now — never what the author's queue held. */
   const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};
   const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;
-  /* A builder type (4E): the version this report was started with. */
+  /* The report's own type goes WITH it (5C: the page carries no catalog):
+     a built-in's definition, or a builder type (4E) as this report was
+     started with it, and the families whose words the page loads. */
   const snap = row.template_snapshot ? readSnapshot(row.template_snapshot) : null;
-  const custom = snap ? templateOf(row) : null;
+  const def = templateOf(row);
+  const wordFamilies = sectionFamilies(def?.base ?? row.template_key);
 
   return NextResponse.json({
     report: {
@@ -120,7 +124,8 @@ export async function GET(req: Request, { params }: Params) {
     appFeed,
     blockData,
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(toClientAttachment),
-    template: custom && snap ? { def: custom, words: templateWords(row.template_key, snap.words) } : undefined,
+    template: def ? (def.custom && snap ? { def, words: templateWords(row.template_key, snap.words) } : { def }) : undefined,
+    wordFamilies,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 

@@ -38,7 +38,7 @@ import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/tod
 import { logPrivateCalendarReads } from "@/lib/server/calendar-access";
 import { accountTimezone, accountTimezones } from "@/lib/server/calendar-notify";
 import { loadDeadlines, loadRequestDeadlines } from "@/lib/server/reports/obligations";
-import { reportTemplate } from "@/lib/reports/templates";
+import { reportTemplate } from "@/lib/reports/catalog";
 import { reportsT } from "@/lib/translations/reports";
 import { HUB, STATUS } from "@/components/kds/colors";
 import type { CalendarAttendeeStatus } from "@/types/supabase";

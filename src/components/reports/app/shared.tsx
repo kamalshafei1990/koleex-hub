@@ -2,21 +2,17 @@
 
 /* ---------------------------------------------------------------------------
    Reports app — the small pieces every screen shares: the status chip, the
-   badges, a person's avatar, and one report row for any list.
+   badges, a person's avatar, a type's icon. (One report row for any list is
+   ./ReportRowItem — it reads the catalog, which the report page must not.)
 
    Colours come from the Hub tokens only, so the same markup reads as flat
    Core or as Aurora glass inside the segment's `kx-app` scope. Semantic
    colour (sent / approved / returned) is kept apart from the accent.
    --------------------------------------------------------------------------- */
 
-import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
-import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
-import { reportTemplate } from "@/lib/reports/templates";
-import { pickWord } from "@/lib/reports/template-words";
-import type { Lang } from "@/lib/i18n";
 import type { RrIconName } from "@/components/ui/RrIcon";
-import { dmyDate, periodLabel, type ReportListRow, type ReportPerson, type ReportStatus } from "@/lib/work-reports";
+import type { ReportPerson, ReportStatus } from "@/lib/work-reports";
 import { initialsOf } from "@/lib/discuss/initials";
 
 export type T = (key: string, fallback?: string) => string;
@@ -65,46 +61,9 @@ export function Avatar({ person, size = 28 }: { person: Pick<ReportPerson, "name
   );
 }
 
-/** `icon`: a builder type's own (4E) — a built-in's comes from its key. */
-export function TemplateIcon({ templateKey, icon, size = 14 }: { templateKey: string; icon?: RrIconName; size?: number }) {
-  return <RrIcon name={icon ?? reportTemplate(templateKey)?.icon ?? "document"} size={size} />;
-}
-
-/** One report in any list: who, what, which period, and its state. A
- *  builder type (4E) is named as the report was started with it. */
-export function ReportRowItem({ r, t, lang, showAuthor = true }: { r: ReportListRow; t: T; lang: string; showAuthor?: boolean }) {
-  const unread = !!r.myRole && !r.readAt;
-  const builtin = reportTemplate(r.templateKey);
-  const tpl = builtin ?? (r.tpl ? { cadence: r.tpl.cadence, urgent: r.tpl.urgent } : null);
-  const typeName = !builtin && r.tpl ? pickWord(r.tpl.name, lang as Lang) || tplName(t, r.templateKey) : tplName(t, r.templateKey);
-  return (
-    <li>
-      <Link
-        href={`/reports/${r.id}`}
-        className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--bg-surface-subtle)] focus-visible:bg-[var(--bg-surface-subtle)] focus-visible:outline-none"
-      >
-        <Avatar person={{ name: showAuthor ? r.authorName : typeName, avatar: null }} />
-        <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-1.5">
-            {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-[#567FB2]" aria-label={t("badge.unread")} />}
-            <span className={`truncate text-[13px] ${unread ? "font-semibold text-[var(--text-primary)]" : "font-medium text-[var(--text-primary)]"}`}>
-              {r.title?.trim() ? <AutoTranslatedText text={r.title} plain /> : typeName}
-            </span>
-          </span>
-          <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-[var(--text-dim)]">
-            <span className="inline-flex items-center gap-1"><TemplateIcon templateKey={r.templateKey} icon={builtin ? undefined : r.tpl?.icon} size={11} />{typeName}</span>
-            {showAuthor && <span className="truncate">· {r.authorName}</span>}
-            <span className="tabular-nums">· {tpl?.cadence ? periodLabel(r.periodStart, r.periodEnd) : dmyDate(r.submittedAt ?? r.updatedAt)}</span>
-            {r.version > 1 && <span className="tabular-nums">· {t("badge.version")} {r.version}</span>}
-          </span>
-        </span>
-        <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-          {tpl?.urgent && r.status !== "draft" && <Badge tone="danger">{t("badge.urgent")}</Badge>}
-          {r.confidential && <Badge>{t("badge.confidential")}</Badge>}
-          {r.reviewRequired && r.status === "submitted" && <Badge tone="warn">{t("badge.review")}</Badge>}
-          <StatusChip status={r.status} t={t} />
-        </span>
-      </Link>
-    </li>
-  );
+/** A type's icon — handed in (the report page has its type's own; the
+ *  lists read the catalog in ./ReportRowItem). This file carries no catalog,
+ *  so the report page stays light (5C). */
+export function TemplateIcon({ icon, size = 14 }: { icon?: RrIconName; size?: number }) {
+  return <RrIcon name={icon ?? "document"} size={size} />;
 }
