@@ -11,9 +11,11 @@ import "server-only";
    one transition API + a unified pending-queue reader + an activity log
    writer.
 
-   No new RBAC framework. Visibility/permission is decided at the route
-   layer using src/lib/experience (CEO/Accountant can approve; everyone
-   can submit; warehouse/sales cannot see cost-sensitive items).
+   Who may use it is decided at the route layer: ./gate.ts lets in internal
+   accounts with the Finance module (view to read, create to move an item);
+   src/lib/experience adds the approver predicate (CEO / Accountant / super
+   admin approve and reject) and hides the cost-sensitive kinds below from
+   roles that cannot see cost data.
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -28,6 +30,27 @@ const TABLE: Record<ApprovalEntity, string> = {
   bill:    "vendor_bills",
   journal: "accounting_journal_entries",
 };
+
+export const APPROVAL_ENTITIES = Object.keys(TABLE) as ApprovalEntity[];
+const APPROVAL_ACTIONS: readonly ApprovalAction[] = ["submit", "approve", "reject"];
+
+/* Own keys only: a plain `TABLE[x]` lookup hands back Object.prototype
+   members ("constructor", "toString") as if they were table names. */
+export function isApprovalEntity(v: unknown): v is ApprovalEntity {
+  return typeof v === "string" && Object.hasOwn(TABLE, v);
+}
+export function isApprovalAction(v: unknown): v is ApprovalAction {
+  return typeof v === "string" && (APPROVAL_ACTIONS as readonly string[]).includes(v);
+}
+
+/** Kinds whose amounts are cost data. A role that cannot see cost data does
+ *  not see them in the queue or its activity, and cannot move them either. */
+export const COST_SENSITIVE_KINDS: ReadonlySet<ApprovalEntity> = new Set<ApprovalEntity>(["bill", "journal"]);
+
+/** The kinds a caller may see. */
+export function visibleKinds(canSeeCostData: boolean): ApprovalEntity[] {
+  return APPROVAL_ENTITIES.filter((k) => canSeeCostData || !COST_SENSITIVE_KINDS.has(k));
+}
 
 const ACTIVE_STATES: ApprovalStatus[] = ["draft", "submitted", "pending"];
 
@@ -71,13 +94,14 @@ export async function logActivity(opts: {
 /* ─── Transition ─── */
 
 export async function transitionApproval(input: TransitionInput): Promise<TransitionResult> {
+  if (!isApprovalEntity(input.entity)) return { ok: false, error: "Unknown entity kind.", code: 400 };
   const table = TABLE[input.entity];
-  if (!table) return { ok: false, error: "Unknown entity kind.", code: 400 };
 
   const cur = await supabaseServer.from(table)
     .select("id, approval_status").eq("id", input.entityId).eq("tenant_id", input.tenantId).maybeSingle();
   if (cur.error || !cur.data) return { ok: false, error: "Not found.", code: 404 };
-  const status = ((cur.data as { approval_status: ApprovalStatus }).approval_status ?? "draft");
+  const readStatus = (cur.data as { approval_status: ApprovalStatus | null }).approval_status;
+  const status = readStatus ?? "draft";
 
   let nextStatus: ApprovalStatus;
   const patch: Record<string, string | null> = {};
@@ -115,9 +139,20 @@ export async function transitionApproval(input: TransitionInput): Promise<Transi
       return { ok: false, error: "Unknown action.", code: 400 };
   }
 
-  const upd = await supabaseServer.from(table)
+  /* Claim, then apply: the update matches only the status this decision was
+     made from. Two reviewers who both read 'submitted' cannot both win — the
+     second update matches no row and gets a 409, instead of overwriting the
+     first decision and logging a second one after it. */
+  const claim = supabaseServer.from(table)
     .update(patch).eq("id", input.entityId).eq("tenant_id", input.tenantId);
+  const upd = await (readStatus === null
+    ? claim.is("approval_status", null)
+    : claim.eq("approval_status", readStatus)
+  ).select("id");
   if (upd.error) return { ok: false, error: upd.error.message, code: 500 };
+  if ((upd.data ?? []).length === 0) {
+    return { ok: false, error: "This item changed while you were deciding. Reload and try again.", code: 409 };
+  }
 
   const actionToLog: "submitted" | "approved" | "rejected" =
     input.action === "submit"  ? "submitted" :
@@ -226,6 +261,9 @@ export interface ActivityRow {
 
 export async function listActivity(tenantId: string, opts: {
   entity?: ApprovalEntity; entityId?: string; limit?: number;
+  /** Only these kinds — the route passes visibleKinds() for the caller. Filtered
+   *  in the query, so "the last N events" stays N events the caller may see. */
+  kinds?: ApprovalEntity[];
 } = {}): Promise<ActivityRow[]> {
   let q = supabaseServer.from("finance_activity_log")
     .select("id, entity_kind, entity_id, action, actor_id, note, created_at")
@@ -234,6 +272,7 @@ export async function listActivity(tenantId: string, opts: {
     .limit(opts.limit ?? 50);
   if (opts.entity)   q = q.eq("entity_kind", opts.entity);
   if (opts.entityId) q = q.eq("entity_id",   opts.entityId);
+  if (opts.kinds)    q = q.in("entity_kind", opts.kinds);
 
   const { data } = await q;
   const rows = (data ?? []) as Array<{
