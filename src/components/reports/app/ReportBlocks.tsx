@@ -26,7 +26,7 @@ import {
   REPORT_CURRENCIES, REPORT_LIMITS, scoreAverage, tableSummary,
   type CheckState, type ReportDataRow, type ReportDataSource, type ReportDataValue, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
 } from "@/lib/reports/templates";
-import { DATA_COLUMNS, DATA_MODULE, dataRowHref, dataTotals, statusWordKey, type DataColumn } from "@/lib/reports/report-data";
+import { DATA_MODULE, blockColumns, blockRows, dataRowHref, dataTotals, statusWordKey, tagsOf, type DataColumn } from "@/lib/reports/report-data";
 import { reportFileUrl, type ReportAttachment } from "@/lib/reports/attachments";
 import { preparePhoto } from "@/lib/reports/prepare-photo";
 import { deleteReportAttachment, dmyDate, dmyTime, searchReportLinks, uploadReportAttachment, type LinkHit } from "@/lib/work-reports";
@@ -317,7 +317,10 @@ function LinksEditor({ t, def, value, onChange }: EditorProps) {
     return () => clearTimeout(id);
   }, [open, type, q]);
   const add = (h: LinkHit) => {
-    if (links.some((l) => l.type === type && l.id === h.id) || links.length >= REPORT_LIMITS.links) return;
+    if (links.some((l) => l.type === type && l.id === h.id)) return;
+    /* What the report is about (5C, max 1): picking another replaces it. */
+    if (def.max === 1) { onChange({ ...value, links: [{ type, id: h.id, label: h.label }] }); setOpen(false); return; }
+    if (links.length >= Math.min(def.max ?? REPORT_LIMITS.links, REPORT_LIMITS.links)) return;
     onChange({ ...value, links: [...links, { type, id: h.id, label: h.label }] });
   };
   const remove = (l: ReportLink) => onChange({ ...value, links: links.filter((x) => !(x.type === l.type && x.id === l.id)) });
@@ -507,12 +510,21 @@ function ChoiceView({ t, tplKey, def, value }: { t: T; tplKey: string; def: Repo
 
 function DataEditor({ t, def, value, live, onChange }: EditorProps) {
   const notes = value.notes ?? {};
+  const inputs = value.inputs ?? {};
   const setNote = (key: string, text: string) => {
     const next = { ...notes };
     if (text) next[key] = text; else delete next[key];
     onChange({ ...value, notes: next });
   };
-  return <DataBlock t={t} def={def} data={live} notes={notes} onNote={def.notes ? setNote : undefined} composing />;
+  /* 5C: the figure typed beside the system's — kept as typed (commas out),
+     the difference worked out from it on every screen. */
+  const setInput = (key: string, raw: string) => {
+    const next = { ...inputs };
+    const clean = raw.replace(/[,\s]/g, "");
+    if (clean) next[key] = clean; else delete next[key];
+    onChange({ ...value, inputs: next });
+  };
+  return <DataBlock t={t} def={def} data={live} notes={notes} inputs={inputs} onNote={def.notes ? setNote : undefined} onInput={def.input ? setInput : undefined} composing />;
 }
 
 const statusWord = (t: T, source: ReportDataSource, s: unknown) => {
@@ -523,7 +535,10 @@ const statusWord = (t: T, source: ReportDataSource, s: unknown) => {
 function dataCell(t: T, source: ReportDataSource, r: ReportDataRow, c: DataColumn): string {
   const v = r.cells[c.id];
   if (v === null || v === undefined || v === "") return "—";
+  /* 5C: the whole company's row of a per-department count. */
+  if (c.id === "department" && v === "*") return t("blk.allCompany");
   switch (c.type) {
+    case "tags": return tagsOf(v).map((x) => statusWord(t, source, x)).join(t("blk.tagSep"));
     case "date": return dmyDate(String(v));
     case "money": return typeof v === "number" ? `${num(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
     case "number": return String(v);
@@ -536,21 +551,30 @@ function dataCell(t: T, source: ReportDataSource, r: ReportDataRow, c: DataColum
  *  glance (`asOf`: the day the numbers were taken). */
 function dataTone(r: ReportDataRow, c: DataColumn, asOf: string): string {
   const v = r.cells[c.id];
+  /* 5C: a shortage, an overspend, a slip, a score under what is asked. */
+  if ((c.id === "variance" || c.id === "variance_value" || c.id === "remaining") && typeof v === "number" && v < 0) return "font-semibold text-red-500";
+  if ((c.id === "slip" || c.id === "days_over" || c.id === "below" || c.id === "critical" || c.id === "late_minutes") && Number(v) > 0) return "font-semibold text-amber-500";
+  if (c.id === "health" && (v === "late" || v === "at_risk")) return v === "late" ? "font-semibold text-red-500" : "font-semibold text-amber-500";
+  if (c.id === "state" && v === "pending") return "font-semibold text-amber-500";
   if ((c.id === "overdue" || c.id === "late" || c.id === "missed" || c.id === "overdue_work" || c.id === "absent") && Number(v) > 0) return "font-semibold text-red-500";
   if ((c.id === "missing" || c.id === "sent_late" || c.id === "late_days") && Number(v) > 0) return "font-semibold text-amber-500";
   if (c.id === "days" && Number(v) >= 14) return "font-semibold text-amber-500";
+  /* 5C: what expires soon. */
+  if (c.id === "days_left" && typeof v === "number") return v <= 14 ? "font-semibold text-red-500" : v <= 30 ? "font-semibold text-amber-500" : "text-[var(--text-primary)]";
   if (c.id === "valid" && typeof v === "string" && v < asOf) return "font-semibold text-red-500";
   return "text-[var(--text-primary)]";
 }
 
-function DataBlock({ t, def, data, notes, onNote, composing }: {
-  t: T; def: ReportSectionDef; data: ReportDataValue | undefined; notes: Record<string, string>;
-  onNote?: (key: string, text: string) => void; composing: boolean;
+function DataBlock({ t, def, data, notes, inputs, onNote, onInput, composing }: {
+  t: T; def: ReportSectionDef; data: ReportDataValue | undefined; notes: Record<string, string>; inputs?: Record<string, string>;
+  onNote?: (key: string, text: string) => void; onInput?: (key: string, raw: string) => void; composing: boolean;
 }) {
   if (!data) return <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
   if (data.denied) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataNoAccess").replace("{app}", DATA_MODULE[data.source])}</p>;
   if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;
   if (data.untracked) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataUntracked")}</p>;
+  /* 5C: about one record, and none is picked yet. */
+  if (data.needsAbout) return <p className="text-[12.5px] text-[var(--text-dim)]">{t(`blk.dataPick.${data.needsAbout}`)}</p>;
   const foot = (
     <p className="text-[11px] text-[var(--text-faint)] tabular-nums">
       {data.live
@@ -560,8 +584,10 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
     </p>
   );
   if (!data.rows.length) return <div className="space-y-1"><p className="text-[13px] text-[var(--text-dim)]">{t(`blk.de.${data.source}`)}</p>{foot}</div>;
-  const cols = DATA_COLUMNS[data.source];
-  const totals = dataTotals(data);
+  /* 5C: the typed figure, the difference and its worth join the columns. */
+  const cols = blockColumns(data.source, def.input);
+  const rows = blockRows(data, def.input, inputs);
+  const totals = dataTotals(data, def.input, inputs);
   const asOf = data.capturedAt.slice(0, 10);
   const colName = (id: string) => t(`blk.dc.${id}`);
   /* The first column names the document (its number, or an expense's
@@ -574,6 +600,25 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
       ? <Link href={href} target={composing ? "_blank" : undefined} rel={composing ? "noopener" : undefined} className="font-semibold text-[var(--text-primary)] underline-offset-2 hover:underline">{text}</Link>
       : <span className="font-semibold text-[var(--text-primary)]">{text}</span>;
   };
+  /* The typed figure: a field while writing, the figure once sent. */
+  /* A figure outside what the block takes (a score 1–5) is ringed — the
+     server keeps only what fits. Aurora owns the field's border, so the
+     ring sits on its wrapper. */
+  const outside = (raw: string | undefined) => {
+    if (!raw || !def.input) return false;
+    const n = Number(raw.replace(/[,\s]/g, ""));
+    return !Number.isFinite(n) || (def.input.min !== undefined && n < def.input.min) || (def.input.max !== undefined && n > def.input.max);
+  };
+  const typedCell = (r: ReportDataRow, c: DataColumn) => (onInput ? (
+    <span className={`inline-flex items-center gap-1 rounded-xl ${outside(inputs?.[r.key]) ? "ring-1 ring-red-500/70" : ""}`}>
+      <input value={inputs?.[r.key] ?? ""} onChange={(e) => onInput(r.key, e.target.value)} inputMode="decimal" dir="ltr"
+        aria-invalid={outside(inputs?.[r.key]) || undefined}
+        aria-label={`${String(r.cells[first.id] ?? "")} — ${colName(c.id)}`}
+        className={`${FIELD} h-8 w-24 py-1 text-end tabular-nums`} />
+      {c.type === "money" && r.currency && <span className="text-[11px] text-[var(--text-faint)]">{r.currency}</span>}
+    </span>
+  ) : dataCell(t, data.source, r, c));
+  const cell = (r: ReportDataRow, c: DataColumn) => (c.typed ? typedCell(r, c) : dataCell(t, data.source, r, c));
   const note = (r: ReportDataRow) => (onNote ? (
     <input value={notes[r.key] ?? ""} onChange={(e) => onNote(r.key, e.target.value)} maxLength={REPORT_LIMITS.item} dir="auto"
       placeholder={t(`blk.dn.${data.source}`)} aria-label={`${String(r.cells[first.id] ?? "")} — ${t(`blk.dn.${data.source}`)}`} className={`${FIELD} h-8 py-1`} />
@@ -581,7 +626,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   return (
     <div className="space-y-2">
       <ul className="space-y-2 sm:hidden">
-        {data.rows.map((r) => (
+        {rows.map((r) => (
           <li key={r.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
             <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
               {docLink(r)}
@@ -591,7 +636,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
               {cols.slice(2).map((c) => (
                 <div key={c.id} className="min-w-0">
                   <dt className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">{colName(c.id)}</dt>
-                  <dd className={`truncate text-[12.5px] tabular-nums ${dataTone(r, c, asOf)}`}>{dataCell(t, data.source, r, c)}</dd>
+                  <dd className={`truncate text-[12.5px] tabular-nums ${dataTone(r, c, asOf)}`}>{cell(r, c)}</dd>
                 </div>
               ))}
             </dl>
@@ -607,13 +652,13 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((r) => (
+            {rows.map((r) => (
               <Fragment key={r.key}>
                 <tr className={def.notes ? "" : "border-b border-[var(--border-subtle)] last:border-0"}>
                   {cols.map((c) => (
                     <td key={c.id} dir={c.type === "text" ? "auto" : "ltr"}
-                      className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.type !== "text" || c.id === "no" ? "whitespace-nowrap" : ""} ${c === first ? "" : dataTone(r, c, asOf)}`}>
-                      {c === first ? docLink(r) : dataCell(t, data.source, r, c)}
+                      className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.type !== "text" || c.id === "no" || c.id === "code" ? "whitespace-nowrap" : ""} ${c === first ? "" : dataTone(r, c, asOf)}`}>
+                      {c === first ? docLink(r) : cell(r, c)}
                     </td>
                   ))}
                 </tr>
@@ -634,6 +679,7 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
           ))}
         </p>
       )}
+      {data.noCost && <p className="text-[11.5px] text-[var(--text-dim)]">{t("blk.dataNoCost")}</p>}
       {foot}
     </div>
   );
@@ -650,7 +696,7 @@ export function BlockView({ t, tplKey, def, value, version }: { t: T; tplKey: st
     case "links": return <LinksView t={t} value={v} />;
     case "signature": return v.signature ? <SignatureView t={t} value={v} version={version} /> : <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
     case "choice": return <ChoiceView t={t} tplKey={tplKey} def={def} value={v} />;
-    case "data": return <DataBlock t={t} def={def} data={v.data} notes={v.notes ?? {}} composing={false} />;
+    case "data": return <DataBlock t={t} def={def} data={v.data} notes={v.notes ?? {}} inputs={v.inputs} composing={false} />;
     default: return null;
   }
 }

@@ -35,7 +35,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
 import { REPORT_FAMILIES, periodFor } from "@/lib/reports/templates";
-import { REPORT_TEMPLATES, reportTemplate } from "@/lib/reports/catalog";
+import { FAMILY_GROUPS, REPORT_TEMPLATES, reportTemplate } from "@/lib/reports/catalog";
 import { headWords, isCustomKey } from "@/lib/reports/template-words";
 import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
 import type { DueItem } from "@/lib/reports/obligations";
@@ -223,12 +223,12 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
 }) {
   /* Before the bundle says what this person may start, only the types
      open to all staff — never a team's or the CEO office's (5B). */
-  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly).map((x) => x.key)), [bundle]);
+  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app).map((x) => x.key)), [bundle]);
   /* Every type this person may start, by group: the built-ins, then the
      builder's (4E) — each named from the dictionary. */
   const offered = useMemo(() => [
-    ...REPORT_TEMPLATES.filter((x) => allowed.has(x.key)).map((x) => ({ key: x.key, family: x.family, icon: x.icon })),
-    ...(bundle?.custom ?? []).map((c) => ({ key: c.key, family: c.family, icon: c.icon })),
+    ...REPORT_TEMPLATES.filter((x) => allowed.has(x.key)).map((x) => ({ key: x.key, family: x.family, icon: x.icon, group: x.group })),
+    ...(bundle?.custom ?? []).map((c) => ({ key: c.key, family: c.family, icon: c.icon, group: undefined as string | undefined })),
   ], [allowed, bundle?.custom]);
   const due = bundle?.due ?? [];
   return (
@@ -242,11 +242,21 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
           {REPORT_FAMILIES.map((fam) => {
             const items = offered.filter((x) => x.family === fam);
             if (!items.length) return null;
+            /* 5C: a big family shows its types under its groups (HR's seven,
+               Projects' four), a builder type after them. */
+            const order = FAMILY_GROUPS[fam];
+            const parts = order
+              ? [...order.map((g) => ({ g, list: items.filter((x) => x.group === g) })), { g: "", list: items.filter((x) => !x.group || !order.includes(x.group)) }].filter((p) => p.list.length)
+              : [{ g: "", list: items }];
             return (
               <div key={fam}>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">{t(`family.${fam}`)}</p>
+                <div className="space-y-3">
+                {parts.map((part) => (
+                <div key={part.g || "rest"}>
+                {part.g && <p className="mb-1.5 text-[11.5px] font-medium text-[var(--text-faint)]">{t(`grp.${fam}.${part.g}`)}</p>}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {items.map((tpl) => (
+                  {part.list.map((tpl) => (
                     <button
                       key={tpl.key}
                       type="button"
@@ -263,6 +273,9 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
                       </span>
                     </button>
                   ))}
+                </div>
+                </div>
+                ))}
                 </div>
               </div>
             );

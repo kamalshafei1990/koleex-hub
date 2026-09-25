@@ -16,5 +16,8 @@ import service from "./service";
 import travel from "./travel";
 import memos from "./memos";
 import hr from "./hr";
+import projects from "./projects";
+import inventory from "./inventory";
+import finance from "./finance";
 
-export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...office, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };
+export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...office, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr, ...projects, ...inventory, ...finance };

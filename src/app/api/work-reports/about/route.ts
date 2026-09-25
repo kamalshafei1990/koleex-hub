@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireReportsUser } from "@/lib/server/reports/core";
 import { listReportsAbout } from "@/lib/server/reports/links";
-import { REPORT_LINK_TYPES, type ReportLinkType } from "@/lib/reports/templates";
+import { STORED_LINK_TYPES, type ReportLinkType } from "@/lib/reports/templates";
 import { reportsT } from "@/lib/translations/reports";
 import { pickWord } from "@/lib/reports/custom-templates";
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type") as ReportLinkType | null;
   const id = (url.searchParams.get("id") ?? "").trim();
-  if (!type || !REPORT_LINK_TYPES.includes(type) || !id || id.length > 64) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  if (!type || !STORED_LINK_TYPES.includes(type) || !id || id.length > 64) return NextResponse.json({ error: "bad_request" }, { status: 400 });
   const lang = url.searchParams.get("lang") === "zh" ? "zh" : url.searchParams.get("lang") === "ar" ? "ar" : "en";
   const word = (key: string) => ((reportsT[key]?.[lang] ?? reportsT[key]?.en) as string | undefined) ?? "";
   try {

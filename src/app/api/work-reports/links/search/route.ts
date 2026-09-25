@@ -10,17 +10,23 @@ import "server-only";
    that app the answer is { hits: [], denied: true }. A quotation or an
    invoice is found by its number or the customer written on it.
    The typed text is stripped of the characters PostgREST filters use.
+   5C: what a report's numbers are about — a project (the Projects app's own
+   rule: a super admin all, anyone else the projects they manage, created,
+   are a member of or hold a task in; templates left out), an employee (HR ·
+   view: everyone still employed; a manager without it: their own team) and
+   a warehouse (Inventory; active ones).
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { requireReportsUser } from "@/lib/server/reports/core";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
+import { involvedProjectsOr } from "@/lib/server/project-access";
 import { REPORT_LINK_TYPES, type ReportLinkType } from "@/lib/reports/templates";
 
 export const dynamic = "force-dynamic";
 
-const MODULE: Partial<Record<ReportLinkType, string>> = { customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices" };
+const MODULE: Partial<Record<ReportLinkType, string>> = { customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices", project: "Projects", warehouse: "Inventory" };
 const LIMIT = 15;
 
 export async function GET(req: Request) {
@@ -37,7 +43,39 @@ export async function GET(req: Request) {
   const like = `%${q}%`;
 
   let hits: Array<{ id: string; label: string; sub?: string }> = [];
-  if (type === "customer" || type === "supplier") {
+  if (type === "project") {
+    let s = supabaseServer.from("projects").select("id, name, code, status").eq("is_template", false);
+    if (auth.tenant_id) s = s.eq("tenant_id", auth.tenant_id);
+    if (!auth.is_super_admin) s = s.or(await involvedProjectsOr(auth.tenant_id ?? "", auth.account_id));
+    if (q) s = s.or(`name.ilike.${like},code.ilike.${like}`);
+    const { data, error } = await (q ? s.order("name", { ascending: true }) : s.order("updated_at", { ascending: false })).limit(LIMIT);
+    if (error) return failed(error.message);
+    hits = ((data ?? []) as Array<{ id: string; name: string | null; code: string | null; status: string | null }>).map((p) => ({ id: p.id, label: p.name || p.code || "—", sub: [p.code, p.status].filter(Boolean).join(" · ") || undefined }));
+  } else if (type === "warehouse") {
+    let s = supabaseServer.from("inventory_warehouses").select("id, name, code, location").eq("is_active", true).is("deleted_at", null);
+    if (auth.tenant_id) s = s.eq("tenant_id", auth.tenant_id);
+    if (q) s = s.or(`name.ilike.${like},code.ilike.${like}`);
+    const { data, error } = await s.order("name", { ascending: true }).limit(LIMIT);
+    if (error) return failed(error.message);
+    hits = ((data ?? []) as Array<{ id: string; name: string | null; code: string | null; location: string | null }>).map((w) => ({ id: w.id, label: w.name || w.code || "—", sub: [w.code, w.location].filter(Boolean).join(" · ") || undefined }));
+  } else if (type === "employee") {
+    /* HR · view: everyone still employed; else the writer's own team. */
+    const hr = auth.is_super_admin || (await requireModuleAction(auth, "HR", "view")) === null;
+    const team = hr ? null : (await loadOrgTree(auth.tenant_id)).descendantsOf(auth.account_id);
+    if (team && !team.length) return NextResponse.json({ hits: [], denied: true }, { headers: { "Cache-Control": "private, no-store" } });
+    let s = supabaseServer.from("koleex_employees").select("id, account_id, employee_number, position, people(full_name)").in("employment_status", ["active", "on_leave", "probation"]);
+    if (auth.tenant_id) s = s.or(`tenant_id.eq.${auth.tenant_id},tenant_id.is.null`);
+    if (team) s = s.in("account_id", team.slice(0, 200));
+    const { data, error } = await s.limit(300);
+    if (error) return failed(error.message);
+    type E = { id: string; employee_number: string | null; position: string | null; people?: { full_name?: string | null } | Array<{ full_name?: string | null }> | null };
+    const name = (e: E) => (Array.isArray(e.people) ? e.people[0]?.full_name : e.people?.full_name) ?? "";
+    const needle = q.toLowerCase();
+    hits = ((data ?? []) as E[])
+      .map((e) => ({ id: e.id, label: name(e) || e.employee_number || "—", sub: [e.employee_number, e.position].filter(Boolean).join(" · ") || undefined }))
+      .filter((h) => !needle || h.label.toLowerCase().includes(needle) || (h.sub ?? "").toLowerCase().includes(needle))
+      .sort((a, b) => a.label.localeCompare(b.label)).slice(0, LIMIT);
+  } else if (type === "customer" || type === "supplier") {
     let s = supabaseServer.from("contacts").select("id, display_name, company_name, full_name, country").eq("contact_type", type);
     if (auth.tenant_id) s = s.eq("tenant_id", auth.tenant_id);
     if (q) s = s.or(`display_name.ilike.${like},company_name.ilike.${like},full_name.ilike.${like}`);

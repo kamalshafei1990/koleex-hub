@@ -16,7 +16,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
 import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
-import { OFFICE_MODULE } from "@/lib/reports/report-data";
+import { OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
+import type { ReportTemplateDef } from "@/lib/reports/templates";
 import { loadMyDue } from "@/lib/server/reports/obligations";
 import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office, projects, inventory, expenses, payroll] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -68,6 +69,12 @@ export async function GET(req: Request) {
     requireModuleAccess(auth, TEMPLATES_MODULE),
     /* 5B: «CEO Office» in Roles starts the CEO office's types. */
     requireModuleAction(auth, OFFICE_MODULE, "create"),
+    /* 5C: the apps the HR, Projects, Inventory and Finance types need, and
+       «Payroll Reports» for the salary types. */
+    requireModuleAccess(auth, "Projects"),
+    requireModuleAccess(auth, "Inventory"),
+    requireModuleAccess(auth, "Expenses"),
+    requireModuleAction(auth, PAYROLL_MODULE, "create"),
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
@@ -76,8 +83,16 @@ export async function GET(req: Request) {
      they are. */
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
   const hasOffice = auth.is_super_admin || office === null;
+  /* 5C: a type's app (HR is HR · view) — or, `orTeam`, a team; salaries
+     «Payroll Reports». */
+  const hasPayroll = auth.is_super_admin || payroll === null;
+  const apps: Record<NonNullable<ReportTemplateDef["app"]>, boolean> = {
+    HR: hrView === null, Projects: projects === null, Inventory: inventory === null, Finance: finance === null, Expenses: expenses === null,
+  };
+  const appOk = (x: { app?: ReportTemplateDef["app"]; orTeam?: boolean }) => !x.app || apps[x.app] || (!!x.orTeam && hasTeam);
   const hiddenSet = new Set(hidden);
-  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam) && (!tpl.officeOnly || hasOffice)).map((tpl) => tpl.key);
+  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam) && (!tpl.officeOnly || hasOffice)
+    && (!tpl.payrollOnly || hasPayroll) && appOk(tpl)).map((tpl) => tpl.key);
   const nameOf = new Map(people.map((p) => [p.id, p]));
 
   return NextResponse.json({
@@ -96,7 +111,7 @@ export async function GET(req: Request) {
       };
     }),
     templates,
-    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam) && (!c.officeOnly || hasOffice)),
+    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam) && (!c.officeOnly || hasOffice) && (!c.payrollOnly || hasPayroll) && appOk(c)),
     people: people.filter((p) => p.id !== me),
     library: { hr: hrView === null, finance: finance === null, tasks: todo === null },
   }, { headers: { "Cache-Control": "private, no-store" } });

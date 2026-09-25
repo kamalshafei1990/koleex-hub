@@ -66,36 +66,98 @@
    the birthdays and work anniversaries, and the visitors of the invitation
    letters; «waiting for your decision» is the one block computed for its
    READER, when they open it — never frozen (LIVE_SOURCES).
+   ---------------------------------------------------------------------------
+   Phase 5C (owner's picks, 26 Sep 2026): HR (31 types in seven groups),
+   Projects (20), Inventory (4) and Finance (6). Two new things a block can
+   do: its numbers can be ABOUT one record the report is about — the
+   project, the employee or the warehouse picked in its links (`about`, per
+   source: DATA_ABOUT) — and a row can take a figure the writer types BESIDE
+   the system's (`input`): the stock counted beside the stock in the system,
+   the budget beside what was spent, the proposed salary beside the current
+   one — the difference is worked out, never typed. A type can need an app
+   to be started (`app`: HR · view, Projects, Inventory, Finance, Expenses —
+   or, `orTeam`, a team); the salary types need «Payroll Reports» in Roles
+   (`payrollOnly`), and so does every block that shows a salary, whatever
+   type it is in. A report never changes stock or the books: a count or a
+   write-off is adjusted in Inventory, with its own approval.
    */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "team" | "office" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
+export type ReportFamily = "work" | "team" | "office" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr" | "projects" | "inventory" | "finance";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
  *  4B: "choice" (one fixed answer) and "data" (numbers from the apps). */
 export type ReportSectionKind = "text" | "list" | "checklist" | "score" | "table" | "links" | "signature" | "choice" | "data";
-/** What a report can be linked to (and so appear on the page of). */
-export type ReportLinkType = "customer" | "supplier" | "product" | "order" | "quotation" | "invoice";
-export const REPORT_LINK_TYPES: ReportLinkType[] = ["customer", "supplier", "product", "order", "quotation", "invoice"];
+/** What a report can be linked to (and so appear on the page of). 5C: a
+ *  project, an employee or a warehouse — what a block's numbers can be
+ *  about (DATA_ABOUT). */
+export type ReportLinkType = "customer" | "supplier" | "product" | "order" | "quotation" | "invoice" | "project" | "employee" | "warehouse";
+export const REPORT_LINK_TYPES: ReportLinkType[] = ["customer", "supplier", "product", "order", "quotation", "invoice", "project", "employee", "warehouse"];
+/** The kinds a report is listed on the page of (work_report_links'
+ *  CHECK). A project, an employee or a warehouse (5C) only says what the
+ *  report's numbers are about: an employee's page never lists the
+ *  confidential HR reports about them. */
+export const STORED_LINK_TYPES: ReportLinkType[] = ["customer", "supplier", "product", "order", "quotation", "invoice"];
+/** What a block's numbers can be about (5C). */
+export type ReportSubject = "project" | "employee" | "warehouse";
 export type ReportColumnType = "text" | "number" | "money" | "date";
 /** Where a numbers block reads from — always the AUTHOR's own documents:
  *  quotations / orders / invoices in the report's period, the quotations
- *  sent and still unanswered, the invoices with money still owed. */
+ *  sent and still unanswered, the invoices with money still owed. 5C: the
+ *  HR, Projects, Inventory and Finance numbers (src/lib/reports/report-data.ts
+ *  says who reads each and how far). */
 export type ReportDataSource =
   | "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables"
   | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables"
   | "expenses"
   | "team_reports" | "team_attendance" | "team_workload"
-  | "decisions" | "schedule" | "time_split" | "meetings" | "followups" | "occasions" | "visitors";
+  | "decisions" | "schedule" | "time_split" | "meetings" | "followups" | "occasions" | "visitors"
+  | "hiring" | "onboarding" | "staff_attendance" | "late_absence" | "leave_balances" | "leave_taken" | "overtime_hours"
+  | "payroll" | "staff_cost" | "salaries" | "insurance"
+  | "appraisals" | "appraisal_results" | "training" | "skills" | "behavior" | "grievances"
+  | "movement" | "turnover" | "expiring" | "contracts" | "missing_files" | "hr_kpis" | "headcount"
+  | "project_overview" | "project_done" | "project_overdue" | "project_milestones" | "project_budget" | "project_expenses"
+  | "project_team" | "project_blocked" | "project_schedule" | "portfolio" | "projects_at_risk"
+  | "stock_count" | "stock_writeoffs" | "stock_moves" | "low_stock"
+  | "expense_categories" | "company_expenses" | "cash_position" | "cash_flow" | "profit_loss" | "ar_aging" | "ap_aging" | "month_close";
 export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "quotations", "orders", "invoices", "quotes_waiting", "receivables",
   "purchase_orders", "receipts", "shortages", "pos_late", "payables",
   "expenses",
   "team_reports", "team_attendance", "team_workload",
   "decisions", "schedule", "time_split", "meetings", "followups", "occasions", "visitors",
+  "hiring", "onboarding", "staff_attendance", "late_absence", "leave_balances", "leave_taken", "overtime_hours",
+  "payroll", "staff_cost", "salaries", "insurance",
+  "appraisals", "appraisal_results", "training", "skills", "behavior", "grievances",
+  "movement", "turnover", "expiring", "contracts", "missing_files", "hr_kpis", "headcount",
+  "project_overview", "project_done", "project_overdue", "project_milestones", "project_budget", "project_expenses",
+  "project_team", "project_blocked", "project_schedule", "portfolio", "projects_at_risk",
+  "stock_count", "stock_writeoffs", "stock_moves", "low_stock",
+  "expense_categories", "company_expenses", "cash_position", "cash_flow", "profit_loss", "ar_aging", "ap_aging", "month_close",
 ];
+/** 5C: a figure the writer types beside the system's, on every row of a
+ *  numbers block — the stock counted beside the stock in the system, the
+ *  budget beside what was spent, the proposed salary beside the current
+ *  one, a score. `against`: the system's column it is compared with — the
+ *  difference (`diff`) is typed − system, worked out, never typed; `valueBy`:
+ *  a money column the difference is multiplied by (`value`: what the stock
+ *  missing is worth). `min` / `max` bound what may be typed (a score 1–5). */
+export interface DataInputDef {
+  id: string;
+  type: "number" | "money";
+  against?: string;
+  diff?: string;
+  valueBy?: string;
+  value?: string;
+  min?: number;
+  max?: number;
+}
+/** 5C: who may start a type, beside everyone — the app's own right (HR is
+ *  HR · view). */
+export type ReportApp = "HR" | "Projects" | "Inventory" | "Finance" | "Expenses";
+export const REPORT_APPS: ReportApp[] = ["HR", "Projects", "Inventory", "Finance", "Expenses"];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
 /** Who a new report goes to before the author changes anything:
@@ -121,17 +183,25 @@ export interface ReportSectionDef {
   summaryOf?: string[];
   /** links: what it may point at. */
   linkTypes?: ReportLinkType[];
+  /** links (5C): how many — 1 for what the report is about (picking
+   *  another replaces it). */
+  max?: number;
   /** choice: the answers, in order. */
   options?: string[];
   /** data: where the numbers come from, and whether each row takes the
    *  author's note (what the customer said, the next step). */
   source?: ReportDataSource;
   notes?: boolean;
+  /** data (5C): the figure the writer types beside the system's. */
+  input?: DataInputDef;
 }
 
 export interface ReportTemplateDef {
   key: string;
   family: ReportFamily;
+  /** 5C: the group it shows under inside its family on the Reports home
+   *  (catalog.ts FAMILY_GROUPS; `grp.<family>.<group>`). */
+  group?: string;
   icon: RrIconName;
   cadence: ReportCadence;
   sections: ReportSectionDef[];
@@ -148,6 +218,13 @@ export interface ReportTemplateDef {
   /** Only super admins and holders of «CEO Office» in Roles start it (5B:
    *  the CEO office's types). Everyone else never sees it offered. */
   officeOnly?: boolean;
+  /** 5C: only someone with this app starts it (HR: HR · view) — or, with
+   *  `orTeam`, someone with a team (a manager writes about their own). */
+  app?: ReportApp;
+  orTeam?: boolean;
+  /** 5C: salaries — only super admins and holders of «Payroll Reports» in
+   *  Roles start it. */
+  payrollOnly?: boolean;
   /** The free report takes the author's own title. */
   customTitle?: boolean;
   /** Only an event asks for it (Phase 3D: the probation review): never
@@ -170,7 +247,7 @@ export interface ReportTemplateDef {
    the report page and its print never do — a report arrives with its own
    type from the server. */
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr", "projects", "inventory", "finance"];
 
 /** The built-in whose suggestions, app facts and AI summary a type uses: its
  *  own — or, for a builder copy, the one it was copied from. */
@@ -212,6 +289,12 @@ export interface ReportDataValue {
   /** 5B: computed for whoever OPENS the report, as they open it («waiting
    *  for your decision») — never frozen; a sent report stores no rows. */
   live?: boolean;
+  /** 5C: about one record, and none is picked yet — the block asks for it
+   *  («pick the project above»). */
+  needsAbout?: ReportSubject;
+  /** 5C: the writer's role shows no cost, so what stock is worth is left
+   *  out — said as such, never shown as nothing. */
+  noCost?: boolean;
 }
 export interface ReportSectionValue {
   id: string;
@@ -227,9 +310,14 @@ export interface ReportSectionValue {
   data?: ReportDataValue;
   /** A numbers block's notes, by row key. */
   notes?: Record<string, string>;
+  /** 5C: the figures the writer typed beside the system's, by row key. */
+  inputs?: Record<string, string>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A typed figure's row (5C): a document, a person, a stock line — or a
+ *  category in one currency ("<id>:USD": spending is never mixed). */
+const ROW_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?::[A-Z]{3})?$/i;
 const NUMBER = /^-?\d{1,12}(\.\d{1,4})?$/;
 /** A number or money cell as it is kept: commas and spaces out
  *  ("1,180.00" → "1180.00"), up to 12 digits and 4 decimals — or null.
@@ -306,7 +394,7 @@ function normalizeBlock(def: ReportSectionDef, v: Record<string, unknown> | unde
         if (!allowed.includes(type) || !lid || seen.has(`${type}|${lid}`)) continue;
         seen.add(`${type}|${lid}`);
         links.push({ type, id: lid, label: clip(l?.label, REPORT_LIMITS.label) || lid });
-        if (links.length >= REPORT_LIMITS.links) break;
+        if (links.length >= Math.min(def.max ?? REPORT_LIMITS.links, REPORT_LIMITS.links)) break;
       }
       return { id, links };
     }
@@ -325,7 +413,19 @@ function normalizeBlock(def: ReportSectionDef, v: Record<string, unknown> | unde
           if (UUID.test(k) && note) notes[k] = note;
         }
       }
-      return Object.keys(notes).length ? { id, notes } : { id };
+      /* 5C: what the writer typed beside the system's figure — a number,
+         by row, within the block's bounds. The system's own figures still
+         never come from the composer. */
+      const inputs: Record<string, string> = {};
+      if (def.input && v?.inputs && typeof v.inputs === "object") {
+        for (const [k, raw] of Object.entries(v.inputs as Record<string, unknown>).slice(0, REPORT_LIMITS.dataRows)) {
+          const n = cellNumber(raw);
+          if (!ROW_KEY.test(k) || n === null) continue;
+          if ((def.input.min !== undefined && Number(n) < def.input.min) || (def.input.max !== undefined && Number(n) > def.input.max)) continue;
+          inputs[k] = n;
+        }
+      }
+      return { id, ...(Object.keys(notes).length ? { notes } : {}), ...(Object.keys(inputs).length ? { inputs } : {}) };
     }
     case "signature": {
       const sg = v?.signature as Record<string, unknown> | null | undefined;

@@ -21,7 +21,7 @@ import { requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import {
   asReportTemplate, readSnapshot, type CustomDef, type CustomTemplateHead, type TemplateWords, type Word,
 } from "@/lib/reports/custom-templates";
-import type { ReportCadence, ReportFamily, ReportTemplateDef } from "@/lib/reports/templates";
+import { REPORT_APPS, type ReportApp, type ReportCadence, type ReportFamily, type ReportTemplateDef } from "@/lib/reports/templates";
 import type { RrIconName } from "@/components/ui/RrIcon";
 
 export const TEMPLATES_MODULE = "Report Templates";
@@ -47,6 +47,7 @@ export interface CustomRow {
 
 type HeadRow = {
   key: string; family: string | null; icon: string | null; cadence: string | null; hr_only: boolean | string | null; team_only: boolean | string | null; office_only: boolean | string | null;
+  payroll_only: boolean | string | null; app: string | null; or_team: boolean | string | null;
   name: Word | null; desc: Word | null; status: string; version: number; updated_at: string;
 };
 
@@ -54,7 +55,7 @@ type HeadRow = {
  *  the builder's list (all). Only the few fields a list shows travel. */
 export async function loadCustomHeads(tenantId: string | null, opts: { activeOnly?: boolean } = {}): Promise<CustomTemplateHead[]> {
   let q = supabaseServer.from("work_report_templates")
-    .select("key, family:def->>family, icon:def->>icon, cadence:def->>cadence, hr_only:def->hrOnly, team_only:def->teamOnly, office_only:def->officeOnly, name:words->name, desc:words->desc, status, version, updated_at")
+    .select("key, family:def->>family, icon:def->>icon, cadence:def->>cadence, hr_only:def->hrOnly, team_only:def->teamOnly, office_only:def->officeOnly, payroll_only:def->payrollOnly, app:def->>app, or_team:def->orTeam, name:words->name, desc:words->desc, status, version, updated_at")
     .order("created_at", { ascending: true }).limit(200);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   if (opts.activeOnly) q = q.eq("status", "active");
@@ -68,6 +69,8 @@ export async function loadCustomHeads(tenantId: string | null, opts: { activeOnl
     hrOnly: r.hr_only === true || r.hr_only === "true",
     teamOnly: r.team_only === true || r.team_only === "true",
     officeOnly: r.office_only === true || r.office_only === "true",
+    payrollOnly: r.payroll_only === true || r.payroll_only === "true",
+    ...(REPORT_APPS.includes(r.app as ReportApp) ? { app: r.app as ReportApp, orTeam: r.or_team === true || r.or_team === "true" } : {}),
     name: r.name ?? {},
     desc: r.desc ?? {},
     status: r.status === "archived" ? "archived" : "active",

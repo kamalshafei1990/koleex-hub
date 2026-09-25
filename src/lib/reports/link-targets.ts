@@ -16,6 +16,10 @@ export function entityHref(type: ReportLinkType, id: string): string | null {
     case "order": return `/orders/${safe}`;
     case "quotation": return `/quotations?doc=${safe}`;
     case "invoice": return `/invoices?doc=${safe}`;
+    /* 5C: what a report's numbers are about. */
+    case "project": return `/projects?project=${safe}`;
+    case "employee": return `/employees/${safe}`;
+    case "warehouse": return "/inventory/warehouses";
     default: return null;
   }
 }

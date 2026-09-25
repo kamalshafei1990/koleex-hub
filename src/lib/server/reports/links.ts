@@ -18,7 +18,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree } from "@/lib/server/reports/core";
 import { reportAccess } from "@/lib/reports/access";
-import type { ReportLink, ReportLinkType } from "@/lib/reports/templates";
+import { STORED_LINK_TYPES, type ReportLink, type ReportLinkType } from "@/lib/reports/templates";
 
 const keyOf = (l: Pick<ReportLink, "type" | "id">) => `${l.type}|${l.id}`;
 
@@ -26,10 +26,15 @@ const keyOf = (l: Pick<ReportLink, "type" | "id">) => `${l.type}|${l.id}`;
  *  (`before` = the links the report had); `before: null` always rewrites
  *  (sending, a new version), so a save that failed midway cannot leave a
  *  record's page short of a report. */
-export async function syncReportLinks(reportId: string, tenantId: string | null, before: ReportLink[] | null, after: ReportLink[]): Promise<void> {
+export async function syncReportLinks(reportId: string, tenantId: string | null, before: ReportLink[] | null, afterAll: ReportLink[]): Promise<void> {
+  /* 5C: a project, an employee or a warehouse only says what the numbers
+     are about — no page lists the report under them (an employee's page
+     never shows the confidential HR reports about them). */
+  const stored = (xs: ReportLink[]) => xs.filter((l) => STORED_LINK_TYPES.includes(l.type));
+  const after = stored(afterAll);
   const b = new Set(after.map(keyOf));
   if (before) {
-    const a = new Set(before.map(keyOf));
+    const a = new Set(stored(before).map(keyOf));
     if (a.size === b.size && [...a].every((k) => b.has(k))) return;
   }
   const { error: dErr } = await supabaseServer.from("work_report_links").delete().eq("report_id", reportId);

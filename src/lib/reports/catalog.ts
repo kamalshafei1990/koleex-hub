@@ -11,7 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
-import type { ReportColumnType, ReportFamily, ReportSectionDef, ReportSectionKind, ReportTemplateDef } from "./templates";
+import type { ReportColumnType, ReportDataSource, ReportFamily, ReportSectionDef, ReportSectionKind, ReportTemplateDef } from "./templates";
 import { CARRY_RULES } from "./carry";
 
 const t = (id: string, kind: ReportSectionKind, required = false): ReportSectionDef => ({ id, kind, required });
@@ -24,6 +24,29 @@ const c = (id: string, type: ReportColumnType = "text") => ({ id, type });
 const office = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: Partial<ReportTemplateDef> = {}): ReportTemplateDef =>
   ({ key, family: "office", icon, cadence: null, officeOnly: true, recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
 const R = { range: true } as const;
+
+/* ── 5C helpers (owner's picks 26 Sep 2026) ── */
+/** What the report is about — ONE project, employee or warehouse (picking
+ *  another replaces it); its numbers blocks read it (DATA_ABOUT). */
+const about = (type: "project" | "employee" | "warehouse", required = true): ReportSectionDef =>
+  b(type, "links", { linkTypes: [type], max: 1 }, required);
+const data = (id: string, source: ReportDataSource, extra: Omit<ReportSectionDef, "id" | "kind" | "required" | "source"> = {}): ReportSectionDef =>
+  b(id, "data", { source, ...extra });
+type More = Partial<ReportTemplateDef>;
+/** An HR type: HR · view starts it (`orTeam`: a manager too), and it reaches HR. */
+const hr = (key: string, group: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "hr", group, icon, cadence: null, app: "HR", recipients: "manager_hr", reviewRequired: false, confidential: false, sections, ...more });
+/** A salary type: «Payroll Reports» starts it; confidential, to the writer's manager only. */
+const pay = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "hr", group: "pay", icon, cadence: "monthly", payrollOnly: true, recipients: "manager", reviewRequired: false, confidential: true, sections, ...more });
+const prj = (key: string, group: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "projects", group, icon, cadence: null, app: "Projects", recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
+const inv = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "inventory", icon, cadence: null, app: "Inventory", recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
+const fin = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: More = {}): ReportTemplateDef =>
+  ({ key, family: "finance", icon, cadence: "monthly", app: "Finance", recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
+const M = { cadence: "monthly" } as const;
+const TEAM = { orTeam: true } as const;
 
 export const REPORT_TEMPLATES: ReportTemplateDef[] = [
   /* ── Work: the Executive Assistant JD's reporting system, for everyone ── */
@@ -459,14 +482,188 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
   { key: "free", family: "memos", icon: "document", cadence: null, recipients: "manager", reviewRequired: false, confidential: false, customTitle: true,
     sections: [t("body", "text", true)] },
   /* ── HR (the owner: "I need the HR also") ── */
-  { key: "hr_incident", family: "hr", icon: "hard-hat", cadence: null, recipients: "manager_hr", reviewRequired: false, confidential: false, urgent: true,
+  { key: "hr_incident", family: "hr", group: "records", icon: "hard-hat", cadence: null, recipients: "manager_hr", reviewRequired: false, confidential: false, urgent: true,
     sections: [t("what", "text", true), t("where_when", "text", true), t("people", "list"), t("action", "text")] },
-  { key: "hr_grievance", family: "hr", icon: "lock", cadence: null, recipients: "hr", reviewRequired: false, confidential: true,
+  { key: "hr_grievance", family: "hr", group: "relations", icon: "lock", cadence: null, recipients: "hr", reviewRequired: false, confidential: true,
     sections: [t("subject", "text", true), t("details", "text", true), t("wanted", "text")] },
-  { key: "hr_warning", family: "hr", icon: "id-badge", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, hrOnly: true,
+  { key: "hr_warning", family: "hr", group: "relations", icon: "id-badge", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, hrOnly: true,
     sections: [t("employee", "text", true), t("incident", "text", true), t("rule", "text"), t("action", "text", true)] },
-  { key: "hr_exit_interview", family: "hr", icon: "users", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, hrOnly: true,
+  { key: "hr_exit_interview", family: "hr", group: "exit", icon: "users", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, hrOnly: true,
     sections: [t("employee", "text", true), t("reasons", "list", true), t("liked", "list"), t("improve", "list"), t("return", "text")] },
+  /* ── HR (Phase 5C, owner's picks 26 Sep 2026): seven groups — hiring,
+     time, pay, performance, relations, movement & exit, records & safety.
+     The numbers come from the HR app: HR · view reads the company; a
+     manager their own team where it is about people's days. ── */
+  hr("hr_hiring_plan", "hiring", "users", [
+    b("roles", "table", { columns: [c("role"), c("department"), c("count", "number"), c("needed_by", "date"), c("reason")], summaryOf: ["count"] }, true),
+    t("summary", "text", true), t("budget", "text"),
+  ], { ...TEAM, reviewRequired: true }),
+  hr("hr_pipeline", "hiring", "search", [data("pipeline", "hiring"), t("summary", "text", true), t("next", "list")], { cadence: "weekly" }),
+  hr("hr_interview", "hiring", "user-headset", [
+    t("candidate", "text", true), t("role", "text", true),
+    b("scores", "score", { points: [{ id: "experience", weight: 2 }, { id: "skills", weight: 2 }, { id: "communication" }, { id: "attitude" }, { id: "culture" }, { id: "language" }] }, true),
+    b("verdict", "choice", { options: ["hire", "second_interview", "keep", "reject"] }, true), t("notes", "text"),
+  ], { ...TEAM, confidential: true, recipients: "hr" }),
+  hr("hr_reference_check", "hiring", "fingerprint", [
+    t("candidate", "text", true),
+    b("referees", "table", { columns: [c("referee"), c("company"), c("relation")], summary: "none" }),
+    t("said", "text", true), b("verdict", "choice", { options: ["positive", "mixed", "negative"] }, true),
+  ], { hrOnly: true, confidential: true, recipients: "hr" }),
+  hr("hr_offer", "hiring", "contract", [
+    t("candidate", "text", true), t("role", "text", true),
+    b("package", "table", { columns: [c("item"), c("monthly", "money")] }, true),
+    t("start", "text", true), t("reason", "text"),
+  ], { hrOnly: true, confidential: true, reviewRequired: true }),
+  hr("hr_onboarding", "hiring", "box-circle-check", [
+    about("employee"), data("steps", "onboarding"),
+    b("setup", "checklist", { points: pts("account", "devices", "email", "contract", "id_badge", "introduction", "policies", "training") }, true),
+    t("notes", "text"),
+  ], TEAM),
+  hr("hr_new_hire", "hiring", "graduation-cap", [
+    about("employee"), data("onboarding", "onboarding"), data("days", "staff_attendance"),
+    t("learned", "list"), t("support", "text"),
+    b("rating", "score", { points: [{ id: "learning" }, { id: "quality" }, { id: "attitude" }, { id: "teamwork" }] }),
+    t("manager_view", "text", true),
+  ], { ...TEAM, cadence: "weekly" }),
+  hr("hr_attendance", "time", "fingerprint", [data("sheet", "staff_attendance"), t("summary", "text", true)], { ...TEAM, ...M }),
+  hr("hr_lateness", "time", "clock", [data("late", "late_absence", { notes: true }), t("summary", "text", true), t("actions", "list")], { ...TEAM, ...M }),
+  hr("hr_leave", "time", "calendar", [data("taken", "leave_taken"), data("balances", "leave_balances"), t("summary", "text", true)], { ...TEAM, ...M }),
+  hr("hr_overtime", "time", "clock", [data("overtime", "overtime_hours"), t("summary", "text", true)], { ...TEAM, ...M }),
+  pay("hr_payroll", "money", [data("payslips", "payroll"), t("summary", "text", true), t("changes", "list")]),
+  pay("hr_staff_cost", "calculator", [data("cost", "staff_cost"), t("summary", "text", true)]),
+  hr("hr_insurance", "pay", "shield-check", [data("insured", "insurance"), t("notes", "text", true)], { ...M, confidential: true }),
+  pay("hr_salary_review", "percentage", [
+    data("salaries", "salaries", { input: { id: "proposed", type: "money", against: "current", diff: "increase" }, notes: true }),
+    t("basis", "text", true), t("budget", "text"),
+  ], { cadence: null, reviewRequired: true }),
+  hr("hr_appraisal", "performance", "award", [
+    about("employee"), data("record", "appraisals"),
+    b("scores", "score", { points: [{ id: "goals", weight: 3 }, { id: "quality", weight: 2 }, { id: "productivity", weight: 2 }, { id: "teamwork" }, { id: "initiative" }] }),
+    t("strengths", "list"), t("improve", "list"), t("goals_next", "list"), t("summary", "text", true),
+  ], { ...TEAM, confidential: true }),
+  hr("hr_appraisal_results", "performance", "badge-check", [data("results", "appraisal_results"), t("summary", "text", true), t("actions", "list")], { confidential: true }),
+  hr("hr_training", "performance", "books", [
+    b("plan", "table", { columns: [c("course"), c("audience"), c("month"), c("cost", "money")], summaryOf: ["cost"] }),
+    data("log", "training"), t("summary", "text", true),
+  ], M),
+  hr("hr_skills", "performance", "bulb", [data("skills", "skills"), t("gaps", "list"), t("summary", "text", true)]),
+  hr("hr_behavior", "performance", "heart-rate", [data("behavior", "behavior"), t("summary", "text", true), t("actions", "list")], { confidential: true }),
+  hr("hr_investigation", "relations", "gavel", [
+    about("employee", false), t("subject", "text", true), t("attendees", "list"), t("statements", "list", true), t("documents", "list"),
+    t("findings", "text", true),
+    b("outcome", "choice", { options: ["no_action", "verbal_warning", "written_warning", "deduction", "suspension", "termination", "other"] }, true),
+    b("hr_sign", "signature", {}), b("employee_sign", "signature", {}),
+  ], { hrOnly: true, confidential: true }),
+  hr("hr_grievance_summary", "relations", "hand-holding-heart", [data("counts", "grievances"), t("summary", "text", true), t("actions", "list")], { ...M, confidential: true }),
+  hr("hr_movement", "exit", "arrow-up-right", [data("moves", "movement"), t("summary", "text", true)], M),
+  hr("hr_turnover", "exit", "recycle", [data("turnover", "turnover"), t("reasons", "list"), t("summary", "text", true)], M),
+  hr("hr_end_of_service", "exit", "stamp", [
+    about("employee"), data("leave", "leave_balances"),
+    b("dues", "table", { columns: [c("item"), c("amount", "money")] }),
+    b("custody", "checklist", { points: pts("laptop", "phone", "car", "keys", "card", "documents", "tools") }),
+    t("handover", "text", true), b("employee_sign", "signature", {}),
+  ], { hrOnly: true, confidential: true, reviewRequired: true }),
+  hr("hr_expiring", "records", "clock", [data("expiring", "expiring"), t("summary", "text", true), t("actions", "list")], M),
+  hr("hr_contracts", "records", "contract", [data("contracts", "contracts", { notes: true }), t("summary", "text", true)], M),
+  hr("hr_missing_files", "records", "file", [data("files", "missing_files"), t("plan", "text", true)], M),
+  hr("hr_safety_inspection", "records", "hard-hat", [
+    b("checks", "checklist", { points: pts("extinguishers", "exits", "first_aid", "electrical", "storage", "ppe", "cleanliness", "signs") }, true),
+    t("actions", "list"), b("sign", "signature", {}),
+  ], { ...TEAM, ...M }),
+  hr("hr_monthly", "records", "newspaper", [
+    data("kpis", "hr_kpis"), data("cost", "staff_cost"), t("summary", "text", true), t("highlights", "list"), t("next", "list"),
+  ], M),
+  hr("hr_headcount", "records", "building", [data("headcount", "headcount"), t("summary", "text", true)], M),
+  /* ── Projects (5C): starting, running, every project, closing. A report
+     about one project reads its numbers; the projects the writer can see
+     (the Projects app's own rule) when it covers them all. ── */
+  prj("prj_proposal", "start", "bulb", [
+    t("problem", "text", true), t("idea", "text", true),
+    b("cost", "table", { columns: [c("item"), c("amount", "money")] }),
+    t("benefit", "text", true), t("risks", "list"), t("timeline", "text"),
+  ], { reviewRequired: true }),
+  prj("prj_charter", "start", "flag-checkered", [
+    about("project"), data("facts", "project_overview"), t("goal", "text", true), t("in_scope", "list"), t("out_scope", "list"),
+    data("team", "project_team"), t("milestones", "list"), t("budget", "text"),
+  ], { reviewRequired: true }),
+  prj("prj_plan", "start", "calendar", [about("project"), data("schedule", "project_schedule"), data("team", "project_team"), t("phases", "list", true), t("resources", "text")]),
+  prj("prj_stakeholders", "start", "users", [
+    about("project"),
+    b("map", "table", { columns: [c("who"), c("role"), c("influence"), c("interest"), c("how")], summary: "none" }, true),
+  ]),
+  prj("prj_status", "execution", "clipboard", [
+    about("project"), data("facts", "project_overview"), data("done", "project_done"), data("overdue", "project_overdue"), data("milestones", "project_milestones"),
+    t("highlights", "text", true), t("risks", "list"), t("next", "list"),
+  ], { cadence: "weekly" }),
+  prj("prj_progress", "execution", "bullseye-arrow", [about("project"), data("schedule", "project_schedule"), t("summary", "text", true)]),
+  prj("prj_budget", "execution", "coins", [about("project"), data("budget", "project_budget"), data("expenses", "project_expenses"), t("summary", "text", true)]),
+  prj("prj_resources", "execution", "users", [about("project", false), data("team", "project_team"), t("needs", "text", true)], M),
+  prj("prj_overdue", "execution", "clock", [about("project", false), data("overdue", "project_overdue"), t("actions", "list", true)]),
+  prj("prj_dependencies", "execution", "key", [about("project", false), data("blocked", "project_blocked"), t("cross", "list"), t("summary", "text", true)]),
+  prj("prj_risks", "execution", "shield-check", [
+    about("project"),
+    b("risks", "table", { columns: [c("risk"), c("likelihood"), c("impact"), c("owner"), c("action"), c("status")], summary: "none" }, true),
+    t("issues", "list"),
+  ]),
+  prj("prj_change", "execution", "arrow-up-right", [
+    about("project"), b("kind", "choice", { options: ["scope", "schedule", "cost", "quality"] }, true),
+    t("change", "text", true), t("reason", "text", true),
+    b("impact", "table", { columns: [c("item"), c("days", "number"), c("cost", "money")] }),
+  ], { reviewRequired: true }),
+  prj("prj_milestone", "execution", "flag-checkered", [about("project"), data("milestones", "project_milestones"), data("done", "project_done"), t("delivered", "text", true), t("next", "list")], { ...R, reviewRequired: true }),
+  prj("prj_acceptance", "execution", "signature", [
+    about("project"), t("deliverable", "text", true),
+    b("checks", "checklist", { points: pts("scope", "quality", "documents", "training", "issues_listed") }, true),
+    t("open_issues", "list"), b("owner_sign", "signature", {}, true),
+  ]),
+  prj("prj_quality", "execution", "badge-check", [
+    about("project"), b("checks", "checklist", { points: pts("requirements", "tested", "reviewed", "documented", "standards") }, true),
+    t("issues", "list"), t("verdict", "text"),
+  ]),
+  prj("prj_portfolio", "portfolio", "briefcase", [data("portfolio", "portfolio"), t("summary", "text", true)], { cadence: "weekly" }),
+  prj("prj_at_risk", "portfolio", "flag-alt", [data("risky", "projects_at_risk", { notes: true }), t("summary", "text", true)], { cadence: "weekly" }),
+  prj("prj_closure", "closure", "box-circle-check", [
+    about("project"), data("facts", "project_overview"), data("budget", "project_budget"),
+    t("result", "text", true), t("went_well", "list"), t("lessons", "list"), t("repeat", "list"), t("stop", "list"),
+  ]),
+  prj("prj_post_review", "closure", "search", [
+    about("project"), b("benefit", "choice", { options: ["achieved", "partly", "not_achieved"] }, true), t("evidence", "text", true), t("followups", "list"),
+  ]),
+  prj("prj_team_eval", "closure", "award", [
+    about("project"), data("team", "project_team", { input: { id: "score", type: "number", min: 1, max: 5 }, notes: true }), t("summary", "text", true),
+  ], { confidential: true }),
+  /* ── Inventory (5C): a report NEVER changes stock — a count or a
+     write-off is adjusted in Inventory, with its own approval. ── */
+  inv("inv_count", "clipboard", [
+    about("warehouse"),
+    data("count", "stock_count", { input: { id: "counted", type: "number", against: "system", diff: "variance", valueBy: "unit_cost", value: "variance_value" }, notes: true }),
+    t("findings", "text", true), b("keeper_sign", "signature", {}),
+  ], { reviewRequired: true }),
+  inv("inv_writeoff", "trash", [
+    about("warehouse", false),
+    b("items", "table", { columns: [c("item"), c("quantity", "number"), c("value", "money"), c("reason")], summaryOf: ["value"] }, true),
+    data("posted", "stock_writeoffs"), t("cause", "text"), b("keeper_sign", "signature", {}),
+  ], { ...R, reviewRequired: true }),
+  inv("inv_movement", "pallet", [about("warehouse", false), data("moves", "stock_moves"), t("summary", "text", true)], { cadence: "daily" }),
+  inv("inv_low_stock", "box-open", [about("warehouse", false), data("low", "low_stock", { notes: true }), t("actions", "list", true)], { cadence: "weekly" }),
+  /* ── Finance (5C): the books' numbers — bank, cash and profit only with
+     «Bank & Profit». ── */
+  fin("fin_expenses", "receipt", [data("by_category", "expense_categories"), data("list", "company_expenses"), t("summary", "text", true)]),
+  fin("fin_petty_cash", "wallet", [
+    b("entries", "table", { columns: [c("date", "date"), c("description"), c("received", "money"), c("spent", "money")], summaryOf: ["received", "spent"] }, true),
+    t("balance", "text", true), b("custodian_sign", "signature", {}),
+  ], { app: "Expenses", reviewRequired: true }),
+  fin("fin_budget", "piggy-bank", [
+    data("budget", "expense_categories", { input: { id: "budget", type: "money", against: "actual", diff: "remaining" }, notes: true }),
+    t("summary", "text", true), t("actions", "list"),
+  ]),
+  fin("fin_cash_flow", "bank", [data("cash", "cash_position"), data("flow", "cash_flow"), t("summary", "text", true), t("forecast", "text")]),
+  fin("fin_statements", "balance-scale-left", [data("pl", "profit_loss"), data("ar", "ar_aging"), data("ap", "ap_aging"), t("summary", "text", true)]),
+  fin("fin_month_close", "stamp", [
+    data("checks", "month_close"),
+    b("steps", "checklist", { points: pts("bank_reconciled", "expenses_posted", "invoices_posted", "payroll_posted", "depreciation", "fx_revaluation", "period_locked") }),
+    data("pl", "profit_loss"), t("comment", "text", true),
+  ]),
   /* ── Asked for by events (Phase 3D, owner's picks 25 Sep 2026) ──
      Anyone may also start the first two themselves; the probation review
      only ever comes from its request, to the employee's manager. */
@@ -474,10 +671,18 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("away", "text"), t("catch_up", "list", true), t("priorities", "list", true), t("help", "text")] },
   { key: "attendance_note", family: "work", icon: "fingerprint", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
     sections: [t("what", "text"), t("reason", "text", true), t("covered", "text"), t("correction", "text")] },
-  { key: "probation_review", family: "hr", icon: "award", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, requestOnly: true,
+  { key: "probation_review", family: "hr", group: "hiring", icon: "award", cadence: null, recipients: "hr", reviewRequired: false, confidential: true, requestOnly: true,
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
+
+/** The groups a family's types show under on the Reports home (5C), in
+ *  order — each `grp.<family>.<group>`. A builder type has none: it shows
+ *  after them. */
+export const FAMILY_GROUPS: Partial<Record<ReportFamily, string[]>> = {
+  hr: ["hiring", "time", "pay", "performance", "relations", "exit", "records"],
+  projects: ["start", "execution", "portfolio", "closure"],
+};
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;

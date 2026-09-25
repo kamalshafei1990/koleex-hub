@@ -53,12 +53,16 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    anniversaries, and the invited visitors. Finance (owner's pick, 26 Sep
    2026): "Bank & Profit" — seeing bank balances, the cash position and
    profit; "Finance Approvals" — approving and rejecting in the approvals
-   queue. Both used to follow from the department's name (src/lib/experience). */
+   queue. Both used to follow from the department's name (src/lib/experience).
+   Reports 5C (owner's pick, 26 Sep 2026): "Payroll Reports" — starting the
+   salary report types, and reading salaries inside any report (the payroll
+   summary, the staff cost, the salary review). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
+  { name: "Payroll Reports", app: "Reports" },
   { name: BANK_PROFIT_MODULE, app: "Finance" },
   { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
 ];

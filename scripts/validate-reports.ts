@@ -89,11 +89,21 @@ import { fileURLToPath } from "node:url";
 import { stripComments } from "./lib/strip-comments";
 import { reportAccess, type ReportAccessFacts } from "../src/lib/reports/access";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, scoreAverage, tableSummary,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, STORED_LINK_TYPES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, scoreAverage, tableSummary,
   type ReportDataValue,
 } from "../src/lib/reports/templates";
 import { REPORT_TEMPLATES, reportTemplate, sectionFamilies } from "../src/lib/reports/catalog";
 import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, LIVE_SOURCES, OFFICE_READS, OFFICE_SOURCES, TEAM_SOURCES, dataRowHref, dataTotals, decisionHref, isOfficeSource, isTeamSource, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
+import {
+  BANK_PROFIT_SOURCES, DATA_ABOUT, FINANCE_SOURCES, HR_SOURCES, HR_TEAM_READS, PAYROLL_MODULE, PAYROLL_SOURCES, PROJECT_SOURCES, SOURCE_GROUPS, STOCK_SOURCES,
+  blockColumns, blockRows, isFinanceSource, isHrSource, isProjectSource, isStockSource, subjectOf, tagsOf,
+} from "../src/lib/reports/report-data";
+import {
+  agingRows, appraisalResultRows, budgetRows, categoryRows, expiryRows, fileGaps, headcountRows, hrKpiRows, movementRows, personDays, projectHealth, riskReasons,
+  scheduleRows as planRows, skillRows, toOrder, turnoverRows, NO_CATEGORY,
+} from "../src/lib/reports/numbers-5c";
+import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
+import { CAPABILITY_MODULES } from "../src/lib/permission-modules";
 import { entityHref } from "../src/lib/reports/link-targets";
 import { reportsT as mainWords } from "../src/lib/translations/reports";
 import { reportDescsT } from "../src/lib/translations/report-descs";
@@ -244,9 +254,17 @@ console.log("\n§3 templates and their words");
   const office5b = ["morning_brief", "decisions_waiting", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary",
     "office_readiness", "admin_affairs", "office_expenses", "assets_custody", "renewals", "visitors_log", "gov_bank", "company_documents", "stamp_log", "correspondence", "gift_register", "occasions"];
   const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...team5a, ...office5b, ...phase1.slice(6)];
-  eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), and the three that events ask for (Phase 3D), in that order");
-  expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
+  /* 5C (owner's picks 26 Sep 2026): HR's 31, Projects' 20, Inventory's 4 and Finance's 6, after the Phase 1 HR types. */
+  const hr5c = ["hr_hiring_plan", "hr_pipeline", "hr_interview", "hr_reference_check", "hr_offer", "hr_onboarding", "hr_new_hire", "hr_attendance", "hr_lateness", "hr_leave", "hr_overtime",
+    "hr_payroll", "hr_staff_cost", "hr_insurance", "hr_salary_review", "hr_appraisal", "hr_appraisal_results", "hr_training", "hr_skills", "hr_behavior", "hr_investigation", "hr_grievance_summary",
+    "hr_movement", "hr_turnover", "hr_end_of_service", "hr_expiring", "hr_contracts", "hr_missing_files", "hr_safety_inspection", "hr_monthly", "hr_headcount"];
+  const prj5c = ["prj_proposal", "prj_charter", "prj_plan", "prj_stakeholders", "prj_status", "prj_progress", "prj_budget", "prj_resources", "prj_overdue", "prj_dependencies", "prj_risks",
+    "prj_change", "prj_milestone", "prj_acceptance", "prj_quality", "prj_portfolio", "prj_at_risk", "prj_closure", "prj_post_review", "prj_team_eval"];
+  const invFin5c = ["inv_count", "inv_writeoff", "inv_movement", "inv_low_stock", "fin_expenses", "fin_petty_cash", "fin_budget", "fin_cash_flow", "fin_statements", "fin_month_close"];
+  eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, ...hr5c, ...prj5c, ...invFin5c, "return_plan", "attendance_note", "probation_review"],
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), and the three that events ask for (Phase 3D), in that order");
+  expect(REPORT_TEMPLATES.filter((t) => t.family === "hr" && !t.payrollOnly).every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
+  expect(REPORT_TEMPLATES.filter((t) => t.payrollOnly).every((t) => t.recipients === "manager" && t.confidential), "a salary type (5C) goes to the writer's manager only, and is confidential");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
 
@@ -1256,7 +1274,7 @@ console.log("\n§15 reports that events ask for");
     (c) => { const a = c.indexOf("const events = await runReportEvents();"); const b = c.indexOf("const run = await runReportNudges();"); return a > 0 && b > a ? [] : ["a request asked now waits a run for its reminder"]; },
     (src) => src.replace("  const events = await runReportEvents();\n  const run = await runReportNudges();", "  const run = await runReportNudges();\n  const events = await runReportEvents();"));
   rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
-    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\) && \(!tpl\.officeOnly \|\| hasOffice\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
+    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\) && \(!tpl\.officeOnly \|\| hasOffice\)\s*&& \(!tpl\.payrollOnly \|\| hasPayroll\) && appOk\(tpl\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
     (src) => src.replace("!tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)", "!hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)"));
   rule("a confidential request is never linked from someone else's calendar", "src/lib/server/calendar-feed.ts",
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
@@ -1383,7 +1401,7 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (src) => src.replace(".filter((r) => reportAccess({", ".filter((r) => r && ({"));
   const LS = "src/app/api/work-reports/links/search/route.ts";
   rule("each kind of record is searched only by those who have its app", LS,
-    (c) => (/const MODULE: Partial<Record<ReportLinkType, string>> = \{ customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices" \};/.test(c) && /if \(mod && \(await requireModuleAccess\(auth, mod\)\)\) return NextResponse\.json\(\{ hits: \[\], denied: true \}/.test(c) ? [] : ["anyone can list customers, suppliers, orders, quotations or invoices"]),
+    (c) => (/const MODULE: Partial<Record<ReportLinkType, string>> = \{ customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices", project: "Projects", warehouse: "Inventory" \};/.test(c) && /if \(mod && \(await requireModuleAccess\(auth, mod\)\)\) return NextResponse\.json\(\{ hits: \[\], denied: true \}/.test(c) ? [] : ["anyone can list customers, suppliers, orders, quotations or invoices"]),
     (src) => src.replace("if (mod && (await requireModuleAccess(auth, mod))) return", "if (false) return"));
   rule("the typed text never reaches a filter with the characters PostgREST reads", LS,
     (c) => (/\.replace\(\/\[,\(\)%\*\\\\\]\/g, " "\)/.test(c) ? [] : ["a comma or bracket can break or widen the search"]),
@@ -1487,7 +1505,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
 
   /* Every source complete */
   /* The author's own documents; the team's numbers (5A) are checked in §21. */
-  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src) && !isOfficeSource(src));
+  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src) && !isOfficeSource(src) && !isHrSource(src) && !isProjectSource(src) && !isStockSource(src) && !isFinanceSource(src));
   expect(docSources.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && ["no", "title"].includes(DATA_COLUMNS[src][0].id) && ["customer", "supplier", "item", "category"].includes(DATA_COLUMNS[src][1].id)),
     "every numbers source has its columns (what names the document, then who or what), its app and what a row opens");
   eq(docSources.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase", "Expenses"], "each source is gated by the app it comes from");
@@ -1645,7 +1663,7 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
     },
     (src) => src.replace('.not("status", "in", "(draft,cancelled,paid)")', '.not("status", "in", "(draft,void,cancelled,paid)")'));
   rule("a numbers read that fails says so — never passes for nothing", RD,
-    (c) => (c.includes("return [src, { source: src, rows: [], capturedAt, failed: true }];") ? [] : ["a failed read shows as an empty period"]),
+    (c) => ((c.match(/return \[src, \{ source: src, rows: \[\], capturedAt, failed: true \}\];/g) ?? []).length >= 2 ? [] : ["a failed read shows as an empty period"]),
     (src) => src.replace("return [src, { source: src, rows: [], capturedAt, failed: true }];", "return [src, { source: src, rows: [], capturedAt }];"));
   rule("the screen and the print say a failed read out loud", "src/components/reports/app/ReportBlocks.tsx",
     (c) => (c.includes('if (data.failed) return <p className="text-[12.5px] text-amber-500">{t("blk.dataFailed")}</p>;') && read("src/lib/reports/print-layout.ts").includes('if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };') ? [] : ["a failed read reads as nothing"]),
@@ -1686,8 +1704,8 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
   const fam = (f: string) => REPORT_TEMPLATES.filter((t) => t.family === f).map((t) => t.key);
   eq([fam("logistics"), fam("travel")], [["container_loading", "shipment_update", "damage_claim", "customs_clearance"], ["trip_report", "delegation_visit", "meeting_minutes", "decision_log"]], "the Logistics and Travel families hold their four types each");
   eq(fam("service"), ["service_visit", "warranty_claim", "customer_training", "spare_parts_request", "installation"], "After-sales holds the four of 4D and the installation of 4A");
-  eq(REPORT_TEMPLATES.filter((t) => t.range).map((t) => t.key), ["trip_report", "delegation_visit", "team_summary", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary", "visitors_log", "gov_bank", "stamp_log", "correspondence", "gift_register", "occasions"],
-    "only a trip, a delegation visit, a team summary (5A) and the CEO office's logs and periods (5B) span days their author picks");
+  eq(REPORT_TEMPLATES.filter((t) => t.range).map((t) => t.key), ["trip_report", "delegation_visit", "team_summary", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary", "visitors_log", "gov_bank", "stamp_log", "correspondence", "gift_register", "occasions", "prj_milestone", "inv_writeoff"],
+    "only a trip, a delegation visit, a team summary (5A), the CEO office's logs and periods (5B), a project's phase and a write-off (5C) span days their author picks");
   expect(REPORT_TEMPLATES.filter((t) => t.range).every((t) => t.cadence === null), "a range is never an obligation's period (no cadence)");
   /* A range's last day */
   eq([rangeEnd("2026-09-10", "2026-09-14"), rangeEnd("2026-09-10", "2026-09-01"), rangeEnd("2026-09-10", null), rangeEnd("2026-09-10", "not a date"), rangeEnd("2026-09-10", "2027-01-01")],
@@ -1726,7 +1744,7 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
     (c) => (c.includes("{tpl.range ? (") && c.includes('<DatePicker id="kx-rep-date-to" value={draft.dateTo}') && c.includes("dateTo: tpl.range ? d.dateTo || undefined : undefined") && c.includes("moveCarry(draftRef.current.date, `${draftRef.current.date}|${to}`, to)") ? [] : ["a trip cannot span its days"]),
     (src) => src.replace("dateTo: tpl.range ? d.dateTo || undefined : undefined", "dateTo: undefined"));
   rule("a numbers block names each document by its first column — a number or an expense's title", "src/components/reports/app/ReportBlocks.tsx",
-    (c) => (c.includes("const text = dataCell(t, data.source, r, first);") && c.includes("{c === first ? docLink(r) : dataCell(t, data.source, r, c)}") ? [] : ["an expense row shows no name"]),
+    (c) => (c.includes("const text = dataCell(t, data.source, r, first);") && c.includes("{c === first ? docLink(r) : cell(r, c)}") ? [] : ["an expense row shows no name"]),
     (src) => src.replace("const text = dataCell(t, data.source, r, first);", 'const text = String(r.cells.no ?? "—");'));
 }
 
@@ -2290,8 +2308,8 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })") ? [] : ["a copy loses the line under its name"]),
     (src) => src.replace("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })", "copyOfBuiltin(key, { ...reportsT, ...REPORT_SECTION_WORDS })"));
   rule("before the bundle answers, no one is offered an office or a team type", "src/components/reports/app/ReportsApp.tsx",
-    (c) => (c.includes("REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly)") ? [] : ["a clerk sees the CEO office's types flash by"]),
-    (src) => src.replace(" && !x.teamOnly && !x.officeOnly)", ")"));
+    (c) => (c.includes("REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)") ? [] : ["a clerk sees the CEO office's types flash by"]),
+    (src) => src.replace(" && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)", ")"));
   rule("the builder's list knows an office-only type", "src/lib/server/reports/custom-templates.ts",
     (c) => (c.includes("office_only:def->officeOnly") && c.includes('officeOnly: r.office_only === true || r.office_only === "true",') ? [] : ["a builder type loses its office flag in the list"]),
     (src) => src.replace('    officeOnly: r.office_only === true || r.office_only === "true",\n', ""));
@@ -2359,6 +2377,194 @@ console.log("\n§23 the report page carries no catalog (Phase 5C)");
     (src) => src.replace("cadence: src?.cadence ?? null", "cadence: null"));
   const dg5 = buildCarry(reportTemplate("daily")!, periodFor("daily", "2026-09-25"), [{ id: "y", template_key: "daily", period_start: "2026-09-24", period_end: "2026-09-24", period_key: "2026-09-24", sections: [{ id: "tomorrow", items: ["Call Cairo"] }], version: 1, superseded: false }], { id: "me", periodKey: "2026-09-25" }, reportTemplate);
   eq(dg5.map((g) => g.cadence), ["daily"], "yesterday's daily is dated by its day — the group says it is a daily");
+}
+
+/* ── §24 HR, Projects, Inventory and Finance (Phase 5C) ───────────────── */
+console.log("\n§24 HR, Projects, Inventory and Finance: who reads how far, about one record, a figure typed beside the system's");
+{
+  const U1 = "11111111-1111-4111-8111-111111111111", U2 = "22222222-2222-4222-8222-222222222222", U3 = "33333333-3333-4333-8333-333333333333";
+  const fam = (f: string) => REPORT_TEMPLATES.filter((t) => t.family === f);
+  const byId = (xs: ReturnType<typeof normalizeSections>, id: string) => xs.find((x) => x.id === id)!;
+
+  /* The catalog: the owner's four groups, whole */
+  eq([fam("hr").length, fam("projects").length, fam("inventory").length, fam("finance").length], [36, 20, 4, 6], "HR holds its 36 (31 new beside the five before), Projects 20, Inventory 4, Finance 6");
+  expect(["projects", "inventory", "finance"].every((f) => REPORT_FAMILIES.includes(f as never)), "the three new families are families");
+  expect(fam("hr").every((t) => !!t.group && FAMILY_GROUPS.hr!.includes(t.group)) && fam("projects").every((t) => !!t.group && FAMILY_GROUPS.projects!.includes(t.group)),
+    "every HR and Projects type shows under one of its family's groups");
+  expect(Object.entries(FAMILY_GROUPS).every(([f, gs]) => gs!.every((g) => reportsT[`grp.${f}.${g}`]?.en && reportsT[`grp.${f}.${g}`]?.zh && reportsT[`grp.${f}.${g}`]?.ar)), "every group's heading speaks en / zh / ar");
+  const newOnes = [...fam("hr"), ...fam("projects"), ...fam("inventory"), ...fam("finance")].filter((t) => !["hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview", "probation_review"].includes(t.key));
+  eq(newOnes.length, 61, "sixty-one new types (owner's picks 26 Sep 2026)");
+  expect(newOnes.every((t) => t.app || t.hrOnly || t.payrollOnly), "no new type is offered to everyone: each needs its app, HR · create or «Payroll Reports»");
+  expect(fam("projects").every((t) => t.app === "Projects") && fam("inventory").every((t) => t.app === "Inventory") && fam("finance").every((t) => t.app === "Finance" || (t.key === "fin_petty_cash" && t.app === "Expenses")),
+    "a Projects type needs Projects, Inventory Inventory, Finance Finance — petty cash the Expenses app (the custodian is rarely an accountant)");
+  eq(REPORT_TEMPLATES.filter((t) => t.payrollOnly).map((t) => t.key), ["hr_payroll", "hr_staff_cost", "hr_salary_review"], "the salary types — payroll, staff cost, salary review — need «Payroll Reports» (owner's pick)");
+  expect(CAPABILITY_MODULES.some((c) => c.name === PAYROLL_MODULE && c.app === "Reports"), "«Payroll Reports» is a Roles row under Reports, closed by default like every capability");
+  expect(["hr_interview", "hr_reference_check", "hr_offer", "hr_investigation", "hr_end_of_service", "hr_appraisal", "hr_behavior", "hr_insurance", "prj_team_eval"].every((k) => reportTemplate(k)?.confidential),
+    "an interview, a reference check, an offer, an investigation, an end of service, an appraisal, behavior, insurance and a team evaluation are confidential by type");
+  expect(["hr_reference_check", "hr_offer", "hr_investigation", "hr_end_of_service"].every((k) => reportTemplate(k)?.hrOnly), "only HR (HR · create) starts a reference check, an offer, an investigation minute or an end of service");
+
+  /* About one record */
+  const aboutKinds = new Set(Object.values(DATA_ABOUT).map((a) => a!.type));
+  expect([...aboutKinds].every((k) => REPORT_LINK_TYPES.includes(k)) && !["project", "employee", "warehouse"].some((k) => STORED_LINK_TYPES.includes(k as never)),
+    "a block can be about a project, an employee or a warehouse — links that no record page lists (an employee's page never shows the HR reports about them)");
+  const needsLink: string[] = [];
+  for (const t of REPORT_TEMPLATES) for (const s of t.sections) {
+    const a = s.kind === "data" && s.source ? DATA_ABOUT[s.source] : undefined;
+    if (!a?.required) continue;
+    const l = t.sections.find((x) => x.kind === "links" && (x.linkTypes ?? []).includes(a.type));
+    if (!l || l.max !== 1) needsLink.push(`${t.key}.${s.id}`);
+  }
+  expect(needsLink.length === 0, "every block about one record sits in a type whose links pick exactly that one (max 1)", needsLink.join(", "));
+  eq(subjectOf([{ links: [{ type: "customer", id: "c", label: "C" }] }, { links: [{ type: "project", id: U1, label: "P" }, { type: "project", id: U2, label: "Q" }] }], "project"), U1, "what a report is about is the first of that kind it links");
+  eq(subjectOf([{ links: [] }], "employee"), null, "…and nothing when none is linked");
+  const count = reportTemplate("inv_count")!;
+  eq(byId(normalizeSections(count, [{ id: "warehouse", links: [{ type: "warehouse", id: U1, label: "A" }, { type: "warehouse", id: U2, label: "B" }] }]), "warehouse").links?.length, 1, "a links block of max 1 keeps one record");
+
+  /* A figure typed beside the system's */
+  const cnt = count.sections.find((x) => x.id === "count")!;
+  const typed = byId(normalizeSections(count, [{ id: "count", inputs: { [U1]: "12", [U2]: "1,000.5", [U3]: "x", "not-a-row": "5" }, notes: { [U1]: " two broken " } }]), "count");
+  eq(typed.inputs, { [U1]: "12", [U2]: "1000.5" }, "the count keeps a number per stock line — commas out; a word, or a row that is no record, dropped");
+  eq(typed.notes, { [U1]: "two broken" }, "…and the keeper's note beside it");
+  const budget = reportTemplate("fin_budget")!;
+  eq(byId(normalizeSections(budget, [{ id: "budget", inputs: { [`${U1}:USD`]: "500", [`${U1}:usd1`]: "9" } }]), "budget").inputs, { [`${U1}:USD`]: "500" }, "a budget is typed per category in one currency (<id>:USD)");
+  const team = reportTemplate("prj_team_eval")!;
+  eq(byId(normalizeSections(team, [{ id: "team", inputs: { [U1]: "4", [U2]: "9", [U3]: "0" } }]), "team").inputs, { [U1]: "4" }, "a score is kept only 1–5");
+  const v: ReportDataValue = { source: "stock_count", capturedAt: "2026-09-26T00:00:00Z", rows: [
+    { key: U1, currency: "CNY", cells: { code: "A1", item: "Needle", unit: "pc", system: 10, unit_cost: 2.5 } },
+    { key: U2, currency: "CNY", cells: { code: "B2", item: "Oil", unit: "l", system: 4, unit_cost: 30 } },
+    { key: U3, currency: "CNY", cells: { code: "C3", item: "Belt", unit: "pc", system: 7, unit_cost: 12 } },
+  ] };
+  eq(blockColumns("stock_count", cnt.input).map((c) => c.id), ["code", "item", "unit", "system", "unit_cost", "counted", "variance", "variance_value"], "a count shows the system's figure, what was counted, the difference and what it is worth");
+  const rows = blockRows(v, cnt.input, { [U1]: "8", [U2]: "4" });
+  eq(rows.map((r) => [r.cells.counted, r.cells.variance, r.cells.variance_value]), [[8, -2, -5], [4, 0, 0], [null, null, null]], "the difference is counted − system and worth difference × unit cost; a line nobody counted stays empty, never 0");
+  eq(dataTotals(v, cnt.input, { [U1]: "8", [U2]: "4" }), [{ col: "variance_value", currency: "CNY", value: -5 }], "the total is what the difference is worth — never a sum of unit costs");
+  const sal: ReportDataValue = { source: "salaries", capturedAt: "2026-09-26T00:00:00Z", rows: [
+    { key: U1, currency: "EGP", cells: { person: "A", department: "", current: 10000 } },
+    { key: U2, currency: "USD", cells: { person: "B", department: "", current: 2000 } },
+    { key: U3, currency: "EGP", cells: { person: "C", department: "", current: 8000 } },
+  ] };
+  const salIn = reportTemplate("hr_salary_review")!.sections.find((x) => x.id === "salaries")!.input;
+  eq(dataTotals(sal, salIn, { [U1]: "11000", [U3]: "8800" }).filter((x) => x.col === "increase"), [{ col: "increase", currency: "EGP", value: 1800 }], "the raises add up per currency — EGP and USD never together");
+
+  /* How each block counts */
+  const days = [
+    { date: "2026-09-01", status: "present", hours: 8, lateMin: 0, overtimeH: 0, overtimeState: null, overtimeApprovedH: 0 },
+    { date: "2026-09-02", status: "late", hours: 7.5, lateMin: 25, overtimeH: 1, overtimeState: "pending", overtimeApprovedH: 0 },
+    { date: "2026-09-03", status: "absent", hours: null, lateMin: 0, overtimeH: 0, overtimeState: null, overtimeApprovedH: 0 },
+    { date: "2026-09-04", status: "leave", hours: null, lateMin: 0, overtimeH: 0, overtimeState: null, overtimeApprovedH: 0 },
+    { date: "2026-09-05", status: "weekend", hours: null, lateMin: 0, overtimeH: 0, overtimeState: null, overtimeApprovedH: 0 },
+    { date: "2026-09-06", status: "present", hours: 9, lateMin: 0, overtimeH: 1.5, overtimeState: "approved", overtimeApprovedH: 1.5 },
+    { date: "2026-10-01", status: "present", hours: 8, lateMin: 0, overtimeH: 0, overtimeState: null, overtimeApprovedH: 0 },
+  ];
+  eq(personDays(days, "2026-09-01", "2026-09-30"), { workdays: 5, present: 3, late: 1, absent: 1, leave: 1, hours: 24.5, lateMin: 25, overtimeDays: 2, approvedH: 1.5, pendingH: 1 },
+    "a person's month: a weekend is no working day, a late day is also present, only approved overtime is approved, a day outside the report never counts");
+  eq(fileGaps({ department: null, managerId: "m", hireDate: "2024-01-01", birthDate: null, idDocument: false, emergency: true, bank: true, documents: 0 }), ["no_department", "no_birth_date", "no_id_document", "no_documents"],
+    "a file's gaps are named, never shown (a bank account's presence only)");
+  const staff = [
+    { id: "a", name: "A", department: "Sales", status: "active", type: "full_time", hire: "2025-01-10", left: null },
+    { id: "b", name: "B", department: "Sales", status: "terminated", type: "full_time", hire: "2024-05-01", left: "2026-09-12" },
+    { id: "c", name: "C", department: "Ops", status: "active", type: "intern", hire: "2026-09-03", left: null },
+    { id: "d", name: "D", department: "", status: "terminated", type: "part_time", hire: "2023-01-01", left: "2026-11-01" },
+  ];
+  eq(turnoverRows(staff, "2026-09-01", "2026-09-30").map((r) => [r.cells.department, r.cells.start_n, r.cells.hires, r.cells.leavers, r.cells.end_n, r.cells.rate]),
+    [["*", 3, 1, 1, 3, 33.3], ["—", 1, 0, 0, 1, 0], ["Ops", 0, 1, 0, 1, 0], ["Sales", 2, 0, 1, 1, 66.7]],
+    "turnover per department: who was there on the first day, joined, left, is there on the last — someone who left later still counts in the month; the company first");
+  eq(headcountRows(staff).map((r) => [r.cells.department, r.cells.people, r.cells.full_time, r.cells.intern]), [["*", 2, 1, 1], ["Ops", 1, 0, 1], ["Sales", 1, 1, 0]], "the headcount counts the people there now, by contract");
+  eq(movementRows([{ key: "x", person: "A", change: "hire", date: "2026-08-31", detail: "" }, { key: "y", person: "B", change: "exit", date: "2026-09-12", detail: "Sales" }], "2026-09-01", "2026-09-30").map((r) => r.key), ["y"], "movement lists only the days of the report");
+  eq(expiryRows([{ key: "k1", person: "A", employeeId: "e", what: "visa", date: "2026-10-01" }, { key: "k2", person: "B", employeeId: "f", what: "contract", date: "2027-02-01" }, { key: "k3", person: "C", employeeId: "g", what: "licence", date: "2026-09-01" }], "2026-09-26", 90).map((r) => [r.key, r.cells.days_left]),
+    [["k1", 5]], "what expires: the next ninety days only, with the days left");
+  eq(appraisalResultRows([{ department: "Sales", status: "completed", overall: 4 }, { department: "Sales", status: "completed", overall: 3 }, { department: "Sales", status: "pending", overall: null }])[0].cells, { department: "Sales", appraised: 3, done_n: 2, average: 3.5, lowest: 3, highest: 4 }, "appraisal results count the finished ones only");
+  eq(skillRows([{ id: "s1", name: "Welding" }, { id: "s2", name: "Unused" }], [{ skillId: "s1", score: 2, required: 3 }, { skillId: "s1", score: 4, required: null }], new Map([["s1", 1]])).map((r) => [r.cells.skill, r.cells.assessed, r.cells.average, r.cells.below]), [["Welding", 2, 3, 1]],
+    "a skill: who is assessed, the average, who is under what their own position asks — a skill nobody has or asks for is left out");
+  eq(hrKpiRows({ headcount: 6, hires: 1, leavers: 0, turnover: 0, absentDays: 2, lateDays: 3, leaveDays: 1, overtimeHours: 4.25, openJobs: 1, applicants: 5 }).map((r) => r.cells.metric), ["headcount", "hires", "leavers", "turnover_rate", "absent_days", "late_days", "leave_days", "overtime_hours", "open_jobs", "applicants"], "the month's HR numbers, one row each");
+  const p0 = { id: "p", name: "P", status: "active", progress: 40, plannedStart: "2026-01-01", plannedEnd: "2026-09-01", budgetHours: 10, loggedHours: 12, open: 2, overdue: 1, done: 3 };
+  eq([projectHealth(p0, "2026-09-26"), projectHealth({ ...p0, plannedEnd: "2026-12-01" }, "2026-09-26"), projectHealth({ ...p0, plannedEnd: "2026-12-01", overdue: 0, loggedHours: 5 }, "2026-09-26"), projectHealth({ ...p0, status: "completed" }, "2026-09-26")],
+    ["late", "at_risk", "on_track", null], "a project is late past its end with work open, at risk with work overdue or hours over budget, else on track; a finished one none");
+  eq(riskReasons(p0, "2026-09-26"), { reasons: ["overdue_tasks", "past_end", "over_hours"], daysOver: 25 }, "…and why, with the days past its end");
+  eq(budgetRows({ budgetHours: 40, loggedHours: 30, budgetAmount: 1000, rate: 20, currency: "USD" }).map((r) => [r.key, r.cells.budget, r.cells.actual, r.cells.remaining, r.cells.used, r.currency ?? null]),
+    [["hours", 40, 30, 10, 75, null], ["amount", 1000, 600, 400, 60, "USD"]], "a project's budget: hours, and money at the billing rate — what is left and how much is used");
+  eq(planRows([{ key: "a", title: "A", kind: "task", due: "2026-09-10", done: "2026-09-13", reached: true }, { key: "b", title: "B", kind: "milestone", due: "2026-09-20", done: null, reached: false }, { key: "c", title: "C", kind: "task", due: "2026-10-10", done: null, reached: false }, { key: "d", title: "D", kind: "task", due: null, done: null, reached: false }], "2026-09-26").map((r) => [r.key, r.cells.slip]),
+    [["a", 3], ["b", 6], ["c", null]], "the plan: done 3 days late, open 6 days past its date, not yet due — and a step with no date is left out");
+  eq([toOrder(3, 10, 50), toOrder(12, 10, null), toOrder(4, 10, 5)], [47, 0, 6], "what to order brings stock back to its maximum (else the reorder point)");
+  eq(agingRows([{ due: "2026-10-01", balance: 100, currency: "USD" }, { due: "2026-09-10", balance: 50, currency: "USD" }, { due: "2026-05-01", balance: 70, currency: "USD" }, { due: "2026-09-20", balance: 30, currency: "CNY" }, { due: null, balance: 0, currency: "USD" }], "2026-09-26").map((r) => [r.cells.bucket, r.currency, r.cells.balance]),
+    [["current", "USD", 100], ["d1_30", "CNY", 30], ["d1_30", "USD", 50], ["d90_plus", "USD", 70]], "what is owed, by age and currency — never mixed, nothing owed left out");
+  eq(categoryRows([{ categoryId: U1, category: "Travel", amount: 10, currency: "usd" }, { categoryId: U1, category: "Travel", amount: 5, currency: "USD" }, { categoryId: null, category: "", amount: 3, currency: "EGP" }], "—").map((r) => [r.key, r.cells.actual]),
+    [[`${U1}:USD`, 15], [`${NO_CATEGORY}:EGP`, 3]], "spending per category in each currency — the row a budget is typed beside");
+  eq(tagsOf("no_bank|no_manager"), ["no_bank", "no_manager"], "a cell of several coded values reads back each");
+
+  /* Words */
+  const lacking: string[] = [];
+  const allSources = [...HR_SOURCES, ...PROJECT_SOURCES, ...STOCK_SOURCES, ...FINANCE_SOURCES];
+  for (const src of allSources) {
+    if (!reportBlocksT[`blk.de.${src}`]) lacking.push(`blk.de.${src}`);
+    if (!reportBuilderT[`tb.src.${src}`]) lacking.push(`tb.src.${src}`);
+  }
+  for (const t of REPORT_TEMPLATES) for (const s of t.sections) {
+    if (s.kind !== "data" || !s.source) continue;
+    for (const c of blockColumns(s.source, s.input)) if (!reportBlocksT[`blk.dc.${c.id}`]) lacking.push(`blk.dc.${c.id}`);
+    if (s.notes && !reportBlocksT[`blk.dn.${s.source}`]) lacking.push(`blk.dn.${s.source}`);
+  }
+  for (const k of ["blk.dataPick.project", "blk.dataPick.employee", "blk.dataPick.warehouse", "blk.dataNoCost", "blk.allCompany", "blk.tagSep", "blk.link.project", "blk.link.employee", "blk.link.warehouse", "tb.payrollOnly", "tb.payrollOnlyHint", "tb.p.about"]) if (!reportsT[k] && !reportBuilderT[k]) lacking.push(k);
+  expect(lacking.length === 0, "every new source, column, note, empty line and link kind speaks — and the builder names each source", [...new Set(lacking)].slice(0, 12).join(", "));
+  expect(SOURCE_GROUPS.flatMap((g) => g.sources).sort().join() === [...REPORT_DATA_SOURCES].sort().join(), "the builder offers every source, each under the app it comes from — once");
+
+  /* Who reads how far — the code says it */
+  const HRD = "src/lib/server/reports/hr-data.ts", PD = "src/lib/server/reports/project-data.ts", SD = "src/lib/server/reports/stock-data.ts", FD = "src/lib/server/reports/finance-data.ts";
+  rule("a salary needs «Payroll Reports» whatever type it sits in", HRD,
+    (c) => (/if \(isPayrollSource\(src\)\) \{\s*if \(!\(await sh\.payroll\(\)\)\) return "denied";/.test(c) ? [] : ["anyone with HR reads the salaries"]),
+    (src) => src.replace('if (!(await sh.payroll())) return "denied";', ""));
+  rule("a manager without HR · view reads only their own team — and only people's days", HRD,
+    (c) => (/\} else if \(isHrTeamRead\(src\)\) \{\s*const team = await sh\.team\(\);\s*if \(!team\.size\) return "denied";\s*allowed = \(s\) => team\.has\(s\.id\);/.test(c) && /if \(!allowed\) return "denied";/.test(c) ? [] : ["a manager reads the whole company's HR"]),
+    (src) => src.replace("allowed = (s) => team.has(s.id);", "allowed = () => true;"));
+  rule("a block about one employee reads them only when the writer's reach holds them", HRD,
+    (c) => (c.includes('return s && allowed(s) ? [s] : "denied";') ? [] : ["any employee's numbers by picking them"]),
+    (src) => src.replace('return s && allowed(s) ? [s] : "denied";', 'return s ? [s] : "denied";'));
+  rule("insurance needs the role's private switch (its provider, class and expiry are private columns)", HRD,
+    (c) => (c.includes('if (!canViewPrivate(x.auth)) return "denied";') && c.includes('if (priv) add("insurance", r.insurance_expiry_date);') ? [] : ["private insurance data shows to anyone with HR"]),
+    (src) => src.replace('if (!canViewPrivate(x.auth)) return "denied";', ""));
+  rule("a grievance summary counts — never a name, a title or a word", HRD,
+    (c) => { const a = c.indexOf('case "grievances": {'); const b = c.indexOf("case ", a + 20); const body = a < 0 ? "" : c.slice(a, b); return /from\("work_reports"\)\.select\("id, submitted_at, work_report_recipients\(read_at, acknowledged_at\)"\)/.test(body) && !/title|sections|author/.test(body) ? [] : ["a grievance's words or its author reach the summary"]; },
+    (src) => src.replace('select("id, submitted_at, work_report_recipients(read_at, acknowledged_at)")', 'select("id, title, submitted_at, work_report_recipients(read_at, acknowledged_at)")'));
+  rule("a project's numbers are the Projects app's own reach — a super admin all, anyone else their involved projects", PD,
+    (c) => (c.includes("if (!auth.is_super_admin) q = q.or(await involvedProjectsOr(auth.tenant_id ?? \"\", auth.account_id));") && c.includes('if (subject && !visible.some((p) => p.id === subject)) return "denied";') ? [] : ["any project's numbers by linking it"]),
+    (src) => src.replace('if (subject && !visible.some((p) => p.id === subject)) return "denied";', ""));
+  rule("a project's expenses also need the Expenses app", PD,
+    (c) => (c.includes('if (await requireModuleAccess(x.auth, "Expenses")) return "denied";') ? [] : ["a project member reads the project's spending"]),
+    (src) => src.replace('if (await requireModuleAccess(x.auth, "Expenses")) return "denied";', ""));
+  rule("what stock is worth needs the role's cost switch — and says so when hidden", SD,
+    (c) => (c.includes("const cost = canSeeCostData(x.auth);") && c.includes("unit_cost: cost ? v?.avg ?? null : null") && c.includes("return cost ? { rows } : { rows, noCost: true };") ? [] : ["a keeper sees what stock costs"]),
+    (src) => src.replace("unit_cost: cost ? v?.avg ?? null : null", "unit_cost: v?.avg ?? null"));
+  rule("finance numbers pass the Finance door; bank, cash and profit «Bank & Profit»", FD,
+    (c) => (c.includes('if (!(await sh.door())) return "denied";') && c.includes('if (isBankProfitSource(src) && !(await sh.bank())) return "denied";') && c.includes("door: memo(async () => (await requireFinanceNumbers(auth)) === null)") ? [] : ["anyone reads the books"]),
+    (src) => src.replace('if (isBankProfitSource(src) && !(await sh.bank())) return "denied";', ""));
+  expect(BANK_PROFIT_SOURCES.every((s) => DATA_MODULE[s] === "Bank & Profit") && PAYROLL_SOURCES.every((s) => DATA_MODULE[s] === PAYROLL_MODULE), "a block that says «no access» names the right it lacks — «Bank & Profit», «Payroll Reports»");
+  expect(HR_TEAM_READS.every((s) => isHrSource(s)) && !(HR_TEAM_READS as readonly string[]).some((s) => (PAYROLL_SOURCES as readonly string[]).includes(s) || ["insurance", "behavior", "grievances", "skills"].includes(s)),
+    "a manager's team reads are about people's days — never a salary, insurance, behavior, grievances or skills");
+  /* Nothing here writes — a report never changes stock or the books (owner's pick) */
+  const writes = [HRD, PD, SD, FD, "src/lib/reports/numbers-5c.ts"].filter((f) => /\.(insert|update|upsert|delete)\(|\.rpc\(/.test(code(read(f))));
+  expect(writes.length === 0, "the new numbers only read — a count or a write-off never changes stock, a report never touches the books", writes.join(", "));
+  rule("an approved count or write-off leaves stock alone — Inventory adjusts it, with its own approval", SD,
+    (c) => (!/inventory_stock_(movements|balances)"\)\.(insert|update|upsert)/.test(c) ? [] : ["a report moves stock"]),
+    (src) => src.replace('let q = supabaseServer.from("inventory_stock_balances").select(', 'await supabaseServer.from("inventory_stock_balances").update({ qty_on_hand: 0 }); let q = supabaseServer.from("inventory_stock_balances").select('));
+  rule("the 5C numbers are dispatched with the writer's reach, and ask for the record when none is picked", "src/lib/server/reports/report-data.ts",
+    (c) => (c.includes('if (got === "about") return [src, { source: src, rows: [], capturedAt, needsAbout: DATA_ABOUT[src]!.type }];') && c.includes('if (isProjectSource(src) && (await requireModuleAccess(auth, "Projects"))) return') && c.includes('if (isStockSource(src) && (await requireModuleAccess(auth, "Inventory"))) return') && c.includes("const about = <T extends ReportSubject>(type: T) => subjectOf(linked, type);") ? [] : ["a block about one record reads everything, or an app's numbers pass without it"]),
+    (src) => src.replace('if (isStockSource(src) && (await requireModuleAccess(auth, "Inventory"))) return [src, { source: src, rows: [], capturedAt, denied: true }];', ""));
+  rule("picking another record re-reads the numbers", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("if (linkWas.current === linkKey) return;") && c.includes("void flush().then((ok) => { if (ok) moveCarry(d.date, carry.key, tpl?.range ? d.dateTo : undefined); });") ? [] : ["the numbers stay those of the first project picked"]),
+    (src) => src.replace("void flush().then((ok) => { if (ok) moveCarry(d.date, carry.key, tpl?.range ? d.dateTo : undefined); });", ""));
+  rule("a project, an employee or a warehouse is never written as a record page's link", "src/lib/server/reports/links.ts",
+    (c) => (c.includes("const stored = (xs: ReportLink[]) => xs.filter((l) => STORED_LINK_TYPES.includes(l.type));") && c.includes("const after = stored(afterAll);") ? [] : ["the CHECK refuses the write, and an employee's page could list their HR reports"]),
+    (src) => src.replace("const after = stored(afterAll);", "const after = afterAll;"));
+  rule("the builder's list keeps a salary or an app type's rule", "src/lib/server/reports/custom-templates.ts",
+    (c) => (c.includes("payroll_only:def->payrollOnly, app:def->>app, or_team:def->orTeam") && c.includes('payrollOnly: r.payroll_only === true || r.payroll_only === "true",') ? [] : ["a builder copy of a salary type is offered to everyone"]),
+    (src) => src.replace('    payrollOnly: r.payroll_only === true || r.payroll_only === "true",\n', ""));
+  rule("starting a type checks its app, its team and «Payroll Reports» on the server", "src/lib/server/reports/core.ts",
+    (c) => (c.includes('if (tpl.payrollOnly && !auth.is_super_admin && (await requireModuleAction(auth, PAYROLL_MODULE, "create")) !== null) return false;') && c.includes("if (tpl.app && !(await hasApp(auth, tpl.app))) {") ? [] : ["the POST starts a salary type for anyone"]),
+    (src) => src.replace('if (tpl.payrollOnly && !auth.is_super_admin && (await requireModuleAction(auth, PAYROLL_MODULE, "create")) !== null) return false;', ""));
+  const copy = copyOfBuiltin("hr_salary_review", reportsT);
+  expect(!!copy && copy.def.payrollOnly && copy.def.sections.find((x) => x.id === "salaries")?.input?.id === "proposed", "a builder copy of a salary review keeps «Payroll Reports» and its typed figure");
+  const checked = checkTemplate({ ...copyOfBuiltin("inv_count", reportsT)!.def, sections: copyOfBuiltin("inv_count", reportsT)!.def.sections.filter((x) => x.kind !== "links") }, copyOfBuiltin("inv_count", reportsT)!.words);
+  expect(checked.problems.includes("about:count"), "a builder type with a count but no warehouse to pick is refused until it has one");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

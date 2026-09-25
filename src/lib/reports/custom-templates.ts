@@ -29,11 +29,12 @@ import type { Lang, Translations } from "@/lib/i18n";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { isCustomKey, isWritten, type TemplateHead, type TemplateWords, type Word } from "./template-words";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
-  type ReportCadence, type ReportColumnType, type ReportDataSource, type ReportDefaultRecipients, type ReportFamily,
+  REPORT_APPS, REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
+  type DataInputDef, type ReportApp, type ReportCadence, type ReportColumnType, type ReportDataSource, type ReportDefaultRecipients, type ReportFamily,
   type ReportLinkType, type ReportSectionDef, type ReportSectionKind, type ReportTemplateDef,
 } from "./templates";
 import { REPORT_TEMPLATES, reportTemplate } from "./catalog";
+import { DATA_ABOUT } from "./report-data";
 
 export { CUSTOM_KEY, isCustomKey, pickWord, templateWords, headWords } from "./template-words";
 export type { Word, TemplateWords, TemplateHead } from "./template-words";
@@ -54,6 +55,12 @@ export interface CustomDef {
   teamOnly: boolean;
   /** 5B: only super admins and «CEO Office» in Roles start it. */
   officeOnly: boolean;
+  /** 5C: only super admins and «Payroll Reports» in Roles start it. */
+  payrollOnly: boolean;
+  /** 5C: the app it needs (HR: HR · view) — or, `orTeam`, a team. A copy
+   *  keeps its built-in's; the builder does not set them. */
+  app?: ReportApp;
+  orTeam?: boolean;
   base?: string;
   sections: ReportSectionDef[];
 }
@@ -70,6 +77,9 @@ export interface CustomTemplateHead {
   hrOnly?: boolean;
   teamOnly?: boolean;
   officeOnly?: boolean;
+  payrollOnly?: boolean;
+  app?: ReportApp;
+  orTeam?: boolean;
   name: Word;
   desc: Word;
   status?: "active" | "archived";
@@ -153,6 +163,8 @@ function cleanSection(raw: Raw): ReportSectionDef | null {
     case "links": {
       const types = list(raw.linkTypes).filter((x): x is ReportLinkType => REPORT_LINK_TYPES.includes(x as ReportLinkType));
       s.linkTypes = types.length ? REPORT_LINK_TYPES.filter((x) => types.includes(x)) : [...REPORT_LINK_TYPES];
+      /* 5C: what the report is about — one, picking another replaces it. */
+      if (raw.max === 1) s.max = 1;
       break;
     }
     case "choice":
@@ -161,9 +173,21 @@ function cleanSection(raw: Raw): ReportSectionDef | null {
     case "data":
       if (REPORT_DATA_SOURCES.includes(raw.source as ReportDataSource)) s.source = raw.source as ReportDataSource;
       if (raw.notes === true) s.notes = true;
+      /* 5C: a copy keeps the figure its built-in takes beside the system's. */
+      { const input = cleanInput(raw.input); if (input) s.input = input; }
       break;
   }
   return s;
+}
+
+/** A typed figure beside the system's (5C), as a copy of a built-in keeps it. */
+function cleanInput(raw: unknown): DataInputDef | undefined {
+  const o = obj(raw);
+  if (typeof o.id !== "string" || !ID.test(o.id) || (o.type !== "number" && o.type !== "money")) return undefined;
+  const out: DataInputDef = { id: o.id, type: o.type };
+  for (const k of ["against", "diff", "valueBy", "value"] as const) if (typeof o[k] === "string" && ID.test(o[k] as string)) out[k] = o[k] as string;
+  for (const k of ["min", "max"] as const) if (typeof o[k] === "number" && Number.isFinite(o[k])) out[k] = o[k] as number;
+  return out;
 }
 
 /** Every word a definition needs, with its length cap and whether it must be written. */
@@ -211,8 +235,10 @@ export function checkTemplate(rawDef: unknown, rawWords: unknown): { def: Custom
     hrOnly: d.hrOnly === true,
     teamOnly: d.teamOnly === true,
     officeOnly: d.officeOnly === true,
+    payrollOnly: d.payrollOnly === true,
     sections,
   };
+  if (REPORT_APPS.includes(d.app as ReportApp)) { def.app = d.app as ReportApp; if (d.orTeam === true) def.orTeam = true; }
   if (typeof d.base === "string" && copyableBuiltin(d.base)) def.base = d.base;
 
   const src = obj(rawWords);
@@ -224,6 +250,10 @@ export function checkTemplate(rawDef: unknown, rawWords: unknown): { def: Custom
     if (s.kind === "table" && !s.columns?.length) problems.push(`columns:${s.id}`);
     if (s.kind === "choice" && (s.options?.length ?? 0) < 2) problems.push(`options:${s.id}`);
     if (s.kind === "data" && !s.source) problems.push(`source:${s.id}`);
+    /* 5C: numbers about one project, employee or warehouse need a links
+       block that can pick one. */
+    const about = s.kind === "data" && s.source ? DATA_ABOUT[s.source] : undefined;
+    if (about?.required && !sections.some((x) => x.kind === "links" && (x.linkTypes ?? REPORT_LINK_TYPES).includes(about.type))) problems.push(`about:${s.id}`);
   }
   for (const slot of wordSlots(def)) {
     const w = obj(src[slot.key]);
@@ -254,6 +284,8 @@ export function asReportTemplate(key: string, def: CustomDef, v: number): Report
   if (def.hrOnly) out.hrOnly = true;
   if (def.teamOnly) out.teamOnly = true;
   if (def.officeOnly) out.officeOnly = true;
+  if (def.payrollOnly) out.payrollOnly = true;
+  if (def.app) { out.app = def.app; if (def.orTeam) out.orTeam = true; }
   if (def.range) out.range = true;
   if (def.base) out.base = def.base;
   return out;
@@ -277,8 +309,10 @@ export function readSnapshot(raw: unknown): TemplateSnapshot | null {
     cadence: def.cadence === "daily" || def.cadence === "weekly" || def.cadence === "monthly" ? def.cadence : null,
     range: def.range === true, recipients: RECIPIENTS.includes(def.recipients as ReportDefaultRecipients) ? (def.recipients as ReportDefaultRecipients) : "manager",
     reviewRequired: def.reviewRequired === true, confidential: def.confidential === true, urgent: def.urgent === true,
-    customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, officeOnly: def.officeOnly === true, sections,
+    customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, officeOnly: def.officeOnly === true,
+    payrollOnly: def.payrollOnly === true, sections,
   };
+  if (REPORT_APPS.includes(def.app as ReportApp)) { clean.app = def.app as ReportApp; if (def.orTeam === true) clean.orTeam = true; }
   if (typeof def.base === "string") clean.base = def.base;
   const words = obj(snap.words) as TemplateWords;
   return { v, def: clean, words, head: headOf(clean, words) };
@@ -304,7 +338,8 @@ export function copyOfBuiltin(key: string, dict: Translations): { def: CustomDef
   const def: CustomDef = {
     family: t.family, icon: t.icon, cadence: t.cadence, range: !!t.range,
     recipients: t.recipients, reviewRequired: t.reviewRequired, confidential: t.confidential, urgent: !!t.urgent,
-    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, officeOnly: !!t.officeOnly, base: t.key,
+    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, officeOnly: !!t.officeOnly, payrollOnly: !!t.payrollOnly, base: t.key,
+    ...(t.app ? { app: t.app, ...(t.orTeam ? { orTeam: true } : {}) } : {}),
     sections: t.sections.map((s) => JSON.parse(JSON.stringify(s)) as ReportSectionDef),
   };
   const words: TemplateWords = {};

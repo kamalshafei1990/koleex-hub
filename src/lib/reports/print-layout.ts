@@ -41,7 +41,7 @@
    --------------------------------------------------------------------------- */
 
 import { scoreAverage, tableSummary, type ReportDataRow, type ReportDataSource, type ReportSectionValue, type ReportTemplateDef, type SignatureValue } from "@/lib/reports/templates";
-import { DATA_COLUMNS, DATA_MODULE, dataTotals, statusWordKey, type DataColumn } from "@/lib/reports/report-data";
+import { DATA_MODULE, blockColumns, blockRows, dataTotals, statusWordKey, tagsOf, type DataColumn } from "@/lib/reports/report-data";
 
 /* 270 mm = 1020 px, minus the sheet's own 24 + 18 px padding, minus air. */
 export const SHEET_PX = 968;
@@ -166,6 +166,8 @@ const figure = (word: PrintWord, kind: "total" | "lowest", col: string, value: s
 function dataCellText(word: PrintWord, source: ReportDataSource, r: ReportDataRow, c: DataColumn): string {
   const v = r.cells[c.id];
   if (v === null || v === undefined || v === "") return "—";
+  if (c.id === "department" && v === "*") return word("blk.allCompany");
+  if (c.type === "tags") return tagsOf(v).map((x) => { const key = statusWordKey(source, x); return key ? word(key) : x; }).join(word("blk.tagSep"));
   if (c.type === "date") return dmy(String(v));
   if (c.type === "money") return typeof v === "number" ? `${fmt(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
   if (c.type === "status") { const key = statusWordKey(source, String(v)); return key ? word(key) : String(v); }
@@ -231,15 +233,19 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
         if (d.denied) return { sid: s.id, paras: [{ text: word("blk.dataNoAccess").replace("{app}", DATA_MODULE[d.source]), bullet: false }] };
         if (d.failed) return { sid: s.id, paras: [{ text: word("blk.dataFailed"), bullet: false }] };
         if (d.untracked) return { sid: s.id, paras: [{ text: word("blk.dataUntracked"), bullet: false }] };
+        if (d.needsAbout) return { sid: s.id, paras: [{ text: word(`blk.dataPick.${d.needsAbout}`), bullet: false }] };
         /* A live block (5B) is what waits for the one printing, as of now. */
         const asOf = { text: word(d.live ? "blk.dataLiveReader" : "blk.dataAsOf").replace("{at}", dmyHm(d.capturedAt)), bullet: false };
         if (!d.rows.length) return { sid: s.id, paras: [{ text: word(`blk.de.${d.source}`), bullet: false }, asOf] };
-        const cols = DATA_COLUMNS[d.source];
-        const totals = dataTotals(d);
+        /* 5C: the typed figure, the difference and its worth print too. */
+        const cols = blockColumns(d.source, s.input);
+        const rows = blockRows(d, s.input, v?.inputs);
+        const totals = dataTotals(d, s.input, v?.inputs);
         return { sid: s.id, paras: [
           { text: cols.map((c) => word(`blk.dc.${c.id}`)).join(" · "), bullet: false },
-          ...d.rows.map((r) => ({ text: `${cols.map((c) => dataCellText(word, d.source, r, c)).join(" · ")}${v?.notes?.[r.key] ? ` — ${v.notes[r.key]}` : ""}`, bullet: true })),
+          ...rows.map((r) => ({ text: `${cols.map((c) => dataCellText(word, d.source, r, c)).join(" · ")}${v?.notes?.[r.key] ? ` — ${v.notes[r.key]}` : ""}`, bullet: true })),
           ...(totals.length ? [{ text: totals.map((x) => figure(word, "total", word(`blk.dc.${x.col}`), `${fmt(x.value)} ${x.currency}`)).join(" · "), bullet: false }] : []),
+          ...(d.noCost ? [{ text: word("blk.dataNoCost"), bullet: false }] : []),
           asOf,
         ] };
       }

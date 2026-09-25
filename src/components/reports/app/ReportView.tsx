@@ -280,6 +280,20 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { timer.current = null; void flush(); }, 1200);
   }, [flush]);
+  /* 5C: a block's numbers can be about the project, the employee or the
+     warehouse the report links — picking another saves the draft, then
+     asks the server for the numbers again (it reads the saved links). */
+  const linkKey = useMemo(() => (tpl && tpl.sections.some((x) => x.kind === "data")
+    ? Object.values(draft.blocks).flatMap((b) => (b.links ?? []).map((l) => `${l.type}:${l.id}`)).join("|") : ""), [tpl, draft.blocks]);
+  const linkWas = useRef(linkKey);
+  useEffect(() => {
+    if (linkWas.current === linkKey) return;
+    linkWas.current = linkKey;
+    const d = draftRef.current;
+    if (!d.date) return;
+    dirty.current = true;
+    void flush().then((ok) => { if (ok) moveCarry(d.date, carry.key, tpl?.range ? d.dateTo : undefined); });
+  }, [linkKey, carry.key, flush, moveCarry, tpl]);
   const setText = (sid: string, value: string) => change({ texts: { ...draftRef.current.texts, [sid]: value } });
   const setBlock = (sid: string, value: ReportSectionValue) => change({ blocks: { ...draftRef.current.blocks, [sid]: value } });
   /* The photos a block shows in place are not listed again under Photos. */

@@ -28,10 +28,11 @@ import type { Lang } from "@/lib/i18n";
 import { reportBuilderT } from "@/lib/translations/report-builder";
 import { reportBlocksT } from "@/lib/translations/report-blocks";
 import {
-  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
+  REPORT_FAMILIES, REPORT_LINK_TYPES,
   type ReportColumnType, type ReportDataSource, type ReportFamily, type ReportLinkType, type ReportSectionDef, type ReportSectionKind,
 } from "@/lib/reports/templates";
 import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
+import { SOURCE_GROUPS } from "@/lib/reports/report-data";
 import {
   BUILDER_LIMITS, ICON_CHOICES, SECTION_KINDS, UNHIDEABLE, checkTemplate, copyableBuiltin, hideableBuiltin, newSectionId, nextId, wordSlots, type CustomDef,
 } from "@/lib/reports/custom-templates";
@@ -65,7 +66,7 @@ const blankDoc = (): TemplateDoc => ({
   key: null,
   def: {
     family: "work", icon: "document", cadence: null, range: false, recipients: "manager", reviewRequired: false,
-    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, officeOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
+    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, officeOnly: false, payrollOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
   },
   words: {},
 });
@@ -503,6 +504,7 @@ function Editor({ t, lang, doc, onClose }: { t: T; lang: Lang; doc: TemplateDoc;
             <Switch on={def.hrOnly} label={t("tb.hrOnly")} hint={t("tb.hrOnlyHint")} onChange={(v) => patch({ hrOnly: v })} />
             <Switch on={def.teamOnly} label={t("tb.teamOnly")} hint={t("tb.teamOnlyHint")} onChange={(v) => patch({ teamOnly: v })} />
             <Switch on={def.officeOnly} label={t("tb.officeOnly")} hint={t("tb.officeOnlyHint")} onChange={(v) => patch({ officeOnly: v })} />
+            <Switch on={def.payrollOnly} label={t("tb.payrollOnly")} hint={t("tb.payrollOnlyHint")} onChange={(v) => patch({ payrollOnly: v })} />
           </section>
         </aside>
       </div>
@@ -662,7 +664,12 @@ function SectionCard({ ctx, s, first, last, onPatch, onDropWords, onMove, onRemo
               <select value={s.source ?? ""} onChange={(e) => onPatch((x) => ({ ...x, source: (e.target.value || undefined) as ReportDataSource | undefined }))}
                 aria-invalid={ctx.bad(`source:${s.id}`) || undefined} className={FIELD}>
                 <option value="">{t("tb.pickSource")}</option>
-                {REPORT_DATA_SOURCES.map((src) => <option key={src} value={src}>{t(`tb.src.${src}`)}</option>)}
+                {/* By the app each comes from (5C: HR, Projects, Inventory and Finance joined). */}
+                {SOURCE_GROUPS.map((g) => (
+                  <optgroup key={g.id} label={t(`family.${g.id}`)}>
+                    {g.sources.map((src) => <option key={src} value={src}>{t(`tb.src.${src}`)}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </span>
           </label>

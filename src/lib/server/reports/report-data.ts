@@ -37,6 +37,13 @@ import "server-only";
                      the send stores none of it (freeze), and loadLiveData
                      computes it for each reader as they open it
                      (src/lib/server/reports/office.ts)
+     HR / Projects / Inventory / Finance
+                     (5C) read by hr-data.ts, project-data.ts, stock-data.ts
+                     and finance-data.ts, each with its own reach (who may
+                     read how far — see src/lib/reports/report-data.ts); a
+                     block about one project, employee or warehouse reads the
+                     one the report links (its stored sections), and asks for
+                     it while none is picked
 
    Called only for the author (the draft's GET and its date move, and the
    send, which freezes the answer into the report). Each source needs its
@@ -61,11 +68,17 @@ import { loadTeamFacts, loadTeamScope } from "@/lib/server/reports/team";
 import { isLiveSource, isOfficeRead, isOfficeSource, type OfficeSource } from "@/lib/reports/report-data";
 import { decisionRows, followupRows, meetingRows, occasionRows, scheduleRows, timeSplitRows, visitorRows } from "@/lib/reports/office";
 import { loadCalendarFacts, loadDecisions, loadFollowups, loadOccasionPeople, loadVisitorLetters, officeAllowed, ownRight } from "@/lib/server/reports/office";
+import { DATA_ABOUT, isFinanceSource, isHrSource, isProjectSource, isStockSource, subjectOf, type FinanceSource, type HrSource, type ProjectSource, type StockSource } from "@/lib/reports/report-data";
+import type { ReportSectionValue, ReportSubject } from "@/lib/reports/templates";
+import { hrData, hrShared } from "@/lib/server/reports/hr-data";
+import { projectData, projectShared } from "@/lib/server/reports/project-data";
+import { stockData } from "@/lib/server/reports/stock-data";
+import { financeData, financeShared } from "@/lib/server/reports/finance-data";
 
 const LIMIT = REPORT_LIMITS.dataRows;
 const DAY = 86_400_000;
 
-type Facts = { template_key: string; template_snapshot?: unknown; tenant_id: string | null; period_start: string | null; period_end: string | null };
+type Facts = { template_key: string; template_snapshot?: unknown; tenant_id: string | null; period_start: string | null; period_end: string | null; sections?: unknown };
 type Ctx = { me: string; tenant: string | null; start: string; end: string; today: string };
 
 const money = (v: unknown): number | null => {
@@ -132,7 +145,8 @@ function sentDay(q: Q): string | null {
   return day(q.issue_date) ?? day(q.created_at);
 }
 
-const READ: Record<Exclude<ReportDataSource, TeamSource | OfficeSource>, (c: Ctx) => Promise<ReportDataRow[]>> = {
+type Source5c = HrSource | ProjectSource | StockSource | FinanceSource;
+const READ: Record<Exclude<ReportDataSource, TeamSource | OfficeSource | Source5c>, (c: Ctx) => Promise<ReportDataRow[]>> = {
   async quotations(c) {
     let q = supabaseServer.from("quotations")
       .select("id, quote_no, status, currency, total, issue_date, company:doc->>companyName, customer:doc->>customerName")
@@ -325,6 +339,13 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
   };
   /* A rejected shared read is answered per block below — never unhandled. */
   shared.calendar?.catch(() => undefined);
+  /* 5C: the rights and the people, the projects, read once for all blocks;
+     what the report is about, from its own links. */
+  const hrSh = sources.some(isHrSource) ? hrShared(auth) : null;
+  const projSh = sources.some(isProjectSource) ? projectShared(auth) : null;
+  const finSh = sources.some(isFinanceSource) ? financeShared(auth) : null;
+  const linked = Array.isArray(row.sections) ? (row.sections as ReportSectionValue[]) : [];
+  const about = <T extends ReportSubject>(type: T) => subjectOf(linked, type);
   const answers = new Map(await Promise.all(sources.map(async (src): Promise<[ReportDataSource, ReportDataValue]> => {
     const capturedAt = now.toISOString();
     if (isOfficeSource(src)) {
@@ -338,6 +359,24 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
         console.error(`[reports] office numbers ${src}:`, e instanceof Error ? e.message : e);
         const unread: ReportDataValue = { source: src, rows: [], capturedAt, failed: true, ...(isLiveSource(src) ? { live: true } : {}) };
         return [src, unread];
+      }
+    }
+    if (isHrSource(src) || isProjectSource(src) || isStockSource(src) || isFinanceSource(src)) {
+      try {
+        if (isProjectSource(src) && (await requireModuleAccess(auth, "Projects"))) return [src, { source: src, rows: [], capturedAt, denied: true }];
+        if (isStockSource(src) && (await requireModuleAccess(auth, "Inventory"))) return [src, { source: src, rows: [], capturedAt, denied: true }];
+        const x = { auth, start: period.start, end: period.end, today, about };
+        const got = isHrSource(src) ? await hrData(src, x, hrSh!)
+          : isProjectSource(src) ? await projectData(src, x, projSh!)
+          : isStockSource(src) ? await stockData(src, x)
+          : await financeData(src as FinanceSource, x, finSh!);
+        if (got === "denied") return [src, { source: src, rows: [], capturedAt, denied: true }];
+        if (got === "about") return [src, { source: src, rows: [], capturedAt, needsAbout: DATA_ABOUT[src]!.type }];
+        const extra = "noCost" in got && got.noCost ? { noCost: true } : {};
+        return [src, got.rows.length > LIMIT ? { source: src, rows: got.rows.slice(0, LIMIT), capturedAt, truncated: true, ...extra } : { source: src, rows: got.rows, capturedAt, ...extra }];
+      } catch (e) {
+        console.error(`[reports] numbers ${src}:`, e instanceof Error ? e.message : e);
+        return [src, { source: src, rows: [], capturedAt, failed: true }];
       }
     }
     if (isTeamSource(src)) {
