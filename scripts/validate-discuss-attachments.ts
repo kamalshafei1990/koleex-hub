@@ -269,7 +269,19 @@ check("objecturl: DiscussApp never calls revokeObjectURL directly",
 check("objecturl: recorder-local preview still revokes its own blob",
   /URL\.revokeObjectURL\(previewUrl\)/.test(voice));
 check("objecturl: released on reconcile", /releasePreviewUrls\(clientMsgId\);/.test(app));
-check("objecturl: released on conversation switch", /releaseAllPreviewUrls\(\);\n    setSelectedChannelId/.test(app));
+/* Scoped to the conversation-switch handler, not to two adjacent lines: the
+   release must run inside handleSelectChannel and before the selection
+   changes, but other statements may sit between them (the WeChat redesign put
+   setAiChatOpen there, which broke an adjacency-only regex). Statement-anchored
+   (^\s*) so a commented-out call cannot satisfy it. */
+{
+  const start = app.indexOf("const handleSelectChannel = useCallback(");
+  const end = start < 0 ? -1 : app.indexOf("}, [", start);
+  const selectChannelBlock = end < 0 ? "" : app.slice(start, end);
+  const releaseAt = selectChannelBlock.search(/^\s*releaseAllPreviewUrls\(\);/m);
+  const switchAt = selectChannelBlock.search(/^\s*setSelectedChannelId\(/m);
+  check("objecturl: released on conversation switch", releaseAt >= 0 && switchAt > releaseAt);
+}
 check("objecturl: released on unmount/logout", /useEffect\(\(\) => releaseAllPreviewUrls, \[\]\)/.test(app));
 check("objecturl: never persisted into an attachment record", !/local_preview_url:/.test(app));
 check("objecturl: blob detector present", /startsWith\("blob:"\)/.test(objectUrls));
