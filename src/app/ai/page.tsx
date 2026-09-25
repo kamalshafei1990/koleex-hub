@@ -30,9 +30,9 @@ const KoleexAiApp = dynamic(() => import("@/components/ai/KoleexAiApp"), {
    promises not to do: "One look from click to content."
 
    Removing it takes nothing away. Checked before touching it: `/ai` is not in
-   either bypass list, and AuthGate gates on BOTH of its branches — AdminAuth
-   when the Supabase flag is off, SupabaseGate when it is on — so the route is
-   behind a gate either way, and it is now gated the same way as the other
+   either bypass list, and AuthGate gates it (AdminAuthGate; the Supabase flag
+   that once gave AuthGate a second branch was retired on 26/09/2026), so the
+   route is behind a gate, and it is now gated the same way as the other
    forty-five routes that never double-wrapped. validate:ai-client-render pins
    all of that, so this cannot quietly become "no gate" later. */
 export default function AiPage() {

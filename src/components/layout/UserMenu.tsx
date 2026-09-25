@@ -2,23 +2,18 @@
 
 /* ---------------------------------------------------------------------------
    UserMenu — avatar + dropdown that replaces the static "KS" circle in
-   MainHeader. Works in both auth modes:
+   MainHeader.
 
-     - Legacy (NEXT_PUBLIC_USE_SUPABASE_AUTH ≠ "true"):
-         · Shows "KS" avatar + "Koleex Admin" identity
-         · "Sign Out" revokes the session cookie (POST /api/auth/signout),
-           clears localStorage["koleex-admin"] and hard-reloads, kicking the
-           user back to the AdminAuth password gate.
-         · "Sign In" opens the legacy password prompt (already rendered by
-           AdminAuth on protected routes), so we just link to "/".
+     · Shows the current account (src/lib/identity.ts), falling back to a
+       "KS" avatar + "Koleex Admin" identity while it loads.
+     · "Sign Out" revokes the session cookie (POST /api/auth/signout),
+       clears localStorage["koleex-admin"] and hard-reloads, kicking the
+       user back to the AdminAuth password gate.
+     · "Sign In" opens the password prompt (already rendered by AdminAuth on
+       protected routes), so we just link to "/".
 
-     - Supabase (flag on):
-         · Reads the current user from auth-client.getCurrentUser()
-         · Avatar initials derived from email or user_metadata.username
-         · "Sign Out" calls auth-client.signOut() (which also writes the
-           audit log entry + revokes the account_sessions row) then
-           redirects to the root, where AdminAuth renders the form.
-         · "Sign In" → "/" (AdminAuth renders the sign-in form there)
+   (The Supabase-Auth mode this menu also handled was retired with
+   SupabaseGate on 26/09/2026 — see AuthGate.)
 
    Theme aware: uses the same dk/light branches as MainHeader.
    --------------------------------------------------------------------------- */
@@ -44,62 +39,16 @@ import {
   LEGACY_SESSION_USER_KEY,
 } from "@/components/admin/session-keys";
 
-/* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
-   mounted header component never statically imports the supabase client. */
-const isSupabaseAuthEnabled = () =>
-  process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
-
-type Identity =
-  | { mode: "supabase"; signedIn: true; email: string; username?: string }
-  | { mode: "supabase"; signedIn: false }
-  | { mode: "legacy"; signedIn: true }
-  | { mode: "legacy"; signedIn: false };
-
-function initialsFor(identity: Identity): string {
-  if (identity.mode === "legacy") return "KS";
-  if (!identity.signedIn) return "—";
-  const source = identity.username || identity.email;
-  const clean = source.split("@")[0].replace(/[^a-zA-Z0-9]/g, " ").trim();
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  if (parts.length === 1 && parts[0].length >= 2) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return "KX";
-}
-
-function displayNameFor(identity: Identity): string {
-  if (identity.mode === "legacy") {
-    return identity.signedIn ? "Koleex Admin" : "Not signed in";
-  }
-  if (!identity.signedIn) return "Not signed in";
-  return identity.username || identity.email;
-}
-
-function subLineFor(identity: Identity): string {
-  if (identity.mode === "legacy") {
-    return identity.signedIn ? "Legacy session" : "Password gate";
-  }
-  if (!identity.signedIn) return "Supabase session";
-  return identity.email;
-}
-
 export default function UserMenu({ dk }: { dk: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [identity, setIdentity] = useState<Identity>(() =>
-    isSupabaseAuthEnabled()
-      ? { mode: "supabase", signedIn: false }
-      : { mode: "legacy", signedIn: false },
-  );
+  const [signedIn, setSignedIn] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* Load the richer "current account" row so we can show the real person
-     name, avatar, role, and user type — not just the stub initials. This
-     resolves in both auth modes (see src/lib/identity.ts). */
+     name, avatar, role, and user type — not just the stub initials (see
+     src/lib/identity.ts). */
   const { account } = useCurrentAccount();
 
   /* Inbox unread count — shown as a badge next to the Inbox menu entry.
@@ -127,52 +76,20 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     return { avatar, fullName, subtitle };
   }, [account]);
 
-  /* Load initial identity + keep it in sync. */
+  /* Load the signed-in flag + keep it in sync. */
   useEffect(() => {
     let cancelled = false;
 
     async function refresh() {
-      if (isSupabaseAuthEnabled()) {
-        const { getCurrentUser } = await import("@/lib/auth-client");
-        const user = await getCurrentUser();
-        if (cancelled) return;
-        if (user?.email) {
-          const username = (user.user_metadata?.username as string | undefined) ?? undefined;
-          setIdentity({
-            mode: "supabase",
-            signedIn: true,
-            email: user.email,
-            username,
-          });
-        } else {
-          setIdentity({ mode: "supabase", signedIn: false });
-        }
-      } else {
-        const signedIn =
-          typeof window !== "undefined" &&
-          window.localStorage.getItem(LEGACY_SESSION_KEY) === "true";
-        setIdentity({ mode: "legacy", signedIn });
-      }
+      const next =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(LEGACY_SESSION_KEY) === "true";
+      if (!cancelled) setSignedIn(next);
     }
 
     void refresh();
 
-    /* Supabase: react to sign-in / sign-out events in this or other tabs. */
-    if (isSupabaseAuthEnabled()) {
-      let unsub: (() => void) | null = null;
-      void import("@/lib/auth-client").then(({ onAuthStateChange }) => {
-        if (cancelled) return;
-        unsub = onAuthStateChange(() => {
-          void refresh();
-        });
-      });
-      return () => {
-        cancelled = true;
-        unsub?.();
-      };
-    }
-
-    /* Legacy: localStorage syncs across tabs via the "storage" event. We
+    /* localStorage syncs across tabs via the "storage" event. We
        also refresh on focus to cover the "just logged in on another tab"
        case where the listener might not have fired yet. */
     function onFocus() {
@@ -197,9 +114,8 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
   const handleSignIn = useCallback(() => {
     setOpen(false);
-    /* Both modes land on the root: AdminAuth renders the username + password
-       form there when there is no session, and it is the only sign-in screen
-       the Hub has. */
+    /* The root: AdminAuth renders the username + password form there when
+       there is no session, and it is the only sign-in screen the Hub has. */
     window.location.href = "/";
   }, []);
 
@@ -208,10 +124,8 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     /* WS3 (safe cache strategy): a session boundary is being crossed. Wipe every
        tenant/account-scoped client cache so the NEXT session — including a
        different user on a shared device — can never paint the previous user's
-       identity, permitted modules, or tenant data. The Supabase path does a SOFT
-       nav (router.replace) so the long-lived QueryClient + warm-start stores
-       would otherwise survive; the legacy path hard-reloads (drops the
-       QueryClient) but localStorage survives a reload, so both paths need this. */
+       identity, permitted modules, or tenant data. The hard reload below drops
+       the QueryClient, but localStorage survives a reload, so this is needed. */
     try { queryClient.clear(); } catch { /* ignore */ }
     /* SIGN OUT USED TO LEAVE THE SESSION ITSELF ALIVE. Everything below
        clears the CLIENT's idea of the session — the flags, the caches, the
@@ -234,14 +148,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
        reload below cut the delete short, which would leave the previous user's
        directory readable by the next one on a shared device. */
     await clearSessionScopedCaches();
-    if (identity.mode === "supabase") {
-      const { signOut: supabaseSignOut } = await import("@/lib/auth-client");
-      await supabaseSignOut();
-      setIdentity({ mode: "supabase", signedIn: false });
-      router.replace("/");
-      return;
-    }
-    /* Legacy — clear the client-side session flags, drop the stored
+    /* Clear the client-side session flags, drop the stored
        "current account id" (so the next sign-in doesn't inherit the old
        identity), and bounce home so AdminAuth re-renders the login form. */
     try {
@@ -251,16 +158,15 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       /* ignore */
     }
     setCurrentAccountId(null);
-    setIdentity({ mode: "legacy", signedIn: false });
+    setSignedIn(false);
     /* Hard reload so the AuthGate re-mounts and shows the login form. */
     window.location.href = "/";
-  }, [identity, router, queryClient]);
+  }, [queryClient]);
 
-  const avatarLabel = initialsFor(identity);
-  const displayName = profile?.fullName ?? displayNameFor(identity);
-  const subLine = profile?.subtitle ?? subLineFor(identity);
+  const avatarLabel = "KS";
+  const displayName = profile?.fullName ?? (signedIn ? "Koleex Admin" : "Not signed in");
+  const subLine = profile?.subtitle ?? (signedIn ? "Legacy session" : "Password gate");
   const avatarUrl = profile?.avatar ?? null;
-  const signedIn = identity.signedIn;
 
   return (
     <div ref={menuRef} className="relative">
@@ -371,15 +277,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
               </div>
             </div>
             <div className="mt-2.5 flex items-center gap-1.5">
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  identity.mode === "supabase"
-                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                    : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                }`}
-              >
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                 <ShieldIcon className="h-2.5 w-2.5" />
-                {identity.mode === "supabase" ? "Supabase Auth" : "Legacy"}
+                Legacy
               </span>
               {signedIn && (
                 <span

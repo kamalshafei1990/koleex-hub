@@ -39,9 +39,6 @@ export const SESSION_INVALID_EVENT = "koleex-session-invalid";
    AdminAuth's own constants. */
 const LEGACY_SESSION_KEY = "koleex-admin";
 const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
-/* The Supabase-mode gate's paint hint. Cleared with the rest so the two auth
-   modes can never disagree about whether this device has a session. */
-const SUPABASE_HINT_KEY = "koleex-authed";
 
 /**
  * Forget that this device is signed in, and tell the gate.
@@ -57,7 +54,6 @@ export function dropClientSessionHints(): void {
   try {
     window.localStorage.removeItem(LEGACY_SESSION_KEY);
     window.localStorage.removeItem(LEGACY_SESSION_USER_KEY);
-    window.localStorage.removeItem(SUPABASE_HINT_KEY);
   } catch {
     /* storage blocked — the event below still flips the gate for this tab */
   }

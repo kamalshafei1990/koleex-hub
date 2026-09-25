@@ -1,21 +1,19 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   identity — resolves "which account is the current user" in both auth modes.
+   identity — resolves "which account is the current user".
 
-   Legacy mode (the default until Supabase Auth is flipped on):
+   (A Supabase-Auth mode, resolving `accounts.auth_user_id = auth.users.id`,
+   was planned here and never built; the flag behind it was retired with
+   SupabaseGate on 26/09/2026.)
+
+   Legacy mode:
      There is no real session. The admin password gate just toggles a
      sessionStorage flag. We still want the MainHeader / UserMenu to show a
      real name + avatar + role for the person using the hub, so we let them
      pick which account row represents "me" and remember that choice in
      localStorage. On first load we auto-pick if exactly one internal account
      exists (common case for a new install).
-
-   Supabase mode (deferred — plumbed but inactive):
-     When `isSupabaseAuthEnabled()` is true, the chosen identity is instead
-     resolved by looking up `accounts.auth_user_id = auth.users.id`. That
-     lookup is not yet implemented here — the hook falls back to the legacy
-     localStorage path so UI can still render during the transition period.
 
    Usage:
      const { account, loading, refresh } = useCurrentAccount();

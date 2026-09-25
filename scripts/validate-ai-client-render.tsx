@@ -22,7 +22,7 @@
    "it compiles" and "it renders what it rendered before".
    --------------------------------------------------------------------------- */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import * as uw from "../src/components/pwa/UpdateWatcher";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
@@ -1584,20 +1584,17 @@ console.log("\n── An Arabic opening before an English code block reads right
 
      Removing a gate is a permissions change, so the safety is pinned rather
      than argued: `/ai` must not be bypassable, the shell must gate what it
-     does not bypass, AuthGate must gate on BOTH of its branches, and the page
-     must not be the thing holding the gate. If any of those stops being true,
-     this fails — it cannot quietly become "no gate". */
+     does not bypass, AuthGate must be the real gate with no second branch,
+     and the page must not be the thing holding the gate. If any of those
+     stops being true, this fails — it cannot quietly become "no gate". */
   const shell = readFileSync("src/components/layout/RootShell.tsx", "utf8");
-  /* The flag-OFF branch is <AdminAuthGate> since d911bb7a: it shows the Hub
-     from the same session flag AdminAuth reads, and loads AdminAuth (the
-     sign-in screen) only when signed out. The pin reads AuthGate's own body
-     with comments stripped, so a gate kept only in a comment, a pass-through
-     defined in place of the import, or an extra `return` ahead of the two
-     branches all fail it. */
+  /* AuthGate is <AdminAuthGate> and nothing else: the Supabase flag that gave
+     it a second branch was retired on 26/09/2026. The pin reads the whole
+     file with comments stripped — one import of the real gate, one return,
+     and `children` only in the prop type, the parameter and that render — so
+     a gate kept only in a comment, a pass-through defined in place of the
+     import, or a second branch all fail it. */
   const gate = stripComments(readFileSync("src/components/admin/AuthGate.tsx", "utf8"));
-  const gateStart = gate.indexOf("export default function AuthGate(");
-  const gateEnd = gate.indexOf("\nfunction SupabaseGate(", gateStart);
-  const gateBody = gateStart >= 0 && gateEnd > gateStart ? gate.slice(gateStart, gateEnd) : "";
   /* Comments stripped: this page EXPLAINS why the second gate went, so the
      word appears in prose. The pin is about the code. */
   const aiPage = stripComments(readFileSync("src/app/ai/page.tsx", "utf8"), { line: "keep" });
@@ -1606,12 +1603,12 @@ console.log("\n── An Arabic opening before an English code block reads right
     /const BYPASS_PREFIXES = \["\/auth"\];/.test(shell) &&
     !/"\/ai"/.test(/const BYPASS_(SUFFIXES|PREFIXES)[^;]*;/.exec(shell)?.[0] ?? "") &&
     /if \(isBypassed\(pathname\)\) \{\s*return <>\{children\}<\/>;\s*\}\s*return \(\s*<AuthGate>/.test(shell));
-  check("  …and AuthGate gates on BOTH branches, so the flag cannot open a hole",
+  check("  …and AuthGate is AdminAuthGate, with no flag or second branch that could open a hole",
     /^import AdminAuthGate from "\.\/AdminAuthGate";$/m.test(gate) &&
-    /if \(!useSupabase\) \{\s*return \(\s*<AdminAuthGate>\{children\}<\/AdminAuthGate>\s*\);\s*\}/.test(gateBody) &&
-    /return <SupabaseGate>\{children\}<\/SupabaseGate>;/.test(gateBody) &&
-    (gateBody.match(/\breturn\b/g) ?? []).length === 2);
-  /* The flag-OFF branch trusts AdminAuthGate, so its own decision is pinned
+    /export default function AuthGate\(\{ children \}: Props\) \{\s*return <AdminAuthGate>\{children\}<\/AdminAuthGate>;\s*\}\s*$/.test(gate) &&
+    (gate.match(/\breturn\b/g) ?? []).length === 1 &&
+    (gate.match(/\bchildren\b/g) ?? []).length === 3);
+  /* AuthGate trusts AdminAuthGate, so its own decision is pinned
      too: it starts at "checking" (the spinner), the ONLY way to "in" is the
      session flag reading exactly "true" (blocked storage counts as signed
      out), every other transition goes to "out", "out" hands over to the real
@@ -1631,38 +1628,25 @@ console.log("\n── An Arabic opening before an English code block reads right
     (adminGateBody.match(/\bsetState\("out"\)/g) ?? []).length === 2 &&
     /if \(state === "checking"\) return spinner\(\);\s*if \(state === "out"\) return <AdminAuth>\{children\}<\/AdminAuth>;\s*return <>\{children\}<\/>;\s*\}\s*$/.test(adminGateBody) &&
     (adminGateBody.match(/\bchildren\b/g) ?? []).length === 4);
-  /* And the flag-ON branch's own decision. SupabaseGate starts at "checking"
-     (a spinner, no children) and reaches "authed" three ways only: the
-     confirmed-session hint, before paint; getCurrentSession() returning a
-     session; or onAuthStateChange announcing one (a sign-in in another tab),
-     which would otherwise leave the spinner up until the next navigation.
-     No session, whether found by that check or announced by
-     onAuthStateChange (a sign-out in another tab), drops the hint, goes to
-     "redirecting" and leaves for "/". The sign-out path sets the state itself
-     because on "/" the redirect changes no pathname and the check would not
-     run again. The session is checked again on every navigation, and the hint is
-     written only where a session was just seen, under the same key that
-     dropClientSessionHints wipes when the server refuses the cookie. */
-  const supabaseGate = gateEnd >= 0 ? gate.slice(gateEnd) : "";
-  const hints = stripComments(readFileSync("src/lib/session-hints.ts", "utf8"));
-  const dropStart = hints.indexOf("export function dropClientSessionHints()");
-  const dropHints = dropStart >= 0 ? hints.slice(dropStart, hints.indexOf("\n}", dropStart)) : "";
-  const hintKey = /^const AUTHED_HINT_KEY = ("[^"]+");$/m.exec(gate)?.[1];
-  check("  …and SupabaseGate renders children only for a session it has seen, drops them on sign-out, and checks again on every navigation",
-    hintKey !== undefined &&
-    /^const SUPABASE_HINT_KEY = ("[^"]+");$/m.exec(hints)?.[1] === hintKey &&
-    /^\s*window\.localStorage\.removeItem\(SUPABASE_HINT_KEY\);/m.test(dropHints) &&
-    /const \[state, setState\] = useState<"checking" \| "authed" \| "redirecting">\(\s*"checking",?\s*\);/.test(supabaseGate) &&
-    /useIsoLayoutEffect\(\(\) => \{\s*try \{\s*if \(localStorage\.getItem\(AUTHED_HINT_KEY\) === "1"\) setState\("authed"\);\s*\} catch \{\s*\}\s*\}, \[\]\);/.test(supabaseGate) &&
-    /const \{ getCurrentSession \} = await import\("@\/lib\/auth-client"\);\s*const session = await getCurrentSession\(\);\s*if \(cancelled\) return;\s*if \(session\) \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*setState\("authed"\);\s*\} else \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\}/.test(supabaseGate) &&
-    /unsubscribe = onAuthStateChange\(\(session\) => \{\s*if \(cancelled\) return;\s*if \(!session\) \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\} else \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*setState\("authed"\);\s*\}\s*\}\);/.test(supabaseGate) &&
-    /\}, \[router, pathname\]\);/.test(supabaseGate) &&
-    (supabaseGate.match(/\bsetState\b/g) ?? []).length === 6 &&
-    (supabaseGate.match(/\bsetState\("authed"\)/g) ?? []).length === 3 &&
-    (supabaseGate.match(/\bsetState\("redirecting"\)/g) ?? []).length === 2 &&
-    (gate.match(/\bsetItem\(/g) ?? []).length === 2 &&
-    /if \(state !== "authed"\) \{\s*return \(\s*<div className="[^"{}]*">\s*<SpinnerIcon className="[^"{}]*" \/>\s*<\/div>\s*\);\s*\}\s*return <>\{children\}<\/>;\s*\}\s*$/.test(supabaseGate) &&
-    (supabaseGate.match(/\bchildren\b/g) ?? []).length === 3);
+  /* …and no second auth mode is left to switch on. The Supabase-Auth path
+     (SupabaseGate, src/lib/auth-client.ts, NEXT_PUBLIC_USE_SUPABASE_AUTH) was
+     retired on 26/09/2026: the flag was never set, the server never accepted
+     a Supabase session, and with /login deleted that mode had no sign-in
+     screen. Nothing in src may read the flag or bring either back. Comments
+     stripped: the files that explain the retirement name all three. */
+  const srcFiles: string[] = [];
+  (function walk(dir: string) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(e.name)) srcFiles.push(p);
+    }
+  })("src");
+  const secondAuthMode = srcFiles.filter((f) =>
+    /NEXT_PUBLIC_USE_SUPABASE_AUTH|@\/lib\/auth-client|\bSupabaseGate\b/.test(stripComments(readFileSync(f, "utf8"), { line: "all" })));
+  if (secondAuthMode.length) console.log(`    second auth mode found in: ${secondAuthMode.join(", ")}`);
+  check("  …and no second auth mode is left to switch on: nothing in src reads the Supabase-Auth flag or loads auth-client",
+    !existsSync("src/lib/auth-client.ts") && srcFiles.length > 100 && secondAuthMode.length === 0);
   check("  …so the page carries no second gate of its own, and no longer imports one",
     !/AdminAuth/.test(aiPage) && /export default function AiPage\(\) \{\s*return <KoleexAiApp \/>;\s*\}/.test(aiPage));
 
