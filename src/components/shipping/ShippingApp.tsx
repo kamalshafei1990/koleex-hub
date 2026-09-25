@@ -32,15 +32,18 @@ import { shippingT } from "@/lib/translations/shipping";
 import { countryDisplayName, flagEmoji } from "@/lib/invitations/types";
 import { CONTAINER_EQUIPMENT, type ContainerEquipment, type ShippingMode, type VolumetricRule } from "@/lib/shipping/types";
 import { cbmOf, revenueTons } from "@/lib/shipping/chargeable-weight";
+import { placeName, type PlaceNames } from "@/lib/shipping/place-names";
+import Link from "next/link";
 import SearchCombobox, { type ComboOption } from "./SearchCombobox";
 import RateResults from "./RateResults";
 import ForwarderQuoteModal from "./ForwarderQuoteModal";
 import {
   loadCountries, loadRoutes, saveRoute, searchAirports, searchPorts, searchRates,
-  RateSearchError, type AirportHit, type PortCountry, type PortHit, type RateSearchResponse, type SavedRoute,
+  RateSearchError, type AirportHit, type PortCountry, type PortHit, type RateSearchResponse, type RoutesPayload, type SavedRoute,
 } from "./shipping-client";
 
 import ShippingIcon from "@/components/icons/ShippingIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import ContainerIcon from "@/components/icons/ui/ContainerIcon";
 import CubicMeterIcon from "@/components/icons/ui/CubicMeterIcon";
 import WeightIcon from "@/components/icons/ui/WeightIcon";
@@ -71,17 +74,32 @@ function countryOfCode(code: string): string | null {
 
 /* A saved route stores codes and labels, not the full port row. Rebuilding the
    option from those two is enough for the trigger to look identical to a
-   freshly picked one — including the flag, which the LOCODE already carries. */
-function restoredEndpoint(code: string, label: string | null): PortOpt {
+   freshly picked one — including the flag, which the LOCODE already carries.
+   The stored label is the LATIN name and stays the option's value; the label
+   shown is its approved name in the screen's language, looked up by code. */
+function restoredEndpoint(code: string, label: string | null, names: PlaceNames | undefined, lang: string): PortOpt {
   const cc = countryOfCode(code);
+  const latin = label ?? code;
   return {
     key: code,
-    value: { locode: code } as PortHit,
-    label: label ?? code,
+    value: { locode: code, name: latin, names } as PortHit,
+    label: placeName(latin, names, lang),
     code,
     glyph: cc ? (flagEmoji(cc) || undefined) : undefined,
   };
 }
+
+/* ⚠️ WHAT IS SHOWN IS NOT WHAT IDENTIFIES. An option's `label` is its name in
+   the screen's language (an approved Arabic or Chinese name); the port's
+   Latin name — the value — is what a code-less port is resolved by, what a
+   saved lane stores and what gets printed. A translated name never leaves
+   the screen (the owner's identifier rule, 15/09/2026). */
+const latinOf = (o: PortOpt): string => o.value?.name || o.label;
+
+/** A saved lane's approved names, by the code it stored. Sea lanes only: an
+ *  air lane's codes are IATA, and airports have no names yet. */
+const laneNames = (routes: RoutesPayload, r: SavedRoute, end: "origin" | "destination"): PlaceNames | undefined =>
+  r.mode === "air" ? undefined : routes.names?.[end === "origin" ? r.origin_code : r.destination_code];
 
 /* The reference endpoint's own ceiling. Anything smaller truncates a country's
    port list during a plain browse, which reads as missing data. The United
@@ -144,7 +162,7 @@ export default function ShippingApp() {
   const [dims, setDims] = useState<{ l: string; w: string; h: string; qty: string }[]>([]);
 
   const [countries, setCountries] = useState<PortCountry[]>([]);
-  const [routes, setRoutes] = useState<{ recent: SavedRoute[]; favorites: SavedRoute[] }>({ recent: [], favorites: [] });
+  const [routes, setRoutes] = useState<RoutesPayload>({ recent: [], favorites: [] });
 
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState<RateSearchResponse | null>(null);
@@ -208,16 +226,25 @@ export default function ShippingApp() {
   }, []);
 
   /* ── option builders ───────────────────────────────────────────────────── */
-  const portOption = useCallback((p: PortHit): PortOpt => ({
-    key: p.id,
-    value: p,
-    label: p.name,
-    sublabel: [p.nameOfficial && p.nameOfficial !== p.name ? p.nameOfficial : null, p.countryName]
-      .filter(Boolean).join(" · ") || undefined,
-    glyph: flagEmoji(p.countryCode) || undefined,
-    code: p.locode ?? undefined,
-    pinned: p.inKoleexList,
-  }), []);
+  /* The approved name in the screen's language on top; under it the Latin
+     name forwarders write (when the top line is a translation), the
+     register's spelling, and the country in the screen's language. */
+  const portOption = useCallback((p: PortHit): PortOpt => {
+    const label = placeName(p.name, p.names, lang);
+    return {
+      key: p.id,
+      value: p,
+      label,
+      sublabel: [
+        label !== p.name ? p.name : null,
+        p.nameOfficial && p.nameOfficial !== p.name ? p.nameOfficial : null,
+        countryDisplayName(p.countryCode, p.countryName ?? p.countryCode, lang),
+      ].filter(Boolean).join(" · ") || undefined,
+      glyph: flagEmoji(p.countryCode) || undefined,
+      code: p.locode ?? undefined,
+      pinned: p.inKoleexList,
+    };
+  }, [lang]);
 
   const airportOption = useCallback((a: AirportHit): PortOpt => ({
     key: a.id,
@@ -237,9 +264,9 @@ export default function ShippingApp() {
       const { airports } = await searchAirports({ q: term, country: "CN", limit: PICKER_ROWS });
       return airports.map(airportOption);
     }
-    const { ports } = await searchPorts({ q: term, origin: true, limit: PICKER_ROWS });
+    const { ports } = await searchPorts({ q: term, origin: true, limit: PICKER_ROWS, nv: routes.namesVersion });
     return ports.map(portOption);
-  }, [isAir, portOption, airportOption]);
+  }, [isAir, portOption, airportOption, routes.namesVersion]);
 
   const searchDest = useCallback(async (term: string, signal: AbortSignal): Promise<PortOpt[]> => {
     void signal;
@@ -249,9 +276,9 @@ export default function ShippingApp() {
       const { airports } = await searchAirports({ q: term, country: cc, limit: PICKER_ROWS });
       return airports.map(airportOption);
     }
-    const { ports } = await searchPorts({ q: term, country: cc, limit: PICKER_ROWS });
+    const { ports } = await searchPorts({ q: term, country: cc, limit: PICKER_ROWS, nv: routes.namesVersion });
     return ports.map(portOption);
-  }, [country?.value.code, isAir, portOption, airportOption]);
+  }, [country?.value.code, isAir, portOption, airportOption, routes.namesVersion]);
 
   /* Countries are a fixed list, so this filters in memory — no request per
      keystroke for 170 rows that never change. Name FIRST, then the flag:
@@ -296,8 +323,8 @@ export default function ShippingApp() {
     try {
       const res = await searchRates({
         mode,
-        origin: origin.code ?? origin.label,
-        destination: dest.code ?? dest.label,
+        origin: origin.code ?? latinOf(origin),
+        destination: dest.code ?? latinOf(dest),
         destinationCountry: country?.value.code,
         equipment: mode === "ocean_fcl" ? equipment : undefined,
         cbm: effectiveCbm,
@@ -310,9 +337,9 @@ export default function ShippingApp() {
       /* Recording the lane is a convenience, never a reason to fail a search. */
       void saveRoute({
         action: "record", mode,
-        originCode: res.origin.locode ?? origin.code ?? origin.label,
-        destinationCode: res.destination.locode ?? dest.code ?? dest.label,
-        originLabel: origin.label, destinationLabel: dest.label,
+        originCode: res.origin.locode ?? origin.code ?? latinOf(origin),
+        destinationCode: res.destination.locode ?? dest.code ?? latinOf(dest),
+        originLabel: latinOf(origin), destinationLabel: latinOf(dest),
         params: { equipment, cbm, grossKg, rule },
       }).then(() => loadRoutes()).then(setRoutes).catch(() => {});
     } catch (e) {
@@ -341,7 +368,7 @@ export default function ShippingApp() {
     await saveRoute({
       action: isFavorite ? "unfavorite" : "favorite",
       mode, originCode, destinationCode: destCode,
-      originLabel: origin.label, destinationLabel: dest.label,
+      originLabel: latinOf(origin), destinationLabel: latinOf(dest),
     });
     setRoutes(await loadRoutes());
   }, [isFavorite, mode, originCode, destCode, origin, dest]);
@@ -365,6 +392,14 @@ export default function ShippingApp() {
           subtitle={t("app.subtitle")}
           icon={<ShippingIcon size={16} />}
           showTabs={false}
+          action={routes.canReviewNames ? (
+            /* Shipping · edit only — the server says so with the lanes. */
+            <Link href="/shipping/names" aria-label={t("names.open")}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] sm:px-4">
+              <LanguagesIcon size={15} />
+              <span className="hidden sm:inline">{t("names.open")}</span>
+            </Link>
+          ) : undefined}
         />
 
         {/* ── the search strip ──────────────────────────────────────────────
@@ -622,13 +657,13 @@ export default function ShippingApp() {
 
           <aside className={`min-w-0 space-y-3 ${wide ? "" : "order-last"}`}>
             {data ? <SourcesPanel providers={data.providers} mode={mode} t={t} panelRef={sourcesRef} /> : null}
-            <RoutesPanel routes={routes} t={t}
+            <RoutesPanel routes={routes} t={t} lang={lang}
               onPick={(r) => {
                 /* changeMode first (it may clear the endpoints when the sea/air
                    axis flips), then set them — never the other way round. */
                 changeMode(r.mode);
-                setOrigin(restoredEndpoint(r.origin_code, r.origin_label));
-                setDest(restoredEndpoint(r.destination_code, r.destination_label));
+                setOrigin(restoredEndpoint(r.origin_code, r.origin_label, laneNames(routes, r, "origin"), lang));
+                setDest(restoredEndpoint(r.destination_code, r.destination_label, laneNames(routes, r, "destination"), lang));
                 /* The country field has to follow, or the form shows a chosen
                    destination port above an empty "Pick a country" and reads
                    half-filled. A UN/LOCODE opens with the ISO country code, so
@@ -662,8 +697,8 @@ export default function ShippingApp() {
           onSaved={() => { void run(true); }}
           lane={{
             mode,
-            origin: origin.code ?? origin.label,
-            destination: dest.code ?? dest.label,
+            origin: origin.code ?? latinOf(origin),
+            destination: dest.code ?? latinOf(dest),
             originLabel: origin.label,
             destinationLabel: dest.label,
             destinationCountry: country?.value.code,
@@ -948,10 +983,15 @@ function SourcesPanel({ providers, mode, t, panelRef }: {
 /* Declared at module scope, not inside RoutesPanel. A component created
    during render is a NEW component type on every render, so React unmounts and
    remounts it and any state inside resets — react-hooks/static-components. */
-function RouteSection({ title, icon, list, empty, onPick, t }: {
+function RouteSection({ title, icon, list, empty, onPick, t, routes, lang }: {
   title: string; icon: React.ReactNode; list: SavedRoute[]; empty?: string;
   onPick: (r: SavedRoute) => void; t: (k: string, f?: string) => string;
+  routes: RoutesPayload; lang: string;
 }) {
+  /* The lane stored its Latin labels; the chip shows each end's approved name
+     in the screen's language, looked up by code. */
+  const from = (r: SavedRoute) => placeName(r.origin_label ?? r.origin_code, laneNames(routes, r, "origin"), lang);
+  const to = (r: SavedRoute) => placeName(r.destination_label ?? r.destination_code, laneNames(routes, r, "destination"), lang);
   return (
     <div>
       <h2 className="mb-1.5 inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
@@ -962,11 +1002,13 @@ function RouteSection({ title, icon, list, empty, onPick, t }: {
       ) : (
         <ul className="flex flex-wrap gap-1.5">
           {list.map((r) => (
-            <li key={r.id}>
+            /* max-w-full: a long name (an airport's, or a port's in Arabic)
+               truncates inside its chip instead of pushing it past the panel. */
+            <li key={r.id} className="max-w-full">
               <button
                 type="button"
                 onClick={() => onPick(r)}
-                title={`${r.origin_label ?? r.origin_code} → ${r.destination_label ?? r.destination_code} · ${t(`mode.${r.mode}`)}`}
+                title={`${from(r)} → ${to(r)} · ${t(`mode.${r.mode}`)}`}
                 className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
                 {/* ⚠️ THE MODE IS PART OF THE IDENTITY. The same lane searched
                     as FCL and as groupage is two rows (the unique key includes
@@ -978,9 +1020,9 @@ function RouteSection({ title, icon, list, empty, onPick, t }: {
                     : r.mode === "ocean_lcl" ? <CubicMeterIcon size={10} />
                     : <ContainerIcon size={10} />}
                 </span>
-                <span className="truncate">{r.origin_label ?? r.origin_code}</span>
+                <span className="truncate">{from(r)}</span>
                 <ArrowRightIcon size={10} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
-                <span className="truncate">{r.destination_label ?? r.destination_code}</span>
+                <span className="truncate">{to(r)}</span>
               </button>
             </li>
           ))}
@@ -990,16 +1032,17 @@ function RouteSection({ title, icon, list, empty, onPick, t }: {
   );
 }
 
-function RoutesPanel({ routes, onPick, t }: {
-  routes: { recent: SavedRoute[]; favorites: SavedRoute[] };
+function RoutesPanel({ routes, onPick, t, lang }: {
+  routes: RoutesPayload;
   onPick: (r: SavedRoute) => void;
   t: (k: string, f?: string) => string;
+  lang: string;
 }) {
   if (!routes.recent.length && !routes.favorites.length) return null;
   return (
     <section className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
-      <RouteSection title={t("fav.title")} icon={<StarIcon size={12} />} list={routes.favorites} empty={t("fav.empty")} onPick={onPick} t={t} />
-      <RouteSection title={t("recent.title")} icon={<HistoryIcon size={12} />} list={routes.recent} onPick={onPick} t={t} />
+      <RouteSection title={t("fav.title")} icon={<StarIcon size={12} />} list={routes.favorites} empty={t("fav.empty")} onPick={onPick} t={t} routes={routes} lang={lang} />
+      <RouteSection title={t("recent.title")} icon={<HistoryIcon size={12} />} list={routes.recent} onPick={onPick} t={t} routes={routes} lang={lang} />
     </section>
   );
 }

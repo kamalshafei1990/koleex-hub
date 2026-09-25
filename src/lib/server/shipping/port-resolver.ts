@@ -45,6 +45,8 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { isTranslatedTerm, type PlaceNames } from "@/lib/shipping/place-names";
+import { approvedNamesForPorts, portIdsByApprovedName } from "@/lib/server/shipping/place-names";
 
 /** Which coding system a code belongs to. Never inferred from its shape. */
 export type CodeSystem = "unlocode" | "iata";
@@ -211,7 +213,12 @@ export async function tradeCodeMap(locodes: string[]): Promise<Map<string, strin
   return out;
 }
 
-export interface PortSearchHit extends CanonicalPort { matchedOn?: string }
+export interface PortSearchHit extends CanonicalPort {
+  matchedOn?: string;
+  /** Approved Arabic / Chinese names — for the picker to SHOW. Only search
+   *  hits carry them: the resolvers above never read a translated name. */
+  names?: PlaceNames;
+}
 
 /**
  * Type-ahead over the 3,806 ports. Server-side on purpose — the whole table
@@ -235,7 +242,13 @@ export async function searchPorts(opts: {
   if (opts.originOnly) q = q.eq("country_code", "CN");
   else if (opts.countryCode) q = q.eq("country_code", opts.countryCode.toUpperCase());
 
-  if (term) {
+  if (term && isTranslatedTerm(term)) {
+    /* Typed in Arabic or Chinese: only an APPROVED name can match, and it
+       narrows the list — the operator still picks the row. */
+    const ids = await portIdsByApprovedName(term, limit);
+    if (!ids.length) return [];
+    q = q.in("id", ids);
+  } else if (term) {
     const esc = term.replace(/[%,()]/g, " ").trim();
     if (esc) q = q.or(`name.ilike.%${esc}%,locode.ilike.${esc}%,name_official.ilike.%${esc}%`);
   }
@@ -246,7 +259,9 @@ export async function searchPorts(opts: {
     .order("name", { ascending: true })
     .limit(limit);
   if (error) return [];
-  return ((data ?? []) as Row[]).map(toPort);
+  const ports: PortSearchHit[] = ((data ?? []) as Row[]).map(toPort);
+  const names = await approvedNamesForPorts(ports.map((p) => p.id));
+  return names.size ? ports.map((p) => (names.has(p.id) ? { ...p, names: names.get(p.id) } : p)) : ports;
 }
 
 /* ── airports ──────────────────────────────────────────────────────────────

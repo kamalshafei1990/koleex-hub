@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { cachedGet } from "@/lib/client-cache";
+import type { PlaceNames } from "@/lib/shipping/place-names";
 import type {
   ContainerEquipment, FreightRate, RateKind, RateQuery, ShippingMode, VolumetricRule,
 } from "@/lib/shipping/types";
@@ -33,6 +34,8 @@ export interface PortHit {
   harborSize: string | null;
   isContainer: boolean | null;
   inKoleexList: boolean;
+  /** Approved Arabic / Chinese names — shown, never used to find a port. */
+  names?: PlaceNames;
 }
 
 export interface AirportHit {
@@ -47,12 +50,15 @@ export interface PortCountry { code: string; name: string | null; ports: number 
    in memory means reopening the picker costs nothing. */
 const REF_TTL = 60 * 60_000;
 
-export function searchPorts(opts: { q?: string; country?: string; origin?: boolean; limit?: number }): Promise<{ ports: PortHit[] }> {
+/** `nv`: the approved names' version (from loadRoutes). Part of the URL, so
+ *  the hour-long cache is a new entry the moment a name is approved. */
+export function searchPorts(opts: { q?: string; country?: string; origin?: boolean; limit?: number; nv?: string }): Promise<{ ports: PortHit[] }> {
   const p = new URLSearchParams({ kind: "ports" });
   if (opts.q) p.set("q", opts.q);
   if (opts.country) p.set("country", opts.country);
   if (opts.origin) p.set("origin", "1");
   if (opts.limit) p.set("limit", String(opts.limit));
+  if (opts.nv) p.set("nv", opts.nv);
   return cachedGet<{ ports: PortHit[] }>(`/api/shipping/reference?${p}`, REF_TTL);
 }
 
@@ -174,7 +180,18 @@ export interface SavedRoute {
   last_run_at?: string;
 }
 
-export function loadRoutes(): Promise<{ recent: SavedRoute[]; favorites: SavedRoute[] }> {
+export interface RoutesPayload {
+  recent: SavedRoute[];
+  favorites: SavedRoute[];
+  /** Approved names of the lanes' sea ports, by UN/LOCODE. */
+  names?: Record<string, PlaceNames>;
+  /** Changes whenever a name is approved — see searchPorts' `nv`. */
+  namesVersion?: string;
+  /** Shipping · edit: may open Port names. */
+  canReviewNames?: boolean;
+}
+
+export function loadRoutes(): Promise<RoutesPayload> {
   return fetch("/api/shipping/routes", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : { recent: [], favorites: [] }))
     .catch(() => ({ recent: [], favorites: [] }));

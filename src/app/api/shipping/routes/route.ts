@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { stageTimer } from "@/lib/server/perf";
+import { approvedNamesForLocodes, placeNamesVersion } from "@/lib/server/shipping/place-names";
 import type { ShippingMode } from "@/lib/shipping/types";
 
 const MODULE = "Shipping";
@@ -44,9 +45,23 @@ export async function GET() {
   ]);
   _t.mark("db");
 
+  /* The lanes store a code and the Latin label they were saved with; their
+     approved Arabic / Chinese names come from the code, at read time. Sea
+     lanes only — an air lane's codes are IATA, and airports get their names
+     in a later phase. The version and the review right ride this call because
+     the Shipping screen makes it anyway: no extra request on opening. */
+  const rows = [...(recent.data ?? []), ...(favorites.data ?? [])] as Array<{ mode: string; origin_code: string; destination_code: string }>;
+  const seaCodes = rows.filter((r) => r.mode !== "air").flatMap((r) => [r.origin_code, r.destination_code]);
+  const [names, namesVersion, reviewDeny] = await Promise.all([
+    approvedNamesForLocodes(seaCodes),
+    placeNamesVersion(),
+    requireModuleAction(auth, MODULE, "edit"),
+  ]);
+  _t.mark("names");
+
   const { header } = _t.done({ status: 200, recent: recent.data?.length ?? 0, fav: favorites.data?.length ?? 0 });
   return NextResponse.json(
-    { recent: recent.data ?? [], favorites: favorites.data ?? [] },
+    { recent: recent.data ?? [], favorites: favorites.data ?? [], names, namesVersion, canReviewNames: !reviewDeny },
     { headers: { "Cache-Control": "private, no-store", "Server-Timing": header } },
   );
 }
