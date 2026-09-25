@@ -524,7 +524,15 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
             {save.state === "saving" ? t("composer.saving") : save.state === "saved" ? `${t("composer.saved")} · ${dmyTime(save.at)}` : save.state === "error" ? t("err.saveFailed") : ""}
           </p>
           {!confirmDelete ? (
-            <button type="button" onClick={() => setConfirmDelete(true)} className="w-full text-center text-[12px] text-[var(--text-dim)] hover:text-red-500">{t("composer.delete")}</button>
+            /* A quiet destructive action: text at rest, a rounded red wash on
+               hover. data-kx-keep-hover opts it out of Aurora's generic
+               control hover, whose 3% fill landed as a square grey slab on a
+               borderless, unrounded text button — the hatch that rule keeps
+               for a control whose hover colour means something (destructive).
+               Same h-9 / rounded-xl as Save draft, so the hover has a
+               button's shape. */
+            <button type="button" data-kx-keep-hover onClick={() => setConfirmDelete(true)}
+              className="flex h-9 w-full items-center justify-center rounded-xl text-[12px] font-medium text-[var(--text-dim)] transition-colors hover:bg-red-500/10 hover:text-red-500">{t("composer.delete")}</button>
           ) : (
             <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-[12px] text-[var(--text-secondary)]">
               <p>{t("composer.deleteConfirm")}</p>
