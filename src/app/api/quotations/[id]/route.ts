@@ -1,6 +1,6 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { logAudit } from "@/lib/server/audit";
@@ -9,6 +9,7 @@ import { getScopeMode } from "@/lib/server/scope-flags";
 import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
 import { sanitizeQuotationDoc } from "@/lib/server/sensitive-columns";
 import { normaliseQuoteStatus, QUOTE_STATUSES } from "@/lib/doc-status";
+import { notifyQuotationStatus, settleQuotationDeleted } from "@/lib/server/commerce-notify";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -197,6 +198,10 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
       ? { status_changed: true, from: prev, to: next }
       : { status_changed: false },
   });
+  if (changed) {
+    const q = cur as { quote_no?: string | null; created_by?: string | null };
+    after(() => notifyQuotationStatus(auth, { id, quote_no: q.quote_no, created_by: q.created_by }, prev, next));
+  }
 
   return NextResponse.json({
     quotation: {
@@ -248,6 +253,7 @@ export async function DELETE(req: Request, { params }: RouteCtx) {
     req,
     metadata: { reason },
   });
+  after(() => settleQuotationDeleted(id));
 
   return NextResponse.json({ ok: true });
 }

@@ -10,9 +10,10 @@ import "server-only";
    parallel here rather than by three client fetches.
    --------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { notifyOrderStatus } from "@/lib/server/commerce-notify";
 
 const MODULE = "Orders";
 
@@ -135,6 +136,13 @@ export async function PATCH(req: Request, { params }: Params) {
     patch.status = body.status;
   }
 
+  /* The status it had, so its owner hears only a real move. Read only when
+     the status is being set — a notes edit costs nothing extra. */
+  const prevStatus = body.status !== undefined
+    ? ((await supabaseServer.from("orders").select("status").eq("id", id).eq("tenant_id", auth.tenant_id).maybeSingle())
+        .data as { status?: string | null } | null)?.status ?? null
+    : null;
+
   const { data, error } = await supabaseServer
     .from("orders")
     .update(patch)
@@ -144,5 +152,10 @@ export async function PATCH(req: Request, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (body.status !== undefined && prevStatus !== body.status) {
+    const o = data as { order_no?: string | null; created_by?: string | null };
+    const to = body.status;
+    after(() => notifyOrderStatus(auth, { id, order_no: o.order_no, created_by: o.created_by }, prevStatus, to));
+  }
   return NextResponse.json({ order: data });
 }

@@ -6,6 +6,7 @@ import { reportsTpl } from "./reports";
 import { hrTpl } from "./hr";
 import { workTpl } from "./work";
 import { adminTpl } from "./admin";
+import { commerceTpl } from "./commerce";
 
 /* ---------------------------------------------------------------------------
    Notification templates, en / zh / ar — see lib/notification-templates.ts
@@ -25,4 +26,5 @@ export const notifTemplatesT: Translations = {
   ...hrTpl,
   ...workTpl,
   ...adminTpl,
+  ...commerceTpl,
 };

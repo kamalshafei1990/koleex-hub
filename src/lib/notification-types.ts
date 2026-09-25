@@ -41,7 +41,7 @@ export type NotifApp =
   | "todo" | "calendar" | "issue-reports" | "reports" | "hr" | "me"
   | "projects" | "planning" | "inventory" | "quotations" | "invoices"
   | "finance" | "notes" | "accounts" | "ai" | "discuss" | "activity-monitor"
-  | "settings";
+  | "settings" | "orders" | "contracts" | "crm" | "expenses" | "purchase";
 
 export type NotifSeverity = "info" | "action" | "warning" | "critical";
 
@@ -140,6 +140,17 @@ export const NOTIFICATION_TYPES = {
   quotation_updated:        { app: "quotations", activity: "quotation_activity", severity: "info", lifecycle: { kind: "supersede", key: "quotation_id" } },
   invoice_sent:             { app: "invoices", activity: "finance_activity", severity: "info", lifecycle: { kind: "info" } },
   finance_reminder:         { app: "finance", activity: "finance_activity", severity: "action", lifecycle: { kind: "clear", key: "reminder_id", when: "the reminder is marked done, cancelled or snoozed (a re-fire also replaces it)" } },
+
+  /* ── Sales & purchasing (phase E, owner's picks 26/09/2026) ────────── */
+  quotation_status_changed: { app: "quotations", activity: "quotation_activity", severity: "info", lifecycle: { kind: "supersede", key: "quotation_id" } },
+  quotation_expired:        { app: "quotations", activity: "quotation_activity", severity: "action", lifecycle: { kind: "clear", key: "quotation_id", when: "the quotation leaves Sent (accepted, rejected, marked expired or back to draft) or is deleted" } },
+  order_status_changed:     { app: "orders", activity: "quotation_activity", severity: "info", lifecycle: { kind: "supersede", key: "order_id" } },
+  contract_ready:           { app: "contracts", activity: "quotation_activity", severity: "action", lifecycle: { kind: "clear", key: "contract_id", when: "the contract leaves Ready (signed, cancelled or back to draft) or is deleted" } },
+  contract_signed:          { app: "contracts", activity: "quotation_activity", severity: "info", lifecycle: { kind: "info" } },
+  crm_followup_due:         { app: "crm", activity: "tasks_due", severity: "action", lifecycle: { kind: "clear", key: "activity_id", when: "the follow-up is done, moved to another day or deleted, or its deal is deleted (the next day's reminder also replaces it)" } },
+  expense_approval_request: { app: "expenses", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "expense_id", when: "the expense is approved, rejected, sent back or withdrawn to draft" } },
+  expense_decided:          { app: "expenses", activity: "finance_activity", severity: "info", lifecycle: { kind: "supersede", key: "expense_id" } },
+  purchase_received:        { app: "purchase", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "purchase_order_id" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },

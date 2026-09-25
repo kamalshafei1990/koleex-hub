@@ -70,11 +70,14 @@ export function classifyBySubstring(type: string): NotificationActivity | null {
      the reader silences elsewhere. */
   if (type.startsWith("report")) return "reports_activity";
   if (type.startsWith("qa")) return "qa_reports";
-  if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
+  /* Sales: quotations, and — since phase E — orders and contracts, which
+     ride the same switch (Settings shows it as "Sales activity"). */
+  if (type.includes("quotation") || type.includes("quote") || type.startsWith("order") || type.startsWith("contract")) return "quotation_activity";
   if (type.includes("stock")) return "low_stock";
   if (
     type.includes("movement") || type.includes("transfer") || type.includes("warehouse") ||
-    type.includes("inventory") || type.includes("requisition") || type.startsWith("return")
+    type.includes("inventory") || type.includes("requisition") || type.startsWith("return") ||
+    type.startsWith("purchase")
   ) return "inventory_activity";
   if (
     type.includes("payment") || type.includes("expense") || type.includes("invoice") ||

@@ -3,7 +3,7 @@
 
    A notification that waits on the reader for a decision (a leave request,
    a task submitted as done, a report for review, an attendance correction,
-   overtime, an account request) can be decided where it is read — the bell
+   overtime, an account request, an expense) can be decided where it is read — the bell
    and the notification center — instead of opening the app to find it.
 
    Each decision goes through the SAME route the app's own screen uses, so
@@ -45,6 +45,7 @@ function target(m: unknown): { type: string; id: string } | null {
     : type === "attendance_correction_approval_request" ? str(md.attendance_correction_id)
     : type === "attendance_overtime_approval_request" ? str(md.attendance_record_id)
     : type === "membership_request" ? str(md.membership_request_id) ?? str(md.request_id)
+    : type === "expense_approval_request" ? str(md.expense_id)
     : null;
   return id ? { type, id } : null;
 }
@@ -56,6 +57,7 @@ export function decisionOf(m: unknown): DecisionSpec | null {
     case "todo_approval_request": return { rejectWord: "return", reasonRequired: true, reasonMin: 1, takesNote: true };
     case "report_approval_request": return { rejectWord: "return", reasonRequired: true, reasonMin: 3, takesNote: true };
     case "membership_request": return { rejectWord: "reject", reasonRequired: true, reasonMin: 1, takesNote: true };
+    case "expense_approval_request": return { rejectWord: "reject", reasonRequired: true, reasonMin: 3, takesNote: true };
     case "attendance_overtime_approval_request": return { rejectWord: "reject", reasonRequired: false, reasonMin: 0, takesNote: false };
     default: return { rejectWord: "reject", reasonRequired: false, reasonMin: 0, takesNote: true };
   }
@@ -109,6 +111,12 @@ export async function decide(m: unknown, verdict: Verdict, note: string): Promis
     case "membership_request":
       r = await call(`/api/membership-requests/${t.id}`, "PATCH", { status: approve ? "approved" : "rejected", note: n || null });
       break;
+    case "expense_approval_request":
+      /* The Approvals queue's own door (Finance + «Finance Approvals»). */
+      r = await call(`/api/approvals`, "POST", approve
+        ? { entity: "expense", entityId: t.id, action: "approve", note: n || undefined }
+        : { entity: "expense", entityId: t.id, action: "reject", reason: n });
+      break;
     default:
       return { ok: false, code: "failed" };
   }
@@ -116,6 +124,6 @@ export async function decide(m: unknown, verdict: Verdict, note: string): Promis
   const err = str(r.json?.error) ?? "";
   if (r.status === 403) return { ok: false, code: "forbidden" };
   if (r.status === 409 || /not_pending|already_decided|not_reviewable/.test(err)) return { ok: false, code: "decided" };
-  if (/note_required|reason/i.test(err)) return { ok: false, code: "reason" };
+  if (r.status === 422 || /note_required|reason/i.test(err)) return { ok: false, code: "reason" };
   return { ok: false, code: "failed", message: err || undefined };
 }

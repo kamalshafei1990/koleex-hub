@@ -24,11 +24,12 @@ import "server-only";
    Both gates use the existing requireModuleAccess plumbing.
    ========================================================================== */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { ApprovalStatus, FinanceExpense } from "@/lib/finance/types";
 import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
+import { notifyExpenseTransition } from "@/lib/server/commerce-notify";
 
 type Action =
   | "submit"
@@ -191,6 +192,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     await ledgerDraft("expense", id, auth.tenant_id, auth.account_id);
   } else if (body.action === "reset" && (current === "approved" || current === "partially_approved")) {
     await ledgerVoid("expense", id, auth.tenant_id, auth.account_id, "Expense approval reset");
+  }
+  /* Submitted → the approvers are asked; decided or withdrawn → the ask
+     clears and the submitter hears the answer. */
+  if (current !== next) {
+    const saved = data as FinanceExpense;
+    const note = body.notes ?? null;
+    after(() => notifyExpenseTransition(auth, saved, next, note));
   }
   return NextResponse.json({ expense: data as FinanceExpense });
 }

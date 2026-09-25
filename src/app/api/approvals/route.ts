@@ -11,7 +11,7 @@ import "server-only";
    Guarded by validate:finance-perf §F and §G.
 */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { canApproveFinance, canSeeCostData } from "@/lib/experience";
 import {
@@ -19,6 +19,7 @@ import {
   visibleKinds, COST_SENSITIVE_KINDS,
 } from "@/lib/approvals";
 import { requireApprovalsAccess } from "@/lib/approvals/gate";
+import { notifyExpenseTransitionById } from "@/lib/server/commerce-notify";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -78,5 +79,10 @@ export async function POST(req: Request) {
     note: typeof body.note === "string" ? body.note : undefined,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.code ?? 500 });
+  if (body.entity === "expense" && r.status) {
+    const expenseId = body.entityId, to = r.status;
+    const note = typeof body.reason === "string" ? body.reason : typeof body.note === "string" ? body.note : null;
+    after(() => notifyExpenseTransitionById(auth, expenseId, to, note));
+  }
   return NextResponse.json({ ok: true, status: r.status });
 }

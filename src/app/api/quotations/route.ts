@@ -1,6 +1,7 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { notifyQuotationStatus } from "@/lib/server/commerce-notify";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
@@ -317,8 +318,10 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const quoteNo = body.quote_no || (cur as { quote_no?: string }).quote_no || "";
     /* Quotation activity is a REAL notification family: the quotation's
-       creator hears when someone ELSE saves changes to their quotation. */
-    if (data && cur.created_by && cur.created_by !== auth.account_id) {
+       creator hears when someone ELSE saves changes to their quotation.
+       A save that also moves the status says so instead (one notice, the
+       more telling one — notifyQuotationStatus below). */
+    if (data && cur.created_by && cur.created_by !== auth.account_id && prevStatus === nextStatus) {
       void notifyLite({
         tenantId: auth.tenant_id,
         recipients: [cur.created_by as string],
@@ -350,6 +353,11 @@ export async function POST(req: Request) {
           ? { status_changed: true, from: prevStatus, to: nextStatus }
           : { status_changed: false },
       });
+      if (statusChanged) {
+        const id = body.id;
+        const createdBy = (cur.created_by as string | null) ?? null;
+        after(() => notifyQuotationStatus(auth, { id, quote_no: quoteNo, created_by: createdBy }, prevStatus, nextStatus));
+      }
     }
     // 0 rows updated → a concurrent writer changed the version between our
     // read and write. Re-report as a conflict (never a silent overwrite).

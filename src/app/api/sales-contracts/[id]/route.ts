@@ -20,9 +20,10 @@ import "server-only";
    agreements. Freezing at signature is the only honest behaviour.
    --------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { notifyContractStatus, settleContractDeleted } from "@/lib/server/commerce-notify";
 import { articlesFor, TERMS_VERSION, type ContractContext } from "@/lib/contracts/general-terms";
 
 /* Contracts is its own permission module, not a rider on Invoices.
@@ -275,6 +276,12 @@ export async function PATCH(req: Request, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const from = typeof contract.status === "string" ? contract.status : null;
+  if (body.status !== undefined && from !== body.status) {
+    const to = body.status;
+    const c = { id, contract_no: contract.contract_no as string | null, created_by: (contract.created_by as string | null) ?? null };
+    after(() => notifyContractStatus(auth, c, from, to));
+  }
   return NextResponse.json({ contract: data });
 }
 
@@ -303,5 +310,6 @@ export async function DELETE(req: Request, { params }: Params) {
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  after(() => settleContractDeleted(id));
   return NextResponse.json({ ok: true });
 }
