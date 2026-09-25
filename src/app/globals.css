@@ -2595,10 +2595,23 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    transparent inside the glass card. Core keeps the var() classes.
    type="range" is excluded: sliders draw their own blue track (standing
    rule) — a well fill/ring behind an appearance-none track is an artifact,
-   not a field. */
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select {
+   not a field.
+   bg-transparent is excluded too: an input its author wrote transparent is
+   the TEXT of a composite field — a search bar, a chip input, a row inside a
+   menu — whose wrapper is the surface (.kx-ahm-search, .kx-ph-search, …).
+   Painting it drew a second well inside the first: a dark square-cornered
+   slab behind the placeholder, and on focus a second ring inside the
+   wrapper's. Owner, on the Reports search bar: "fix this ui bug". Measured
+   in 15 apps (Reports, Inventory, Quotations, Contracts, Orders, CRM,
+   Markets, To-do, Discuss, Calendar, Notes, Planning, Projects, Travel);
+   54 such inputs in 36 files, none a standalone field — 51 have no border
+   of their own, 3 only a bottom divider. `~=` matches the class token
+   exactly, so hover:bg-transparent does not count. Wrapped in :where() so
+   the exclusion weighs NOTHING: the focus rules below carry the same one,
+   and the two must keep equal weight (see the note under this rule). */
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:where([class~="bg-transparent"])),
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:not(:where([class~="bg-transparent"])),
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select:not(:where([class~="bg-transparent"])) {
   background-color: rgba(3, 5, 9, 0.55);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
@@ -2612,22 +2625,22 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    it as part of "the selected field UI issue".
    Adding an exclusion to the resting rule without mirroring it here silently
    turns the ring off again. */
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
-[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:where([class~="bg-transparent"])):focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:not(:where([class~="bg-transparent"])):focus,
+[data-kx-skin="aurora"] :is(.kx-ai-form, .kx-pd, .kx-app) select:not(:where([class~="bg-transparent"])):focus {
   border-color: rgba(86, 127, 178, 0.70) !important;
   box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:where([class~="bg-transparent"])),
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:not(:where([class~="bg-transparent"])),
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:not(:where([class~="bg-transparent"])) {
   background-color: rgba(255, 255, 255, 0.70);
   border-color: rgba(0, 0, 0, 0.10);
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:where([class~="bg-transparent"])):focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:not(:where([class~="bg-transparent"])):focus,
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:not(:where([class~="bg-transparent"])):focus {
   border-color: rgba(62, 103, 150, 0.75) !important;
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
