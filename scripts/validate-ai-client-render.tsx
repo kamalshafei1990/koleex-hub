@@ -1632,9 +1632,11 @@ console.log("\n── An Arabic opening before an English code block reads right
     /if \(state === "checking"\) return spinner\(\);\s*if \(state === "out"\) return <AdminAuth>\{children\}<\/AdminAuth>;\s*return <>\{children\}<\/>;\s*\}\s*$/.test(adminGateBody) &&
     (adminGateBody.match(/\bchildren\b/g) ?? []).length === 4);
   /* And the flag-ON branch's own decision. SupabaseGate starts at "checking"
-     (a spinner, no children) and reaches "authed" two ways only: the
-     confirmed-session hint, before paint, or getCurrentSession() returning a
-     session. No session, whether found by that check or announced by
+     (a spinner, no children) and reaches "authed" three ways only: the
+     confirmed-session hint, before paint; getCurrentSession() returning a
+     session; or onAuthStateChange announcing one (a sign-in in another tab),
+     which would otherwise leave the spinner up until the next navigation.
+     No session, whether found by that check or announced by
      onAuthStateChange (a sign-out in another tab), drops the hint, goes to
      "redirecting" and leaves for "/". The sign-out path sets the state itself
      because on "/" the redirect changes no pathname and the check would not
@@ -1653,10 +1655,10 @@ console.log("\n── An Arabic opening before an English code block reads right
     /const \[state, setState\] = useState<"checking" \| "authed" \| "redirecting">\(\s*"checking",?\s*\);/.test(supabaseGate) &&
     /useIsoLayoutEffect\(\(\) => \{\s*try \{\s*if \(localStorage\.getItem\(AUTHED_HINT_KEY\) === "1"\) setState\("authed"\);\s*\} catch \{\s*\}\s*\}, \[\]\);/.test(supabaseGate) &&
     /const \{ getCurrentSession \} = await import\("@\/lib\/auth-client"\);\s*const session = await getCurrentSession\(\);\s*if \(cancelled\) return;\s*if \(session\) \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*setState\("authed"\);\s*\} else \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\}/.test(supabaseGate) &&
-    /unsubscribe = onAuthStateChange\(\(session\) => \{\s*if \(cancelled\) return;\s*if \(!session\) \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\} else \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*\}\s*\}\);/.test(supabaseGate) &&
+    /unsubscribe = onAuthStateChange\(\(session\) => \{\s*if \(cancelled\) return;\s*if \(!session\) \{\s*try \{\s*localStorage\.removeItem\(AUTHED_HINT_KEY\);\s*\} catch \{\s*\}\s*setState\("redirecting"\);\s*router\.replace\("\/"\);\s*\} else \{\s*try \{\s*localStorage\.setItem\(AUTHED_HINT_KEY, "1"\);\s*\} catch \{\s*\}\s*setState\("authed"\);\s*\}\s*\}\);/.test(supabaseGate) &&
     /\}, \[router, pathname\]\);/.test(supabaseGate) &&
-    (supabaseGate.match(/\bsetState\b/g) ?? []).length === 5 &&
-    (supabaseGate.match(/\bsetState\("authed"\)/g) ?? []).length === 2 &&
+    (supabaseGate.match(/\bsetState\b/g) ?? []).length === 6 &&
+    (supabaseGate.match(/\bsetState\("authed"\)/g) ?? []).length === 3 &&
     (supabaseGate.match(/\bsetState\("redirecting"\)/g) ?? []).length === 2 &&
     (gate.match(/\bsetItem\(/g) ?? []).length === 2 &&
     /if \(state !== "authed"\) \{\s*return \(\s*<div className="[^"{}]*">\s*<SpinnerIcon className="[^"{}]*" \/>\s*<\/div>\s*\);\s*\}\s*return <>\{children\}<\/>;\s*\}\s*$/.test(supabaseGate) &&

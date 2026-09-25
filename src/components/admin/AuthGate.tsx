@@ -112,6 +112,10 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
           router.replace("/");
         } else {
           try { localStorage.setItem(AUTHED_HINT_KEY, "1"); } catch { /* ignore */ }
+          /* A session arrived (a sign-in in another tab, or one recovered
+             after the check above said none): show the Hub now instead of
+             leaving the spinner up until the next navigation. */
+          setState("authed");
         }
       });
     });
