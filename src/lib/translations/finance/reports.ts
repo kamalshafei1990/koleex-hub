@@ -48,4 +48,10 @@ export const FIN_REPORTS: Translations = {
   "reports.internal.note":      { en: "Internal only — contains operator data. Never share with customers or suppliers.",
                                    zh: "仅内部使用 — 包含操作员数据。切勿与客户或供应商共享。",
                                    ar: "داخلي فقط — يحتوي على بيانات تشغيلية. لا تشاركه مع العملاء أو الموردين." },
+  "reports.locked.bankProfit":  { en: "This report opens with «Bank & Profit» in Roles & Permissions.",
+                                   zh: "此报表需要在角色与权限中拥有「Bank & Profit」才能打开。",
+                                   ar: "هذا التقرير يُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
+  "reports.locked.cost":        { en: "This report opens with «Can see private data» in Roles & Permissions.",
+                                   zh: "此报表需要在角色与权限中开启「可查看私密数据」才能打开。",
+                                   ar: "هذا التقرير يُفتح مع «يرى البيانات الخاصة» في الأدوار والصلاحيات." },
 };

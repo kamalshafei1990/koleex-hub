@@ -115,6 +115,9 @@ export default function FinanceSuppliers() {
                     <div className="mt-1"><ProgressBar value={r.paid_amount ?? 0} max={r.total_purchases ?? 0} color="emerald" /></div>
                   </div>
                   )}
+                  {/* The statement prints what was bought — closed without
+                      the switch like the figures above (reportRefusal). */}
+                  {!r.cost_hidden && (
                   <div className="mt-3">
                     <button
                       type="button"
@@ -126,6 +129,7 @@ export default function FinanceSuppliers() {
                       {generating === r.supplier_id ? t("suppliers.preparing", "Preparing…") : t("suppliers.generate", "Generate Supplier Statement")}
                     </button>
                   </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -35,6 +35,8 @@
          owed kept; the «Bank & Profit» door; what is owed on a supplier line
      ..  supplier totals, opening lines and setup cards: hidden by the same
          two answers, receivables and payables kept
+     ..  reports: treasury «Bank & Profit», supplier statement the switch,
+         executive summary both, the rest open
 
    The per-role answer for a real role (a koleex_permissions row) is
    requireModuleAccess's, covered where that helper is; the static guard that
@@ -58,6 +60,7 @@ import {
   hideSetupCardTotal,
   hideSupplierTotals,
   openingCategoryRefusal,
+  reportRefusal,
   requireBankAndProfit,
   requireFinanceNumbers,
 } from "../src/lib/experience";
@@ -272,6 +275,21 @@ async function main() {
       && shown(both) === cards.map((c) => c.key).join(",")
       && hideSetupCardTotal(cards[0], neither).total === 0,
     `neither=${shown(neither)} bank-only=${shown({ bankAndProfit: true, cost: false })}`,
+  );
+
+  /* Finance reports: a document is opened whole or not at all. */
+  const types = ["customer_statement", "supplier_statement", "payment_report", "reconciliation_report", "treasury_report",
+    "expense_report", "executive_summary", "vat_return", "ar_aging_ledger", "ap_aging_ledger"];
+  const closed = (can: { bankAndProfit: boolean; cost: boolean }) => types.filter((ty) => reportRefusal(ty, can) !== null).join(",");
+  ok(
+    `${String(n++).padStart(2, "0")}  reports: treasury needs «Bank & Profit», supplier statement the switch, executive summary both, the rest open`,
+    closed(neither) === "supplier_statement,treasury_report,executive_summary"
+      && closed({ bankAndProfit: true, cost: false }) === "supplier_statement,executive_summary"
+      && closed({ bankAndProfit: false, cost: true }) === "treasury_report,executive_summary"
+      && closed(both) === ""
+      && reportRefusal("executive_summary", neither) === "needs_bank_profit"
+      && reportRefusal("executive_summary", { bankAndProfit: true, cost: false }) === "needs_private_data",
+    `neither=${closed(neither)} bank-only=${closed({ bankAndProfit: true, cost: false })} switch-only=${closed({ bankAndProfit: false, cost: true })}`,
   );
 
   console.log("─".repeat(72));

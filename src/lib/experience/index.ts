@@ -169,6 +169,26 @@ export function hideOpeningAmount<T extends object>(row: T): T & { amount_hidden
   return out as T & { amount_hidden: true };
 }
 
+/* ── Finance reports & exports (src/lib/reports/build.ts) ─────────────────
+   A report is a document, so it is opened whole or not at all: the treasury
+   report is bank balances («Bank & Profit»); the supplier statement is what
+   was bought (the switch); the executive summary carries profit, cash AND
+   the supplier cost, so it needs both. The rest — customer statements,
+   payments, reconciliation (movements, not balances), expenses, the VAT
+   return and the two agings — are what the Finance screens already show. */
+export const REPORTS_NEED_BANK_PROFIT = ["treasury_report", "executive_summary"] as const;
+export const REPORTS_NEED_COST = ["supplier_statement", "executive_summary"] as const;
+
+/** The refusal code for a report this caller may not open, or null. */
+export function reportRefusal(
+  type: string,
+  can: { bankAndProfit: boolean; cost: boolean },
+): "needs_bank_profit" | "needs_private_data" | null {
+  if (!can.bankAndProfit && (REPORTS_NEED_BANK_PROFIT as readonly string[]).includes(type)) return "needs_bank_profit";
+  if (!can.cost && (REPORTS_NEED_COST as readonly string[]).includes(type)) return "needs_private_data";
+  return null;
+}
+
 /* The Finance setup cards (/api/finance/setup/status) total the same
    figures: bank, cash, loans and capital are «Bank & Profit»; the starting
    position adds up every opening line, inventory included, so it needs

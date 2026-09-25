@@ -214,6 +214,9 @@ export interface ReportTemplateDescriptor {
   required_filters: Array<keyof ReportFilters>;
   optional_filters: Array<keyof ReportFilters>;
   icon: string;                  // RrIcon name
+  /** Set by GET /api/reports/templates for the caller: why this report is
+   *  closed to them (src/lib/experience, reportRefusal), or null. */
+  locked?: "needs_bank_profit" | "needs_private_data" | null;
 }
 
 /* ---------- Audit row shape -------------------------------------------- */

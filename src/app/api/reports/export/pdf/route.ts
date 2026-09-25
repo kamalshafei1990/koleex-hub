@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     filters: body.filters ?? {},
     channel: "pdf",
   });
-  if (!built.ok) return NextResponse.json({ error: built.error }, { status: built.status });
+  if (!built.ok) return NextResponse.json({ error: built.error, code: built.code }, { status: built.status });
 
   const html = renderReportHtml(built.result.payload, { autoPrint: false });
 

@@ -1092,5 +1092,92 @@ rule("the four screens show «•••» for what the role may not see and offe
     mutate: (s) => once(s, "value={kpi.costHidden ? HIDDEN : formatCompact(kpi.purchases)}", "value={formatCompact(kpi.purchases)}") },
 ]);
 
+/* Finance reports & exports (owner, 26 Sep 2026: «طبّق نفس القاعدة على الـ
+   Reports والـ exports»). A report is a document: opened whole or not at all.
+   The treasury report needs «Bank & Profit», the supplier statement the
+   switch, the executive summary both; the rest show what the Finance screens
+   already do. ONE gate: every report route — preview, PDF, print and a stored
+   export's print page, which rebuilds as its viewer — goes through
+   buildAndAudit, and the refusal comes before anything is built or recorded. */
+const RBUILD = "src/lib/reports/build.ts";
+const RTEMPL = "src/app/api/reports/templates/route.ts";
+const RPREV_HTML = "src/app/api/reports/preview-html/route.ts";
+const REPORT_ROUTES = [
+  "src/app/api/reports/preview/route.ts", RPREV_HTML, "src/app/api/reports/export/pdf/route.ts",
+  "src/app/api/reports/export/print/route.ts", "src/app/api/reports/exports/[id]/html/route.ts",
+];
+const FREPORTS = "src/components/finance/FinanceReports.tsx";
+
+rule("which report needs which right — treasury «Bank & Profit», supplier statement the switch, executive summary both", EXP, (c) => {
+  const p: string[] = [];
+  const list = (name: string) => /\[([^\]]*)\]/.exec(c.slice(c.indexOf(`export const ${name} =`)))?.[1] ?? "";
+  for (const r of ["treasury_report", "executive_summary"]) if (!list("REPORTS_NEED_BANK_PROFIT").includes(`"${r}"`)) p.push(`${r} opens without «Bank & Profit»`);
+  for (const r of ["supplier_statement", "executive_summary"]) if (!list("REPORTS_NEED_COST").includes(`"${r}"`)) p.push(`${r} opens without the switch`);
+  if (/aging|customer_statement/.test(list("REPORTS_NEED_BANK_PROFIT") + list("REPORTS_NEED_COST"))) p.push("what is owed, or the customer's own statement, is locked");
+  const f = fnBody(c, "reportRefusal");
+  if (!/if \(!can\.bankAndProfit && \(REPORTS_NEED_BANK_PROFIT as readonly string\[\]\)\.includes\(type\)\) return "needs_bank_profit";/.test(f)
+    || !/if \(!can\.cost && \(REPORTS_NEED_COST as readonly string\[\]\)\.includes\(type\)\) return "needs_private_data";/.test(f)) p.push("reportRefusal does not ask the two answers");
+  return p;
+}, [
+  { label: "the treasury report left open", caught: /treasury_report opens without «Bank & Profit»/,
+    mutate: (s) => once(s, '["treasury_report", "executive_summary"]', '["executive_summary"]') },
+  { label: "the executive summary without the cost check", caught: /executive_summary opens without the switch/,
+    mutate: (s) => once(s, '["supplier_statement", "executive_summary"]', '["supplier_statement"]') },
+  { label: "the payables aging locked", caught: /what is owed, or the customer's own statement, is locked/,
+    mutate: (s) => once(s, '["treasury_report", "executive_summary"]', '["treasury_report", "executive_summary", "ap_aging_ledger"]') },
+]);
+
+rule("every report is refused in buildAndAudit before it is built or recorded", RBUILD, (c) => {
+  const p: string[] = [];
+  const f = fnBody(c, "buildAndAudit");
+  const refuseAt = f.search(/const refusal = reportRefusal\(input\.type, \{\s*bankAndProfit: await canSeeBankAndProfit\(input\.auth\),\s*cost: canSeeCostData\(input\.auth\),\s*\}\);\s*if \(refusal\) \{\s*return \{\s*ok: false,\s*status: 403,\s*code: refusal,/);
+  const buildAt = f.search(/await entry\.build\(ctx\)/);
+  const auditAt = f.search(/\.from\("finance_report_exports"\)/);
+  if (refuseAt < 0) p.push("reports are built without asking who may open them");
+  else if ((buildAt >= 0 && buildAt < refuseAt) || (auditAt >= 0 && auditAt < refuseAt)) p.push("a report is built or recorded before the refusal");
+  return p;
+}, [
+  { label: "the report gate removed", caught: /built without asking/,
+    mutate: (s) => once(s, "  if (refusal) {\n    return {\n      ok: false,\n      status: 403,", "  if (false) {\n    return {\n      ok: false,\n      status: 403,") },
+  { label: "the gate asked after the build", caught: /built or recorded before the refusal/,
+    mutate: (s) => once(once(s, "  let payload: ReportPayload;\n  try {\n    payload = await entry.build(ctx);\n", "  let payload: ReportPayload;\n  try {\n"),
+      "  const refusal = reportRefusal(", "  let payload: ReportPayload = await entry.build(ctx);\n  const refusal = reportRefusal(") },
+]);
+
+for (const r of REPORT_ROUTES) {
+  const c = code(read(r));
+  const ok = /code: (res|built)\.code \}, \{ status: (res|built)\.status \}/.test(c) && /buildAndAudit\(\{/.test(c);
+  check(`${r}: goes through buildAndAudit and passes the refusal code on`, ok);
+}
+rule("a report route hands the refusal code to the screen", RPREV_HTML, (c) => /code: res\.code \}, \{ status: res\.status \}/.test(c) ? [] : ["the refusal reaches the screen as a bare error"], [
+  { label: "the code dropped", caught: /bare error/,
+    mutate: (s) => once(s, "{ error: res.error, code: res.code }", "{ error: res.error }") },
+]);
+
+rule("the report list says which reports are closed to the caller", RTEMPL, (c) => {
+  return /templates: listReportTemplates\(\)\.map\(\(t\) => \(\{ \.\.\.t, locked: reportRefusal\(t\.type, can\) \}\)\)/.test(bodyOf(c, "GET")) ? [] : ["the report list offers every report as open"];
+}, [
+  { label: "the list without locks", caught: /offers every report as open/,
+    mutate: (s) => once(s, "templates: listReportTemplates().map((t) => ({ ...t, locked: reportRefusal(t.type, can) }))", "templates: listReportTemplates()") },
+]);
+
+rule("the reporting centre shows a closed report as one line and prints nothing", FREPORTS, (c) => {
+  const p: string[] = [];
+  if (!/disabled=\{!!t\.locked\}/.test(c)) p.push("a closed report can be picked");
+  if (!/if \(!activeType \|\| activeLocked\) return;/.test(c)) p.push("a closed report is still previewed");
+  const lockAt = c.search(/\{lockedCode \? \(/), errAt = c.search(/\) : previewError \? \(/);
+  if (lockAt < 0 || errAt < 0 || lockAt > errAt) p.push("a closed report shows as a red failure");
+  if ((c.match(/disabled=\{busy !== null \|\| locked\}/g) ?? []).length !== 2) p.push("a closed report can still be printed or downloaded");
+  if ((c.match(/if \(j\.code === "needs_bank_profit" \|\| j\.code === "needs_private_data"\) \{ setServerLocked\(j\.code\); return; \}/g) ?? []).length !== 3) p.push("a 403 from preview, PDF or print is not turned into the closed line");
+  const sup = code(read(FSUP));
+  if (!/\{!r\.cost_hidden && \(\s*<div className="mt-3">\s*<button\s+type="button"\s+onClick=\{\(\) => void generateStatement/.test(sup)) p.push("the supplier card offers a statement the role may not open");
+  return p;
+}, [
+  { label: "a closed report pickable", caught: /a closed report can be picked/,
+    mutate: (s) => once(s, "disabled={!!t.locked}", "disabled={false}") },
+  { label: "a closed report previewed", caught: /is still previewed/,
+    mutate: (s) => once(s, "if (!activeType || activeLocked) return;", "if (!activeType) return;") },
+]);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
