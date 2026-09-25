@@ -20,6 +20,12 @@
  * Known limit: JSX text is not a token of its own. An apostrophe in it reads
  * as a string that ends with the line, which is harmless; a lone backtick or
  * a "/*" in JSX text would still mislead it. There is none today.
+ *
+ * It reads SQL too (lang "sql", same day) for the migration guard in
+ * apply-migration.ts, which had the same bare regex: a "/*" in a -- comment or
+ * in a string ('image/*') opens a fake comment there as well, and a DROP
+ * between it and the next real comment's end would go unseen. Nothing was
+ * hidden yet: on all 133 migrations the two read exactly the same text.
  */
 
 export interface StripOptions {
@@ -28,8 +34,10 @@ export interface StripOptions {
    *  except right after ":" (a URL in JSX text); "keep" leaves them. A kept
    *  one is still read as a comment, so nothing inside it opens a string. */
   line?: "leading" | "all" | "keep";
-  /** "css": strings and block comments only — no //, template or regex. */
-  lang?: "ts" | "css";
+  /** "css": strings and block comments only — no //, template or regex.
+   *  "sql": Postgres — every -- and block comment (see stripSql); `line` is
+   *  not read. */
+  lang?: "ts" | "css" | "sql";
 }
 
 /** After one of these words a "/" starts a regex, not a division. */
@@ -39,6 +47,7 @@ const isSpace = (c: string) => c === " " || c === "\t" || c === "\r" || c === "\
 const isWord = (c: string) => c.charCodeAt(0) >= 0x80 || /[\w$]/.test(c);
 
 export function stripComments(src: string, opts: StripOptions = {}): string {
+  if (opts.lang === "sql") return stripSql(src);
   const line = opts.line ?? "leading";
   const css = opts.lang === "css";
   const n = src.length;
@@ -155,4 +164,73 @@ export function stripComments(src: string, opts: StripOptions = {}): string {
   let out = "", at = 0;
   for (const [from, to] of cuts) { out += src.slice(at, from); at = to; }
   return out + src.slice(at);
+}
+
+/** The dollar-quote tag at i, "$$" or "$name$" (a name without "$"), or "". */
+function tagAt(src: string, i: number): string {
+  let j = i + 1;
+  while (j < src.length && src[j] !== "$" && isWord(src[j]) && (j > i + 1 || !/[0-9]/.test(src[j]))) j++;
+  return src[j] === "$" ? src.slice(i, j + 1) : "";
+}
+
+/** Postgres, read the way its own lexer reads it (src/backend/parser/scan.l).
+ *  A -- comment runs to the end of its line and goes. A block comment nests,
+ *  and becomes one space, which is what it is to Postgres: a comment between
+ *  DROP and TABLE still drops the table. Stepped over whole, so nothing inside
+ *  them opens a comment: '…' strings ('' is a quote; in E'…' a backslash also
+ *  takes the next character) and "…" identifiers ("" is a quote). A $tag$ …
+ *  $tag$ body is read as SQL again — it is a function or a DO block, with
+ *  comments of its own — but only up to its closing tag, which Postgres finds
+ *  without reading anything in between, so nothing in it runs on past it.
+ *  Anything unclosed runs to the end, as it does for Postgres, which then
+ *  refuses the whole file. */
+function stripSql(src: string): string {
+  const read = (from: number, to: number): string => {
+    const at = (k: number) => (k < to ? src[k] : "");
+    /** From just inside a quote to just past the one that closes it. */
+    const quoted = (q: string, j: number, backslash: boolean): number => {
+      for (; j < to; j++) {
+        if (backslash && src[j] === "\\") j++;
+        else if (src[j] === q) { if (at(j + 1) !== q) return j + 1; j++; }
+      }
+      return to;
+    };
+    let out = "", done = from, i = from;
+    while (i < to) {
+      const ch = src[i], nx = at(i + 1);
+      if (ch === "-" && nx === "-") {
+        let j = i + 2;
+        while (j < to && src[j] !== "\n" && src[j] !== "\r") j++;
+        out += src.slice(done, i);
+        done = i = j;
+      } else if (ch === "/" && nx === "*") {
+        let j = i + 2, depth = 1;
+        while (j < to && depth > 0) {
+          if (src[j] === "/" && at(j + 1) === "*") { depth++; j += 2; }
+          else if (src[j] === "*" && at(j + 1) === "/") { depth--; j += 2; }
+          else j++;
+        }
+        out += src.slice(done, i) + " ";
+        done = i = j;
+      } else if (ch === "'" || ch === '"') {
+        i = quoted(ch, i + 1, false);
+      } else if (ch === "$") {
+        const tag = tagAt(src, i);
+        if (!tag || i + tag.length > to) { i++; continue; } // $1, or a lone $
+        const open = i + tag.length, close = src.indexOf(tag, open);
+        const end = close < 0 || close + tag.length > to ? to : close;
+        out += src.slice(done, open) + read(open, end);
+        done = end;
+        i = Math.min(end + tag.length, to);
+      } else if (isWord(ch) && !/[0-9]/.test(ch)) {
+        // a name, "$" in it included (a$$ is a name, not a tag); a lone E
+        // right before a quote opens E'…'
+        let j = i + 1;
+        while (j < to && isWord(src[j])) j++;
+        i = j === i + 1 && (ch === "E" || ch === "e") && at(j) === "'" ? quoted("'", j + 1, true) : j;
+      } else i++;
+    }
+    return out + src.slice(done, to);
+  };
+  return read(0, src.length);
 }

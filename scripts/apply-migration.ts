@@ -41,6 +41,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -58,7 +59,9 @@ function loadEnv(): Record<string, string> {
 }
 
 /* Statements that can lose data or break a running app. Comments are stripped
-   before matching so a migration that merely DESCRIBES a drop is not blocked.
+   before matching so a migration that merely DESCRIBES a drop is not blocked —
+   the way Postgres reads them (lib/strip-comments, lang "sql"), so a "/*" in a
+   -- comment or in a string ('image/*') cannot hide the statements after it.
  *
  * NOT listed, deliberately: `DROP POLICY|TRIGGER|INDEX|FUNCTION IF EXISTS`
  * followed by a CREATE. That is the idempotent re-declaration pattern every
@@ -73,18 +76,14 @@ const DESTRUCTIVE = [
   /\bDROP\s+(TABLE|COLUMN|SCHEMA|DATABASE|TYPE)\b/i,
   /\bTRUNCATE\b/i,
   /\bDELETE\s+FROM\b/i,
-  /\bALTER\s+TABLE\s+\S+\s+DROP\s+(COLUMN|CONSTRAINT)\b/i,
+  // ALTER TABLE in any form (ONLY, IF EXISTS, several actions) dropping a
+  // constraint or a column, the word COLUMN being optional; an ALTER COLUMN's
+  // DROP DEFAULT / NOT NULL / EXPRESSION / IDENTITY loses nothing
+  /\bALTER\s+TABLE\b[^;]*?\bDROP\s+(?!(DEFAULT|NOT|EXPRESSION|IDENTITY)\b)(IF\s+EXISTS\s+)?[\w"]+/i,
   /\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b/i,
-  /\bUPDATE\s+\w+\s+SET\b(?![^;]*\bWHERE\b)/i, // an unbounded UPDATE
+  // an unbounded UPDATE: UPDATE [ONLY] [schema.]table [[AS] alias] SET, no WHERE
+  /\bUPDATE\s+(ONLY\s+)?[\w$."]+(\s+(AS\s+)?[\w$"]+)?\s+SET\b(?![^;]*\bWHERE\b)/i,
 ];
-
-function stripComments(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
-    .map((l) => l.replace(/--.*$/, ""))
-    .join("\n");
-}
 
 const args = process.argv.slice(2);
 const force = args.includes("--force");
@@ -102,7 +101,7 @@ if (!fs.existsSync(sqlPath)) {
 }
 
 const sql = fs.readFileSync(sqlPath, "utf8");
-const bare = stripComments(sql);
+const bare = stripComments(sql, { lang: "sql" });
 
 const hits = DESTRUCTIVE.filter((re) => re.test(bare));
 
