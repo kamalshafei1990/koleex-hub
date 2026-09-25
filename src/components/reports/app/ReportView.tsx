@@ -28,7 +28,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation, type Translations } from "@/lib/i18n";
-import { reportsT } from "@/lib/translations/reports";
+import { reportCommonT } from "@/lib/translations/report-ui/common";
+import { reportPageT } from "@/lib/translations/report-ui/page";
+import { reportComposerT } from "@/lib/translations/report-ui/composer";
 import { loadReportWords } from "@/lib/translations/report-sections";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import DatePicker from "@/components/ui/DatePicker";
@@ -64,10 +66,12 @@ const hasBlocks = (tpl: ReportTemplateDef | null) => !!tpl?.sections.some((x) =>
  *  definition, or a builder type as the report was started with it), so
  *  this page never carries the catalog of every type (5C). */
 const typeOf = (d: ReportDetail): ReportTemplateDef | null => d.template?.def ?? null;
+/** This page's words — never the home's (26 Sep 2026: ./report-ui). */
+const PAGE_WORDS = { ...reportCommonT, ...reportPageT, ...reportComposerT };
 
 export default function ReportView({ id }: { id: string }) {
   const [sectionWords, setSectionWords] = useState<Translations | null>(null);
-  const words = useMemo(() => (sectionWords ? { ...reportsT, ...sectionWords } : reportsT), [sectionWords]);
+  const words = useMemo(() => (sectionWords ? { ...PAGE_WORDS, ...sectionWords } : PAGE_WORDS), [sectionWords]);
   const { t, lang } = useTranslation(words);
   const [detail, setDetail] = useState<ReportDetail | null>(null);
   const [blocks, setBlocks] = useState<BlocksModule | null>(null);

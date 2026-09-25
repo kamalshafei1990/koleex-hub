@@ -160,7 +160,9 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   /* reports/[id] + its print route — MEASURED 25/09/2026 at 9 chunks / 586 KB
      and 12 chunks / 742 KB, +12%. The print route carries the quotation's
      PRINT_AND_DOC_STYLES like every house document; it only ever loads in
-     the reader's hidden print iframe. */
+     the reader's hidden print iframe. 26/09/2026: 604 → 589 KB and 777 →
+     748 KB once each Reports screen downloaded only its own words
+     (translations/report-ui — validate:reports §26). */
   "reports/[id]": { chunks: 10, kbytes: 657 },
   "reports/[id]/print": { chunks: 14, kbytes: 832 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
@@ -263,7 +265,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      in its Library are a dynamic import and are NOT in this number.
      26/09/2026: 665 KB after Phase 5C (146 types) → 638 KB once the home
      listed the types from their heads (lib/reports/catalog-heads, generated)
-     instead of the whole catalog of sections; the builder tab keeps that. */
+     instead of the whole catalog of sections; the builder tab keeps that →
+     616 KB once it downloaded only its own words (translations/report-ui). */
   "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },

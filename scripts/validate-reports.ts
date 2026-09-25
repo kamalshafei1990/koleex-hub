@@ -85,6 +85,9 @@
  *   §25 the Reports home lists the types from their HEADS (catalog-heads.ts,
  *      generated from the catalog) — never the catalog of sections; the
  *      heads are exactly the catalog's, and stale ones fail.
+ *   §26 the Reports words live one file per place that reads them
+ *      (translations/report-ui): each screen imports only its own, never the
+ *      union — and never calls a word it did not import.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -1698,7 +1701,7 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   const leak = allFiles("src").filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("src/app/api/") && !f.startsWith("src/lib/server/") && !f.startsWith("src/lib/translations/report-sections/") && read(f).includes("report-sections/all"));
   expect(leak.length === 0, "no page imports every family's words — only the server does", leak.join(", "));
   rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
-    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
+    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportCommonT, ...reportPrintT, ...reportBlocksT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
     (src) => src.replace("own = await loadReportWords(res.data.wordFamilies ?? [], res.data.template?.words ? { words: res.data.template.words } : undefined);", "own = {};"));
 }
 
@@ -2145,8 +2148,8 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes("setSectionWords({ ...(mod?.BLOCK_WORDS ?? {}), ...(descs?.reportDescsT ?? {}), ...own });") && !/translations\/report-blocks"/.test(c) ? [] : ["the blocks' words are missing or ride every report"]),
     (src) => src.replace("setSectionWords({ ...(mod?.BLOCK_WORDS ?? {}), ...(descs?.reportDescsT ?? {}), ...own });", "setSectionWords({ ...(descs?.reportDescsT ?? {}), ...own });"));
   rule("the print carries the blocks' words", "src/app/reports/[id]/print/page.tsx",
-    (c) => (c.includes("words: { ...reportsT, ...reportBlocksT, ...own }") ? [] : ["a printed block shows its keys"]),
-    (src) => src.replace("words: { ...reportsT, ...reportBlocksT, ...own }", "words: { ...reportsT, ...own }"));
+    (c) => (c.includes("words: { ...reportCommonT, ...reportPrintT, ...reportBlocksT, ...own }") ? [] : ["a printed block shows its keys"]),
+    (src) => src.replace("words: { ...reportCommonT, ...reportPrintT, ...reportBlocksT, ...own }", "words: { ...reportCommonT, ...reportPrintT, ...own }"));
 
   const RD5 = "src/lib/server/reports/report-data.ts";
   const API5 = "src/app/api/work-reports";
@@ -2320,6 +2323,43 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (src) => src.replace('    officeOnly: r.office_only === true || r.office_only === "true",\n', ""));
 }
 
+/* The import graph of a screen (§23, §25, §26): walked, not listed, so a new
+   helper cannot bring a dependency back unseen. */
+const SRC = path.join(ROOT, "src");
+const resolveImport = (from: string, spec: string): string | null => {
+  let base: string;
+  if (spec.startsWith("@/")) base = path.join(SRC, spec.slice(2));
+  else if (spec.startsWith(".")) base = path.resolve(path.dirname(from), spec);
+  else return null;
+  for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+    const f = base + ext;
+    if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+  }
+  return null;
+};
+/* `virtual`: a file's content as a probe wants it — the shared tree is
+   never written to prove a check bites (another session could commit it).
+   `lazy`: follow import() too — a chunk loaded later (a tab, a dialog); a
+   page's first load is the static graph alone. */
+const graph = (entries: string[], virtual: Map<string, string> = new Map(), lazy = true): Set<string> => {
+  const seen = new Set<string>();
+  const todo = entries.map((e) => path.join(ROOT, e));
+  while (todo.length) {
+    const f = todo.pop()!;
+    if (seen.has(f)) continue;
+    seen.add(f);
+    const src = code(virtual.get(f) ?? fs.readFileSync(f, "utf8"));
+    /* Type-only imports are erased — they carry nothing into the bundle. */
+    for (const m of src.matchAll(/(?:^|\n)\s*import\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|(?:^|\n)\s*export\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']/g)) {
+      if (m[2] && !lazy) continue;
+      const spec = m[1] ?? m[2] ?? m[3];
+      const r = spec ? resolveImport(f, spec) : null;
+      if (r && !seen.has(r)) todo.push(r);
+    }
+  }
+  return seen;
+};
+
 /* ── §23 the report page carries no catalog (Phase 5C, step 0) ───────── */
 console.log("\n§23 the report page carries no catalog (Phase 5C)");
 {
@@ -2328,40 +2368,6 @@ console.log("\n§23 the report page carries no catalog (Phase 5C)");
      (GET …/[id] → template.def + wordFamilies), so neither may reach the
      catalog through any import, however indirect — walked, not listed, so a
      new helper cannot bring it back unseen. */
-  const SRC = path.join(ROOT, "src");
-  const resolveImport = (from: string, spec: string): string | null => {
-    let base: string;
-    if (spec.startsWith("@/")) base = path.join(SRC, spec.slice(2));
-    else if (spec.startsWith(".")) base = path.resolve(path.dirname(from), spec);
-    else return null;
-    for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
-      const f = base + ext;
-      if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
-    }
-    return null;
-  };
-  /* `virtual`: a file's content as a probe wants it — the shared tree is
-     never written to prove a check bites (another session could commit it). */
-  /* `lazy`: follow import() too — a chunk loaded later (a tab, a dialog).
-     The page's first load is the static graph alone. */
-  const graph = (entries: string[], virtual: Map<string, string> = new Map(), lazy = true): Set<string> => {
-    const seen = new Set<string>();
-    const todo = entries.map((e) => path.join(ROOT, e));
-    while (todo.length) {
-      const f = todo.pop()!;
-      if (seen.has(f)) continue;
-      seen.add(f);
-      const src = code(virtual.get(f) ?? fs.readFileSync(f, "utf8"));
-      /* Type-only imports are erased — they carry nothing into the bundle. */
-      for (const m of src.matchAll(/(?:^|\n)\s*import\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|(?:^|\n)\s*export\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']/g)) {
-        if (m[2] && !lazy) continue;
-        const spec = m[1] ?? m[2] ?? m[3];
-        const r = spec ? resolveImport(f, spec) : null;
-        if (r && !seen.has(r)) todo.push(r);
-      }
-    }
-    return seen;
-  };
   const CATALOG = path.join(ROOT, "src/lib/reports/catalog.ts");
   const pageGraph = graph(["src/app/reports/[id]/page.tsx", "src/components/reports/app/ReportView.tsx", "src/app/reports/[id]/print/page.tsx"]);
   expect(pageGraph.size > 20, `the walk reaches the page's modules (${pageGraph.size} files)`);
@@ -2604,6 +2610,76 @@ console.log("\n§25 the Reports home lists the types from their heads");
   expect(JSON.stringify(HEAD_GROUPS) === JSON.stringify(FAMILY_GROUPS), "the home groups the types as the catalog does");
   expect(reportHead("hr_offer")?.app === "HR" && reportHead("hr_payroll")?.payrollOnly === true && reportHead("probation_review")?.requestOnly === true && reportHead("c-abcdefghij") === null,
     "a head keeps who is offered the type (an app, «Payroll Reports», only on request); a builder type has none");
+}
+
+/* ── §26 each screen downloads only its own words (26 Sep 2026) ──────── */
+console.log("\n§26 each Reports screen downloads only its own words");
+{
+  /* Both failure directions are silent (the dictionary-split lesson): a
+     screen importing the union gets every word back and nothing looks
+     wrong; a screen calling a word it did not import shows the key. So:
+     which file owns each namespace, which namespaces each screen's code
+     names (any "ns.… / `ns.${…}" literal, comments stripped — a key held
+     in an array or built from a variable still names its namespace), and
+     whether the screen imported the file that owns it. */
+  const UI = "src/lib/translations/report-ui";
+  const UNION = path.join(ROOT, "src/lib/translations/reports.ts");
+  const nsOwner = new Map<string, string>();
+  const twice: string[] = [];
+  for (const f of fs.readdirSync(path.join(ROOT, UI)).filter((x) => x.endsWith(".ts"))) {
+    for (const m of read(`${UI}/${f}`).matchAll(/^\s{2}"([a-z][\w-]*)\.[^"]*":/gm)) {
+      const was = nsOwner.get(m[1]);
+      if (was && was !== f) twice.push(`${m[1]}: ${was} + ${f}`);
+      nsOwner.set(m[1], f);
+    }
+  }
+  expect(twice.length === 0 && nsOwner.size > 20, `each namespace of words lives in exactly one file (${nsOwner.size} namespaces)`, twice.join("; "));
+  expect(Object.keys(mainWords).every((k) => nsOwner.has(k.split(".")[0])) && [...nsOwner.values()].every((f) => code(read("src/lib/translations/reports.ts")).includes(`from "./report-ui/${f.slice(0, -3)}"`)),
+    "the union the server reads spreads every file — nothing lost, nothing defined twice");
+  const REPORTS_CODE = /\/src\/(components\/reports|app\/reports|lib\/reports)\/|\/src\/lib\/work-reports\.ts$/;
+  const named = (files: Set<string>, virtual: Map<string, string>): Map<string, string> => {
+    const out = new Map<string, string>();
+    for (const f of files) {
+      if (!REPORTS_CODE.test(f)) continue;
+      const c = code(virtual.get(f) ?? fs.readFileSync(f, "utf8"));
+      for (const ns of nsOwner.keys()) if (!out.has(ns) && new RegExp(`["'\`]${ns}\\.[a-z$]`).test(c)) out.set(ns, path.relative(ROOT, f));
+    }
+    return out;
+  };
+  const importsOf = (file: string, virtual: Map<string, string>) =>
+    new Set([...code(virtual.get(path.join(ROOT, file)) ?? read(file)).matchAll(/from "@\/lib\/translations\/report-ui\/([a-z-]+)"/g)].map((m) => `${m[1]}.ts`));
+  const HOME = "src/components/reports/app/ReportsApp.tsx";
+  type Screen = { name: string; entry: string[]; dictFrom: string[]; lazy: boolean; minus?: string };
+  const SCREENS: Screen[] = [
+    { name: "the Reports home", entry: [HOME], dictFrom: [HOME], lazy: false },
+    { name: "its builder tab", entry: ["src/components/reports/app/TemplatesTab.tsx"], dictFrom: [HOME, "src/components/reports/app/TemplatesTab.tsx"], lazy: false, minus: HOME },
+    { name: "its compliance tab", entry: ["src/components/reports/app/ComplianceTab.tsx"], dictFrom: [HOME, "src/components/reports/app/ComplianceTab.tsx"], lazy: false, minus: HOME },
+    { name: "its team summary", entry: ["src/components/reports/app/TeamSummary.tsx"], dictFrom: [HOME], lazy: false, minus: HOME },
+    { name: "the report page", entry: ["src/app/reports/[id]/page.tsx", "src/components/reports/app/ReportView.tsx"], dictFrom: ["src/components/reports/app/ReportView.tsx"], lazy: true },
+    { name: "its print", entry: ["src/app/reports/[id]/print/page.tsx"], dictFrom: ["src/app/reports/[id]/print/page.tsx"], lazy: true },
+  ];
+  const problems = (sc: Screen, virtual: Map<string, string> = new Map()): string[] => {
+    const files = graph(sc.entry, virtual, sc.lazy);
+    const own = sc.minus ? new Set([...files].filter((f) => !graph([sc.minus!], virtual, false).has(f))) : files;
+    const has = new Set(sc.dictFrom.flatMap((f) => [...importsOf(f, virtual)]));
+    const out: string[] = [];
+    if (files.has(UNION)) out.push("imports the union of every Reports word");
+    for (const [ns, where] of named(own, virtual)) if (!has.has(nsOwner.get(ns)!)) out.push(`${where} names "${ns}.…" but ${sc.name} never imports ${nsOwner.get(ns)}`);
+    return out;
+  };
+  for (const sc of SCREENS) {
+    const p = problems(sc);
+    expect(p.length === 0, `${sc.name} imports exactly the words it names — never the union`, p.join("; "));
+  }
+  /* …and both directions would be caught (in memory only). */
+  const rowFile = path.join(ROOT, "src/components/reports/app/ReportRowItem.tsx");
+  const row = fs.readFileSync(rowFile, "utf8");
+  expect(problems(SCREENS[0], new Map([[rowFile, `import { reportsT } from "@/lib/translations/reports";\nvoid reportsT;\n${row}`]])).some((x) => x.includes("union")),
+    "…a screen importing the union again is caught");
+  expect(problems(SCREENS[0], new Map([[rowFile, row.replace('{t("badge.unread")}', '{t("reader.title")}')]])).some((x) => x.includes('"reader.…"')),
+    "…and a word from a file the screen never imported is caught");
+  expect(problems(SCREENS[4], new Map([[path.join(ROOT, "src/components/reports/app/ReportView.tsx"), read("src/components/reports/app/ReportView.tsx").replace('import { reportPageT } from "@/lib/translations/report-ui/page";\n', "")]])).length > 0,
+    "…and so is the page losing its own words");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

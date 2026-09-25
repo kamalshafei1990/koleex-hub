@@ -22,6 +22,8 @@ import { addDays } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
 import { dmyDate, dmyTime, fetchCompliance, fetchObligations, localToday, previewNudges, saveObligations, type ComplianceBoard, type NudgePreview, type ObligationSetup } from "@/lib/work-reports";
 import { Avatar, CARD, type T } from "./shared";
+import type { Lang } from "@/lib/i18n";
+import { reportComplianceT } from "@/lib/translations/report-ui/compliance";
 
 const STATE_STYLE: Record<CellState, { cls: string; icon: React.ReactNode }> = {
   sent: { cls: "border-emerald-500/30 bg-emerald-500/12 text-emerald-500", icon: <RrIcon name="check" size={11} /> },
@@ -44,7 +46,13 @@ function CellView({ t, cell, label }: { t: T; cell: Cell; label: string }) {
     : <span title={`${label} · ${facts}`} aria-label={`${label}: ${facts}`} className="block">{box}</span>;
 }
 
-export default function ComplianceTab({ t, lang }: { t: T; lang: string }) {
+export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string }) {
+  /* The board's own words ride this tab's chunk (./report-ui/compliance);
+     everything else is the home's. */
+  const t = useCallback<T>((key, fallback) => {
+    const e = reportComplianceT[key];
+    return e ? (e[lang as Lang] ?? e.en) : shared(key, fallback);
+  }, [shared, lang]);
   const [day, setDay] = useState(() => localToday());
   const [board, setBoard] = useState<ComplianceBoard | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");

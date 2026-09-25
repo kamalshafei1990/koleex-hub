@@ -1,0 +1,53 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Reports words — The compliance board and its reminders (the Compliance
+   tab — its own chunk). One file per place that reads them (26 Sep 2026):
+   each screen imports only its own, and ../reports.ts spreads them all for
+   the server. validate:reports §26 fails when a screen reads a word it did
+   not import. */
+export const reportComplianceT: Translations = {
+  "compliance.title":   { en: "Who sent what", zh: "谁提交了什么", ar: "مين بعت إيه" },
+  "compliance.hint":    { en: "Each person on their own calendar: their weekend and holidays, their leave, the end of their working day.", zh: "按每个人自己的日历：周末、节假日、休假和下班时间。", ar: "كل واحد على تقويمه: إجازته الأسبوعية والعطلات وإجازاته وميعاد آخر يوم شغله." },
+  "compliance.prev":    { en: "Previous week", zh: "上一周", ar: "الأسبوع اللي فات" },
+  "compliance.next":    { en: "Next week", zh: "下一周", ar: "الأسبوع الجاي" },
+  "compliance.rate":    { en: "{n}% on time", zh: "准时率 {n}%", ar: "{n}% في الميعاد" },
+  "compliance.person":  { en: "Person", zh: "人员", ar: "الشخص" },
+  "compliance.weekly":  { en: "Weekly", zh: "周报", ar: "أسبوعي" },
+  "compliance.monthly": { en: "Monthly", zh: "月报", ar: "شهري" },
+  "compliance.sentAt":  { en: "sent {at}", zh: "提交于 {at}", ar: "اتبعت {at}" },
+  "compliance.dueAt":   { en: "due {at}", zh: "截止 {at}", ar: "الميعاد {at}" },
+  "compliance.empty":   { en: "Nobody here is expected to send reports.", zh: "这里没有需要提交报告的人。", ar: "مفيش حد هنا مطلوب منه تقارير." },
+  "compliance.notStarted": { en: "Counting has not started: nobody is marked late or missing yet. The board shows who is expected and what was sent.", zh: "尚未开始统计：目前不会有人被标记为迟交或未交。看板显示应提交的人和已提交的内容。", ar: "العدّ لسه ما بدأش: محدش هيتحسب متأخر أو ناقص. اللوحة بتوري مين مطلوب منه وإيه اللي اتبعت." },
+  "compliance.notStartedShort": { en: "Not started", zh: "未开始", ar: "لسه ما بدأش" },
+  "compliance.startOn": { en: "Start counting from", zh: "开始统计日期", ar: "ابدأ العدّ من" },
+  "compliance.start":   { en: "Start", zh: "开始", ar: "ابدأ" },
+  "compliance.setup":   { en: "Who writes what", zh: "谁写哪些报告", ar: "مين يكتب إيه" },
+  "compliance.setupHint": { en: "By default everyone writes the daily and the weekly, managers also the monthly, and super admins nothing. Tap to change it for one person.", zh: "默认所有人写日报和周报，管理者还需写月报，超级管理员无需提交。点击可为个人单独调整。", ar: "افتراضيًا الكل بيكتب اليومي والأسبوعي، والمديرين كمان الشهري، والسوبر أدمن مش مطلوب منه. دوس عشان تغيّر لشخص معين." },
+  "compliance.exempt":  { en: "Super admin — exempt by default", zh: "超级管理员——默认无需提交", ar: "سوبر أدمن — مش مطلوب منه افتراضيًا" },
+  "compliance.manager": { en: "Manager — monthly too", zh: "管理者——还需写月报", ar: "مدير — والشهري كمان" },
+  "compliance.default": { en: "As the default", zh: "按默认", ar: "زي الافتراضي" },
+  "compliance.changed": { en: "Changed for this person", zh: "已为此人单独调整", ar: "متغيّر للشخص ده" },
+  "compliance.k.daily":   { en: "Daily", zh: "日报", ar: "يومي" },
+  "compliance.k.weekly":  { en: "Weekly", zh: "周报", ar: "أسبوعي" },
+  "compliance.k.monthly": { en: "Monthly", zh: "月报", ar: "شهري" },
+  "compliance.s.sent":      { en: "On time", zh: "准时", ar: "في الميعاد" },
+  "compliance.s.late":      { en: "Late", zh: "迟交", ar: "متأخر" },
+  "compliance.s.missing":   { en: "Missing", zh: "未交", ar: "ناقص" },
+  "compliance.s.due":       { en: "Due", zh: "待交", ar: "مطلوب" },
+  "compliance.s.upcoming":  { en: "Not yet", zh: "未到", ar: "لسه" },
+  "compliance.s.off":       { en: "Day off", zh: "休息日", ar: "إجازة رسمية" },
+  "compliance.s.leave":     { en: "On leave", zh: "休假", ar: "في إجازة" },
+  "compliance.s.untracked": { en: "Not counted", zh: "不计入", ar: "مش محسوب" },
+
+  /* Phase 3B — reminders and escalation. */
+  "nudge.reminders":     { en: "Remind the author", zh: "提醒提交人", ar: "فكّر صاحب التقرير" },
+  "nudge.remindersHint": { en: "An hour before the deadline, if the report is not sent yet.", zh: "截止前一小时，如果报告尚未提交。", ar: "قبل الميعاد بساعة، لو التقرير لسه ما اتبعتش." },
+  "nudge.escalations":   { en: "Tell the manager", zh: "通知主管", ar: "بلّغ المدير" },
+  "nudge.escalationsHint": { en: "When it is still missing: the daily 2 hours after the deadline, the weekly and monthly after one working day.", zh: "仍未提交时：日报在截止后 2 小时，周报和月报在一个工作日后。", ar: "لو لسه ناقص: اليومي بعد الميعاد بساعتين، والأسبوعي والشهري بعد يوم شغل." },
+  "nudge.live":          { en: "Counting has started, so these are on: nobody gets the same notification twice.", zh: "已开始统计，提醒已生效：同一通知不会重复发送。", ar: "العدّ بدأ، فدول شغالين: محدش هيوصله نفس الإشعار مرتين." },
+  "nudge.notYet":        { en: "Nothing is sent until counting starts.", zh: "开始统计前不会发送任何通知。", ar: "مفيش حاجة بتتبعت لحد ما العدّ يبدأ." },
+  "nudge.preview":       { en: "Preview now", zh: "立即预览", ar: "معاينة دلوقتي" },
+  "nudge.previewNone":   { en: "Nobody would be told anything right now.", zh: "此刻不会通知任何人。", ar: "مفيش حد هيوصله حاجة دلوقتي." },
+  "nudge.kind.reminder":   { en: "Reminder", zh: "提醒", ar: "تذكير" },
+  "nudge.kind.escalation": { en: "Manager told", zh: "通知主管", ar: "تبليغ المدير" },
+};

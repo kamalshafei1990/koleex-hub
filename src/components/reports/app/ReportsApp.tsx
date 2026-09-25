@@ -28,7 +28,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
-import { reportsT } from "@/lib/translations/reports";
+import { reportCommonT } from "@/lib/translations/report-ui/common";
+import { reportHomeT } from "@/lib/translations/report-ui/home";
 import { reportDescsT } from "@/lib/translations/report-descs";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
@@ -53,10 +54,11 @@ const TeamSummary = dynamic(() => import("./TeamSummary"), { ssr: false, loading
 type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
 const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
 const WARM_KEY = "kx:reports:bundle";
-/** The UI words and every type's name, with the one line under each name
- *  (5B: the descriptions live apart — only the places a type is picked
- *  carry them, this home and the builder's list). */
-const APP_WORDS = { ...reportsT, ...reportDescsT };
+/** The home's words and every type's name, with the one line under each
+ *  name (5B: the descriptions live apart — only the places a type is picked
+ *  carry them, this home and the builder's list). Never the whole Reports
+ *  dictionary: the report page's words stay with the report page (26 Sep). */
+const APP_WORDS = { ...reportCommonT, ...reportHomeT, ...reportDescsT };
 
 export default function ReportsApp() {
   const [bundle, setBundle] = useState<ReportsBundle | null>(null);

@@ -27,6 +27,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import type { Lang } from "@/lib/i18n";
 import { reportBuilderT } from "@/lib/translations/report-builder";
 import { reportBlocksT } from "@/lib/translations/report-blocks";
+import { reportComposerT } from "@/lib/translations/report-ui/composer";
 import {
   REPORT_FAMILIES, REPORT_LINK_TYPES,
   type ReportColumnType, type ReportDataSource, type ReportFamily, type ReportLinkType, type ReportSectionDef, type ReportSectionKind,
@@ -73,9 +74,10 @@ const blankDoc = (): TemplateDoc => ({
 
 export default function TemplatesTab({ t: shared, lang, onChanged }: { t: T; lang: string; onChanged: () => void }) {
   const l = (LANGS.find((x) => x === lang) ?? "en") as Lang;
-  /* The builder's own words first (and the blocks' — link kinds, 5B), then the Reports dictionary (groups, type names). */
+  /* The builder's own words first (and the blocks' — link kinds, 5B — and
+     the composer's few it shares), then the home's (groups, type names). */
   const t = useCallback<T>((key, fallback) => {
-    const e = reportBuilderT[key] ?? reportBlocksT[key];
+    const e = reportBuilderT[key] ?? reportBlocksT[key] ?? reportComposerT[key];
     return e ? (e[l] ?? e.en) : shared(key, fallback);
   }, [shared, l]);
   const [list, setList] = useState<TemplateList | null>(null);
