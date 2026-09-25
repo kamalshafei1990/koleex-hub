@@ -5,6 +5,7 @@
    --------------------------------------------------------------------------- */
 
 import type { ReportSectionValue } from "@/lib/reports/templates";
+import type { CarryGroup } from "@/lib/reports/carry";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -57,6 +58,8 @@ export interface ReportDetail {
   access: "author" | "recipient" | "manager" | "super_admin";
   can: { edit: boolean; remove: boolean; revise: boolean; decide: boolean; acknowledge: boolean; comment: boolean };
   people?: ReportPerson[];
+  /** The author's draft only: suggestions from their earlier reports. */
+  carry?: CarryGroup[];
 }
 
 export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; extra?: Record<string, unknown> };
@@ -94,6 +97,9 @@ export const decideReport = (id: string, action: "approve" | "return" | "acknowl
 export const commentOnReport = (id: string, body: string) =>
   call<{ comment: ReportComment }>(`/api/work-reports/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
 export const reviseReport = (id: string) => call<{ id: string; existing: boolean }>(`/api/work-reports/${id}/revise`, { method: "POST" });
+/** The draft's suggestions again, for the day / week / month it is moving to. */
+export const fetchCarry = (id: string, date: string) =>
+  call<{ carry: CarryGroup[] }>(`/api/work-reports/${id}/carry?date=${encodeURIComponent(date)}`);
 
 /** The browser's own calendar day (not the UTC one). */
 export const localToday = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

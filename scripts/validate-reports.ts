@@ -18,6 +18,9 @@
  *      Latin or Chinese.
  *   §7 wiring — the registry, the sidebar, the migration, the layout's
  *      exclusions, the Finance links.
+ *   §8 carry-over (Phase 2A) — which earlier reports feed a new one, that a
+ *      suggestion is offered once and never cut, that it is only ever the
+ *      author's own text, and that nothing lands in a report by itself.
  *
  * Source rules are checked in both directions, like validate:attendance: the
  * real file passes, and a mutated copy that breaks the rule must fail.
@@ -30,6 +33,7 @@ import {
   REPORT_FAMILIES, REPORT_LIMITS, REPORT_TEMPLATES, isoWeekKey, missingSections, normalizeSections, periodFor, reportTemplate,
 } from "../src/lib/reports/templates";
 import { reportsT } from "../src/lib/translations/reports";
+import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
 import { NOTIFICATION_ACTIVITIES, classifyNotificationActivity } from "../src/lib/notification-activity";
 import {
   LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, widthUnits, type Measurer, type PrintPara,
@@ -183,7 +187,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 7, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise)`);
+  expect(files.length === 8, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -224,6 +228,21 @@ console.log("\n§5 routes");
   rule("send refuses a report with nobody to send it to", `${API}/[id]/submit/route.ts`,
     (c) => (/no_recipients/.test(c) ? [] : ["no recipient check"]),
     (s) => s.replace(/if \(!recipients\.some[^\n]*\n/, "\n"));
+  rule("only the author's own draft carries suggestions", `${API}/[id]/route.ts`,
+    (c) => (/const carry = isAuthor && row\.status === "draft" \? await loadCarry\(row, auth\) : undefined;/.test(c) ? [] : ["carry is not gated on the author's draft"]),
+    (s) => s.replace('isAuthor && row.status === "draft" ? await loadCarry', "true ? await loadCarry"));
+  rule("the carry route answers the author of a draft only", `${API}/[id]/carry/route.ts`,
+    (c) => (/loaded\.access !== "author"/.test(c) && /loaded\.row\.status !== "draft"/.test(c) ? [] : ["the carry route does not check author + draft"]),
+    (s) => s.replace('if (!loaded || loaded.access !== "author")', "if (!loaded)"));
+  rule("the carry read is the VIEWER's own latest versions", "src/lib/server/reports/carry.ts",
+    (c) => (/\.eq\("author_account_id", auth\.account_id\)\.eq\("superseded", false\)/.test(c) ? [] : ["the carry read is not scoped to the viewer"]),
+    (s) => s.replace('.eq("author_account_id", auth.account_id)', ""));
+  rule("nothing lands in a report by itself (the card only acts on a tap)", "src/components/reports/app/CarryCard.tsx",
+    (c) => (/useEffect\(|useLayoutEffect\(/.test(c) ? ["the card runs an effect"] : (/onPlace\(/.test(c) ? [] : ["the card never places"])),
+    (s) => s.replace('import { useState } from "react";', 'import { useEffect, useState } from "react";\nuseEffect(() => {});'));
+  rule("the first suggestions come with the report (one request, nothing shifting in)", "src/components/reports/app/ReportView.tsx",
+    (c) => ((c.match(/fetchCarry\(/g) ?? []).length === 1 && /groups: detail\.carry \?\? \[\]/.test(c) ? [] : ["the composer fetches suggestions on its own"]),
+    (s) => s.replace("groups: detail.carry ?? []", "groups: []"));
   rule("the bundle is ONE request (no per-card fetches)", "src/components/reports/app/ReportsApp.tsx",
     (c) => ((c.match(/fetchReportsBundle\(/g) ?? []).length === 1 && !/fetch\(["'`]\/api\//.test(c) ? [] : ["the home screen fetches more than the bundle"]),
     (s) => s.replace("fetchReportsBundle(", "fetch(\"/api/work-reports/bundle\"); fetchReportsBundle("));
@@ -296,6 +315,117 @@ console.log("\n§7 wiring");
     "Finance links point at /reports/operational, not the new app");
   expect(fs.existsSync(path.join(ROOT, "src/app/reports/operational/page.tsx")) && !fs.existsSync(path.join(ROOT, "src/app/reports/(app)")),
     "the Finance page moved to /reports/operational, and no route group hides the app from the budgets guard");
+}
+
+/* ── §8 carry-over ─────────────────────────────────────────────────────── */
+console.log("\n§8 carry-over and roll-ups");
+{
+  const bad: string[] = [];
+  for (const [key, rules] of Object.entries(CARRY_RULES)) {
+    const tpl = reportTemplate(key);
+    if (!tpl) { bad.push(`${key}: unknown template`); continue; }
+    for (const r of rules) {
+      const sec = reportTemplate(r.from)?.sections.find((x) => x.id === r.section);
+      if (!sec) { bad.push(`${key} <- ${r.from}.${r.section}: no such section`); continue; }
+      if (!r.to.length) bad.push(`${key} <- ${r.from}.${r.section}: goes nowhere`);
+      for (const sid of r.to) {
+        const target = tpl.sections.find((x) => x.id === sid);
+        if (!target) bad.push(`${key}.${sid}: no such section`);
+        else if (sec.kind === "text" && target.kind === "list") bad.push(`${key}.${sid}: a paragraph cannot become one list line`);
+      }
+    }
+  }
+  expect(bad.length === 0, `${Object.keys(CARRY_RULES).length} report types carry items; every rule points at real sections, and a paragraph never lands in a list`, bad.join("; "));
+  eq(Object.keys(CARRY_RULES).sort(), ["daily", "monthly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly and monthly carry items; memos and visits start blank");
+  const need = ["carry.title", "carry.hint", "carry.addAllTo", "carry.added", "carry.showAll", "carry.more", "carry.less", "carry.hide", "carry.show", "carry.waiting", "carry.allAdded", "carry.full"];
+  expect(need.every((k) => !!reportsT[k]), "the card's words exist (their three languages are checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
+
+  const rep = (id: string, key: string, start: string, sections: unknown, x: { end?: string; pk?: string; v?: number; sup?: boolean } = {}): CarrySource =>
+    ({ id, template_key: key, period_start: start, period_end: x.end ?? start, period_key: x.pk ?? start, sections, version: x.v ?? 1, superseded: x.sup ?? false });
+  const texts = (g: ReturnType<typeof buildCarry>) => g.flatMap((x) => x.items.map((i) => i.text));
+
+  /* the daily */
+  const today = periodFor("daily", "2026-09-25");
+  const me = { id: "self", periodKey: today.key };
+  const yesterday = rep("y", "daily", "2026-09-24", [
+    { id: "tomorrow", items: ["Call the forwarder", "Send the Yili quote"] },
+    { id: "pending", items: ["- call the  forwarder", "Customs papers"] },
+    { id: "done", items: ["Old news"] },
+  ]);
+  const older = rep("o", "daily", "2026-09-22", [{ id: "tomorrow", items: ["Stale plan"] }]);
+  const dg = buildCarry("daily", today, [older, yesterday], me);
+  eq(dg.map((x) => `${x.section}>${x.to.join("|")}`), ["tomorrow>done|pending", "pending>done|pending"], "a daily offers yesterday's plan, then yesterday's pending: done, or still pending?");
+  eq(texts(dg), ["Call the forwarder", "Send the Yili quote", "Customs papers"], "only the latest earlier daily speaks, and a line its pending repeats is offered once");
+  eq(dg[0].sources.map((x) => x.id), ["y"], "the card names the report the items came from");
+  eq(buildCarry("daily", today, [rep("far", "daily", "2026-09-14", [{ id: "tomorrow", items: ["Too old"] }])], me), [], "a daily more than 10 days back is not offered");
+  eq(buildCarry("daily", today, [rep("self", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Me"] }])], me), [], "a report never feeds itself");
+  eq(buildCarry("daily", today, [rep("same", "daily", "2026-09-25", [{ id: "tomorrow", items: ["Other version of today"] }])], me), [], "nor does another version of the same day");
+  eq(buildCarry("daily", today, [rep("later", "daily", "2026-09-26", [{ id: "tomorrow", items: ["Future"] }])], me), [], "a later daily is not an earlier one");
+  eq(texts(buildCarry("daily", today, [
+    rep("v1", "daily", "2026-09-24", [{ id: "tomorrow", items: ["From version 1"] }], { v: 1 }),
+    rep("v2", "daily", "2026-09-24", [{ id: "tomorrow", items: ["From version 2"] }], { v: 2 }),
+  ], me)), ["From version 2"], "of two versions of one day (a sent one and its new draft), the newer speaks");
+  eq(buildCarry("daily", today, [rep("old", "daily", "2026-09-24", [{ id: "tomorrow", items: ["Replaced"] }], { sup: true })], me), [], "a replaced version never speaks");
+  eq(texts(buildCarry("daily", today, [rep("junk", "daily", "2026-09-24", [{ id: "tomorrow", items: ["  ", 7, "Real"] }, { id: "tomorrow", text: 9 }])], me)), ["Real"], "blank and non-text lines in an old row are ignored");
+
+  /* Monday's plan */
+  const wk40 = periodFor("weekly", "2026-09-28");
+  const lastWeekly = rep("w39", "weekly", "2026-09-21", [{ id: "next_week", items: ["Launch the catalogue", "Visit Ningbo"] }], { end: "2026-09-27", pk: "2026-W39" });
+  eq(texts(buildCarry("weekly_plan", wk40, [lastWeekly], { id: "self", periodKey: wk40.key })), ["Launch the catalogue", "Visit Ningbo"], "Monday's plan offers last week's 'next week' as this week's goals");
+
+  /* Friday's weekly */
+  const wk39 = periodFor("weekly", "2026-09-25");
+  const day = (d: string, secs: unknown) => rep(`d${d}`, "daily", `2026-09-${d}`, secs);
+  const wg = buildCarry("weekly", wk39, [
+    day("20", [{ id: "meetings", items: ["Last Sunday, outside the week"] }]),
+    day("24", [{ id: "meetings", items: ["Call with Mr Chen"] }, { id: "done", items: ["Booked the container"] }, { id: "pending", items: ["Customs papers"] }, { id: "tomorrow", items: ["customs papers", "Pay the forwarder"] }]),
+    day("21", [{ id: "meetings", items: ["Kick-off with the Cairo team"] }, { id: "done", items: ["Priced the Yili order"] }, { id: "pending", items: ["Monday pending"] }]),
+    rep("plan", "weekly_plan", "2026-09-21", [{ id: "goals", items: ["Close the Yili order"] }], { end: "2026-09-27", pk: "2026-W39" }),
+  ], { id: "self", periodKey: wk39.key });
+  const by = Object.fromEntries(wg.map((x) => [`${x.from}.${x.section}`, x]));
+  eq(by["weekly_plan.goals"]?.items.map((i) => i.text), ["Close the Yili order"], "the weekly report opens with Monday's goals");
+  eq(by["weekly_plan.goals"]?.to, ["summary", "next_week"], "a goal is either reached (the summary) or carried to next week");
+  eq(by["daily.meetings"]?.items.map((i) => i.text), ["Kick-off with the Cairo team", "Call with Mr Chen"], "it gathers the week's meetings, oldest first, nothing from outside the week");
+  eq(by["daily.done"]?.items.map((i) => i.text), ["Priced the Yili order", "Booked the container"], "and everything done that week");
+  eq(by["daily.pending"]?.items.map((i) => i.text), ["Customs papers"], "what is still pending comes from the week's LAST daily only");
+  eq(by["daily.tomorrow"]?.items.map((i) => i.text), ["Pay the forwarder"], "then that daily's plan, without repeating a pending line");
+  eq(by["daily.meetings"]?.items.map((i) => i.date), ["2026-09-21", "2026-09-24"], "each item keeps the day it came from");
+
+  /* the monthly */
+  const sep = periodFor("monthly", "2026-09-30");
+  const mg = buildCarry("monthly", sep, [
+    rep("w35", "weekly", "2026-08-24", [{ id: "summary", text: "August only" }], { end: "2026-08-30", pk: "2026-W35" }),
+    rep("w36", "weekly", "2026-08-31", [{ id: "summary", text: "Crosses into September" }, { id: "projects", items: ["Catalogue 60%"] }], { end: "2026-09-06", pk: "2026-W36" }),
+    rep("w39", "weekly", "2026-09-21", [{ id: "summary", text: "Shipped two containers.\nClosed Yili." }, { id: "decisions", items: ["Move to Aliyun"] }], { end: "2026-09-27", pk: "2026-W39" }),
+  ], { id: "self", periodKey: sep.key });
+  const mb = Object.fromEntries(mg.map((x) => [x.section, x]));
+  eq(mb.summary?.items.map((i) => i.text), ["Crosses into September", "Shipped two containers.\nClosed Yili."], "the monthly gathers the month's weekly summaries (a week crossing into it counts), nothing from August");
+  expect(!!mb.summary?.items.length && mb.summary.items.every((i) => i.paragraph), "a weekly summary comes as one whole paragraph");
+  eq(mb.projects?.items.map((i) => i.text), ["Catalogue 60%"], "and the weeks' project lines");
+  eq(mb.decisions?.to, ["summary", "improvements"], "a week's decision goes to the summary or to the plans");
+  eq(buildCarry("customer_visit", periodFor(null, "2026-09-25"), [lastWeekly], { id: "self" }), [], "a visit report starts blank");
+
+  /* the one read */
+  eq(carryQueryRange("daily", today), { templates: ["daily"], from: "2026-09-15", to: "2026-09-25" }, "the daily reads 10 days back, in one query");
+  eq(carryQueryRange("weekly", wk39), { templates: ["weekly_plan", "daily"], from: "2026-09-15", to: "2026-09-27" }, "the weekly reads its week (and 6 days before, for a crossing period)");
+  eq(carryQueryRange("monthly", sep), { templates: ["weekly"], from: "2026-08-26", to: "2026-09-30" }, "the monthly reads from 6 days before the month");
+  eq(carryQueryRange("free", today), null, "a free report reads nothing");
+
+  /* landing in a section */
+  const item = { text: "Call the forwarder", paragraph: false, date: null };
+  eq(insertInto("", item, "list"), "Call the forwarder", "into an empty list: the line itself");
+  eq(insertInto("Booked the container\n\n", item, "list"), "Booked the container\nCall the forwarder", "into a list: a new line at the end, no blank line between");
+  eq(insertInto("We had a good week.", item, "text"), "We had a good week.\n- Call the forwarder", "into a text section: a '- ' line");
+  eq(insertInto("Intro", { text: "Para two", paragraph: true }, "text"), "Intro\n\nPara two", "a paragraph: after a blank line");
+  eq(insertInto("", { text: "A paragraph", paragraph: true }, "list"), null, "a paragraph never becomes one list line");
+  eq(insertInto(Array.from({ length: REPORT_LIMITS.items }, (_, i) => `item ${i}`).join("\n"), item, "list"), null, `a list already holding ${REPORT_LIMITS.items} items takes no more`);
+  eq(insertInto("x".repeat(REPORT_LIMITS.text - 5), item, "text"), null, `nothing is cut: past ${REPORT_LIMITS.text} characters it does not go in`);
+  expect(isPlaced(item, { done: "Booked the container\n- call  the Forwarder" }, ["done", "pending"]), "already there: a bullet, spaces and case do not matter");
+  expect(isPlaced(item, { pending: "Call the forwarder" }, ["done", "pending"]), "already in the OTHER place counts too");
+  expect(!isPlaced(item, { done: "Call the forwarder about Monday" }, ["done", "pending"]), "a longer line that only starts the same is another item");
+  expect(!isPlaced(item, { summary: "Call the forwarder" }, ["done", "pending"]), "a section it cannot go to does not count");
+  expect(isPlaced({ text: "Shipped two containers.\nClosed Yili.", paragraph: true, date: null }, { summary: "Intro\n\nShipped two containers. Closed  Yili." }, ["summary"]),
+    "a paragraph is found even after its line breaks moved");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

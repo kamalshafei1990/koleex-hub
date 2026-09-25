@@ -5,7 +5,10 @@
    anything sent opens as the reader.
 
    Composer: the template's sections (text, or one item per line), the
-   period, To / Copy (filled from the type's default readers), Confidential.
+   period, To / Copy (filled from the type's default readers), Confidential,
+   and — for the daily / weekly / monthly family — the author's earlier
+   reports offered as tap-to-add suggestions (CarryCard; nothing is added
+   by itself).
    It saves itself a moment after each change — one save on the wire at a
    time, always of the latest text — and once more when the page closes,
    so nothing typed is lost. Send saves first. The server enforces the same
@@ -27,11 +30,13 @@ import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
 import { REPORT_LIMITS, periodFor, reportTemplate, type ReportSectionValue, type ReportTemplateDef } from "@/lib/reports/templates";
+import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
 import {
-  commentOnReport, decideReport, deleteDraft, dmyTime, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
+  commentOnReport, decideReport, deleteDraft, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
   type ReportDetail, type ReportPerson, type ReportRecipient,
 } from "@/lib/work-reports";
 import { Avatar, Badge, CARD, FIELD, StatusChip, TemplateIcon, tplName, type T } from "./shared";
+import CarryCard from "./CarryCard";
 
 export default function ReportView({ id }: { id: string }) {
   const { t, lang } = useTranslation(reportsT);
@@ -117,6 +122,15 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const people = useMemo(() => detail.people ?? [], [detail.people]);
   const nameOf = useMemo(() => new Map([...people, ...detail.recipients].map((p) => [p.id, p])), [people, detail.recipients]);
+  /* The suggestions arrive with the report; moving the draft to another
+     day / week / month asks again for that period (the latest answer wins).
+     `key` remounts the card for a new period, so it reopens fresh. */
+  const [carry, setCarry] = useState<{ key: string; groups: CarryGroup[] }>(() => ({ key: detail.report.periodKey ?? "", groups: detail.carry ?? [] }));
+  const carryAsk = useRef(0);
+  const moveCarry = useCallback((date: string, key: string) => {
+    const n = ++carryAsk.current;
+    void fetchCarry(id, date).then((res) => { if (res.ok && n === carryAsk.current) setCarry({ key, groups: res.data.carry }); });
+  }, [id]);
 
   const patchOf = useCallback((d: Draft) => (tpl ? {
     title: tpl.customTitle ? d.title : undefined, date: d.date || undefined,
@@ -219,6 +233,8 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
         </header>
         {detail.report.version > 1 && <p className="rounded-xl border border-[#567FB2]/30 bg-[#567FB2]/10 px-4 py-2.5 text-[12.5px] text-[var(--text-secondary)]">{t("composer.newVersionNote")}</p>}
 
+        {carry.groups.length > 0 && <CarryCard key={carry.key} t={t} tpl={tpl} groups={carry.groups} texts={draft.texts} onPlace={setText} />}
+
         {tpl.customTitle && (
           <label className={`${CARD} block p-4`}>
             <span className="mb-1.5 block text-[12px] font-semibold text-[var(--text-secondary)]">{t("composer.titleLabel")} <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span></span>
@@ -252,7 +268,13 @@ function Composer({ t, detail, onSent }: { t: T; detail: ReportDetail; onSent: (
             <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
               {tpl.cadence === "weekly" ? t("period.week") : tpl.cadence === "monthly" ? t("period.month") : tpl.cadence === "daily" ? t("period.day") : t("period.date")}
             </p>
-            <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => { if (iso) change({ date: iso }); }} />
+            <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
+              if (!iso) return;
+              const key = periodFor(tpl.cadence, iso).key;
+              const moved = !!CARRY_RULES[tpl.key] && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
+              change({ date: iso });
+              if (moved) moveCarry(iso, key);
+            }} />
             {period && tpl.cadence && tpl.cadence !== "daily" && <p className="mt-1 text-[11.5px] text-[var(--text-dim)] tabular-nums">{periodLabel(period.start, period.end)}</p>}
           </div>
           <PeopleField t={t} label={t("composer.to")} ids={draft.to} people={people} nameOf={nameOf}

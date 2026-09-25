@@ -5,7 +5,10 @@ import "server-only";
 
    GET    The report, its recipients (with read / acknowledged), its thread
           and what THIS viewer may do with it. Opening it as a recipient marks
-          it read and clears the reader's own notification.
+          it read and clears the reader's own notification. The author's
+          draft also carries the suggestions from their earlier reports
+          (yesterday's plan, the week's dailies…), so the composer paints
+          complete — no second request, nothing shifting in later.
    PATCH  The author edits a DRAFT: { title?, date?, sections?, to?, cc?,
           confidential? }. A sent report is never edited — a new version is
           (POST …/revise).
@@ -20,6 +23,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { REPORT_LIMITS, normalizeSections, periodFor, reportTemplate } from "@/lib/reports/templates";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
+import { loadCarry } from "@/lib/server/reports/carry";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +66,9 @@ export async function GET(req: Request, { params }: Params) {
   const isAuthor = access === "author";
   const isTo = mine?.role === "to";
   const open = row.status === "submitted";
+  /* One more read, and only for the author's own draft — the only screen
+     that shows them. */
+  const carry = isAuthor && row.status === "draft" ? await loadCarry(row, auth) : undefined;
 
   return NextResponse.json({
     report: {
@@ -86,6 +93,7 @@ export async function GET(req: Request, { params }: Params) {
       comment: row.status !== "draft",
     },
     people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
+    carry,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 

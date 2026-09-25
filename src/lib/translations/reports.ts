@@ -1,6 +1,6 @@
 import type { Translations } from "@/lib/i18n";
 
-/* Reports app (Phase 1, 25 Sep 2026). Template strings follow
+/* Reports app (Phase 1, 25 Sep 2026; carry-over Phase 2A). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
    template key and section has all three languages. */
 export const reportsT: Translations = {
@@ -76,6 +76,21 @@ export const reportsT: Translations = {
   "composer.deleteConfirm": { en: "Delete this draft? This cannot be undone.", zh: "删除此草稿？此操作无法撤销。", ar: "تمسح المسودة دي؟ مش هتقدر ترجعها." },
   "composer.cancel":     { en: "Cancel", zh: "取消", ar: "إلغاء" },
   "composer.newVersionNote": { en: "You are editing a new version. The one already sent stays as it is until you send this.", zh: "你正在编辑新版本。已发送的版本在你发送前保持不变。", ar: "إنت بتعدل نسخة جديدة. النسخة اللي اتبعتت هتفضل زي ما هي لحد ما تبعت دي." },
+
+  /* Phase 2A — carry-over and roll-ups: the author's earlier reports offered
+     as suggestions in a new one. */
+  "carry.title":    { en: "From your earlier reports", zh: "来自你之前的报告", ar: "من تقاريرك اللي فاتت" },
+  "carry.hint":     { en: "Tap where each item belongs. Nothing is added by itself.", zh: "点选每一项应放入的位置。不会自动添加任何内容。", ar: "اختار كل بند يروح فين. مفيش حاجة بتتضاف لوحدها." },
+  "carry.addAllTo": { en: "All to {section}", zh: "全部放入「{section}」", ar: "الكل في «{section}»" },
+  "carry.added":    { en: "Added", zh: "已添加", ar: "اتضاف" },
+  "carry.showAll":  { en: "Show all ({n})", zh: "显示全部（{n}）", ar: "اعرض الكل ({n})" },
+  "carry.more":     { en: "Read all", zh: "展开全文", ar: "اقرا الكل" },
+  "carry.less":     { en: "Show less", zh: "收起", ar: "اعرض أقل" },
+  "carry.hide":     { en: "Hide", zh: "收起", ar: "إخفاء" },
+  "carry.show":     { en: "Show", zh: "展开", ar: "إظهار" },
+  "carry.waiting":  { en: "{n} not added yet", zh: "还有 {n} 项未添加", ar: "{n} لسه ما اتضافوش" },
+  "carry.allAdded": { en: "Everything here is in your report", zh: "这些内容都已加入报告", ar: "كل ده اتضاف لتقريرك" },
+  "carry.full":     { en: "No room left in {section}.", zh: "「{section}」已满。", ar: "مفيش مكان فاضي في «{section}»." },
 
   "reader.from":        { en: "From", zh: "发件人", ar: "من" },
   "reader.to":          { en: "To", zh: "收件人", ar: "إلى" },
