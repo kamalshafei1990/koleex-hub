@@ -399,6 +399,7 @@ export function BulkBar({
   onClear,
   stages,
   accounts,
+  canDelete = false,
   onRun,
 }: {
   count: number;
@@ -409,6 +410,9 @@ export function BulkBar({
    *  "Set status" instead (their tasks may span projects). */
   stages?: ProjectStage[];
   accounts: AccountLite[];
+  /** Show "Delete": the Projects "delete" action AND write on every
+   *  selected task (server `can_delete`) — the bulk route's rule. */
+  canDelete?: boolean;
   onRun: (op: BulkTaskAction) => Promise<void>;
 }) {
   const { t } = useTranslation(projectsT);
@@ -521,14 +525,16 @@ export function BulkBar({
           <CrossIcon size={11} />
         </button>
       </div>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => askConfirm(t("bulk.deleteConfirm").replace("{n}", String(count)), () => run({ action: "delete" }), { confirmLabel: t("btn.delete") })}
-        className="h-8 px-3 rounded-lg text-[12px] font-semibold text-rose-400 hover:bg-rose-500/10 flex items-center gap-1.5 disabled:opacity-50"
-      >
-        <TrashIcon className="h-3 w-3" /> {t("bulk.delete")}
-      </button>
+      {canDelete && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => askConfirm(t("bulk.deleteConfirm").replace("{n}", String(count)), () => run({ action: "delete" }), { confirmLabel: t("btn.delete") })}
+          className="h-8 px-3 rounded-lg text-[12px] font-semibold text-rose-400 hover:bg-rose-500/10 flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <TrashIcon className="h-3 w-3" /> {t("bulk.delete")}
+        </button>
+      )}
       <span className="w-px h-5 bg-[var(--border-subtle)]" aria-hidden />
       {busy && <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />}
       <button

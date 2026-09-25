@@ -336,7 +336,7 @@ export function AttachmentsPanel({ taskId, readOnly = false }: { taskId: string;
 }
 
 /* ── Subtasks (child tasks via parent_task_id) ──────────────────────── */
-export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId: string; projectId: string; readOnly?: boolean }) {
+export function SubtasksPanel({ taskId, projectId, readOnly = false, canCreate }: { taskId: string; projectId: string; readOnly?: boolean; canCreate?: boolean }) {
   const { t } = useTranslation(projectsT);
   const { fail, toastElement } = usePanelFeedback();
   const [items, setItems] = useState<TaskRow[]>([]);
@@ -380,10 +380,15 @@ export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId:
   const done = items.filter((x) => x.status === "done").length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
   /* Each subtask is a task: its own server `can_edit` decides (a viewer
-     still ticks the subtasks they created or hold). `readOnly` = the
-     PARENT's can_edit is false — adding a subtask is a write on the parent
-     (POST /api/projects/tasks: assertTaskWrite on parent_task_id). */
+     still ticks the subtasks they created or hold), and its `can_delete`
+     (the module's delete action too) decides the trash button. Adding one
+     needs the PARENT's server `can_create` — the module's create action
+     AND a write on the parent (POST /api/projects/tasks: requireModuleAction
+     "create" + assertTaskWrite on parent_task_id); without that flag the
+     parent's edit right (`readOnly`) is the fallback. */
   const rowEditable = (s: TaskRow) => s.can_edit ?? !readOnly;
+  const rowDeletable = (s: TaskRow) => s.can_delete ?? rowEditable(s);
+  const mayAdd = canCreate ?? !readOnly;
   if (loading) return <PanelSpinner />;
   if (loadError) return <PanelError onRetry={load} />;
   return (
@@ -399,12 +404,12 @@ export function SubtasksPanel({ taskId, projectId, readOnly = false }: { taskId:
               className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${s.status === "done" ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"}`}
             ><CheckIcon size={10} /></button>
             <span className={`flex-1 text-[12.5px] ${s.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{s.title}</span>
-            {rowEditable(s) && <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
+            {rowDeletable(s) && <button type="button" onClick={() => remove(s.id)} aria-label={t("tip.delete")} className={`${revealCls} h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center`}><TrashIcon className="h-3 w-3" /></button>}
           </div>
         ))}
         {items.length === 0 && <Empty text={t("x.noSubtasks", "No subtasks yet.")} />}
       </div>
-      {!readOnly && <div className="flex items-center gap-2">
+      {mayAdd && <div className="flex items-center gap-2">
         <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("x.addSubtask", "Add a subtask…")} aria-label={t("x.addSubtask", "Add a subtask…")} className={`flex-1 ${inputCls}`} />
         <button type="button" onClick={add} disabled={busy || !title.trim()} aria-label={t("tip.addItem")} className={btnCls}>
           {busy ? <SpinnerIcon className="h-3 w-3" /> : <PlusIcon size={12} />}

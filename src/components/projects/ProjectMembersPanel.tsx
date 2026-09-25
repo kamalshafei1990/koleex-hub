@@ -159,6 +159,22 @@ export default function ProjectMembersPanel({
                     <span className="flex-1 min-w-0">
                       <span className="block truncate text-[12.5px] font-semibold text-[var(--text-primary)]">{name}</span>
                       {isPM && <span className="block text-[10px] text-[var(--text-dim)]">{t("mem.projectManager")}</span>}
+                      {!isPM && m.source === "auto" && (
+                        <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)]" title={t("mem.autoHelp")}>
+                          {t("mem.auto")}
+                          {canManage && (
+                            <button
+                              type="button"
+                              disabled={!!busy}
+                              onClick={() => { void act(`keep:${m.account_id}`, () => updateProjectMemberRole(projectId, m.account_id, m.role)); }}
+                              aria-label={`${t("mem.keep")}: ${name}`}
+                              className="font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2 disabled:opacity-50"
+                            >
+                              {t("mem.keep")}
+                            </button>
+                          )}
+                        </span>
+                      )}
                     </span>
                     {canManage && !isPM ? (
                       <select

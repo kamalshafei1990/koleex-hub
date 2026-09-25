@@ -62,6 +62,49 @@ export const NoteTaskItem = TaskItem.extend({
    left exactly as they are. */
 
 const CONFLICT_BLOCKS = ["paragraph", "heading", "codeBlock"];
+
+/* ── Restored blocks ─────────────────────────────────────────────────────
+   A block re-inserted because someone typed in it while it was deleted
+   elsewhere (notes-yjs-rescue) carries `restoredFrom` = the Yjs id of the
+   deleted original, so a second rescuer of the same block recognises it
+   instead of inserting a duplicate. Internal: never rendered, never parsed
+   from HTML (a pasted copy must not look like the rescued block), not kept
+   on split. Any block can be rescued, so every block type carries it. */
+const RESTORABLE_BLOCKS = [
+  "paragraph", "heading", "codeBlock", "blockquote", "bulletList", "orderedList", "listItem",
+  "taskList", "taskItem", "table", "tableRow", "tableCell", "tableHeader", "image", "horizontalRule",
+];
+
+/** Marker attributes that are stored only when set (see stripMarkerDefaults). */
+const MARKER_ATTRS = ["conflict", "restoredFrom"] as const;
+
+/**
+ * The document JSON with unset marker attributes removed (`conflict: null`,
+ * `restoredFrom: null`, and an `attrs` object left empty by that), so saved
+ * bodies look exactly as they did before the markers existed. Pure; the
+ * input is not modified. Readers accept both forms (a missing attribute
+ * takes its default).
+ */
+export function stripMarkerDefaults<T>(json: T): T {
+  const walk = (n: unknown): unknown => {
+    if (Array.isArray(n)) return n.map(walk);
+    if (!n || typeof n !== "object") return n;
+    const src = n as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (k === "content") { out[k] = walk(v); continue; }
+      if (k === "attrs" && v && typeof v === "object" && !Array.isArray(v)) {
+        const attrs: Record<string, unknown> = { ...(v as Record<string, unknown>) };
+        for (const m of MARKER_ATTRS) if (m in attrs && (attrs[m] === null || attrs[m] === false || attrs[m] === undefined || attrs[m] === "")) delete attrs[m];
+        if (Object.keys(attrs).length) out[k] = attrs;
+        continue;
+      }
+      out[k] = v;
+    }
+    return out;
+  };
+  return walk(json) as T;
+}
 const conflictKey = new PluginKey<{ label: string; set: DecorationSet }>("noteConflictLabel");
 
 function conflictDecorations(doc: PMNode, label: string): DecorationSet {
@@ -102,6 +145,16 @@ export const NoteConflictMarker = Extension.create<{ getLabel: (() => string) | 
           keepOnSplit: false,
           parseHTML: (el: HTMLElement) => (el.getAttribute("data-conflict") === "1" ? true : null),
           renderHTML: (attrs: { conflict?: unknown }) => (attrs.conflict ? { "data-conflict": "1" } : {}),
+        },
+      },
+    }, {
+      types: RESTORABLE_BLOCKS,
+      attributes: {
+        restoredFrom: {
+          default: null,
+          keepOnSplit: false,
+          rendered: false,
+          parseHTML: () => null,
         },
       },
     }];

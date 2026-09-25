@@ -49,6 +49,7 @@ import {
   putDiscussOutbox,
   readDiscussOutbox,
   removeDiscussOutbox,
+  discardDiscussOutbox,
 } from "@/lib/discuss-outbox";
 import { discussTime } from "@/lib/discuss-time";
 import { TranslatableBody } from "./TranslatableBody";
@@ -310,7 +311,9 @@ export function ThreadPane({
 
   const handleDiscard = useCallback(
     (tempId: string) => {
-      removeDiscussOutbox(currentAccountId, [tempId.replace(/^temp_/, "")]);
+      /* Thread replies are text-only today, but Delete goes through the same
+         discard path as the main pane so an uploaded file is never orphaned. */
+      discardDiscussOutbox(currentAccountId, [tempId.replace(/^temp_/, "")]);
       setFailedIds((prev) => {
         const next = new Set(prev);
         next.delete(tempId);

@@ -307,7 +307,7 @@ check("objecturl: release-except helper releases via the single owner",
   /export function releasePreviewUrlsExcept[\s\S]{0,300}?releasePreviewUrls\(key\)/.test(objectUrls));
 check("objecturl: account switch releases everything",
   /\(\) => \(\) => \{\s*releaseAllPreviewUrls\(\);\s*clearOutboxMediaUrls\(\);\s*\},\s*\[accountId\]/.test(app));
-check("objecturl: released on discard", /forgetFailedSend\(tempId, clientMsgId\);\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== tempId\)\);\s*releasePreviewUrls\(clientMsgId\);/.test(app));
+check("objecturl: released on discard", /forgetFailedSend\(tempId, clientMsgId, true\);\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== tempId\)\);\s*releasePreviewUrls\(clientMsgId\);/.test(app));
 check("objecturl: released when a refresh settles a failed send",
   /releasePreviewUrls\(id\.replace\(\/\^temp_\/, ""\)\)/.test(app));
 check("objecturl: released on unmount/logout", /useEffect\(\(\) => releaseAllPreviewUrls, \[\]\)/.test(app));
@@ -359,8 +359,9 @@ check("pending: route zero unwrapped NextResponse.json returns",
   const migration = read("supabase/migrations/20260929_discuss_pending_uploads.sql");
   check("bind: pending-media looks up the uploader",
     /lookupDiscussUpload\(bucket, path\)/.test(pendingRoute));
-  check("bind: pending-media denies another account / tenant / no row",
-    /if \(!binding\.owner\) return deny\(\);/.test(pendingRoute) &&
+  check("bind: pending-media denies another account / tenant / no row (after the cutoff)",
+    /if \("error" in binding\) return deny\(\);/.test(pendingRoute) &&
+    /if \(!binding\.owner\) \{[\s\S]{0,400}if \(!\(uploadedAt < PENDING_UPLOADS_CUTOFF_MS\)\) return deny\(\);/.test(pendingRoute) &&
     /binding\.owner\.accountId !== auth\.account_id\) return deny\(\);/.test(pendingRoute) &&
     /binding\.owner\.tenantId !== auth\.tenant_id\) return deny\(\);/.test(pendingRoute));
   check("bind: lookup fails closed on errors other than a missing table",
@@ -379,14 +380,16 @@ check("pending: route zero unwrapped NextResponse.json returns",
     /const FILE_PREFIX = "kx:discuss:outbox-file:"/.test(files) && /const META_PREFIX = "kx:discuss:outbox-meta:"/.test(files));
   check("idb: same store the sign-out wipe clears",
     /const DB_NAME = "koleex-cache";/.test(files) && /const STORE = "kv";/.test(files));
-  check("idb: per-file cap = Discuss transport limit, total ~50MB",
-    /DISCUSS_OUTBOX_FILE_MAX_BYTES = DISCUSS_TRANSPORT_MAX_BYTES/.test(files) &&
+  check("idb: per-file cap = Discuss policy max of its kind (single source), total ~50MB",
+    /return discussUploadMaxBytes\(kind === "voice" \? "discuss-voice" : "discuss-media"\);/.test(files) &&
+    /f\.blob\.size > discussOutboxFileMaxBytes\(f\.kind\)/.test(files) &&
+    !/DISCUSS_TRANSPORT_MAX_BYTES/.test(files) &&
     /DISCUSS_OUTBOX_FILES_MAX_TOTAL = 50 \* 1024 \* 1024/.test(files));
   check("idb: never falls back to localStorage", !/localStorage/.test(files.replace(/\/\*[\s\S]*?\*\//g, "")));
   check("idb: outbox removal purges the bytes",
     /for \(const id of drop\) pendingMedia\.delete\(id\);\s*void deleteDiscussOutboxFiles\(accountId, drop\);/.test(outbox));
   check("idb: TTL-expired outbox entries purge their bytes",
-    /if \(gone\.length > 0\) void deleteDiscussOutboxFiles/.test(outbox));
+    /if \(gone\.length > 0\) \{\s*void deleteDiscussOutboxFiles/.test(outbox));
   check("idb: pending files never reach the wire payload",
     /sendDiscussMessageResult\(\{ \.\.\.wireOf\(payload\), authorId: accountId \}\)/.test(app));
   check("idb: Retry uploads pending files before sending",
@@ -399,6 +402,55 @@ check("pending: route zero unwrapped NextResponse.json returns",
     /for \(const id of inFlightRef\.current\) stillFailed\.add\(id\);/.test(block));
   check("inflight: send settles its in-flight mark",
     /await sendDiscussMessageResult\(\{ \.\.\.payload, authorId: accountId \}\);\s*inFlightRef\.current\.delete\(clientMsgId\);/.test(app));
+}
+
+/* ── 12d. PRE-TABLE UPLOADS + LARGE KEPT FILES + ORPHAN CLEANUP ──────────
+   (Discuss final edge cases, 2026-09-30)
+     · a path with no binding row but an upload time before the table's
+       deploy keeps the previous membership rule (temporary, dies 2026-10-03);
+     · the IndexedDB per-file cap is the policy max; Retry may go direct;
+     · abandoned uploads are deleted: client discard on Delete / TTL / refusal
+       (own, unreferenced rows only) + a daily fail-closed cron sweep. */
+{
+  const policy = read("src/lib/discuss-upload-policy.ts");
+  const binding = read("src/lib/discuss-pending-uploads.ts");
+  const discard = read("src/app/api/discuss/pending-media/discard/route.ts");
+  const sweep = read("src/app/api/cron/discuss-pending-sweep/route.ts");
+  const vercel = JSON.parse(read("vercel.json")) as { crons?: Array<{ path: string; schedule: string }> };
+  const discussLibSrc = read("src/lib/discuss.ts");
+  check("legacy: cutoff hard-coded at the table deploy time",
+    /const PENDING_UPLOADS_CUTOFF_MS = Date\.parse\("2026-09-25T18:00:00Z"\);/.test(pendingRoute) &&
+    /can be deleted after 2026-10-03/.test(pendingRoute));
+  check("legacy: pre-cutoff no-row path still needs active membership + not sent elsewhere",
+    pendingRoute.indexOf("PENDING_UPLOADS_CUTOFF_MS) return deny()") < pendingRoute.indexOf('.is("left_at", null)') &&
+    pendingRoute.indexOf('.is("left_at", null)') < pendingRoute.indexOf("r.channel_id !== channelId"));
+  check("policy: checkDiscussUpload uses the single max source",
+    /const max = discussUploadMaxBytes\(bucket\);/.test(policy));
+  check("retry: kept attachment may go direct (uploadToStorage routes it)",
+    /uploadDiscussAttachment\(file, \{ allowDirect: true \}\)/.test(app) &&
+    /if \(!opts\.allowDirect && payload\.size > DISCUSS_TRANSPORT_MAX_BYTES\)/.test(discussLibSrc));
+  check("discard: route requires auth + Discuss module",
+    /requireAuth\(req\)/.test(discard) && /requireModuleAccess\(auth, "Discuss"\)/.test(discard));
+  check("discard: only the caller's own row (account AND tenant)",
+    /row\.account_id !== owner\.accountId \|\| row\.tenant_id !== owner\.tenantId/.test(binding) &&
+    /discardDiscussUploads\(\{ accountId: auth\.account_id, tenantId: auth\.tenant_id \}/.test(discard));
+  check("discard: refuses a path any message references (lookup error = keep)",
+    /const referenced = await isDiscussPathReferenced\(row\.bucket, row\.path, refSince\(row\)\);\s*if \(referenced !== false\)/.test(binding));
+  check("discard: object removed before the row",
+    /removeObjects\(row\.bucket, \[row\.path\]\)[\s\S]{0,120}await deleteRows\(row\.bucket, \[row\.path\]\);/.test(binding));
+  check("discard: client calls it on Delete, refusal and TTL purge",
+    /forgetFailedSend\(tempId, clientMsgId, true\);[\s\S]{0,200}releasePreviewUrls/.test(app) &&
+    /if \(discard\) discardDiscussOutbox\(accountId, \[clientMsgId\], \[payload\?\.metadata\]\);/.test(app) &&
+    /Expired unsent[\s\S]{0,120}discardUploadedOf\(gone\);/.test(outbox) &&
+    /"\/api\/discuss\/pending-media\/discard"/.test(outbox));
+  check("sweep: no opportunistic row prune left (it orphaned objects)",
+    !/Math\.random\(\) < 0\.02/.test(binding));
+  check("sweep: cron is fail-closed on CRON_SECRET",
+    /if \(!secret \|\| req\.headers\.get\("authorization"\) !== `Bearer \$\{secret\}`\)/.test(sweep));
+  check("sweep: only unreferenced paths lose their object",
+    /const orphans = inBucket\.filter\(\(x\) => x\.v === false\)/.test(binding));
+  check("sweep: scheduled once daily in vercel.json",
+    (vercel.crons ?? []).some((c) => c.path === "/api/cron/discuss-pending-sweep" && /^\d+ \d+ \* \* \*$/.test(c.schedule)));
 }
 
 /* ── 13. DRAFTS — no storage reference in either direction ─────────────── */

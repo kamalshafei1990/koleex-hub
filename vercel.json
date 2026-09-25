@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/notes-trash-purge",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/discuss-pending-sweep",
+      "schedule": "45 3 * * *"
     }
   ],
   "functions": {

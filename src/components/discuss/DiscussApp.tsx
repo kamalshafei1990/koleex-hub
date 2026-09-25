@@ -147,6 +147,9 @@ import {
   putDiscussOutbox,
   readDiscussOutbox,
   removeDiscussOutbox,
+  discardDiscussOutbox,
+  discardDiscussPendingUploads,
+  uploadedRefsOf,
   type DiscussOutboxPendingFile,
 } from "@/lib/discuss-outbox";
 import {
@@ -348,7 +351,11 @@ function wireOf(p: PendingSend): Omit<PendingSend, "pendingUploads"> {
 }
 
 /** Upload a send's pending files; returns the wire metadata with them in, or
- *  null when any upload fails (nothing is sent then). */
+ *  null when any upload fails (nothing is sent then). Both kinds go through
+ *  the normal uploadToStorage, which routes files above its direct-upload
+ *  threshold (~4.2MB) straight to Storage — so a kept voice clip / file up to
+ *  the Discuss policy max can be retried, not just ones under the transport
+ *  limit. */
 async function uploadPendingFiles(p: PendingSend): Promise<DiscussMessageMetadata | null> {
   const metadata: DiscussMessageMetadata = { ...p.metadata };
   const atts = Array.isArray(p.metadata.attachments) ? [...p.metadata.attachments] : [];
@@ -365,7 +372,7 @@ async function uploadPendingFiles(p: PendingSend): Promise<DiscussMessageMetadat
       metadata.voice = voice;
     } else {
       const file = new File([f.blob], f.name || "file", { type: f.type || f.blob.type });
-      const res = await uploadDiscussAttachment(file);
+      const res = await uploadDiscussAttachment(file, { allowDirect: true });
       if (!res.ok) return null;
       atts.splice(Math.min(f.index, atts.length), 0, res.attachment);
     }
@@ -2123,7 +2130,7 @@ export default function DiscussApp() {
         );
       }
       if (accountId) {
-        const files = pending.flatMap((p) => (p.blob ? [{ index: p.index, blob: p.blob }] : []));
+        const files = pending.flatMap((p) => (p.blob ? [{ index: p.index, kind: p.kind, blob: p.blob }] : []));
         const stored = putDiscussOutbox(
           accountId,
           {
@@ -2159,9 +2166,12 @@ export default function DiscussApp() {
   );
 
   /* The send is settled (sent, refused for good, or deleted by the user):
-     forget it everywhere. The bubble itself is the caller's business. */
+     forget it everywhere. The bubble itself is the caller's business.
+     `discard` (Delete / refused — NOT sent): the files it had already
+     uploaded will never be used, so ask the server to delete them. */
   const forgetFailedSend = useCallback(
-    (tempId: string, clientMsgId: string) => {
+    (tempId: string, clientMsgId: string, discard = false) => {
+      const payload = failedPayloadsRef.current.get(tempId);
       failedPayloadsRef.current.delete(tempId);
       const drop = (prev: ReadonlySet<string>) => {
         if (!prev.has(tempId)) return prev;
@@ -2172,7 +2182,9 @@ export default function DiscussApp() {
       setFailedIds(drop);
       setDroppedAttachIds(drop);
       setPendingUploadIds(drop);
-      if (accountId) removeDiscussOutbox(accountId, [clientMsgId]);
+      if (!accountId) return;
+      if (discard) discardDiscussOutbox(accountId, [clientMsgId], [payload?.metadata]);
+      else removeDiscussOutbox(accountId, [clientMsgId]);
     },
     [accountId],
   );
@@ -2402,8 +2414,12 @@ export default function DiscussApp() {
             }
           }
           const metadata = await uploadPendingFiles(payload);
-          /* Deleted while uploading → do not send it after all. */
-          if (!failedPayloadsRef.current.has(tempId)) return;
+          /* Deleted while uploading → do not send it after all, and drop
+             what this retry just uploaded (nobody will send it now). */
+          if (!failedPayloadsRef.current.has(tempId)) {
+            if (metadata) discardDiscussPendingUploads(uploadedRefsOf(metadata));
+            return;
+          }
           if (!metadata) {
             stillFailed("send.retryUploadFailed", "The file didn't upload. Tap Retry to try again.");
             return;
@@ -2427,7 +2443,7 @@ export default function DiscussApp() {
           /* Still in the outbox from the first failure — just show it again. */
           stillFailed("send.failedRetry", "Message not sent. Tap Retry to send it again.");
         } else {
-          forgetFailedSend(tempId, clientMsgId);
+          forgetFailedSend(tempId, clientMsgId, true);
           setMessages((prev) => prev.filter((m) => m.id !== tempId));
           releasePreviewUrls(clientMsgId);
           showError(t("status.failed", "Failed to send"));
@@ -2443,7 +2459,7 @@ export default function DiscussApp() {
     const payload = failedPayloadsRef.current.get(tempId);
     /* A temp id is `temp_<clientMsgId>` for every send path. */
     const clientMsgId = payload?.clientMsgId ?? tempId.replace(/^temp_/, "");
-    forgetFailedSend(tempId, clientMsgId);
+    forgetFailedSend(tempId, clientMsgId, true);
     setMessages((prev) => prev.filter((m) => m.id !== tempId));
     releasePreviewUrls(clientMsgId);
   }, [forgetFailedSend]);

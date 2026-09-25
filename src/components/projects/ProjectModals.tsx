@@ -687,7 +687,7 @@ export function TaskFormModal({
       footer={
         <>
           <div className="flex items-center gap-1.5">
-            {editing && !readOnly && (
+            {editing && !readOnly && (editing.can_delete ?? true) && (
               <button type="button" onClick={remove} className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
                 <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
               </button>
@@ -719,7 +719,7 @@ export function TaskFormModal({
       {toastElement}
       {editing && detailTab !== "details" && (
         <div className="px-5 py-4 overflow-y-auto" role="tabpanel">
-          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={readOnly} />}
+          {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} readOnly={readOnly} canCreate={editing.can_create ?? !readOnly} />}
           {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "comments" && <CommentsPanel taskId={editing.id} readOnly={readOnly} />}
           {detailTab === "time" && <TimePanel taskId={editing.id} readOnly={readOnly} />}

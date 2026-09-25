@@ -276,6 +276,11 @@ export const projectsT: Translations = {
   "mem.readOnly":        { en: "Only the project's managers can change members.", zh: "只有项目管理者可以更改成员。", ar: "يمكن لمديري المشروع فقط تغيير الأعضاء." },
   "mem.projectManager":  { en: "Project manager",   zh: "项目负责人",         ar: "مدير المشروع" },
   "mem.added":           { en: "Member added.",     zh: "已添加成员。",       ar: "تمت إضافة العضو." },
+  "mem.auto":            { en: "Added automatically", zh: "自动添加",        ar: "أُضيف تلقائيًا" },
+  "mem.autoHelp":        { en: "Added because they manage the project or were assigned a task. Removed automatically when that is no longer true — choose Keep to make the membership permanent.",
+                           zh: "因负责该项目或被分配任务而自动加入。条件不再成立时会被自动移除——选择“保留”可使成员身份永久有效。",
+                           ar: "أُضيف لأنه يدير المشروع أو أُسندت إليه مهمة. يُزال تلقائيًا عندما لا يعود ذلك صحيحًا — اختر «إبقاء» لجعل العضوية دائمة." },
+  "mem.keep":            { en: "Keep",              zh: "保留",              ar: "إبقاء" },
 
   /* Archive / delete */
   "action.archive":      { en: "Archive",           zh: "归档",              ar: "أرشفة" },

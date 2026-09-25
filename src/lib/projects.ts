@@ -89,6 +89,12 @@ export interface ProjectRow {
    *  membership is the only way in; "module" = no edit right in the
    *  Projects module. Drives the "View only" tooltip wording. */
   my_access_reason?: ProjectViewReason | null;
+  /** Server-computed: the Projects module's create action AND project
+   *  write access — adding a (top-level) task. Absent = follow my_access. */
+  can_create?: boolean;
+  /** Server-computed: the module's delete action AND project write access
+   *  — deleting tasks of this project. Absent = follow my_access. */
+  can_delete?: boolean;
 }
 
 export type ProjectAccess = "manage" | "edit" | "view";
@@ -158,8 +164,16 @@ export interface TaskRow {
    *  its assignee / creator (a view-only member keeps edit rights on the
    *  tasks they created). Absent on older payloads = follow the project. */
   can_edit?: boolean;
-  /** The caller's project-level access for the task's project — creating
-   *  a subtask is a project write, so the subtasks panel follows this. */
+  /** Server-computed: the Projects module's create action AND write
+   *  access to THIS task — adding a subtask under it (the POST route's
+   *  rule). Absent on older payloads = follow can_edit. */
+  can_create?: boolean;
+  /** Server-computed: the module's delete action AND write access to THIS
+   *  task (the DELETE and bulk-delete routes' rule). Absent = follow
+   *  can_edit. */
+  can_delete?: boolean;
+  /** The caller's project-level access for the task's project (e.g. the
+   *  "you edit this because it is yours" note). */
   project_access?: ProjectAccess;
 }
 
@@ -290,6 +304,11 @@ export interface ProjectMember {
   role: ProjectMemberRole;
   added_by: string | null;
   created_at: string;
+  /** 'auto' = added because they manage the project or were assigned a
+   *  task; removed again automatically once that reason is gone. Adding
+   *  them or changing their role makes it 'manual'. Absent before the
+   *  20260930 migration. */
+  source?: "manual" | "auto";
   account?: { id: string; username: string } | null;
 }
 

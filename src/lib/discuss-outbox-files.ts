@@ -20,9 +20,13 @@
          kx:discuss:outbox-file:<accountId>:<clientMsgId>:<index>  → bytes
          kx:discuss:outbox-meta:<accountId>:<clientMsgId>:<index>  → {size, savedAt}
        The small meta row lets the size cap be enforced without reading bytes.
-     · Caps: one file ≤ DISCUSS_TRANSPORT_MAX_BYTES (the Discuss transport
-       limit), all files ≤ ~50MB. A file over either cap is simply not kept —
-       the bubble falls back to "add it again" after a reload.
+     · Caps: one file ≤ the Discuss POLICY maximum of its kind
+       (discussUploadMaxBytes: voice 25MB, attachment 50MB — the same limit
+       checkDiscussUpload enforces), all files ≤ ~50MB. Not the 4MB
+       transport limit: Retry uploads through uploadToStorage, which sends
+       anything above that straight to Storage (signed upload). A file over
+       either cap is simply not kept — the bubble falls back to "add it
+       again" after a reload.
      · Purged with the outbox's 7-day TTL, when the send is sent / deleted /
        refused (removeDiscussOutbox), for entries no longer in the outbox, and
        on sign-out.
@@ -30,7 +34,7 @@
        means "not durable" (false / null), never an exception.
    --------------------------------------------------------------------------- */
 
-import { DISCUSS_TRANSPORT_MAX_BYTES } from "@/lib/discuss-upload-policy";
+import { discussUploadMaxBytes } from "@/lib/discuss-upload-policy";
 
 const DB_NAME = "koleex-cache";
 const STORE = "kv";
@@ -38,8 +42,11 @@ const FILE_PREFIX = "kx:discuss:outbox-file:";
 const META_PREFIX = "kx:discuss:outbox-meta:";
 /** Total bytes kept across every account on this device. */
 export const DISCUSS_OUTBOX_FILES_MAX_TOTAL = 50 * 1024 * 1024;
-/** One file — the Discuss transport limit. */
-export const DISCUSS_OUTBOX_FILE_MAX_BYTES = DISCUSS_TRANSPORT_MAX_BYTES;
+/** One file — the Discuss policy maximum of its kind (single source:
+ *  discussUploadMaxBytes in discuss-upload-policy.ts). */
+export function discussOutboxFileMaxBytes(kind: "attachment" | "voice"): number {
+  return discussUploadMaxBytes(kind === "voice" ? "discuss-voice" : "discuss-media");
+}
 /** Same as DISCUSS_OUTBOX_TTL_MS (kept local to avoid an import cycle). */
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -48,6 +55,9 @@ export type DiscussOutboxFile = {
   index: number;
   blob: Blob;
 };
+
+/** A file handed to putDiscussOutboxFiles — its kind picks the size cap. */
+export type DiscussOutboxFileInput = DiscussOutboxFile & { kind: "attachment" | "voice" };
 
 type FileRow = { bytes: ArrayBuffer; type: string };
 type MetaRow = { size: number; savedAt: number };
@@ -175,11 +185,11 @@ export async function discussOutboxFilesAvailable(): Promise<boolean> {
 export async function putDiscussOutboxFiles(
   accountId: string,
   clientMsgId: string,
-  files: DiscussOutboxFile[],
+  files: DiscussOutboxFileInput[],
 ): Promise<boolean> {
   try {
     if (!accountId || !clientMsgId || files.length === 0) return false;
-    if (files.some((f) => !f.blob || f.blob.size > DISCUSS_OUTBOX_FILE_MAX_BYTES)) return false;
+    if (files.some((f) => !f.blob || f.blob.size > discussOutboxFileMaxBytes(f.kind))) return false;
     const incoming = files.reduce((n, f) => n + f.blob.size, 0);
     if (incoming > DISCUSS_OUTBOX_FILES_MAX_TOTAL) return false;
 

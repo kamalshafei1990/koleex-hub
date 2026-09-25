@@ -303,7 +303,8 @@ export const planningT: Translations = {
   "tl.awayAfter":        { en: "+ out of office after {h}",  zh: "+ {h} 之后不在办公室", ar: "+ خارج المكتب بعد {h}" },
   "tl.itemsBefore":      { en: "+ items before {h}", zh: "+ {h} 之前有安排",    ar: "+ عناصر قبل {h}" },
   "tl.itemsAfter":       { en: "+ items after {h}",  zh: "+ {h} 之后有安排",    ar: "+ عناصر بعد {h}" },
-  "tl.expandDay":        { en: "Click to show the full day", zh: "点击显示全天", ar: "انقر لعرض اليوم كاملًا" },
+  "tl.expandDay":        { en: "Click to show this day 00:00–24:00", zh: "点击将这一天显示为 00:00–24:00", ar: "انقر لعرض هذا اليوم من 00:00 إلى 24:00" },
+  "tl.collapseDay":      { en: "Collapse {d} back to 06:00–22:00", zh: "将 {d} 收起为 06:00–22:00", ar: "طيّ {d} إلى 06:00–22:00" },
 
   /* Copy last week / publish week */
   "copy.title":          { en: "Copy last week",    zh: "复制上周",           ar: "نسخ الأسبوع الماضي" },

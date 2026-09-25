@@ -4,7 +4,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { assertProjectAccess, assertTaskWrite, likeTerm, memberProjectIds, taskEditFlags, UUID_RE } from "@/lib/server/project-access";
+import { assertProjectAccess, assertTaskWrite, likeTerm, memberProjectIds, projectModuleRights, taskEditFlags, taskFlagsPayload as flagsOf, UUID_RE } from "@/lib/server/project-access";
 import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
@@ -118,13 +118,9 @@ export async function GET(req: Request) {
   /* Per-task can_edit + project_access (project-access.ts taskEditFlags):
      a view-only caller still edits the tasks they created or hold. */
   const rows = (data ?? []) as unknown as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }[];
-  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
-  const flags = await taskEditFlags(auth, rows, canEditModule);
+  const flags = await taskEditFlags(auth, rows, await projectModuleRights(auth));
   return NextResponse.json({
-    tasks: rows.map((r) => {
-      const f = flags.get(r.id);
-      return { ...r, can_edit: f?.can_edit ?? false, project_access: f?.project_access ?? "view" };
-    }),
+    tasks: rows.map((r) => ({ ...r, ...flagsOf(flags.get(r.id)) })),
   });
 }
 
@@ -204,7 +200,6 @@ export async function POST(req: Request) {
     if (who) await syncProjectMembersFromAssignees(auth, projectId, [who]);
   });
 
-  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
-  const f = (await taskEditFlags(auth, [data as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }], canEditModule)).get(data.id as string);
-  return NextResponse.json({ task: { ...data, can_edit: f?.can_edit ?? false, project_access: f?.project_access ?? "view" } });
+  const f = (await taskEditFlags(auth, [data as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }], await projectModuleRights(auth))).get(data.id as string);
+  return NextResponse.json({ task: { ...data, ...flagsOf(f) } });
 }

@@ -8,7 +8,10 @@
                            stored state (merges commute; nothing is lost).
                            Typing that reaches a block the stored state
                            already deleted keeps that block (edit wins over
-                           delete — notes-yjs-rescue).
+                           delete — notes-yjs-rescue: re-inserted once,
+                           origin-marked, racing duplicates collapsed; a
+                           block JOINED into its neighbour only gets the
+                           new characters grafted into the joined block).
      · applyBodyToState  — a SINGLE-EDITOR save on a note that already has a
                            Yjs state: the incoming body_json is turned into a
                            Yjs update against the stored state (the XML
@@ -35,10 +38,10 @@ import * as Y from "yjs";
 import { getSchema } from "@tiptap/core";
 import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import { prosemirrorJSONToYDoc, updateYFragment, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
-import { NOTES_YJS_FIELD, notesSchemaExtensions } from "@/lib/notes-schema";
+import { NOTES_YJS_FIELD, notesSchemaExtensions, stripMarkerDefaults } from "@/lib/notes-schema";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
 import { charDiff, mergeDocs, similarity } from "@/lib/notes-merge3";
-import { applyRescues, findRescues, otherSideOf, type Rescue } from "@/lib/notes-yjs-rescue";
+import { applyRescues, collapseRestored, findRescues, otherSideOf, type Rescue } from "@/lib/notes-yjs-rescue";
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -79,6 +82,8 @@ export type MergeResult =
       /** Blocks the stored state had deleted, kept because this update
        *  carried concurrent typing inside them (edit wins over delete). */
       rescued?: number;
+      /** Duplicate restored copies (racing rescuers) removed by the merge. */
+      collapsed?: number;
     }
   | { ok: false; error: string };
 
@@ -117,8 +122,12 @@ export function mergeState(stored: string | null, incomingB64: string): MergeRes
     }
     Y.applyUpdate(doc, incoming);
     const rescued = rescues.length ? applyRescues(doc, NOTES_YJS_FIELD, rescues) : 0;
+    // Two rescuers that raced (this save vs the typist's own pull) leave
+    // two copies of one origin side by side — keep one.
+    const collapsed = collapseRestored(doc, NOTES_YJS_FIELD);
     const done = finish(doc);
-    return done.ok && rescued ? { ...done, rescued } : done;
+    if (!done.ok) return done;
+    return { ...done, ...(rescued ? { rescued } : {}), ...(collapsed ? { collapsed } : {}) };
   } catch (e) {
     console.error("[notes-yjs] merge", e instanceof Error ? e.message : e);
     return { ok: false, error: "Invalid collaborative update" };
@@ -370,7 +379,10 @@ function baseBlockKeys(base: unknown): Set<string> | null {
 /** A body run through the note schema (equal content → equal JSON), or null. */
 export function normalizeBody(json: unknown): Record<string, unknown> | null {
   try {
-    return schema().nodeFromJSON(json ?? EMPTY_DOC).toJSON() as Record<string, unknown>;
+    // Unset markers (conflict / restoredFrom: null) are dropped, so a
+    // stored body looks as it did before the markers existed; input with
+    // or without them normalises to the same JSON.
+    return stripMarkerDefaults(schema().nodeFromJSON(json ?? EMPTY_DOC).toJSON() as Record<string, unknown>);
   } catch {
     return null;
   }

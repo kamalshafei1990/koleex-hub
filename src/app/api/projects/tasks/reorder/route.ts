@@ -12,8 +12,9 @@ import "server-only";
    behind a spinner. Access: the project write gate, or ownership of the
    moved card (see below). Here: one access check, one membership check, a
    sort_order write for the MOVED card only (a position between its new
-   neighbours; the column is renumbered only when that gap is exhausted
-   AND the caller has project write), and one stage/status update for the
+   neighbours — fractional once sort_order is double precision; the column
+   is renumbered only when that gap is exhausted AND the caller has
+   project write), and one stage/status update for the
    moved card (with the same stage⇄status rules as the PATCH route).
    Response: { moved, positions: { id → sort_order } for every card
    written }. */
@@ -87,7 +88,13 @@ export async function POST(req: Request) {
 
   /* 1. Position. The moved card alone gets a new sort_order strictly
         between its new neighbours' (placeMoved) — no other card is
-        written. Only when the gap there is exhausted:
+        written. sort_order is double precision after
+        20260930_projects_member_source, so the midpoint may be
+        fractional and a gap only runs out after ~50 halvings of the same
+        spot (or when the two neighbours share one value). Until that
+        migration is applied the column is integer: a fractional write is
+        refused (or comes back rounded), and the drop is planned again
+        with integer midpoints. Only when the gap is exhausted:
           · a caller with project write renumbers the column (spaced by
             GAP, so later drops find room again);
           · an owner-only caller (view-only project, own card) never
@@ -98,22 +105,45 @@ export async function POST(req: Request) {
   const k = ids.indexOf(movedId);
   const others = ids.filter((id) => id !== movedId).map((id) => byId.get(id)!);
   const sorts = others.map((r) => Number(r.sort_order) || 0);
-  let writes: { r: (typeof others)[number]; sort: number }[] = [];
-  const movedSort = Number(byId.get(movedId)!.sort_order) || 0;
-  let slot = placeMoved(sorts, k, movedSort);
-  if (slot === null && !ownerOnly) {
-    const column = ids.map((id) => byId.get(id)!);
-    writes = column
-      .map((r, i) => ({ r, sort: (i + 1) * GAP }))
-      .filter(({ r, sort }) => Number(r.sort_order) !== sort);
-  } else {
-    if (slot === null) slot = nearestSlot(sorts, k);
-    const moved0 = byId.get(movedId)!;
-    if (Number(moved0.sort_order) !== slot) writes = [{ r: moved0, sort: slot }];
-  }
-  const changed = writes.map(({ r, sort }) => ({ id: r.id, tenant_id: r.tenant_id, project_id: r.project_id, title: r.title, sort_order: sort }));
+  const moved0 = byId.get(movedId)!;
+  const movedSort = Number(moved0.sort_order) || 0;
+  type Row = typeof moved0;
+  const plan = (fractional: boolean): { r: Row; sort: number }[] => {
+    let slot = placeMoved(sorts, k, movedSort, fractional);
+    if (slot === null && !ownerOnly) {
+      return ids
+        .map((id, i) => ({ r: byId.get(id)!, sort: (i + 1) * GAP }))
+        .filter(({ r, sort }) => Number(r.sort_order) !== sort);
+    }
+    if (slot === null) slot = nearestSlot(sorts, k, fractional);
+    return Number(moved0.sort_order) !== slot ? [{ r: moved0, sort: slot }] : [];
+  };
+  const toRows = (w: { r: Row; sort: number }[]) =>
+    w.map(({ r, sort }) => ({ id: r.id, tenant_id: r.tenant_id, project_id: r.project_id, title: r.title, sort_order: sort }));
+  const write = (rowsToWrite: ReturnType<typeof toRows>) =>
+    supabaseServer.from("project_tasks").upsert(rowsToWrite, { onConflict: "id" }).select("id, sort_order");
+
+  let changed = toRows(plan(true));
   if (changed.length > 0) {
-    const { error } = await supabaseServer.from("project_tasks").upsert(changed, { onConflict: "id" });
+    const first = await write(changed);
+    const back = first.data;
+    let error = first.error;
+    const fractionalWrite = changed.some((c) => !Number.isInteger(c.sort_order));
+    /* Integer column (migration pending): refused ("invalid input syntax
+       for type integer") or stored rounded — plan again with integers. */
+    const rounded = !error && fractionalWrite && ((back ?? []) as { id: string; sort_order: unknown }[]).some((b) => {
+      const want = changed.find((c) => c.id === b.id)?.sort_order;
+      return want !== undefined && Number(b.sort_order) !== want;
+    });
+    if (fractionalWrite && (rounded || error?.code === "22P02")) {
+      let w = plan(false);
+      /* A rounded write already landed: the moved card must be rewritten
+         even when the integer plan would leave it where it was. */
+      if (rounded && !w.some((x) => x.r.id === movedId)) w = [...w, { r: moved0, sort: movedSort }];
+      changed = toRows(w);
+      error = null;
+      if (changed.length > 0) ({ error } = await write(changed));
+    }
     if (error) {
       console.error("[api/projects/tasks/reorder] upsert:", error.message);
       return NextResponse.json({ error: "Failed to reorder" }, { status: 500 });
@@ -160,9 +190,12 @@ const GAP = 1024;
 
 /** A sort_order that puts the moved card at index `k` among `sorts` (the
  *  OTHER cards of the column, top→bottom) without touching them: above
- *  every card before k and below every card from k on. Integers only (the
- *  column is not guaranteed fractional). null = no room there. */
-function placeMoved(sorts: number[], k: number, current?: number): number | null {
+ *  every card before k and below every card from k on. An integer
+ *  midpoint when the gap allows one; otherwise, with `fractional` (a
+ *  double precision column), the exact midpoint while it still differs
+ *  from both neighbours. null = no room there (neighbours share a value,
+ *  or the gap is exhausted). */
+function placeMoved(sorts: number[], k: number, current: number | undefined, fractional: boolean): number | null {
   const before = sorts.slice(0, k);
   const after = sorts.slice(k);
   const lo = before.length > 0 ? Math.max(...before) : null;
@@ -170,21 +203,25 @@ function placeMoved(sorts: number[], k: number, current?: number): number | null
   /* Already in place (or alone in the column): keep it — nothing to write. */
   if (current !== undefined && (lo === null || current > lo) && (hi === null || current < hi)) return current;
   if (lo === null && hi === null) return 0;
-  if (lo === null) return (hi as number) - GAP;
-  if (hi === null) return lo + GAP;
+  if (lo === null) return Math.floor((hi as number) - GAP);
+  if (hi === null) return Math.ceil(lo + GAP);
   if (hi - lo >= 2) return Math.floor((lo + hi) / 2);
+  if (fractional && hi > lo) {
+    const mid = lo + (hi - lo) / 2;
+    if (mid > lo && mid < hi) return mid;
+  }
   return null;
 }
 
 /** The slot closest to `k` that still has room (placeMoved not null). The
  *  two column ends always have room, so this always answers. */
-function nearestSlot(sorts: number[], k: number): number {
+function nearestSlot(sorts: number[], k: number, fractional: boolean): number {
   for (let d = 1; d <= sorts.length; d++) {
     for (const j of [k - d, k + d]) {
       if (j < 0 || j > sorts.length) continue;
-      const v = placeMoved(sorts, j);
+      const v = placeMoved(sorts, j, undefined, fractional);
       if (v !== null) return v;
     }
   }
-  return placeMoved(sorts, sorts.length) ?? 0;
+  return placeMoved(sorts, sorts.length, undefined, fractional) ?? 0;
 }

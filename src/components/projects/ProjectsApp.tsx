@@ -716,6 +716,13 @@ function ProjectDetailView({
   const selection = useTaskSelection(orderedIds);
   const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
   const runBulk = useBulkRunner({ ids: selectedIds, onDone: refresh, clear: selection.clear, toast: showToast });
+  /* Bulk Delete: only when EVERY selected card carries the server's
+     `can_delete` (Projects "delete" action + write on that task — the
+     bulk route's own rule), so the bar never offers a 403. */
+  const bulkCanDelete = useMemo(() => {
+    const byId = new Map(tasks.map((tk) => [tk.id, tk]));
+    return selectedIds.every((id) => byId.get(id)?.can_delete ?? !boardViewOnly);
+  }, [tasks, selectedIds, boardViewOnly]);
   const selecting = selection.count > 0;
   const { clear: clearSelection } = selection;
   useEffect(() => {
@@ -908,6 +915,9 @@ function ProjectDetailView({
      (or no Projects edit right): every write gate answers 403, so the
      board hides / disables them. Absent (older payload) = the old UI. */
   const readOnly = project.my_access === "view";
+  /* Adding a task needs the Projects "create" action too (server
+     `can_create`), not only write access. */
+  const canCreateTask = !readOnly && (project.can_create ?? true);
   /* Per task: a view-only caller still edits the tasks they created or
      hold (server `can_edit`, the same rule as every task write route). */
   const canEditTask = (tk: TaskRow) => !readOnly || tk.can_edit === true;
@@ -1048,7 +1058,7 @@ function ProjectDetailView({
                 <PencilIcon className="h-3.5 w-3.5" />
               </button>
             )}
-            {!readOnly && (
+            {canCreateTask && (
               <Button onClick={() => setTaskModal({ open: true, editing: null })} icon={<PlusIcon size={12} />} aria-label={t("btn.addTask")}>
                 <span className="hidden sm:inline">{t("btn.addTask")}</span>
               </Button>
@@ -1198,7 +1208,7 @@ function ProjectDetailView({
                         {t("empty.noTasks")}
                       </div>
                     )}
-                    {!readOnly && <div className="flex items-center gap-1.5">
+                    {canCreateTask && <div className="flex items-center gap-1.5">
                       <div className="flex-1 min-w-0">
                         <QuickAddTask
                           projectId={project.id}
@@ -1271,6 +1281,7 @@ function ProjectDetailView({
               onClear={selection.clear}
               stages={stages}
               accounts={accounts}
+              canDelete={bulkCanDelete}
               onRun={runBulk}
             />
           )}
@@ -1617,6 +1628,12 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const selection = useTaskSelection(orderedIds);
   const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
   const runBulk = useBulkRunner({ ids: selectedIds, onDone: afterWrite, clear: selection.clear, toast: showToast });
+  /* Bulk Delete only when every selected task carries the server's
+     `can_delete` (Projects "delete" action + write on that task). */
+  const bulkCanDelete = useMemo(() => {
+    const byId = new Map(tasks.map((tk) => [tk.id, tk]));
+    return selectedIds.every((id) => byId.get(id)?.can_delete ?? byId.get(id)?.can_edit !== false);
+  }, [tasks, selectedIds]);
 
   return (
     <div className="space-y-4">
@@ -1674,6 +1691,7 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
         onSelectAll={selection.selectAll}
         onClear={selection.clear}
         accounts={accounts}
+        canDelete={bulkCanDelete}
         onRun={runBulk}
       />
 

@@ -109,13 +109,16 @@ export async function POST(req: Request) {
   /* ── Delete ── */
   if (action === "delete") {
     const { data: subs } = await supabaseServer
-      .from("project_tasks").select("id, project_id, assignee_account_id").eq("tenant_id", auth.tenant_id).in("parent_task_id", ids);
-    const subRows = (subs ?? []) as { id: string; project_id: string; assignee_account_id: string | null }[];
+      .from("project_tasks").select("id, project_id, assignee_account_id, created_by_account_id").eq("tenant_id", auth.tenant_id).in("parent_task_id", ids);
+    const subRows = (subs ?? []) as { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id: string | null }[];
     const allIds = [...new Set([...ids, ...subRows.map((r) => r.id)])];
-    /* Assignees of the deleted tasks may lose their last way in. */
-    const lostSeats = [...rows, ...subRows]
-      .filter((r) => r.assignee_account_id)
-      .map((r) => ({ project_id: r.project_id, account_id: r.assignee_account_id as string }));
+    /* Assignees (and creators — a reason to keep an automatic membership)
+       of the deleted tasks may lose their last way in. */
+    const lostSeats = [...rows, ...subRows].flatMap((r) =>
+      [r.assignee_account_id, r.created_by_account_id]
+        .filter((a): a is string => !!a)
+        .map((account_id) => ({ project_id: r.project_id, account_id })),
+    );
     const { data: files } = await supabaseServer
       .from("project_task_attachments").select("file_path").eq("tenant_id", auth.tenant_id).in("task_id", allIds);
     const { error: delErr } = await supabaseServer.from("project_tasks").delete().eq("tenant_id", auth.tenant_id).in("id", ids);

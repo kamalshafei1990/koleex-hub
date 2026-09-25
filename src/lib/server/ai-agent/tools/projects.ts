@@ -611,10 +611,12 @@ const deleteProjectTask: ToolDef<
        lose their last way into the project (and so its chat seat). */
     const { data: subs } = await supabaseServer
       .from("project_tasks")
-      .select("assignee_account_id")
+      .select("assignee_account_id, created_by_account_id")
       .eq("tenant_id", ctx.auth.tenant_id)
       .eq("parent_task_id", id);
-    const lostAssignees = [t.assignee_account_id, ...((subs ?? []) as { assignee_account_id: string | null }[]).map((r) => r.assignee_account_id)]
+    /* Creators too: creating a task is a reason to keep an automatic membership. */
+    const lostAssignees = [t, ...((subs ?? []) as { assignee_account_id: string | null; created_by_account_id: string | null }[])]
+      .flatMap((r) => [r.assignee_account_id, r.created_by_account_id])
       .filter((a): a is string => !!a);
 
     const { error } = await supabaseServer

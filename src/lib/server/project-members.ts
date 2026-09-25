@@ -23,6 +23,18 @@ import "server-only";
    Before the migration is applied the table is missing: reads answer
    { available: false }, writes answer a clear 409, and the automatic sync
    from assignees is a silent no-op.
+
+   Source (20260930_projects_member_source): every row is 'manual' (added
+   on purpose — Members panel, AI tool, a role change) or 'auto' (added
+   because the account became the manager or a task assignee). An 'auto'
+   row lives only as long as its reason: pruneProjectChatSeats deletes an
+   'auto' row whose account is no longer the project's manager or creator,
+   nor the assignee or creator of any task in it (and demotes an 'auto'
+   manager row to member once they stop managing), then runs the chat
+   check. 'manual' rows are never touched there; an automatic add never
+   downgrades a 'manual' row. Until that migration is applied the column
+   is missing and everything behaves as before (every row counts, like
+   'manual').
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -31,18 +43,32 @@ import type { MemberRole } from "@/lib/server/project-access";
 
 export const MEMBER_ROLES: readonly MemberRole[] = ["manager", "member", "viewer"];
 
+export type MemberSource = "manual" | "auto";
+
 export interface ProjectMemberRow {
   account_id: string;
   role: MemberRole;
   added_by: string | null;
   created_at: string;
+  /** Absent before 20260930_projects_member_source. */
+  source?: MemberSource;
   account?: { id: string; username: string } | null;
 }
 
 interface Auth { account_id: string; tenant_id: string }
 
-function tableMissing(err: { code?: string; message?: string } | null): boolean {
+type PgErr = { code?: string; message?: string } | null;
+
+/** The `source` column is not there yet (20260930 pending). Checked BEFORE
+ *  tableMissing, whose message test would also match "project_members.source". */
+function sourceMissing(err: PgErr): boolean {
   if (!err) return false;
+  return err.code === "42703" || err.code === "PGRST204" || /\bsource\b/.test(err.message ?? "");
+}
+
+function tableMissing(err: PgErr): boolean {
+  if (!err) return false;
+  if (sourceMissing(err)) return false;
   return err.code === "42P01" || err.code === "PGRST205" || /project_members/.test(err.message ?? "");
 }
 
@@ -50,12 +76,15 @@ export async function listProjectMembers(
   tenantId: string,
   projectId: string,
 ): Promise<{ available: boolean; members: ProjectMemberRow[]; error?: string }> {
-  const { data, error } = await supabaseServer
-    .from("project_members")
-    .select("account_id, role, added_by, created_at, account:account_id ( id, username )")
-    .eq("tenant_id", tenantId)
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: true });
+  const read = (cols: string) =>
+    supabaseServer
+      .from("project_members")
+      .select(`${cols}, account:account_id ( id, username )`)
+      .eq("tenant_id", tenantId)
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+  let { data, error } = await read("account_id, role, added_by, created_at, source");
+  if (sourceMissing(error)) ({ data, error } = await read("account_id, role, added_by, created_at"));
   if (error) {
     if (tableMissing(error)) return { available: false, members: [] };
     return { available: true, members: [], error: error.message };
@@ -83,24 +112,54 @@ export async function tenantAccountIds(tenantId: string, ids: string[]): Promise
 }
 
 /** Insert or update members. Returns the ids that were NEW (for the chat
- *  sync + notifications), or an error. */
+ *  sync + notifications), or an error.
+ *
+ *  source 'manual' (default — Members panel, AI tool): the rows become
+ *  manual, so an explicit add or role change "pins" an auto member.
+ *  source 'auto' (the project's manager): NEW rows are inserted as 'auto';
+ *  existing rows only get the role, their source is left alone (a manual
+ *  row is never downgraded). Before 20260930 the column is left out. */
 export async function upsertProjectMembers(
   auth: Auth,
   projectId: string,
   entries: { account_id: string; role: MemberRole }[],
+  opts?: { source?: MemberSource },
 ): Promise<{ added: string[] } | { error: string; status: number }> {
   if (entries.length === 0) return { added: [] };
+  const source: MemberSource = opts?.source ?? "manual";
   const before = new Set(await projectMemberIds(auth.tenant_id, projectId));
-  const { error } = await supabaseServer.from("project_members").upsert(
-    entries.map((e) => ({
-      tenant_id: auth.tenant_id,
-      project_id: projectId,
-      account_id: e.account_id,
-      role: e.role,
-      added_by: auth.account_id,
-    })),
-    { onConflict: "project_id,account_id" },
-  );
+  const rowOf = (e: { account_id: string; role: MemberRole }, withSource: boolean) => ({
+    tenant_id: auth.tenant_id,
+    project_id: projectId,
+    account_id: e.account_id,
+    role: e.role,
+    added_by: auth.account_id,
+    ...(withSource ? { source } : {}),
+  });
+  const write = async (withSource: boolean): Promise<PgErr> => {
+    if (source === "manual") {
+      return (await supabaseServer
+        .from("project_members")
+        .upsert(entries.map((e) => rowOf(e, withSource)), { onConflict: "project_id,account_id" })).error;
+    }
+    /* auto: role-only update for existing rows, insert (as auto) for new. */
+    for (const e of entries.filter((x) => before.has(x.account_id))) {
+      const { error } = await supabaseServer
+        .from("project_members")
+        .update({ role: e.role })
+        .eq("tenant_id", auth.tenant_id)
+        .eq("project_id", projectId)
+        .eq("account_id", e.account_id);
+      if (error) return error;
+    }
+    const fresh = entries.filter((x) => !before.has(x.account_id));
+    if (fresh.length === 0) return null;
+    return (await supabaseServer
+      .from("project_members")
+      .upsert(fresh.map((e) => rowOf(e, withSource)), { onConflict: "project_id,account_id", ignoreDuplicates: true })).error;
+  };
+  let error = await write(true);
+  if (sourceMissing(error)) error = await write(false);
   if (error) {
     if (tableMissing(error)) return { error: "Project members are not available yet.", status: 409 };
     console.error("[project-members] upsert:", error.message);
@@ -201,15 +260,88 @@ async function stillReachingPairs(tenantId: string, pairs: ProjectSeat[], countM
   return keep;
 }
 
+/** 'auto' memberships among <pairs> that lost their reason: the account is
+ *  no longer the project's manager or creator, nor the assignee or creator
+ *  of any task in it. Those rows are deleted; an 'auto' row with role
+ *  manager whose account no longer manages the project (but still has
+ *  another reason) is demoted to member. 'manual' rows are never touched.
+ *  Before 20260930 (no `source` column) — or on any read error — it does
+ *  nothing (today's behaviour: every row counts). Never throws. */
+async function pruneAutoMemberships(tenantId: string, pairs: ProjectSeat[]): Promise<void> {
+  if (pairs.length === 0) return;
+  const pids = [...new Set(pairs.map((p) => p.project_id))];
+  const aids = [...new Set(pairs.map((p) => p.account_id))];
+  const wanted = new Set(pairs.map((p) => pairKey(p.project_id, p.account_id)));
+  const { data: rows, error } = await supabaseServer
+    .from("project_members")
+    .select("project_id, account_id, role")
+    .eq("tenant_id", tenantId)
+    .eq("source", "auto")
+    .in("project_id", pids)
+    .in("account_id", aids);
+  if (error) return; /* column/table missing, or a read error: keep everything */
+  const auto = ((rows ?? []) as { project_id: string; account_id: string; role: MemberRole }[])
+    .filter((r) => wanted.has(pairKey(r.project_id, r.account_id)));
+  if (auto.length === 0) return;
+
+  const [projs, assigned, created] = await Promise.all([
+    supabaseServer.from("projects").select("id, manager_account_id, created_by_account_id").eq("tenant_id", tenantId).in("id", pids),
+    supabaseServer.from("project_tasks").select("project_id, assignee_account_id")
+      .eq("tenant_id", tenantId).in("project_id", pids).in("assignee_account_id", aids).limit(20000),
+    supabaseServer.from("project_tasks").select("project_id, created_by_account_id")
+      .eq("tenant_id", tenantId).in("project_id", pids).in("created_by_account_id", aids).limit(20000),
+  ]);
+  if (projs.error || assigned.error || created.error) return; /* never a spurious removal */
+  const managerOf = new Map<string, string | null>();
+  const reason = new Set<string>();
+  for (const p of (projs.data ?? []) as { id: string; manager_account_id: string | null; created_by_account_id: string | null }[]) {
+    managerOf.set(p.id, p.manager_account_id);
+    if (p.manager_account_id) reason.add(pairKey(p.id, p.manager_account_id));
+    if (p.created_by_account_id) reason.add(pairKey(p.id, p.created_by_account_id));
+  }
+  for (const t of (assigned.data ?? []) as { project_id: string; assignee_account_id: string | null }[]) {
+    if (t.assignee_account_id) reason.add(pairKey(t.project_id, t.assignee_account_id));
+  }
+  for (const t of (created.data ?? []) as { project_id: string; created_by_account_id: string | null }[]) {
+    if (t.created_by_account_id) reason.add(pairKey(t.project_id, t.created_by_account_id));
+  }
+
+  for (const r of auto) {
+    /* The `source = 'auto'` filter on every write keeps a row that was
+       made manual in the meantime (Members panel) out of reach. */
+    if (!reason.has(pairKey(r.project_id, r.account_id))) {
+      const { error: delErr } = await supabaseServer
+        .from("project_members")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("project_id", r.project_id)
+        .eq("account_id", r.account_id)
+        .eq("source", "auto");
+      if (delErr) console.error("[project-members] prune auto:", delErr.message);
+    } else if (r.role === "manager" && managerOf.has(r.project_id) && managerOf.get(r.project_id) !== r.account_id) {
+      const { error: upErr } = await supabaseServer
+        .from("project_members")
+        .update({ role: "member" })
+        .eq("tenant_id", tenantId)
+        .eq("project_id", r.project_id)
+        .eq("account_id", r.account_id)
+        .eq("source", "auto");
+      if (upErr) console.error("[project-members] demote auto manager:", upErr.message);
+    }
+  }
+}
+
 /** After someone LOST a path into a project without a membership change —
  *  a task reassigned away from them (PATCH, bulk assign, AI tool), a task
- *  of theirs deleted, or the project's manager changed — take their seat
- *  in the project chat away if they no longer reach the project at all
- *  (not manager, creator, task assignee, nor a project member of any
- *  role). Batched: one reachability pass (stillReachingPairs, three
- *  queries) for every pair, then one soft-leave per account that really
- *  lost access (removeAccountFromProjectChannel is per account). Call it
- *  AFTER the write has landed, from after(). Never throws. */
+ *  of theirs deleted, or the project's manager changed — first drop their
+ *  'auto' membership if it no longer has a reason (pruneAutoMemberships;
+ *  'manual' rows stay), then take their seat in the project chat away if
+ *  they no longer reach the project at all (not manager, creator, task
+ *  assignee, nor a remaining project member of any role). Batched: one
+ *  reachability pass (stillReachingPairs, three queries) for every pair,
+ *  then one soft-leave per account that really lost access
+ *  (removeAccountFromProjectChannel is per account). Call it AFTER the
+ *  write has landed, from after(). Never throws. */
 export async function pruneProjectChatSeats(tenantId: string, seats: ProjectSeat[]): Promise<void> {
   try {
     const uniq = new Map<string, ProjectSeat>();
@@ -217,6 +349,7 @@ export async function pruneProjectChatSeats(tenantId: string, seats: ProjectSeat
       if (s.project_id && s.account_id) uniq.set(pairKey(s.project_id, s.account_id), s);
     }
     if (uniq.size === 0) return;
+    await pruneAutoMemberships(tenantId, [...uniq.values()]);
     const keep = await stillReachingPairs(tenantId, [...uniq.values()], true);
     for (const [k, s] of uniq) {
       if (!keep.has(k)) await removeAccountFromProjectChannel(tenantId, s.project_id, s.account_id);
@@ -226,9 +359,10 @@ export async function pruneProjectChatSeats(tenantId: string, seats: ProjectSeat
   }
 }
 
-/** Assigning a task to someone makes them a member (role member) if they
- *  are not one yet — matching the migration's backfill. Existing roles are
- *  never changed. Fire-and-forget safe: never throws. */
+/** Assigning a task to someone makes them a member (role member, source
+ *  'auto') if they are not one yet — matching the migration's backfill.
+ *  Existing rows (roles AND sources) are never changed, so a manual row is
+ *  never downgraded. Fire-and-forget safe: never throws. */
 export async function syncProjectMembersFromAssignees(auth: Auth, projectId: string, accountIds: string[]): Promise<void> {
   const ids = [...new Set(accountIds.filter(Boolean))];
   if (ids.length === 0) return;
@@ -236,16 +370,20 @@ export async function syncProjectMembersFromAssignees(auth: Auth, projectId: str
     const before = new Set(await projectMemberIds(auth.tenant_id, projectId));
     const fresh = ids.filter((id) => !before.has(id));
     if (fresh.length === 0) return;
-    const { error } = await supabaseServer.from("project_members").upsert(
-      fresh.map((id) => ({
-        tenant_id: auth.tenant_id,
-        project_id: projectId,
-        account_id: id,
-        role: "member",
-        added_by: auth.account_id,
-      })),
-      { onConflict: "project_id,account_id", ignoreDuplicates: true },
-    );
+    const insert = (withSource: boolean) =>
+      supabaseServer.from("project_members").upsert(
+        fresh.map((id) => ({
+          tenant_id: auth.tenant_id,
+          project_id: projectId,
+          account_id: id,
+          role: "member",
+          added_by: auth.account_id,
+          ...(withSource ? { source: "auto" } : {}),
+        })),
+        { onConflict: "project_id,account_id", ignoreDuplicates: true },
+      );
+    let { error } = await insert(true);
+    if (sourceMissing(error)) ({ error } = await insert(false));
     if (error && !tableMissing(error)) {
       console.error("[project-members] sync:", error.message);
       return;

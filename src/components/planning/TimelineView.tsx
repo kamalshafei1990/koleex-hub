@@ -5,11 +5,18 @@
    open-shifts row); each item sits at its real start and end.
 
      · Day   — the whole day, 64px an hour, opened scrolled to 06:00.
-     · Week  — seven days side by side, 06:00–22:00 each, 14px an hour;
-               or 00:00–24:00 at 10px an hour with "Full day" (?hours=full).
-               While clipped, a day whose out-of-office or items reach
-               outside 06–22 shows a small "+" chip at that edge of the
-               row; clicking it switches to the full day.
+     · Week  — seven days side by side, 06:00–22:00 each, 14px an hour.
+               A day can be expanded to 00:00–24:00 at the compact 10px an
+               hour: every day with "Full day" (?hours=full), or one day at
+               a time (?open=YYYY-MM-DD,…). While clipped, a day whose
+               out-of-office or items reach outside 06–22 shows a small
+               "+" chip at that edge of the row; clicking it expands that
+               day only. An expanded day carries a "−" in its header that
+               collapses it back.
+
+   Geometry is per day: each shown day has its own window (from/to hour),
+   scale, x offset and width, so the axis, bars, hit-testing and drag maths
+   all read the day they fall in — the days need not share a scale.
 
    Out-of-office is decorative: a click on the hatch goes through to the
    track and starts a new item there (the conflict dialog warns on save).
@@ -42,6 +49,7 @@ import {
 } from "@/lib/planning";
 import { AWAY_HATCH, type AwaySlice } from "@/lib/planning-away";
 import { fmtDMY } from "@/lib/finance/format";
+import MinusIcon from "@/components/icons/ui/MinusIcon";
 
 export interface TimelineRow {
   /** "__open__" for the open-shifts row, else the resource id. */
@@ -63,6 +71,19 @@ const SNAP = 15 * 60_000;
 const LANE_H = 26;
 const ROW_PAD = 6;
 const HEAD_W = 180;
+
+/** One shown day's slice of the axis. */
+interface DayGeom {
+  /** Window, in hours from that day's 00:00 on the planner's clock. */
+  from: number;
+  to: number;
+  pxPerHour: number;
+  /** Inline-start offset and width inside the track. */
+  x: number;
+  w: number;
+  /** Week range: showing the whole day (via Full day or ?open). */
+  expanded: boolean;
+}
 
 const snap = (ms: number) => Math.round(ms / SNAP) * SNAP;
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -97,7 +118,9 @@ export default function TimelineView({
   awayCells,
   awayTip,
   fullDay = false,
-  onFullDay,
+  openDays,
+  onExpandDay,
+  onCollapseDay,
   canWrite,
   onItemClick,
   onMove,
@@ -114,10 +137,14 @@ export default function TimelineView({
   awayCells: Map<string, AwaySlice[]>;
   /** Tooltip text for a day's slices (a title only when the server sent one). */
   awayTip: (slices: AwaySlice[]) => string;
-  /** Week range: show 00:00–24:00 instead of 06:00–22:00. */
+  /** Week range: show every day 00:00–24:00 instead of 06:00–22:00. */
   fullDay?: boolean;
-  /** Week range: switch to the full day (from an edge chip). */
-  onFullDay?: () => void;
+  /** Week range: day keys (YYYY-MM-DD) individually shown 00:00–24:00. */
+  openDays?: ReadonlySet<string>;
+  /** Week range: expand one day (an edge chip, or a nudge past its window). */
+  onExpandDay?: (dayKey: string) => void;
+  /** Week range: collapse one expanded day back to 06:00–22:00. */
+  onCollapseDay?: (dayKey: string) => void;
   canWrite: (i: PlanningItem) => boolean;
   onItemClick: (i: PlanningItem) => void;
   onMove: (id: string, patch: TimelinePatch) => void;
@@ -127,13 +154,6 @@ export default function TimelineView({
   const hintId = useId();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const clipped = range === "week" && !fullDay;
-  const hFrom = clipped ? 6 : 0;
-  const hTo = clipped ? 22 : 24;
-  const pxPerHour = range === "day" ? 64 : clipped ? 14 : 10;
-  const dayWidth = (hTo - hFrom) * pxPerHour;
-  const totalWidth = dayWidth * days.length;
-
   /* The instant each shown day starts on the planner's clock. */
   const dayStarts = useMemo(
     () => days.map((d) => zonedToUtc(d.getFullYear(), d.getMonth() + 1, d.getDate(), 0, 0, 0, 0, tz)),
@@ -141,22 +161,44 @@ export default function TimelineView({
   );
   const dayKeys = useMemo(() => days.map(dateKey), [days]);
 
+  /* Per-day window, scale and offset. Day range: one day, 00–24 at 64px. */
+  const geom = useMemo<DayGeom[]>(() => {
+    const out: DayGeom[] = [];
+    for (const k of dayKeys) {
+      const expanded = range === "week" && (fullDay || !!openDays?.has(k));
+      const from = range === "day" || expanded ? 0 : 6;
+      const to = range === "day" || expanded ? 24 : 22;
+      const pxPerHour = range === "day" ? 64 : expanded ? 10 : 14;
+      const prev = out[out.length - 1];
+      out.push({ from, to, pxPerHour, x: prev ? prev.x + prev.w : 0, w: (to - from) * pxPerHour, expanded });
+    }
+    return out;
+  }, [dayKeys, range, fullDay, openDays]);
+  const totalWidth = geom.reduce((sum, g) => sum + g.w, 0);
+  /** Week range: this day shows only 06:00–22:00. */
+  const isClipped = (i: number) => range === "week" && !geom[i].expanded;
+  const anyClipped = geom.some((g) => range === "week" && !g.expanded);
+
   const xOf = useCallback(
     (ms: number, i: number) => {
+      const g = geom[i];
       const raw = (ms - dayStarts[i]) / H;
-      const clamped = Math.min(hTo, Math.max(hFrom, raw));
-      return i * dayWidth + (clamped - hFrom) * pxPerHour;
+      const clamped = Math.min(g.to, Math.max(g.from, raw));
+      return g.x + (clamped - g.from) * g.pxPerHour;
     },
-    [dayStarts, hFrom, hTo, dayWidth, pxPerHour],
+    [dayStarts, geom],
   );
 
+  /* The day under x (clamped to the first/last), then its own window. */
   const timeAtX = useCallback(
     (x: number) => {
-      const i = Math.min(days.length - 1, Math.max(0, Math.floor(x / dayWidth)));
-      const within = Math.min(dayWidth, Math.max(0, x - i * dayWidth));
-      return dayStarts[i] + (hFrom + within / pxPerHour) * H;
+      let i = geom.findIndex((g) => x < g.x + g.w);
+      if (i === -1) i = geom.length - 1;
+      const g = geom[i];
+      const within = Math.min(g.w, Math.max(0, x - g.x));
+      return dayStarts[i] + (g.from + within / g.pxPerHour) * H;
     },
-    [days.length, dayWidth, dayStarts, hFrom, pxPerHour],
+    [geom, dayStarts],
   );
 
   /* Open on 06:00 in Day range (the default 06–22 window); scroll stays free. */
@@ -164,9 +206,9 @@ export default function TimelineView({
     const el = scrollerRef.current;
     if (!el) return;
     const rtl = getComputedStyle(el).direction === "rtl";
-    const target = range === "day" ? 6 * pxPerHour : 0;
+    const target = range === "day" ? 6 * 64 : 0;
     el.scrollLeft = rtl ? -target : target;
-  }, [range, pxPerHour, days]);
+  }, [range, days]);
 
   /* ── Drag state: a ref for the maths, state for the paint ── */
   const dragRef = useRef<Drag | null>(null);
@@ -274,6 +316,15 @@ export default function TimelineView({
     const patch = e.shiftKey
       ? { start: s, end: Math.max(s + SNAP, en + sign * SNAP) }
       : { start: s + sign * SNAP, end: en + sign * SNAP };
+    /* Nudging past a clipped day's own window would hide the bar (and drop
+       its focus): expand the day the edited edge lands in. */
+    const edge = e.shiftKey ? patch.end - 1 : sign > 0 ? patch.end - 1 : patch.start;
+    const di = dayStarts.findIndex((d0) => edge >= d0 && edge < d0 + 24 * H);
+    if (di !== -1 && isClipped(di)) {
+      const g = geom[di];
+      const off = (edge - dayStarts[di]) / H;
+      if (off < g.from || off >= g.to) onExpandDay?.(dayKeys[di]);
+    }
     onMove(item.id, {
       start_at: new Date(patch.start).toISOString(),
       end_at: new Date(patch.end).toISOString(),
@@ -282,8 +333,8 @@ export default function TimelineView({
   };
 
   /* ── Layout: rows → lanes (overlapping items stack) ── */
-  const windowStart = dayStarts[0] + hFrom * H;
-  const windowEnd = dayStarts[dayStarts.length - 1] + hTo * H;
+  const windowStart = dayStarts[0] + geom[0].from * H;
+  const windowEnd = dayStarts[dayStarts.length - 1] + geom[geom.length - 1].to * H;
   const laidOut = useMemo(() => {
     const byRow = new Map<string, Array<{ item: PlanningItem; s: number; e: number }>>();
     for (const it of items) {
@@ -317,8 +368,8 @@ export default function TimelineView({
   const segmentsOf = (s: number, e: number) => {
     const segs: Array<{ x: number; w: number; first: boolean; last: boolean }> = [];
     for (let i = 0; i < days.length; i++) {
-      const ws = dayStarts[i] + hFrom * H;
-      const we = dayStarts[i] + hTo * H;
+      const ws = dayStarts[i] + geom[i].from * H;
+      const we = dayStarts[i] + geom[i].to * H;
       const a = Math.max(s, ws);
       const b = Math.min(e, we);
       if (b <= a) continue;
@@ -328,23 +379,24 @@ export default function TimelineView({
     return segs;
   };
 
+  /* Each day labels its own window: 06·09·…·21 clipped, 00·06·12·18 expanded. */
   const hourTicks = useMemo(() => {
-    const step = range === "day" ? 1 : clipped ? 3 : 6;
     const ticks: Array<{ x: number; label: string; major: boolean }> = [];
-    days.forEach((_, i) => {
-      for (let h = hFrom; h < hTo; h += step) {
-        ticks.push({ x: i * dayWidth + (h - hFrom) * pxPerHour, label: `${pad(h)}:00`, major: h === hFrom });
+    for (const g of geom) {
+      const step = range === "day" ? 1 : g.expanded ? 6 : 3;
+      for (let h = g.from; h < g.to; h += step) {
+        ticks.push({ x: g.x + (h - g.from) * g.pxPerHour, label: `${pad(h)}:00`, major: h === g.from });
       }
-    });
+    }
     return ticks;
-  }, [days, range, clipped, hFrom, hTo, dayWidth, pxPerHour]);
+  }, [geom, range]);
 
-  /* Clipped week: per `row|dayIndex`, what lies outside 06:00–22:00 —
+  /* Clipped days of the week: per `row|dayIndex`, what lies outside 06:00–22:00 —
      out-of-office (a timed slice; a full-day one already fills the day)
      and items (by their real times, including ones hidden entirely). */
   const edges = useMemo(() => {
     const out = new Map<string, { awayBefore: boolean; awayAfter: boolean; itemsBefore: boolean; itemsAfter: boolean }>();
-    if (!clipped) return out;
+    if (!anyClipped) return out;
     const get = (k: string) => {
       let v = out.get(k);
       if (!v) {
@@ -362,9 +414,10 @@ export default function TimelineView({
     }
     for (const row of rows) {
       for (let i = 0; i < days.length; i++) {
+        if (range !== "week" || geom[i].expanded) continue;
         const d0 = dayStarts[i];
-        const early = d0 + hFrom * H;
-        const late = d0 + hTo * H;
+        const early = d0 + geom[i].from * H;
+        const late = d0 + geom[i].to * H;
         const dayEnd = d0 + 24 * H;
         for (const { s, e } of itemsByRow.get(row.id) ?? []) {
           if (s < early && e > d0) get(`${row.id}|${i}`).itemsBefore = true;
@@ -379,7 +432,7 @@ export default function TimelineView({
       }
     }
     return out;
-  }, [clipped, items, rows, days.length, dayStarts, dayKeys, hFrom, hTo, awayCells]);
+  }, [anyClipped, range, geom, items, rows, days.length, dayStarts, dayKeys, awayCells]);
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -388,7 +441,7 @@ export default function TimelineView({
   }, []);
   const nowX = (() => {
     for (let i = 0; i < days.length; i++) {
-      if (nowMs >= dayStarts[i] + hFrom * H && nowMs < dayStarts[i] + hTo * H) return xOf(nowMs, i);
+      if (nowMs >= dayStarts[i] + geom[i].from * H && nowMs < dayStarts[i] + geom[i].to * H) return xOf(nowMs, i);
     }
     return null;
   })();
@@ -411,16 +464,34 @@ export default function TimelineView({
             </div>
             <div className="relative" style={{ width: totalWidth, height: range === "week" ? 44 : 30 }}>
               {range === "week" &&
-                days.map((d, i) => (
-                  <div
-                    key={dayKeys[i]}
-                    role="columnheader"
-                    className="absolute top-0 h-5 px-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] border-s border-[var(--border-subtle)] truncate"
-                    style={{ insetInlineStart: i * dayWidth, width: dayWidth }}
-                  >
-                    {weekday(d)} {fmtDMY(d).slice(0, 5)}
-                  </div>
-                ))}
+                days.map((d, i) => {
+                  const dayLabel = `${weekday(d)} ${fmtDMY(d).slice(0, 5)}`;
+                  const collapseLabel = t("tl.collapseDay").replace("{d}", dayLabel);
+                  return (
+                    <div
+                      key={dayKeys[i]}
+                      role="columnheader"
+                      className="absolute top-0 h-5 ps-1.5 pe-0.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] border-s border-[var(--border-subtle)]"
+                      style={{ insetInlineStart: geom[i].x, width: geom[i].w }}
+                    >
+                      <span className="min-w-0 truncate">{dayLabel}</span>
+                      {/* A collapse control on every expanded day. Under
+                          Full day the parent turns that into "every other
+                          day stays open". */}
+                      {geom[i].expanded && onCollapseDay && (
+                        <button
+                          type="button"
+                          title={collapseLabel}
+                          aria-label={collapseLabel}
+                          onClick={() => onCollapseDay(dayKeys[i])}
+                          className="ms-auto shrink-0 h-4 w-4 rounded-sm flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/10 outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]"
+                        >
+                          <MinusIcon size={10} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               {hourTicks.map((tk) => (
                 <div
                   key={tk.x}
@@ -477,7 +548,7 @@ export default function TimelineView({
                             ? "border-[var(--border-color)]"
                             : "border-transparent"
                       }`}
-                      style={{ insetInlineStart: i * dayWidth, width: dayWidth }}
+                      style={{ insetInlineStart: geom[i].x, width: geom[i].w }}
                     >
                       {row.resourceId && leaveCells.has(`${row.resourceId}|${dayKeys[i]}`) && (
                         <span className="absolute top-0.5 start-1 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
@@ -497,8 +568,8 @@ export default function TimelineView({
                       if (!slices?.length) return null;
                       return slices.map((sl) => {
                         const x0 = xOf(sl.fromMs, i);
-                        const x1 = sl.full ? (i + 1) * dayWidth : xOf(sl.toMs, i);
-                        const left = sl.full ? i * dayWidth : x0;
+                        const x1 = sl.full ? geom[i].x + geom[i].w : xOf(sl.toMs, i);
+                        const left = sl.full ? geom[i].x : x0;
                         if (x1 - left < 1) return null;
                         const tip = awayTip([sl]);
                         return (
@@ -519,24 +590,27 @@ export default function TimelineView({
                                 data-tl-passthrough
                                 title={tip}
                                 aria-hidden="true"
-                                className="absolute bottom-0.5 start-4 text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap cursor-help pointer-events-auto"
+                                className="absolute bottom-0.5 start-4 max-w-[calc(100%-1.25rem)] truncate text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap cursor-help pointer-events-auto"
                               >
                                 {t("sched.outOfOffice")}
+                                {/* Only present when the server allowed it for this viewer. */}
+                                {sl.title && <span className="normal-case tracking-normal font-semibold"> · {sl.title}</span>}
                               </span>
                             )}
                           </div>
                         );
                       });
                     })}
-                  {/* Clipped week: "+" chips at a day's edges for what lies
-                      outside 06:00–22:00; a click shows the full day. */}
-                  {clipped &&
+                  {/* Clipped days: "+" chips at a day's edges for what lies
+                      outside 06:00–22:00; a click expands that day only. */}
+                  {anyClipped &&
                     days.map((_, i) => {
-                      const ed = edges.get(`${row.id}|${i}`);
+                      const ed = isClipped(i) ? edges.get(`${row.id}|${i}`) : undefined;
                       if (!ed) return null;
+                      const g = geom[i];
                       const chip = (side: "before" | "after", away: boolean, its: boolean) => {
                         if (!away && !its) return null;
-                        const h = side === "before" ? `${pad(hFrom)}:00` : `${pad(hTo)}:00`;
+                        const h = side === "before" ? `${pad(g.from)}:00` : `${pad(g.to)}:00`;
                         const lines = [
                           away ? t(side === "before" ? "tl.awayBefore" : "tl.awayAfter").replace("{h}", h) : null,
                           its ? t(side === "before" ? "tl.itemsBefore" : "tl.itemsAfter").replace("{h}", h) : null,
@@ -550,7 +624,7 @@ export default function TimelineView({
                             aria-label={label}
                             onClick={(ev) => {
                               ev.stopPropagation();
-                              onFullDay?.();
+                              onExpandDay?.(dayKeys[i]);
                             }}
                             className={`absolute bottom-0.5 z-[2] h-3.5 w-3 rounded-sm flex items-center justify-center text-[10px] font-bold leading-none outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2] ${
                               its
@@ -558,7 +632,7 @@ export default function TimelineView({
                                 : "bg-slate-500/20 text-slate-600 dark:text-slate-300 hover:bg-slate-500/35"
                             }`}
                             style={{
-                              insetInlineStart: side === "before" ? i * dayWidth + 1 : (i + 1) * dayWidth - 13,
+                              insetInlineStart: side === "before" ? g.x + 1 : g.x + g.w - 13,
                               ...(away && !its ? { backgroundImage: AWAY_HATCH } : {}),
                             }}
                           >

@@ -37,6 +37,11 @@
        refresh replacement in mergeServerPage / reconcile), when the user
        deletes it, when the server refuses it for good, or after 7 days —
        and its IndexedDB bytes go with it.
+     · Files it had ALREADY UPLOADED would be orphans once it leaves without
+       being sent. On Delete (discardDiscussOutbox), refusal and TTL expiry
+       their paths go to POST /api/discuss/pending-media/discard (best-effort,
+       keepalive), which deletes only the caller's own unreferenced uploads.
+       What that misses, the daily /api/cron/discuss-pending-sweep removes.
    --------------------------------------------------------------------------- */
 
 import { deleteDiscussOutboxFiles } from "@/lib/discuss-outbox-files";
@@ -104,6 +109,14 @@ function readRaw(accountId: string): DiscussOutboxEntry[] {
 }
 
 function writeRaw(accountId: string, entries: DiscussOutboxEntry[]): void {
+  /* Entries pushed out by the cap are gone for good: same cleanup as TTL. */
+  if (entries.length > MAX_ENTRIES) {
+    const over = entries.slice(0, entries.length - MAX_ENTRIES).filter((e) => e && typeof e.clientMsgId === "string");
+    if (over.length > 0) {
+      void deleteDiscussOutboxFiles(accountId, over.map((e) => e.clientMsgId));
+      discardUploadedOf(over);
+    }
+  }
   try {
     if (entries.length === 0) window.localStorage.removeItem(keyFor(accountId));
     else window.localStorage.setItem(keyFor(accountId), JSON.stringify(entries.slice(-MAX_ENTRIES)));
@@ -133,7 +146,11 @@ export function readDiscussOutbox(accountId: string): DiscussOutboxEntry[] {
   if (live.length !== all.length) {
     writeRaw(accountId, live);
     const gone = all.filter((e) => e && !live.includes(e) && typeof e.clientMsgId === "string");
-    if (gone.length > 0) void deleteDiscussOutboxFiles(accountId, gone.map((e) => e.clientMsgId));
+    if (gone.length > 0) {
+      void deleteDiscussOutboxFiles(accountId, gone.map((e) => e.clientMsgId));
+      /* Expired unsent: its already-uploaded files will never be used. */
+      discardUploadedOf(gone);
+    }
   }
   return live;
 }
@@ -275,6 +292,82 @@ function mediaUrlsOf(entry: Pick<DiscussOutboxEntry, "channelId" | "metadata">):
 export function outboxMediaUrlsFor(clientMsgId: string | null | undefined): Record<number, string> {
   if (!clientMsgId) return {};
   return pendingMedia.get(clientMsgId) ?? {};
+}
+
+/* ── Orphaned uploads ─────────────────────────────────────────────────── */
+
+type UploadRef = { bucket: string; path: string };
+
+/** The storage objects a wire metadata points at (uploaded files only). */
+export function uploadedRefsOf(metadata: DiscussMessageMetadata | null | undefined): UploadRef[] {
+  const out: UploadRef[] = [];
+  if (!metadata) return out;
+  if (Array.isArray(metadata.attachments)) {
+    for (const a of metadata.attachments) {
+      if (a && typeof a.file_path === "string" && a.file_path) out.push({ bucket: "discuss-media", path: a.file_path });
+    }
+  }
+  const v = metadata.voice;
+  if (v && typeof v.path === "string" && v.path && (!v.bucket || v.bucket === "discuss-voice")) {
+    out.push({ bucket: "discuss-voice", path: v.path });
+  }
+  return out;
+}
+
+/**
+ * Ask the server to delete uploads a send will never use (Deleted bubble,
+ * expired / refused entry). Best-effort and fire-and-forget: the server only
+ * deletes the caller's own paths that no message references, and the daily
+ * sweep catches anything this misses (offline, tab closed…).
+ */
+export function discardDiscussPendingUploads(refs: UploadRef[]): void {
+  if (typeof window === "undefined" || refs.length === 0) return;
+  const seen = new Set<string>();
+  const unique = refs.filter((r) => {
+    const k = `${r.bucket}/${r.path}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  for (let i = 0; i < unique.length; i += 40) {
+    try {
+      void fetch("/api/discuss/pending-media/discard", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(unique.slice(i, i + 40)),
+        /* Survives the tab closing right after Delete. */
+        keepalive: true,
+      }).catch(() => { /* the sweep will get it */ });
+    } catch {
+      /* the sweep will get it */
+    }
+  }
+}
+
+function discardUploadedOf(entries: Array<Pick<DiscussOutboxEntry, "metadata">>): void {
+  discardDiscussPendingUploads(entries.flatMap((e) => uploadedRefsOf(e.metadata)));
+}
+
+/**
+ * The user gave up on these unsent messages (Delete), or the server refused
+ * them for good: forget them like removeDiscussOutbox AND discard the files
+ * they had already uploaded. `extra` = in-memory wire metadata that may hold
+ * uploads the stored entry does not (e.g. no localStorage this session).
+ */
+export function discardDiscussOutbox(
+  accountId: string,
+  clientMsgIds: Iterable<string>,
+  extra: Array<DiscussMessageMetadata | null | undefined> = [],
+): void {
+  if (typeof window === "undefined" || !accountId) return;
+  const drop = new Set(clientMsgIds);
+  const refs = readDiscussOutbox(accountId)
+    .filter((e) => drop.has(e.clientMsgId))
+    .flatMap((e) => uploadedRefsOf(e.metadata));
+  for (const m of extra) refs.push(...uploadedRefsOf(m));
+  removeDiscussOutbox(accountId, drop);
+  discardDiscussPendingUploads(refs);
 }
 
 /** Forget entries by client_msg_id (sent, refused or deleted). */

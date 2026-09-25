@@ -4,7 +4,7 @@ import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned, clearTaskNotifications } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { assertTaskAccess, assertTaskWrite, taskEditFlags } from "@/lib/server/project-access";
+import { assertTaskAccess, assertTaskWrite, projectModuleRights, taskEditFlags, taskFlagsPayload } from "@/lib/server/project-access";
 import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
 import { pruneProjectChatSeats, syncProjectMembersFromAssignees } from "@/lib/server/project-members";
@@ -52,9 +52,8 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
   /* can_edit / project_access: what assertTaskWrite would answer, so the
      task form enables exactly the writes the server accepts. */
-  const canEditModule = !(await requireModuleAction(auth, "Projects", "edit"));
-  const flags = (await taskEditFlags(auth, [gate.task], canEditModule)).get(id);
-  return NextResponse.json({ task: { ...data, can_edit: flags?.can_edit ?? false, project_access: flags?.project_access ?? "view" } });
+  const flags = (await taskEditFlags(auth, [gate.task], await projectModuleRights(auth))).get(id);
+  return NextResponse.json({ task: { ...data, ...taskFlagsPayload(flags) } });
 }
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
@@ -117,8 +116,8 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     await recomputeProjectProgress(auth.tenant_id, prev.project_id);
   });
 
-  const flags = (await taskEditFlags(auth, [prev], true)).get(id);
-  return NextResponse.json({ task: { ...data, can_edit: true, project_access: flags?.project_access ?? "view" } });
+  const flags = (await taskEditFlags(auth, [prev], await projectModuleRights(auth))).get(id);
+  return NextResponse.json({ task: { ...data, ...taskFlagsPayload(flags), can_edit: true } });
 }
 
 export async function DELETE(_req: Request, { params }: RouteCtx) {
@@ -134,13 +133,15 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
      (this task and any subtasks cascading with it). */
   const { data: subs } = await supabaseServer
     .from("project_tasks")
-    .select("id, assignee_account_id")
+    .select("id, assignee_account_id, created_by_account_id")
     .eq("tenant_id", auth.tenant_id)
     .eq("parent_task_id", id);
-  const subRows = (subs ?? []) as { id: string; assignee_account_id: string | null }[];
+  const subRows = (subs ?? []) as { id: string; assignee_account_id: string | null; created_by_account_id: string | null }[];
   const taskIds = [id, ...subRows.map((r) => r.id)];
-  /* Their assignees may lose their last way into the project. */
-  const lostSeats = [gate.task.assignee_account_id, ...subRows.map((r) => r.assignee_account_id)]
+  /* Their assignees (and creators — a reason to keep an automatic
+     membership) may lose their last way into the project. */
+  const lostSeats = [gate.task, ...subRows]
+    .flatMap((r) => [r.assignee_account_id, r.created_by_account_id])
     .filter((a): a is string => !!a)
     .map((account_id) => ({ project_id: gate.task.project_id, account_id }));
   const { data: files } = await supabaseServer

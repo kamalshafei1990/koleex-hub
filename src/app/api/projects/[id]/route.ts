@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { assertProjectAccess, canManageProject, projectAccessLevels, viewReason } from "@/lib/server/project-access";
+import { assertProjectAccess, canManageProject, projectPermissionFlags } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
 import { projectMemberCounts, pruneProjectChatSeats, upsertProjectMembers } from "@/lib/server/project-members";
 import { collectProjectAttachmentPaths, removeTaskAttachmentFiles } from "@/lib/server/project-files";
@@ -34,10 +34,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
     projectMemberCounts(auth.tenant_id, [id]),
-    requireModuleAction(auth, "Projects", "edit").then(async (denied) => ({
-      canEditModule: !denied,
-      levels: await projectAccessLevels(auth, [gate], !denied),
-    })),
+    projectPermissionFlags(auth, [gate]),
   ]);
   if (error) {
     console.error("[api/projects/:id GET]", error.message);
@@ -48,8 +45,10 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     project: {
       ...data,
       member_count: memberCounts.get(id) ?? 0,
-      my_access: access.levels.get(id) ?? "view",
-      my_access_reason: viewReason(access.levels.get(id) ?? "view", access.canEditModule),
+      my_access: access.get(id)?.my_access ?? "view",
+      my_access_reason: access.get(id)?.my_access_reason ?? "module",
+      can_create: access.get(id)?.can_create ?? false,
+      can_delete: access.get(id)?.can_delete ?? false,
     },
   });
 }
@@ -123,7 +122,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const managerChanged = newManager !== undefined && (newManager ?? null) !== oldManager;
   if (managerChanged) {
     after(async () => {
-      if (newManager) await upsertProjectMembers(auth, id, [{ account_id: newManager, role: "manager" }]);
+      if (newManager) await upsertProjectMembers(auth, id, [{ account_id: newManager, role: "manager" }], { source: "auto" });
       if (oldManager) await pruneProjectChatSeats(auth.tenant_id, [{ project_id: id, account_id: oldManager }]);
     });
   }

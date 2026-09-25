@@ -168,10 +168,12 @@ async function collabPatch(
     const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
     if (!saved) continue; // someone saved in between — merge again
     const kept = merged.rescued ?? 0;
+    const collapsed = merged.collapsed ?? 0;
     after(async () => {
       // A kept block is new to every live doc (the delete already reached
-      // them): have them pull the stored state.
-      if (kept) await pingNoteBodyChanged(id);
+      // them), and so is the removal of a racing duplicate copy: have them
+      // pull the stored state.
+      if (kept || collapsed) await pingNoteBodyChanged(id);
       await afterContentSaved({
         noteId: id,
         tenantId: ctx.tenantId,

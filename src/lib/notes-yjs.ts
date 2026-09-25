@@ -35,7 +35,18 @@ import {
   removeAwarenessStates,
 } from "y-protocols/awareness";
 import { NOTES_YJS_FIELD } from "@/lib/notes-schema";
-import { applyRescues, findRescues, otherSideOf, type Rescue } from "@/lib/notes-yjs-rescue";
+import {
+  applyRescues,
+  caretIntoRestored,
+  caretSnapshot,
+  collapseRestored,
+  findRescues,
+  locateCursor,
+  otherSideOf,
+  type CaretSnapshot,
+  type Rescue,
+  type RescueCursor,
+} from "@/lib/notes-yjs-rescue";
 
 export interface CollabKeys {
   k: string;
@@ -114,6 +125,11 @@ export class NoteYjsSession {
   private destroyed = false;
   /** Called when a peer uses a different key id (membership changed). */
   onStaleKey: (() => void) | null = null;
+  /** The editor's caret as a Yjs relative position (set by the editor), so
+   *  a rescue can put the caret back into the re-inserted block. */
+  caret: { read: () => Y.RelativePosition | null; write: (rp: Y.RelativePosition) => void } | null = null;
+  /** What the last applyServerState did beyond plain merging. */
+  lastPull: { rescued: number; joined: number; collapsed: number } = { rescued: 0, joined: 0, collapsed: 0 };
 
   constructor(opts: { noteId: string; state: string; keys: CollabKeys; tabId: string }) {
     this.noteId = opts.noteId;
@@ -151,6 +167,7 @@ export class NoteYjsSession {
    *  Returns how many blocks were kept because we were typing in them
    *  when the server state deleted them. */
   applyServerState(stateB64: string): number {
+    this.lastPull = { rescued: 0, joined: 0, collapsed: 0 };
     try {
       const update = fromB64(stateB64);
       // A single-editor save may have DELETED a block this tab is typing
@@ -159,16 +176,37 @@ export class NoteYjsSession {
       // over a delete. Only our own typing counts, so two tabs never both
       // rescue the same block. The re-insert is a LOCAL change: it reaches
       // peers over the socket and the caller persists it.
+      //
+      // A block the server state JOINED into its neighbour (Backspace at
+      // its start) is not re-inserted: only our new characters are grafted
+      // into the joined block. A block someone already re-inserted (same
+      // origin marker) only gets our new characters; racing copies of one
+      // origin are collapsed afterwards. The caret follows the rescue.
       let rescues: Rescue[] = [];
+      let cursor: RescueCursor | null = null;
+      let snap: CaretSnapshot | null = null;
       const srv = new Y.Doc();
       try {
         Y.applyUpdate(srv, update);
         rescues = findRescues(this.doc, NOTES_YJS_FIELD, otherSideOf(srv), this.doc.clientID);
+        let caret: Y.RelativePosition | null = null;
+        try { caret = this.caret?.read() ?? null; } catch { caret = null; }
+        cursor = locateCursor(this.doc, rescues, caret);
+        // Also: the server may already have re-inserted the block we are in
+        // (from our own save) — the pulled state then deletes our copy.
+        snap = cursor ? null : caretSnapshot(this.doc, caret);
       } finally {
         srv.destroy();
       }
       Y.applyUpdate(this.doc, update, ORIGIN_REMOTE);
-      return rescues.length ? applyRescues(this.doc, NOTES_YJS_FIELD, rescues) : 0;
+      const n = rescues.length ? applyRescues(this.doc, NOTES_YJS_FIELD, rescues, cursor) : 0;
+      const collapsed = collapseRestored(this.doc, NOTES_YJS_FIELD);
+      this.lastPull = { rescued: n, joined: rescues.filter((r) => r.kind === "graft").length, collapsed };
+      const moved = cursor?.result ?? caretIntoRestored(this.doc, NOTES_YJS_FIELD, snap);
+      if (moved) {
+        try { this.caret?.write(moved); } catch { /* the editor went away */ }
+      }
+      return n;
     } catch {
       return 0;
     }

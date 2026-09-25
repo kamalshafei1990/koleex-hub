@@ -583,6 +583,13 @@ async function compressImageForChat(file: File): Promise<File> {
 
 export async function uploadDiscussAttachment(
   file: File,
+  opts: {
+    /** Retry of a failed send's kept file (DiscussApp uploadPendingFiles):
+     *  skip the composer's transport refusal and let uploadToStorage route a
+     *  file above DIRECT_UPLOAD_THRESHOLD straight to Storage. The policy
+     *  (type + policy max) still applies, here and at the server. */
+    allowDirect?: boolean;
+  } = {},
 ): Promise<
   | { ok: true; attachment: DiscussAttachment }
   | { ok: false; reason: "type" | "size" | "transport" | "failed" }
@@ -599,7 +606,7 @@ export async function uploadDiscussAttachment(
   /* Refuse over-transport files NOW, not after minutes of doomed uploading:
      the platform kills request bodies past ~4.5MB, so waiting can only end
      in the silent failure users reported. */
-  if (payload.size > DISCUSS_TRANSPORT_MAX_BYTES) {
+  if (!opts.allowDirect && payload.size > DISCUSS_TRANSPORT_MAX_BYTES) {
     return { ok: false, reason: "transport" };
   }
 

@@ -219,11 +219,22 @@ export default function PlanningApp() {
     setTlRangeState(r);
     writeUrlParams({ range: r === "week" ? "week" : null });
   }, []);
-  /* Week timeline shows 06:00–22:00 unless "Full day" (?hours=full). */
+  /* Week timeline shows 06:00–22:00 unless "Full day" (?hours=full, every
+     day) or a day is expanded on its own (?open=YYYY-MM-DD,…). The switch
+     resets the individual days either way. */
   const [tlFull, setTlFullState] = useState<boolean>(() => readUrlParam("hours") === "full");
+  const [tlOpen, setTlOpenState] = useState<string[]>(() =>
+    (readUrlParam("open") ?? "").split(",").filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)),
+  );
+  const setTlOpen = useCallback((keys: string[]) => {
+    const next = [...new Set(keys)].sort();
+    setTlOpenState(next);
+    writeUrlParams({ open: next.length ? next.join(",") : null });
+  }, []);
   const setTlFull = useCallback((on: boolean) => {
     setTlFullState(on);
-    writeUrlParams({ hours: on ? "full" : null });
+    setTlOpenState([]);
+    writeUrlParams({ hours: on ? "full" : null, open: null });
   }, []);
   /* One-off: drop the pre-merge `planning:leaves:` warm entries (the
      absence overlay moved to `planning:absence:`) so they stop taking
@@ -779,6 +790,8 @@ export default function PlanningApp() {
                   onTlRange={setTlRange}
                   tlFull={tlFull}
                   onTlFull={setTlFull}
+                  tlOpen={tlOpen}
+                  onTlOpen={setTlOpen}
                   templates={templates}
                   canWrite={canWrite}
                   onTemplateCreate={handleTemplateCreate}
@@ -942,6 +955,8 @@ function ScheduleView({
   onTlRange,
   tlFull,
   onTlFull,
+  tlOpen,
+  onTlOpen,
   templates,
   canWrite,
   onTemplateCreate,
@@ -969,6 +984,9 @@ function ScheduleView({
   onTlRange: (r: TlRange) => void;
   tlFull: boolean;
   onTlFull: (on: boolean) => void;
+  /** Week timeline: day keys expanded one at a time (?open). */
+  tlOpen: string[];
+  onTlOpen: (keys: string[]) => void;
   templates: PlanningTemplate[];
   canWrite: (i: PlanningItem) => boolean;
   onTemplateCreate: (tpl: PlanningTemplate, resourceId: string | null, day: Date) => void | Promise<void>;
@@ -1003,7 +1021,15 @@ function ScheduleView({
     (slices: AwaySlice[]) => {
       /* A title only rides along when the server allowed it (the viewer
          could open that event in Calendar); the privacy hint stays for
-         any slice without one. */
+         any slice without one.
+
+         View-as (by design, no special case here): /api/planning/leaves
+         decides on the EFFECTIVE identity getServerAuth resolves. A Super
+         Admin viewing as an account sees exactly the titles that account
+         may open; viewing as a role runs with is_super_admin forced off,
+         so the SA bypass no longer applies. The board therefore previews
+         what the impersonated user would see — it never leaks the real
+         SA's wider access into the lens. */
       const parts = slices.map((sl) => {
         const when = sl.full ? t("sched.allDay") : awaySliceRange(sl, tz);
         return sl.title ? `${when} — ${sl.title}` : when;
@@ -1107,6 +1133,22 @@ function ScheduleView({
   const isTimeline = mode === "timeline";
   /* Stable per day/week so the timeline keeps its scroll position across saves. */
   const tlDays = useMemo(() => (tlRange === "day" ? [activeDay] : days), [tlRange, activeDay, days]);
+  /* Individually expanded days. Keys outside this week are dropped on the
+     next change so ?open never collects stale weeks. */
+  const tlOpenSet = useMemo(() => new Set(tlOpen), [tlOpen]);
+  const expandTlDay = (key: string) => {
+    if (tlFull || tlOpenSet.has(key)) return;
+    onTlOpen([...tlOpen.filter((k) => dayKeys.includes(k)), key]);
+  };
+  /* Under Full day, collapsing one day keeps every other day open. */
+  const collapseTlDay = (key: string) => {
+    if (tlFull) {
+      onTlFull(false);
+      onTlOpen(dayKeys.filter((k) => k !== key));
+      return;
+    }
+    onTlOpen(tlOpen.filter((k) => k !== key && dayKeys.includes(k)));
+  };
   /* Week actions act on what is on screen: the visible resources (and the
      open-shifts row), or everything when grouped by role. */
   const weekScopeIds = groupBy === "resource" || isTimeline ? visibleResources.map((r) => r.id) : null;
@@ -1312,7 +1354,9 @@ function ScheduleView({
           awayCells={awayCells}
           awayTip={awayTip}
           fullDay={tlFull}
-          onFullDay={() => onTlFull(true)}
+          openDays={tlOpenSet}
+          onExpandDay={expandTlDay}
+          onCollapseDay={collapseTlDay}
           canWrite={canWrite}
           onItemClick={onItemClick}
           onMove={onTimelineMove}
@@ -1640,8 +1684,10 @@ function MobileItemRow({
 /** Week-grid pill. A focusable role="button" (Enter/Space opens) rather than
  *  a <button>: Firefox will not start a drag from a <button>. */
 /* Calendar out-of-office — hatched (AWAY_HATCH), so it never reads as
-   leave (amber, solid). The tooltip names only the time span: a Calendar
-   event's title is private and never reaches the board. */
+   leave (amber, solid). The label and tooltip name the time span; the
+   event's title joins them only when the server sent one (the viewer may
+   open that event in Calendar — see awayTip). The label truncates with an
+   ellipsis; the tooltip keeps the whole text. */
 function AwayBadge({
   slices,
   tz,
@@ -1656,6 +1702,9 @@ function AwayBadge({
   const { t } = useTranslation(planningT);
   const full = slices.some((sl) => sl.full);
   const label = full ? t("sched.outOfOffice") : `${t("sched.outOfOffice")} ${awaySliceRange(slices[0], tz)}${slices.length > 1 ? " +" : ""}`;
+  /* The slice the label describes, else any slice that carries a title. */
+  const lead = full ? slices.find((sl) => sl.full) : slices[0];
+  const title = lead?.title || slices.find((sl) => sl.title)?.title;
   return (
     <span
       title={tip(slices)}
@@ -1663,6 +1712,7 @@ function AwayBadge({
       style={{ backgroundImage: AWAY_HATCH }}
     >
       {label}
+      {title && <span className="normal-case tracking-normal font-semibold"> · {title}</span>}
     </span>
   );
 }

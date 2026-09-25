@@ -48,6 +48,7 @@ import type { Editor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import { absolutePositionToRelativePosition, relativePositionToAbsolutePosition, ySyncPluginKey } from "@tiptap/y-tiptap";
 
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
@@ -68,7 +69,7 @@ import { getTabClientId, useNoteCollab, type NoteUpdate } from "@/lib/note-colla
 import { mergeDocs, stableKey } from "@/lib/notes-merge3";
 import { mapPosAcrossDocs } from "@/lib/notes-cursor-map";
 import { TextSelection } from "@tiptap/pm/state";
-import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink } from "@/lib/notes-schema";
+import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink, stripMarkerDefaults } from "@/lib/notes-schema";
 import { NoteYjsSession, fetchCollabJoin, peerColor } from "@/lib/notes-yjs";
 import { noteFileName, noteToMarkdown } from "@/lib/notes-markdown";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
@@ -320,6 +321,12 @@ const PRINT_CSS = `
 function conflictPrintCss(label: string): string {
   const css = JSON.stringify(`${label} `).replace(/</g, "\\3c ");
   return `[data-conflict]::before { content: ${css}; font-style: italic; opacity: 0.6; }`;
+}
+
+/** The body as saved: unset marker attributes (conflict / restoredFrom:
+ *  null) are left out, so stored bodies look as they did before them. */
+function bodyJSON(ed: Editor): Record<string, unknown> {
+  return stripMarkerDefaults(ed.getJSON() as Record<string, unknown>);
 }
 
 function countWords(text: string): { words: number; chars: number } {
@@ -578,11 +585,11 @@ export default function NoteEditor({
         // A peer's change arrived over the socket: its author persists it.
         if (isChangeOrigin(transaction) || !live.canWrite) return;
         lastLocalEditAt.current = Date.now();
-        queueChange({ body_json: ed.getJSON(), yjs_update: live.encodeState() });
+        queueChange({ body_json: bodyJSON(ed), yjs_update: live.encodeState() });
         return;
       }
       lastLocalEditAt.current = Date.now();
-      queueChange({ body_json: ed.getJSON() });
+      queueChange({ body_json: bodyJSON(ed) });
     },
   }, [activeSession]);
 
@@ -597,7 +604,7 @@ export default function NoteEditor({
     adoptMergedRef.current = (id, sent, merged) => {
       const ed = editor;
       if (!ed || ed.isDestroyed || sessionRef.current || noteIdRef.current !== id) return;
-      const now = ed.getJSON();
+      const now = bodyJSON(ed);
       const typedSince = stableKey(now) !== stableKey(sent ?? null);
       const target = typedSince ? mergeDocs(sent, now, merged).doc : merged;
       if (stableKey(target) === stableKey(now)) return;
@@ -619,7 +626,7 @@ export default function NoteEditor({
         ed.view.dispatch(ed.state.tr.setSelection(sel).setMeta("addToHistory", false));
       } catch { /* ignore */ }
       setCounts(countWords(ed.getText()));
-      if (typedSince) queueChange({ body_json: ed.getJSON() });
+      if (typedSince) queueChange({ body_json: bodyJSON(ed) });
     };
   }, [editor, queueChange]);
 
@@ -629,16 +636,51 @@ export default function NoteEditor({
   const rescuedRef = useRef<(n: number) => void>(() => {});
   useEffect(() => {
     rescuedRef.current = (n) => {
-      if (n <= 0) return;
-      notify(t("conflict.rescued"), "info");
       const s = sessionRef.current;
+      // A racing duplicate of a restored block was removed: persist that
+      // quietly (it is not news to anyone).
+      const collapsed = s?.lastPull.collapsed ?? 0;
+      if (n <= 0 && collapsed <= 0) return;
+      if (n > 0) notify(t(s && s.lastPull.joined >= n ? "conflict.joinedKept" : "conflict.rescued"), "info");
       const ed = editor;
       if (s && s.canWrite && ed && !ed.isDestroyed) {
         lastLocalEditAt.current = Date.now();
-        queueChange({ body_json: ed.getJSON(), yjs_update: s.encodeState() });
+        queueChange({ body_json: bodyJSON(ed), yjs_update: s.encodeState() });
       }
     };
   }, [editor, notify, t, queueChange]);
+
+  /* The caret, for a rescue: read as a Yjs relative position before a
+     pulled state is merged, and put back into the re-inserted block (or the
+     block a paragraph was joined into) at the same offset afterwards. */
+  useEffect(() => {
+    const s = activeSession;
+    const ed = editor;
+    if (!s || !ed) return;
+    const binding = () => {
+      if (ed.isDestroyed) return null;
+      const b = ySyncPluginKey.getState(ed.state)?.binding as
+        | { type: Parameters<typeof absolutePositionToRelativePosition>[1]; mapping: Parameters<typeof absolutePositionToRelativePosition>[2]; doc: Parameters<typeof relativePositionToAbsolutePosition>[0] }
+        | undefined;
+      return b && b.doc === s.doc ? b : null;
+    };
+    const bridge: NonNullable<NoteYjsSession["caret"]> = {
+      read: () => {
+        const b = binding();
+        return b ? absolutePositionToRelativePosition(ed.state.selection.head, b.type, b.mapping) : null;
+      },
+      write: (rp) => {
+        const b = binding();
+        if (!b) return;
+        const pos = relativePositionToAbsolutePosition(b.doc, b.type, rp, b.mapping);
+        if (pos === null || pos < 0 || pos > ed.state.doc.content.size) return;
+        const sel = TextSelection.near(ed.state.doc.resolve(pos));
+        ed.view.dispatch(ed.state.tr.setSelection(sel).setMeta("addToHistory", false));
+      },
+    };
+    s.caret = bridge;
+    return () => { if (s.caret === bridge) s.caret = null; };
+  }, [editor, activeSession]);
 
   // Placeholder + conflict label follow the UI language.
   useEffect(() => {
@@ -934,6 +976,8 @@ export default function NoteEditor({
       tags: tagsDraft,
       body: editor.getJSON(),
       origin: window.location.origin,
+      // Conflict copies are labelled in the exporting user's language.
+      conflictLabel: t("conflict.copyLabel"),
     });
     const url = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" }));
     const a = document.createElement("a");
@@ -994,7 +1038,7 @@ export default function NoteEditor({
       // collaborator as ordinary edits (and is saved as a merge).
       editor.commands.setContent((v.body_json ?? EMPTY_DOC) as never, { emitUpdate: true });
       setTitleDraft(v.title ?? "");
-      queueChange({ title: v.title ?? "", body_json: editor.getJSON() }, true);
+      queueChange({ title: v.title ?? "", body_json: bodyJSON(editor) }, true);
       setHistoryKey((k) => k + 1);
       setRestoreTarget(null);
       notify(t("history.restored"), "success");

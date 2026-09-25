@@ -20,11 +20,13 @@ import "server-only";
      3b. the path is BOUND TO THE CALLER: public.discuss_pending_uploads
         (written by /api/storage/upload and /api/storage/signed-upload, see
         src/lib/discuss-pending-uploads.ts) records the uploading account and
-        tenant, and both must match the caller. No row → 404. Only when the
-        table does not exist yet (migration 20260929 not applied) does the
-        route fall back to the previous rule, where the unguessable path
-        (never sent to any other client — the serializer strips it) was the
-        only uploader check;
+        tenant, and both must match the caller. No row → 404, EXCEPT for a
+        path uploaded before the table existed (its embedded upload time is
+        before PENDING_UPLOADS_CUTOFF_MS): such an upload never got a row, so
+        it keeps the previous rule (steps 2 + 4 below, where the unguessable
+        path — never sent to any other client, the serializer strips it —
+        was the only uploader check). The same previous rule applies when
+        the table does not exist at all (migration 20260929 not applied);
      4. the object is NOT already the media of a message in another channel.
         Once a message references the path, its canonical first-party route
         (with that channel's membership check) is the only way in — so a
@@ -38,7 +40,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { lookupDiscussUpload } from "@/lib/discuss-pending-uploads";
+import { DISCUSS_UPLOAD_PATH_RE, lookupDiscussUpload } from "@/lib/discuss-pending-uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +50,14 @@ const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
 
 const BUCKETS: Record<string, string> = { m: "discuss-media", v: "discuss-voice" };
 /** `${Date.now()}_${random base36}.${ext}` — see src/lib/discuss.ts. */
-const PATH_RE = /^(\d{12,14})_[a-z0-9]{4,16}\.[a-z0-9]{1,8}$/;
+const PATH_RE = DISCUSS_UPLOAD_PATH_RE;
+/** Deploy time of the uploader binding (discuss_pending_uploads). Uploads
+ *  whose embedded timestamp is BEFORE this were made when no route recorded
+ *  a row, so "no row" means "pre-table", not "someone else's".
+ *  TEMPORARY: with the outbox TTL of 7 days (+1 day slack, MAX_AGE_MS) no such
+ *  path is servable after 2026-10-03 — this cutoff and the legacy branch that
+ *  uses it can be deleted after 2026-10-03. */
+const PENDING_UPLOADS_CUTOFF_MS = Date.parse("2026-09-25T18:00:00Z");
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Outbox TTL (7 days) plus a day of clock slack. */
 const MAX_AGE_MS = 8 * 24 * 60 * 60 * 1000;
@@ -75,16 +84,25 @@ export async function GET(req: Request) {
   const path = url.searchParams.get("p") ?? "";
   const m = PATH_RE.exec(path);
   if (!bucket || !m || !UUID_RE.test(channelId)) return deny();
-  const age = Date.now() - Number(m[1]);
+  const uploadedAt = Number(m[1]);
+  const age = Date.now() - uploadedAt;
   if (!Number.isFinite(age) || age > MAX_AGE_MS || age < -24 * 60 * 60 * 1000) return deny();
 
   /* 3b. Bound to the caller (account AND tenant). Fails closed on any lookup
-     error; falls back to the previous rule only if the table is missing. */
+     error; falls back to the previous rule only if the table is missing, or
+     for a pre-table upload that has no row (legacy branch below). */
   const binding = await lookupDiscussUpload(bucket, path);
   if (binding.available) {
-    if (!binding.owner) return deny();
-    if (binding.owner.accountId !== auth.account_id) return deny();
-    if (!auth.tenant_id || binding.owner.tenantId !== auth.tenant_id) return deny();
+    if ("error" in binding) return deny();
+    if (!binding.owner) {
+      /* LEGACY (delete after 2026-10-03): uploaded before the table's
+         deploy → no row was ever written; keep the previous rule (steps 2 +
+         4). After the cutoff, no row = deny. */
+      if (!(uploadedAt < PENDING_UPLOADS_CUTOFF_MS)) return deny();
+    } else {
+      if (binding.owner.accountId !== auth.account_id) return deny();
+      if (!auth.tenant_id || binding.owner.tenantId !== auth.tenant_id) return deny();
+    }
   }
 
   /* 2. Active membership of the target conversation, in the caller's tenant. */

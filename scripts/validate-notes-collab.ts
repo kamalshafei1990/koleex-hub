@@ -18,6 +18,9 @@
         note channel is public (REST broadcasts default to public topics);
         the editor pulls on `body`; every server path that merges a body
         into a Yjs state pings.
+     4. Rescue (edit wins over delete): both ends rescue, collapse racing
+        duplicates and carry the caret; a small Yjs run proves a rescue
+        is origin-marked, never inserted twice, and a join is grafted.
 
    Pure file reads + one module import — no env, no database.
    ========================================================================== */
@@ -26,6 +29,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import ts from "typescript";
+import * as Y from "yjs";
 import {
   NOTE_PING_EVENT,
   SERVER_PING_BY,
@@ -34,6 +38,7 @@ import {
   noteTopic,
   parseNotePing,
 } from "../src/lib/note-collab-protocol";
+import { RESTORED_ATTR, applyRescues, collapseRestored, findRescues, otherSideOf } from "../src/lib/notes-yjs-rescue";
 
 const ROOT = path.resolve(__dirname, "..");
 const PROTOCOL = "@/lib/note-collab-protocol";
@@ -224,6 +229,59 @@ console.log("\n[4] wiring");
   ok("the browser's applyServerState rescues its own typing before merging a pulled state",
     /applyServerState\([^)]*\)[^{]*\{[\s\S]*?findRescues\([\s\S]*?this\.doc\.clientID\)[\s\S]*?applyRescues\(/.test(yjsClient));
   ok("the editor persists + reports rescued blocks after a pull", /rescuedRef\.current\(s\.applyServerState\(j\.state\)\)/.test(ed));
+  ok("mergeState collapses racing duplicate copies (collapseRestored)", !!mergeFn && calls(mergeFn, "collapseRestored").length === 1);
+  ok("applyServerState locates the caret, collapses duplicates and writes the caret back",
+    /applyServerState\([^)]*\)[^{]*\{[\s\S]*?locateCursor\([\s\S]*?collapseRestored\([\s\S]*?this\.caret\?\.write\(/.test(yjsClient));
+  ok("the editor provides the caret bridge to the session", /s\.caret = bridge/.test(ed) && /absolutePositionToRelativePosition\(/.test(ed) && /relativePositionToAbsolutePosition\(/.test(ed));
+  ok("saved bodies drop unset marker attributes (no raw getJSON in a save)", !/queueChange\(\{[^}]*getJSON\(\)/.test(ed) && /stripMarkerDefaults\(/.test(ed));
+  ok("Markdown export passes the localized conflict label", /noteToMarkdown\(\{[\s\S]*?conflictLabel:\s*t\("conflict\.copyLabel"\)/.test(ed));
+}
+
+/* ── 5. Runtime: rescue is origin-marked, deduped, and joins are grafted ── */
+console.log("\n[5] rescue runtime");
+{
+  const F = "default";
+  const para = (text: string) => { const el = new Y.XmlElement("paragraph"); const t = new Y.XmlText(); t.insert(0, text); el.insert(0, [t]); return el; };
+  const seed = new Y.Doc();
+  seed.getXmlFragment(F).insert(0, [para("intro"), para("doomed"), para("outro")]);
+  const base = Y.encodeStateAsUpdate(seed);
+  const typist = new Y.Doc(); Y.applyUpdate(typist, base);
+  const deleter = new Y.Doc(); Y.applyUpdate(deleter, base);
+  ((typist.getXmlFragment(F).get(1) as Y.XmlElement).get(0) as Y.XmlText).insert(6, " + typed");
+  deleter.getXmlFragment(F).delete(1, 1);
+  // Two rescuers that do not see each other: both mark the same origin.
+  const r1 = new Y.Doc(); Y.applyUpdate(r1, Y.encodeStateAsUpdate(deleter));
+  const res1 = findRescues(typist, F, otherSideOf(r1), null);
+  Y.applyUpdate(r1, Y.encodeStateAsUpdate(typist));
+  applyRescues(r1, F, res1);
+  const r2 = new Y.Doc(); Y.applyUpdate(r2, Y.encodeStateAsUpdate(deleter));
+  const res2 = findRescues(typist, F, otherSideOf(r2), null);
+  Y.applyUpdate(r2, Y.encodeStateAsUpdate(typist));
+  applyRescues(r2, F, res2);
+  const o1 = (r1.getXmlFragment(F).get(1) as Y.XmlElement).getAttribute(RESTORED_ATTR);
+  ok("a restored block carries a deterministic origin marker", typeof o1 === "string" && o1 === (r2.getXmlFragment(F).get(1) as Y.XmlElement).getAttribute(RESTORED_ATTR));
+  ok("a second rescue of the same origin is not inserted again", applyRescues(r1, F, findRescues(typist, F, otherSideOf(deleter), null)) === 0 && r1.getXmlFragment(F).length === 3);
+  Y.applyUpdate(r1, Y.encodeStateAsUpdate(r2));
+  Y.applyUpdate(r2, Y.encodeStateAsUpdate(r1));
+  const c1 = collapseRestored(r1, F);
+  const c2 = collapseRestored(r2, F);
+  Y.applyUpdate(r1, Y.encodeStateAsUpdate(r2));
+  const texts = r1.getXmlFragment(F).toArray().map((e) => ((e as Y.XmlElement).get(0) as Y.XmlText).toString());
+  ok("racing copies collapse to ONE on every replica", c1 === 1 && c2 === 1 && JSON.stringify(texts) === JSON.stringify(["intro", "doomed + typed", "outro"]), JSON.stringify(texts));
+  // Join: the deleter appended the block to its neighbour (Backspace).
+  const joiner = new Y.Doc(); Y.applyUpdate(joiner, base);
+  const typist2 = new Y.Doc(); Y.applyUpdate(typist2, base);
+  joiner.transact(() => {
+    ((joiner.getXmlFragment(F).get(0) as Y.XmlElement).get(0) as Y.XmlText).insert(5, "doomed");
+    joiner.getXmlFragment(F).delete(1, 1);
+  });
+  ((typist2.getXmlFragment(F).get(1) as Y.XmlElement).get(0) as Y.XmlText).insert(6, "!");
+  const merged = new Y.Doc(); Y.applyUpdate(merged, Y.encodeStateAsUpdate(joiner));
+  const jr = findRescues(typist2, F, otherSideOf(merged), null);
+  Y.applyUpdate(merged, Y.encodeStateAsUpdate(typist2));
+  applyRescues(merged, F, jr);
+  const jt = merged.getXmlFragment(F).toArray().map((e) => ((e as Y.XmlElement).get(0) as Y.XmlText).toString());
+  ok("a joined block is not restored: only the new characters are grafted", jr[0]?.kind === "graft" && JSON.stringify(jt) === JSON.stringify(["introdoomed!", "outro"]), JSON.stringify(jt));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

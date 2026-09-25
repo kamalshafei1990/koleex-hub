@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectAccessLevels, UUID_RE, viewReason } from "@/lib/server/project-access";
+import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectPermissionFlags, UUID_RE } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
 import { projectMemberCounts, upsertProjectMembers } from "@/lib/server/project-members";
 
@@ -174,18 +174,17 @@ export async function GET(req: Request) {
         ]).then(([r, m]) => new Set([...(r.data ?? []).map((x) => (x as { project_id: string }).project_id), ...m]))
       : Promise.resolve(null),
     templatesOnly ? Promise.resolve(new Map<string, number>()) : projectMemberCounts(auth.tenant_id, ids),
-    requireModuleAction(auth, "Projects", "edit").then(async (denied) => ({
-      canEditModule: !denied,
-      levels: await projectAccessLevels(auth, projects, !denied),
-    })),
+    projectPermissionFlags(auth, projects),
   ]);
 
   const out = projects.map((p) => ({
     ...p,
     task_counts: tc.get(p.id) ?? ZERO,
     member_count: memberCounts.get(p.id) ?? 0,
-    my_access: access.levels.get(p.id) ?? "view",
-    my_access_reason: viewReason(access.levels.get(p.id) ?? "view", access.canEditModule),
+    my_access: access.get(p.id)?.my_access ?? "view",
+    my_access_reason: access.get(p.id)?.my_access_reason ?? "module",
+    can_create: access.get(p.id)?.can_create ?? false,
+    can_delete: access.get(p.id)?.can_delete ?? false,
     involved: mine
       ? p.manager_account_id === auth.account_id || p.created_by_account_id === auth.account_id || mine.has(p.id)
       : true,
@@ -269,7 +268,7 @@ export async function POST(req: Request) {
      the project chat include them from day one. */
   const managerId = (project as { manager_account_id: string | null }).manager_account_id;
   if (managerId && !project.is_template) {
-    after(async () => { await upsertProjectMembers(auth, project.id, [{ account_id: managerId, role: "manager" }]); });
+    after(async () => { await upsertProjectMembers(auth, project.id, [{ account_id: managerId, role: "manager" }], { source: "auto" }); });
   }
 
   return NextResponse.json({ project });

@@ -32,6 +32,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { requireModuleAction } from "@/lib/server/auth";
 
 export interface AccessAuth {
   account_id: string;
@@ -286,39 +287,119 @@ export function viewReason(level: ProjectAccessLevel | undefined, canEditModule:
   return canEditModule ? "viewer" : "module";
 }
 
-/** Per-task `can_edit` for task payloads, so the UI enables exactly what
- *  assertTaskWrite allows: project access manage/edit, or ownsTask. Also
- *  returns the project-level access per task (`project_access`, e.g. for
- *  the "you edit this because it is yours" note). Creating a SUBTASK
- *  follows the parent's can_edit (POST /api/projects/tasks gates it with
- *  assertTaskWrite on parent_task_id), not the project level.
+/** Per-task flags for task payloads, so the UI enables exactly what the
+ *  write routes allow:
+ *    can_edit   — assertTaskWrite (project access manage/edit, or
+ *                 ownsTask) AND the Projects module's edit action;
+ *    can_create — the same task write AND the module's create action:
+ *                 adding a SUBTASK under this task (POST
+ *                 /api/projects/tasks gates it with requireModuleAction
+ *                 "create" + assertTaskWrite on parent_task_id);
+ *    can_delete — the same task write AND the module's delete action
+ *                 (DELETE /api/projects/tasks/:id and bulk delete).
+ *  Also returns the project-level access per task (`project_access`, e.g.
+ *  for the "you edit this because it is yours" note).
  *  Batched: one projects read + projectAccessLevels' two queries. */
-export interface TaskEditFlags { can_edit: boolean; project_access: ProjectAccessLevel }
+export interface TaskEditFlags {
+  can_edit: boolean;
+  can_create: boolean;
+  can_delete: boolean;
+  project_access: ProjectAccessLevel;
+}
+
+/** The Projects module's create / edit / delete actions for the caller
+ *  (requireModuleAction — role row, per-account override, view-as). */
+export interface ProjectModuleRights { create: boolean; edit: boolean; delete: boolean }
+
+export async function projectModuleRights(auth: Parameters<typeof requireModuleAction>[0]): Promise<ProjectModuleRights> {
+  const [c, e, d] = await Promise.all([
+    requireModuleAction(auth, "Projects", "create"),
+    requireModuleAction(auth, "Projects", "edit"),
+    requireModuleAction(auth, "Projects", "delete"),
+  ]);
+  return { create: !c, edit: !e, delete: !d };
+}
 
 export async function taskEditFlags(
   auth: AccessAuth,
   tasks: { id: string; project_id: string; assignee_account_id: string | null; created_by_account_id?: string | null }[],
-  canEditModule: boolean,
+  rights: boolean | Partial<ProjectModuleRights>,
 ): Promise<Map<string, TaskEditFlags>> {
   const out = new Map<string, TaskEditFlags>();
   if (tasks.length === 0) return out;
+  /* `true`/`false` = the edit action only (older call sites). */
+  const r: ProjectModuleRights = typeof rights === "boolean"
+    ? { edit: rights, create: false, delete: false }
+    : { edit: !!rights.edit, create: !!rights.create, delete: !!rights.delete };
   const pids = [...new Set(tasks.map((t) => t.project_id))];
   let levels = new Map<string, ProjectAccessLevel>();
-  if (canEditModule) {
+  if (r.edit || r.create || r.delete) {
     const { data } = await supabaseServer
       .from("projects")
       .select("id, manager_account_id, created_by_account_id")
       .eq("tenant_id", auth.tenant_id)
       .in("id", pids);
+    /* The raw access level — independent of the module's edit action. */
     levels = await projectAccessLevels(auth, (data ?? []) as ProjectAccessRow[], true);
   }
   for (const t of tasks) {
-    const level = canEditModule ? levels.get(t.project_id) ?? "view" : "view";
-    const can_edit =
-      canEditModule &&
-      (auth.is_super_admin || level !== "view" ||
-        ownsTask(auth, { assignee_account_id: t.assignee_account_id, created_by_account_id: t.created_by_account_id ?? null }));
-    out.set(t.id, { can_edit, project_access: level });
+    const level = levels.get(t.project_id) ?? "view";
+    const write =
+      auth.is_super_admin || level !== "view" ||
+      ownsTask(auth, { assignee_account_id: t.assignee_account_id, created_by_account_id: t.created_by_account_id ?? null });
+    out.set(t.id, {
+      can_edit: r.edit && write,
+      can_create: r.create && write,
+      can_delete: r.delete && write,
+      project_access: r.edit ? level : "view",
+    });
+  }
+  return out;
+}
+
+/** The task-payload fields for one TaskEditFlags entry (all false /
+ *  "view" when missing). */
+export function taskFlagsPayload(f: TaskEditFlags | undefined): TaskEditFlags {
+  return {
+    can_edit: f?.can_edit ?? false,
+    can_create: f?.can_create ?? false,
+    can_delete: f?.can_delete ?? false,
+    project_access: f?.project_access ?? "view",
+  };
+}
+
+/** Project payload flags (list + detail): `my_access` / `my_access_reason`
+ *  as before, plus
+ *    can_create — module create action AND project write (manage/edit):
+ *                 what POST /api/projects/tasks needs for a top-level task;
+ *    can_delete — module delete action AND project write: deleting any
+ *                 task of the project (owners of a task can still delete
+ *                 their own — see the per-task can_delete).
+ *  One module-rights check + projectAccessLevels' two queries. */
+export interface ProjectPermissionFlags {
+  my_access: ProjectAccessLevel;
+  my_access_reason: ViewReason | null;
+  can_create: boolean;
+  can_delete: boolean;
+}
+
+export async function projectPermissionFlags(
+  auth: AccessAuth & Parameters<typeof requireModuleAction>[0],
+  projects: ProjectAccessRow[],
+): Promise<Map<string, ProjectPermissionFlags>> {
+  const out = new Map<string, ProjectPermissionFlags>();
+  if (projects.length === 0) return out;
+  const rights = await projectModuleRights(auth);
+  const raw = await projectAccessLevels(auth, projects, true);
+  for (const p of projects) {
+    const level = raw.get(p.id) ?? "view";
+    const my = rights.edit ? level : "view";
+    out.set(p.id, {
+      my_access: my,
+      my_access_reason: viewReason(my, rights.edit),
+      can_create: rights.create && level !== "view",
+      can_delete: rights.delete && level !== "view",
+    });
   }
   return out;
 }
