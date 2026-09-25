@@ -54,6 +54,12 @@
  *      kept in step on save, send and a new version; a new version's blocks
  *      point at its own copies; a record's page lists only what its viewer
  *      may read; every kind of record searched only by those who own its app.
+ *   §17 sales & customers (Phase 4B) — a choice keeps only its answers; a
+ *      numbers block keeps only the author's notes (the figures are the
+ *      server's, pinned to the author, gated by each app, frozen on send);
+ *      totals never mix currencies; dates are real days; quotations and
+ *      invoices link and open in their editors; the editors' card is quiet
+ *      and never printed; the links migration only widens the kinds.
  *   §9 photos and files (Phase 2C) — one policy for the picker, the route and
  *      the bucket; bytes checked before storing; files served only through
  *      the report's read rule; an object leaves storage only when no version
@@ -65,17 +71,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stripComments } from "./lib/strip-comments";
 import { reportAccess, type ReportAccessFacts } from "../src/lib/reports/access";
 import {
-  REPORT_FAMILIES, REPORT_LIMITS, REPORT_TEMPLATES, blockFileIds, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
+  REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
+  type ReportDataValue,
 } from "../src/lib/reports/templates";
+import { DATA_COLUMNS, DATA_LINK, DATA_MODULE, DATA_STATUSES, dataTotals, withBlockData } from "../src/lib/reports/report-data";
+import { entityHref } from "../src/lib/reports/link-targets";
 import { reportsT } from "../src/lib/translations/reports";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
 import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
 import {
-  boardRow, cellOf, dailyDue, dayKind, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
+  OBLIGATION_KEYS, boardRow, cellOf, dailyDue, dayKind, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
   type Clock, type PersonClock, type Sent,
 } from "../src/lib/reports/obligations";
 import { REPORT_DUE_WORDS, reportDueLine } from "../src/lib/home/report-due-line";
@@ -101,25 +111,10 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 const eq = (got: unknown, want: unknown, m: string) => expect(JSON.stringify(got) === JSON.stringify(want), m, `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
-/** The file without its comments. Strings are stepped over whole: a bare
- *  regex read accept="image/*" as a comment opening and dropped the code up
- *  to the next one — every guard on that file then checked half of it, and
- *  a "never uses X" guard passed on nothing. */
-const code = (src: string) => {
-  let out = "", i = 0;
-  while (i < src.length) {
-    const ch = src[i], nx = src[i + 1];
-    if (ch === '"' || ch === "'" || ch === "`") {
-      let j = i + 1;
-      while (j < src.length && src[j] !== ch && !(ch !== "`" && src[j] === "\n")) j += src[j] === "\\" ? 2 : 1;
-      out += src.slice(i, j + 1); i = j + 1; continue;
-    }
-    if (ch === "/" && nx === "*") { const end = src.indexOf("*/", i + 2); i = end < 0 ? src.length : end + 2; continue; }
-    if (ch === "/" && nx === "/" && /^\s*$/.test(src.slice(src.lastIndexOf("\n", i - 1) + 1, i))) { const end = src.indexOf("\n", i); i = end < 0 ? src.length : end; continue; }
-    out += ch; i++;
-  }
-  return out;
-};
+/** The file without its comments — the validators' one stripper, which
+ *  steps over strings, templates and regexes (a bare regex read
+ *  accept="image/*" as a comment opening and dropped the code after it). */
+const code = (src: string) => stripComments(src);
 
 /** A rule must pass on the real file and fail on the mutation. */
 function rule(name: string, file: string, check: (c: string) => string[], mutate: (src: string) => string) {
@@ -200,9 +195,10 @@ console.log("\n§3 templates and their words");
   for (const [k, e] of Object.entries(reportsT)) if (holes(e.en ?? "") !== holes(e.zh ?? "") || holes(e.en ?? "") !== holes(e.ar ?? "")) missing.push(`${k}: placeholders differ between languages`);
   expect(missing.length === 0, `${REPORT_TEMPLATES.length} templates, every name / description / section in en, zh and ar`, [...new Set(missing)].slice(0, 12).join(", "));
   const phase1 = ["daily", "weekly_plan", "weekly", "monthly", "customer_visit", "supplier_visit", "decision_memo", "escalation", "handover", "free", "hr_incident", "hr_grievance", "hr_warning", "hr_exit_interview"];
-  const withBlocks = [...phase1.slice(0, 6), "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
+  const sales = ["customer_call", "complaint", "lost_deal", "sales_weekly", "sales_monthly", "quote_followup", "collection", "account_plan", "account_review", "competitor_prices", "country_study", "agent_report"];
+  const withBlocks = [...phase1.slice(0, 6), ...sales, "factory_audit", "price_comparison", "installation", ...phase1.slice(6)];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the three that use the Phase 4A blocks after the visits, and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B) after the visits, then the three of Phase 4A, and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -303,8 +299,8 @@ console.log("\n§5 routes");
   rule("send refuses a report with nobody to send it to", `${API}/[id]/submit/route.ts`,
     (c) => (/no_recipients/.test(c) ? [] : ["no recipient check"]),
     (s) => s.replace(/if \(!recipients\.some[^\n]*\n/, "\n"));
-  rule("only the author's own draft carries suggestions (earlier reports and the apps)", `${API}/[id]/route.ts`,
-    (c) => (/const \[carry, appFeed\] = isAuthor && row\.status === "draft"\s*\? await Promise\.all\(\[loadCarry\(row, auth\), loadAppFeed\(row, auth\)\]\)\s*: \[undefined, undefined\];/.test(c) ? [] : ["the suggestions are not gated on the author's draft"]),
+  rule("only the author's own draft carries suggestions (earlier reports, the apps and the numbers blocks)", `${API}/[id]/route.ts`,
+    (c) => (/const \[carry, appFeed, blockData\] = isAuthor && row\.status === "draft"\s*\? await Promise\.all\(\[loadCarry\(row, auth\), loadAppFeed\(row, auth\), loadReportData\(row, auth\)\]\)\s*: \[undefined, undefined, undefined\];/.test(c) ? [] : ["the suggestions are not gated on the author's draft"]),
     (s) => s.replace('isAuthor && row.status === "draft"\n    ? await Promise.all', "true\n    ? await Promise.all"));
   rule("the carry route answers the author of a draft only", `${API}/[id]/carry/route.ts`,
     (c) => (/loaded\.access !== "author"/.test(c) && /loaded\.row\.status !== "draft"/.test(c) ? [] : ["the carry route does not check author + draft"]),
@@ -1332,7 +1328,7 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (src) => src.replace(".filter((r) => reportAccess({", ".filter((r) => r && ({"));
   const LS = "src/app/api/work-reports/links/search/route.ts";
   rule("each kind of record is searched only by those who have its app", LS,
-    (c) => (/const MODULE: Partial<Record<ReportLinkType, string>> = \{ customer: "Customers", supplier: "Suppliers", order: "Orders" \};/.test(c) && /if \(mod && \(await requireModuleAccess\(auth, mod\)\)\) return NextResponse\.json\(\{ hits: \[\], denied: true \}/.test(c) ? [] : ["anyone can list customers, suppliers or orders"]),
+    (c) => (/const MODULE: Partial<Record<ReportLinkType, string>> = \{ customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices" \};/.test(c) && /if \(mod && \(await requireModuleAccess\(auth, mod\)\)\) return NextResponse\.json\(\{ hits: \[\], denied: true \}/.test(c) ? [] : ["anyone can list customers, suppliers, orders, quotations or invoices"]),
     (src) => src.replace("if (mod && (await requireModuleAccess(auth, mod))) return", "if (false) return"));
   rule("the typed text never reaches a filter with the characters PostgREST reads", LS,
     (c) => (/\.replace\(\/\[,\(\)%\*\\\\\]\/g, " "\)/.test(c) ? [] : ["a comma or bracket can break or widen the search"]),
@@ -1365,6 +1361,126 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
   const lm = read("supabase/migrations/20260925_reports_links.sql");
   expect(/REFERENCES work_reports\(id\) ON DELETE CASCADE/.test(lm) && /ALTER TABLE work_report_links ENABLE ROW LEVEL SECURITY/.test(lm) && !/CREATE POLICY/i.test(lm) && /CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order'\)\)/.test(lm),
     "a link row goes with its report, is RLS-on with no policy, and points at the four kinds only");
+}
+
+/* ── §17 sales & customers (Phase 4B) ─────────────────────────────────── */
+console.log("\n§17 sales & customers: choices, numbers from the apps, quotation and invoice links");
+{
+  const API = "src/app/api/work-reports";
+  const U3 = "11111111-1111-4111-8111-111111111111", U4 = "22222222-2222-4222-8222-222222222222";
+  const en = (k: string) => (reportsT[k]?.en as string | undefined) ?? k;
+  const call = reportTemplate("customer_call")!, complaint = reportTemplate("complaint")!, lost = reportTemplate("lost_deal")!;
+  const weekly = reportTemplate("sales_weekly")!, monthly = reportTemplate("sales_monthly")!, follow = reportTemplate("quote_followup")!, collect = reportTemplate("collection")!, plan = reportTemplate("account_plan")!;
+  const norm = (tpl: typeof call, raw: unknown[]) => normalizeSections(tpl, raw);
+  const byId = (xs: ReturnType<typeof norm>, id: string) => xs.find((x) => x.id === id)!;
+
+  expect(REPORT_TEMPLATES.filter((t) => t.family === "sales").length === 12 && REPORT_FAMILIES.includes("sales"), "the Sales & customers family holds its twelve types");
+  eq([weekly.cadence, monthly.cadence], ["weekly", "monthly"], "the sales report comes weekly and monthly — its numbers cover the whole period");
+  expect(REPORT_TEMPLATES.filter((t) => t.family === "sales").every((t) => !(OBLIGATION_KEYS as readonly string[]).includes(t.key)), "no sales type is owed by anyone — obligations stay the daily, weekly and monthly work reports");
+
+  /* A choice */
+  eq(byId(norm(call, [{ id: "channel", choice: "whatsapp" }]), "channel").choice, "whatsapp", "a choice keeps one of its answers");
+  eq(byId(norm(call, [{ id: "channel", choice: "fax" }]), "channel").choice, undefined, "an answer the template does not offer is dropped");
+  expect(missingSections(call, norm(call, [])).includes("channel"), "a required choice not made is missing");
+
+  /* Numbers: the server's, never the composer's */
+  const typed = norm(follow, [{ id: "waiting", data: { source: "quotes_waiting", rows: [{ key: U3, cells: { no: "FAKE", amount: 999999 } }], capturedAt: "2026-09-25T00:00:00Z" }, notes: { [U3]: " call Monday ", "not-a-uuid": "x", [U4]: "" } }]);
+  eq(byId(typed, "waiting"), { id: "waiting", notes: { [U3]: "call Monday" } }, "a numbers block keeps only the author's notes, by document id — a typed figure is dropped");
+  eq(byId(norm(weekly, [{ id: "quotations", notes: { [U3]: "x" } }]), "quotations"), { id: "quotations" }, "a block without notes keeps none");
+  expect(missingSections(weekly, norm(weekly, [{ id: "highlights", text: "ok" }])).length === 0, "a numbers block is never missing — there is nothing to fill in");
+  expect(missingSections(follow, norm(follow, [])).includes("summary") && missingSections(collect, norm(collect, [])).includes("actions"), "the follow-up and the collection report still need the author's own plan");
+
+  /* Dates in a table */
+  const goals = byId(norm(plan, [{ id: "goals", rows: [{ goal: "Double orders", date: "2026-12-31" }, { goal: "Visit", date: "2026-02-30" }, { goal: "Other", date: "31/12/2026" }] }]), "goals");
+  eq(goals.rows, [{ goal: "Double orders", date: "2026-12-31" }, { goal: "Visit" }, { goal: "Other" }], "a date cell is a real day in YYYY-MM-DD — 30 Feb and a typed D/M/Y are dropped");
+  eq([cellDate("2026-09-25"), cellDate("2026-13-01"), cellDate(" 2026-09-25 ")], ["2026-09-25", null, "2026-09-25"], "cellDate reads only a real calendar day");
+  eq(tableSummary(plan.sections.find((x) => x.id === "goals")!, [{ goal: "a", date: "2026-01-01" }, { goal: "b", date: "2026-02-01" }]), [], "a date column is never added up");
+
+  /* Totals never mix currencies */
+  const mixed: ReportDataValue = { source: "quotations", capturedAt: "2026-09-25T00:00:00Z", rows: [
+    { key: U3, currency: "USD", cells: { amount: 1000 } }, { key: U4, currency: "CNY", cells: { amount: 7000 } }, { key: "c", currency: "USD", cells: { amount: 250.5 } },
+  ] };
+  eq(dataTotals(mixed), [{ col: "amount", currency: "USD", value: 1250.5 }, { col: "amount", currency: "CNY", value: 7000 }], "a numbers block totals each currency apart — USD and CNY are never added together");
+  eq(dataTotals({ ...mixed, rows: mixed.rows.slice(0, 1) }), [], "one document is its own total: nothing under it");
+  eq(withBlockData([{ id: "quotations" }, { id: "highlights", text: "x" }], { quotations: mixed }).map((x) => !!x.data), [true, false], "a draft's numbers join only their own blocks");
+
+  /* Every source complete */
+  expect(REPORT_DATA_SOURCES.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && DATA_LINK[src] && DATA_COLUMNS[src][0].id === "no" && DATA_COLUMNS[src][1].id === "customer"),
+    "every numbers source has its columns (number and customer first), its app and what a row opens");
+  eq(REPORT_DATA_SOURCES.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices"], "each source is gated by the app it comes from");
+
+  /* Quotations and invoices */
+  expect(REPORT_LINK_TYPES.includes("quotation") && REPORT_LINK_TYPES.includes("invoice"), "a report can be about a quotation or an invoice");
+  eq([entityHref("quotation", U3), entityHref("invoice", U4)], [`/quotations?doc=${U3}`, `/invoices?doc=${U4}`], "a quotation or an invoice opens in its own editor");
+  expect(!!lost.sections.find((x) => x.id === "link")?.linkTypes?.includes("quotation") && !!complaint.sections.find((x) => x.id === "link")?.linkTypes?.includes("invoice"), "a lost deal links its quotation, a complaint its invoice");
+
+  /* Printing */
+  const pr = printParagraphs({ templateKey: "quote_followup", title: "", sections: [
+    { id: "waiting", data: { source: "quotes_waiting", capturedAt: "2026-09-25T08:00:00Z", rows: [
+      { key: U3, currency: "USD", cells: { no: "KL-QU-1", customer: "Acme", sent: "2026-09-01", days: 24, amount: 1000, valid: "2026-10-01" } },
+      { key: U4, currency: "USD", cells: { no: "KL-QU-2", customer: "Beta", sent: "2026-09-20", days: 5, amount: 500, valid: null } },
+    ] }, notes: { [U3]: "call Monday" } },
+  ] }, en);
+  const lines = pr.find((x) => x.sid === "waiting")!.paras.map((x) => x.text);
+  eq(lines.slice(0, 4), ["No. · Customer · Sent · Days waiting · Amount · Valid until", "KL-QU-1 · Acme · 01/09/2026 · 24 · 1,000 USD · 01/10/2026 — call Monday", "KL-QU-2 · Beta · 20/09/2026 · 5 · 500 USD · —", "Total Amount: 1,500 USD"],
+    "a numbers block prints its heads, one line per document with the author's note, and the total per currency");
+  expect(/^As of \d{2}\/09\/2026 \d{2}:\d{2}$/.test(lines[4] ?? ""), "…and the moment the numbers were taken", lines[4]);
+  eq(printParagraphs({ templateKey: "complaint", title: "", sections: [{ id: "severity", choice: "high" }] }, en).find((x) => x.sid === "severity")!.paras.map((x) => x.text), ["High"], "a choice prints its answer");
+  eq(printParagraphs({ templateKey: "collection", title: "", sections: [{ id: "receivables", data: { source: "receivables", capturedAt: "2026-09-25T08:00:00Z", rows: [], denied: true } }] }, en).find((x) => x.sid === "receivables")!.paras.map((x) => x.text),
+    ["These numbers come from Invoices, which you don't have."], "a block its author could not read says so, empty");
+
+  /* The words */
+  const lacking: string[] = [];
+  const need = (k: string) => { for (const l of ["en", "zh", "ar"] as const) if (!reportsT[k]?.[l]) lacking.push(`${k}.${l}`); };
+  for (const tpl of REPORT_TEMPLATES) for (const sec of tpl.sections) {
+    for (const o of sec.options ?? []) need(`tpl.${tpl.key}.s.${sec.id}.o.${o}`);
+    if (sec.kind === "data") { need(`blk.de.${sec.source}`); if (sec.notes) need(`blk.dn.${sec.source}`); }
+  }
+  for (const src of REPORT_DATA_SOURCES) for (const c of DATA_COLUMNS[src]) need(`blk.dc.${c.id}`);
+  for (const st of DATA_STATUSES) need(`blk.st.${st}`);
+  for (const lt of REPORT_LINK_TYPES) need(`blk.link.${lt}`);
+  for (const k of ["blk.dataNoAccess", "blk.dataLive", "blk.dataAsOf", "blk.dataTruncated"]) need(k);
+  expect(lacking.length === 0, "every answer, numbers column, document status, empty line and link kind speaks en / zh / ar", lacking.slice(0, 10).join(", "));
+
+  /* The server and the screens, as their code states them */
+  const RD = "src/lib/server/reports/report-data.ts";
+  rule("every numbers read is pinned to the author (or to ids the author's own rows gave)", RD,
+    (c) => {
+      const reads = c.split("supabaseServer.from(").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf(";") > 0 ? chunk.indexOf(";") : chunk.length));
+      const loose = reads.filter((r) => !/\.eq\("created_by(_account_id)?", c\.me\)/.test(r) && !r.includes('.or(ids.length ? `created_by.eq.${c.me},id.in.(${ids.join(",")})` : `created_by.eq.${c.me}`)'));
+      return reads.length >= 6 && loose.length === 0 && /me: auth\.account_id/.test(c) ? [] : [`${loose.length} of ${reads.length} read(s) not pinned to the author`];
+    },
+    (src) => src.replace('.eq("created_by_account_id", c.me).not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)', '.not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)'));
+  rule("a numbers block is read only when its author holds the app it comes from", RD,
+    (c) => (c.includes("if (await requireModuleAccess(auth, DATA_MODULE[src])) return [src, { source: src, rows: [], capturedAt, denied: true }];") ? [] : ["the module gate is missing"]),
+    (src) => src.replace("if (await requireModuleAccess(auth, DATA_MODULE[src])) return [src, { source: src, rows: [], capturedAt, denied: true }];", ""));
+  rule("a quotation counts as sent from its status history, not from the date written on it", RD,
+    (c) => (c.includes('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);') ? [] : ["days waiting count from the typed date"]),
+    (src) => src.replace('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);', ""));
+  rule("sending freezes the numbers the server computes, before the report is marked sent", `${API}/[id]/submit/route.ts`,
+    (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections })'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
+    (src) => src.replace("const sections = withBlockData(typed, await loadReportData(row, auth));", "const sections = typed;"));
+  rule("moving the draft to another period asks for its numbers again", `${API}/[id]/carry/route.ts`,
+    (c) => (c.includes("loadReportData(loaded.row, auth, date)") && c.includes("return NextResponse.json({ carry, appFeed, blockData }") ? [] : ["the numbers stay on the old period"]),
+    (src) => src.replace("loadReportData(loaded.row, auth, date)", "Promise.resolve({})"));
+  rule("the composer shows the live numbers and re-asks them when the period moves", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("live={carry.data[s.id]}") && c.includes('|| tpl.sections.some((x) => x.kind === "data")) && key !==') ? [] : ["the numbers go stale in the composer"]),
+    (src) => src.replace(' || tpl.sections.some((x) => x.kind === "data"))', ")"));
+  rule("a draft's print carries the numbers the server computed", "src/components/reports/app/ReportPrintDoc.tsx",
+    (c) => (c.includes("sections: withBlockData(detail.report.sections, detail.blockData)") ? [] : ["a draft prints empty numbers"]),
+    (src) => src.replace("sections: withBlockData(detail.report.sections, detail.blockData)", "sections: detail.report.sections"));
+  for (const [file, type] of [["src/components/quotations/Quotations.tsx", "quotation"], ["src/components/invoices-doc/InvoicesDoc.tsx", "invoice"]] as const) {
+    rule(`the ${type} editor lists the reports about it — only when there are some, never printed`, file,
+      (c) => (new RegExp(`<ReportsAboutCard quiet type="${type}" id=\\{current\\.id\\}\\s*className="no-print `).test(c) ? [] : ["the card prints, or shows empty on every document"]),
+      (src) => src.replace(`<ReportsAboutCard quiet type="${type}"`, `<ReportsAboutCard type="${type}"`));
+  }
+  rule("a quiet card shows nothing while it asks and nothing when empty", "src/components/reports/ReportsAboutCard.tsx",
+    (c) => (c.includes("if (quiet && !rows?.length) return null;") ? [] : ["an empty card sits on every quotation and invoice"]),
+    (src) => src.replace("if (quiet && !rows?.length) return null;", ""));
+  const sm = read("supabase/migrations/20260925_reports_links_sales.sql").replace(/--[^\n]*/g, "");
+  expect(/BEGIN;[\s\S]*DROP CONSTRAINT IF EXISTS work_report_links_entity_type_check;[\s\S]*ADD CONSTRAINT work_report_links_entity_type_check\s+CHECK \(entity_type IN \('customer', 'supplier', 'product', 'order', 'quotation', 'invoice'\)\);[\s\S]*COMMIT;/.test(sm)
+    && (sm.match(/\bDROP\b/g) ?? []).length === 1 && !/\b(DELETE|UPDATE|TRUNCATE|INSERT)\b/i.test(sm),
+    "the links migration only widens the kinds to six — drop and add in one transaction, no row touched");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

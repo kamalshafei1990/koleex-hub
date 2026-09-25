@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useReducer, useRef, useMemo } from "react";
 import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
@@ -3581,6 +3582,12 @@ export default function Quotations() {
       </div>
       </div>
       </div>
+      {/* The reports about this quotation (Reports 4B) — under the paper,
+          only when there are some, never printed. */}
+      {current.id && (
+        <ReportsAboutCard quiet type="quotation" id={current.id}
+          className="no-print mx-4 mb-10 mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 sm:mx-auto sm:w-full sm:max-w-[794px]" />
+      )}
       <ProductPickerModal
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setInsertAtIdx(null); }}

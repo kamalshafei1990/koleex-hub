@@ -1,12 +1,14 @@
 import "server-only";
 
 /* ---------------------------------------------------------------------------
-   GET /api/work-reports/links/search?type=customer|supplier|product|order&q=
-   What a report's links block can point at (Phase 4A) — at most 15, the
-   newest first when nothing is typed. Each kind is gated by the app that
-   owns it (Customers, Suppliers, Orders; products as the catalogue shows
-   them: active only), so a link never shows a name its author could not
-   already see; without that app the answer is { hits: [], denied: true }.
+   GET /api/work-reports/links/search?type=customer|supplier|product|order|quotation|invoice&q=
+   What a report's links block can point at (Phase 4A; quotations and
+   invoices 4B) — at most 15, the newest first when nothing is typed. Each
+   kind is gated by the app that owns it (Customers, Suppliers, Orders,
+   Quotations, Invoices; products as the catalogue shows them: active only),
+   so a link never shows a name its author could not already see; without
+   that app the answer is { hits: [], denied: true }. A quotation or an
+   invoice is found by its number or the customer written on it.
    The typed text is stripped of the characters PostgREST filters use.
    --------------------------------------------------------------------------- */
 
@@ -18,7 +20,7 @@ import { REPORT_LINK_TYPES, type ReportLinkType } from "@/lib/reports/templates"
 
 export const dynamic = "force-dynamic";
 
-const MODULE: Partial<Record<ReportLinkType, string>> = { customer: "Customers", supplier: "Suppliers", order: "Orders" };
+const MODULE: Partial<Record<ReportLinkType, string>> = { customer: "Customers", supplier: "Suppliers", order: "Orders", quotation: "Quotations", invoice: "Invoices" };
 const LIMIT = 15;
 
 export async function GET(req: Request) {
@@ -52,6 +54,17 @@ export async function GET(req: Request) {
     const { data, error } = await (q ? s.order("product_name", { ascending: true }) : s.order("updated_at", { ascending: false })).limit(LIMIT);
     if (error) return failed(error.message);
     hits = ((data ?? []) as Array<{ id: string; product_name: string | null; brand: string | null }>).map((p) => ({ id: p.id, label: p.product_name || "—", sub: p.brand || undefined }));
+  } else if (type === "quotation" || type === "invoice") {
+    const table = type === "quotation" ? "quotations" : "invoices";
+    const no = type === "quotation" ? "quote_no" : "inv_no";
+    let s = supabaseServer.from(table).select(`id, no:${no}, status, company:doc->>companyName, customer:doc->>customerName`);
+    if (auth.tenant_id) s = s.eq("tenant_id", auth.tenant_id);
+    if (q) s = s.or(`${no}.ilike.${like},doc->>companyName.ilike.${like},doc->>customerName.ilike.${like}`);
+    const { data, error } = await s.order("created_at", { ascending: false }).limit(LIMIT);
+    if (error) return failed(error.message);
+    hits = ((data ?? []) as Array<{ id: string; no: string | null; status: string | null; company: string | null; customer: string | null }>).map((d) => ({
+      id: d.id, label: d.no || "—", sub: [d.company || d.customer, d.status].filter(Boolean).join(" · ") || undefined,
+    }));
   } else {
     let s = supabaseServer.from("orders").select("id, order_no, deal_no, customer_name, company_name, customer_code");
     if (auth.tenant_id) s = s.eq("tenant_id", auth.tenant_id);

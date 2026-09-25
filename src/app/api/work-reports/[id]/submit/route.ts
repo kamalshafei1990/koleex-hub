@@ -6,7 +6,9 @@ import "server-only";
    Refused while a required section is empty or nobody is in "To". Sending a
    new version retires the one it replaces (superseded), so a reader always
    lands on the latest. The claim is conditional (status = draft), so a double
-   click sends once.
+   click sends once. Its numbers blocks (Phase 4B) are computed here, by the
+   server, and frozen into the report: every reader sees what was true when
+   it was sent.
    --------------------------------------------------------------------------- */
 
 import { NextResponse, after } from "next/server";
@@ -17,6 +19,8 @@ import { syncReportLinks } from "@/lib/server/reports/links";
 import { REPORT_COLS, listPeople, loadForViewer, requireReportsUser, type ReportRow } from "@/lib/server/reports/core";
 import { notifyReportSubmitted } from "@/lib/server/reports/notify";
 import { markRequestSent } from "@/lib/server/reports/events";
+import { loadReportData } from "@/lib/server/reports/report-data";
+import { withBlockData } from "@/lib/reports/report-data";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +37,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const tpl = reportTemplate(row.template_key);
   if (!tpl) return NextResponse.json({ error: "unknown_template" }, { status: 400 });
 
-  const sections = normalizeSections(tpl, row.sections);
-  const missing = missingSections(tpl, sections);
+  const typed = normalizeSections(tpl, row.sections);
+  const missing = missingSections(tpl, typed);
   if (missing.length) return NextResponse.json({ error: "missing_sections", missing }, { status: 400 });
   if (tpl.customTitle && !row.title.trim()) return NextResponse.json({ error: "missing_title" }, { status: 400 });
   if (!recipients.some((r) => r.role === "to")) return NextResponse.json({ error: "no_recipients" }, { status: 400 });
+  const sections = withBlockData(typed, await loadReportData(row, auth));
 
   const now = new Date().toISOString();
   const { data: sent, error } = await supabaseServer.from("work_reports")

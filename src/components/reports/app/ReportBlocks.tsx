@@ -7,7 +7,8 @@
    the customers, suppliers, products and orders it is about, and a signature
    drawn with a finger. One editor and one view per kind; the stored shape
    and its limits are templates.ts (normalizeSections), the same on the
-   server.
+   server. Phase 4B adds a choice (one fixed answer) and the numbers from the
+   apps — shown live while drafting, frozen when sent — and a date column.
 
    Loaded only by a report whose template has a block (next/dynamic from
    ReportView), so the plain daily never carries it. Photos and the
@@ -15,18 +16,19 @@
    route); the general photos-and-files list leaves them out.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import {
   REPORT_CURRENCIES, REPORT_LIMITS, scoreAverage, tableSummary,
-  type CheckState, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
+  type CheckState, type ReportDataRow, type ReportDataValue, type ReportLink, type ReportLinkType, type ReportSectionDef, type ReportSectionValue,
 } from "@/lib/reports/templates";
+import { DATA_COLUMNS, DATA_LINK, DATA_MODULE, DATA_STATUSES, dataTotals, type DataColumn } from "@/lib/reports/report-data";
 import { reportFileUrl, type ReportAttachment } from "@/lib/reports/attachments";
 import { preparePhoto } from "@/lib/reports/prepare-photo";
-import { deleteReportAttachment, dmyTime, searchReportLinks, uploadReportAttachment, type LinkHit } from "@/lib/work-reports";
+import { deleteReportAttachment, dmyDate, dmyTime, searchReportLinks, uploadReportAttachment, type LinkHit } from "@/lib/work-reports";
 import { entityHref } from "@/lib/reports/link-targets";
 import { PhotoViewer } from "./AttachmentsView";
 import { FIELD, type T } from "./shared";
@@ -41,6 +43,8 @@ interface EditorProps {
   onChange: (v: ReportSectionValue) => void;
   /** An upload is on its way (Send waits for it). */
   onBusy: (busy: boolean) => void;
+  /** A numbers block: what the server computed for this draft just now. */
+  live?: ReportDataValue;
 }
 
 const num = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
@@ -56,6 +60,8 @@ export function BlockEditor(p: EditorProps) {
     case "table": return <TableEditor {...p} />;
     case "links": return <LinksEditor {...p} />;
     case "signature": return <SignatureEditor {...p} />;
+    case "choice": return <ChoiceEditor {...p} />;
+    case "data": return <DataEditor {...p} />;
     default: return null;
   }
 }
@@ -220,7 +226,8 @@ function TableEditor({ t, tplKey, def, value, onChange }: EditorProps) {
                   {colName(c.id)}{c.type === "money" ? ` (${currency})` : ""}
                 </span>
                 <input value={r[c.id] ?? ""} onChange={(e) => setCell(ri, c.id, e.target.value)} maxLength={REPORT_LIMITS.cell}
-                  inputMode={c.type === "text" ? "text" : "decimal"} dir={c.type === "text" ? "auto" : "ltr"}
+                  type={c.type === "date" ? "date" : "text"}
+                  inputMode={c.type === "number" || c.type === "money" ? "decimal" : undefined} dir={c.type === "text" ? "auto" : "ltr"}
                   className={`${FIELD} h-9 py-1.5 ${c.type === "text" ? "" : "tabular-nums"}`} />
               </label>
             ))}
@@ -437,6 +444,163 @@ function SignatureEditor({ t, value, reportId, version, onChange, onBusy }: Edit
   );
 }
 
+/* ── A choice (4B): one of a few fixed answers ──────────────────────── */
+
+function ChoiceEditor({ t, tplKey, def, value, onChange }: EditorProps) {
+  return (
+    <div role="radiogroup" aria-label={t(`tpl.${tplKey}.s.${def.id}`)} className="flex flex-wrap gap-1.5">
+      {(def.options ?? []).map((o) => {
+        const on = value.choice === o;
+        return (
+          <button key={o} type="button" role="radio" aria-checked={on} onClick={() => onChange({ ...value, choice: on ? undefined : o })}
+            className={`h-9 rounded-lg px-3 text-[12.5px] font-semibold transition-colors ${on ? "bg-[#567FB2] text-white" : "border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+            {t(`tpl.${tplKey}.s.${def.id}.o.${o}`)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChoiceView({ t, tplKey, def, value }: { t: T; tplKey: string; def: ReportSectionDef; value: ReportSectionValue }) {
+  if (!value.choice) return <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
+  return (
+    <span className="inline-flex rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-1 text-[13px] font-medium text-[var(--text-primary)]">
+      {t(`tpl.${tplKey}.s.${def.id}.o.${value.choice}`)}
+    </span>
+  );
+}
+
+/* ── Numbers from the apps (4B) ────────────────────────────────────────
+   The author's own documents, as the server read them: live while the
+   draft is written, frozen when it is sent. A row opens its document; a
+   block that takes notes has one line per document for the author's word
+   (what the customer said, the next step). One card per document on a
+   phone, a table from sm up; money totals never mix currencies. */
+
+function DataEditor({ t, def, value, live, onChange }: EditorProps) {
+  const notes = value.notes ?? {};
+  const setNote = (key: string, text: string) => {
+    const next = { ...notes };
+    if (text) next[key] = text; else delete next[key];
+    onChange({ ...value, notes: next });
+  };
+  return <DataBlock t={t} def={def} data={live} notes={notes} onNote={def.notes ? setNote : undefined} composing />;
+}
+
+const statusWord = (t: T, s: unknown) => (typeof s === "string" && (DATA_STATUSES as readonly string[]).includes(s) ? t(`blk.st.${s}`) : String(s ?? "—"));
+
+function dataCell(t: T, r: ReportDataRow, c: DataColumn): string {
+  const v = r.cells[c.id];
+  if (v === null || v === undefined || v === "") return "—";
+  switch (c.type) {
+    case "date": return dmyDate(String(v));
+    case "money": return typeof v === "number" ? `${num(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
+    case "number": return String(v);
+    case "status": return statusWord(t, v);
+    default: return String(v);
+  }
+}
+
+/** Late money, long waits and a quotation past its validity read at a
+ *  glance (`asOf`: the day the numbers were taken). */
+function dataTone(r: ReportDataRow, c: DataColumn, asOf: string): string {
+  const v = r.cells[c.id];
+  if (c.id === "overdue" && Number(v) > 0) return "font-semibold text-red-500";
+  if (c.id === "days" && Number(v) >= 14) return "font-semibold text-amber-500";
+  if (c.id === "valid" && typeof v === "string" && v < asOf) return "font-semibold text-red-500";
+  return "text-[var(--text-primary)]";
+}
+
+function DataBlock({ t, def, data, notes, onNote, composing }: {
+  t: T; def: ReportSectionDef; data: ReportDataValue | undefined; notes: Record<string, string>;
+  onNote?: (key: string, text: string) => void; composing: boolean;
+}) {
+  if (!data) return <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
+  if (data.denied) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataNoAccess").replace("{app}", DATA_MODULE[data.source])}</p>;
+  const foot = (
+    <p className="text-[11px] text-[var(--text-faint)] tabular-nums">
+      {composing ? t("blk.dataLive") : t("blk.dataAsOf").replace("{at}", dmyTime(data.capturedAt))}
+      {data.truncated ? ` · ${t("blk.dataTruncated").replace("{n}", String(REPORT_LIMITS.dataRows))}` : ""}
+    </p>
+  );
+  if (!data.rows.length) return <div className="space-y-1"><p className="text-[13px] text-[var(--text-dim)]">{t(`blk.de.${data.source}`)}</p>{foot}</div>;
+  const cols = DATA_COLUMNS[data.source];
+  const totals = dataTotals(data);
+  const asOf = data.capturedAt.slice(0, 10);
+  const colName = (id: string) => t(`blk.dc.${id}`);
+  const docLink = (r: ReportDataRow) => {
+    const href = entityHref(DATA_LINK[data.source], r.key);
+    const text = String(r.cells.no ?? "—");
+    return href
+      ? <Link href={href} target={composing ? "_blank" : undefined} rel={composing ? "noopener" : undefined} className="font-semibold text-[var(--text-primary)] underline-offset-2 hover:underline">{text}</Link>
+      : <span className="font-semibold text-[var(--text-primary)]">{text}</span>;
+  };
+  const note = (r: ReportDataRow) => (onNote ? (
+    <input value={notes[r.key] ?? ""} onChange={(e) => onNote(r.key, e.target.value)} maxLength={REPORT_LIMITS.item} dir="auto"
+      placeholder={t(`blk.dn.${data.source}`)} aria-label={`${String(r.cells.no ?? "")} — ${t(`blk.dn.${data.source}`)}`} className={`${FIELD} h-8 py-1`} />
+  ) : notes[r.key] ? <p className="text-[12.5px] text-[var(--text-secondary)]" dir="auto">{notes[r.key]}</p> : null);
+  return (
+    <div className="space-y-2">
+      <ul className="space-y-2 sm:hidden">
+        {data.rows.map((r) => (
+          <li key={r.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
+            <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
+              {docLink(r)}
+              <span className="min-w-0 truncate text-[var(--text-secondary)]" dir="auto">{dataCell(t, r, cols[1])}</span>
+            </div>
+            <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+              {cols.slice(2).map((c) => (
+                <div key={c.id} className="min-w-0">
+                  <dt className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">{colName(c.id)}</dt>
+                  <dd className={`truncate text-[12.5px] tabular-nums ${dataTone(r, c, asOf)}`}>{dataCell(t, r, c)}</dd>
+                </div>
+              ))}
+            </dl>
+            {def.notes && <div className="mt-2">{note(r)}</div>}
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="w-full border-collapse text-[12.5px]">
+          <thead>
+            <tr className="border-b border-[var(--border-subtle)] text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">
+              {cols.map((c) => <th key={c.id} className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end" : "text-start"}`}>{colName(c.id)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.map((r) => (
+              <Fragment key={r.key}>
+                <tr className={def.notes ? "" : "border-b border-[var(--border-subtle)] last:border-0"}>
+                  {cols.map((c) => (
+                    <td key={c.id} dir={c.type === "text" ? "auto" : "ltr"}
+                      className={`px-2 py-1.5 ${c.type === "money" || c.type === "number" ? "text-end tabular-nums" : "text-start"} ${c.id === "customer" ? "" : "whitespace-nowrap"} ${c.id === "no" ? "" : dataTone(r, c, asOf)}`}>
+                      {c.id === "no" ? docLink(r) : dataCell(t, r, c)}
+                    </td>
+                  ))}
+                </tr>
+                {def.notes && (
+                  <tr className="border-b border-[var(--border-subtle)] last:border-0">
+                    <td colSpan={cols.length} className="px-2 pb-2">{note(r)}</td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totals.length > 0 && (
+        <p className="flex flex-wrap gap-x-3 text-[12px] text-[var(--text-dim)] tabular-nums">
+          {totals.map((x) => (
+            <span key={`${x.col}|${x.currency}`}>{colName(x.col)} · {t("blk.total")} <b className="text-[var(--text-primary)]">{num(x.value)} {x.currency}</b></span>
+          ))}
+        </p>
+      )}
+      {foot}
+    </div>
+  );
+}
+
 /* ── The views (the reader, and the signature once saved) ──────────── */
 
 export function BlockView({ t, tplKey, def, value, version }: { t: T; tplKey: string; def: ReportSectionDef; value: ReportSectionValue | undefined; version: number }) {
@@ -447,6 +611,8 @@ export function BlockView({ t, tplKey, def, value, version }: { t: T; tplKey: st
     case "table": return <TableView t={t} tplKey={tplKey} def={def} value={v} />;
     case "links": return <LinksView t={t} value={v} />;
     case "signature": return v.signature ? <SignatureView t={t} value={v} version={version} /> : <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>;
+    case "choice": return <ChoiceView t={t} tplKey={tplKey} def={def} value={v} />;
+    case "data": return <DataBlock t={t} def={def} data={v.data} notes={v.notes ?? {}} composing={false} />;
     default: return null;
   }
 }
@@ -539,15 +705,15 @@ function TableView({ t, tplKey, def, value }: { t: T; tplKey: string; def: Repor
         <table className="w-full min-w-[480px] border-collapse text-[12.5px]">
           <thead>
             <tr className="border-b border-[var(--border-subtle)] text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">
-              {cols.map((c) => <th key={c.id} className={`px-2 py-1.5 ${c.type === "text" ? "text-start" : "text-end"}`}>{t(`tpl.${tplKey}.s.${def.id}.c.${c.id}`)}{c.type === "money" ? ` (${currency})` : ""}</th>)}
+              {cols.map((c) => <th key={c.id} className={`px-2 py-1.5 ${c.type === "text" || c.type === "date" ? "text-start" : "text-end"}`}>{t(`tpl.${tplKey}.s.${def.id}.c.${c.id}`)}{c.type === "money" ? ` (${currency})` : ""}</th>)}
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
                 {cols.map((c) => (
-                  <td key={c.id} className={`px-2 py-1.5 ${best.get(c.id) === i ? "font-semibold text-[#567FB2] dark:text-[#7FA9D6]" : "text-[var(--text-primary)]"} ${c.type === "text" ? "text-start" : "text-end tabular-nums"}`} dir={c.type === "text" ? "auto" : "ltr"}>
-                    {r[c.id] ? (c.type === "text" ? r[c.id] : num(Number(r[c.id]))) : "—"}
+                  <td key={c.id} className={`px-2 py-1.5 ${best.get(c.id) === i ? "font-semibold text-[#567FB2] dark:text-[#7FA9D6]" : "text-[var(--text-primary)]"} ${c.type === "text" ? "text-start" : c.type === "date" ? "text-start tabular-nums" : "text-end tabular-nums"}`} dir={c.type === "text" ? "auto" : "ltr"}>
+                    {r[c.id] ? (c.type === "text" ? r[c.id] : c.type === "date" ? dmyDate(r[c.id]) : num(Number(r[c.id]))) : "—"}
                   </td>
                 ))}
               </tr>

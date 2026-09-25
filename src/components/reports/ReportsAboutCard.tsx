@@ -9,12 +9,17 @@
    report's type and status already worded by the server, and it asks only
    once the page has finished fetching (whenNetworkQuiet), never alongside
    the data the page paints with. Someone outside Reports sees nothing.
+
+   `quiet` (the quotation and invoice editors, 4B): nothing while it asks
+   and nothing when there is no report — a working surface keeps no empty
+   card. It sits at the very bottom, so arriving later moves nothing.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { whenNetworkQuiet } from "@/lib/net-idle";
+import type { ReportLinkType } from "@/lib/reports/templates";
 
 const WORDS: Translations = {
   title: { en: "Reports about this", zh: "相关报告", ar: "تقارير عنه" },
@@ -25,7 +30,7 @@ interface AboutReport { id: string; typeName: string; statusLabel: string; statu
 
 const dmy = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
 
-export default function ReportsAboutCard({ type, id, className }: { type: "customer" | "supplier" | "product" | "order"; id: string; className?: string }) {
+export default function ReportsAboutCard({ type, id, className, quiet = false }: { type: ReportLinkType; id: string; className?: string; quiet?: boolean }) {
   const { t, lang } = useTranslation(WORDS);
   const [rows, setRows] = useState<AboutReport[] | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -44,6 +49,7 @@ export default function ReportsAboutCard({ type, id, className }: { type: "custo
   }, [type, id, lang]);
 
   if (hidden) return null;
+  if (quiet && !rows?.length) return null;
   return (
     <section aria-labelledby={`kx-about-${type}`} className={className ?? "kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"}>
       <h2 id={`kx-about-${type}`} className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">{t("title")}</h2>

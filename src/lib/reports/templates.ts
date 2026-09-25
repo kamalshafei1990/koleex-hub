@@ -19,19 +19,32 @@
    report then shows on their pages), and a signature drawn on the phone.
    A checklist point or a score criterion is `tpl.<key>.s.<section>.i.<id>`,
    a table column `tpl.<key>.s.<section>.c.<id>`.
+
+   Phase 4B (owner's picks, 25 Sep 2026) adds the Sales & customers family
+   and two blocks: a CHOICE (one of a few fixed answers — a reason, a
+   severity, a channel; `tpl.<key>.s.<section>.o.<id>`) and NUMBERS FROM
+   THE APPS (`data`): the author's own quotations, orders, invoices, open
+   quotes and money still owed, computed by the server — never typed — and
+   frozen into the report when it is sent. A table column can be a date.
    --------------------------------------------------------------------------- */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "visits" | "suppliers" | "service" | "memos" | "hr";
+export type ReportFamily = "work" | "visits" | "sales" | "suppliers" | "service" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
- *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature". */
-export type ReportSectionKind = "text" | "list" | "checklist" | "score" | "table" | "links" | "signature";
+ *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
+ *  4B: "choice" (one fixed answer) and "data" (numbers from the apps). */
+export type ReportSectionKind = "text" | "list" | "checklist" | "score" | "table" | "links" | "signature" | "choice" | "data";
 /** What a report can be linked to (and so appear on the page of). */
-export type ReportLinkType = "customer" | "supplier" | "product" | "order";
-export const REPORT_LINK_TYPES: ReportLinkType[] = ["customer", "supplier", "product", "order"];
-export type ReportColumnType = "text" | "number" | "money";
+export type ReportLinkType = "customer" | "supplier" | "product" | "order" | "quotation" | "invoice";
+export const REPORT_LINK_TYPES: ReportLinkType[] = ["customer", "supplier", "product", "order", "quotation", "invoice"];
+export type ReportColumnType = "text" | "number" | "money" | "date";
+/** Where a numbers block reads from — always the AUTHOR's own documents:
+ *  quotations / orders / invoices in the report's period, the quotations
+ *  sent and still unanswered, the invoices with money still owed. */
+export type ReportDataSource = "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables";
+export const REPORT_DATA_SOURCES: ReportDataSource[] = ["quotations", "orders", "invoices", "quotes_waiting", "receivables"];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
 /** Who a new report goes to before the author changes anything:
@@ -52,6 +65,12 @@ export interface ReportSectionDef {
   summary?: "total" | "lowest";
   /** links: what it may point at. */
   linkTypes?: ReportLinkType[];
+  /** choice: the answers, in order. */
+  options?: string[];
+  /** data: where the numbers come from, and whether each row takes the
+   *  author's note (what the customer said, the next step). */
+  source?: ReportDataSource;
+  notes?: boolean;
 }
 
 export interface ReportTemplateDef {
@@ -94,6 +113,81 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [b("link", "links", { linkTypes: ["customer", "product", "order"] }), t("who", "text", true), t("purpose", "text"), t("discussion", "text", true), t("opportunities", "list"), t("next_steps", "list")] },
   { key: "supplier_visit", family: "visits", icon: "building", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
     sections: [b("link", "links", { linkTypes: ["supplier", "product"] }), t("who", "text", true), t("purpose", "text"), t("findings", "list", true), t("decisions", "list"), t("next_steps", "list")] },
+  /* ── Sales & customers (Phase 4B, owner's picks 25 Sep 2026): the
+     customer reports, the numbers from the apps, the key customer, the
+     market ── */
+  { key: "customer_call", family: "sales", icon: "user-headset", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "quotation", "order", "product"] }),
+      b("channel", "choice", { options: ["phone", "whatsapp", "wechat", "email", "video", "in_person"] }, true),
+      t("who", "text", true), t("discussion", "text", true), t("needs", "list"), t("next_steps", "list"),
+    ] },
+  { key: "complaint", family: "sales", icon: "hand-holding-heart", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "order", "invoice", "product"] }, true),
+      b("severity", "choice", { options: ["low", "medium", "high", "critical"] }, true),
+      t("what", "text", true), t("cause", "text"), t("actions", "list"),
+      b("status", "choice", { options: ["solved", "in_progress", "open"] }, true),
+      b("customer_sign", "signature", {}),
+    ] },
+  { key: "lost_deal", family: "sales", icon: "cross-circle", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "quotation", "product"] }, true),
+      b("reason", "choice", { options: ["price", "delivery", "quality", "specs", "payment", "competitor", "budget", "no_reply", "other"] }, true),
+      t("story", "text", true),
+      b("competitor", "table", { columns: [{ id: "competitor", type: "text" }, { id: "product", type: "text" }, { id: "price", type: "money" }, { id: "terms", type: "text" }], summary: "lowest" }),
+      t("lesson", "text"),
+    ] },
+  { key: "sales_weekly", family: "sales", icon: "coins", cadence: "weekly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("quotations", "data", { source: "quotations" }), b("orders", "data", { source: "orders" }), b("invoices", "data", { source: "invoices" }),
+      t("highlights", "text", true), b("customers", "links", { linkTypes: ["customer", "quotation", "order"] }), t("problems", "text"), t("next", "list"),
+    ] },
+  { key: "sales_monthly", family: "sales", icon: "money", cadence: "monthly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("quotations", "data", { source: "quotations" }), b("orders", "data", { source: "orders" }), b("invoices", "data", { source: "invoices" }),
+      t("highlights", "text", true), b("customers", "links", { linkTypes: ["customer", "quotation", "order"] }), t("problems", "text"), t("next", "list"),
+    ] },
+  { key: "quote_followup", family: "sales", icon: "clock", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [b("waiting", "data", { source: "quotes_waiting", notes: true }), t("summary", "text", true)] },
+  { key: "collection", family: "sales", icon: "wallet", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [b("receivables", "data", { source: "receivables", notes: true }), t("actions", "list", true), t("escalate", "text")] },
+  { key: "account_plan", family: "sales", icon: "flag-checkered", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer"] }, true),
+      b("goals", "table", { columns: [{ id: "goal", type: "text" }, { id: "target", type: "text" }, { id: "date", type: "date" }, { id: "owner", type: "text" }] }, true),
+      b("relationship", "score", { points: pts("satisfaction", "trust", "communication", "payment", "growth") }, true),
+      t("risks", "list"), t("actions", "list", true),
+    ] },
+  { key: "account_review", family: "sales", icon: "badge-check", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer"] }, true),
+      t("year", "text", true),
+      b("rating", "score", { points: pts("satisfaction", "trust", "communication", "payment", "growth") }, true),
+      t("wins", "list"), t("problems", "list"), t("next_year", "list", true),
+    ] },
+  { key: "competitor_prices", family: "sales", icon: "scale", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["product"] }),
+      t("market", "text", true),
+      b("prices", "table", { columns: [{ id: "competitor", type: "text" }, { id: "product", type: "text" }, { id: "price", type: "money" }, { id: "terms", type: "text" }, { id: "source", type: "text" }], summary: "lowest" }, true),
+      t("notes", "text"),
+    ] },
+  { key: "country_study", family: "sales", icon: "ship-side", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
+    sections: [
+      t("country", "text", true), t("demand", "text", true),
+      b("competitors", "table", { columns: [{ id: "competitor", type: "text" }, { id: "brands", type: "text" }, { id: "price", type: "money" }, { id: "share", type: "text" }], summary: "lowest" }),
+      t("channels", "list"), t("rules", "text"),
+      b("recommendation", "choice", { options: ["go", "test", "wait", "no"] }, true),
+      t("why", "text", true),
+    ] },
+  { key: "agent_report", family: "sales", icon: "contract", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [
+      b("link", "links", { linkTypes: ["customer", "product"] }),
+      t("agent", "text", true), t("results", "text", true),
+      b("rating", "score", { points: pts("sales", "coverage", "communication", "payment", "policy") }),
+      t("issues", "list"), t("support", "text"),
+    ] },
   /* ── Purchasing & suppliers, After-sales: the first users of the Phase 4A
      blocks (the families fill out in their own phases) ── */
   { key: "factory_audit", family: "suppliers", icon: "tools", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
@@ -147,13 +241,13 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "suppliers", "service", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "visits", "sales", "suppliers", "service", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
 
 /* ── Limits (server-enforced; the composer mirrors them) ── */
-export const REPORT_LIMITS = { title: 200, text: 8000, items: 60, item: 600, comment: 4000, recipients: 30, rows: 50, cell: 200, links: 20, label: 200, signer: 120 } as const;
+export const REPORT_LIMITS = { title: 200, text: 8000, items: 60, item: 600, comment: 4000, recipients: 30, rows: 50, cell: 200, links: 20, label: 200, signer: 120, dataRows: 100 } as const;
 
 /* ── Sections as stored ── */
 export type CheckState = "ok" | "issue" | "na";
@@ -167,6 +261,20 @@ export interface SignatureValue {
   /** The version it was signed on — a later version shows it as such. */
   version: number;
 }
+/** One document in a numbers block: its id (the note's key), its cells by
+ *  column, its currency (documents differ — totals never mix them). */
+export interface ReportDataRow { key: string; cells: Record<string, string | number | null>; currency?: string }
+/** A numbers block as the SERVER computed it — on a draft fresh at every
+ *  open, frozen into the report when it is sent. */
+export interface ReportDataValue {
+  source: ReportDataSource;
+  rows: ReportDataRow[];
+  capturedAt: string;
+  /** The author has no access to the app the numbers come from. */
+  denied?: boolean;
+  /** More than REPORT_LIMITS.dataRows — the first ones are kept. */
+  truncated?: boolean;
+}
 export interface ReportSectionValue {
   id: string;
   text?: string;
@@ -177,6 +285,10 @@ export interface ReportSectionValue {
   currency?: string;
   links?: ReportLink[];
   signature?: SignatureValue | null;
+  choice?: string;
+  data?: ReportDataValue;
+  /** A numbers block's notes, by row key. */
+  notes?: Record<string, string>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -190,6 +302,14 @@ export function cellNumber(raw: unknown): string | null {
   return NUMBER.test(n) ? n : null;
 }
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+/** A date cell as it is kept: YYYY-MM-DD and a real day — or null. */
+export function cellDate(raw: unknown): string | null {
+  if (typeof raw !== "string" || !YMD.test(raw.trim())) return null;
+  const v = raw.trim();
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
 
 /** One block's stored value, cleaned: only the template's points / criteria /
  *  columns / link types, in range, capped. The single normaliser the
@@ -230,6 +350,7 @@ function normalizeBlock(def: ReportSectionDef, v: Record<string, unknown> | unde
           const cell = clip((r as Record<string, unknown> | null)?.[c.id], REPORT_LIMITS.cell);
           if (!cell) continue;
           if (c.type === "text") row[c.id] = cell;
+          else if (c.type === "date") { const d = cellDate(cell); if (d !== null) row[c.id] = d; }
           else { const n = cellNumber(cell); if (n !== null) row[c.id] = n; }
         }
         return row;
@@ -250,6 +371,23 @@ function normalizeBlock(def: ReportSectionDef, v: Record<string, unknown> | unde
         if (links.length >= REPORT_LIMITS.links) break;
       }
       return { id, links };
+    }
+    case "choice": {
+      const pick = typeof v?.choice === "string" && (def.options ?? []).includes(v.choice) ? v.choice : undefined;
+      return pick ? { id, choice: pick } : { id };
+    }
+    case "data": {
+      /* Only the author's notes come from the composer. The numbers never
+         do: the server computes them (fresh on a draft) and writes them
+         itself when the report is sent — a typed figure is refused. */
+      const notes: Record<string, string> = {};
+      if (def.notes && v?.notes && typeof v.notes === "object") {
+        for (const [k, n] of Object.entries(v.notes as Record<string, unknown>).slice(0, REPORT_LIMITS.dataRows)) {
+          const note = clip(n, REPORT_LIMITS.item);
+          if (UUID.test(k) && note) notes[k] = note;
+        }
+      }
+      return Object.keys(notes).length ? { id, notes } : { id };
     }
     case "signature": {
       const sg = v?.signature as Record<string, unknown> | null | undefined;
@@ -299,7 +437,7 @@ export function tableSummary(def: ReportSectionDef, rows: Array<Record<string, s
   const nameCol = (def.columns ?? []).find((c) => c.type === "text");
   const out: TableFigure[] = [];
   for (const col of def.columns ?? []) {
-    if (col.type === "text") continue;
+    if (col.type !== "number" && col.type !== "money") continue;
     const filled = list.flatMap((r, i) => { const n = cellNumber(r[col.id]); return n === null ? [] : [{ n: Number(n), i }]; });
     if (filled.length < 2) continue;
     if (def.summary === "lowest") {
@@ -380,6 +518,9 @@ export function missingSections(tpl: ReportTemplateDef, sections: ReportSectionV
       case "table": return !(v?.rows && v.rows.length);
       case "links": return !(v?.links && v.links.length);
       case "signature": return !v?.signature;
+      case "choice": return !v?.choice;
+      /* The numbers are the system's: there is nothing to fill in. */
+      case "data": return false;
       default: return !(v?.text && v.text.trim());
     }
   }).map((s) => s.id);

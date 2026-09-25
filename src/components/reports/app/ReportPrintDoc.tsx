@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
 import { blockFileIds, reportTemplate } from "@/lib/reports/templates";
+import { withBlockData } from "@/lib/reports/report-data";
 import {
   ATTACH_SID, LINE_PX, PARA_GAP_PX, PARA_WIDTH_CSS, PHOTO_BOX_PX, PHOTO_CAPTION_PX, PHOTO_ROW_GAP_PX, PHOTO_ROW_PX, SIGN_BOX_PX, SIGN_PX, cutByHeight, paginateReport,
   type Measurer, type PrintAttachments, type PrintPara, type PrintSheet,
@@ -76,7 +77,10 @@ function domMeasurer(plain: HTMLElement, bullet: HTMLElement, bulletText: HTMLEl
 
 export default function ReportPrintDoc({ detail, lang, onReady }: { detail: ReportDetail; lang: Lang; onReady?: () => void }) {
   const t = (key: string) => reportsT[key]?.[lang] ?? reportsT[key]?.en ?? key;
-  const { report, recipients, comments, attachments } = detail;
+  const { recipients, comments, attachments } = detail;
+  /* A draft's numbers blocks (4B) as the server computed them just now; a
+     sent report carries them frozen in its sections. */
+  const report = useMemo(() => ({ ...detail.report, sections: withBlockData(detail.report.sections, detail.blockData) }), [detail.report, detail.blockData]);
   const tpl = reportTemplate(report.templateKey);
   const decision = report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
   const note = decision?.body.trim() ?? "";

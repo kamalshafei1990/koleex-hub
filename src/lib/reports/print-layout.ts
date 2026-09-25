@@ -34,9 +34,14 @@
    so they paginate by the same rule. A checklist photo joins the photo
    rows, its point as the caption. A signature is one FIXED box (the drawn
    PNG, the signer and the moment) that never splits.
+
+   Phase 4B: a choice prints its answer; a numbers block prints its column
+   heads, one line per document (with the author's note), the totals per
+   currency and the moment the numbers were taken; a date cell is D/M/Y.
    --------------------------------------------------------------------------- */
 
-import { reportTemplate, scoreAverage, tableSummary, type ReportSectionValue, type SignatureValue } from "@/lib/reports/templates";
+import { reportTemplate, scoreAverage, tableSummary, type ReportDataRow, type ReportSectionValue, type SignatureValue } from "@/lib/reports/templates";
+import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, dataTotals, type DataColumn } from "@/lib/reports/report-data";
 
 /* 270 mm = 1020 px, minus the sheet's own 24 + 18 px padding, minus air. */
 export const SHEET_PX = 968;
@@ -148,6 +153,22 @@ export const SIGN_BOX_PX = 90;
 export const SIGN_PX = SIGN_BOX_PX + 8 + 2 * LINE_PX;
 const MARK: Record<string, string> = { ok: "✓", issue: "✗", na: "—" };
 const fmt = (n: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(n);
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** D/M/Y for a date cell; D/M/Y HH:MM (the reader's own clock) for a moment. */
+const dmy = (ymd: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd); return m ? `${m[3]}/${m[2]}/${m[1]}` : ymd; };
+const dmyHm = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+/** "Total Amount: 1,500 USD" — each language orders it its own way
+ *  (إجمالي المبلغ · 金额合计), so the phrase is a pattern, not glued words. */
+const figure = (word: PrintWord, kind: "total" | "lowest", col: string, value: string) =>
+  word(kind === "lowest" ? "blk.printLowest" : "blk.printTotal").replace("{col}", col).replace("{value}", value);
+function dataCellText(word: PrintWord, r: ReportDataRow, c: DataColumn): string {
+  const v = r.cells[c.id];
+  if (v === null || v === undefined || v === "") return "—";
+  if (c.type === "date") return dmy(String(v));
+  if (c.type === "money") return typeof v === "number" ? `${fmt(v)}${r.currency ? ` ${r.currency}` : ""}` : "—";
+  if (c.type === "status") return (DATA_STATUSES as readonly string[]).includes(String(v)) ? word(`blk.st.${v}`) : String(v);
+  return String(v);
+}
 
 /* ── Photos and files ──────────────────────────────────────────────────── */
 /** The attachments card's id (never a template section id). */
@@ -189,9 +210,9 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
         const figures = tableSummary(s, rows);
         return { sid: s.id, paras: [
           { text: cols.map((c) => `${name("c", c.id)}${c.type === "money" ? ` (${cur})` : ""}`).join(" · "), bullet: false },
-          ...rows.map((r) => ({ text: cols.map((c) => (r[c.id] ? (c.type === "text" ? r[c.id] : fmt(Number(r[c.id]))) : "—")).join(" · "), bullet: true })),
+          ...rows.map((r) => ({ text: cols.map((c) => (r[c.id] ? (c.type === "text" ? r[c.id] : c.type === "date" ? dmy(r[c.id]) : fmt(Number(r[c.id]))) : "—")).join(" · "), bullet: true })),
           ...(figures.length ? [{
-            text: figures.map((f) => `${word(f.kind === "lowest" ? "blk.lowest" : "blk.total")} ${name("c", f.col.id)}: ${fmt(f.value)}${f.col.type === "money" ? ` ${cur}` : ""}${f.who ? ` (${f.who})` : ""}`).join(" · "),
+            text: figures.map((f) => `${figure(word, f.kind, name("c", f.col.id), `${fmt(f.value)}${f.col.type === "money" ? ` ${cur}` : ""}`)}${f.who ? ` (${f.who})` : ""}`).join(" · "),
             bullet: false,
           }] : []),
         ] };
@@ -200,6 +221,23 @@ export function printParagraphs(report: PrintInput, word: PrintWord = (k) => k):
         return { sid: s.id, paras: (v?.links ?? []).map((l) => ({ text: `${word(`blk.link.${l.type}`)}: ${l.label}`, bullet: true })) };
       case "signature":
         return { sid: s.id, paras: [], ...(v?.signature ? { signature: v.signature } : {}) };
+      case "choice":
+        return { sid: s.id, paras: v?.choice ? [{ text: word(`tpl.${report.templateKey}.s.${s.id}.o.${v.choice}`), bullet: false }] : [] };
+      case "data": {
+        const d = v?.data;
+        if (!d) return { sid: s.id, paras: [] };
+        if (d.denied) return { sid: s.id, paras: [{ text: word("blk.dataNoAccess").replace("{app}", DATA_MODULE[d.source]), bullet: false }] };
+        const asOf = { text: word("blk.dataAsOf").replace("{at}", dmyHm(d.capturedAt)), bullet: false };
+        if (!d.rows.length) return { sid: s.id, paras: [{ text: word(`blk.de.${d.source}`), bullet: false }, asOf] };
+        const cols = DATA_COLUMNS[d.source];
+        const totals = dataTotals(d);
+        return { sid: s.id, paras: [
+          { text: cols.map((c) => word(`blk.dc.${c.id}`)).join(" · "), bullet: false },
+          ...d.rows.map((r) => ({ text: `${cols.map((c) => dataCellText(word, r, c)).join(" · ")}${v?.notes?.[r.key] ? ` — ${v.notes[r.key]}` : ""}`, bullet: true })),
+          ...(totals.length ? [{ text: totals.map((x) => figure(word, "total", word(`blk.dc.${x.col}`), `${fmt(x.value)} ${x.currency}`)).join(" · "), bullet: false }] : []),
+          asOf,
+        ] };
+      }
       default:
         break;
     }

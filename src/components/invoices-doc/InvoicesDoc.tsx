@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
 import Link from "next/link";
@@ -2452,6 +2453,12 @@ export default function Quotations() {
         fmt={fmt}
         numberToWords={numberToWords}
       />
+      {/* The reports about this invoice (Reports 4B) — under the paper,
+          only when there are some, never printed. */}
+      {current.id && (
+        <ReportsAboutCard quiet type="invoice" id={current.id}
+          className="no-print mx-4 mb-10 mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 sm:mx-auto sm:w-full sm:max-w-[794px]" />
+      )}
       <ProductPickerModal
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setInsertAt(null); }}

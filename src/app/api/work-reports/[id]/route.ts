@@ -8,8 +8,9 @@ import "server-only";
           it read and clears the reader's own notification. The author's
           draft also carries the suggestions from their earlier reports
           (yesterday's plan, the week's dailies…) and their own work in the
-          apps around the period (appFeed), so the composer paints
-          complete — no second request, nothing shifting in later. Photos
+          apps around the period (appFeed) and its numbers blocks as the
+          server computes them now (blockData, Phase 4B), so the composer
+          paints complete — no second request, nothing shifting in later. Photos
           and files come as ids only; their bytes are fetched through
           /api/files/report/<id>, which applies this same read rule.
    PATCH  The author edits a DRAFT: { title?, date?, sections?, to?, cc?,
@@ -30,6 +31,7 @@ import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/ser
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { loadCarry } from "@/lib/server/reports/carry";
 import { loadAppFeed } from "@/lib/server/reports/app-feed";
+import { loadReportData } from "@/lib/server/reports/report-data";
 import { loadAttachmentRows, removeUnreferenced, toClientAttachment, type AttachmentRow } from "@/lib/server/reports/attachments";
 
 export const dynamic = "force-dynamic";
@@ -76,9 +78,9 @@ export async function GET(req: Request, { params }: Params) {
   const open = row.status === "submitted";
   /* One more wave, and only for the author's own draft — the only screen
      that shows them. */
-  const [carry, appFeed] = isAuthor && row.status === "draft"
-    ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth)])
-    : [undefined, undefined];
+  const [carry, appFeed, blockData] = isAuthor && row.status === "draft"
+    ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth), loadReportData(row, auth)])
+    : [undefined, undefined, undefined];
 
   return NextResponse.json({
     report: {
@@ -105,6 +107,7 @@ export async function GET(req: Request, { params }: Params) {
     people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
     carry,
     appFeed,
+    blockData,
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(toClientAttachment),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

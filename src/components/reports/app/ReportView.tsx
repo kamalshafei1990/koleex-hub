@@ -34,7 +34,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RrIcon from "@/components/ui/RrIcon";
 import {
-  REPORT_LIMITS, blockFileIds, missingSections, periodFor, reportTemplate, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
+  REPORT_LIMITS, blockFileIds, missingSections, periodFor, reportTemplate, type ReportDataValue, type ReportSectionKind, type ReportSectionValue, type ReportTemplateDef,
 } from "@/lib/reports/templates";
 import { CARRY_RULES, type CarryGroup } from "@/lib/reports/carry";
 import { APP_RULES, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
@@ -190,12 +190,18 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
   const nameOf = useMemo(() => new Map([...people, ...detail.recipients].map((p) => [p.id, p])), [people, detail.recipients]);
   /* The suggestions arrive with the report; moving the draft to another
      day / week / month asks again for that period (the latest answer wins).
-     `key` remounts the card for a new period, so it reopens fresh. */
-  const [carry, setCarry] = useState<{ key: string; groups: CarryGroup[]; feed: AppRecord[] }>(() => ({ key: detail.report.periodKey ?? "", groups: detail.carry ?? [], feed: detail.appFeed ?? [] }));
+     `key` remounts the card for a new period, so it reopens fresh. The
+     numbers blocks (4B) ride the same answers: computed by the server for
+     the period now shown. */
+  const [carry, setCarry] = useState<{ key: string; groups: CarryGroup[]; feed: AppRecord[]; data: Record<string, ReportDataValue> }>(() => ({
+    key: detail.report.periodKey ?? "", groups: detail.carry ?? [], feed: detail.appFeed ?? [], data: detail.blockData ?? {},
+  }));
   const carryAsk = useRef(0);
   const moveCarry = useCallback((date: string, key: string) => {
     const n = ++carryAsk.current;
-    void fetchCarry(id, date).then((res) => { if (res.ok && n === carryAsk.current) setCarry({ key, groups: res.data.carry, feed: res.data.appFeed ?? [] }); });
+    void fetchCarry(id, date).then((res) => {
+      if (res.ok && n === carryAsk.current) setCarry({ key, groups: res.data.carry, feed: res.data.appFeed ?? [], data: res.data.blockData ?? {} });
+    });
   }, [id]);
   /* The apps' facts, on the author's own clock and in their language (`t`
      changes with the language, so the words follow a switch). */
@@ -364,7 +370,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
               {s.required && <span className="font-normal text-[var(--text-faint)]">· {t("composer.required")}</span>}
             </p>
             {blocks && <blocks.BlockEditor t={t} tplKey={tpl.key} def={s} value={draft.blocks[s.id] ?? { id: s.id }} reportId={id}
-              version={detail.report.version} onChange={(v) => setBlock(s.id, v)} onBusy={bumpBusy} />}
+              version={detail.report.version} onChange={(v) => setBlock(s.id, v)} onBusy={bumpBusy} live={carry.data[s.id]} />}
           </div>
         ) : (
           /* A card, not a <label>: its head carries buttons now, and a label
@@ -417,7 +423,7 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
             <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
               if (!iso) return;
               const key = periodFor(tpl.cadence, iso).key;
-              const moved = !!(CARRY_RULES[tpl.key] || APP_RULES[tpl.key]) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
+              const moved = !!(CARRY_RULES[tpl.key] || APP_RULES[tpl.key] || tpl.sections.some((x) => x.kind === "data")) && key !== (draftRef.current.date ? periodFor(tpl.cadence, draftRef.current.date).key : "");
               change({ date: iso });
               if (moved) moveCarry(iso, key);
             }} />
