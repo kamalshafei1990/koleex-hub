@@ -2318,9 +2318,9 @@ console.log("\n§22 the CEO office (Phase 5B)");
   rule("a copy of a built-in keeps its description", `${API5}/templates/[key]/route.ts`,
     (c) => (c.includes("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })") ? [] : ["a copy loses the line under its name"]),
     (src) => src.replace("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })", "copyOfBuiltin(key, { ...reportsT, ...REPORT_SECTION_WORDS })"));
-  rule("before the bundle answers, no one is offered an office or a team type", "src/components/reports/app/ReportsApp.tsx",
-    (c) => (c.includes("REPORT_HEADS.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)") ? [] : ["a clerk sees the CEO office's types flash by"]),
-    (src) => src.replace(" && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app)", ")"));
+  rule("before the server's list answers, no type is offered at all — an office or a team type never flashes by", "src/components/reports/app/ReportsApp.tsx",
+    (c) => (c.includes("const allowed = useMemo(() => new Set(bundle?.templates ?? []), [bundle]);") && !/REPORT_HEADS\.filter\(\(x\) => !x\./.test(c) ? [] : ["a clerk sees the CEO office's types flash by"]),
+    (src) => src.replace("new Set(bundle?.templates ?? [])", "new Set(bundle?.templates ?? REPORT_HEADS.map((x) => x.key))"));
   rule("the builder's list knows an office-only type", "src/lib/server/reports/custom-templates.ts",
     (c) => (c.includes("office_only:def->officeOnly") && c.includes('officeOnly: r.office_only === true || r.office_only === "true",') ? [] : ["a builder type loses its office flag in the list"]),
     (src) => src.replace('    officeOnly: r.office_only === true || r.office_only === "true",\n', ""));
@@ -2603,16 +2603,46 @@ console.log("\n§25 the Reports home lists the types from their heads");
 {
   const file = read(HEADS_FILE);
   expect(file === renderReportHeads(REPORT_TEMPLATES, FAMILY_GROUPS),
-    "the heads are the catalog's, type by type and flag by flag", `${HEADS_FILE} is stale or edited by hand — run npm run -s reports:heads`);
-  const flipped = REPORT_TEMPLATES.map((x) => (x.key === "hr_offer" ? { ...x, payrollOnly: true } : x));
+    "the heads are the catalog's, type by type and field by field", `${HEADS_FILE} is stale or edited by hand — run npm run -s reports:heads`);
+  const flipped = REPORT_TEMPLATES.map((x) => (x.key === "hr_offer" ? { ...x, cadence: "weekly" as const } : x));
   expect(renderReportHeads(flipped, FAMILY_GROUPS) !== file && renderReportHeads(REPORT_TEMPLATES.slice(1), FAMILY_GROUPS) !== file,
-    "…and a flag changed, or a type added or removed, in the catalog makes them stale");
+    "…and a head changed (a cadence), or a type added or removed, in the catalog makes them stale");
   expect(REPORT_HEADS.length === REPORT_TEMPLATES.length && REPORT_TEMPLATES.every((x) => JSON.stringify(reportHead(x.key)) === JSON.stringify(headOf(x))),
     `one head per built-in (${REPORT_HEADS.length}), each its type's own`);
   expect(!/\bsections\b\s*:/.test(code(file)) && REPORT_HEADS.every((h) => !("sections" in h) && !("recipients" in h)), "no head carries a type's sections or readers");
   expect(JSON.stringify(HEAD_GROUPS) === JSON.stringify(FAMILY_GROUPS), "the home groups the types as the catalog does");
-  expect(reportHead("hr_offer")?.app === "HR" && reportHead("hr_payroll")?.payrollOnly === true && reportHead("probation_review")?.requestOnly === true && reportHead("c-abcdefghij") === null,
-    "a head keeps who is offered the type (an app, «Payroll Reports», only on request); a builder type has none");
+  expect(REPORT_HEADS.every((h) => ["app", "hrOnly", "requestOnly", "teamOnly", "officeOnly", "payrollOnly", "orTeam"].every((f) => !(f in h))) && reportHead("hr_offer")?.group === "hiring" && reportHead("c-abcdefghij") === null,
+    "a head is what the home draws — never who may start the type (the server's list says that); a builder type has none");
+}
+
+/* ── §27 the one line under each name rides its own chunk (26 Sep 2026) ─ */
+console.log("\n§27 the home's descriptions load beside the list, behind a skeleton");
+{
+  /* Owner's pick: the descriptions (report-descs, 146 types × 3 languages)
+     leave the home's first load; they start loading with the page, beside
+     the list of types, and "Write a report" is a skeleton until BOTH are
+     here — the cards land once and never grow under the reader's eyes. */
+  const HOME = "src/components/reports/app/ReportsApp.tsx";
+  const DESCS = path.join(ROOT, "src/lib/translations/report-descs.ts");
+  expect(!graph([HOME], new Map(), false).has(DESCS) && code(read(HOME)).includes('import("@/lib/translations/report-descs")'),
+    "the home's first load never carries the descriptions — they are asked for as their own chunk");
+  {
+    const rowFile = path.join(ROOT, "src/components/reports/app/ReportRowItem.tsx");
+    const probed = new Map([[rowFile, `import { reportDescsT } from "@/lib/translations/report-descs";\nvoid reportDescsT;\n${fs.readFileSync(rowFile, "utf8")}`]]);
+    expect(graph([HOME], probed, false).has(DESCS), "…and a static import of them anywhere the home loads would be caught");
+  }
+  rule("\"Write a report\" waits for the list AND the descriptions, a skeleton meanwhile", HOME,
+    (c) => (c.includes("ready={!!bundle && !!descs}") && c.includes("{!ready ? (failed ? ") && c.includes(": <WriteSkeleton />) : (") ? [] : ["the cards paint, then grow as their lines arrive"]),
+    (src) => src.replace("ready={!!bundle && !!descs}", "ready={!!bundle}"));
+  rule("a failed load is cards without their lines — never a skeleton for good", HOME,
+    (c) => (c.includes("loadDescs().then((d) => { if (!cancelled) setDescs(d); }, () => { if (!cancelled) setDescs({}); });") ? [] : ["one lost chunk leaves the grid a skeleton forever"]),
+    (src) => src.replace(", () => { if (!cancelled) setDescs({}); });", ");"));
+  rule("the skeleton is the grid's own shape, hidden from screen readers, the section marked busy", HOME,
+    (c) => (/function WriteSkeleton\(\)[\s\S]*?<div aria-hidden>[\s\S]*?grid grid-cols-1 gap-2 sm:grid-cols-2[\s\S]*?h-8 w-8 shrink-0 rounded-lg/.test(c) && c.includes('aria-busy={!ready && !failed}') ? [] : ["the skeleton does not look like what replaces it"]),
+    (src) => src.replace(" aria-busy={!ready && !failed}", ""));
+  rule("the builder carries the built-ins' descriptions itself (the home loads them after its first paint)", "src/components/reports/app/TemplatesTab.tsx",
+    (c) => (c.includes("?? reportComposerT[key] ?? reportDescsT[key];") ? [] : ["the builder's list shows types without their lines until the home's chunk arrives"]),
+    (src) => src.replace(" ?? reportDescsT[key];", ";"));
 }
 
 /* ── §26 each screen downloads only its own words (26 Sep 2026) ──────── */

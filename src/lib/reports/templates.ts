@@ -246,9 +246,10 @@ export interface ReportTemplateDef {
    server, the builder and validate:reports import them; the report page and
    its print never do — a report arrives with its own type from the server.
    The Reports home imports only their HEADS (./catalog-heads.ts, generated
-   from the catalog): what it takes to list a type, group it, draw it and
-   decide who is offered it — never its sections. */
-export const REPORT_HEAD_FIELDS = ["key", "family", "group", "icon", "cadence", "urgent", "hrOnly", "requestOnly", "teamOnly", "officeOnly", "payrollOnly", "app"] as const;
+   from the catalog): what it takes to list a type, group it and draw it —
+   never its sections, and never who may start it: that is the server's
+   list (the bundle's `templates`), which the home waits for. */
+export const REPORT_HEAD_FIELDS = ["key", "family", "group", "icon", "cadence", "urgent"] as const;
 export type ReportTemplateHead = Pick<ReportTemplateDef, (typeof REPORT_HEAD_FIELDS)[number]>;
 
 export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr", "projects", "inventory", "finance"];

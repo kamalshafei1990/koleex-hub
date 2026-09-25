@@ -32,11 +32,11 @@ export function renderReportHeads(templates: readonly ReportTemplateDef[], group
    validate:reports fails while this file differs from it.
 
    The HEADS of the built-in report types — what the Reports home needs to
-   list a type, group it, draw it and decide who is offered it; never its
-   sections, readers or defaults. The home and its lists import this; the
-   full catalog stays with the server and the template builder's own chunk
-   (validate:reports §23/§25), so the page no longer carries every type's
-   sections. */
+   list a type, group it and draw it; never its sections, readers or
+   defaults, nor who may start it (the server's list says that). The home
+   and its lists import this; the full catalog stays with the server and the
+   template builder's own chunk (validate:reports §23/§25), so the page no
+   longer carries every type's sections. */
 
 import type { ReportFamily, ReportTemplateHead } from "./templates";
 

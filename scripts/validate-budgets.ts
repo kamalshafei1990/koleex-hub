@@ -266,7 +266,9 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      26/09/2026: 665 KB after Phase 5C (146 types) → 638 KB once the home
      listed the types from their heads (lib/reports/catalog-heads, generated)
      instead of the whole catalog of sections; the builder tab keeps that →
-     616 KB once it downloaded only its own words (translations/report-ui). */
+     616 KB once it downloaded only its own words (translations/report-ui) →
+     569 KB once the descriptions became their own chunk, loaded beside the
+     list behind a skeleton (validate:reports §27). */
   "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },

@@ -27,10 +27,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Translations } from "@/lib/i18n";
 import { reportCommonT } from "@/lib/translations/report-ui/common";
 import { reportHomeT } from "@/lib/translations/report-ui/home";
-import { reportDescsT } from "@/lib/translations/report-descs";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import SharedKpiCard from "@/components/ui/KpiCard";
@@ -54,18 +53,25 @@ const TeamSummary = dynamic(() => import("./TeamSummary"), { ssr: false, loading
 type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
 const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
 const WARM_KEY = "kx:reports:bundle";
-/** The home's words and every type's name, with the one line under each
- *  name (5B: the descriptions live apart — only the places a type is picked
- *  carry them, this home and the builder's list). Never the whole Reports
+/** The home's words and every type's name. Never the whole Reports
  *  dictionary: the report page's words stay with the report page (26 Sep). */
-const APP_WORDS = { ...reportCommonT, ...reportHomeT, ...reportDescsT };
+const APP_WORDS = { ...reportCommonT, ...reportHomeT };
+/* The one line under each type's name (5B) rides its own chunk (owner's
+   pick, 26 Sep 2026): it starts loading with the page, beside the list of
+   types, and "Write a report" is a skeleton until BOTH are here — the cards
+   land once, never growing under the reader's eyes. Kept once loaded, so
+   coming back to the home finds it at once. */
+let descsLoaded: Translations | null = null;
+const loadDescs = (): Promise<Translations> =>
+  import("@/lib/translations/report-descs").then((m) => (descsLoaded = m.reportDescsT));
 
 export default function ReportsApp() {
   const [bundle, setBundle] = useState<ReportsBundle | null>(null);
   /* The builder types' names and descriptions (4E) join the dictionary, so
      "Write a report" names them like any other type. */
   const custom = bundle?.custom;
-  const words = useMemo(() => (custom?.length ? { ...APP_WORDS, ...headWords(custom) } : APP_WORDS), [custom]);
+  const [descs, setDescs] = useState<Translations | null>(() => descsLoaded);
+  const words = useMemo(() => (descs || custom?.length ? { ...APP_WORDS, ...(descs ?? {}), ...(custom?.length ? headWords(custom) : {}) } : APP_WORDS), [descs, custom]);
   const { t, lang } = useTranslation(words);
   const router = useRouter();
   const [tab, setTabState] = useState<Tab>(() => {
@@ -114,6 +120,8 @@ export default function ReportsApp() {
       if (raw) queueMicrotask(() => { if (!cancelled) setBundle(JSON.parse(raw) as ReportsBundle); });
     } catch { /* corrupt — the network covers it */ }
     void Promise.resolve().then(() => { if (!cancelled) reload(); });
+    /* A failed load is no lines under the names — never a skeleton for good. */
+    if (!descsLoaded) loadDescs().then((d) => { if (!cancelled) setDescs(d); }, () => { if (!cancelled) setDescs({}); });
     return () => { cancelled = true; };
   }, [reload]);
 
@@ -204,7 +212,7 @@ export default function ReportsApp() {
         )}
 
         <div key={tab} className="kx-tab-in">
-          {tab === "home" && <Home t={t} lang={lang} bundle={bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
+          {tab === "home" && <Home t={t} lang={lang} bundle={bundle} ready={!!bundle && !!descs} failed={loadError && !bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
           {tab === "team" && bundle?.me.hasTeam && <TeamSummary t={t} lang={lang} />}
           {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} lang={lang} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
           {tab === "compliance" && <ComplianceTab t={t} lang={lang} />}
@@ -222,13 +230,15 @@ export default function ReportsApp() {
 
 type StartFn = (key: string, date?: string, opts?: { request?: string }) => void;
 
-function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: {
-  t: T; lang: string; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
+function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, onOpenInbox }: {
+  t: T; lang: string; bundle: ReportsBundle | null; ready: boolean; failed: boolean; creating: string | null; createError: string | null;
   onStart: StartFn; onOpenInbox: () => void;
 }) {
-  /* Before the bundle says what this person may start, only the types
-     open to all staff — never a team's or the CEO office's (5B). */
-  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_HEADS.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly && !x.payrollOnly && !x.app).map((x) => x.key)), [bundle]);
+  /* What this person may start is the server's list, and only that — until
+     it is here nothing is offered (a skeleton), so no one ever sees a type
+     flash by that they may not start (5B), and the grid never jumps from a
+     guess to the real list. */
+  const allowed = useMemo(() => new Set(bundle?.templates ?? []), [bundle]);
   /* Every type this person may start, by group: the built-ins, then the
      builder's (4E) — each named from the dictionary. */
   const offered = useMemo(() => [
@@ -240,9 +250,10 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
     <div className="space-y-4">
     {due.length > 0 && <DueCard t={t} due={due} creating={creating} onStart={onStart} />}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-      <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-write">
+      <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-write" aria-busy={!ready && !failed}>
         <h2 id="kx-rep-write" className="mb-3 text-[14px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
         {createError && <p className="mb-3 text-[12.5px] text-red-400">{createError}</p>}
+        {!ready ? (failed ? <p className="text-[12.5px] text-[var(--text-dim)]">{t("err.generic")}</p> : <WriteSkeleton />) : (
         <div className="space-y-4">
           {REPORT_FAMILIES.map((fam) => {
             const items = offered.filter((x) => x.family === fam);
@@ -286,6 +297,7 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
             );
           })}
         </div>
+        )}
       </section>
 
       <section className={`${CARD} p-2 sm:p-3`} aria-labelledby="kx-rep-latest">
@@ -304,6 +316,31 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
         )}
       </section>
     </div>
+    </div>
+  );
+}
+
+/** "Write a report" while the list of types is on its way: the grid's own
+ *  shape — a family's heading, then cards of an icon and two lines — so the
+ *  real one lands where the skeleton stood. Hidden from screen readers (the
+ *  section says it is busy). */
+function WriteSkeleton() {
+  const bar = "block rounded bg-[var(--bg-surface-subtle)] motion-safe:animate-pulse";
+  return (
+    <div aria-hidden>
+      <span className={`${bar} mb-2 h-2.5 w-16`} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-3">
+            <span className="h-8 w-8 shrink-0 rounded-lg bg-[var(--bg-surface-subtle)] motion-safe:animate-pulse" />
+            <span className="min-w-0 flex-1 space-y-1.5 pt-0.5">
+              <span className={`${bar} h-3`} style={{ width: `${58 - (i % 3) * 9}%` }} />
+              <span className={`${bar} h-2.5 w-[88%]`} />
+              <span className={`${bar} h-2.5 w-3/5`} />
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
