@@ -27,6 +27,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SESSION_INVALID_EVENT } from "@/lib/session-hints";
+import { noteSignInShown } from "@/lib/perf/client";
 import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -459,6 +460,11 @@ export default function AdminAuth({ children }: Props) {
       setAuthed(false);
     }
   }, []);
+
+  /* The form is on screen: a Home that mounts after this sign-in includes
+     the time spent typing, so it is not recorded as a Home load
+     (isCountableHomeLoad in src/lib/perf/client.ts). */
+  useEffect(() => { if (authed === false) noteSignInShown(); }, [authed]);
 
   /* THIS FLAG OUTLIVES THE COOKIE. The read above is the whole decision
      between "show the Hub" and "ask for a password", and it consults nothing

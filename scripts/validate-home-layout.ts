@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { launcherColumns, packAppBands, type AppBand } from "../src/lib/home/app-bands";
 import { appForPath, readHomeAppsPref, seedPins, MY_APPS_MAX, MY_APPS_SEED } from "../src/lib/home/my-apps";
 import { withDefaults, DEFAULT_PREFERENCES } from "../src/lib/access-control";
+import { isCountableHomeLoad } from "../src/lib/perf/client";
 
 let passed = 0;
 let failed = 0;
@@ -112,6 +113,26 @@ check("the row paints from the device's copy on the first render (no effect, no 
 const route = readFileSync("src/app/api/home/app-usage/route.ts", "utf8");
 check("the usage route is self-scoped: the account comes from the session only",
   /\.eq\("account_id", auth\.account_id\)/.test(route) && !/searchParams\.get\("account/.test(route) && /ROUTE_RE\.test/.test(route));
+
+/* The owner judges Home by home.interactive_ms. Measured 25/09/2026: 12% of
+   the samples were not Home loading at all (tabs that opened elsewhere and
+   reached Home minutes later), and a sign-in counted the password typing. */
+console.log("── The Home load number counts only Home loads ──");
+const loadOf = (landingPath: string | null, signIn = false, hidden = false) =>
+  isCountableHomeLoad({ landingPath, signInShown: signIn, wasHidden: hidden });
+check("a tab opened on / by a signed-in person, never hidden → counted", loadOf("/") === true);
+check("/ with a query or a hash is still Home", loadOf("/?tab=x") === true && loadOf("/#apps") === true);
+check("a tab that opened on /ai (or /home, the role dashboard) and reached Home later → not counted",
+  loadOf("/ai") === false && loadOf("/quotations") === false && loadOf("/home") === false);
+check("the sign-in form was shown in this document → not counted (it would count the typing)", loadOf("/", true) === false);
+check("the tab was hidden at some point → not counted (frames stop while hidden)", loadOf("/", false, true) === false);
+check("no navigation entry → not counted (never guess)", loadOf(null) === false);
+const perfClient = readFileSync("src/lib/perf/client.ts", "utf8");
+check("markHomeInteractive decides with isCountableHomeLoad BEFORE it records",
+  /if \(!isCountableHomeLoad\(\{[^}]*\}\)\) return;\s*const start = nav\?\.startTime \?\? 0;\s*record\("home\.interactive_ms"/.test(perfClient));
+const adminAuth = readFileSync("src/components/admin/AdminAuth.tsx", "utf8");
+check("the sign-in gate reports that its form was shown",
+  /useEffect\(\(\) => \{ if \(authed === false\) noteSignInShown\(\); \}, \[authed\]\);/.test(adminAuth));
 
 console.log(`\nhome-layout: ${passed} passed, ${failed} failed.`);
 if (failed) process.exit(1);
