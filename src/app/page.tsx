@@ -31,6 +31,7 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
+import { useInboxUnreadByApp } from "@/lib/inbox-unread-store";
 import { todoListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
@@ -279,6 +280,12 @@ function estimateLauncherColumns(): number {
  *  54/61 px. Checked in a rendered tile at 1, 1.7, 1.8 and 1.9 — the sphere
  *  stays clear of the label below it at every one. */
 const AI_TILE_ORB = 1.8;
+
+/* The tiles that count something of their own: Discuss its unread messages,
+   To-do the open tasks on you, Projects your open tasks, Planning your
+   shifts this week (useAppBadges). Every other tile counts its unread
+   notifications. */
+const OWN_TILE_NUMBER = new Set(["discuss", "todo", "projects", "planning"]);
 
 const AppCard = memo(function AppCard({
   app,
@@ -930,6 +937,29 @@ export default function HomePage() {
     };
   }, [account?.id, badgesReady]);
 
+  /* ── Every other app's tile: its unread notifications ──
+     Discuss, To-do, Projects and Planning keep their own numbers (above and
+     useAppBadges). Every other tile shows the notifications from that app
+     still unread — the registry's app for each type, security alerts left
+     out as the bell's All tab leaves them out (/api/inbox/feed badges →
+     byApp). No request of their own: the header's Gate publishes them with
+     the unread count it already reads (the shell batch, then its poll).
+     Only when the count moves WITHOUT them — the real bell, once opened,
+     publishes the count alone — are they read again, once per move. */
+  const tileCounts = useInboxUnreadByApp(account?.id ?? null);
+  const [refetched, setRefetched] = useState<{ at: number; byApp: Record<string, number> } | null>(null);
+  const needsRead = badgesReady && tileCounts.published && !tileCounts.fresh;
+  useEffect(() => {
+    if (!needsRead) return;
+    let cancelled = false;
+    const at = tileCounts.count;
+    void import("@/lib/inbox")
+      .then(({ fetchUnreadByApp }) => fetchUnreadByApp())
+      .then((byApp) => { if (!cancelled) setRefetched({ at, byApp }); });
+    return () => { cancelled = true; };
+  }, [needsRead, tileCounts.count]);
+  const unreadByApp = !tileCounts.fresh && refetched?.at === tileCounts.count ? refetched.byApp : tileCounts.byApp;
+
   /* App launch (navigation + telemetry + pressed feedback + modifier keys) is
      handled by the shared <AppLaunchLink> primitive that AppCard renders. This
      page only supplies the intent-preload warm callback below. */
@@ -1260,8 +1290,8 @@ export default function HomePage() {
       app={app}
       t={t}
       isCurrentApp={currentAppId === app.id}
-      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
-      appUnreadNoun={app.id === "todo" ? "task" : "message"}
+      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : OWN_TILE_NUMBER.has(app.id) ? 0 : unreadByApp[app.id] ?? 0}
+      appUnreadNoun={app.id === "todo" ? "task" : app.id === "discuss" ? "message" : "notification"}
       dk={dk}
       onPrefetch={prefetchApp}
       iconPx={iconPx}

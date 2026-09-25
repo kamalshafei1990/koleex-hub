@@ -194,7 +194,7 @@ export function subscribeToInboxMessages(
    for every signed-in user — now share a single round trip instead of paying
    two border crossings for two numbers from the same table. Invalidation is
    by prefix ("/api/inbox/feed"), so mark-read still clears this key. */
-type BadgeCounts = { ok?: boolean; data?: { unread?: number; unreadTasks?: number } };
+type BadgeCounts = { ok?: boolean; data?: { unread?: number; unreadTasks?: number; byApp?: Record<string, number> } };
 
 export async function fetchUnreadCount(accountId: string): Promise<number> {
   void accountId; // recipient scope comes from the session server-side
@@ -208,6 +208,17 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
     return json?.data?.unread ?? 0;
   } catch {
     return 0;
+  }
+}
+
+/** Unread notifications per app (APP_REGISTRY id) — the Home tiles' numbers.
+ *  Rides the same coalesced request as the unread count: no extra call. */
+export async function fetchUnreadByApp(): Promise<Record<string, number>> {
+  try {
+    const json = await cachedGet<BadgeCounts>("/api/inbox/feed?resource=badges", 5_000);
+    return json?.data?.byApp ?? {};
+  } catch {
+    return {};
   }
 }
 

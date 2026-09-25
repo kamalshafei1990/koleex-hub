@@ -30,7 +30,11 @@
      K  every link a writer stores opens a page that exists in src/app
      L  the bell stays light: the header's Gate reaches the open bell only
         through import(), and the bell reads the slim, capped feed
-        (its built weight is measured by validate:budgets §J)
+        (its built weight is measured by validate:budgets §L)
+     M  each Home tile shows its app's unread notifications — counted through
+        the registry (security left out), published by the Gate with the
+        count it already reads; Discuss, To-do, Projects and Planning keep
+        their own numbers; Home asks again only when the count moved alone
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -547,6 +551,29 @@ check("the bell's rows are the slim projection — no avatar, no *", !!slimProj 
 check("the feed never answers more than 300 rows", /Math\.min\(Number\(url\.searchParams\.get\("limit"\)\)\s*\|\|\s*\d+,\s*300\)/.test(feed));
 const bellSrc = fileSrc("src/components/layout/NotificationBell.tsx");
 check("the bell asks for slim rows", /fetchInboxMessagesOrNull\(\{[^}]*slim:\s*true/.test(bellSrc));
+
+/* ── M: each Home tile counts its own app's unread notifications ─────── */
+console.log("\nM. the Home tiles count each app's unread notifications");
+/* Owner, 26/09: a number on every app's tile. Four tiles already count
+   something of their own and keep it — To-do's is open tasks on purpose
+   (the owner, looking at 37 unread task MESSAGES: "I don't know this
+   notifications for what"). The rest count the app's unread notifications,
+   read from the registry, and cost no request of their own. */
+const feedSrc = fileSrc("src/app/api/inbox/feed/route.ts");
+const badgesCase = feedSrc.slice(feedSrc.indexOf('case "badges"'), feedSrc.indexOf("default:", feedSrc.indexOf('case "badges"')));
+check("the badges reply counts unread per app through the registry, security left out",
+  /notificationTypeDef\(r\.type \?\? r\.kind\)\?\.app/.test(badgesCase) && /app === "activity-monitor"/.test(badgesCase) && /byApp\s*\}/.test(badgesCase));
+const gateSrc = fileSrc("src/components/layout/NotificationBellGate.tsx");
+check("the Gate publishes the per-app numbers with the count it already reads",
+  /publishInboxUnread\(accountId,\s*unreadInbox,\s*inbox\.data\?\.byApp/.test(gateSrc));
+const homeSrc = fileSrc("src/app/page.tsx");
+const own = homeSrc.match(/const OWN_TILE_NUMBER = new Set\(\[([^\]]*)\]\)/)?.[1].replace(/\s/g, "") ?? "";
+check("Discuss, To-do, Projects and Planning keep their own numbers — and only they",
+  own === '"discuss","todo","projects","planning"' && /OWN_TILE_NUMBER\.has\(app\.id\)\s*\?\s*0\s*:\s*unreadByApp\[app\.id\]/.test(homeSrc), own || "OWN_TILE_NUMBER not found");
+/* Home reads them again only when the count moved without them. */
+const homeReads = [...homeSrc.matchAll(/fetchUnreadByApp\(\)/g)].length;
+check("Home never asks for them on its own load — only when the count moved without them",
+  homeReads === 1 && /const needsRead = badgesReady && tileCounts\.published && !tileCounts\.fresh;/.test(homeSrc) && /if \(!needsRead\) return;/.test(homeSrc));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

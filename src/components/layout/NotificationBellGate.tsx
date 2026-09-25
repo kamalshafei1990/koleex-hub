@@ -39,7 +39,7 @@ import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
    directly — a mount with no intermediate null, ever. */
 type BellComponent = ComponentType<{ dk: boolean; defaultOpen?: boolean }>;
 
-interface Badges { data?: { unread?: number } }
+interface Badges { data?: { unread?: number; byApp?: Record<string, number> } }
 interface Channels { data?: { unread_count?: number; marked_unread?: boolean }[] }
 
 /* The SAME sum the real bell shows: a conversation the user manually marked
@@ -195,7 +195,7 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
            bell used to publish there, and the real bell mounts on the first
            click — so on every ordinary page load the pill said 0. At rest,
            this is the publisher. */
-        if (inbox) publishInboxUnread(accountId, unreadInbox);
+        if (inbox) publishInboxUnread(accountId, unreadInbox, inbox.data?.byApp ?? {});
       } catch { /* a missing badge is not worth an error state */ }
     };
     void read();

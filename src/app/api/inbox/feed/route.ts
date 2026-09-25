@@ -17,6 +17,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { notificationTypeDef } from "@/lib/notification-types";
 
 const INBOX = "inbox_messages";
 
@@ -219,17 +220,37 @@ export async function GET(req: Request) {
           .eq("recipient_account_id", me)
           .is("read_at", null)
           .is("archived_at", null);
-        const [unreadRes, tasksRes] = await Promise.all([
+        const [unreadRes, tasksRes, typesRes] = await Promise.all([
           base(),
           /* All task categories — the type filter here undercounted for the
              same reason the reconcile under-cleared (recurring + approval
              rows are tasks too). */
           base().eq("category", "task"),
+          /* Each unread row's type only (two short strings), for the Home
+             tiles' per-app numbers below. */
+          supabaseServer
+            .from(INBOX)
+            .select("type:metadata->>type, kind:metadata->>kind")
+            .eq("recipient_account_id", me)
+            .is("read_at", null)
+            .is("archived_at", null)
+            .limit(1000),
         ]);
         if (unreadRes.error) throw new Error(unreadRes.error.message);
         if (tasksRes.error) throw new Error(tasksRes.error.message);
+        /* Unread notifications per app — the number on each Home tile. The
+           app is the registry's (lib/notification-types); security alerts
+           are left out as the bell's All tab leaves them out: they have
+           their own tab, and they are not work in an app. A failed read
+           only loses the tiles' numbers, never the counts above. */
+        const byApp: Record<string, number> = {};
+        for (const r of (typesRes.data ?? []) as Array<{ type: string | null; kind: string | null }>) {
+          const app = notificationTypeDef(r.type ?? r.kind)?.app;
+          if (!app || app === "activity-monitor") continue;
+          byApp[app] = (byApp[app] ?? 0) + 1;
+        }
         return NextResponse.json(
-          { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0 } },
+          { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0, byApp } },
           // Badge counts feed the home/header; a short SWR cache collapses the
           // repeated (realtime-triggered) refetches to one round-trip. Realtime
           // pings still refresh them; the count can lag a few seconds at most.
