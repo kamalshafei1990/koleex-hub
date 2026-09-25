@@ -90,9 +90,11 @@ import {
   REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LIMITS, REPORT_LINK_TYPES, REPORT_TEMPLATES, blockFileIds, cellDate, cellNumber, columnTotal, isoWeekKey, missingSections, normalizeSections, periodFor, rangeEnd, remapBlockFiles, reportLinks, reportTemplate, scoreAverage, tableSummary,
   type ReportDataValue,
 } from "../src/lib/reports/templates";
-import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, TEAM_SOURCES, dataRowHref, dataTotals, isTeamSource, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
+import { DATA_COLUMNS, DATA_MODULE, DATA_STATUSES, LIVE_SOURCES, OFFICE_READS, OFFICE_SOURCES, TEAM_SOURCES, dataRowHref, dataTotals, decisionHref, isOfficeSource, isTeamSource, statusWordKey, withBlockData } from "../src/lib/reports/report-data";
 import { entityHref } from "../src/lib/reports/link-targets";
 import { reportsT as mainWords } from "../src/lib/translations/reports";
+import { reportDescsT } from "../src/lib/translations/report-descs";
+import { reportBlocksT } from "../src/lib/translations/report-blocks";
 import { REPORT_SECTION_WORDS } from "../src/lib/translations/report-sections/all";
 import { sectionFamilies } from "../src/lib/translations/report-sections";
 import { CARRY_RULES, buildCarry, carryQueryRange, insertInto, isPlaced, type CarrySource } from "../src/lib/reports/carry";
@@ -132,6 +134,7 @@ import {
 } from "../src/lib/reports/team";
 import { serverMaterial } from "../src/lib/reports/ai-draft";
 import { reportTeamT } from "../src/lib/translations/report-team";
+import { decisionRows, followupRows, meetingRows, occasionRows, scheduleRows, timeSplitRows, visitorRows, yearlyOn, type CalendarFact } from "../src/lib/reports/office";
 import type { BoardRow } from "../src/lib/reports/obligations";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -142,7 +145,7 @@ const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(
 const eq = (got: unknown, want: unknown, m: string) => expect(JSON.stringify(got) === JSON.stringify(want), m, `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
 /** Every Reports word: the main dictionary and every family's section words (Phase 4C split). */
-const reportsT = { ...mainWords, ...REPORT_SECTION_WORDS };
+const reportsT = { ...mainWords, ...reportDescsT, ...reportBlocksT, ...REPORT_SECTION_WORDS };
 /** The file without its comments — the validators' one stripper, which
  *  steps over strings, templates and regexes (a bare regex read
  *  accept="image/*" as a comment opening and dropped the code after it). */
@@ -236,9 +239,11 @@ console.log("\n§3 templates and their words");
   const suppliers4c = ["supplier_approval", "sample_evaluation", "negotiation", "production_followup", "supplier_performance", "supplier_risk", "supplier_stop", "purchasing_weekly", "purchasing_monthly", "late_pos", "payables"];
   const d4 = ["container_loading", "shipment_update", "damage_claim", "customs_clearance", "service_visit", "warranty_claim", "customer_training", "spare_parts_request", "trip_report", "delegation_visit", "meeting_minutes", "decision_log"];
   const team5a = ["team_summary", "one_on_one", "promotion_recommendation"];
-  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...team5a, ...phase1.slice(6)];
+  const office5b = ["morning_brief", "decisions_waiting", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary",
+    "office_readiness", "admin_affairs", "office_expenses", "assets_custody", "renewals", "visitors_log", "gov_bank", "company_documents", "stamp_log", "correspondence", "gift_register", "occasions"];
+  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...team5a, ...office5b, ...phase1.slice(6)];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr").every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
   expect(["hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.hrOnly), "only HR starts a warning or an exit interview");
@@ -1249,7 +1254,7 @@ console.log("\n§15 reports that events ask for");
     (c) => { const a = c.indexOf("const events = await runReportEvents();"); const b = c.indexOf("const run = await runReportNudges();"); return a > 0 && b > a ? [] : ["a request asked now waits a run for its reminder"]; },
     (src) => src.replace("  const events = await runReportEvents();\n  const run = await runReportNudges();", "  const run = await runReportNudges();\n  const events = await runReportEvents();"));
   rule("the Write list never offers a request-only type", "src/app/api/work-reports/bundle/route.ts",
-    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
+    (c) => (/REPORT_TEMPLATES\.filter\(\(tpl\) => !tpl\.requestOnly && !hiddenSet\.has\(tpl\.key\) && \(!tpl\.hrOnly \|\| hrCreate === null\) && \(!tpl\.teamOnly \|\| hasTeam\) && \(!tpl\.officeOnly \|\| hasOffice\)\)/.test(c) ? [] : ["the probation review is offered to everyone"]),
     (src) => src.replace("!tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)", "!hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null)"));
   rule("a confidential request is never linked from someone else's calendar", "src/lib/server/calendar-feed.ts",
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
@@ -1385,8 +1390,8 @@ console.log("\n§16 blocks: checklist, score, table, links, signature");
     (c) => (/from\("products"\)\.select\("id, product_name, brand"\)\.eq\("status", "active"\)/.test(c) ? [] : ["drafts and retired products can be linked"]),
     (src) => src.replace('.eq("status", "active")', ""));
   rule("a report opens once its blocks' code and its own words are here — the page lays out once", "src/components/reports/app/ReportView.tsx",
-    (c) => { const a = c.indexOf('const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);'); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return a > 0 && b > a ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
-    (src) => src.replace('const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);', 'const mod = null, own = {}; void loadReportWords(key, res.data.template);'));
+    (c) => { const m = /const \[mod, own, descs\] = await Promise\.all\(\[\s*hasBlocks\(typeOf\(res\.data\)\) \? import\("\.\/ReportBlocks"\) : Promise\.resolve\(null\),\s*loadReportWords\(key, res\.data\.template\),\s*res\.data\.can\.edit \? import\("@\/lib\/translations\/report-descs"\) : Promise\.resolve\(null\),\s*\]\);/.exec(c); const b = c.indexOf('setDetail(res.data); setPhase("ready");'); return m && b > m.index ? [] : ["the page can paint, then grow when the blocks or its words arrive"]; },
+    (src) => src.replace("const [mod, own, descs] = await Promise.all([", "const [mod, own, descs] = [null, {}, null] as const; void Promise.all(["));
   rule("the card on other apps' pages carries no Reports dictionary and asks only once the page is quiet", "src/components/reports/ReportsAboutCard.tsx",
     (c) => (!/translations\/reports/.test(c) && /whenNetworkQuiet\(/.test(c) && /if \(res\.status === 401 \|\| res\.status === 403\) \{ setHidden\(true\); return; \}/.test(c) ? [] : ["the card is heavy, early, or shows outside Reports"]),
     (src) => src.replace('import { whenNetworkQuiet } from "@/lib/net-idle";', 'import { whenNetworkQuiet } from "@/lib/net-idle";\nimport { reportsT } from "@/lib/translations/reports";'));
@@ -1454,7 +1459,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
 
   /* Every source complete */
   /* The author's own documents; the team's numbers (5A) are checked in §21. */
-  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src));
+  const docSources = REPORT_DATA_SOURCES.filter((src) => !isTeamSource(src) && !isOfficeSource(src));
   expect(docSources.every((src) => DATA_COLUMNS[src]?.length && DATA_MODULE[src] && dataRowHref(src, U3) && ["no", "title"].includes(DATA_COLUMNS[src][0].id) && ["customer", "supplier", "item", "category"].includes(DATA_COLUMNS[src][1].id)),
     "every numbers source has its columns (what names the document, then who or what), its app and what a row opens");
   eq(docSources.map((src) => DATA_MODULE[src]), ["Quotations", "Orders", "Invoices", "Quotations", "Invoices", "Purchase", "Purchase", "Purchase", "Purchase", "Purchase", "Expenses"], "each source is gated by the app it comes from");
@@ -1512,8 +1517,8 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
     (c) => (c.includes('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);') ? [] : ["days waiting count from the typed date"]),
     (src) => src.replace('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);', ""));
   rule("sending freezes the numbers the server computes, before the report is marked sent", `${API}/[id]/submit/route.ts`,
-    (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections })'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
-    (src) => src.replace("const sections = withBlockData(typed, await loadReportData(row, auth));", "const sections = typed;"));
+    (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections })'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
+    (src) => src.replace("const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));", "const sections = typed;"));
   rule("moving the draft to another period asks for its numbers again", `${API}/[id]/carry/route.ts`,
     (c) => (c.includes("loadReportData(loaded.row, auth, date, to)") && c.includes("return NextResponse.json({ carry, appFeed, blockData }") ? [] : ["the numbers stay on the old period"]),
     (src) => src.replace("loadReportData(loaded.row, auth, date, to)", "Promise.resolve({})"));
@@ -1642,7 +1647,7 @@ console.log("\n§18 quality & purchasing, and a report's words loaded with it");
   const leak = allFiles("src").filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("src/app/api/") && !f.startsWith("src/lib/server/") && !f.startsWith("src/lib/translations/report-sections/") && read(f).includes("report-sections/all"));
   expect(leak.length === 0, "no page imports every family's words — only the server does", leak.join(", "));
   rule("the print lays out once the report's own words are here", "src/app/reports/[id]/print/page.tsx",
-    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.report.templateKey, res.data.template);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
+    (c) => { const a = c.indexOf("own = await loadReportWords(res.data.report.templateKey, res.data.template);"); const b = c.indexOf("setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } })"); return a > 0 && b > a ? [] : ["the print can lay out without its section words"]; },
     (src) => src.replace("own = await loadReportWords(res.data.report.templateKey, res.data.template);", "own = {};"));
 }
 
@@ -1653,7 +1658,8 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
   const fam = (f: string) => REPORT_TEMPLATES.filter((t) => t.family === f).map((t) => t.key);
   eq([fam("logistics"), fam("travel")], [["container_loading", "shipment_update", "damage_claim", "customs_clearance"], ["trip_report", "delegation_visit", "meeting_minutes", "decision_log"]], "the Logistics and Travel families hold their four types each");
   eq(fam("service"), ["service_visit", "warranty_claim", "customer_training", "spare_parts_request", "installation"], "After-sales holds the four of 4D and the installation of 4A");
-  eq(REPORT_TEMPLATES.filter((t) => t.range).map((t) => t.key), ["trip_report", "delegation_visit", "team_summary"], "only a trip, a delegation visit and a team summary (5A) span days their author picks");
+  eq(REPORT_TEMPLATES.filter((t) => t.range).map((t) => t.key), ["trip_report", "delegation_visit", "team_summary", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary", "visitors_log", "gov_bank", "stamp_log", "correspondence", "gift_register", "occasions"],
+    "only a trip, a delegation visit, a team summary (5A) and the CEO office's logs and periods (5B) span days their author picks");
   expect(REPORT_TEMPLATES.filter((t) => t.range).every((t) => t.cadence === null), "a range is never an obligation's period (no cadence)");
   /* A range's last day */
   eq([rangeEnd("2026-09-10", "2026-09-14"), rangeEnd("2026-09-10", "2026-09-01"), rangeEnd("2026-09-10", null), rangeEnd("2026-09-10", "not a date"), rangeEnd("2026-09-10", "2027-01-01")],
@@ -1692,8 +1698,8 @@ console.log("\n§19 logistics, after-sales and travel; a trip's days; its expens
     (c) => (c.includes("{tpl.range ? (") && c.includes('<DatePicker id="kx-rep-date-to" value={draft.dateTo}') && c.includes("dateTo: tpl.range ? d.dateTo || undefined : undefined") && c.includes("moveCarry(draftRef.current.date, `${draftRef.current.date}|${to}`, to)") ? [] : ["a trip cannot span its days"]),
     (src) => src.replace("dateTo: tpl.range ? d.dateTo || undefined : undefined", "dateTo: undefined"));
   rule("a numbers block names each document by its first column — a number or an expense's title", "src/components/reports/app/ReportBlocks.tsx",
-    (c) => (c.includes("const text = String(r.cells[first.id] ?? \"—\");") && c.includes("{c === first ? docLink(r) : dataCell(t, data.source, r, c)}") ? [] : ["an expense row shows no name"]),
-    (src) => src.replace('const text = String(r.cells[first.id] ?? "—");', 'const text = String(r.cells.no ?? "—");'));
+    (c) => (c.includes("const text = dataCell(t, data.source, r, first);") && c.includes("{c === first ? docLink(r) : dataCell(t, data.source, r, c)}") ? [] : ["an expense row shows no name"]),
+    (src) => src.replace("const text = dataCell(t, data.source, r, first);", 'const text = String(r.cells.no ?? "—");'));
 }
 
 /* ── §20 the template builder (Phase 4E) ──────────────────────────────── */
@@ -2056,6 +2062,205 @@ console.log("\n§21 the manager and the team");
   const pages5 = ["src/components/reports/app/ReportsApp.tsx", "src/components/reports/app/ReportView.tsx", "src/components/reports/app/shared.tsx", "src/components/reports/app/ReportBlocks.tsx", "src/components/reports/app/ReportPrintDoc.tsx", "src/app/reports/[id]/print/page.tsx"];
   const heavy5 = pages5.filter((f) => /reports\/team"|translations\/report-team"/.test(code(read(f))));
   expect(heavy5.length === 0, "no report page carries the team rules or the card's words", heavy5.join(", "));
+}
+
+/* ── §22 the CEO office (Phase 5B) ───────────────────────────────────── */
+console.log("\n§22 the CEO office (Phase 5B)");
+{
+  /* Step 0 — the report page stops growing with each description: the one
+     line under a type's name lives apart and rides only where a type is
+     picked (the home, the builder) and a draft's header (asked for then). */
+  const descKeys = Object.keys(reportDescsT);
+  const want = new Set(REPORT_TEMPLATES.map((x) => `tpl.${x.key}.desc`));
+  const stray = descKeys.filter((k) => !want.has(k));
+  expect(stray.length === 0 && descKeys.length === want.size, `one description per built-in type (${want.size}), nothing else in the file`, stray.join(", "));
+  const kept = Object.keys(mainWords).filter((k) => /^tpl\.[^.]+\.desc$/.test(k));
+  expect(kept.length === 0, "the dictionary on every Reports page carries no description", kept.join(", "));
+  rule("a report page asks for the descriptions only while it is a draft", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes('res.data.can.edit ? import("@/lib/translations/report-descs") : Promise.resolve(null),') && !/from "@\/lib\/translations\/report-descs"/.test(c) ? [] : ["every report page carries the descriptions"]),
+    (src) => src.replace('res.data.can.edit ? import("@/lib/translations/report-descs") : Promise.resolve(null),', 'import("@/lib/translations/report-descs"),'));
+  const light = ["src/app/reports/[id]/print/page.tsx", "src/components/reports/app/ReportPrintDoc.tsx", "src/components/reports/app/shared.tsx", "src/components/reports/app/ReportBlocks.tsx"]
+    .filter((f) => /translations\/report-descs"/.test(code(read(f))));
+  expect(light.length === 0, "the print and the shared pieces never carry the descriptions", light.join(", "));
+  /* …and the blocks' own words ride the blocks' chunk. */
+  const blkKept = Object.keys(mainWords).filter((k) => k.startsWith("blk."));
+  expect(blkKept.length === 0, "the dictionary on every Reports page carries no block word", blkKept.slice(0, 6).join(", "));
+  const blkStray = Object.keys(reportBlocksT).filter((k) => !k.startsWith("blk."));
+  expect(blkStray.length === 0, "the block words file holds only block words", blkStray.join(", "));
+  rule("the blocks' words come with the blocks' code", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (c.includes('export { reportBlocksT as BLOCK_WORDS } from "@/lib/translations/report-blocks";') ? [] : ["the blocks come without their words"]),
+    (src) => src.replace('export { reportBlocksT as BLOCK_WORDS } from "@/lib/translations/report-blocks";', ""));
+  rule("the report page merges the blocks' words, and never carries them itself", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("setSectionWords({ ...(mod?.BLOCK_WORDS ?? {}), ...(descs?.reportDescsT ?? {}), ...own });") && !/translations\/report-blocks"/.test(c) ? [] : ["the blocks' words are missing or ride every report"]),
+    (src) => src.replace("setSectionWords({ ...(mod?.BLOCK_WORDS ?? {}), ...(descs?.reportDescsT ?? {}), ...own });", "setSectionWords({ ...(descs?.reportDescsT ?? {}), ...own });"));
+  rule("the print carries the blocks' words", "src/app/reports/[id]/print/page.tsx",
+    (c) => (c.includes("words: { ...reportsT, ...reportBlocksT, ...own }") ? [] : ["a printed block shows its keys"]),
+    (src) => src.replace("words: { ...reportsT, ...reportBlocksT, ...own }", "words: { ...reportsT, ...own }"));
+
+  const RD5 = "src/lib/server/reports/report-data.ts";
+  const API5 = "src/app/api/work-reports";
+  /* The CEO office's types (owner's picks): twenty-two, in four groups,
+     started only with «CEO Office» (or by a super admin). */
+  const officeKeys = ["morning_brief", "decisions_waiting", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary",
+    "office_readiness", "admin_affairs", "office_expenses", "assets_custody", "renewals", "visitors_log", "gov_bank", "company_documents", "stamp_log", "correspondence", "gift_register", "occasions"];
+  const officeTypes = REPORT_TEMPLATES.filter((x) => x.family === "office");
+  eq(officeTypes.map((x) => x.key), officeKeys, "the CEO office's twenty-two types: the CEO's day, time and travel, the office, documents");
+  expect(officeTypes.every((x) => x.officeOnly && x.recipients === "manager" && !x.reviewRequired && !x.hrOnly && !x.teamOnly) && REPORT_TEMPLATES.filter((x) => x.officeOnly).length === officeKeys.length,
+    "only the CEO office starts them, each goes to the writer's manager — and nothing else is office-only");
+  expect(REPORT_FAMILIES.indexOf("office") === REPORT_FAMILIES.indexOf("team") + 1, "the office's group sits right under the manager's team");
+  eq(["admin_affairs", "office_expenses"].map((k) => reportTemplate(k)?.cadence), ["monthly", "monthly"], "the admin affairs and the office's expenses cover a month");
+  expect(officeTypes.every((x) => x.sections.some((sec) => sec.required)), "every office type has something it cannot be sent without");
+
+  /* Its sources and who reads them */
+  eq([...OFFICE_SOURCES], ["decisions", "schedule", "time_split", "meetings", "followups", "occasions", "visitors"], "seven new sources");
+  eq([...LIVE_SOURCES], ["decisions"], "only «waiting for your decision» is computed for its reader");
+  eq([...OFFICE_READS], ["followups", "occasions", "visitors"], "«CEO Office» reads company-wide exactly the three the owner picked");
+  eq(OFFICE_SOURCES.map((x) => DATA_MODULE[x]), ["Reports", "Calendar", "Calendar", "Calendar", "Reports", "HR", "Travel"], "without the row: the calendar needs Calendar, the birthdays HR, the visitors Travel");
+  eq(["leave_manager:a", "leave_hr:a", "overtime:a", "correction:a", "expense:a", "payment:a", "todo:t1", "report:r1", "odd:a"].map(decisionHref),
+    ["/me?tab=approvals", "/hr?tab=leave", "/hr?tab=attendance", "/hr?tab=attendance", "/finance/approvals", "/finance/approvals", "/todo?task=t1", "/reports/r1", null], "a decision opens where it is decided");
+  eq([dataRowHref("schedule", "e|x"), dataRowHref("meetings", "e|x"), dataRowHref("followups", "Sales"), dataRowHref("occasions", "k"), dataRowHref("visitors", "v")], ["/calendar", "/calendar", null, null, null],
+    "an event opens the calendar; follow-ups, occasions and visitors open nothing (the office may hold neither app)");
+
+  /* Waiting for a decision: oldest first, how long it has waited */
+  const dr = decisionRows([
+    { kind: "todo", link: "todo", id: "t1", item: "Sign the contract", from: "Mona", since: "2026-09-20" },
+    { kind: "leave", link: "leave_manager", id: "l1", item: "01/10/2026 → 03/10/2026", from: "Ali", since: "2026-09-10" },
+    { kind: "expense", link: "expense", id: "e1", item: "EXP-7", from: "", since: null, amount: 120.5, currency: "USD" },
+  ], "2026-09-25");
+  eq(dr.map((r) => r.key), ["leave_manager:l1", "todo:t1", "expense:e1"], "what waited longest comes first, one with no date last");
+  eq(dr[0].cells, { item: "01/10/2026 → 03/10/2026", app: "leave", from: "Ali", amount: null, since: "2026-09-10", days: 15 }, "a row: what, which app, from whom, since when, how many days");
+  eq([dr[2].currency, dr[2].cells.amount, dr[2].cells.from, dr[2].cells.days], ["USD", 120.5, "—", null], "money keeps its currency; an unknown sender reads —");
+
+  /* The calendar: the writer's own, a private event only as time */
+  const W0 = Date.parse("2026-09-24T00:00:00Z"), W1 = Date.parse("2026-09-25T00:00:00Z");
+  const ev = (id: string, kind: string, start: string, end: string, extra: Partial<CalendarFact> = {}): CalendarFact =>
+    ({ id, title: `T-${id}`, kind, start, end, allDay: false, private: false, location: null, url: null, guests: 2, ...extra });
+  const cal = [
+    ev("a", "meeting", "2026-09-24T07:00:00Z", "2026-09-24T08:30:00Z", { location: "Board room" }),
+    ev("b", "event", "2026-09-24T10:00:00Z", "2026-09-24T11:00:00Z", { url: "https://www.zoom.us/j/1" }),
+    ev("c", "task", "2026-09-24T12:00:00Z", "2026-09-24T12:30:00Z"),
+    ev("p", "meeting", "2026-09-24T13:00:00Z", "2026-09-24T15:00:00Z", { private: true, title: "Doctor", location: "Clinic" }),
+    ev("d", "holiday", "2026-09-24", "2026-09-24", { allDay: true, guests: 0 }),
+    ev("x", "meeting", "2026-09-23T22:00:00Z", "2026-09-24T01:00:00Z"),
+  ];
+  const sched = scheduleRows(cal, "UTC");
+  eq(sched.map((r) => r.cells.event), ["T-x", "T-d", "T-a", "T-b", "T-c"], "the day's events in order — a private one never listed");
+  eq([sched[2].cells.time, sched[2].cells.where, sched[3].cells.where, sched[1].cells.time, sched[1].cells.date], ["07:00–08:30", "Board room", "zoom.us", "", "2026-09-24"],
+    "each with its time, its place (else the call link's host); an all-day one has a day, no time");
+  eq(meetingRows(cal, "UTC", W0, W1).map((r) => [r.cells.event, r.cells.hours]), [["T-x", 1], ["T-a", 1.5], ["T-b", 1]], "the meetings (timed, not private), each cut at the report's days");
+  eq(timeSplitRows(cal, W0, W1).map((r) => [r.cells.kind, r.cells.events, r.cells.hours, r.cells.share]), [["meeting", 2, 2.5, 42], ["private", 1, 2, 33], ["event", 1, 1, 17], ["task", 1, 0.5, 8]],
+    "the hours per kind and each one's share — a private event counts as time only, an all-day one not at all");
+  expect(!/Doctor|Clinic/.test(JSON.stringify([sched, meetingRows(cal, "UTC", W0, W1), timeSplitRows(cal, W0, W1)])), "a private event's title and place never leave the calendar");
+
+  /* Follow-ups per department: numbers only */
+  const per = new Map([["u1", { open: 3, overdue: 1, done: 0 }], ["u2", { open: 2, overdue: 2, done: 1 }], ["u3", { open: 0, overdue: 0, done: 0 }], ["u4", { open: 1, overdue: 0, done: 0 }]]);
+  eq(followupRows(per, new Map([["u1", "Sales"], ["u2", "Sales"], ["u3", "HR"]])).map((r) => [r.cells.department, r.cells.open_work, r.cells.overdue_work, r.cells.done_work]),
+    [["Sales", 5, 3, 1], ["—", 1, 0, 0]], "per department, the most overdue first; no department is —; a department with nothing is left out");
+
+  /* Birthdays and anniversaries: a day and the years — never a birth year */
+  const staff = [
+    { id: "e1", name: "Ali", birth: "1990-10-02", hire: "2020-09-30" },
+    { id: "e2", name: "Mona", birth: "1992-02-29", hire: "2026-01-10" },
+    { id: "e3", name: "Sara", birth: null, hire: "2025-12-31" },
+  ];
+  eq(occasionRows(staff, "2026-09-28", "2026-10-05").map((r) => [r.cells.person, r.cells.occasion, r.cells.date, r.cells.years]),
+    [["Ali", "anniversary", "2026-09-30", 6], ["Ali", "birthday", "2026-10-02", null]], "the occasions falling in the days, soonest first, with the years of service");
+  eq([yearlyOn("02-29", 2027), yearlyOn("02-29", 2028)], ["2027-02-28", "2028-02-29"], "29 February falls on the 28th in a year without one");
+  eq(occasionRows(staff, "2027-02-27", "2027-03-01").map((r) => [r.cells.person, r.cells.date]), [["Mona", "2027-02-28"]], "…so a leap-day birthday is never skipped");
+  eq(occasionRows(staff, "2026-12-30", "2027-01-11").map((r) => [r.cells.person, r.cells.date, r.cells.years]), [["Sara", "2026-12-31", 1], ["Mona", "2027-01-10", 1]],
+    "a range may cross the new year; the hire day itself is no anniversary");
+  expect(!/1990|1992/.test(JSON.stringify(occasionRows(staff, "2026-01-01", "2026-12-31"))), "a birthday never carries the birth year (so never an age)");
+
+  /* Visitors: a stay that meets the days */
+  const letters = [
+    { id: "v1", visitor: "John", company: "Acme", country: "Egypt", arrival: "2026-09-20", departure: "2026-09-26", purpose: "factory", status: "issued" },
+    { id: "v2", visitor: "Kim", company: null, country: null, arrival: "2026-10-01", departure: "2026-10-03", purpose: "meeting", status: "draft" },
+  ];
+  eq(visitorRows(letters, "2026-09-25", "2026-09-30").map((r) => r.key), ["v1"], "a stay that meets the days is in, a later one is not");
+  eq(visitorRows(letters, "2026-09-25", "2026-10-01").map((r) => [r.cells.purpose, r.cells.status]), [["factory", "issued"], ["meeting", "draft"]], "in order of arrival, each with its purpose — and whether its letter is issued yet");
+  expect(!Object.keys(visitorRows(letters, "2026-01-01", "2026-12-31")[0].cells).some((k) => /passport|dob|birth/.test(k)), "a visitor row has no passport and no date of birth");
+
+  /* The builder keeps the flag */
+  const offCopy = copyOfBuiltin("morning_brief", reportsT);
+  expect(!!offCopy?.def.officeOnly && asReportTemplate("c-abcdefghij", offCopy!.def, 1).officeOnly === true && readSnapshot({ v: 1, def: offCopy!.def, words: {} })?.def.officeOnly === true,
+    "a copy of an office type stays office-only — in the builder, as a type, and in a report's snapshot");
+  expect(checkTemplate({ ...offCopy!.def, officeOnly: "yes" }, { name: { en: "x" } }).def.officeOnly === false, "only a real true makes a builder type office-only");
+  for (const k of ["tb.officeOnly", "tb.officeOnlyHint"]) expect(!!reportBuilderT[k]?.ar && !!reportBuilderT[k]?.zh, `the builder says ${k} in every language`);
+  for (const k of ["blk.dataLiveReader", "blk.dataLiveDraft"]) expect(!!reportsT[k]?.ar && !!reportsT[k]?.zh && reportsT[k].en.includes("{at}") === reportsT[k].ar!.includes("{at}"), `${k} speaks en / zh / ar`);
+
+  /* Who may start one, and what the row reads */
+  rule("only a super admin or «CEO Office» starts a CEO-office type", "src/lib/server/reports/core.ts",
+    (c) => (c.includes('if (tpl.officeOnly && !auth.is_super_admin && (await requireModuleAction(auth, OFFICE_MODULE, "create")) !== null) return false;') ? [] : ["anyone can start an office type"]),
+    (src) => src.replace('  if (tpl.officeOnly && !auth.is_super_admin && (await requireModuleAction(auth, OFFICE_MODULE, "create")) !== null) return false;\n', ""));
+  rule("the Write list offers the office's types — built-in or made in the builder — only with the row", "src/app/api/work-reports/bundle/route.ts",
+    (c) => (c.includes('requireModuleAction(auth, OFFICE_MODULE, "create"),') && c.includes("const hasOffice = auth.is_super_admin || office === null;") && c.includes("(!c.officeOnly || hasOffice)") ? [] : ["the office's types are offered to everyone"]),
+    (src) => src.replace(" && (!c.officeOnly || hasOffice)", ""));
+  rule("«CEO Office» is a Roles row, right under Reports", "src/lib/permission-modules.ts",
+    (c) => (c.includes('{ name: "CEO Office", app: "Reports" }') ? [] : ["the row is missing"]),
+    (src) => src.replace('  { name: "CEO Office", app: "Reports" },\n', ""));
+  rule("the row is «CEO Office» · create, or a super admin", "src/lib/server/reports/office.ts",
+    (c) => (c.includes('return auth.is_super_admin || (await requireModuleAction(auth, OFFICE_MODULE, "create")) === null;') ? [] : ["the office's reads pass without the row"]),
+    (src) => src.replace('return auth.is_super_admin || (await requireModuleAction(auth, OFFICE_MODULE, "create")) === null;', "return true;"));
+  rule("without the row, birthdays need HR and visitors need Travel", RD5,
+    (c) => (c.includes('if (!(await shared.office) && !(await ownRight(auth, "HR"))) return "denied";') && c.includes('if (!(await shared.office) && !(await ownRight(auth, "Travel"))) return "denied";') ? [] : ["anyone reads the staff's birthdays or the visitors"]),
+    (src) => src.replace('      if (!(await shared.office) && !(await ownRight(auth, "HR"))) return "denied";\n', ""));
+  rule("a failed row check is no row — never the company-wide read", RD5,
+    (c) => (c.includes("office: sources.some(isOfficeRead) ? officeAllowed(auth).catch(() => false) : Promise.resolve(false),") ? [] : ["a failed check can open the company"]),
+    (src) => src.replace("officeAllowed(auth).catch(() => false)", "officeAllowed(auth).catch(() => true)"));
+  rule("the calendar blocks read nothing without the Calendar app", RD5,
+    (c) => (c.includes('? requireModuleAccess(auth, "Calendar").then((deny) => (deny ? null : loadCalendarFacts(auth, period.start, period.end)))') && c.includes('if (!cal) return "denied";') ? [] : ["the calendar is read without its app"]),
+    (src) => src.replace('? requireModuleAccess(auth, "Calendar").then((deny) => (deny ? null : loadCalendarFacts(auth, period.start, period.end)))', "? loadCalendarFacts(auth, period.start, period.end)"));
+  const OF = "src/lib/server/reports/office.ts";
+  rule("the calendar is the writer's own — real events, never a mirror, never a declined invitation", OF,
+    (c) => (c.includes("loadCalendarFeed(auth, auth.account_id, feedWindow(new Date(winFrom), new Date(winTo)))") && c.includes('const real = feed.filter((e) => !e.source && e.invite_status !== "declined");') ? [] : ["someone else's calendar, or the mirrors, fill the block"]),
+    (src) => src.replace('const real = feed.filter((e) => !e.source && e.invite_status !== "declined");', "const real = feed;"));
+  rule("a visitor's passport and birth date are never read", OF,
+    (c) => (/passport|visitor_dob/.test(c) ? ["a visitor's passport is read"] : []),
+    (src) => src.replace('.select("id, visitor_name, visitor_company', '.select("id, visitor_passport_no, visitor_name, visitor_company'));
+  rule("the birthdays read a name and two dates — nothing else of a person", OF,
+    (c) => (c.includes('.select("id, employment_status, birth_date, hire_date, people(full_name)")') ? [] : ["more of a person is read"]),
+    (src) => src.replace('.select("id, employment_status, birth_date, hire_date, people(full_name)")', '.select("id, employment_status, birth_date, hire_date, visa_expiry_date, people(full_name)")'));
+  rule("follow-ups count work, never read a title", "src/lib/server/reports/team.ts",
+    (c) => { const a = c.indexOf("export async function teamWorkload("); const b = c.indexOf("\n}\n", a); return a > 0 && !/title/.test(c.slice(a, b)) ? [] : ["a task's title is read for the numbers"]; },
+    (src) => src.replace('select("id, completed, completed_at, due_date, assigned_by_account_id, is_private")', 'select("id, title, completed, completed_at, due_date, assigned_by_account_id, is_private")'));
+  rule("a to-do waits for the one who assigned it", OF,
+    (c) => (c.includes('.eq("approval_state", "pending").or(`assigned_by_account_id.eq.${auth.account_id},and(assigned_by_account_id.is.null,created_by_account_id.eq.${auth.account_id})`)') ? [] : ["someone else's to-dos wait for the reader"]),
+    (src) => src.replace('.or(`assigned_by_account_id.eq.${auth.account_id},and(assigned_by_account_id.is.null,created_by_account_id.eq.${auth.account_id})`)', ""));
+  rule("a report waits only for its To who must review it", OF,
+    (c) => (c.includes('.eq("account_id", auth.account_id).eq("role", "to")') && c.includes('.eq("status", "submitted").eq("review_required", true).eq("superseded", false)') ? [] : ["any report counts as waiting"]),
+    (src) => src.replace('.eq("status", "submitted").eq("review_required", true).eq("superseded", false)', '.eq("status", "submitted")'));
+  rule("finance waits only for whoever may decide it — the queue's door and an approver — never with a draft", OF,
+    (c) => (c.includes('requireApprovalsAccess(auth, "create").then((d) => d === null),') && c.includes("const finance = financeDoor && canApprove(exp.dashboard_role, exp.is_super_admin);") && c.includes('i.status !== "draft" && (costs || !COST_SENSITIVE_KINDS.has(i.kind))') ? [] : ["anyone sees the finance queue, or its drafts"]),
+    (src) => src.replace("const finance = financeDoor && canApprove(", "const finance = canApprove("));
+  rule("…and a draft never counts as waiting", OF,
+    (c) => (c.includes('i.status !== "draft" && (costs || !COST_SENSITIVE_KINDS.has(i.kind))') ? [] : ["a draft waits for a decision"]),
+    (src) => src.replace('i.status !== "draft" && (costs', "(costs"));
+  rule("overtime and corrections wait only for HR · edit", OF,
+    (c) => (c.includes("hrEdit ? overtimeWaiting() : Promise.resolve([]),") && c.includes("hrEdit ? correctionsWaiting() : Promise.resolve([]),") ? [] : ["anyone sees HR's queue"]),
+    (src) => src.replace("hrEdit ? overtimeWaiting() : Promise.resolve([]),", "overtimeWaiting(),"));
+
+  /* Live: stored empty, read for each reader as they open it */
+  rule("sending stores no one's decisions — a live block is frozen empty", RD5,
+    (c) => (c.includes("if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];") ? [] : ["the writer's queue is frozen into the report"]),
+    (src) => src.replace("      if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];\n", ""));
+  rule("a sent report's live block is read for the one opening it", `${API5}/[id]/route.ts`,
+    (c) => (c.includes('const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};') && c.includes("const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;") && /\n\s+sections, status: row\.status,/.test(c) ? [] : ["a reader sees the writer's queue, or none"]),
+    (src) => src.replace("const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;", "const sections = row.sections;"));
+  rule("the live read is for the viewer, and costs nothing on a report without one", RD5,
+    (c) => { const a = c.indexOf("export async function loadLiveData("); const body = c.slice(a); return a > 0 && body.includes("if (!secs.length) return {};") && body.includes("decisionRows(await loadDecisions(auth), today)") ? [] : ["every report pays for the live read"]; },
+    (src) => src.replace("  if (!secs.length) return {};\n  const capturedAt = new Date().toISOString();", "  const capturedAt = new Date().toISOString();"));
+  rule("a live block says whose it is", "src/components/reports/app/ReportBlocks.tsx",
+    (c) => (c.includes('(composing ? t("blk.dataLiveDraft") : t("blk.dataLiveReader").replace("{at}", dmyTime(data.capturedAt)))') ? [] : ["a reader cannot tell the list is their own"]),
+    (src) => src.replace('(composing ? t("blk.dataLiveDraft") : t("blk.dataLiveReader").replace("{at}", dmyTime(data.capturedAt)))', 't("blk.dataLive")'));
+  rule("a copy of a built-in keeps its description", `${API5}/templates/[key]/route.ts`,
+    (c) => (c.includes("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })") ? [] : ["a copy loses the line under its name"]),
+    (src) => src.replace("copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS })", "copyOfBuiltin(key, { ...reportsT, ...REPORT_SECTION_WORDS })"));
+  rule("before the bundle answers, no one is offered an office or a team type", "src/components/reports/app/ReportsApp.tsx",
+    (c) => (c.includes("REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly)") ? [] : ["a clerk sees the CEO office's types flash by"]),
+    (src) => src.replace(" && !x.teamOnly && !x.officeOnly)", ")"));
+  rule("the builder's list knows an office-only type", "src/lib/server/reports/custom-templates.ts",
+    (c) => (c.includes("office_only:def->officeOnly") && c.includes('officeOnly: r.office_only === true || r.office_only === "true",') ? [] : ["a builder type loses its office flag in the list"]),
+    (src) => src.replace('    officeOnly: r.office_only === true || r.office_only === "true",\n', ""));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

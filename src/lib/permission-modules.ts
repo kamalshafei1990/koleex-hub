@@ -47,9 +47,13 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    app it belongs to, closed by default like any module (it is never
    openAccess). Reports 4E (owner's pick, 25 Sep 2026): making, editing and
    hiding report types — super admins always, anyone else only when a role or
-   an override grants "Report Templates". */
+   an override grants "Report Templates". Reports 5B (owner's pick, 25 Sep
+   2026): "CEO Office" — starting the CEO office's report types, and reading
+   inside them the follow-up numbers per department, the birthdays and work
+   anniversaries, and the invited visitors. */
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
+  { name: "CEO Office", app: "Reports" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */

@@ -46,7 +46,7 @@ export interface CustomRow {
 }
 
 type HeadRow = {
-  key: string; family: string | null; icon: string | null; cadence: string | null; hr_only: boolean | string | null; team_only: boolean | string | null;
+  key: string; family: string | null; icon: string | null; cadence: string | null; hr_only: boolean | string | null; team_only: boolean | string | null; office_only: boolean | string | null;
   name: Word | null; desc: Word | null; status: string; version: number; updated_at: string;
 };
 
@@ -54,7 +54,7 @@ type HeadRow = {
  *  the builder's list (all). Only the few fields a list shows travel. */
 export async function loadCustomHeads(tenantId: string | null, opts: { activeOnly?: boolean } = {}): Promise<CustomTemplateHead[]> {
   let q = supabaseServer.from("work_report_templates")
-    .select("key, family:def->>family, icon:def->>icon, cadence:def->>cadence, hr_only:def->hrOnly, team_only:def->teamOnly, name:words->name, desc:words->desc, status, version, updated_at")
+    .select("key, family:def->>family, icon:def->>icon, cadence:def->>cadence, hr_only:def->hrOnly, team_only:def->teamOnly, office_only:def->officeOnly, name:words->name, desc:words->desc, status, version, updated_at")
     .order("created_at", { ascending: true }).limit(200);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   if (opts.activeOnly) q = q.eq("status", "active");
@@ -67,6 +67,7 @@ export async function loadCustomHeads(tenantId: string | null, opts: { activeOnl
     cadence: (r.cadence === "daily" || r.cadence === "weekly" || r.cadence === "monthly" ? r.cadence : null) as ReportCadence,
     hrOnly: r.hr_only === true || r.hr_only === "true",
     teamOnly: r.team_only === true || r.team_only === "true",
+    officeOnly: r.office_only === true || r.office_only === "true",
     name: r.name ?? {},
     desc: r.desc ?? {},
     status: r.status === "archived" ? "archived" : "active",

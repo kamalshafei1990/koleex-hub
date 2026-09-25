@@ -25,6 +25,18 @@ import "server-only";
                      (src/lib/server/reports/team.ts); no app gate: the
                      author's own team decides, and without one the block is
                      empty
+     schedule / time_split / meetings
+                     (5B) the author's own calendar in the report's days
+                     (the Calendar app's right)
+     followups / occasions / visitors
+                     (5B) with «CEO Office» company-wide (numbers per
+                     department; a name, a day and the years; a visitor,
+                     never a passport) — else the author's team, HR, Travel
+     decisions       (5B) LIVE: what waits for the decision of whoever opens
+                     the report. The author's draft shows the author's own;
+                     the send stores none of it (freeze), and loadLiveData
+                     computes it for each reader as they open it
+                     (src/lib/server/reports/office.ts)
 
    Called only for the author (the draft's GET and its date move, and the
    send, which freezes the answer into the report). Each source needs its
@@ -46,6 +58,9 @@ import { templateOf } from "@/lib/reports/custom-templates";
 import { DATA_MODULE, isTeamSource, type TeamSource } from "@/lib/reports/report-data";
 import { teamRows } from "@/lib/reports/team";
 import { loadTeamFacts, loadTeamScope } from "@/lib/server/reports/team";
+import { isLiveSource, isOfficeRead, isOfficeSource, type OfficeSource } from "@/lib/reports/report-data";
+import { decisionRows, followupRows, meetingRows, occasionRows, scheduleRows, timeSplitRows, visitorRows } from "@/lib/reports/office";
+import { loadCalendarFacts, loadDecisions, loadFollowups, loadOccasionPeople, loadVisitorLetters, officeAllowed, ownRight } from "@/lib/server/reports/office";
 
 const LIMIT = REPORT_LIMITS.dataRows;
 const DAY = 86_400_000;
@@ -117,7 +132,7 @@ function sentDay(q: Q): string | null {
   return day(q.issue_date) ?? day(q.created_at);
 }
 
-const READ: Record<Exclude<ReportDataSource, TeamSource>, (c: Ctx) => Promise<ReportDataRow[]>> = {
+const READ: Record<Exclude<ReportDataSource, TeamSource | OfficeSource>, (c: Ctx) => Promise<ReportDataRow[]>> = {
   async quotations(c) {
     let q = supabaseServer.from("quotations")
       .select("id, quote_no, status, currency, total, issue_date, company:doc->>companyName, customer:doc->>customerName")
@@ -252,10 +267,38 @@ const READ: Record<Exclude<ReportDataSource, TeamSource>, (c: Ctx) => Promise<Re
   },
 };
 
+/** The CEO office's blocks (5B): each read once per report. `denied`
+ *  when the author may not read it; the calendar once for all three. */
+type OfficeShared = { office: Promise<boolean>; calendar: Promise<Awaited<ReturnType<typeof loadCalendarFacts>> | null> | null };
+async function officeData(src: OfficeSource, auth: ServerAuthContext, c: Ctx, shared: OfficeShared): Promise<{ rows: ReportDataRow[] } | "denied"> {
+  switch (src) {
+    case "decisions": return { rows: decisionRows(await loadDecisions(auth), c.today) };
+    case "schedule": case "time_split": case "meetings": {
+      const cal = await shared.calendar;
+      if (!cal) return "denied";
+      if (src === "schedule") return { rows: scheduleRows(cal.events, cal.tz) };
+      if (src === "meetings") return { rows: meetingRows(cal.events, cal.tz, cal.winFrom, cal.winTo) };
+      return { rows: timeSplitRows(cal.events, cal.winFrom, cal.winTo) };
+    }
+    case "followups": {
+      const f = await loadFollowups(auth, await shared.office, c.start, c.end);
+      return { rows: followupRows(f.work, f.deptOf) };
+    }
+    case "occasions":
+      if (!(await shared.office) && !(await ownRight(auth, "HR"))) return "denied";
+      return { rows: occasionRows(await loadOccasionPeople(auth), c.start, c.end) };
+    case "visitors":
+      if (!(await shared.office) && !(await ownRight(auth, "Travel"))) return "denied";
+      return { rows: visitorRows(await loadVisitorLetters(auth, c.start, c.end), c.start, c.end) };
+  }
+}
+
 /** The numbers blocks of the author's report, by section id — for the
  *  report's own period, or for `date`'s period when the draft moves (a
- *  range template — a trip — from `date` to `to`). */
-export async function loadReportData(row: Facts, auth: ServerAuthContext, date?: string | null, to?: string | null): Promise<Record<string, ReportDataValue>> {
+ *  range template — a trip — from `date` to `to`). `freeze` (the send): a
+ *  LIVE block stores no rows — each reader's own are computed as they open
+ *  it (loadLiveData). */
+export async function loadReportData(row: Facts, auth: ServerAuthContext, date?: string | null, to?: string | null, opts: { freeze?: boolean } = {}): Promise<Record<string, ReportDataValue>> {
   const tpl = templateOf(row);
   const secs = (tpl?.sections ?? []).filter((s) => s.kind === "data" && s.source);
   if (!tpl || !secs.length) return {};
@@ -271,8 +314,32 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
   const teamP = sources.some(isTeamSource)
     ? loadTeamScope(auth).then((scope) => loadTeamFacts(auth, scope, period.start, period.end, teamParts))
     : null;
+  /* The CEO office (5B): the row checked once, the calendar read once. */
+  const shared: OfficeShared = {
+    /* A failed check is no row — the author's own rights then apply. */
+    office: sources.some(isOfficeRead) ? officeAllowed(auth).catch(() => false) : Promise.resolve(false),
+    /* Only with the Calendar app (null: no access — the blocks say so). */
+    calendar: sources.some((s) => s === "schedule" || s === "time_split" || s === "meetings")
+      ? requireModuleAccess(auth, "Calendar").then((deny) => (deny ? null : loadCalendarFacts(auth, period.start, period.end)))
+      : null,
+  };
+  /* A rejected shared read is answered per block below — never unhandled. */
+  shared.calendar?.catch(() => undefined);
   const answers = new Map(await Promise.all(sources.map(async (src): Promise<[ReportDataSource, ReportDataValue]> => {
     const capturedAt = now.toISOString();
+    if (isOfficeSource(src)) {
+      if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];
+      try {
+        const got = await officeData(src, auth, c, shared);
+        if (got === "denied") return [src, { source: src, rows: [], capturedAt, denied: true }];
+        const live = isLiveSource(src) ? { live: true } : {};
+        return [src, got.rows.length > LIMIT ? { source: src, rows: got.rows.slice(0, LIMIT), capturedAt, truncated: true, ...live } : { source: src, rows: got.rows, capturedAt, ...live }];
+      } catch (e) {
+        console.error(`[reports] office numbers ${src}:`, e instanceof Error ? e.message : e);
+        const unread: ReportDataValue = { source: src, rows: [], capturedAt, failed: true, ...(isLiveSource(src) ? { live: true } : {}) };
+        return [src, unread];
+      }
+    }
     if (isTeamSource(src)) {
       try {
         const team = await teamP!;
@@ -296,4 +363,24 @@ export async function loadReportData(row: Facts, auth: ServerAuthContext, date?:
     }
   })));
   return Object.fromEntries(secs.map((s) => [s.id, answers.get(s.source!)!]));
+}
+
+/** A sent report's LIVE blocks («waiting for your decision», 5B) for the
+ *  one opening it — computed now, for them, never stored. Empty when the
+ *  type has none. */
+export async function loadLiveData(row: Facts, auth: ServerAuthContext): Promise<Record<string, ReportDataValue>> {
+  const tpl = templateOf(row);
+  const secs = (tpl?.sections ?? []).filter((s) => s.kind === "data" && s.source && isLiveSource(s.source));
+  if (!secs.length) return {};
+  const capturedAt = new Date().toISOString();
+  const today = capturedAt.slice(0, 10);
+  let value: ReportDataValue;
+  try {
+    const rows = decisionRows(await loadDecisions(auth), today);
+    value = rows.length > LIMIT ? { source: "decisions", rows: rows.slice(0, LIMIT), capturedAt, truncated: true, live: true } : { source: "decisions", rows, capturedAt, live: true };
+  } catch (e) {
+    console.error("[reports] live decisions:", e instanceof Error ? e.message : e);
+    value = { source: "decisions", rows: [], capturedAt, failed: true, live: true };
+  }
+  return Object.fromEntries(secs.map((s) => [s.id, value]));
 }

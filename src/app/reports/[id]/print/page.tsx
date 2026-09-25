@@ -14,6 +14,7 @@ import ReportPrintDoc from "@/components/reports/app/ReportPrintDoc";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { fetchReport, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import { reportsT } from "@/lib/translations/reports";
+import { reportBlocksT } from "@/lib/translations/report-blocks";
 import { loadReportWords } from "@/lib/translations/report-sections";
 import type { Lang, Translations } from "@/lib/i18n";
 
@@ -33,7 +34,7 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
          come with it — before the sheets are laid out. */
       let own: Translations;
       try { own = await loadReportWords(res.data.report.templateKey, res.data.template); } catch { if (!cancelled) setError("Could not load the report (network)."); return; }
-      if (!cancelled) setData({ detail: res.data, words: { ...reportsT, ...own } });
+      if (!cancelled) setData({ detail: res.data, words: { ...reportsT, ...reportBlocksT, ...own } });
     });
     return () => { cancelled = true; };
   }, [id]);

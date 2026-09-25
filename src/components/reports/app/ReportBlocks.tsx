@@ -33,6 +33,10 @@ import { entityHref } from "@/lib/reports/link-targets";
 import { PhotoViewer } from "./AttachmentsView";
 import { FIELD, type T } from "./shared";
 
+/* The blocks' own words (5B) ride this chunk: the report page merges them
+   into its dictionary when it loads this module, so no other page pays. */
+export { reportBlocksT as BLOCK_WORDS } from "@/lib/translations/report-blocks";
+
 interface EditorProps {
   t: T;
   tplKey: string;
@@ -526,7 +530,9 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   if (data.untracked) return <p className="text-[12.5px] text-[var(--text-dim)]">{t("blk.dataUntracked")}</p>;
   const foot = (
     <p className="text-[11px] text-[var(--text-faint)] tabular-nums">
-      {composing ? t("blk.dataLive") : t("blk.dataAsOf").replace("{at}", dmyTime(data.capturedAt))}
+      {data.live
+        ? (composing ? t("blk.dataLiveDraft") : t("blk.dataLiveReader").replace("{at}", dmyTime(data.capturedAt)))
+        : composing ? t("blk.dataLive") : t("blk.dataAsOf").replace("{at}", dmyTime(data.capturedAt))}
       {data.truncated ? ` · ${t("blk.dataTruncated").replace("{n}", String(REPORT_LIMITS.dataRows))}` : ""}
     </p>
   );
@@ -536,11 +542,11 @@ function DataBlock({ t, def, data, notes, onNote, composing }: {
   const asOf = data.capturedAt.slice(0, 10);
   const colName = (id: string) => t(`blk.dc.${id}`);
   /* The first column names the document (its number, or an expense's
-     title) and opens it. */
+     title) and opens it — in its own words when it is a kind (5B). */
   const first = cols[0];
   const docLink = (r: ReportDataRow) => {
     const href = dataRowHref(data.source, r.key);
-    const text = String(r.cells[first.id] ?? "—");
+    const text = dataCell(t, data.source, r, first);
     return href
       ? <Link href={href} target={composing ? "_blank" : undefined} rel={composing ? "noopener" : undefined} className="font-semibold text-[var(--text-primary)] underline-offset-2 hover:underline">{text}</Link>
       : <span className="font-semibold text-[var(--text-primary)]">{text}</span>;

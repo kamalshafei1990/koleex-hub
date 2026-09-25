@@ -10,10 +10,16 @@
    items still short on a partly received order, the orders past their
    delivery date, the supplier bills still to pay — and (4D) their own
    expenses in a trip's days — and (5A) a manager's TEAM: its reports,
-   attendance and work, one row per person. The server computes the
-   rows (src/lib/server/reports/report-data.ts) — fresh every time a draft
+   attendance and work, one row per person — and (5B, the CEO office) the
+   writer's calendar (the day's or the week's events, where the time went,
+   the meetings), the follow-ups per department, the birthdays and work
+   anniversaries, the visitors of the invitation letters, and «waiting for
+   your decision». The server computes the rows
+   (src/lib/server/reports/report-data.ts) — fresh every time a draft
    opens, frozen into the report when it is sent — so a reader sees exactly
-   what the author saw, and no figure is typed.
+   what the author saw, and no figure is typed. The one exception is a LIVE
+   source («waiting for your decision»): it is computed for whoever opens
+   the report, as they open it, and a sent report stores none of it.
 
    Words: a column is `blk.dc.<id>`, a document status `blk.st.<status>`.
    --------------------------------------------------------------------------- */
@@ -28,6 +34,23 @@ export interface DataColumn { id: string; type: DataColumnType }
 export const TEAM_SOURCES = ["team_reports", "team_attendance", "team_workload"] as const;
 export type TeamSource = (typeof TEAM_SOURCES)[number];
 export const isTeamSource = (s: string): s is TeamSource => (TEAM_SOURCES as readonly string[]).includes(s);
+
+/** The CEO office's sources (5B): read by src/lib/server/reports/office.ts. */
+export const OFFICE_SOURCES = ["decisions", "schedule", "time_split", "meetings", "followups", "occasions", "visitors"] as const;
+export type OfficeSource = (typeof OFFICE_SOURCES)[number];
+export const isOfficeSource = (s: string): s is OfficeSource => (OFFICE_SOURCES as readonly string[]).includes(s);
+/** Computed for the READER when they open the report (5B, owner's pick):
+ *  what waits for THEIR decision — the writer never sees the reader's. */
+export const LIVE_SOURCES = ["decisions"] as const;
+export const isLiveSource = (s: string): boolean => (LIVE_SOURCES as readonly string[]).includes(s);
+/** What holding «CEO Office» in Roles reads company-wide inside a report
+ *  (5B, owner's picks): the follow-up NUMBERS per department, the birthdays
+ *  and work anniversaries (never a birth year or an age), the visitors of
+ *  the invitation letters (never a passport). Without the row each keeps
+ *  its own right — the team, HR, Travel. */
+export const OFFICE_READS = ["followups", "occasions", "visitors"] as const;
+export const isOfficeRead = (s: string): boolean => (OFFICE_READS as readonly string[]).includes(s);
+export const OFFICE_MODULE = "CEO Office";
 
 const NO: DataColumn = { id: "no", type: "text" };
 const PERSON: DataColumn = { id: "person", type: "text" };
@@ -50,6 +73,13 @@ export const DATA_COLUMNS: Record<ReportDataSource, DataColumn[]> = {
   team_reports: [PERSON, n("owed"), n("on_time"), n("sent_late"), n("missed")],
   team_attendance: [PERSON, n("present"), n("late_days"), n("absent"), n("leave_days")],
   team_workload: [PERSON, n("open_work"), n("overdue_work"), n("done_work")],
+  decisions: [{ id: "item", type: "text" }, { id: "app", type: "status" }, { id: "from", type: "text" }, { id: "amount", type: "money" }, { id: "since", type: "date" }, n("days")],
+  schedule: [{ id: "event", type: "text" }, { id: "date", type: "date" }, { id: "time", type: "text" }, { id: "where", type: "text" }, n("with")],
+  time_split: [{ id: "kind", type: "status" }, n("events"), n("hours"), n("share")],
+  meetings: [{ id: "event", type: "text" }, { id: "date", type: "date" }, { id: "time", type: "text" }, n("hours"), n("with")],
+  followups: [{ id: "department", type: "text" }, n("open_work"), n("overdue_work"), n("done_work")],
+  occasions: [PERSON, { id: "occasion", type: "status" }, { id: "date", type: "date" }, n("years")],
+  visitors: [{ id: "visitor", type: "text" }, { id: "company", type: "text" }, { id: "country", type: "text" }, { id: "arrival", type: "date" }, { id: "departure", type: "date" }, { id: "purpose", type: "status" }, { id: "status", type: "status" }],
 };
 
 /** The app a source belongs to — the author must hold it (requireModuleAccess).
@@ -59,6 +89,10 @@ export const DATA_MODULE: Record<ReportDataSource, string> = {
   purchase_orders: "Purchase", receipts: "Purchase", shortages: "Purchase", pos_late: "Purchase", payables: "Purchase",
   expenses: "Expenses",
   team_reports: "Reports", team_attendance: "Reports", team_workload: "Reports",
+  /* 5B: each approval kind checks its own right; the calendar is the
+     writer's own; the office reads pass with «CEO Office» (OFFICE_READS). */
+  decisions: "Reports", schedule: "Calendar", time_split: "Calendar", meetings: "Calendar",
+  followups: "Reports", occasions: "HR", visitors: "Travel",
 };
 
 /** What a row opens: the document in its own app — a quotation or an
@@ -76,6 +110,27 @@ export function dataRowHref(source: ReportDataSource, key: string): string | nul
     /* A person's reports on the compliance board; attendance and work
        open nothing (the manager may hold neither HR nor Projects). */
     case "team_reports": return "/reports?tab=compliance";
+    /* 5B: a decision opens where it is decided (its key is kind:id); an
+       event, the calendar. Follow-ups, occasions and visitors open nothing
+       — the office may hold neither To-do, HR nor Travel. */
+    case "decisions": return decisionHref(key);
+    case "schedule": case "meetings": return "/calendar";
+    default: return null;
+  }
+}
+
+/** Where a pending decision is taken (5B) — key `kind:id`. */
+export function decisionHref(key: string): string | null {
+  const at = key.indexOf(":");
+  const kind = at > 0 ? key.slice(0, at) : key;
+  const id = at > 0 ? key.slice(at + 1) : "";
+  switch (kind) {
+    case "leave_manager": return "/me?tab=approvals";
+    case "leave_hr": return "/hr?tab=leave";
+    case "overtime": case "correction": return "/hr?tab=attendance";
+    case "expense": case "payment": case "bill": case "journal": return "/finance/approvals";
+    case "todo": return id ? `/todo?task=${id}` : "/todo";
+    case "report": return id ? `/reports/${id}` : "/reports";
     default: return null;
   }
 }
@@ -85,6 +140,11 @@ export const DATA_STATUSES = [
   "draft", "sent", "accepted", "rejected", "expired", "open", "confirmed", "in_production", "shipped", "delivered", "completed", "closed", "cancelled", "paid", "partial", "overdue",
   "pending", "approved", "received", "posted", "void", "issued", "final", "complete", "voided",
   "submitted", "changes_requested",
+  /* 5B — coded values with a word: what a decision is, an event's kind, an
+     occasion, a visit's purpose. */
+  "leave", "overtime", "correction", "expense", "payment", "bill", "journal", "todo", "report",
+  "meeting", "event", "task", "reminder", "out_of_office", "holiday", "private",
+  "birthday", "anniversary", "exhibition", "factory", "training",
 ] as const;
 
 /** A status's word: "partial" is partly RECEIVED on a purchase order or a

@@ -76,9 +76,16 @@ export default function ReportView({ id }: { id: string }) {
     if (res.ok) {
       const key = res.data.report.templateKey;
       try {
-        const [mod, own] = await Promise.all([hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null), loadReportWords(key, res.data.template)]);
+        /* A built-in type's one-line description (5B) shows only in a
+           draft's header — its own chunk, asked for with the words; the
+           blocks' own words come with the blocks' code. */
+        const [mod, own, descs] = await Promise.all([
+          hasBlocks(typeOf(res.data)) ? import("./ReportBlocks") : Promise.resolve(null),
+          loadReportWords(key, res.data.template),
+          res.data.can.edit ? import("@/lib/translations/report-descs") : Promise.resolve(null),
+        ]);
         if (mod) setBlocks(() => mod);
-        setSectionWords(own);
+        setSectionWords({ ...(mod?.BLOCK_WORDS ?? {}), ...(descs?.reportDescsT ?? {}), ...own });
       } catch { setPhase("error"); return; }
       setDetail(res.data); setPhase("ready");
     }

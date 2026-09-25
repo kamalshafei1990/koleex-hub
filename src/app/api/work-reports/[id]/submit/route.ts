@@ -43,7 +43,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (missing.length) return NextResponse.json({ error: "missing_sections", missing }, { status: 400 });
   if (tpl.customTitle && !row.title.trim()) return NextResponse.json({ error: "missing_title" }, { status: 400 });
   if (!recipients.some((r) => r.role === "to")) return NextResponse.json({ error: "no_recipients" }, { status: 400 });
-  const sections = withBlockData(typed, await loadReportData(row, auth));
+  /* Frozen as sent — except a LIVE block (5B), which stores nothing: each
+     reader's own is read as they open it. */
+  const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));
 
   const now = new Date().toISOString();
   const { data: sent, error } = await supabaseServer.from("work_reports")

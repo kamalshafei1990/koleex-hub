@@ -51,6 +51,8 @@ export interface CustomDef {
   hrOnly: boolean;
   /** 5A: only someone with a team starts it. */
   teamOnly: boolean;
+  /** 5B: only super admins and «CEO Office» in Roles start it. */
+  officeOnly: boolean;
   base?: string;
   sections: ReportSectionDef[];
 }
@@ -66,6 +68,7 @@ export interface CustomTemplateHead {
   cadence: ReportCadence;
   hrOnly?: boolean;
   teamOnly?: boolean;
+  officeOnly?: boolean;
   name: Word;
   desc: Word;
   status?: "active" | "archived";
@@ -206,6 +209,7 @@ export function checkTemplate(rawDef: unknown, rawWords: unknown): { def: Custom
     customTitle: d.customTitle === true,
     hrOnly: d.hrOnly === true,
     teamOnly: d.teamOnly === true,
+    officeOnly: d.officeOnly === true,
     sections,
   };
   if (typeof d.base === "string" && copyableBuiltin(d.base)) def.base = d.base;
@@ -248,6 +252,7 @@ export function asReportTemplate(key: string, def: CustomDef, v: number): Report
   if (def.customTitle) out.customTitle = true;
   if (def.hrOnly) out.hrOnly = true;
   if (def.teamOnly) out.teamOnly = true;
+  if (def.officeOnly) out.officeOnly = true;
   if (def.range) out.range = true;
   if (def.base) out.base = def.base;
   return out;
@@ -271,7 +276,7 @@ export function readSnapshot(raw: unknown): TemplateSnapshot | null {
     cadence: def.cadence === "daily" || def.cadence === "weekly" || def.cadence === "monthly" ? def.cadence : null,
     range: def.range === true, recipients: RECIPIENTS.includes(def.recipients as ReportDefaultRecipients) ? (def.recipients as ReportDefaultRecipients) : "manager",
     reviewRequired: def.reviewRequired === true, confidential: def.confidential === true, urgent: def.urgent === true,
-    customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, sections,
+    customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, officeOnly: def.officeOnly === true, sections,
   };
   if (typeof def.base === "string") clean.base = def.base;
   const words = obj(snap.words) as TemplateWords;
@@ -298,7 +303,7 @@ export function copyOfBuiltin(key: string, dict: Translations): { def: CustomDef
   const def: CustomDef = {
     family: t.family, icon: t.icon, cadence: t.cadence, range: !!t.range,
     recipients: t.recipients, reviewRequired: t.reviewRequired, confidential: t.confidential, urgent: !!t.urgent,
-    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, base: t.key,
+    customTitle: !!t.customTitle, hrOnly: !!t.hrOnly, teamOnly: !!t.teamOnly, officeOnly: !!t.officeOnly, base: t.key,
     sections: t.sections.map((s) => JSON.parse(JSON.stringify(s)) as ReportSectionDef),
   };
   const words: TemplateWords = {};

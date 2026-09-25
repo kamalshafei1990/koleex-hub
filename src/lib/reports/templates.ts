@@ -57,11 +57,20 @@
    and its work (project tasks and the to-dos someone assigned; a person's
    own to-dos stay private). And the 1-on-1 minutes and the promotion or
    bonus recommendation. Only someone with a team starts these (teamOnly).
-   --------------------------------------------------------------------------- */
+   --------------------------------------------------------------------------- 
+   Phase 5B (owner's picks, 25 Sep 2026): the CEO office — 22 types in four
+   groups (the CEO's day, time and travel, the office, documents), started
+   only by super admins and whoever holds «CEO Office» in Roles
+   (`officeOnly`). Their numbers come from the calendar (the writer's own
+   events), the approvals across the apps, the follow-ups per department,
+   the birthdays and work anniversaries, and the visitors of the invitation
+   letters; «waiting for your decision» is the one block computed for its
+   READER, when they open it — never frozen (LIVE_SOURCES).
+   */
 
 import type { RrIconName } from "@/components/ui/RrIcon";
 
-export type ReportFamily = "work" | "team" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
+export type ReportFamily = "work" | "team" | "office" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr";
 export type ReportCadence = "daily" | "weekly" | "monthly" | null;
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
@@ -78,12 +87,14 @@ export type ReportDataSource =
   | "quotations" | "orders" | "invoices" | "quotes_waiting" | "receivables"
   | "purchase_orders" | "receipts" | "shortages" | "pos_late" | "payables"
   | "expenses"
-  | "team_reports" | "team_attendance" | "team_workload";
+  | "team_reports" | "team_attendance" | "team_workload"
+  | "decisions" | "schedule" | "time_split" | "meetings" | "followups" | "occasions" | "visitors";
 export const REPORT_DATA_SOURCES: ReportDataSource[] = [
   "quotations", "orders", "invoices", "quotes_waiting", "receivables",
   "purchase_orders", "receipts", "shortages", "pos_late", "payables",
   "expenses",
   "team_reports", "team_attendance", "team_workload",
+  "decisions", "schedule", "time_split", "meetings", "followups", "occasions", "visitors",
 ];
 /** The currencies a table's money is written in. */
 export const REPORT_CURRENCIES = ["USD", "CNY", "EGP", "EUR", "AED", "SAR"] as const;
@@ -134,6 +145,9 @@ export interface ReportTemplateDef {
   /** Only someone with a team (anyone under them) — or a super admin —
    *  starts it (5A: the team summary, a 1-on-1, a recommendation). */
   teamOnly?: boolean;
+  /** Only super admins and holders of «CEO Office» in Roles start it (5B:
+   *  the CEO office's types). Everyone else never sees it offered. */
+  officeOnly?: boolean;
   /** The free report takes the author's own title. */
   customTitle?: boolean;
   /** Only an event asks for it (Phase 3D: the probation review): never
@@ -155,6 +169,12 @@ const t = (id: string, kind: ReportSectionKind, required = false): ReportSection
 /** A block section (Phase 4A) with its points, columns or link types. */
 const b = (id: string, kind: ReportSectionKind, extra: Omit<ReportSectionDef, "id" | "kind" | "required">, required = false): ReportSectionDef => ({ id, kind, required, ...extra });
 const pts = (...ids: string[]) => ids.map((id) => ({ id }));
+/** A table column (text unless said). */
+const c = (id: string, type: ReportColumnType = "text") => ({ id, type });
+/** A CEO-office type (5B): officeOnly, to the writer's manager, no review. */
+const office = (key: string, icon: RrIconName, sections: ReportSectionDef[], more: Partial<ReportTemplateDef> = {}): ReportTemplateDef =>
+  ({ key, family: "office", icon, cadence: null, officeOnly: true, recipients: "manager", reviewRequired: false, confidential: false, sections, ...more });
+const R = { range: true } as const;
 
 export const REPORT_TEMPLATES: ReportTemplateDef[] = [
   /* ── Work: the Executive Assistant JD's reporting system, for everyone ── */
@@ -498,6 +518,88 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
       t("effective", "text"),
       b("sign", "signature", {}),
     ] },
+  /* ── The CEO office (Phase 5B, owner's picks 25 Sep 2026): only super
+     admins and «CEO Office» in Roles start these ── */
+  /* The CEO's day */
+  office("morning_brief", "mug-hot", [
+    t("priorities", "list", true), b("schedule", "data", { source: "schedule" }), b("decisions", "data", { source: "decisions" }),
+    b("occasions", "data", { source: "occasions" }), t("followups", "list"), t("notes", "text"),
+  ]),
+  office("decisions_waiting", "scale", [
+    t("summary", "text", true), b("decisions", "data", { source: "decisions" }),
+    b("requests", "table", { columns: [c("request"), c("from"), c("deadline", "date"), c("recommendation")] }), t("notes", "text"),
+  ]),
+  office("followups_open", "clipboard", [
+    t("summary", "text", true), b("departments", "data", { source: "followups" }), t("overdue", "list"), t("actions", "list"),
+  ], R),
+  office("promises_log", "badge-check", [
+    b("promises", "table", { columns: [c("promise"), c("to"), c("due", "date"), c("owner"), c("state")] }, true), t("notes", "text"),
+  ], R),
+  office("calls_log", "user-headset", [
+    b("calls", "table", { columns: [c("date", "date"), c("who"), c("channel"), c("subject"), c("action")] }, true), t("urgent", "list"), t("notes", "text"),
+  ], R),
+  /* Time and travel */
+  office("next_week", "calendar", [
+    t("summary", "text", true), b("schedule", "data", { source: "schedule" }), t("prep", "list"), t("conflicts", "list"),
+  ], R),
+  office("trip_folder", "plane", [
+    t("purpose", "text", true),
+    b("ready", "checklist", { points: pts("passport_visa", "flights", "hotel", "transport", "meetings", "documents", "gifts", "money", "insurance", "contacts") }),
+    b("itinerary", "table", { columns: [c("date", "date"), c("time"), c("what"), c("where")] }),
+    b("people", "table", { columns: [c("name"), c("company"), c("phone")] }), t("notes", "text"),
+  ], R),
+  office("bookings_log", "ticket", [
+    b("bookings", "table", { columns: [c("date", "date"), c("kind"), c("for"), c("details"), c("cost", "money"), c("ref")], summaryOf: ["cost"] }, true), t("notes", "text"),
+  ], R),
+  office("time_split", "clock", [
+    t("reading", "text", true), b("time", "data", { source: "time_split" }), b("meetings", "data", { source: "meetings" }), t("next", "list"),
+  ], R),
+  office("meetings_summary", "chair-office", [
+    t("summary", "text", true), b("meetings", "data", { source: "meetings" }), t("decisions", "list"),
+    b("actions", "table", { columns: [c("action"), c("owner"), c("due", "date")] }),
+  ], R),
+  /* The office */
+  office("office_readiness", "broom", [
+    b("checks", "checklist", { points: pts("reception", "meeting_rooms", "supplies", "hospitality", "printers_it", "internet_phones", "security_keys", "lights_ac", "cleaning", "mail") }, true),
+    t("issues", "list"), t("notes", "text"),
+  ]),
+  office("admin_affairs", "building", [
+    t("summary", "text", true), t("done", "list"), t("pending", "list"), t("issues", "list"), t("next", "list"),
+  ], { cadence: "monthly" }),
+  office("office_expenses", "wallet", [
+    t("summary", "text", true), b("expenses", "data", { source: "expenses" }), t("unusual", "list"), t("savings", "list"),
+  ], { cadence: "monthly" }),
+  office("assets_custody", "key", [
+    b("assets", "table", { columns: [c("item"), c("tag"), c("holder"), c("location"), c("condition")] }, true), t("missing", "list"), t("notes", "text"),
+  ]),
+  office("renewals", "recycle", [
+    b("items", "table", { columns: [c("item"), c("provider"), c("renews", "date"), c("cost", "money"), c("owner"), c("action")], summaryOf: ["cost"] }, true),
+    t("due_soon", "list"), t("notes", "text"),
+  ]),
+  office("visitors_log", "id-badge", [
+    t("summary", "text", true), b("invited", "data", { source: "visitors" }),
+    b("visitors", "table", { columns: [c("date", "date"), c("name"), c("company"), c("host"), c("purpose")] }), t("followups", "list"),
+  ], R),
+  /* Documents */
+  office("gov_bank", "bank", [
+    b("transactions", "table", { columns: [c("date", "date"), c("entity"), c("transaction"), c("state"), c("next")] }, true), t("waiting", "list"), t("notes", "text"),
+  ], R),
+  office("company_documents", "file", [
+    b("documents", "table", { columns: [c("document"), c("number"), c("expires", "date"), c("kept"), c("action")] }, true), t("expiring", "list"), t("notes", "text"),
+  ]),
+  office("stamp_log", "signature", [
+    b("uses", "table", { columns: [c("date", "date"), c("document"), c("party"), c("used_by"), c("approved_by")] }, true), t("notes", "text"),
+  ], R),
+  office("correspondence", "paper-plane", [
+    b("letters", "table", { columns: [c("date", "date"), c("direction"), c("party"), c("subject"), c("ref"), c("action")] }, true), t("pending", "list"), t("notes", "text"),
+  ], R),
+  office("gift_register", "gift", [
+    b("gifts", "table", { columns: [c("date", "date"), c("direction"), c("party"), c("gift"), c("value", "money"), c("approved_by")], summaryOf: ["value"] }, true), t("notes", "text"),
+  ], R),
+  office("occasions", "cocktail", [
+    t("plan", "list", true), b("occasions", "data", { source: "occasions" }),
+    b("greetings", "table", { columns: [c("date", "date"), c("person"), c("occasion"), c("how")] }), t("notes", "text"),
+  ], R),
   /* ── Memos ── */
   { key: "decision_memo", family: "memos", icon: "gavel", cadence: null, recipients: "manager", reviewRequired: true, confidential: false,
     sections: [t("background", "text", true), t("options", "list", true), t("recommendation", "text", true), t("deadline", "text")] },
@@ -527,7 +629,7 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("employee", "text", true), t("performance", "text", true), t("strengths", "list"), t("concerns", "list"), t("recommendation", "text", true)] },
 ];
 
-export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
+export const REPORT_FAMILIES: ReportFamily[] = ["work", "team", "office", "visits", "sales", "marketing", "suppliers", "quality", "logistics", "service", "travel", "memos", "hr"];
 
 const BY_KEY = new Map(REPORT_TEMPLATES.map((x) => [x.key, x]));
 export const reportTemplate = (key: string): ReportTemplateDef | null => BY_KEY.get(key) ?? null;
@@ -572,6 +674,9 @@ export interface ReportDataValue {
   /** The team's reports before counting starts (5A): nothing is late or
    *  missing yet — said as such. */
   untracked?: boolean;
+  /** 5B: computed for whoever OPENS the report, as they open it («waiting
+   *  for your decision») — never frozen; a sent report stores no rows. */
+  live?: boolean;
 }
 export interface ReportSectionValue {
   id: string;

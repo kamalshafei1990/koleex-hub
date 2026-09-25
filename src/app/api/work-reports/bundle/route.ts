@@ -16,6 +16,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@/lib/server/reports/core";
 import { REPORT_TEMPLATES } from "@/lib/reports/templates";
+import { OFFICE_MODULE } from "@/lib/reports/report-data";
 import { loadMyDue } from "@/lib/server/reports/obligations";
 import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -65,15 +66,18 @@ export async function GET(req: Request) {
     loadCustomHeads(t, { activeOnly: true }).catch(quiet("custom templates", [])),
     loadHiddenKeys(t).catch(quiet("hidden templates", [] as string[])),
     requireModuleAccess(auth, TEMPLATES_MODULE),
+    /* 5B: «CEO Office» in Roles starts the CEO office's types. */
+    requireModuleAction(auth, OFFICE_MODULE, "create"),
   ]);
 
   /* canStartTemplate's rule, decided once for the wave: an HR-only type
      (warning, exit interview) needs HR·create; a team type (5A) needs a
-     team. A hidden built-in is not offered (4E); its old reports stay where
+     team; a CEO-office type (5B) needs «CEO Office». A hidden built-in is not offered (4E); its old reports stay where
      they are. */
   const hasTeam = auth.is_super_admin || tree.descendantsOf(me).length > 0;
+  const hasOffice = auth.is_super_admin || office === null;
   const hiddenSet = new Set(hidden);
-  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam)).map((tpl) => tpl.key);
+  const templates = REPORT_TEMPLATES.filter((tpl) => !tpl.requestOnly && !hiddenSet.has(tpl.key) && (!tpl.hrOnly || hrCreate === null) && (!tpl.teamOnly || hasTeam) && (!tpl.officeOnly || hasOffice)).map((tpl) => tpl.key);
   const nameOf = new Map(people.map((p) => [p.id, p]));
 
   return NextResponse.json({
@@ -92,7 +96,7 @@ export async function GET(req: Request) {
       };
     }),
     templates,
-    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam)),
+    custom: custom.filter((c) => (!c.hrOnly || hrCreate === null) && (!c.teamOnly || hasTeam) && (!c.officeOnly || hasOffice)),
     people: people.filter((p) => p.id !== me),
     library: { hr: hrView === null, finance: finance === null, tasks: todo === null },
   }, { headers: { "Cache-Control": "private, no-store" } });

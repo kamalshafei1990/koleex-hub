@@ -121,8 +121,9 @@ async function teamAttendance(auth: ServerAuthContext, owners: Owner[], from: st
 }
 
 /** Project tasks assigned to each person, and the to-dos someone else
- *  assigned them (not private) — open, overdue, done in those days. */
-async function teamWorkload(auth: ServerAuthContext, ids: string[], from: string, to: string, today: string) {
+ *  assigned them (not private) — open, overdue, done in those days. The
+ *  CEO office's follow-ups per department (5B) count the same way. */
+export async function teamWorkload(auth: ServerAuthContext, ids: string[], from: string, to: string, today: string) {
   const items = new Map<string, WorkItem[]>(ids.map((id) => [id, []]));
   const push = (id: string, it: WorkItem) => items.get(id)?.push(it);
   for (const part of chunks(ids)) {

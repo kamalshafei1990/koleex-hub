@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { reportsT } from "@/lib/translations/reports";
+import { reportDescsT } from "@/lib/translations/report-descs";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import SharedKpiCard from "@/components/ui/KpiCard";
@@ -47,13 +48,17 @@ const TeamSummary = dynamic(() => import("./TeamSummary"), { ssr: false, loading
 type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
 const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
 const WARM_KEY = "kx:reports:bundle";
+/** The UI words and every type's name, with the one line under each name
+ *  (5B: the descriptions live apart — only the places a type is picked
+ *  carry them, this home and the builder's list). */
+const APP_WORDS = { ...reportsT, ...reportDescsT };
 
 export default function ReportsApp() {
   const [bundle, setBundle] = useState<ReportsBundle | null>(null);
   /* The builder types' names and descriptions (4E) join the dictionary, so
      "Write a report" names them like any other type. */
   const custom = bundle?.custom;
-  const words = useMemo(() => (custom?.length ? { ...reportsT, ...headWords(custom) } : reportsT), [custom]);
+  const words = useMemo(() => (custom?.length ? { ...APP_WORDS, ...headWords(custom) } : APP_WORDS), [custom]);
   const { t, lang } = useTranslation(words);
   const router = useRouter();
   const [tab, setTabState] = useState<Tab>(() => {
@@ -209,7 +214,9 @@ function Home({ t, lang, bundle, creating, createError, onStart, onOpenInbox }: 
   t: T; lang: string; bundle: ReportsBundle | null; creating: string | null; createError: string | null;
   onStart: StartFn; onOpenInbox: () => void;
 }) {
-  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly).map((x) => x.key)), [bundle]);
+  /* Before the bundle says what this person may start, only the types
+     open to all staff — never a team's or the CEO office's (5B). */
+  const allowed = useMemo(() => new Set(bundle?.templates ?? REPORT_TEMPLATES.filter((x) => !x.hrOnly && !x.requestOnly && !x.teamOnly && !x.officeOnly).map((x) => x.key)), [bundle]);
   /* Every type this person may start, by group: the built-ins, then the
      builder's (4E) — each named from the dictionary. */
   const offered = useMemo(() => [

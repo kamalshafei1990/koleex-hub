@@ -29,6 +29,7 @@ import { requireReportsUser } from "@/lib/server/reports/core";
 import { loadCustomTemplate, templateRights } from "@/lib/server/reports/custom-templates";
 import { checkTemplate, copyOfBuiltin, copyableBuiltin, hideableBuiltin, isCustomKey } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
+import { reportDescsT } from "@/lib/translations/report-descs";
 import { REPORT_SECTION_WORDS } from "@/lib/translations/report-sections/all";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +58,7 @@ export async function GET(req: Request, { params }: Params) {
     if (!row) return notFound();
     return NextResponse.json({ key: row.key, def: row.def, words: row.words, status: row.status, version: row.version }, { headers: { "Cache-Control": "private, no-store" } });
   }
-  const copy = copyableBuiltin(key) ? copyOfBuiltin(key, { ...reportsT, ...REPORT_SECTION_WORDS }) : null;
+  const copy = copyableBuiltin(key) ? copyOfBuiltin(key, { ...reportsT, ...reportDescsT, ...REPORT_SECTION_WORDS }) : null;
   if (!copy) return notFound();
   return NextResponse.json({ key: null, def: copy.def, words: copy.words }, { headers: { "Cache-Control": "private, no-store" } });
 }

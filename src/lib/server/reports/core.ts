@@ -18,6 +18,7 @@ import { listAssignableEmployees, type AssignableEmployee } from "@/lib/server/a
 import { hrReviewerAccountIds } from "@/lib/server/leave-review";
 import { reportAccess, type ReportAccess } from "@/lib/reports/access";
 import type { ReportTemplateDef, ReportSectionValue } from "@/lib/reports/templates";
+import { OFFICE_MODULE } from "@/lib/reports/report-data";
 
 export const REPORT_COLS =
   "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at, template_snapshot";
@@ -71,10 +72,12 @@ export function requireReportsUser(auth: ServerAuthContext): NextResponse | null
 /** May this person START a report of this type? HR-only types (a warning,
  *  an exit interview) need HR·create; a team type (5A: the team summary, a
  *  1-on-1, a recommendation) needs a team — anyone under them — or a super
+ *  admin; a CEO-office type (5B) needs «CEO Office» in Roles, or a super
  *  admin; every other type is open to staff. */
 export async function canStartTemplate(tpl: ReportTemplateDef, auth: ServerAuthContext): Promise<boolean> {
   if (tpl.hrOnly && (await requireModuleAction(auth, "HR", "create")) !== null) return false;
   if (tpl.teamOnly && !auth.is_super_admin && !(await loadOrgTree(auth.tenant_id)).descendantsOf(auth.account_id).length) return false;
+  if (tpl.officeOnly && !auth.is_super_admin && (await requireModuleAction(auth, OFFICE_MODULE, "create")) !== null) return false;
   return true;
 }
 

@@ -5,6 +5,7 @@
 import type { Translations } from "@/lib/i18n";
 import work from "./work";
 import team from "./team";
+import office from "./office";
 import visits from "./visits";
 import sales from "./sales";
 import marketing from "./marketing";
@@ -16,4 +17,4 @@ import travel from "./travel";
 import memos from "./memos";
 import hr from "./hr";
 
-export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };
+export const REPORT_SECTION_WORDS: Translations = { ...work, ...team, ...office, ...visits, ...sales, ...marketing, ...suppliers, ...quality, ...logistics, ...service, ...travel, ...memos, ...hr };

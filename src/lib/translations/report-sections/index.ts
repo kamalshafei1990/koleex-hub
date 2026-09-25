@@ -21,6 +21,7 @@ import { CARRY_RULES } from "@/lib/reports/carry";
 const LOAD: Record<ReportFamily, () => Promise<{ default: Translations }>> = {
   work: () => import("./work"),
   team: () => import("./team"),
+  office: () => import("./office"),
   visits: () => import("./visits"),
   sales: () => import("./sales"),
   marketing: () => import("./marketing"),

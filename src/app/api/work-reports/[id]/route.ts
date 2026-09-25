@@ -34,7 +34,8 @@ import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/ser
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { loadCarry } from "@/lib/server/reports/carry";
 import { loadAppFeed } from "@/lib/server/reports/app-feed";
-import { loadReportData } from "@/lib/server/reports/report-data";
+import { loadLiveData, loadReportData } from "@/lib/server/reports/report-data";
+import { withBlockData } from "@/lib/reports/report-data";
 import { loadAttachmentRows, removeUnreferenced, toClientAttachment, type AttachmentRow } from "@/lib/server/reports/attachments";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +85,10 @@ export async function GET(req: Request, { params }: Params) {
   const [carry, appFeed, blockData] = isAuthor && row.status === "draft"
     ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth), loadReportData(row, auth)])
     : [undefined, undefined, undefined];
+  /* 5B: a sent report's LIVE block («waiting for your decision») shows what
+     waits for THIS viewer, read now — never what the author's queue held. */
+  const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};
+  const sections = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;
   /* A builder type (4E): the version this report was started with. */
   const snap = row.template_snapshot ? readSnapshot(row.template_snapshot) : null;
   const custom = snap ? templateOf(row) : null;
@@ -92,7 +97,7 @@ export async function GET(req: Request, { params }: Params) {
     report: {
       id: row.id, templateKey: row.template_key, title: row.title, author: person(row.author_account_id),
       periodStart: row.period_start, periodEnd: row.period_end, periodKey: row.period_key,
-      sections: row.sections, status: row.status, confidential: row.confidential, reviewRequired: row.review_required,
+      sections, status: row.status, confidential: row.confidential, reviewRequired: row.review_required,
       version: row.version, previousId: row.previous_id, superseded: row.superseded,
       newerId: row.superseded ? ((newerRes.data as { id?: string } | null)?.id ?? null) : null,
       submittedAt: row.submitted_at, decidedAt: row.decided_at, decidedBy: row.decided_by ? person(row.decided_by) : null,

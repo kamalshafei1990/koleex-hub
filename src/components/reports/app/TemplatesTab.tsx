@@ -26,6 +26,7 @@ import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import type { Lang } from "@/lib/i18n";
 import { reportBuilderT } from "@/lib/translations/report-builder";
+import { reportBlocksT } from "@/lib/translations/report-blocks";
 import {
   REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES, REPORT_TEMPLATES,
   type ReportColumnType, type ReportDataSource, type ReportFamily, type ReportLinkType, type ReportSectionDef, type ReportSectionKind,
@@ -63,16 +64,16 @@ const blankDoc = (): TemplateDoc => ({
   key: null,
   def: {
     family: "work", icon: "document", cadence: null, range: false, recipients: "manager", reviewRequired: false,
-    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
+    confidential: false, urgent: false, customTitle: false, hrOnly: false, teamOnly: false, officeOnly: false, sections: [{ id: "s1", kind: "text", required: true }],
   },
   words: {},
 });
 
 export default function TemplatesTab({ t: shared, lang, onChanged }: { t: T; lang: string; onChanged: () => void }) {
   const l = (LANGS.find((x) => x === lang) ?? "en") as Lang;
-  /* The builder's own words first, then the Reports dictionary (groups, link kinds, type names). */
+  /* The builder's own words first (and the blocks' — link kinds, 5B), then the Reports dictionary (groups, type names). */
   const t = useCallback<T>((key, fallback) => {
-    const e = reportBuilderT[key];
+    const e = reportBuilderT[key] ?? reportBlocksT[key];
     return e ? (e[l] ?? e.en) : shared(key, fallback);
   }, [shared, l]);
   const [list, setList] = useState<TemplateList | null>(null);
@@ -500,6 +501,7 @@ function Editor({ t, lang, doc, onClose }: { t: T; lang: Lang; doc: TemplateDoc;
             <Switch on={def.customTitle} label={t("tb.ownTitle")} hint={t("tb.ownTitleHint")} onChange={(v) => patch({ customTitle: v })} />
             <Switch on={def.hrOnly} label={t("tb.hrOnly")} hint={t("tb.hrOnlyHint")} onChange={(v) => patch({ hrOnly: v })} />
             <Switch on={def.teamOnly} label={t("tb.teamOnly")} hint={t("tb.teamOnlyHint")} onChange={(v) => patch({ teamOnly: v })} />
+            <Switch on={def.officeOnly} label={t("tb.officeOnly")} hint={t("tb.officeOnlyHint")} onChange={(v) => patch({ officeOnly: v })} />
           </section>
         </aside>
       </div>
