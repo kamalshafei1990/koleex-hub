@@ -222,3 +222,7 @@ export { default as WorkflowIcon } from "./WorkflowIcon";
 export { default as WrenchIcon } from "./WrenchIcon";
 export { default as XCircleIcon } from "./XCircleIcon";
 export { default as ZapIcon } from "./ZapIcon";
+export { default as RepeatIcon } from "./RepeatIcon";
+export { default as TimelineIcon } from "./TimelineIcon";
+export { default as GanttChartIcon } from "./GanttChartIcon";
+export { default as VideoIcon } from "./VideoIcon";

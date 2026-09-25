@@ -31,6 +31,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -78,6 +79,16 @@ import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
+import ProjectsIcon from "@/components/icons/ProjectsIcon";
+import {
+  ArchiveIcon,
+  ArrowDownIcon,
+  CrownIcon,
+  PencilIcon,
+  RefreshIcon,
+  SignOutIcon,
+  UserXIcon,
+} from "@/components/icons/ui";
 import {
   createChannel,
   deleteDiscussMessage,
@@ -113,7 +124,17 @@ import {
   uploadDiscussAttachment,
   uploadDiscussVoice,
   fetchMessageableAccounts,
+  sendDiscussMessageResult,
+  markAllChannelsRead,
+  addChannelMembers,
+  removeChannelMember,
+  setChannelMemberRole,
+  renameChannel,
+  leaveChannel,
+  archiveChannel,
+  type DiscussChannelListRow,
 } from "@/lib/discuss";
+import { findMentionQuery, normalizeMentions, rankMentionCandidates } from "@/lib/discuss-mentions";
 import { setActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { discussAttachmentUrl } from "@/lib/discuss-attachments";
 import {
@@ -154,7 +175,6 @@ import { discussT } from "@/lib/translations/discuss";
 import type {
   DiscussAttachment,
   DiscussChannelKind,
-  DiscussChannelWithState,
   DiscussMemberRow,
   DiscussMention,
   DiscussMessageKind,
@@ -183,6 +203,8 @@ const VoicePlaybackBubble = dynamic(
 const PhotoLightbox = dynamic(() => import("./PhotoLightbox"), { ssr: false });
 const DiscussAiChat = dynamic(() => import("./DiscussAiChat"), { ssr: false });
 const SearchPanel = dynamic(() => import("./SearchPanel"), { ssr: false });
+const QuickSwitcher = dynamic(() => import("./QuickSwitcher"), { ssr: false });
+const AddMembersModal = dynamic(() => import("./AddMembersModal"), { ssr: false });
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Small helpers — shared by multiple subsections of the file
@@ -193,7 +215,7 @@ type TFn = (key: string, fallback?: string) => string;
 
 /* The other party's native/alternate name (people.name_alt, e.g. Chinese),
    for the muted second line under the English name. Direct chats only. */
-function altNameFor(c: DiscussChannelWithState): string | null {
+function altNameFor(c: DiscussChannelListRow): string | null {
   const alt = (c.other?.name_alt ?? "").trim();
   if (!alt) return null;
   return alt === (c.other?.full_name ?? "").trim() ? null : alt;
@@ -201,7 +223,7 @@ function altNameFor(c: DiscussChannelWithState): string | null {
 
 /** Human-readable display for a channel row — the other member's name for
  *  DMs, the linked customer for customer chats, else channel.name. */
-function displayNameFor(c: DiscussChannelWithState, t: TFn): string {
+function displayNameFor(c: DiscussChannelListRow, t: TFn): string {
   if (c.kind === "direct") {
     return c.other?.full_name || c.other?.username || t("channel.direct", "Direct message");
   }
@@ -211,7 +233,7 @@ function displayNameFor(c: DiscussChannelWithState, t: TFn): string {
 /** Short preview for the last message (used in the sidebar). Collapses
  *  whitespace and caps length so long messages don't break the layout. */
 function previewMessage(
-  preview: DiscussChannelWithState["last_message"],
+  preview: DiscussChannelListRow["last_message"],
   t: TFn,
 ): string {
   if (!preview) return "";
@@ -221,6 +243,40 @@ function previewMessage(
   if (preview.kind === "voice") return t("preview.voice", "Voice message");
   return text;
 }
+
+/** Unread shown on a conversation ROW: muted conversations report their
+ *  count in muted_unread_count (unread_count is 0 so badges skip them). */
+function rowUnread(c: DiscussChannelListRow): number {
+  return (c.unread_count ?? 0) + (c.muted_unread_count ?? 0);
+}
+
+/** A row after muting / unmuting: its count moves between the badge-counted
+ *  field and the muted one, so the bell / home tile follow immediately. */
+function withMuted(c: DiscussChannelListRow, muted: boolean): DiscussChannelListRow {
+  const n = rowUnread(c);
+  return { ...c, muted, unread_count: muted ? 0 : n, muted_unread_count: muted ? n : 0 };
+}
+
+/** Tell the bell / home tile what a conversation's BADGE count now is. */
+function announceUnread(channelId: string, unread: number, markedUnread?: boolean) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("discuss:unread-changed", {
+      detail: { channelId, unread, ...(typeof markedUnread === "boolean" ? { markedUnread } : {}) },
+    }),
+  );
+}
+
+/** Wire payload of a send, kept for a "Not sent — Retry" bubble. Reusing it
+ *  (same clientMsgId) makes the retry idempotent server-side. */
+type PendingSend = {
+  channelId: string;
+  body: string;
+  kind: DiscussMessageKind;
+  metadata: DiscussMessageMetadata;
+  replyToMessageId: string | null;
+  clientMsgId: string;
+};
 
 /** Merge a fresh server page into the list on screen.
  *   · keeps OLDER messages the user paged in ("load older") that fall before
@@ -285,8 +341,8 @@ export default function DiscussApp() {
   /* ── Sidebar state ─────────────────────────────────────────────── */
   /* Warm start: paint the conversation list from the last answer (wiped on
      sign-out with every other kx: cache) and revalidate behind it. */
-  const warmChannels = useWarm<DiscussChannelWithState[]>("discuss:channels");
-  const [channels, setChannels] = useState<DiscussChannelWithState[]>(() => warmChannels ?? []);
+  const warmChannels = useWarm<DiscussChannelListRow[]>("discuss:channels");
+  const [channels, setChannels] = useState<DiscussChannelListRow[]>(() => warmChannels ?? []);
   const [loadingChannels, setLoadingChannels] = useState(() => !warmChannels?.length);
   const [sidebarFilter, setSidebarFilter] = useState<"all" | "unread">("all");
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -327,6 +383,17 @@ export default function DiscussApp() {
      Enter presses in one tick would both see `sending === false`; a ref flips
      immediately and is the real double-send guard. (Discuss stabilization P1.) */
   const sendingRef = useRef(false);
+  /* Failed sends ("Not sent — Retry / Delete"). The bubble stays in the
+     thread under its temp id; the wire payload (same clientMsgId) waits here
+     for a retry, which the server dedupes on (channel_id, client_msg_id). */
+  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const failedPayloadsRef = useRef<Map<string, PendingSend>>(new Map());
+  /* @mention autocomplete: the "@query" the caret is in, and the highlighted
+     suggestion. `dismissedAt` remembers an Esc so the same "@" stays closed. */
+  const [mentionState, setMentionState] = useState<{ start: number; query: string; active: number } | null>(null);
+  const mentionDismissedRef = useRef<number | null>(null);
+  /* ↑ in the empty composer started this edit → focus returns there after. */
+  const editFromComposerRef = useRef(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -368,6 +435,14 @@ export default function DiscussApp() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [customerChatOpen, setCustomerChatOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+  /* Unread jump pill: the thread is scrolled up away from the newest, and
+     the id of the newest message at the moment it left the bottom. */
+  const [scrolledUp, setScrolledUp] = useState(false);
+  const [awayAnchorAt, setAwayAnchorAt] = useState<number | null>(null);
+  const scrolledUpRef = useRef(false);
 
   /* ── Translation ──────────────────────────────────────────────────
      Multi-national teams: a sender writes in their own language and the
@@ -488,7 +563,11 @@ export default function DiscussApp() {
      the subscription handlers, and leave the effect depending only
      on the two things that actually imply "teardown + resubscribe":
      `selectedChannelId` and `accountId`. */
-  const channelsRef = useRef<DiscussChannelWithState[]>(channels);
+  const channelsRef = useRef<DiscussChannelListRow[]>(channels);
+  const detailsOpenRef = useRef(false);
+  useEffect(() => {
+    detailsOpenRef.current = detailsOpen;
+  }, [detailsOpen]);
   const membersRef = useRef(members);
   const notifApiRef = useRef(notifApi);
   const accountRef = useRef(account);
@@ -697,7 +776,7 @@ export default function DiscussApp() {
 
     const ids = [...channels]
       .filter((c) => c.id !== selectedChannelIdRef.current)
-      .sort((a, b) => (b.unread_count > 0 ? 1 : 0) - (a.unread_count > 0 ? 1 : 0))
+      .sort((a, b) => (rowUnread(b) > 0 ? 1 : 0) - (rowUnread(a) > 0 ? 1 : 0))
       .slice(0, 8)
       .map((c) => c.id);
     let cursor = 0;
@@ -838,16 +917,16 @@ export default function DiscussApp() {
              travels over broadcast). Keep the previous preview text and just
              bump the clock / unread; the silent refetch brings the real
              snippet ~1s later. */
-          const next: DiscussChannelWithState = {
+          const bump = !(isSelected || isMine);
+          const next: DiscussChannelListRow = {
             ...existing,
             last_message_at: msg.created_at,
             last_message: existing.last_message
               ? { ...existing.last_message, created_at: msg.created_at }
               : existing.last_message,
-            unread_count:
-              isSelected || isMine
-                ? existing.unread_count
-                : existing.unread_count + 1,
+            /* Muted rows count in muted_unread_count (kept off the badges). */
+            unread_count: bump && !existing.muted ? existing.unread_count + 1 : existing.unread_count,
+            muted_unread_count: (existing.muted_unread_count ?? 0) + (bump && existing.muted ? 1 : 0),
           };
           const rest = prev.filter((_, i) => i !== idx);
           return [next, ...rest];
@@ -904,7 +983,7 @@ export default function DiscussApp() {
           if (idx === -1) return prev;
           const existing = prev[idx];
           if (existing.last_message?.id === m.id) return prev; // already applied
-          const next: DiscussChannelWithState = {
+          const next: DiscussChannelListRow = {
             ...existing,
             last_message_at: m.created_at,
             last_message: {
@@ -914,16 +993,24 @@ export default function DiscussApp() {
               author_username: m.author?.username ?? null,
               created_at: m.created_at,
             },
-            unread_count:
-              isMine || isSelected || !firstSighting
-                ? existing.unread_count
-                : existing.unread_count + 1,
+            ...(() => {
+              const bump = !(isMine || isSelected || !firstSighting);
+              return {
+                unread_count: bump && !existing.muted ? existing.unread_count + 1 : existing.unread_count,
+                muted_unread_count: (existing.muted_unread_count ?? 0) + (bump && existing.muted ? 1 : 0),
+              };
+            })(),
           };
           const rest = prev.filter((_, i) => i !== idx);
           return [next, ...rest];
         });
       },
-      (channelId) => {
+      (channelId, info) => {
+        /* A rename / archive / membership change: the LIST is stale. */
+        if (info?.meta) {
+          scheduleChannelRefresh();
+          if (selectedChannelIdRef.current === channelId) void loadMembers(channelId);
+        }
         /* An edit / delete / reaction / pin landed somewhere. */
         if (!channelsRef.current.some((c) => c.id === channelId)) {
           scheduleChannelRefresh();
@@ -940,7 +1027,11 @@ export default function DiscussApp() {
         if (changeTimer != null) window.clearTimeout(changeTimer);
         changeTimer = window.setTimeout(() => {
           changeTimer = null;
-          if (selectedChannelIdRef.current === channelId) void loadMessages(channelId, true);
+          if (selectedChannelIdRef.current !== channelId) return;
+          void loadMessages(channelId, true);
+          /* Role changes / member adds touch the channel too; keep the
+             details pane's member list honest while it is on screen. */
+          if (detailsOpenRef.current) void loadMembers(channelId);
         }, 350);
       },
     );
@@ -948,7 +1039,7 @@ export default function DiscussApp() {
       unsub();
       if (changeTimer != null) window.clearTimeout(changeTimer);
     };
-  }, [accountId, scheduleChannelRefresh, notifyInbound, loadMessages]);
+  }, [accountId, scheduleChannelRefresh, notifyInbound, loadMessages, loadMembers]);
 
   /* Load messages + members when a channel is selected, and subscribe to
      that channel's realtime stream. Cleanup tears down both subscriptions
@@ -1350,7 +1441,7 @@ export default function DiscussApp() {
        since the last mark. (It used to fire on every message-count change,
        including my own sends and "load older" pages.) */
     const ch = channelsRef.current.find((c) => c.id === selectedChannelId);
-    if (!needsReadRef.current && (ch?.unread_count ?? 0) === 0 && !ch?.marked_unread) return;
+    if (!needsReadRef.current && (ch ? rowUnread(ch) : 0) === 0 && !ch?.marked_unread) return;
     const id = window.setTimeout(() => {
       needsReadRef.current = false;
       void markChannelRead(selectedChannelId, accountId).then((ok) => {
@@ -1360,7 +1451,7 @@ export default function DiscussApp() {
         }
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === selectedChannelId ? { ...c, unread_count: 0, marked_unread: false } : c,
+            c.id === selectedChannelId ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false } : c,
           ),
         );
         if (typeof window !== "undefined") {
@@ -1484,7 +1575,7 @@ export default function DiscussApp() {
   const filteredChannels = useMemo(() => {
     let list = channels;
     if (sidebarFilter === "unread") {
-      list = list.filter((c) => c.unread_count > 0 || c.marked_unread === true);
+      list = list.filter((c) => rowUnread(c) > 0 || c.marked_unread === true);
     }
     const q = sidebarSearch.trim().toLowerCase();
     if (q) {
@@ -1494,8 +1585,8 @@ export default function DiscussApp() {
   }, [channels, sidebarFilter, sidebarSearch, t]);
 
   const groupedChannels = useMemo(() => {
-    const dms: DiscussChannelWithState[] = [];
-    const groups: DiscussChannelWithState[] = [];
+    const dms: DiscussChannelListRow[] = [];
+    const groups: DiscussChannelListRow[] = [];
     for (const c of filteredChannels) {
       if (c.kind === "direct") dms.push(c);
       else groups.push(c);
@@ -1503,7 +1594,7 @@ export default function DiscussApp() {
     /* Pinned conversations float to the top of their group so an optimistic
        pin reorders instantly (the server also sorts pinned-first). Stable:
        non-pinned keep their existing last-message order. */
-    const pinnedFirst = (a: DiscussChannelWithState, b: DiscussChannelWithState) =>
+    const pinnedFirst = (a: DiscussChannelListRow, b: DiscussChannelListRow) =>
       a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1;
     dms.sort(pinnedFirst);
     groups.sort(pinnedFirst);
@@ -1553,6 +1644,12 @@ export default function DiscussApp() {
       setEditingDraft("");
       setVoiceOpen(false);
       setHasOlder(true);
+      setMentionState(null);
+      mentionDismissedRef.current = null;
+      setScrolledUp(false);
+      scrolledUpRef.current = false;
+      setAwayAnchorAt(null);
+      setAddMembersOpen(false);
       needsReadRef.current = false;
     }
   }, []);
@@ -1601,7 +1698,9 @@ export default function DiscussApp() {
   );
 
   const handleFilePick = useCallback(
-    async (files: FileList | null) => {
+    /* One path for the paperclip, drag & drop and paste: same preflight
+       (type / size / transport), same upload, same preview chips. */
+    async (files: FileList | File[] | null) => {
       if (!files || files.length === 0) return;
       setUploading(true);
       const uploaded: DiscussAttachment[] = [];
@@ -1659,6 +1758,38 @@ export default function DiscussApp() {
     [showToast, t, composerAttachments.length, ensurePendingKey],
   );
 
+  /* Replace an optimistic bubble with its canonical row (id, time and the
+     server's media projection), then free its local previews. */
+  const reconcileSent = useCallback(
+    (tempId: string, saved: { id: string; created_at: string; metadata?: DiscussMessageMetadata | null }, clientMsgId: string) => {
+      setMessages((prev) => {
+        /* The canonical row may already be on screen (a reconcile merged it
+           in by client_msg_id while the answer was in flight): drop the temp. */
+        if (prev.some((m) => m.id === saved.id)) return prev.filter((m) => m.id !== tempId);
+        return prev.map((m) =>
+          m.id === tempId
+            ? {
+                ...m,
+                id: saved.id,
+                created_at: saved.created_at,
+                /* Adopt the SERVER's media projection. The optimistic bubble
+                   was rendering locally-derived media against a temp id, which
+                   discussAttachmentUrl() refuses; once reconciled the message
+                   has a canonical id, so its media must come from the canonical
+                   response for the first-party URLs to resolve. */
+                metadata: saved.metadata ?? m.metadata,
+              }
+            : m,
+        );
+      });
+      /* Canonical media is now live, so the local previews have no reader.
+         Releasing here — and only here — frees the Blobs at the exact moment
+         they stop being displayed. */
+      releasePreviewUrls(clientMsgId);
+    },
+    [],
+  );
+
   const handleSend = useCallback(async () => {
     if (!accountId || !selectedChannelId) return;
     /* Re-entrancy guard: the button is disabled while sending, but the Enter
@@ -1689,7 +1820,10 @@ export default function DiscussApp() {
     const metadata: DiscussMessageMetadata = {};
     if (composerAttachments.length > 0) metadata.attachments = composerAttachments;
     if (composerProducts.length > 0) metadata.products = composerProducts;
-    if (composerMentions.length > 0) metadata.mentions = composerMentions;
+    /* Offsets are recomputed against the body actually sent (trimmed, edited
+       since insertion); a mention deleted by hand is dropped. */
+    const sentMentions = normalizeMentions(trimmed, composerMentions);
+    if (sentMentions.length > 0) metadata.mentions = sentMentions;
 
     /* DISPLAY payload — what the optimistic bubble renders. Built to the SAME
        client-safe contract the server returns (metadata.media, canonical
@@ -1761,6 +1895,11 @@ export default function DiscussApp() {
       reply_preview: replyPreview,
     };
     setMessages((prev) => [...prev, optimistic]);
+    /* Sending means "take me to the bottom" even when scrolled up reading. */
+    requestAnimationFrame(() => {
+      const el = threadScrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
     /* kx-perf: press -> optimistic bubble painted (next frame). */
     requestAnimationFrame(() => perfRecord("discuss.send.optimistic_ms", performance.now() - kxT0));
     setComposerBody("");
@@ -1772,62 +1911,45 @@ export default function DiscussApp() {
 
     const kxReq = performance.now(); /* kx-perf: HTTP round-trip start */
     const sentChannelId = selectedChannelId;
-    const saved = await sendDiscussMessage({
+    const payload: PendingSend = {
       channelId: selectedChannelId,
-      authorId: accountId,
       body: trimmed,
       kind,
       metadata,
       replyToMessageId: replyToId,
       clientMsgId,
-    });
+    };
+    const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
+    const saved = result.row;
 
     if (saved) {
       /* kx-perf: server acknowledgement + full-lifecycle timings. */
       perfRecord("discuss.send.ack_ms", performance.now() - kxReq);
       perfRecord("discuss.send.total_ms", performance.now() - kxT0);
       requestAnimationFrame(() => perfRecord("discuss.send.reconcile_ms", performance.now() - kxT0));
-      /* Replace the optimistic row with the real one so its id matches
-         the realtime INSERT event we'll get, and the dedupe logic
-         works. */
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId
-            ? {
-                ...m,
-                id: saved.id,
-                created_at: saved.created_at,
-                /* Adopt the SERVER's media projection. The optimistic bubble
-                   was rendering locally-derived media against a temp id, which
-                   discussAttachmentUrl() refuses; once reconciled the message
-                   has a canonical id, so its media must come from the canonical
-                   response for the first-party URLs to resolve. */
-                metadata: saved.metadata ?? m.metadata,
-              }
-            : m,
-        ),
-      );
-      /* Canonical media is now live, so the local previews have no reader.
-         Releasing here — and only here — frees the Blobs at the exact moment
-         they stop being displayed. */
-      releasePreviewUrls(clientMsgId);
+      reconcileSent(tempId, saved, clientMsgId);
       /* Sent: drop this channel's draft now (no-op when none exists). */
       persistDraft(selectedChannelId, "");
       /* Silent refresh so the sidebar reflects the new last_message_at
          — the realtime handler will also patch it in place, this is
          just a safety net. No spinner. */
       void loadChannels(true);
+    } else if (result.retryable) {
+      /* Network / timeout / 5xx: keep the bubble as "Not sent" with Retry /
+         Delete. Its previews stay alive (the bubble still renders them) and
+         are released on reconcile or discard. */
+      perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
+      failedPayloadsRef.current.set(tempId, payload);
+      setFailedIds((prev) => new Set(prev).add(tempId));
+      showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
     } else {
       perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
-      /* Restore the body so the user can retry without re-typing — but only
+      /* Refused (not a member, too long, invalid): a retry cannot help.
+         Restore the body so the user can fix it without re-typing — but only
          if this chat is still open (the composer now belongs to another). */
       if (selectedChannelIdRef.current === sentChannelId) setComposerBody(trimmed);
       showError(t("status.failed", "Failed to send"));
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
-      /* Today a failed send DISCARDS the optimistic bubble, so nothing renders
-         its previews any more and holding the Blobs would leak. Unit 3 will
-         keep the bubble in a failed-pending state for retry/discard; when it
-         does, this release moves to the discard branch only. */
       releasePreviewUrls(clientMsgId);
     }
     sendingRef.current = false;
@@ -1848,7 +1970,135 @@ export default function DiscussApp() {
     persistDraft,
     showError,
     t,
+    reconcileSent,
   ]);
+
+  /* Retry a "Not sent" bubble with the SAME payload + clientMsgId. If the
+     first attempt actually committed, the server hands back that row. */
+  const handleRetrySend = useCallback(
+    async (tempId: string) => {
+      const payload = failedPayloadsRef.current.get(tempId);
+      if (!payload || !accountId) return;
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      const result = await sendDiscussMessageResult({ ...payload, authorId: accountId });
+      if (result.row) {
+        failedPayloadsRef.current.delete(tempId);
+        reconcileSent(tempId, result.row, payload.clientMsgId);
+        void loadChannels(true);
+      } else if (result.retryable) {
+        setFailedIds((prev) => new Set(prev).add(tempId));
+        showError(t("send.failedRetry", "Message not sent. Tap Retry to send it again."));
+      } else {
+        failedPayloadsRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        releasePreviewUrls(payload.clientMsgId);
+        showError(t("status.failed", "Failed to send"));
+      }
+    },
+    [accountId, reconcileSent, loadChannels, showError, t],
+  );
+
+  const handleDiscardSend = useCallback((tempId: string) => {
+    const payload = failedPayloadsRef.current.get(tempId);
+    failedPayloadsRef.current.delete(tempId);
+    setFailedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(tempId);
+      return next;
+    });
+    setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    if (payload) releasePreviewUrls(payload.clientMsgId);
+  }, []);
+
+  const handleStartEdit = useCallback((msg: DiscussMessageWithAuthor) => {
+    setEditingMessageId(msg.id);
+    setEditingDraft(msg.body ?? "");
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditingDraft("");
+    /* Started from ↑ in the composer → hand the caret back there. */
+    if (editFromComposerRef.current) {
+      editFromComposerRef.current = false;
+      requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }, []);
+
+  /* ── @mention autocomplete ─────────────────────────────────────────────
+     Candidates are the conversation's members (minus me). The inserted text
+     and the metadata.mentions entry use the exact format of the @ picker,
+     so "Mentions only" push filtering keeps working unchanged. */
+  const mentionPeople = useMemo(
+    () =>
+      members
+        .filter((m) => m.account_id !== accountId && m.author?.username)
+        .map((m) => ({
+          id: m.account_id,
+          username: m.author.username,
+          full_name: m.author.full_name,
+          name_alt: m.author.name_alt ?? null,
+          avatar_url: m.author.avatar_url,
+        })),
+    [members, accountId],
+  );
+  const mentionResults = useMemo(
+    () => (mentionState ? rankMentionCandidates(mentionPeople, mentionState.query) : []),
+    [mentionState, mentionPeople],
+  );
+  const mentionOpen = !!mentionState && mentionResults.length > 0;
+  const mentionActive = mentionOpen ? Math.min(mentionState!.active, mentionResults.length - 1) : 0;
+
+  /** Re-read the "@query" under the caret (after typing or moving it). */
+  const updateMentionQuery = useCallback((el: HTMLTextAreaElement) => {
+    const caret = el.selectionStart ?? el.value.length;
+    if ((el.selectionEnd ?? caret) !== caret) {
+      setMentionState(null);
+      return;
+    }
+    const q = findMentionQuery(el.value, caret);
+    if (!q) {
+      mentionDismissedRef.current = null;
+      setMentionState(null);
+      return;
+    }
+    if (mentionDismissedRef.current === q.start) {
+      setMentionState(null);
+      return;
+    }
+    setMentionState((prev) =>
+      prev && prev.start === q.start && prev.query === q.query ? prev : { ...q, active: 0 },
+    );
+  }, []);
+
+  /** Insert `@username ` over [from, to) and record the mention. */
+  const insertMention = useCallback(
+    (r: { id: string; username: string }, from: number, to: number, pad = "") => {
+      const token = `@${r.username} `;
+      const next = composerBody.slice(0, from) + pad + token + composerBody.slice(to);
+      const at = from + pad.length;
+      setComposerBody(next);
+      setComposerMentions((prev) =>
+        prev.some((m) => m.account_id === r.id)
+          ? prev
+          : [...prev, { account_id: r.id, username: r.username, offset: at, length: token.length - 1 }],
+      );
+      setMentionState(null);
+      mentionDismissedRef.current = null;
+      const caret = at + token.length;
+      requestAnimationFrame(() => {
+        const el = composerRef.current;
+        if (!el) return;
+        el.focus();
+        try { el.setSelectionRange(caret, caret); } catch { /* detached */ }
+      });
+    },
+    [composerBody],
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1858,6 +2108,69 @@ export default function DiscussApp() {
          the composer unusable for CJK. `isComposing` is the standard signal;
          keyCode 229 is the legacy fallback some IMEs still report. */
       if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+
+      /* Mention suggestions own ↑ / ↓ / Enter / Tab / Esc while open. */
+      if (mentionOpen && mentionState) {
+        const n = mentionResults.length;
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const delta = e.key === "ArrowDown" ? 1 : -1;
+          setMentionState((prev) => (prev ? { ...prev, active: (mentionActive + delta + n) % n } : prev));
+          return;
+        }
+        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+          e.preventDefault();
+          const pick = mentionResults[mentionActive];
+          const caret = e.currentTarget.selectionStart ?? composerBody.length;
+          if (pick) insertMention(pick, mentionState.start, caret);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          mentionDismissedRef.current = mentionState.start;
+          setMentionState(null);
+          return;
+        }
+      }
+
+      /* Esc backs out of a reply, then out of an inline edit. */
+      if (e.key === "Escape") {
+        if (replyTarget) {
+          e.preventDefault();
+          setReplyTarget(null);
+          return;
+        }
+        if (editingMessageId) {
+          e.preventDefault();
+          handleCancelEdit();
+          return;
+        }
+      }
+
+      /* ↑ in an EMPTY composer edits my last message (Slack / Teams). */
+      if (
+        e.key === "ArrowUp" &&
+        !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey &&
+        composerBody === "" &&
+        composerAttachments.length === 0
+      ) {
+        const list = messagesRef.current;
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i];
+          if (m.channel_id !== selectedChannelIdRef.current) break;
+          if (m.author_account_id !== accountId || m.deleted_at || m.id.startsWith("temp_")) continue;
+          /* Edits are body-only: a voice note / bare attachment has none. */
+          if (m.kind === "voice" || !(m.body ?? "").trim()) break;
+          e.preventDefault();
+          editFromComposerRef.current = true;
+          handleStartEdit(m);
+          requestAnimationFrame(() =>
+            document.getElementById(`msg-${m.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+          );
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         /* Approved 2026-07-17 (shipped 2026-08-07): Enter-to-send is a
            DESKTOP convention. On touch devices Enter inserts a newline and
@@ -1868,14 +2181,29 @@ export default function DiscussApp() {
         void handleSend();
       }
     },
-    [handleSend],
+    [
+      handleSend,
+      mentionOpen,
+      mentionState,
+      mentionResults,
+      mentionActive,
+      insertMention,
+      composerBody,
+      composerAttachments.length,
+      replyTarget,
+      editingMessageId,
+      handleCancelEdit,
+      handleStartEdit,
+      accountId,
+    ],
   );
 
   const handleComposerChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       setComposerBody(e.target.value);
+      updateMentionQuery(e.target);
     },
-    [],
+    [updateMentionQuery],
   );
 
   const handleAddProduct = useCallback((p: ProductRow) => {
@@ -1893,22 +2221,15 @@ export default function DiscussApp() {
 
   const handleAddMention = useCallback(
     (r: Recipient) => {
-      const token = `@${r.username} `;
-      const offset = composerBody.length;
-      setComposerBody((prev) => prev + token);
-      setComposerMentions((prev) => [
-        ...prev,
-        {
-          account_id: r.id,
-          username: r.username,
-          offset,
-          length: token.length - 1,
-        },
-      ]);
+      /* Same format as the autocomplete; inserted at the caret (end when the
+         composer never had focus), with a separating space when needed. */
+      const el = composerRef.current;
+      const at = el && document.activeElement === el ? el.selectionStart ?? composerBody.length : composerBody.length;
+      const pad = at > 0 && !/\s/.test(composerBody[at - 1] ?? "") ? " " : "";
+      insertMention(r, at, at, pad);
       setMentionPickerOpen(false);
-      composerRef.current?.focus();
     },
-    [composerBody],
+    [composerBody, insertMention],
   );
 
   const handleAddEmoji = useCallback((emoji: string) => {
@@ -1985,16 +2306,6 @@ export default function DiscussApp() {
     },
     [accountId, flipReaction, showError, t],
   );
-
-  const handleStartEdit = useCallback((msg: DiscussMessageWithAuthor) => {
-    setEditingMessageId(msg.id);
-    setEditingDraft(msg.body ?? "");
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingMessageId(null);
-    setEditingDraft("");
-  }, []);
 
   const handleSaveEdit = useCallback(async () => {
     if (!editingMessageId) return;
@@ -2125,14 +2436,17 @@ export default function DiscussApp() {
     const next = !ch.muted;
     const id = selectedChannelId;
     setChannels((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, muted: next } : c)),
+      prev.map((c) => (c.id === id ? withMuted(c, next) : c)),
     );
     const ok = await setChannelMuted(id, accountId, next);
     if (!ok) {
-      setChannels((prev) => prev.map((c) => (c.id === id ? { ...c, muted: !next } : c)));
+      setChannels((prev) => prev.map((c) => (c.id === id ? withMuted(c, !next) : c)));
       showError(t("error.mute", "Couldn't change notifications."));
       return;
     }
+    /* Muted conversations leave the bell / home-tile count (and come back
+       on unmute) right away, not on the next recount. */
+    announceUnread(id, next ? 0 : rowUnread(ch));
     showToast(
       next
         ? t("notif.muted", "Channel muted")
@@ -2165,14 +2479,14 @@ export default function DiscussApp() {
      re-synced so the badge/order match the server.
      ═══════════════════════════════════════════════════════════════════════ */
   const [convMenu, setConvMenu] = useState<{
-    channel: DiscussChannelWithState;
+    channel: DiscussChannelListRow;
     x: number;
     y: number;
   } | null>(null);
   const closeConvMenu = useCallback(() => setConvMenu(null), []);
 
   const handleToggleConvPin = useCallback(
-    async (ch: DiscussChannelWithState) => {
+    async (ch: DiscussChannelListRow) => {
       const next = !ch.pinned;
       const stamp = new Date().toISOString();
       setChannels((prev) =>
@@ -2195,29 +2509,30 @@ export default function DiscussApp() {
   );
 
   const handleSetConvMuted = useCallback(
-    async (ch: DiscussChannelWithState) => {
+    async (ch: DiscussChannelListRow) => {
       if (!accountId) return;
       const next = !ch.muted;
-      setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: next } : c)));
+      setChannels((prev) => prev.map((c) => (c.id === ch.id ? withMuted(c, next) : c)));
       const ok = await setChannelMuted(ch.id, accountId, next);
       if (!ok) {
-        setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: !next } : c)));
+        setChannels((prev) => prev.map((c) => (c.id === ch.id ? withMuted(c, !next) : c)));
         showError(t("error.mute", "Couldn't change notifications."));
         return;
       }
+      announceUnread(ch.id, next ? 0 : rowUnread(ch));
       showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
     },
     [accountId, showToast, showError, t],
   );
 
   const handleToggleConvUnread = useCallback(
-    async (ch: DiscussChannelWithState) => {
+    async (ch: DiscussChannelListRow) => {
       if (!accountId) return;
-      const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+      const isUnread = rowUnread(ch) > 0 || ch.marked_unread === true;
       if (isUnread) {
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === ch.id ? { ...c, unread_count: 0, marked_unread: false } : c,
+            c.id === ch.id ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false } : c,
           ),
         );
         await markChannelRead(ch.id, accountId);
@@ -2244,7 +2559,7 @@ export default function DiscussApp() {
   );
 
   const handleHideConversation = useCallback(
-    async (ch: DiscussChannelWithState) => {
+    async (ch: DiscussChannelListRow) => {
       setChannels((prev) => prev.filter((c) => c.id !== ch.id));
       if (selectedChannelIdRef.current === ch.id) setSelectedChannelId(null);
       await hideChannel(ch.id);
@@ -2255,7 +2570,7 @@ export default function DiscussApp() {
   );
 
   const handleDeleteConversation = useCallback(
-    (ch: DiscussChannelWithState) => {
+    (ch: DiscussChannelListRow) => {
       askConfirm(
         t("conv.deleteConfirm", "Delete this conversation? It will be removed from your list."),
         async () => {
@@ -2270,6 +2585,228 @@ export default function DiscussApp() {
     },
     [askConfirm, loadChannels, showToast, t],
   );
+
+  /* Sidebar menu → "Mark all as read": every conversation in one write. */
+  const handleMarkAllRead = useCallback(async () => {
+    setSidebarMenuOpen(false);
+    const before = channelsRef.current;
+    setChannels((prev) =>
+      prev.map((c) =>
+        rowUnread(c) > 0 || c.marked_unread
+          ? { ...c, unread_count: 0, muted_unread_count: 0, marked_unread: false }
+          : c,
+      ),
+    );
+    needsReadRef.current = false;
+    const ok = await markAllChannelsRead();
+    if (!ok) {
+      setChannels(before);
+      showError(t("sidebar.markAllReadFailed", "Couldn't mark everything as read."));
+      return;
+    }
+    /* No detail → the bell / home tile recount once. */
+    window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+    showToast(t("sidebar.markAllReadDone", "All conversations marked as read"));
+  }, [showError, showToast, t]);
+
+  /* ── Channel administration (details pane) ───────────────────────────
+     The server is the authority on every rule (admin-only actions, last
+     admin, tenant); the UI only hides what cannot succeed. */
+  const myRole = members.find((m) => m.account_id === accountId)?.role ?? null;
+  const isChannelAdmin = myRole === "admin";
+
+  const handleAddMembers = useCallback(
+    async (accountIds: string[]): Promise<boolean> => {
+      const channelId = selectedChannelIdRef.current;
+      if (!channelId || accountIds.length === 0) return false;
+      const res = await addChannelMembers(channelId, accountIds);
+      if (!res.ok) {
+        showError(t("admin.failed", "That didn't work. Please try again."));
+        return false;
+      }
+      void loadMembers(channelId);
+      showToast(t("admin.added", "Members added"));
+      return true;
+    },
+    [loadMembers, showError, showToast, t],
+  );
+
+  const handleRemoveMember = useCallback(
+    (member: DiscussMemberRow & { author: DiscussAuthor }) => {
+      const channelId = selectedChannelIdRef.current;
+      if (!channelId) return;
+      const name = member.author.full_name || member.author.username;
+      askConfirm(
+        t("admin.removeConfirm", "Remove {name} from this conversation?").replace("{name}", name),
+        async () => {
+          setMembers((prev) => prev.filter((m) => m.account_id !== member.account_id));
+          const res = await removeChannelMember(channelId, member.account_id);
+          if (!res.ok) {
+            void loadMembers(channelId);
+            showError(t("admin.failed", "That didn't work. Please try again."));
+            return;
+          }
+          showToast(t("admin.removed", "Member removed"));
+        },
+        { confirmLabel: t("btn.remove", "Remove") },
+      );
+    },
+    [askConfirm, loadMembers, showError, showToast, t],
+  );
+
+  const handleSetMemberRole = useCallback(
+    async (member: DiscussMemberRow & { author: DiscussAuthor }, role: "admin" | "member") => {
+      const channelId = selectedChannelIdRef.current;
+      if (!channelId) return;
+      const before = member.role;
+      setMembers((prev) => prev.map((m) => (m.account_id === member.account_id ? { ...m, role } : m)));
+      const res = await setChannelMemberRole(channelId, member.account_id, role);
+      if (!res.ok) {
+        setMembers((prev) => prev.map((m) => (m.account_id === member.account_id ? { ...m, role: before } : m)));
+        showError(
+          /at least one admin/i.test(res.error ?? "")
+            ? t("admin.lastAdmin", "A conversation needs at least one admin.")
+            : t("admin.failed", "That didn't work. Please try again."),
+        );
+        return;
+      }
+      showToast(t("admin.roleChanged", "Role updated"));
+    },
+    [showError, showToast, t],
+  );
+
+  const handleRenameChannel = useCallback(
+    async (name: string): Promise<boolean> => {
+      const channelId = selectedChannelIdRef.current;
+      const clean = name.trim().slice(0, 120);
+      if (!channelId || !clean) return false;
+      const before = channelsRef.current.find((c) => c.id === channelId)?.name ?? null;
+      setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, name: clean } : c)));
+      const res = await renameChannel(channelId, clean);
+      if (!res.ok) {
+        setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, name: before } : c)));
+        showError(t("admin.failed", "That didn't work. Please try again."));
+        return false;
+      }
+      showToast(t("admin.renamed", "Conversation renamed"));
+      return true;
+    },
+    [showError, showToast, t],
+  );
+
+  /* Leave / archive both take the conversation off MY list. */
+  const dropConversation = useCallback((channelId: string) => {
+    setChannels((prev) => prev.filter((c) => c.id !== channelId));
+    if (selectedChannelIdRef.current === channelId) {
+      setSelectedChannelId(null);
+      setDetailsOpen(false);
+      setMobileView("list");
+    }
+    messagesCacheRef.current.delete(channelId);
+    window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+  }, []);
+
+  const handleLeaveChannel = useCallback(() => {
+    const channelId = selectedChannelIdRef.current;
+    if (!channelId) return;
+    askConfirm(
+      t("admin.leaveConfirm", "Leave this conversation? You will stop receiving its messages."),
+      async () => {
+        const res = await leaveChannel(channelId);
+        if (!res.ok) {
+          showError(t("admin.failed", "That didn't work. Please try again."));
+          return;
+        }
+        dropConversation(channelId);
+        void loadChannels(true);
+        showToast(t("admin.left", "You left the conversation"));
+      },
+      { confirmLabel: t("admin.leave", "Leave conversation") },
+    );
+  }, [askConfirm, dropConversation, loadChannels, showError, showToast, t]);
+
+  const handleArchiveChannel = useCallback(() => {
+    const channelId = selectedChannelIdRef.current;
+    if (!channelId) return;
+    askConfirm(
+      t("admin.archiveConfirm", "Archive this conversation for everyone? It will disappear from every member's list."),
+      async () => {
+        const res = await archiveChannel(channelId);
+        if (!res.ok) {
+          showError(t("admin.failed", "That didn't work. Please try again."));
+          return;
+        }
+        dropConversation(channelId);
+        void loadChannels(true);
+        showToast(t("admin.archived", "Conversation archived"));
+      },
+      { confirmLabel: t("admin.archive", "Archive conversation") },
+    );
+  }, [askConfirm, dropConversation, loadChannels, showError, showToast, t]);
+
+  /* Ctrl/⌘+K — quick switcher, only while Discuss is mounted. */
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "k" && e.key !== "K") return;
+      e.preventDefault();
+      setSwitcherOpen((v) => !v);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const switcherItems = useMemo(
+    () =>
+      switcherOpen
+        ? channels.map((c) => {
+            const name = displayNameFor(c, t);
+            const hint =
+              c.kind === "direct"
+                ? [c.other?.username ? `@${c.other.username}` : "", altNameFor(c) ?? ""].filter(Boolean).join(" · ")
+                : c.description ?? "";
+            return { channel: c, name, hint, unread: rowUnread(c) };
+          })
+        : [],
+    [switcherOpen, channels, t],
+  );
+
+  /* ── Unread jump pill ───────────────────────────────────────────────── */
+  const newBelowCount = useMemo(() => {
+    if (!scrolledUp || !awayAnchorAt) return 0;
+    let n = 0;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (Date.parse(m.created_at) <= awayAnchorAt) break;
+      if (m.author_account_id !== accountId && !m.id.startsWith("temp_")) n += 1;
+    }
+    return n;
+  }, [scrolledUp, awayAnchorAt, messages, accountId]);
+
+  const handleThreadScroll = useCallback(
+    (el: HTMLDivElement) => {
+      /* Near the top → page in older history. */
+      if (el.scrollTop < 120 && hasOlder && !loadingOlder && !loadingMessages) {
+        void loadOlder();
+      }
+      const up = el.scrollHeight - (el.scrollTop + el.clientHeight) > 240;
+      if (up === scrolledUpRef.current) return;
+      scrolledUpRef.current = up;
+      setScrolledUp(up);
+      if (up) {
+        const list = messagesRef.current;
+        setAwayAnchorAt(list.length ? Date.parse(list[list.length - 1].created_at) : null);
+      } else {
+        setAwayAnchorAt(null);
+      }
+    },
+    [hasOlder, loadingOlder, loadingMessages, loadOlder],
+  );
+
+  const jumpToLatest = useCallback(() => {
+    const el = threadScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
 
   /* Close the conversation menu on outside-click / Escape / scroll. */
   useEffect(() => {
@@ -2554,6 +3091,50 @@ export default function DiscussApp() {
                 <ArrowLeftIcon className="h-4 w-4" />
               </Link>
               <div className="flex-1" />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSidebarMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={sidebarMenuOpen}
+                  aria-label={t("sidebar.menu", "Conversation list options")}
+                  title={t("sidebar.menu", "Conversation list options")}
+                  className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                >
+                  <MoreHorizontalIcon className="h-4 w-4" />
+                </button>
+                {sidebarMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setSidebarMenuOpen(false)} />
+                    <div
+                      role="menu"
+                      aria-label={t("sidebar.menu", "Conversation list options")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setSidebarMenuOpen(false);
+                        }
+                      }}
+                      className="kx-pop-panel kx-glass-pop absolute end-0 top-9 z-30 w-60 p-1"
+                    >
+                      <MessageMenuItem
+                        icon={<CheckCheckIcon className="h-4 w-4" />}
+                        label={t("sidebar.markAllRead", "Mark all as read")}
+                        autoFocus
+                        onClick={() => void handleMarkAllRead()}
+                      />
+                      <MessageMenuItem
+                        icon={<SearchIcon className="h-4 w-4" />}
+                        label={t("switcher.shortcut", "Quick switcher (Ctrl/⌘ K)")}
+                        onClick={() => {
+                          setSidebarMenuOpen(false);
+                          setSwitcherOpen(true);
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="relative">
                 <button
                   type="button"
@@ -2886,6 +3467,9 @@ export default function DiscussApp() {
                         )}
                   </div>
                 </div>
+                {selectedChannel.linked_project_id && (
+                  <ProjectBadge projectId={selectedChannel.linked_project_id} t={t} />
+                )}
                 {/* Search lives in the conversation's own toolbar (the
                     unified app header is untouched). Opens scoped to this
                     conversation with a switch to search everywhere. */}
@@ -2946,14 +3530,10 @@ export default function DiscussApp() {
               </div>
 
               {/* Message list */}
+              <div className="relative flex-1 min-h-0 flex flex-col">
               <div
                 ref={threadScrollRef}
-                onScroll={(e) => {
-                  /* Near the top → page in older history. */
-                  if (e.currentTarget.scrollTop < 120 && hasOlder && !loadingOlder && !loadingMessages) {
-                    void loadOlder();
-                  }
-                }}
+                onScroll={(e) => handleThreadScroll(e.currentTarget)}
                 className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
               >
                 {loadingOlder && (
@@ -2998,6 +3578,9 @@ export default function DiscussApp() {
                     onReply={handleStartReply}
                     onOpenThread={handleOpenThread}
                     onToggleReaction={handleToggleReaction}
+                    failedIds={failedIds}
+                    onRetrySend={handleRetrySend}
+                    onDiscardSend={handleDiscardSend}
                     autoTranslate={translatePrefs.auto}
                     targetLang={translatePrefs.lang}
                     t={t}
@@ -3014,6 +3597,33 @@ export default function DiscussApp() {
                         : t("thread.typing.many")}
                   </div>
                 )}
+              </div>
+              {/* "↓ N new" — floats over the thread while scrolled up. */}
+              {scrolledUp && (
+                <button
+                  type="button"
+                  onClick={jumpToLatest}
+                  aria-label={
+                    newBelowCount > 0
+                      ? t("unread.pill", "{n} new").replace("{n}", String(newBelowCount))
+                      : t("unread.jumpLatest", "Jump to latest")
+                  }
+                  className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 ps-2.5 pe-3 rounded-full border shadow-lg flex items-center gap-1.5 text-[11.5px] font-semibold transition-colors ${
+                    newBelowCount > 0
+                      ? aurora
+                        ? "kx-seg-on border-transparent text-[var(--text-primary)]"
+                        : "bg-[var(--bg-inverted)] border-transparent text-[var(--text-inverted)] hover:bg-[var(--bg-inverted-hover)]"
+                      : "kx-glass-pop bg-[var(--bg-elevated)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <ArrowDownIcon className="h-3.5 w-3.5" aria-hidden />
+                  <span aria-live="polite">
+                    {newBelowCount > 0
+                      ? t("unread.pill", "{n} new").replace("{n}", String(newBelowCount > 99 ? "99+" : newBelowCount))
+                      : t("unread.jumpLatest", "Jump to latest")}
+                  </span>
+                </button>
+              )}
               </div>
 
               {/* Composer */}
@@ -3044,6 +3654,16 @@ export default function DiscussApp() {
                 onSend={handleSend}
                 onPickFile={() => fileInputRef.current?.click()}
                 onDropFiles={(files) => void handleFilePick(files)}
+                onPasteFiles={(files) => void handleFilePick(files)}
+                onCaretMove={updateMentionQuery}
+                mentionSuggestions={mentionOpen ? mentionResults : []}
+                mentionActive={mentionActive}
+                onPickMention={(r) => {
+                  if (!mentionState) return;
+                  const caret = composerRef.current?.selectionStart ?? composerBody.length;
+                  insertMention(r, mentionState.start, caret);
+                }}
+                onHoverMention={(i) => setMentionState((prev) => (prev ? { ...prev, active: i } : prev))}
                 onOpenProductPicker={openProductPicker}
                 onOpenMentionPicker={() => setMentionPickerOpen(true)}
                 onOpenEmojiPicker={() => setEmojiPickerOpen(true)}
@@ -3102,6 +3722,13 @@ export default function DiscussApp() {
               onOpenSearch={() => setSearchOpen(true)}
               notificationPref={selectedChannel.notification_pref}
               onSetNotificationPref={handleSetNotificationPref}
+              isAdmin={isChannelAdmin}
+              onAddMembers={() => setAddMembersOpen(true)}
+              onRemoveMember={handleRemoveMember}
+              onSetMemberRole={(m, role) => void handleSetMemberRole(m, role)}
+              onRename={handleRenameChannel}
+              onLeave={handleLeaveChannel}
+              onArchive={handleArchiveChannel}
               onClose={() => {
                 setDetailsOpen(false);
                 setMobileView("thread");
@@ -3169,7 +3796,7 @@ export default function DiscussApp() {
               ? { left, bottom: Math.max(M, window.innerHeight - convMenu.y) }
               : { left, top: convMenu.y };
             const ch = convMenu.channel;
-            const isUnread = ch.unread_count > 0 || ch.marked_unread === true;
+            const isUnread = rowUnread(ch) > 0 || ch.marked_unread === true;
             return (
               <div
                 id="kx-conv-menu"
@@ -3261,6 +3888,27 @@ export default function DiscussApp() {
           t={t}
         />
       )}
+      {switcherOpen && (
+        <QuickSwitcher
+          items={switcherItems}
+          onCancel={() => setSwitcherOpen(false)}
+          onSelect={(id) => {
+            setSwitcherOpen(false);
+            handleSelectChannel(id);
+          }}
+          t={t}
+        />
+      )}
+      {addMembersOpen && selectedChannel && (
+        <AddMembersModal
+          candidates={recipients.filter(
+            (r) => r.id !== accountId && !members.some((m) => m.account_id === r.id),
+          )}
+          onCancel={() => setAddMembersOpen(false)}
+          onAdd={handleAddMembers}
+          t={t}
+        />
+      )}
       {emojiPickerOpen && (
         <EmojiPicker
           onCancel={() => setEmojiPickerOpen(false)}
@@ -3286,7 +3934,7 @@ function ChannelRow({
   lang,
   t,
 }: {
-  channel: DiscussChannelWithState;
+  channel: DiscussChannelListRow;
   selected: boolean;
   onSelect: () => void;
   /** Warm this conversation's messages on hover/press so the open is instant. */
@@ -3307,7 +3955,10 @@ function ChannelRow({
     ? discussListStamp(channel.last_message.created_at, lang, t("thread.yesterday", "Yesterday"))
     : "";
   const isDm = channel.kind === "direct";
-  const showUnreadDot = channel.unread_count === 0 && channel.marked_unread === true;
+  /* Muted rows still show their count (WeChat), in a quieter pill — it is
+     kept off the bell / home-tile badge server-side. */
+  const unread = rowUnread(channel);
+  const showUnreadDot = unread === 0 && channel.marked_unread === true;
   /* Inverted text only on Core's solid selected pill. */
   const inv = selected && !aurora;
   const longPressRef = useRef<number | null>(null);
@@ -3394,7 +4045,7 @@ function ChannelRow({
                 className={`text-[13px] truncate ${
                   inv
                     ? "font-semibold text-[var(--text-inverted)]"
-                    : selected || channel.unread_count > 0
+                    : selected || (unread > 0 && !channel.muted)
                     ? "font-semibold text-[var(--text-primary)]"
                     : "font-medium text-[var(--text-muted)]"
                 }`}
@@ -3430,7 +4081,7 @@ function ChannelRow({
                 className={`text-[11.5px] truncate flex-1 ${
                   inv
                     ? "text-[var(--text-inverted)]/75"
-                    : channel.unread_count > 0
+                    : unread > 0 && !channel.muted
                     ? "text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-dim)]"
                 }`}
@@ -3449,11 +4100,17 @@ function ChannelRow({
                   preview || "—"
                 )}
               </span>
-              {channel.unread_count > 0 ? (
+              {unread > 0 ? (
                 <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
-                  inv ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  channel.muted
+                    ? inv
+                      ? "bg-[var(--text-inverted)]/25 text-[var(--text-inverted)]"
+                      : "bg-[var(--bg-surface-active)] text-[var(--text-muted)]"
+                    : inv
+                      ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]"
+                      : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                 }`}>
-                  {channel.unread_count > 99 ? "99+" : channel.unread_count}
+                  {unread > 99 ? "99+" : unread}
                 </span>
               ) : showUnreadDot ? (
                 /* Manually "marked as unread" — a WeChat-style dot with no count. */
@@ -3509,6 +4166,10 @@ type MessageListProps = {
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  /** Temp ids of optimistic sends that failed ("Not sent — Retry"). */
+  failedIds: ReadonlySet<string>;
+  onRetrySend: (tempId: string) => void;
+  onDiscardSend: (tempId: string) => void;
   autoTranslate: boolean;
   targetLang: string;
   t: (key: string, fallback?: string) => string;
@@ -3635,6 +4296,9 @@ function MessageList(props: MessageListProps) {
             onReply={props.onReply}
             onOpenThread={props.onOpenThread}
             onToggleReaction={props.onToggleReaction}
+            failed={props.failedIds.has(row.msg.id)}
+            onRetrySend={props.onRetrySend}
+            onDiscardSend={props.onDiscardSend}
             autoTranslate={props.autoTranslate}
             targetLang={props.targetLang}
             t={props.t}
@@ -3645,7 +4309,9 @@ function MessageList(props: MessageListProps) {
   );
 }
 
-const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"];
+/* One-tap reactions: the hover/focus row beside a message and the top of
+   its context menu. */
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 /* Header control: turn Auto-translate on/off and pick the language every
    incoming message is rendered in. Monochrome, matches the mute/info icons. */
@@ -3765,6 +4431,10 @@ type MessageBubbleProps = {
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  /** Optimistic send that failed — shows "Not sent · Retry · Delete". */
+  failed?: boolean;
+  onRetrySend?: (tempId: string) => void;
+  onDiscardSend?: (tempId: string) => void;
   autoTranslate: boolean;
   targetLang: string;
   t: (key: string, fallback?: string) => string;
@@ -3861,10 +4531,14 @@ function MessageBubble({
   onReply,
   onOpenThread,
   onToggleReaction,
+  failed = false,
+  onRetrySend,
+  onDiscardSend,
   autoTranslate,
   targetLang,
   t,
 }: MessageBubbleProps) {
+  const isTemp = msg.id.startsWith("temp_");
   const author = msg.author;
   const authorName = author?.full_name || author?.username || t("channel.unknown", "Unknown");
   const authorAlt = (() => {
@@ -3929,12 +4603,12 @@ function MessageBubble({
      element, and move focus into it so arrow/Tab navigation works. */
   const openMenuFrom = useCallback(
     (el: HTMLElement) => {
-      if (isDeleted) return;
+      if (isDeleted || failed) return;
       const r = el.getBoundingClientRect();
       menuOpenerRef.current = el;
       setMenuPos({ x: Math.max(8, r.left), y: r.bottom + 4 });
     },
-    [isDeleted],
+    [isDeleted, failed],
   );
   useEffect(() => {
     if (!menuPos || !menuOpenerRef.current) return;
@@ -3943,10 +4617,10 @@ function MessageBubble({
   }, [menuPos]);
   const openMenu = useCallback(
     (x: number, y: number) => {
-      if (isDeleted) return;
+      if (isDeleted || failed) return;
       setMenuPos({ x, y });
     },
-    [isDeleted],
+    [isDeleted, failed],
   );
   useEffect(() => {
     if (!menuPos) return;
@@ -4034,19 +4708,58 @@ function MessageBubble({
         isSelf ? "flex-row-reverse" : ""
       } ${showAuthor ? "mt-3" : "mt-0.5"} ${highlighted ? "bg-[#567FB2]/10" : ""}`}
     >
-      {/* "More" — the pointer-free route to the same menu as right-click /
-          long-press. Appears on hover and on keyboard focus only, beside the
-          bubble, so the approved bubble itself is unchanged. */}
-      {!isDeleted && !isEditing && (
-        <button
-          type="button"
-          onClick={(e) => openMenuFrom(e.currentTarget)}
-          aria-label={t("msg.more", "More actions")}
-          aria-haspopup="menu"
-          className={`absolute top-0 ${isSelf ? "start-2" : "end-2"} z-[1] h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:text-[var(--text-primary)] transition-opacity`}
+      {/* Hover / focus toolbar: one-tap reactions + "More" (the pointer-free
+          route to the same menu as right-click / long-press). Appears on
+          hover and on keyboard focus only, beside the bubble, so the approved
+          bubble itself is unchanged. The reaction buttons are reached with
+          ←/→ from "More" (one tab stop per message, not seven). */}
+      {!isDeleted && !isEditing && !failed && (
+        <div
+          role="toolbar"
+          aria-label={t("reactions.quick", "Quick reactions")}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button"));
+            const i = items.indexOf(document.activeElement as HTMLElement);
+            if (i === -1) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+            const forward = (e.key === "ArrowRight") !== rtl;
+            items[(i + (forward ? 1 : -1) + items.length) % items.length]?.focus();
+          }}
+          className={`absolute top-0 ${isSelf ? "start-2" : "end-2"} z-[1] flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-sm opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition-opacity`}
         >
-          <MoreHorizontalIcon className="h-3.5 w-3.5" />
-        </button>
+          {!isTemp &&
+            QUICK_REACTIONS.map((emoji) => {
+              const mine = msg.reactions?.some((r) => r.emoji === emoji && r.reacted_by_me) ?? false;
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  tabIndex={-1}
+                  aria-pressed={mine}
+                  aria-label={t("reactions.react", "React with {emoji}").replace("{emoji}", emoji)}
+                  title={emoji}
+                  onClick={() => onToggleReaction(msg.id, emoji)}
+                  className={`hidden md:flex h-7 w-7 rounded-md items-center justify-center text-[15px] leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
+                    mine ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
+                  }`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+          <button
+            type="button"
+            onClick={(e) => openMenuFrom(e.currentTarget)}
+            aria-label={t("msg.more", "More actions")}
+            aria-haspopup="menu"
+            className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] transition-colors"
+          >
+            <MoreHorizontalIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
       {showAuthor ? (
         <Avatar
@@ -4250,6 +4963,31 @@ function MessageBubble({
           </>
         )}
         </MessageSurface>
+        {failed && (
+          <div
+            role="group"
+            aria-label={t("send.notSent", "Not sent")}
+            className={`mt-1 flex items-center gap-1.5 text-[11px] ${isSelf ? "flex-row-reverse" : ""}`}
+          >
+            <span className="font-semibold text-[var(--state-error)]">{t("send.notSent", "Not sent")}</span>
+            <button
+              type="button"
+              onClick={() => onRetrySend?.(msg.id)}
+              className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-surface)] transition-colors"
+            >
+              <RefreshIcon className="h-3 w-3" aria-hidden />
+              {t("send.retry", "Retry")}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDiscardSend?.(msg.id)}
+              className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[var(--text-muted)] hover:text-[var(--state-error)] hover:bg-[var(--bg-surface)] transition-colors"
+            >
+              <TrashIcon className="h-3 w-3" aria-hidden />
+              {t("send.discard", "Delete")}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right-click / long-press context menu (WeChat-style). Portaled to
@@ -4381,16 +5119,20 @@ function MessageMenuItem({
   label,
   onClick,
   danger = false,
+  autoFocus = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** Take focus when the menu opens (keyboard users land inside it). */
+  autoFocus?: boolean;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      autoFocus={autoFocus}
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start outline-none transition-colors ${
         danger
@@ -4600,6 +5342,23 @@ function ProductChip({ product, t }: { product: DiscussProductRef; t: TFn }) {
   );
 }
 
+/* A conversation that belongs to a Project (discuss_channels.linked_project_id,
+   added by the Projects migration — absent until applied, so this simply
+   never renders before then). Links to the project in the Projects app. */
+function ProjectBadge({ projectId, t, className = "" }: { projectId: string; t: TFn; className?: string }) {
+  return (
+    <Link
+      href={`/projects?project=${encodeURIComponent(projectId)}`}
+      title={t("project.open", "Open linked project")}
+      aria-label={t("project.open", "Open linked project")}
+      className={`shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] text-[10.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors ${className}`}
+    >
+      <ProjectsIcon className="h-3 w-3" aria-hidden />
+      {t("project.badge", "Project")}
+    </Link>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    EMPTY STATE — shown for a channel that has zero messages
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -4608,7 +5367,7 @@ function ThreadEmptyState({
   channel,
   t,
 }: {
-  channel: DiscussChannelWithState;
+  channel: DiscussChannelListRow;
   t: (key: string, fallback?: string) => string;
 }) {
   return (
@@ -4656,6 +5415,12 @@ function Composer({
   products,
   onRemoveAttachment,
   onDropFiles,
+  onPasteFiles,
+  onCaretMove,
+  mentionSuggestions = [],
+  mentionActive = 0,
+  onPickMention,
+  onHoverMention,
   attachmentPreviews,
   onRemoveProduct,
   replyTarget,
@@ -4685,6 +5450,15 @@ function Composer({
   onRemoveAttachment: (index: number) => void;
   /** Files dropped onto the composer — same path as the paperclip picker. */
   onDropFiles?: (files: FileList) => void;
+  /** Files pasted into the textarea (screenshots, copied files) — same path. */
+  onPasteFiles?: (files: File[]) => void;
+  /** The caret moved / text changed: re-evaluate the "@query" under it. */
+  onCaretMove?: (el: HTMLTextAreaElement) => void;
+  /** @mention autocomplete (empty = closed). */
+  mentionSuggestions?: Array<{ id: string; username: string; full_name: string | null; name_alt: string | null; avatar_url: string | null }>;
+  mentionActive?: number;
+  onPickMention?: (r: { id: string; username: string }) => void;
+  onHoverMention?: (index: number) => void;
   /** Sender-local blob: URLs, index-aligned with `attachments`. Image slots
    *  with a URL render as a real thumbnail (WeChat-style); everything else
    *  keeps the filename chip. */
@@ -4725,6 +5499,8 @@ function Composer({
   const dragDepth = useRef(0);
   const hasFiles = (e: React.DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  const listboxId = useId();
+  const mentionsShown = mentionSuggestions.length > 0;
 
   return (
     <div
@@ -4895,12 +5671,76 @@ function Composer({
       )}
 
       {/* Textarea + action row */}
-      <div className="rounded-xl border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] bg-[var(--bg-primary)] transition-colors">
+      <div className="relative rounded-xl border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] bg-[var(--bg-primary)] transition-colors">
+        {/* @mention suggestions — a listbox owned by the textarea (combobox
+            pattern): ↑/↓ move, Enter/Tab insert, Esc closes, handled in the
+            composer's keydown so focus never leaves the text. */}
+        {mentionsShown && (
+          <div className="kx-pop-panel kx-glass-pop absolute bottom-full mb-2 start-0 z-20 w-72 max-w-[calc(100vw-2rem)] p-1">
+            <ul id={listboxId} role="listbox" aria-label={t("mention.suggestions", "Mention suggestions")} className="max-h-60 overflow-y-auto">
+              {mentionSuggestions.map((r, i) => (
+                <li
+                  key={r.id}
+                  id={`${listboxId}-${i}`}
+                  role="option"
+                  aria-selected={i === mentionActive}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => onHoverMention?.(i)}
+                  onClick={() => onPickMention?.(r)}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer ${
+                    i === mentionActive ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
+                  }`}
+                >
+                  <Avatar name={r.full_name || r.username} url={r.avatar_url} size={24} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-semibold text-[var(--text-primary)] truncate">
+                      {r.full_name || r.username}
+                      {nativeAltOf(r.full_name, r.name_alt) && (
+                        <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                          {nativeAltOf(r.full_name, r.name_alt)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-[10.5px] text-[var(--text-dim)] truncate">@{r.username}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="px-2 pt-1 pb-0.5 text-[10px] text-[var(--text-dim)] hidden md:block">
+              {t("mention.hint", "↑↓ to choose · Enter to insert · Esc to close")}
+            </div>
+          </div>
+        )}
         <textarea
           ref={composerRef}
           value={body}
           onChange={onChange}
           onKeyDown={onKeyDown}
+          onSelect={onCaretMove ? (e) => onCaretMove(e.currentTarget) : undefined}
+          onPaste={
+            onPasteFiles
+              ? (e) => {
+                  const files = Array.from(e.clipboardData?.files ?? []);
+                  if (files.length === 0) return;
+                  /* Rich text from Office / a web page often carries a picture
+                     of itself too — that is a TEXT paste. Only a clipboard
+                     with no real text (a screenshot, a copied image, files
+                     copied in Finder / Explorer) becomes attachments. */
+                  const html = e.clipboardData.getData("text/html");
+                  const htmlText = html
+                    ? html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, "").trim()
+                    : "";
+                  if (htmlText) return;
+                  e.preventDefault();
+                  onPasteFiles(files);
+                }
+              : undefined
+          }
+          role={onCaretMove ? "combobox" : undefined}
+          aria-autocomplete={onCaretMove ? "list" : undefined}
+          aria-expanded={onCaretMove ? mentionsShown : undefined}
+          aria-controls={mentionsShown ? listboxId : undefined}
+          aria-activedescendant={mentionsShown ? `${listboxId}-${mentionActive}` : undefined}
           placeholder={placeholder}
           aria-label={placeholder}
           rows={2}
@@ -5000,10 +5840,17 @@ function DetailsPane({
   onOpenSearch,
   notificationPref,
   onSetNotificationPref,
+  isAdmin,
+  onAddMembers,
+  onRemoveMember,
+  onSetMemberRole,
+  onRename,
+  onLeave,
+  onArchive,
   onClose,
   t,
 }: {
-  channel: DiscussChannelWithState;
+  channel: DiscussChannelListRow;
   members: Array<DiscussMemberRow & { author: DiscussAuthor }>;
   /** The loaded thread — Files / Photos are derived from it. */
   messages: DiscussMessageWithAuthor[];
@@ -5013,10 +5860,35 @@ function DetailsPane({
   onOpenSearch: () => void;
   notificationPref: DiscussNotificationPref;
   onSetNotificationPref: (pref: DiscussNotificationPref) => void;
+  /** I am an admin of this conversation (server re-checks every action). */
+  isAdmin: boolean;
+  onAddMembers: () => void;
+  onRemoveMember: (m: DiscussMemberRow & { author: DiscussAuthor }) => void;
+  onSetMemberRole: (m: DiscussMemberRow & { author: DiscussAuthor }, role: "admin" | "member") => void;
+  onRename: (name: string) => Promise<boolean>;
+  onLeave: () => void;
+  onArchive: () => void;
   onClose: () => void;
   t: TFn;
 }) {
   const isCustomer = channel.kind === "customer";
+  const isGroupLike = channel.kind === "group" || channel.kind === "channel";
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [memberMenuFor, setMemberMenuFor] = useState<string | null>(null);
+  const adminCount = members.filter((m) => m.role === "admin").length;
+  const submitRename = async () => {
+    const clean = nameDraft.trim();
+    if (!clean || clean === (channel.name ?? "") || savingName) {
+      setRenaming(false);
+      return;
+    }
+    setSavingName(true);
+    const ok = await onRename(clean);
+    setSavingName(false);
+    if (ok) setRenaming(false);
+  };
   const linkedContact = channel.linked_contact ?? null;
   const [view, setView] = useState<DetailsView>("main");
   const [remote, setRemote] = useState<{ key: string; rows: DiscussMessageWithAuthor[] } | null>(null);
@@ -5219,9 +6091,67 @@ function DetailsPane({
               )}
             </div>
           )}
-          <div className="text-[15px] font-bold text-[var(--text-primary)]">
-            {displayNameFor(channel, t)}
-          </div>
+          {renaming ? (
+            <form
+              className="w-full flex items-center gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitRename();
+              }}
+            >
+              <input
+                autoFocus
+                value={nameDraft}
+                maxLength={120}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setRenaming(false);
+                  }
+                }}
+                aria-label={t("admin.nameLabel", "Conversation name")}
+                className="flex-1 min-w-0 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[13px] text-[var(--text-primary)] outline-none"
+              />
+              <button
+                type="submit"
+                disabled={savingName || !nameDraft.trim()}
+                className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 transition-colors"
+              >
+                {savingName ? <SpinnerIcon className="h-3.5 w-3.5" /> : t("edit.save", "Save")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRenaming(false)}
+                aria-label={t("btn.cancel", "Cancel")}
+                className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+              >
+                <CrossIcon className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center justify-center gap-1 max-w-full">
+              <div className="text-[15px] font-bold text-[var(--text-primary)] truncate">
+                {displayNameFor(channel, t)}
+              </div>
+              {isAdmin && isGroupLike && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameDraft(channel.name ?? "");
+                    setRenaming(true);
+                  }}
+                  aria-label={t("admin.rename", "Rename")}
+                  title={t("admin.rename", "Rename")}
+                  className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                >
+                  <PencilIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          {channel.linked_project_id && <ProjectBadge projectId={channel.linked_project_id} t={t} />}
           {channel.kind === "direct" && altNameFor(channel) && (
             <div lang="zh" className="text-[12px] text-[var(--text-dim)] -mt-1">
               {altNameFor(channel)}
@@ -5280,16 +6210,24 @@ function DetailsPane({
             <div className="flex items-center justify-between mb-2">
               <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                 {t("details.members")}
+                <span className="ms-1.5 text-[10.5px] font-normal normal-case tracking-normal tabular-nums">
+                  {members.length}
+                </span>
               </div>
-              <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
-                {members.length}
-              </span>
+              <button
+                type="button"
+                onClick={onAddMembers}
+                className="h-7 px-2 -me-1 rounded-md flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+              >
+                <UserPlusIcon className="h-3.5 w-3.5" />
+                {t("admin.addMembers", "Add members")}
+              </button>
             </div>
             <div className="flex flex-col gap-1">
               {members.map((m) => (
                 <div
                   key={m.id}
-                  className="flex items-center gap-2 py-1 px-1 rounded-md hover:bg-[var(--bg-surface)] transition-colors"
+                  className="relative flex items-center gap-2 py-1 px-1 rounded-md hover:bg-[var(--bg-surface)] transition-colors"
                 >
                   <Avatar
                     name={m.author.full_name || m.author.username}
@@ -5307,13 +6245,29 @@ function DetailsPane({
                     </div>
                     <div className="text-[10px] text-[var(--text-dim)] truncate">
                       @{m.author.username}
-                      {m.role !== "member" && (
+                      {m.role === "admin" ? (
+                        <span className="ms-1.5 inline-flex items-center gap-0.5 text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+                          <CrownIcon className="h-2.5 w-2.5" aria-hidden />
+                          {t("admin.roleAdmin", "Admin")}
+                        </span>
+                      ) : m.role !== "member" ? (
                         <span className="ms-1.5 text-[var(--text-muted)] font-semibold uppercase tracking-wider">
                           {m.role}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
+                  {isAdmin && m.account_id !== currentAccountId && (
+                    <MemberAdminMenu
+                      member={m}
+                      open={memberMenuFor === m.account_id}
+                      onOpenChange={(o) => setMemberMenuFor(o ? m.account_id : null)}
+                      canDemote={m.role !== "admin" || adminCount > 1}
+                      onSetRole={(role) => onSetMemberRole(m, role)}
+                      onRemove={() => onRemoveMember(m)}
+                      t={t}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -5355,7 +6309,146 @@ function DetailsPane({
             />
           </div>
         </section>
+
+        {/* Leave (anyone) / archive (admins) — never for a 1:1 DM, which
+            uses "Delete" in the conversation list instead. */}
+        {channel.kind !== "direct" && (
+          <section>
+            <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
+              {t("admin.dangerZone", "Conversation")}
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={onLeave}
+                className="h-9 px-2 rounded-md flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <SignOutIcon className="h-3.5 w-3.5 text-[var(--text-dim)] rtl:-scale-x-100" />
+                <span className="flex-1 text-start">{t("admin.leave", "Leave conversation")}</span>
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={onArchive}
+                  className="h-9 px-2 rounded-md flex items-center gap-2 text-[12px] font-medium text-[var(--state-error)] hover:bg-red-500/10 transition-colors"
+                >
+                  <ArchiveIcon className="h-3.5 w-3.5" />
+                  <span className="flex-1 text-start">{t("admin.archive", "Archive conversation")}</span>
+                </button>
+              )}
+            </div>
+          </section>
+        )}
       </div>
+      )}
+    </div>
+  );
+}
+
+/* Per-member admin actions in the details pane: make / unmake admin, remove.
+   A small anchored menu (role="menu"): Esc or an outside click closes it and
+   focus returns to its button; ↑/↓ move between items. */
+function MemberAdminMenu({
+  member,
+  open,
+  onOpenChange,
+  canDemote,
+  onSetRole,
+  onRemove,
+  t,
+}: {
+  member: DiscussMemberRow & { author: DiscussAuthor };
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** False when this is the last admin (the server would refuse). */
+  canDemote: boolean;
+  onSetRole: (role: "admin" | "member") => void;
+  onRemove: () => void;
+  t: TFn;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) onOpenChange(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, onOpenChange]);
+  const name = member.author.full_name || member.author.username;
+  const close = () => {
+    onOpenChange(false);
+    btnRef.current?.focus();
+  };
+  return (
+    <div ref={wrapRef} className="relative shrink-0">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("admin.memberActions", "Actions for {name}").replace("{name}", name)}
+        className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)] transition-colors"
+      >
+        <MoreHorizontalIcon className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              close();
+              return;
+            }
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button"));
+              if (items.length === 0) return;
+              e.preventDefault();
+              const i = items.indexOf(document.activeElement as HTMLElement);
+              const next = e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+              items[next]?.focus();
+            }
+          }}
+          className="kx-pop-panel kx-glass-pop absolute end-0 top-full mt-1 z-30 w-52 p-1"
+        >
+          {member.role === "admin" ? (
+            canDemote && (
+              <MessageMenuItem
+                autoFocus
+                icon={<CrownIcon className="h-4 w-4" />}
+                label={t("admin.makeMember", "Remove admin role")}
+                onClick={() => {
+                  onSetRole("member");
+                  close();
+                }}
+              />
+            )
+          ) : (
+            <MessageMenuItem
+              autoFocus
+              icon={<CrownIcon className="h-4 w-4" />}
+              label={t("admin.makeAdmin", "Make admin")}
+              onClick={() => {
+                onSetRole("admin");
+                close();
+              }}
+            />
+          )}
+          <MessageMenuItem
+            icon={<UserXIcon className="h-4 w-4" />}
+            label={t("admin.remove", "Remove from channel")}
+            danger
+            autoFocus={member.role === "admin" && !canDemote}
+            onClick={() => {
+              onOpenChange(false);
+              onRemove();
+            }}
+          />
+        </div>
       )}
     </div>
   );

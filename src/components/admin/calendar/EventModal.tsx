@@ -23,6 +23,17 @@
    The guest list is only written back once it has been READ and CHANGED: a
    save racing the first load (or after a failed load) used to PUT an empty
    list and silently uninvite everyone.
+
+   Opened on ONE occurrence of a series (`occurrence`), the editor asks what
+   a change applies to: "This event" stores an exception for that occurrence
+   (title, time, place and link — the fields one occurrence can have of its
+   own; the rest is locked while it is chosen), "All events" edits the
+   series, shifting it by as much as the occurrence was moved. Delete asks
+   the same.
+
+   A meeting link (https) gets a Join button — Hub Blue on the day — and an
+   event with guests a "Chat with attendees" link to Discuss. With guests
+   picked, a free/busy timeline shows everyone's day (FreeBusy).
    --------------------------------------------------------------------------- */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -30,7 +41,8 @@ import { createPortal } from "react-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
-import { CalendarPlusIcon, CrossIcon, DiskIcon, TrashIcon } from "@/components/icons/ui";
+import { CalendarPlusIcon, CrossIcon, DiskIcon, MessageSquareIcon, TrashIcon, VideoIcon } from "@/components/icons/ui";
+import { ChoiceRows } from "@/components/kds";
 import { HUB } from "@/components/kds/colors";
 import type {
   CalendarAttendeeStatus,
@@ -42,15 +54,18 @@ import type {
 } from "@/types/supabase";
 import { fetchAssignableEmployees } from "@/lib/todo-admin";
 import {
+  changeOccurrence,
   createEvent,
   updateEvent,
   fetchAttendees,
   saveAttendees,
   respondToInvite,
   type CalendarAttendee,
+  type OccurrenceChange,
 } from "@/lib/calendar-events";
 import { CALENDAR_EVENT_TYPES, CALENDAR_RECURRENCES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
-import { toDateTimeLocal, fromDateTimeLocal } from "@/lib/calendar-utils";
+import { toDateTimeLocal, fromDateTimeLocal, isoDateKey } from "@/lib/calendar-utils";
+import FreeBusy from "./FreeBusy";
 import { allDayKeys, fromWall, toWall, zonedDateKey, zonedToUtc } from "@/lib/calendar-tz";
 
 /* Preset swatches for the color picker — Hub Blue first. */
@@ -63,8 +78,29 @@ const DURATION_CHIPS = [15, 30, 60, 120];
 
 /** The row being edited; start_date / end_date ride along on an all-day
  *  event read from the server (its dates in the ORGANIZER's zone). */
-export type EventDraft = CalendarEventInsert & { start_date?: string; end_date?: string };
+export type EventDraft = CalendarEventInsert & { start_date?: string; end_date?: string; meeting_url?: string | null };
 export type EventModalMode = "create" | "edit" | "view";
+
+/** The editor was opened on one occurrence of a series: its ORIGINAL start
+ *  (the key of a "this occurrence" change) and the series row's own times. */
+export interface OccurrenceContext {
+  start: string;
+  base: { start_at: string; end_at: string };
+}
+
+export type ChangeScope = "this" | "all";
+
+/** An https link, or null when the text is not one. */
+export function validMeetingUrl(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim();
+  if (!s || s.length > 500) return null;
+  try {
+    const u = new URL(s);
+    return u.protocol === "https:" && u.hostname ? s : null;
+  } catch {
+    return null;
+  }
+}
 
 function keyParts(key: string): [number, number, number] {
   const [y, m, d] = key.split("-").map(Number);
@@ -81,9 +117,18 @@ interface Props {
   /** The calendar's timezone — times are shown and entered on its clock. */
   timezone: string;
   onClose: () => void;
-  onSaved: (ev: CalendarEventRow) => void;
-  /** Asks the shell to confirm and delete; says whether guests will hear. */
-  onDelete?: (info: { hasGuests: boolean }) => void;
+  /** Saved; the row when the series or a one-off was written, null when one
+   *  occurrence was changed. */
+  onSaved: (ev: CalendarEventRow | null) => void;
+  /** Asks the shell to confirm and delete; says whether guests will hear,
+   *  and — for an occurrence — whether it is that one or the whole series. */
+  onDelete?: (info: { hasGuests: boolean; scope: ChangeScope }) => void;
+  /** Set when opened on one occurrence of a series. */
+  occurrence?: OccurrenceContext;
+  /** Holiday names on a day (YYYY-MM-DD), for the free/busy timeline. */
+  holidaysOn?: (dayKey: string) => string[];
+  /** The calendar's wall "now" (the Join button is prominent on the day). */
+  now?: Date;
   onResponded?: (status: CalendarAttendeeStatus) => void;
   onError?: (msg: string) => void;
 }
@@ -107,14 +152,22 @@ export default function EventModal({
   onDelete,
   onResponded,
   onError,
+  occurrence,
+  holidaysOn,
+  now,
 }: Props) {
   const { t } = useTranslation(calendarT);
   useScrollLock();
   const readOnly = mode === "view";
+  const onOccurrence = mode === "edit" && !!occurrence;
+  const [scope, setScope] = useState<ChangeScope>(onOccurrence ? "this" : "all");
+  /* "This event": only the fields one occurrence can have of its own. */
+  const occurrenceOnly = onOccurrence && scope === "this";
+  const locked = readOnly || occurrenceOnly;
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const ids = { title: useId(), heading: useId(), type: useId(), start: useId(), end: useId(), reminder: useId(), repeat: useId(), until: useId(), location: useId(), description: useId(), guests: useId() };
+  const ids = { title: useId(), heading: useId(), type: useId(), start: useId(), end: useId(), reminder: useId(), repeat: useId(), until: useId(), location: useId(), description: useId(), guests: useId(), link: useId(), linkHint: useId() };
   // Portalled to <body> so the overlay is viewport-level (the calendar page
   // sits inside a scroll container, which otherwise traps `position: fixed`
   // and lets the app header paint over the modal's top). The modal is
@@ -262,23 +315,66 @@ export default function EventModal({
     patch(key, fromWall(wall, timezone).toISOString());
   }
 
+  /** "This event": the occurrence's changed fields, as an override. */
+  async function saveOccurrence() {
+    if (!existingId || !occurrence) return;
+    const change: OccurrenceChange = {};
+    if (form.title.trim() !== draft.title.trim()) change.title = form.title.trim();
+    if (form.start_at !== draft.start_at || form.end_at !== draft.end_at) { change.start_at = form.start_at; change.end_at = form.end_at; }
+    if ((form.location?.trim() || null) !== (draft.location?.trim() || null)) change.location = form.location?.trim() || null;
+    if ((form.meeting_url?.trim() || null) !== (draft.meeting_url?.trim() || null)) change.meeting_url = form.meeting_url?.trim() || null;
+    if (Object.keys(change).length === 0) { onClose(); return; }
+    setSaving(true);
+    const res = await changeOccurrence(existingId, occurrence.start, { action: "override", ...change });
+    setSaving(false);
+    if (!res.ok) { onError?.(res.unavailable ? t("err.occurrenceUnavailable") : t("err.save")); return; }
+    onSaved(null);
+  }
+
+  /** "All events" from an occurrence: only what changed goes to the series;
+   *  a moved occurrence moves the series by the same amount. */
+  function seriesPatch(payload: CalendarEventInsert & { meeting_url?: string | null }): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    const before = draft as unknown as Record<string, unknown>;
+    for (const [k, v] of Object.entries(payload)) {
+      if (k === "start_at" || k === "end_at" || k === "account_id") continue;
+      if ((v ?? null) !== ((before[k] as unknown) ?? null)) out[k] = v;
+    }
+    if (occurrence && (form.start_at !== draft.start_at || form.end_at !== draft.end_at)) {
+      const shift = Date.parse(form.start_at) - Date.parse(draft.start_at);
+      const start = Date.parse(occurrence.base.start_at) + shift;
+      out.start_at = new Date(start).toISOString();
+      out.end_at = new Date(start + (Date.parse(form.end_at) - Date.parse(form.start_at))).toISOString();
+    }
+    return out;
+  }
+
   async function handleSave() {
     if (readOnly || guestsState === "loading") return;
     if (!form.title.trim()) { setLocalError(t("err.titleRequired")); return; }
     if (new Date(form.end_at) < new Date(form.start_at)) { setLocalError(t("err.endBeforeStart")); return; }
+    if (form.meeting_url?.trim() && !validMeetingUrl(form.meeting_url)) { setLocalError(t("err.meetingUrl")); return; }
     setLocalError(null);
+    if (occurrenceOnly) { await saveOccurrence(); return; }
     setSaving(true);
 
     const { start_date: _sd, end_date: _ed, ...row } = form;
     void _sd; void _ed;
-    const payload: CalendarEventInsert = {
+    const payload: CalendarEventInsert & { meeting_url?: string | null } = {
       ...row,
       title: form.title.trim(),
       description: form.description?.trim() || null,
       location: form.location?.trim() || null,
+      meeting_url: form.meeting_url?.trim() || null,
     };
 
-    const saved = existingId ? await updateEvent(existingId, payload) : await createEvent(payload);
+    let saved: CalendarEventRow | null;
+    if (existingId && onOccurrence) {
+      const patchBody = seriesPatch(payload);
+      saved = Object.keys(patchBody).length ? await updateEvent(existingId, patchBody) : ({ id: existingId } as CalendarEventRow);
+    } else {
+      saved = existingId ? await updateEvent(existingId, payload) : await createEvent(payload);
+    }
     setSaving(false);
     if (!saved) { onError?.(t("err.save")); return; }
 
@@ -329,9 +425,25 @@ export default function EventModal({
   const endDate = new Date(form.end_at);
   const color = form.color || EVENT_TYPE_COLORS[form.event_type];
   const heading = mode === "create" ? t("modal.new") : mode === "edit" ? t("modal.edit") : t("modal.view");
-  const editingSeries = mode === "edit" && !!draft.recurrence;
+  const editingSeries = mode === "edit" && !!draft.recurrence && !onOccurrence;
   const guestsLoading = guestsState === "loading";
   const liveGuests = attendees.filter((a) => a.status !== "declined").length > 0;
+  const link = validMeetingUrl(form.meeting_url);
+  const linkInvalid = !!form.meeting_url?.trim() && !link;
+  const hasGuests = attendees.some((a) => a.status !== "declined") || (!readOnly && attendeeIds.length > 0);
+  /* Free/busy: the organizer and the picked guests, on the event's day. */
+  const fbIds = useMemo(() => [organizerId, ...attendeeIds.filter((id) => id !== organizerId)].slice(0, 20), [organizerId, attendeeIds]);
+  const startWall = toWall(form.start_at, timezone);
+  const endWall = toWall(form.end_at, timezone);
+  /* The Join button is Hub Blue on the event's day (the calendar's clock). */
+  const joinToday = !!link && !!now && (form.all_day
+    ? isoDateKey(now) >= dayKeys.start && isoDateKey(now) <= dayKeys.end
+    : endWall.getTime() >= now.getTime() && (isoDateKey(startWall) === isoDateKey(now) || startWall.getTime() <= now.getTime()));
+  const fbDay = form.all_day ? dayKeys.start : isoDateKey(startWall);
+  const fbProposal = form.all_day ? null : {
+    startMin: startWall.getHours() * 60 + startWall.getMinutes(),
+    endMin: isoDateKey(endWall) > fbDay ? 24 * 60 : endWall.getHours() * 60 + endWall.getMinutes(),
+  };
 
   return createPortal(
     <div
@@ -389,6 +501,22 @@ export default function EventModal({
             </div>
           )}
 
+          {onOccurrence && (
+            <div>
+              <span className={labelClass} id={ids.heading + "-scope"}>{t("scope.label")}</span>
+              <div aria-labelledby={ids.heading + "-scope"}>
+                <ChoiceRows<ChangeScope>
+                  value={scope}
+                  onChange={setScope}
+                  options={[
+                    { value: "this", label: t("scope.this"), hint: t("scope.this.hint") },
+                    { value: "all", label: t("scope.all"), hint: t("scope.all.hint") },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label htmlFor={ids.title} className={labelClass}>{t("f.title")}</label>
@@ -410,7 +538,7 @@ export default function EventModal({
               className={inputClass}
               value={form.event_type}
               onChange={(e) => patch("event_type", e.target.value as CalendarEventType)}
-              disabled={readOnly}
+              disabled={locked}
             >
               {CALENDAR_EVENT_TYPES.map((ev) => (
                 <option key={ev} value={ev}>{t(`type.${ev}`)}</option>
@@ -419,7 +547,7 @@ export default function EventModal({
           </div>
 
           {/* Color picker — Default (type color) + preset swatches */}
-          {!readOnly && (
+          {!locked && (
             <div>
               <span className={labelClass}>{t("f.color")}</span>
               <div className="flex items-center gap-2 flex-wrap" role="group" aria-label={t("f.color")}>
@@ -461,12 +589,12 @@ export default function EventModal({
                 type="checkbox"
                 checked={form.all_day}
                 onChange={(e) => toggleAllDay(e.target.checked)}
-                disabled={readOnly}
+                disabled={locked}
                 className="h-4 w-4 rounded border-[var(--border-subtle)]"
               />
               <span className="text-[13px] text-[var(--text-muted)]">{t("f.allDay")}</span>
             </label>
-            {!readOnly && (
+            {!locked && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -561,7 +689,7 @@ export default function EventModal({
                 id={ids.reminder}
                 className={inputClass}
                 value={form.reminder_minutes ?? ""}
-                disabled={readOnly}
+                disabled={locked}
                 onChange={(e) => patch("reminder_minutes", e.target.value === "" ? null : Number(e.target.value))}
               >
                 {REMINDER_MINUTES.map((v) => (
@@ -575,7 +703,7 @@ export default function EventModal({
                 id={ids.repeat}
                 className={inputClass}
                 value={form.recurrence ?? ""}
-                disabled={readOnly}
+                disabled={locked}
                 onChange={(e) => patch("recurrence", (e.target.value || null) as CalendarRecurrence)}
               >
                 <option value="">{t("repeat.none")}</option>
@@ -595,17 +723,17 @@ export default function EventModal({
                 type="date"
                 className={inputClass}
                 value={form.recurrence_until ?? ""}
-                disabled={readOnly}
+                disabled={locked}
                 onChange={(e) => patch("recurrence_until", e.target.value || null)}
               />
-              {!readOnly && (
+              {!locked && (
                 <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("f.repeatUntil.hint")}</p>
               )}
             </div>
           )}
 
           {/* Guests */}
-          {readOnly ? (
+          {locked ? (
             attendees.length > 0 && (
               <div>
                 <span className={labelClass}>{t("modal.guests")}</span>
@@ -727,6 +855,18 @@ export default function EventModal({
             </div>
           )}
 
+          {/* Free/busy of the organizer and the picked guests */}
+          {!readOnly && attendeeIds.length > 0 && guestsState !== "failed" && (
+            <FreeBusy
+              accountIds={fbIds}
+              nameFor={(id) => (id === organizerId && !personById.has(id) ? t("fb.organizer") : nameFor(id))}
+              dayKey={fbDay}
+              timezone={timezone}
+              proposal={fbProposal}
+              holidays={holidaysOn?.(fbDay) ?? []}
+            />
+          )}
+
           {/* Location */}
           <div>
             <label htmlFor={ids.location} className={labelClass}>{t("f.location")}</label>
@@ -748,11 +888,65 @@ export default function EventModal({
               className={textareaClass}
               rows={3}
               value={form.description ?? ""}
-              disabled={readOnly}
+              disabled={locked}
               onChange={(e) => patch("description", e.target.value || null)}
               placeholder={readOnly ? "" : t("f.description.placeholder")}
             />
           </div>
+
+          {/* Meeting link + Join, and the chat with the guests */}
+          {(!readOnly || link || (existingId && hasGuests)) && (
+          <div>
+            {readOnly
+              ? <span className={labelClass}>{t("f.meetingUrl")}</span>
+              : <label htmlFor={ids.link} className={labelClass}>{t("f.meetingUrl")}</label>}
+            {!readOnly && (
+              <input
+                id={ids.link}
+                type="url"
+                inputMode="url"
+                dir="ltr"
+                className={`${inputClass} ${linkInvalid ? "border-[var(--state-error)]" : ""}`}
+                value={form.meeting_url ?? ""}
+                maxLength={500}
+                onChange={(e) => patch("meeting_url", e.target.value || null)}
+                placeholder="https://"
+                aria-invalid={linkInvalid || undefined}
+                aria-describedby={linkInvalid ? ids.linkHint : undefined}
+              />
+            )}
+            {linkInvalid && (
+              <p id={ids.linkHint} className="mt-1 text-[11px] text-[var(--state-error)]">{t("err.meetingUrl")}</p>
+            )}
+            {(link || (existingId && hasGuests)) && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`h-9 px-4 rounded-xl inline-flex items-center gap-2 text-[13px] font-semibold transition-colors ${
+                      joinToday
+                        ? "bg-[#567FB2] text-white hover:bg-[#4A6F9E] dark:bg-[#7FA9D6] dark:text-[#0B1320] dark:hover:bg-[#BCD8F0] shadow-lg"
+                        : "bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[#567FB2] dark:text-[#7FA9D6] hover:border-[var(--border-focus)]"
+                    }`}
+                  >
+                    <VideoIcon size={15} aria-hidden /> {t("join")}
+                    <span className="sr-only"> · {link}</span>
+                  </a>
+                )}
+                {existingId && hasGuests && (
+                  <a
+                    href="/discuss"
+                    className="h-9 px-4 rounded-xl inline-flex items-center gap-2 text-[13px] font-semibold bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+                  >
+                    <MessageSquareIcon size={15} aria-hidden /> {t("chatAttendees")}
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+          )}
 
           {localError && (
             <div role="alert" className="rounded-lg border border-[var(--state-error)]/30 bg-[var(--state-error)]/[0.08] text-[var(--state-error)] px-3 py-2 text-[12px]">
@@ -766,7 +960,7 @@ export default function EventModal({
           {mode === "edit" && onDelete ? (
             <button
               type="button"
-              onClick={() => onDelete({ hasGuests: liveGuests })}
+              onClick={() => onDelete({ hasGuests: liveGuests, scope: onOccurrence ? scope : "all" })}
               disabled={saving}
               className="h-10 px-4 sm:px-6 rounded-xl bg-[var(--state-error)]/10 border border-[var(--state-error)]/30 text-[var(--state-error)] text-[13px] font-semibold flex items-center gap-2 hover:bg-[var(--state-error)]/20 transition-all disabled:opacity-60"
             >

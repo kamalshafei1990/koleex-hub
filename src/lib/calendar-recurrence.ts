@@ -124,3 +124,139 @@ export function nextOccurrenceStart(
   }
   return null;
 }
+
+/* ── "This occurrence only" ──────────────────────────────────────────────
+   A series can have exceptions (koleex_calendar_event_exceptions), keyed by
+   an occurrence's ORIGINAL start: a skip removes the occurrence, an override
+   replaces its title / time / place / link. The feed and the reminder cron
+   both run the expansion through here, so they agree on what happens. */
+
+export interface OccurrenceException {
+  occurrence_start: string;
+  kind: "skip" | "override";
+  title?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+export interface EffectiveOccurrence {
+  start: Date;
+  end: Date;
+  /** The occurrence's original start — its key. */
+  original: Date;
+  override?: OccurrenceException;
+}
+
+/** Index a series' exceptions by the ms of their original start. */
+export function exceptionIndex(list: OccurrenceException[] | undefined): Map<number, OccurrenceException> {
+  const out = new Map<number, OccurrenceException>();
+  for (const e of list ?? []) {
+    const ms = Date.parse(e.occurrence_start);
+    if (Number.isFinite(ms)) out.set(ms, e);
+  }
+  return out;
+}
+
+/** The occurrences of a series that land in [winFrom, winTo) once its
+ *  exceptions are applied: skipped ones are dropped, overridden ones take
+ *  their own time (and may move into or out of the window). */
+export function expandWithExceptions(
+  baseStartISO: string,
+  baseEndISO: string,
+  rec: CalendarRec,
+  untilDate: string | null | undefined,
+  winFrom: Date,
+  winTo: Date,
+  exceptions: OccurrenceException[] | undefined,
+  cap = 400,
+  tz = "UTC",
+): EffectiveOccurrence[] {
+  const index = exceptionIndex(exceptions);
+  const durationMs = Math.max(0, Date.parse(baseEndISO) - Date.parse(baseStartISO));
+  const fromMs = winFrom.getTime();
+  const toMs = winTo.getTime();
+  const overlaps = (s: number, e: number) => e >= fromMs && s < toMs;
+  const out: EffectiveOccurrence[] = [];
+  const seen = new Set<number>();
+  for (const o of expandRecurrence(baseStartISO, baseEndISO, rec, untilDate, winFrom, winTo, cap, tz)) {
+    const key = o.start.getTime();
+    seen.add(key);
+    const ex = index.get(key);
+    if (!ex) { out.push({ start: o.start, end: o.end, original: o.start }); continue; }
+    if (ex.kind === "skip") continue;
+    const eff = effectiveSpan(key, durationMs, ex);
+    if (overlaps(eff.s, eff.e)) out.push({ start: new Date(eff.s), end: new Date(eff.e), original: o.start, override: ex });
+  }
+  /* An override moved INTO the window from an occurrence outside it. */
+  for (const [key, ex] of index) {
+    if (seen.has(key) || ex.kind !== "override" || !ex.start_at) continue;
+    const eff = effectiveSpan(key, durationMs, ex);
+    if (overlaps(eff.s, eff.e)) out.push({ start: new Date(eff.s), end: new Date(eff.e), original: new Date(key), override: ex });
+  }
+  return out.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+function effectiveSpan(originalMs: number, durationMs: number, ex: OccurrenceException): { s: number; e: number } {
+  const s = ex.start_at ? Date.parse(ex.start_at) : originalMs;
+  const start = Number.isFinite(s) ? s : originalMs;
+  const e = ex.end_at ? Date.parse(ex.end_at) : NaN;
+  return { s: start, e: Number.isFinite(e) && e >= start ? e : start + durationMs };
+}
+
+/** Is `occurrenceISO` really an occurrence of this series (its original
+ *  start)? Used to refuse an exception keyed on a time the series never has. */
+export function isOccurrenceOf(
+  baseStartISO: string,
+  baseEndISO: string,
+  rec: CalendarRec,
+  untilDate: string | null | undefined,
+  occurrenceISO: string,
+  tz = "UTC",
+): boolean {
+  const ms = Date.parse(occurrenceISO);
+  if (!rec || !Number.isFinite(ms)) return false;
+  return expandRecurrence(baseStartISO, baseEndISO, rec, untilDate, new Date(ms - 1), new Date(ms + 1), 8, tz)
+    .some((o) => o.start.getTime() === ms);
+}
+
+/** The next occurrence a reminder is due for, exceptions applied: the
+ *  earliest EFFECTIVE start at/after `now` (60s grace). A one-off answers
+ *  its own start. */
+export function nextEffectiveOccurrence(
+  baseStartISO: string,
+  baseEndISO: string,
+  rec: CalendarRec,
+  untilDate: string | null | undefined,
+  now: Date,
+  exceptions: OccurrenceException[] | undefined,
+  tz = "UTC",
+): EffectiveOccurrence | null {
+  const bStart = Date.parse(baseStartISO);
+  if (!Number.isFinite(bStart)) return null;
+  if (!rec) {
+    const bEnd = Date.parse(baseEndISO);
+    return { start: new Date(bStart), end: new Date(Number.isFinite(bEnd) ? bEnd : bStart), original: new Date(bStart) };
+  }
+  if (!exceptions || exceptions.length === 0) {
+    const s = nextOccurrenceStart(baseStartISO, rec, untilDate, now, tz);
+    if (!s) return null;
+    const dur = Math.max(0, Date.parse(baseEndISO) - bStart);
+    return { start: s, end: new Date(s.getTime() + dur), original: s };
+  }
+  const floor = now.getTime() - 60_000;
+  const step = rec === "daily" ? 4 * DAY : rec === "weekly" ? 22 * DAY : 70 * DAY;
+  /* Look back a little: an override can move an earlier occurrence later. */
+  let from = floor - 8 * DAY;
+  for (let tries = 0; tries < 6; tries++) {
+    const to = floor + step * (tries + 1);
+    const list = expandWithExceptions(baseStartISO, baseEndISO, rec, untilDate, new Date(from), new Date(to), exceptions, 128, tz)
+      .filter((o) => o.start.getTime() >= floor);
+    if (list.length) return list[0];
+    from = to;
+    const until = untilBoundary(untilDate, safeTimeZone(tz));
+    if (until != null && until < from) return null;
+  }
+  return null;
+}

@@ -3,7 +3,8 @@
 /* ---------------------------------------------------------------------------
    AgendaView — the visible range as a plain list grouped by day. The phone
    default: a month grid of 42 cells or a seven-column week does not read at
-   phone width; a list does.
+   phone width; a list does. An event with a meeting link on today carries a
+   Join button; pending leave is drawn dashed.
    --------------------------------------------------------------------------- */
 
 import type { CalendarFeedEvent } from "@/lib/calendar-types";
@@ -11,8 +12,8 @@ import type { HolidayInstance } from "@/lib/calendar-holidays";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
 import { EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
-import { colorForEvent, formatDMY, formatEventTimeRange, isToday, isoDateKey, isoWeekday } from "@/lib/calendar-utils";
-import type { ChipLabels } from "./EventChip";
+import { colorForEvent, formatDMY, formatEventTimeRange, isTentative, isToday, isoDateKey, isoWeekday, joinableNow } from "@/lib/calendar-utils";
+import { JoinLink, isMilestone, type ChipLabels } from "./EventChip";
 
 interface Props {
   days: Date[];
@@ -61,26 +62,38 @@ export default function AgendaView({ days, today, eventsByDay, holidaysByDay, ch
             ))}
             {items.map((ev) => {
               const declined = ev.invite_status === "declined";
+              const tentative = isTentative(ev);
+              const join = ev.meeting_url && joinableNow(ev, today) ? ev.meeting_url : null;
+              const color = colorForEvent(ev);
               return (
-                <li key={ev.id}>
+                <li key={ev.id} className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onEventClick?.(ev)}
-                    className={`w-full flex items-start gap-2.5 rounded-lg px-2 py-1.5 -mx-2 text-start hover:bg-[var(--bg-surface-subtle)] transition-colors ${declined ? "opacity-60" : ""}`}
+                    className={`flex-1 min-w-0 flex items-start gap-2.5 rounded-lg px-2 py-1.5 -ms-2 text-start hover:bg-[var(--bg-surface-subtle)] transition-colors ${declined ? "opacity-60" : ""} ${tentative ? "italic" : ""}`}
                   >
-                    <span className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: colorForEvent(ev) }} />
+                    <span
+                      className="h-2 w-2 rounded-full mt-1.5 shrink-0"
+                      style={tentative ? { border: `1px dashed ${color}` } : { backgroundColor: color }}
+                    />
                     <span className="w-24 shrink-0 text-[11px] text-[var(--text-dim)] tabular-nums pt-0.5">
                       {ev.all_day ? chipLabels.allDay : formatEventTimeRange(ev, chipLabels.allDay)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className={`block text-[13px] font-medium text-[var(--text-primary)] truncate ${declined ? "line-through" : ""}`}>{ev.title}</span>
-                      {(ev.location || ev.source === "leave" || declined) && (
+                      {(ev.location || ev.source === "leave" || declined || isMilestone(ev)) && (
                         <span className="block text-[11px] text-[var(--text-dim)] truncate">
-                          {[ev.location, ev.source === "leave" ? chipLabels.readOnly : null, declined ? chipLabels.declined : null].filter(Boolean).join(" · ")}
+                          {[
+                            isMilestone(ev) ? `${chipLabels.milestone}${ev.description ? ` · ${ev.description}` : ""}` : null,
+                            ev.location,
+                            ev.source === "leave" ? (tentative ? chipLabels.pending : chipLabels.readOnly) : null,
+                            declined ? chipLabels.declined : null,
+                          ].filter(Boolean).join(" · ")}
                         </span>
                       )}
                     </span>
                   </button>
+                  {join && <JoinLink url={join} label={chipLabels.join} title={ev.title} />}
                 </li>
               );
             })}

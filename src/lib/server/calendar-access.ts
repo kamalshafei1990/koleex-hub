@@ -33,6 +33,8 @@ export interface CalendarEventCore {
   recurrence: CalendarRecurrence;
   recurrence_until: string | null;
   color: string | null;
+  /** Absent until the 2026-09-26 migration adds the column. */
+  meeting_url?: string | null;
 }
 
 export interface CalendarActor {
@@ -46,14 +48,51 @@ const EVENT_CORE_COLUMNS =
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string): boolean => UUID_RE.test(v);
 
+/** A PostgREST error that says a column (or table) this code expects is not
+ *  there yet — the 2026-09-26 migration has not run. */
+export function isMissingSchema(error: { message?: string; code?: string } | null | undefined, name: string): boolean {
+  if (!error) return false;
+  const m = error.message ?? "";
+  return m.includes(name) && /does not exist|could not find|schema cache/i.test(m);
+}
+
 /** One event, tenant-bounded. A non-uuid (the list mixes in virtual rows such
- *  as `todo:<id>`) is a not-found, not a Postgres error. */
+ *  as `todo:<id>`) is a not-found, not a Postgres error. The meeting link is
+ *  read when the column exists. */
 export async function loadCalendarEvent(id: string, tenantId: string | null): Promise<CalendarEventCore | null> {
   if (!UUID_RE.test(id)) return null;
-  let q = supabaseServer.from("koleex_calendar_events").select(EVENT_CORE_COLUMNS).eq("id", id);
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  const { data } = await q.maybeSingle();
-  return (data as CalendarEventCore | null) ?? null;
+  const run = (cols: string) => {
+    let q = supabaseServer.from("koleex_calendar_events").select(cols).eq("id", id);
+    if (tenantId) q = q.eq("tenant_id", tenantId);
+    return q.maybeSingle();
+  };
+  let { data, error } = await run(`${EVENT_CORE_COLUMNS}, meeting_url`);
+  if (isMissingSchema(error, "meeting_url")) ({ data, error } = await run(EVENT_CORE_COLUMNS));
+  return (data as unknown as CalendarEventCore | null) ?? null;
+}
+
+/** Insert / update an event row. Before the migration adds meeting_url the
+ *  write is retried without it, so the rest of the event still saves. */
+export async function insertEventRow(row: Record<string, unknown>) {
+  const run = (r: Record<string, unknown>) => supabaseServer.from("koleex_calendar_events").insert(r).select("*").maybeSingle();
+  let res = await run(row);
+  if ("meeting_url" in row && isMissingSchema(res.error, "meeting_url")) {
+    const { meeting_url: _m, ...rest } = row;
+    void _m;
+    res = await run(rest);
+  }
+  return res;
+}
+
+export async function updateEventRow(id: string, row: Record<string, unknown>) {
+  const run = (r: Record<string, unknown>) => supabaseServer.from("koleex_calendar_events").update(r).eq("id", id).select("*").maybeSingle();
+  let res = await run(row);
+  if ("meeting_url" in row && isMissingSchema(res.error, "meeting_url")) {
+    const { meeting_url: _m, ...rest } = row;
+    void _m;
+    res = Object.keys(rest).length ? await run(rest) : await supabaseServer.from("koleex_calendar_events").select("*").eq("id", id).maybeSingle();
+  }
+  return res;
 }
 
 export function isEventOwner(ev: Pick<CalendarEventCore, "account_id">, actor: CalendarActor): boolean {
@@ -126,11 +165,29 @@ export async function eventAttendeeIds(eventId: string, opts?: { excludeDeclined
 const WRITABLE_KEYS = [
   "title", "description", "location", "start_at", "end_at", "all_day",
   "event_type", "color", "is_private", "reminder_minutes", "recurrence", "recurrence_until",
+  "meeting_url",
 ] as const;
 
 export type SanitizedEvent =
-  | { ok: true; row: Record<string, unknown>; timeChanged: boolean; locationChanged: boolean }
+  | { ok: true; row: Record<string, unknown>; timeChanged: boolean; locationChanged: boolean; meetingUrlChanged: boolean; seriesChanged: boolean }
   | { ok: false; error: string };
+
+/** A meeting link: https only, at most 500 characters. `undefined` = not a
+ *  usable link (the caller answers 400); null = cleared. */
+export function cleanMeetingUrl(v: unknown): string | null | undefined {
+  if (v === null) return null;
+  if (typeof v !== "string") return undefined;
+  const s = v.trim();
+  if (!s) return null;
+  if (s.length > 500) return undefined;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "https:" || !u.hostname) return undefined;
+    return u.toString().length <= 500 ? s : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function optString(v: unknown, max: number): string | null | undefined {
   if (v === undefined) return undefined;
@@ -145,7 +202,7 @@ function optString(v: unknown, max: number): string | null | undefined {
 export function sanitizeEventInput(
   body: Record<string, unknown>,
   mode: "create" | "update",
-  existing?: Pick<CalendarEventCore, "start_at" | "end_at"> & Partial<Pick<CalendarEventCore, "color" | "location">>,
+  existing?: Pick<CalendarEventCore, "start_at" | "end_at"> & Partial<Pick<CalendarEventCore, "color" | "location" | "meeting_url" | "recurrence" | "recurrence_until">>,
 ): SanitizedEvent {
   const row: Record<string, unknown> = {};
   for (const k of WRITABLE_KEYS) if (k in body) row[k] = body[k];
@@ -208,6 +265,12 @@ export function sanitizeEventInput(
     }
   }
 
+  if ("meeting_url" in row) {
+    const v = cleanMeetingUrl(row.meeting_url);
+    if (v === undefined) return { ok: false, error: "meeting_url must be an https link (max 500 characters)" };
+    row.meeting_url = v;
+  }
+
   const timeChanged =
     (!!row.start_at && row.start_at !== existing?.start_at) ||
     (!!row.end_at && row.end_at !== existing?.end_at);
@@ -215,6 +278,21 @@ export function sanitizeEventInput(
      the old time must not silence the new one. */
   if (mode === "update" && timeChanged) row.reminded_at = null;
   const locationChanged = mode === "update" && "location" in row && (row.location ?? null) !== (existing?.location ?? null);
+  const meetingUrlChanged = mode === "update" && "meeting_url" in row && (row.meeting_url ?? null) !== (existing?.meeting_url ?? null);
+  /* The occurrences of a series move when its start or its rule changes:
+     "this occurrence only" changes keyed on the old times no longer apply. */
+  const seriesChanged = mode === "update" && (
+    (!!row.start_at && row.start_at !== existing?.start_at) ||
+    ("recurrence" in row && (row.recurrence ?? null) !== (existing?.recurrence ?? null))
+  );
 
-  return { ok: true, row, timeChanged, locationChanged };
+  return { ok: true, row, timeChanged, locationChanged, meetingUrlChanged, seriesChanged };
+}
+
+/** A search term made safe for an ILIKE inside a PostgREST `.or()`: the LIKE
+ *  metacharacters match literally, and `,` `(` `)` `"` — which would split
+ *  or re-shape the expression — become the single-char wildcard. */
+export function orLikeTerm(raw: string): string {
+  const escaped = raw.replace(/[%_\\]/g, "\\$&").replace(/[,()"]/g, "_");
+  return `%${escaped}%`;
 }

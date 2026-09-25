@@ -56,6 +56,12 @@ export async function validateProjectFields(
     if (!Number.isFinite(n) || n < 0) return { error: `Invalid ${k}` };
     patch[k] = n;
   }
+  if (has("currency")) {
+    const v = body.currency;
+    if (v === null || v === "") patch.currency = null;
+    else if (typeof v === "string" && /^[A-Za-z]{3}$/.test(v.trim())) patch.currency = v.trim().toUpperCase();
+    else return { error: "Invalid currency" };
+  }
   if (has("progress_pct")) {
     const n = Number(body.progress_pct);
     if (!Number.isFinite(n) || n < 0 || n > 100) return { error: "Invalid progress_pct" };
@@ -82,4 +88,25 @@ export async function validateProjectFields(
     } else return { error: "Invalid manager" };
   }
   return { patch };
+}
+
+/** Columns added by 20260926_projects_additions.sql. Until it is applied a
+ *  write carrying them fails with "column not found" — strip and retry. */
+export const PENDING_PROJECT_COLUMNS = ["archived_at", "currency"] as const;
+
+/** True for Postgres/PostgREST "no such column" errors. */
+export function isMissingColumn(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  return (
+    err.code === "42703" ||
+    err.code === "PGRST204" ||
+    /column .* does not exist|Could not find the .* column/i.test(err.message ?? "")
+  );
+}
+
+/** Copy of `patch` without the pending (maybe-unmigrated) columns. */
+export function withoutPendingColumns(patch: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...patch };
+  for (const k of PENDING_PROJECT_COLUMNS) delete out[k];
+  return out;
 }

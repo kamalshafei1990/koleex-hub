@@ -10,7 +10,15 @@
        dropped — when the note changes, the editor unmounts, or the tab is
        hidden / closed (keepalive request).
      • Sharing: a Share button + live collaborator presence (avatars)
-     • Realtime on shared notes — a peer's save pings us and we re-fetch
+     • LIVE CO-EDITING on shared notes (Yjs over the note's realtime channel,
+       end-to-end encrypted — src/lib/notes-yjs.ts). The editor is rebuilt
+       with the Collaboration extension once the session has joined; saves
+       then send the Yjs state, which the server MERGES (no 409s). Where
+       collaboration is unavailable it falls back to the single-editor path
+       (a peer's save pings us and we re-fetch).
+     • "/" block menu, "[[" note links + Backlinks, checklist → To-do,
+       version history, Koleex AI (summary / action items), duplicate,
+       Markdown export, print / PDF, Send to Discuss, a phone keyboard bar
      • Move-to-folder, Pin, Delete; read-only for trash + view-only sharees
    Loaded with next/dynamic from NotesApp, so the list paints before TipTap.
    --------------------------------------------------------------------------- */
@@ -27,27 +35,35 @@ import {
 import { createPortal } from "react-dom";
 import { useEditor, useEditorState, EditorContent } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
-import Link from "@tiptap/extension-link";
-import Underline from "@tiptap/extension-underline";
-import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { Color } from "@tiptap/extension-color";
-import TextAlign from "@tiptap/extension-text-align";
-import { Table } from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableHeader from "@tiptap/extension-table-header";
-import TableCell from "@tiptap/extension-table-cell";
+import Collaboration, { isChangeOrigin } from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
-import { fetchNote, uploadNoteImage, type NoteFull, type NotesFolderRow } from "@/lib/notes";
+import {
+  createTodoFromNote,
+  fetchNote,
+  fetchNotes,
+  saveVersion,
+  uploadNoteImage,
+  type NoteAiResult,
+  type NoteFull,
+  type NoteRow,
+  type NoteVersionFull,
+  type NotesFolderRow,
+} from "@/lib/notes";
 import { NOTES_IMAGE_MIME } from "@/lib/notes-policy";
-import { useNoteCollab } from "@/lib/note-collab";
+import { getTabClientId, useNoteCollab } from "@/lib/note-collab";
+import { NOTES_YJS_FIELD, noteLinkHref, notesSchemaExtensions, parseNoteLink } from "@/lib/notes-schema";
+import { NoteYjsSession, fetchCollabJoin, peerColor } from "@/lib/notes-yjs";
+import { noteFileName, noteToMarkdown } from "@/lib/notes-markdown";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
+import { NoteLinkPicker, SlashCommand, type MenuBridge, type MenuItem } from "./editor-extensions";
+import SuggestionMenu, { useMenuBridge } from "./SuggestionMenu";
+import { AiPanel, Backlinks, HistoryPanel } from "./NotePanels";
+import SendToDiscussDialog from "./SendToDiscussDialog";
+import { ChecklistTodoControl, MobileFormatBar, taskItemAtSelection } from "./EditorFloatingBars";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
@@ -75,6 +91,18 @@ import RemoveFormattingIcon from "@/components/icons/ui/RemoveFormattingIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import PrintIcon from "@/components/icons/ui/PrintIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import BookmarkIcon from "@/components/icons/ui/BookmarkIcon";
+import Heading1Icon from "@/components/icons/ui/Heading1Icon";
+import Heading2Icon from "@/components/icons/ui/Heading2Icon";
+import Heading3Icon from "@/components/icons/ui/Heading3Icon";
+import FileIcon from "@/components/icons/ui/FileIcon";
 import { PromptDialog } from "./NotesDialog";
 
 type T = (k: string) => string;
@@ -178,9 +206,15 @@ const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
 export type EditorChange = {
   title?: string;
+  /** Always the editor's current document (also in collab mode, where it
+   *  is kept for the local preview / auto-title and NOT sent). */
   body_json?: unknown;
   color?: string | null;
   tags?: string[];
+  /** Collaborative save: the full Yjs state (base64). */
+  yjs_update?: string;
+  /** Collab mode: saves are merges — no concurrency token, no 409. */
+  collab?: boolean;
 };
 
 export type SaveResult = "ok" | "error" | "conflict";
@@ -208,10 +242,59 @@ export interface NoteEditorProps {
   onShare: () => void;
   /** Phones: return to the list. */
   onBack?: () => void;
+  /** Open another note (a [[link]] or a backlink was clicked). */
+  onOpenNote: (id: string) => void;
+  /** Copy this note into a new one. */
+  onDuplicate: () => void;
   /** The title was changed outside the editor (Rename dialog). */
   titleSignal?: { id: string; title: string; seq: number } | null;
   notify: (msg: string, kind?: "success" | "error" | "info") => void;
 }
+
+/** A collaborator's caret: a coloured bar with their name. */
+function renderCaret(user: Record<string, unknown>): HTMLElement {
+  const color = typeof user.color === "string" ? user.color : "#567FB2";
+  const caret = document.createElement("span");
+  caret.classList.add("collaboration-carets__caret");
+  caret.style.borderColor = color;
+  const label = document.createElement("div");
+  label.classList.add("collaboration-carets__label");
+  label.style.backgroundColor = color;
+  label.setAttribute("dir", "auto");
+  label.textContent = typeof user.name === "string" && user.name ? user.name : "•";
+  caret.append(label);
+  return caret;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+}
+
+/* A clean, print-only page for "Print / Save as PDF". */
+const PRINT_CSS = `
+  @page { margin: 18mm; }
+  * { box-sizing: border-box; }
+  body { font: 12pt/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", "PingFang SC", sans-serif; color: #111; margin: 0; }
+  h1.note-title { font-size: 22pt; margin: 0 0 4pt; }
+  .note-tags { color: #567FB2; font-size: 10pt; margin-bottom: 14pt; }
+  h1 { font-size: 18pt; } h2 { font-size: 15pt; } h3 { font-size: 13pt; }
+  h1, h2, h3 { margin: 14pt 0 6pt; break-after: avoid; }
+  p { margin: 4pt 0; }
+  a { color: #2F5C8A; }
+  img { max-width: 100%; height: auto; border-radius: 6pt; break-inside: avoid; }
+  blockquote { border-inline-start: 3px solid #bbb; margin: 8pt 0; padding-inline-start: 10pt; color: #444; }
+  pre { background: #f4f4f4; border-radius: 6pt; padding: 8pt; white-space: pre-wrap; font-size: 10pt; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+  td, th { border: 1px solid #bbb; padding: 4pt 6pt; vertical-align: top; }
+  th { background: #f0f0f0; }
+  hr { border: 0; border-top: 1px solid #ccc; margin: 12pt 0; }
+  ul[data-type="taskList"] { list-style: none; padding-inline-start: 0; }
+  ul[data-type="taskList"] li { display: flex; gap: 6pt; align-items: flex-start; }
+  ul[data-type="taskList"] li > label { flex: none; }
+  ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: #777; }
+  mark { background: #fff3a3; }
+`;
 
 function countWords(text: string): { words: number; chars: number } {
   const trimmed = text.trim();
@@ -234,6 +317,8 @@ export default function NoteEditor({
   onPurge,
   onShare,
   onBack,
+  onOpenNote,
+  onDuplicate,
   titleSignal,
   notify,
 }: NoteEditorProps) {
@@ -254,21 +339,53 @@ export default function NoteEditor({
   const isTrashed = note?.deleted_at != null;
   const isViewer = note?.role === "viewer";
   const isSharee = note?.role === "viewer" || note?.role === "editor";
-  const editingDisabled = readOnly || isTrashed || isViewer;
+
+  /* ── Live co-editing session (shared notes) ─────────────────────────────
+     `collab` records what was decided FOR WHICH NOTE: a shared note stays
+     read-only until its session has joined (or collaboration was found to
+     be unavailable → "off" → the single-editor path). Typing into a solo
+     editor while the session is being set up would race the server seed. */
+  const noteId = note?.id ?? null;
+  const collabEligible = !!note && !isTrashed && (isSharee || !!note.is_shared) && !!me;
+  const [session, setSession] = useState<NoteYjsSession | null>(null);
+  const [collab, setCollab] = useState<{ id: string | null; phase: "off" | "joining" | "live" }>({ id: null, phase: "off" });
+  const activeSession = session && noteId && session.noteId === noteId ? session : null;
+  const collabPending = collabEligible && !activeSession && !(collab.id === noteId && collab.phase === "off");
+  const editingDisabled = readOnly || isTrashed || isViewer || collabPending;
+
+  /* Side panels + dialogs of the 2026-09-26 additions. */
+  const [panel, setPanel] = useState<"history" | "ai" | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [discussOpen, setDiscussOpen] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<NoteVersionFull | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [todoBusy, setTodoBusy] = useState(false);
+  const [mobileBar, setMobileBar] = useState(false);
+  const moreBtnRef = useRef<HTMLButtonElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  // Opening the menu moves focus to its first item (menu-button pattern).
+  useEffect(() => {
+    if (moreOpen) moreMenuRef.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [moreOpen]);
 
   /* Latest values for callbacks that outlive a render (timers, listeners). */
   const noteRef = useRef(note);
   const noteIdRef = useRef<string | null>(note?.id ?? null);
   const disabledRef = useRef(editingDisabled);
   const onChangeRef = useRef(onChange);
+  const sessionRef = useRef<NoteYjsSession | null>(activeSession);
+  const onOpenNoteRef = useRef(onOpenNote);
   useEffect(() => {
     noteRef.current = note;
     noteIdRef.current = note?.id ?? null;
     disabledRef.current = editingDisabled;
     onChangeRef.current = onChange;
+    sessionRef.current = activeSession;
+    onOpenNoteRef.current = onOpenNote;
   });
 
-  const placeholderRef = useRef(t("editor.placeholder"));
+  const placeholderRef = useRef(`${t("editor.placeholder")}  ${t("slash.hint")}`);
   const lastLocalEditAt = useRef(0);
   const countTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -293,8 +410,11 @@ export default function NoteEditor({
     const p = onChangeRef.current(id, payload, { keepalive })
       .then((res) => {
         if (res === "ok") {
-          // Tell peers only once the save has actually landed.
-          if (id === noteIdRef.current) broadcastRef.current();
+          // Tell peers only once the save has actually landed. In a live
+          // session the body already reached them over the socket — ping
+          // only for what is not in the Yjs doc (title / tags / colour).
+          const metaChanged = "title" in payload || "tags" in payload || "color" in payload;
+          if (id === noteIdRef.current && (!payload.yjs_update || metaChanged)) broadcastRef.current();
         } else if (res === "error") {
           // Keep the edits: newer pending changes win over the failed ones.
           pendingRef.current.set(id, { ...payload, ...(pendingRef.current.get(id) ?? {}) });
@@ -319,10 +439,12 @@ export default function NoteEditor({
   const queueChange = useCallback((next: EditorChange, immediate = false) => {
     const id = noteIdRef.current;
     if (!id || disabledRef.current) return;
-    pendingRef.current.set(id, { ...(pendingRef.current.get(id) ?? {}), ...next });
+    const live = sessionRef.current?.noteId === id;
+    pendingRef.current.set(id, { ...(pendingRef.current.get(id) ?? {}), ...next, ...(live ? { collab: true } : {}) });
     if (saveTimer.current) clearTimeout(saveTimer.current);
     if (immediate) { flushAll(); return; }
-    saveTimer.current = setTimeout(() => { saveTimer.current = null; flushAll(); }, 500);
+    // Live sessions already share every keystroke; persistence can breathe.
+    saveTimer.current = setTimeout(() => { saveTimer.current = null; flushAll(); }, next.yjs_update ? 1500 : 500);
   }, [flushAll]);
 
   /* Flush on unmount, and with a keepalive request when the tab is hidden or
@@ -339,23 +461,37 @@ export default function NoteEditor({
     };
   }, [flushAll]);
 
+  /* "/" and "[[" menus — the extensions read these lazily. */
+  const { bridge, menu, choose: chooseMenu, hover: hoverMenu } = useMenuBridge();
+  const bridgeRef = useRef<MenuBridge | null>(bridge);
+  useEffect(() => { bridgeRef.current = bridge; }, [bridge]);
+  const slashItemsRef = useRef<(q: string) => MenuItem[]>(() => []);
+  const linkItemsRef = useRef<(q: string) => Promise<MenuItem[]>>(async () => []);
+
+  /* The editor is REBUILT when a live session starts or ends (the
+     Collaboration extension binds to one Y.Doc for its whole life). A solo
+     editor is reused across notes, exactly as before. */
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false, underline: false }),
-      Underline,
-      Highlight.configure({ multicolor: false }),
-      TextStyle,
-      Color,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
+      ...notesSchemaExtensions({ collab: !!activeSession }),
       Placeholder.configure({ placeholder: () => placeholderRef.current }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Link.configure({ openOnClick: false, autolink: true }),
-      Image.configure({ inline: false, allowBase64: false, HTMLAttributes: { class: "notes-image" } }),
+      SlashCommand.configure({ getBridge: () => bridgeRef.current, getItems: (q) => slashItemsRef.current(q) }),
+      NoteLinkPicker.configure({ getBridge: () => bridgeRef.current, getItems: (q) => linkItemsRef.current(q) }),
+      ...(activeSession
+        ? [
+            Collaboration.configure({ document: activeSession.doc, field: NOTES_YJS_FIELD }),
+            CollaborationCaret.configure({
+              provider: { awareness: activeSession.awareness },
+              user: { name: me?.name ?? "", color: peerColor(me?.id) },
+              render: renderCaret,
+              selectionRender: (user: Record<string, unknown>) => ({
+                nodeName: "span",
+                class: "collaboration-carets__selection",
+                style: `background-color: ${String(user.color ?? "#567FB2")}33`,
+              }),
+            }),
+          ]
+        : []),
     ],
     content: null,
     editable: !editingDisabled,
@@ -370,21 +506,39 @@ export default function NoteEditor({
         class:
           "notes-editor max-w-none focus:outline-none h-full min-h-[calc(100dvh-15rem)] text-[var(--text-primary)] text-[15px] md:text-[17px]",
       },
+      // In-app note links open the note instead of navigating the page.
+      handleClick: (_view, _pos, event) => {
+        const a = (event.target as HTMLElement | null)?.closest?.("a");
+        const target = a ? parseNoteLink(a.getAttribute("href")) : null;
+        if (!target) return false;
+        event.preventDefault();
+        onOpenNoteRef.current(target);
+        return true;
+      },
     },
-    onUpdate: ({ editor: ed }) => {
-      lastLocalEditAt.current = Date.now();
-      queueChange({ body_json: ed.getJSON() });
+    onUpdate: ({ editor: ed, transaction }) => {
       // Word count is cosmetic — debounce it instead of a render per key.
       if (countTimer.current) clearTimeout(countTimer.current);
       countTimer.current = setTimeout(() => setCounts(countWords(ed.getText())), 300);
+
+      const live = sessionRef.current;
+      if (live) {
+        // A peer's change arrived over the socket: its author persists it.
+        if (isChangeOrigin(transaction) || !live.canWrite) return;
+        lastLocalEditAt.current = Date.now();
+        queueChange({ body_json: ed.getJSON(), yjs_update: live.encodeState() });
+        return;
+      }
+      lastLocalEditAt.current = Date.now();
+      queueChange({ body_json: ed.getJSON() });
     },
-  });
+  }, [activeSession]);
 
   useEffect(() => () => { if (countTimer.current) clearTimeout(countTimer.current); }, []);
 
   // Placeholder follows the UI language.
   useEffect(() => {
-    placeholderRef.current = t("editor.placeholder");
+    placeholderRef.current = `${t("editor.placeholder")}  ${t("slash.hint")}`;
     if (editor && !editor.isDestroyed) {
       try { editor.view.dispatch(editor.state.tr); } catch { /* not mounted yet */ }
     }
@@ -409,23 +563,81 @@ export default function NoteEditor({
     if (!fresh || busy() || noteIdRef.current !== cur.id) return; // re-check after the await
     setTitleDraft(fresh.title ?? "");
     setTagsDraft(fresh.tags ?? []);
-    try {
-      editor.commands.setContent((fresh.body_json ?? EMPTY_DOC) as never, { emitUpdate: false });
-      setCounts(countWords(editor.getText()));
-    } catch { /* malformed — ignore */ }
+    // In a live session the body is the shared Yjs doc — never overwrite it.
+    if (!sessionRef.current) {
+      try {
+        editor.commands.setContent((fresh.body_json ?? EMPTY_DOC) as never, { emitUpdate: false });
+        setCounts(countWords(editor.getText()));
+      } catch { /* malformed — ignore */ }
+    }
     onRemoteApplied(fresh);
   }, [editor, onRemoteApplied]);
 
   /* Only a note that is actually shared opens a realtime channel. */
-  const collabEnabled = !!note && !isTrashed && (isSharee || !!note.is_shared);
   const { peers, broadcastUpdate } = useNoteCollab({
     noteId: note?.id,
     me,
     status: editingDisabled ? "viewing" : "editing",
-    enabled: collabEnabled,
+    enabled: collabEligible,
     onRemoteUpdate: handleRemote,
+    yjs: activeSession,
   });
   useEffect(() => { broadcastRef.current = broadcastUpdate; }, [broadcastUpdate]);
+
+  /* Join the live session of a shared note. Pending single-editor edits of
+     this note are landed FIRST so the server's seed contains them; if they
+     cannot be saved, the note stays on the single-editor path. */
+  useEffect(() => {
+    if (!collabEligible || !noteId) {
+      setSession(null);
+      setCollab({ id: noteId, phase: "off" });
+      return;
+    }
+    let cancelled = false;
+    setCollab({ id: noteId, phase: "joining" });
+    void (async () => {
+      await sendNote(noteId);
+      if (cancelled) return;
+      if (pendingRef.current.has(noteId)) { setCollab({ id: noteId, phase: "off" }); return; }
+      const j = await fetchCollabJoin(noteId);
+      if (cancelled) return;
+      if (!j || !j.available) { setCollab({ id: noteId, phase: "off" }); return; }
+      setSession(new NoteYjsSession({ noteId, state: j.state, keys: j.keys, tabId: getTabClientId() }));
+      setCollab({ id: noteId, phase: "live" });
+    })();
+    return () => { cancelled = true; };
+  }, [collabEligible, noteId, sendNote]);
+
+  /* One session at a time; a replaced session is torn down (its caret is
+     removed for everyone). A peer using a different key (someone was added
+     or removed) makes us refetch the keys — throttled; if collaboration is
+     no longer available (unshared), fall back to the single-editor path. */
+  useEffect(() => {
+    if (!session) return;
+    let last = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    session.onStaleKey = () => {
+      if (timer) return;
+      timer = setTimeout(async () => {
+        timer = null;
+        last = Date.now();
+        const j = await fetchCollabJoin(session.noteId);
+        if (!j) return;
+        if (!j.available) {
+          setSession((cur) => (cur === session ? null : cur));
+          setCollab({ id: session.noteId, phase: "off" });
+          return;
+        }
+        session.setKeys(j.keys);
+        session.applyServerState(j.state);
+      }, Math.max(0, last + 10_000 - Date.now()));
+    };
+    return () => {
+      session.onStaleKey = null;
+      if (timer) clearTimeout(timer);
+      session.destroy();
+    };
+  }, [session]);
 
   /* ── Link dialog + image upload handlers ─────────────────────────── */
   const openLinkDialog = useCallback(() => {
@@ -469,6 +681,208 @@ export default function NoteEditor({
     [editor, notify, t],
   );
 
+  /* ── "/" block menu + "[[" note-link picker items ─────────────────────── */
+  const linkSeq = useRef(0);
+  const lastLinkItems = useRef<MenuItem[]>([]);
+  useEffect(() => {
+    const cmd = (fn: (e: Editor, r: { from: number; to: number }) => void) => fn;
+    slashItemsRef.current = (query: string) => {
+      const all: MenuItem[] = [
+        { id: "h1", icon: "h1", label: t("fmt.title"), keywords: "heading title h1", run: cmd((e, r) => { e.chain().focus().deleteRange(r).setNode("heading", { level: 1 }).run(); }) },
+        { id: "h2", icon: "h2", label: t("fmt.heading"), keywords: "heading h2", run: cmd((e, r) => { e.chain().focus().deleteRange(r).setNode("heading", { level: 2 }).run(); }) },
+        { id: "h3", icon: "h3", label: t("fmt.subheading"), keywords: "subheading heading h3", run: cmd((e, r) => { e.chain().focus().deleteRange(r).setNode("heading", { level: 3 }).run(); }) },
+        { id: "bullet", icon: "bullet", label: t("fmt.bulletList"), keywords: "bullet list unordered ul", run: cmd((e, r) => { e.chain().focus().deleteRange(r).toggleBulletList().run(); }) },
+        { id: "ordered", icon: "ordered", label: t("fmt.numberedList"), keywords: "numbered ordered list ol", run: cmd((e, r) => { e.chain().focus().deleteRange(r).toggleOrderedList().run(); }) },
+        { id: "task", icon: "task", label: t("fmt.checklist"), keywords: "checklist todo task check", run: cmd((e, r) => { e.chain().focus().deleteRange(r).toggleTaskList().run(); }) },
+        { id: "table", icon: "table", label: t("slash.table"), keywords: "table grid", run: cmd((e, r) => { e.chain().focus().deleteRange(r).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }) },
+        { id: "divider", icon: "divider", label: t("tt.divider"), keywords: "divider rule hr line separator", run: cmd((e, r) => { e.chain().focus().deleteRange(r).setHorizontalRule().run(); }) },
+        { id: "quote", icon: "quote", label: t("fmt.quote"), keywords: "quote blockquote", run: cmd((e, r) => { e.chain().focus().deleteRange(r).toggleBlockquote().run(); }) },
+        { id: "code", icon: "code", label: t("fmt.codeBlock"), keywords: "code block pre snippet", run: cmd((e, r) => { e.chain().focus().deleteRange(r).toggleCodeBlock().run(); }) },
+        { id: "image", icon: "image", label: t("slash.image"), keywords: "image picture photo upload img", run: cmd((e, r) => { e.chain().focus().deleteRange(r).run(); fileInputRef.current?.click(); }) },
+      ];
+      const q = query.trim().toLowerCase();
+      if (!q) return all;
+      return all.filter((i) => i.label.toLowerCase().includes(q) || (i.keywords ?? "").includes(q));
+    };
+
+    linkItemsRef.current = async (query: string) => {
+      const seq = ++linkSeq.current;
+      await new Promise((r) => setTimeout(r, 140)); // debounce keystrokes
+      if (seq !== linkSeq.current) return lastLinkItems.current;
+      const search = query.trim() || undefined;
+      let rows: NoteRow[] = [];
+      try {
+        const [own, shared] = await Promise.all([
+          fetchNotes({ smartFolder: "all", search }),
+          fetchNotes({ smartFolder: "shared", search }).catch(() => [] as NoteRow[]),
+        ]);
+        rows = [...own, ...shared];
+      } catch { /* offline → empty list */ }
+      if (seq !== linkSeq.current) return lastLinkItems.current;
+      const self = noteIdRef.current;
+      const seen = new Set<string>();
+      const items = rows
+        .filter((n) => n.id !== self && !seen.has(n.id) && (seen.add(n.id), true))
+        .slice(0, 8)
+        .map<MenuItem>((n) => {
+          const label = n.title?.trim() || t("untitled");
+          return {
+            id: n.id,
+            icon: "note",
+            label,
+            hint: n.owner_name ? `${t("share.sharedBy")} ${n.owner_name}` : (n.body_plain ?? "").split("\n")[0]?.slice(0, 60),
+            run: (e, r) => {
+              e.chain().focus().deleteRange(r).insertContent([
+                { type: "text", text: label, marks: [{ type: "link", attrs: { href: noteLinkHref(n.id) } }] },
+                { type: "text", text: " " },
+              ]).run();
+            },
+          };
+        });
+      lastLinkItems.current = items;
+      return items;
+    };
+  });
+
+  /* ── Note actions ──────────────────────────────────────────────────────── */
+
+  const exportMarkdown = useCallback(() => {
+    const cur = noteRef.current;
+    if (!editor || !cur) return;
+    const md = noteToMarkdown({
+      title: titleDraft,
+      tags: tagsDraft,
+      body: editor.getJSON(),
+      origin: window.location.origin,
+    });
+    const url = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = noteFileName(titleDraft || t("untitled"), "md");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [editor, titleDraft, tagsDraft, t]);
+
+  const printNote = useCallback(() => {
+    if (!editor) return;
+    const title = titleDraft.trim() || t("untitled");
+    const tags = tagsDraft.length ? `<div class="note-tags">${tagsDraft.map((x) => `#${escapeHtml(x)}`).join(" ")}</div>` : "";
+    const html =
+      `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8">` +
+      `<title>${escapeHtml(title)}</title><style>${PRINT_CSS}</style></head><body>` +
+      `<h1 class="note-title" dir="auto">${escapeHtml(title)}</h1>${tags}<main dir="auto">${editor.getHTML()}</main></body></html>`;
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.tabIndex = -1;
+    Object.assign(frame.style, { position: "fixed", width: "0", height: "0", border: "0", insetInlineStart: "-9999px" });
+    frame.onload = () => {
+      const w = frame.contentWindow;
+      if (!w) { frame.remove(); return; }
+      w.addEventListener("afterprint", () => setTimeout(() => frame.remove(), 100));
+      w.focus();
+      w.print();
+      // Some browsers never fire afterprint for a frame.
+      setTimeout(() => frame.remove(), 60_000);
+    };
+    frame.srcdoc = html;
+    document.body.appendChild(frame);
+  }, [editor, titleDraft, tagsDraft, lang, t]);
+
+  const doSaveVersion = useCallback(async () => {
+    const cur = noteRef.current;
+    if (!cur) return;
+    await sendNote(cur.id); // the snapshot must include what was just typed
+    const ok = await saveVersion(cur.id);
+    notify(t(ok ? "act.versionSaved" : "history.unavailable"), ok ? "success" : "error");
+    if (ok) setHistoryKey((k) => k + 1);
+  }, [sendNote, notify, t]);
+
+  const doRestore = useCallback(async () => {
+    const v = restoreTarget;
+    const cur = noteRef.current;
+    if (!v || !cur || !editor || disabledRef.current) return;
+    setRestoreBusy(true);
+    try {
+      await sendNote(cur.id);
+      // Snapshot the current content FIRST — a restore is never destructive.
+      const ok = await saveVersion(cur.id);
+      if (!ok) { notify(t("error.generic"), "error"); return; }
+      if (noteIdRef.current !== cur.id) return;
+      // Applied through the editor, so in a live session it reaches every
+      // collaborator as ordinary edits (and is saved as a merge).
+      editor.commands.setContent((v.body_json ?? EMPTY_DOC) as never, { emitUpdate: true });
+      setTitleDraft(v.title ?? "");
+      queueChange({ title: v.title ?? "", body_json: editor.getJSON() }, true);
+      setHistoryKey((k) => k + 1);
+      setRestoreTarget(null);
+      notify(t("history.restored"), "success");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }, [restoreTarget, editor, sendNote, queueChange, notify, t]);
+
+  const insertAi = useCallback((r: Extract<NoteAiResult, { ok: true }>) => {
+    if (!editor || disabledRef.current) return;
+    const heading = {
+      type: "heading",
+      attrs: { level: 3 },
+      content: [{ type: "text", text: t(r.kind === "summary" ? "ai.summaryHeading" : "ai.actionsHeading") }],
+    };
+    const body =
+      r.kind === "summary"
+        ? r.text.split(/\n+/).map((p) => p.trim()).filter(Boolean).map((p) => ({ type: "paragraph", content: [{ type: "text", text: p }] }))
+        : [{
+            type: "taskList",
+            content: r.items.map((it) => ({ type: "taskItem", attrs: { checked: false }, content: [{ type: "paragraph", content: [{ type: "text", text: it }] }] })),
+          }];
+    editor.chain().insertContentAt(editor.state.doc.content.size, [heading, ...body]).focus("end").run();
+    notify(t("ai.inserted"), "success");
+  }, [editor, notify, t]);
+
+  const createTodo = useCallback(async () => {
+    const cur = noteRef.current;
+    if (!editor || !cur || disabledRef.current) return;
+    const item = taskItemAtSelection(editor);
+    if (!item || item.todoId) return;
+    if (!item.text) { notify(t("todo.emptyItem"), "info"); return; }
+    setTodoBusy(true);
+    const title = titleDraft.trim() || t("untitled");
+    const res = await createTodoFromNote({
+      title: item.text,
+      noteId: cur.id,
+      noteTitle: title,
+      description: `${t("todo.fromNote")}: ${title}\n${window.location.origin}${noteLinkHref(cur.id)}`,
+    });
+    setTodoBusy(false);
+    if (!res.ok) { notify(t(res.forbidden ? "todo.forbidden" : "error.generic"), "error"); return; }
+    notify(t("todo.created"), "success");
+    if (noteIdRef.current !== cur.id || editor.isDestroyed) return;
+    // Link the item (positions may have moved while the request ran).
+    let target = -1;
+    const at = editor.state.doc.nodeAt(item.pos);
+    if (at?.type.name === "taskItem" && !at.attrs.todoId) target = item.pos;
+    else {
+      editor.state.doc.descendants((n, pos) => {
+        if (target >= 0) return false;
+        if (n.type.name === "taskItem" && !n.attrs.todoId && (n.firstChild?.textContent ?? "").trim() === item.text) target = pos;
+        return true;
+      });
+    }
+    if (target < 0) return;
+    editor.chain().command(({ tr }) => {
+      const n = tr.doc.nodeAt(target);
+      if (!n) return false;
+      tr.setNodeMarkup(target, undefined, { ...n.attrs, todoId: res.id });
+      return true;
+    }).run();
+  }, [editor, titleDraft, notify, t]);
+
+  const openTodo = useCallback((todoId: string) => {
+    window.open(`/todo?task=${encodeURIComponent(todoId)}`, "_blank", "noopener");
+  }, []);
+
   /* When a DIFFERENT note is selected (or the parent asks for a reload),
      sync title/tags/body into the editor. Pending edits of the previous note
      are FLUSHED first — never discarded. A reload of the SAME note (after a
@@ -496,7 +910,10 @@ export default function NoteEditor({
     setTitleDraft(cur.title ?? "");
     setTagsDraft(cur.tags ?? []);
     setTagInput("");
-    editor.commands.setContent((cur.body_json ?? EMPTY_DOC) as never, { emitUpdate: false });
+    // A live editor renders the shared Yjs doc; only a solo editor loads JSON.
+    if (!sessionRef.current || sessionRef.current.noteId !== cur.id) {
+      editor.commands.setContent((cur.body_json ?? EMPTY_DOC) as never, { emitUpdate: false });
+    }
     setCounts(countWords(editor.getText()));
   }, [editor, loadKey, contentVersion, flushAll]);
 
@@ -584,8 +1001,17 @@ export default function NoteEditor({
     : "[&_a]:text-[#567FB2]! dark:[&_a]:text-[#7FA9D6]!";
   const ownerControls = !editingDisabled && !isSharee; // owner-only chrome
 
+  const collabLive = !!activeSession;
+  const menuItemCls =
+    "w-full flex items-center gap-2.5 px-3 h-9 rounded-lg text-start text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] focus-visible:bg-[var(--bg-surface)] focus-visible:text-[var(--text-primary)] outline-none disabled:opacity-40";
+  const closeMore = (refocus = true) => {
+    setMoreOpen(false);
+    if (refocus) moreBtnRef.current?.focus();
+  };
+  const moreAction = (fn: () => void) => () => { closeMore(false); fn(); };
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="relative h-full flex flex-col">
       {/* Toolbar — tools live inside a bordered "shell" panel */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 md:px-5 py-2.5 flex items-center gap-2 flex-wrap">
         {backButton}
@@ -628,13 +1054,34 @@ export default function NoteEditor({
           <span className="text-[11px] text-[var(--text-dim)]">{t("share.sharedBy")} {note.owner_name}</span>
         )}
 
+        {collabLive ? (
+          <span
+            title={t("collab.liveTip")}
+            className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full border border-emerald-600/30 bg-emerald-500/10 text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300"
+          >
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
+            {t("collab.live")}
+            <span className="sr-only">— {t("collab.liveTip")}</span>
+          </span>
+        ) : collabPending ? (
+          <span role="status" className="inline-flex items-center gap-1.5 h-6 px-2 text-[10.5px] text-[var(--text-dim)]">
+            <SpinnerIcon className="h-3 w-3" /> {t("collab.connecting")}
+          </span>
+        ) : null}
+
         {peers.length > 0 && (
           <div className="flex items-center -space-x-1.5 rtl:space-x-reverse" title={peers.map((p) => `${p.name ?? t("someone")} (${p.status})`).join(", ")}>
             {peers.slice(0, 4).map((p) => {
               const name = p.name ?? t("someone");
               const initials = name.split(/\s+/).map((x) => x[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+              // Same colour as the person's caret in the text.
+              const editing = p.status === "editing";
               return (
-                <span key={p.id} className={`h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-[var(--bg-primary)] ${p.status === "editing" ? "bg-[#567FB2] text-white" : "bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>
+                <span
+                  key={p.id}
+                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-[var(--bg-primary)] ${editing ? "text-white" : "bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}
+                  style={editing ? { backgroundColor: peerColor(p.accountId) } : undefined}
+                >
                   {initials || "?"}
                 </span>
               );
@@ -687,6 +1134,84 @@ export default function NoteEditor({
             )}
           </div>
         )}
+
+        {/* Koleex AI */}
+        {!isTrashed && (
+          <button
+            type="button"
+            onClick={() => setPanel((p) => (p === "ai" ? null : "ai"))}
+            title={t("act.ai")}
+            aria-label={t("act.ai")}
+            aria-pressed={panel === "ai"}
+            className={`h-8 px-2.5 rounded-lg flex items-center gap-1.5 border transition-all text-[11.5px] font-semibold ${panel === "ai" ? "bg-[#567FB2]/15 border-[#567FB2]/30 text-[#567FB2] dark:text-[#7FA9D6]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
+          >
+            <SparklesIcon className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">{t("act.ai")}</span>
+          </button>
+        )}
+
+        {/* More — history, versions, duplicate, export, print, Discuss */}
+        <div className="relative">
+          <button
+            ref={moreBtnRef}
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            title={t("more.title")}
+            aria-label={t("more.title")}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all"
+          >
+            <MoreHorizontalIcon className="h-3.5 w-3.5" />
+          </button>
+          {moreOpen && (
+            <>
+              <div className="fixed inset-0 z-[55]" onClick={() => closeMore(false)} />
+              <div
+                role="menu"
+                aria-label={t("more.title")}
+                ref={moreMenuRef}
+                onKeyDown={(e) => {
+                  const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[role=menuitem]:not([disabled])"));
+                  const i = items.indexOf(document.activeElement as HTMLElement);
+                  if (e.key === "Escape") { e.stopPropagation(); closeMore(); }
+                  else if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
+                  else if (e.key === "Home") { e.preventDefault(); items[0]?.focus(); }
+                  else if (e.key === "End") { e.preventDefault(); items[items.length - 1]?.focus(); }
+                  else if (e.key === "Tab") closeMore(false);
+                }}
+                className="kx-glass-pop absolute end-0 mt-1 z-[56] w-[232px] p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl"
+              >
+                <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(() => setPanel("history"))}>
+                  <HistoryIcon className="h-3.5 w-3.5" /> {t("act.history")}
+                </button>
+                {!editingDisabled && (
+                  <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(() => { void doSaveVersion(); })}>
+                    <BookmarkIcon className="h-3.5 w-3.5" /> {t("act.saveVersion")}
+                  </button>
+                )}
+                {!isTrashed && (
+                  <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(() => { flushAll(); onDuplicate(); })}>
+                    <CopyIcon className="h-3.5 w-3.5" /> {t("act.duplicate")}
+                  </button>
+                )}
+                <div role="separator" className="my-1 h-px bg-[var(--border-subtle)]" />
+                <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(exportMarkdown)}>
+                  <DownloadIcon className="h-3.5 w-3.5" /> {t("act.exportMd")}
+                </button>
+                <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(printNote)}>
+                  <PrintIcon className="h-3.5 w-3.5" /> {t("act.print")}
+                </button>
+                {!isTrashed && (
+                  <button type="button" role="menuitem" className={menuItemCls} onClick={moreAction(() => setDiscussOpen(true))}>
+                    <PaperPlaneIcon className="h-3.5 w-3.5 rtl:-scale-x-100" /> {t("act.sendDiscuss")}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Share */}
         {!isTrashed && (
@@ -803,13 +1328,87 @@ export default function NoteEditor({
           )}
         </div>
 
-        <div className={linkClass}>
+        <div className={`${linkClass} ${mobileBar ? "notes-mobilebar-open" : ""}`}>
           <EditorContent editor={editor} />
         </div>
+
+        {!isTrashed && <Backlinks noteId={note.id} refreshKey={historyKey} onOpen={onOpenNote} t={t} />}
       </div>
 
       {/* Floating table controls — appear anchored to the table you're editing */}
       <TableFloatingControls editor={editor} enabled={!editingDisabled} t={t} />
+
+      {/* Checklist item → To-do */}
+      <ChecklistTodoControl
+        editor={editor}
+        canCreate={!editingDisabled}
+        busy={todoBusy}
+        onCreate={() => { void createTodo(); }}
+        onOpen={openTodo}
+        t={t}
+      />
+
+      {/* "/" and "[[" menus */}
+      <SuggestionMenu
+        menu={menu}
+        title={menu?.kind === "link" ? t("linkPicker.title") : t("slash.title")}
+        emptyLabel={menu?.kind === "link" ? t("linkPicker.empty") : t("slash.empty")}
+        onChoose={chooseMenu}
+        onHover={hoverMenu}
+        renderIcon={renderMenuIcon}
+      />
+
+      {/* Phones: formatting bar above the keyboard */}
+      <MobileFormatBar
+        editor={editor}
+        enabled={!editingDisabled}
+        onImage={triggerImageUpload}
+        onVisibleChange={setMobileBar}
+        t={t}
+      />
+
+      {/* Side panels */}
+      {panel === "history" && (
+        <HistoryPanel
+          key={note.id}
+          noteId={note.id}
+          canRestore={!editingDisabled}
+          onRestore={(v) => setRestoreTarget(v)}
+          onClose={() => setPanel(null)}
+          refreshKey={historyKey}
+          t={t}
+        />
+      )}
+      {panel === "ai" && (
+        <AiPanel
+          key={note.id}
+          noteId={note.id}
+          canInsert={!editingDisabled}
+          onInsert={insertAi}
+          onClose={() => setPanel(null)}
+          t={t}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!restoreTarget}
+        busy={restoreBusy}
+        title={t("history.restoreTitle")}
+        message={t("history.restoreDesc")}
+        confirmLabel={t("history.restore")}
+        cancelLabel={t("dialog.cancel")}
+        onConfirm={() => { void doRestore(); }}
+        onCancel={() => { if (!restoreBusy) setRestoreTarget(null); }}
+      />
+
+      <SendToDiscussDialog
+        open={discussOpen}
+        note={{ id: note.id, title: titleDraft }}
+        meId={me?.id ?? null}
+        onClose={() => setDiscussOpen(false)}
+        notify={notify}
+        t={t}
+      />
 
       {/* Link prompt */}
       <PromptDialog
@@ -824,6 +1423,25 @@ export default function NoteEditor({
       />
     </div>
   );
+}
+
+/** Icons for the "/" and "[[" menu rows. */
+function renderMenuIcon(item: MenuItem): ReactNode {
+  const c = "h-3.5 w-3.5";
+  switch (item.icon) {
+    case "h1": return <Heading1Icon className={c} />;
+    case "h2": return <Heading2Icon className={c} />;
+    case "h3": return <Heading3Icon className={c} />;
+    case "bullet": return <ListIcon className={c} />;
+    case "ordered": return <ListOrderedIcon className={c} />;
+    case "task": return <CheckSquareIcon className={c} />;
+    case "table": return <TableIcon className={c} />;
+    case "divider": return <MinusIcon className={c} />;
+    case "quote": return <QuoteIcon className={c} />;
+    case "code": return <FileCode2Icon className={c} />;
+    case "image": return <ImageRawIcon className={c} />;
+    default: return <FileIcon className={c} />;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

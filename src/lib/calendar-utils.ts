@@ -350,3 +350,43 @@ export function roundToNextHalfHour(d: Date): Date {
   else x.setHours(x.getHours() + 1, 0, 0, 0);
   return x;
 }
+
+/* ── Meeting links, tentative items ─────────────────────────────────────── */
+
+/** Show a "Join" button: the event has a call link and it is on today (the
+ *  calendar's wall "now") and not over — or it is running right now. */
+export function joinableNow(event: Dated & { meeting_url?: string | null }, now: Date): boolean {
+  if (!event.meeting_url) return false;
+  if (event.all_day) {
+    const r = allDayRange(event);
+    const key = isoDateKey(now);
+    return key >= r.start && key <= r.end;
+  }
+  const s = new Date(event.start_at);
+  const e = new Date(event.end_at);
+  if (e.getTime() < now.getTime()) return false;
+  return isSameDay(s, now) || s.getTime() <= now.getTime();
+}
+
+/** A tentative item — pending leave — is drawn dashed. */
+export function isTentative(event: { source?: string | null; source_kind?: string | null }): boolean {
+  return event.source === "leave" && event.source_kind === "pending";
+}
+
+/** Add whole days to a "YYYY-MM-DD" key. */
+export function addDaysToDateKey(key: string, n: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + n)).toISOString().slice(0, 10);
+}
+
+/** Whole days from one "YYYY-MM-DD" key to another. */
+export function daysBetweenKeys(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
+}
+
+/** Snap minutes to a step (15 by default). */
+export function snapMinutes(min: number, step = 15): number {
+  return Math.round(min / step) * step;
+}

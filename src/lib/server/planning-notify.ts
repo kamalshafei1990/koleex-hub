@@ -107,3 +107,77 @@ export async function notifyPlanningTaken(auth: AuthCtx, item: PlanningItemLike)
     console.error("[planning-notify] taken:", e instanceof Error ? e.message : e);
   }
 }
+
+/** Publish-week: ONE grouped notice per person, whatever the item count.
+ *  Items without a resource, and the publisher's own items, notify no one. */
+export async function notifyPlanningPublishedBatch(auth: AuthCtx, items: PlanningItemLike[]): Promise<void> {
+  try {
+    const resIds = [...new Set(items.map((i) => i.resource_id).filter((x): x is string => !!x))];
+    if (resIds.length === 0) return;
+    const { data: res } = await supabaseServer
+      .from("planning_resources")
+      .select("id, account_id")
+      .eq("tenant_id", auth.tenant_id)
+      .in("id", resIds);
+    const accountByRes = new Map(
+      ((res ?? []) as Array<{ id: string; account_id: string | null }>).map((r) => [r.id, r.account_id]),
+    );
+    const byAccount = new Map<string, PlanningItemLike[]>();
+    for (const it of items) {
+      const to = it.resource_id ? accountByRes.get(it.resource_id) : null;
+      if (!to || to === auth.account_id) continue;
+      const arr = byAccount.get(to) ?? [];
+      arr.push(it);
+      byAccount.set(to, arr);
+    }
+    if (byAccount.size === 0) return;
+
+    const MAX_LINES = 12;
+    const rows = [...byAccount.entries()].map(([to, list]) => {
+      const sorted = [...list].sort((a, b) => a.start_at.localeCompare(b.start_at));
+      const lines = sorted.slice(0, MAX_LINES).map((i) => `${i.title || i.type} · ${fmt(i.start_at)}`);
+      if (sorted.length > MAX_LINES) lines.push(`+${sorted.length - MAX_LINES}`);
+      return {
+        to,
+        count: sorted.length,
+        link: sorted.length === 1 ? itemLink(sorted[0].id) : "/planning",
+        row: {
+          recipient_account_id: to,
+          sender_account_id: auth.account_id,
+          tenant_id: auth.tenant_id,
+          category: "system",
+          subject: sorted.length === 1 ? `Scheduled: ${sorted[0].title || sorted[0].type}` : `Scheduled: ${sorted.length} items`,
+          body: lines.join("\n"),
+          link: sorted.length === 1 ? itemLink(sorted[0].id) : "/planning",
+          metadata: {
+            source: "planning",
+            type: "planning_published",
+            planning_item_ids: sorted.map((i) => i.id),
+            count: sorted.length,
+          },
+        },
+      };
+    });
+
+    const { error } = await supabaseServer.from("inbox_messages").insert(rows.map((r) => r.row));
+    if (error) throw new Error(error.message);
+    await emitPings(rows.map((r) => ({ topic: rtTopic.inbox(r.to) })));
+    await Promise.all(
+      rows.map((r) =>
+        sendPushToAccounts(
+          [r.to],
+          {
+            title: "Scheduled",
+            body: r.row.subject,
+            url: r.link,
+            tag: `planning:week:${r.to}`,
+            kind: "planning_published",
+          },
+          { actorAccountId: auth.account_id },
+        ),
+      ),
+    );
+  } catch (e) {
+    console.error("[planning-notify] published batch:", e instanceof Error ? e.message : e);
+  }
+}

@@ -50,6 +50,8 @@ export interface NoteRow {
   /* Present only for rows returned by the "Shared with me" view. */
   shared_role?: "viewer" | "editor";
   owner_name?: string | null;
+  /** "Shared with me" rows: not opened yet. */
+  unread?: boolean;
 }
 
 export interface NoteFull extends NoteRow {
@@ -165,6 +167,8 @@ export interface FetchNotesOptions {
   folderId?: string | null;
   /** "all" | "none" (loose) | "pinned" | "trash" | "shared" — overrides folderId */
   smartFolder?: SmartFolder;
+  /** Only notes carrying this tag (own notes). */
+  tag?: string;
   search?: string;
 }
 
@@ -177,6 +181,7 @@ export async function fetchNotes(
   const params = new URLSearchParams();
   if (options.folderId) params.set("folder_id", options.folderId);
   else if (options.smartFolder) params.set("folder", options.smartFolder);
+  if (options.tag) params.set("tag", options.tag);
   if (options.search) params.set("search", options.search);
   const qs = params.toString();
   const res = await fetch("/api/notes" + (qs ? "?" + qs : ""), {
@@ -203,6 +208,7 @@ export async function createNote(input: {
   title?: string;
   body_json?: unknown;
   folder_id?: string | null;
+  tags?: string[];
 }): Promise<NoteFull | null> {
   try {
     const res = await fetch("/api/notes", {
@@ -221,6 +227,9 @@ export async function createNote(input: {
 }
 
 export type NotePatch = Partial<{
+  /** Collaborative save: the full Yjs state (base64) — merged server-side;
+   *  body_json is then derived there and must not be sent. */
+  yjs_update: string;
   title: string;
   body_json: unknown;
   folder_id: string | null;
@@ -230,7 +239,7 @@ export type NotePatch = Partial<{
 }>;
 
 export type UpdateNoteResult =
-  | { ok: true; updated_at: string | null }
+  | { ok: true; updated_at: string | null; body_plain?: string }
   | { ok: false; conflict: true; note: NoteFull }
   | { ok: false; conflict: false };
 
@@ -260,8 +269,8 @@ export async function updateNote(
       return { ok: false, conflict: true, note: { ...json.note, role: json.role } };
     }
     if (!res.ok) return { ok: false, conflict: false };
-    const json = (await res.json().catch(() => ({}))) as { updated_at?: string | null };
-    return { ok: true, updated_at: json.updated_at ?? null };
+    const json = (await res.json().catch(() => ({}))) as { updated_at?: string | null; body_plain?: string };
+    return { ok: true, updated_at: json.updated_at ?? null, body_plain: json.body_plain };
   } catch {
     return { ok: false, conflict: false };
   }
@@ -312,6 +321,167 @@ export async function emptyTrash(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/** Copy a readable note into a new note owned by the caller. */
+export async function duplicateNote(id: string, title: string): Promise<NoteFull | null> {
+  try {
+    const res = await fetch(`/api/notes/${id}/duplicate`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { note: NoteFull };
+    return json.note;
+  } catch {
+    return null;
+  }
+}
+
+/* ── Tags ── */
+
+export interface TagCount { tag: string; count: number }
+
+export async function fetchTags(): Promise<TagCount[]> {
+  const res = await fetch("/api/notes/tags", { credentials: "include" });
+  if (!res.ok) throw new Error(`tags ${res.status}`);
+  const json = (await res.json()) as { tags?: TagCount[] };
+  return json.tags ?? [];
+}
+
+/** Notes shared with me that I have not opened yet. */
+export async function fetchSharedUnread(): Promise<{ count: number; ids: string[] }> {
+  try {
+    const res = await fetch("/api/notes/shared-unread", { credentials: "include", cache: "no-store" });
+    if (!res.ok) return { count: 0, ids: [] };
+    const json = (await res.json()) as { count?: number; ids?: string[] };
+    return { count: json.count ?? 0, ids: json.ids ?? [] };
+  } catch {
+    return { count: 0, ids: [] };
+  }
+}
+
+/* ── Version history ── */
+
+export interface NoteVersionRow {
+  id: string;
+  title: string;
+  account_id: string | null;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface NoteVersionFull {
+  id: string;
+  note_id: string;
+  title: string;
+  body_json: unknown | null;
+  created_at: string;
+}
+
+export async function fetchVersions(noteId: string): Promise<{ available: boolean; versions: NoteVersionRow[] } | null> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/versions`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { available?: boolean; versions?: NoteVersionRow[] };
+    return { available: json.available !== false, versions: json.versions ?? [] };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchVersion(noteId: string, versionId: string): Promise<NoteVersionFull | null> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/versions/${versionId}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return null;
+    return ((await res.json()) as { version: NoteVersionFull }).version;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveVersion(noteId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/versions`, { method: "POST", credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/* ── Backlinks ── */
+
+export interface BacklinkRow { id: string; title: string; updated_at: string }
+
+export async function fetchBacklinks(noteId: string): Promise<BacklinkRow[] | null> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/backlinks`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { available?: boolean; notes?: BacklinkRow[] };
+    return json.available === false ? null : json.notes ?? [];
+  } catch {
+    return null;
+  }
+}
+
+/* ── Koleex AI ── */
+
+export type NoteAiResult =
+  | { ok: true; kind: "summary"; text: string }
+  | { ok: true; kind: "actions"; items: string[] }
+  | { ok: false; reason: "busy" | "forbidden" | "empty" | "failed" };
+
+export async function runNoteAi(noteId: string, action: "summary" | "actions"): Promise<NoteAiResult> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/ai`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { text?: string; items?: string[]; error?: string };
+    if (!res.ok) {
+      const reason = res.status === 429 ? "busy" : res.status === 403 ? "forbidden" : json.error === "empty" ? "empty" : "failed";
+      return { ok: false, reason };
+    }
+    if (action === "summary") return { ok: true, kind: "summary", text: json.text ?? "" };
+    return { ok: true, kind: "actions", items: json.items ?? [] };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}
+
+/* ── Checklist → To-do ── */
+
+/** Create a personal To-do from a checklist item (POST /api/todos). */
+export async function createTodoFromNote(input: {
+  title: string;
+  noteId: string;
+  noteTitle: string;
+  description: string;
+}): Promise<{ ok: true; id: string } | { ok: false; forbidden: boolean }> {
+  try {
+    const res = await fetch("/api/todos", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title.slice(0, 500),
+        description: input.description,
+        priority: "medium",
+        status: "todo",
+        source: "manual",
+        metadata: { source_app: "notes", note_id: input.noteId, note_title: input.noteTitle },
+      }),
+    });
+    if (!res.ok) return { ok: false, forbidden: res.status === 403 };
+    const json = (await res.json()) as { todo?: { id?: string } };
+    return json.todo?.id ? { ok: true, id: json.todo.id } : { ok: false, forbidden: false };
+  } catch {
+    return { ok: false, forbidden: false };
   }
 }
 

@@ -19,6 +19,11 @@
      · Saves are serialized per note with optimistic concurrency
        (base_updated_at → 409 → reload + toast).
 
+     · Shared notes save as Yjs MERGES while a live session runs (no base
+       token → no false conflicts); see NoteEditor / notes-yjs.
+     · Tags: a tag is a view of its own (sidebar filter, counts from the
+       server); search also matches tags.
+
    Deep links: /notes?id=<noteId> opens a note, /notes?new=1 creates one.
    Shortcuts: Ctrl/Cmd+N new note (not while typing), Ctrl/Cmd+K search,
    Esc closes the open dialog / clears search / closes the note.
@@ -57,6 +62,10 @@ import {
   createFolder,
   updateFolder,
   deleteFolder,
+  duplicateNote,
+  fetchTags,
+  fetchSharedUnread,
+  type TagCount,
   extractPlainText,
   deriveAutoTitle,
   type FoldersPayload,
@@ -90,7 +99,8 @@ const WARM_FOLDERS = "notes:folders";
 const WARM_ALL = "notes:list:all";
 
 function queryKeyOf(sel: FolderSelection, search: string): string {
-  return `${sel.kind === "folder" ? `f:${sel.id}` : `s:${sel.key}`}|${search}`;
+  const k = sel.kind === "folder" ? `f:${sel.id}` : sel.kind === "tag" ? `t:${sel.tag}` : `s:${sel.key}`;
+  return `${k}|${search}`;
 }
 
 function sortNotes(rows: NoteRow[]): NoteRow[] {
@@ -153,6 +163,26 @@ export default function NotesApp() {
   }, []);
   useEffect(() => { void refreshFolders(); }, [refreshFolders]);
 
+  /* ── Tags (sidebar filter) ──────────────────────────────────────────── */
+  const [tags, setTags] = useState<TagCount[]>([]);
+  const refreshTags = useCallback(async () => {
+    try { setTags(await fetchTags()); } catch { /* keep what we have */ }
+  }, []);
+  useEffect(() => { void refreshTags(); }, [refreshTags]);
+
+  /* ── "Shared with me" not-yet-opened badge ──────────────────────────── */
+  const [sharedUnread, setSharedUnread] = useState<string[]>([]);
+  const refreshUnread = useCallback(async () => {
+    const r = await fetchSharedUnread();
+    setSharedUnread(r.ids);
+  }, []);
+  useEffect(() => {
+    void refreshUnread();
+    const onFocus = () => { void refreshUnread(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshUnread]);
+
   const patchFolders = useCallback(
     (fn: (f: NotesFolderRow[]) => NotesFolderRow[]) => {
       setFoldersState((prev) => {
@@ -209,6 +239,7 @@ export default function NotesApp() {
     const seq = ++reqSeq.current;
     const params: Parameters<typeof fetchNotes>[0] = {};
     if (selection.kind === "folder") params.folderId = selection.id;
+    else if (selection.kind === "tag") { params.smartFolder = "all"; params.tag = selection.tag; }
     else params.smartFolder = selection.key;
     if (debouncedSearch) params.search = debouncedSearch;
     try {
@@ -248,6 +279,15 @@ export default function NotesApp() {
     setActiveNoteId(null);
     setActiveNote(null);
   }, []);
+
+  /** Open a note (list, [[link]], backlink, deep link). Opening a note that
+   *  was shared with me clears its "new" mark right away (the server marks
+   *  the share read on the GET). */
+  const openNote = useCallback((id: string) => {
+    setActiveNoteId(id);
+    setSharedUnread((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids));
+    setNotes((rows) => (rows.some((r) => r.id === id && r.unread) ? rows.map((r) => (r.id === id ? { ...r, unread: false } : r)) : rows));
+  }, [setNotes]);
 
   /* Fetch the full note (with body_json) whenever activeNoteId changes.
      Keeps the previous note visible during the fetch so the editor doesn't
@@ -373,6 +413,8 @@ export default function NotesApp() {
         title: "",
         folder_id: folderId,
         body_json: { type: "doc", content: [{ type: "paragraph" }] },
+        // A note created while a tag is selected carries that tag.
+        ...(nextSel.kind === "tag" ? { tags: [nextSel.tag] } : {}),
       });
       if (!n) { showToast(t("error.generic"), "error"); return; }
 
@@ -395,10 +437,34 @@ export default function NotesApp() {
       setActiveNoteId(n.id);
       if (!keyChanged) void reloadNotes(); // otherwise the key change reloads
       if (folderId) void refreshFolders();
+      if (nextSel.kind === "tag") void refreshTags();
     } finally {
       creatingRef.current = false;
     }
-  }, [selection, search, debouncedSearch, reloadNotes, refreshFolders, showToast, t]);
+  }, [selection, search, debouncedSearch, reloadNotes, refreshFolders, refreshTags, showToast, t]);
+
+  /* Duplicate the open note into a new note the caller owns, and open it. */
+  const onDuplicateNote = useCallback(async () => {
+    const src = activeNoteRef.current;
+    if (!src) return;
+    const title = `${(src.title || t("untitled")).trim()} ${t("act.copySuffix")}`.slice(0, NOTE_LIMITS.title);
+    const n = await duplicateNote(src.id, title);
+    if (!n) { showToast(t("error.generic"), "error"); return; }
+    showToast(t("act.duplicated"), "success");
+    const visibleHere =
+      (selection.kind === "smart" && (selection.key === "all" || (selection.key === "none" && !n.folder_id))) ||
+      (selection.kind === "folder" && selection.id === n.folder_id) ||
+      (selection.kind === "tag" && (n.tags ?? []).includes(selection.tag));
+    if (!visibleHere) setSelection({ kind: "smart", key: "all" });
+    if (search || debouncedSearch) { setSearch(""); setDebouncedSearch(""); }
+    bumpBase(baseRef.current, n.id, n.updated_at);
+    skipFetchRef.current = n.id;
+    setActiveNote({ ...n, role: "owner" });
+    setActiveNoteId(n.id);
+    if (visibleHere && !search && !debouncedSearch) void reloadNotes();
+    if (n.folder_id) void refreshFolders();
+    if ((n.tags ?? []).length) void refreshTags();
+  }, [selection, search, debouncedSearch, reloadNotes, refreshFolders, refreshTags, showToast, t]);
 
   useOpenOnNewParam(() => { void onCreateNote(); });
 
@@ -410,8 +476,9 @@ export default function NotesApp() {
       if (!id) return;
       url.searchParams.delete("id");
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-      if (UUID_RE.test(id)) setActiveNoteId(id);
+      if (UUID_RE.test(id)) openNote(id);
     } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
   }, []);
 
   const onTogglePin = useCallback(
@@ -486,8 +553,9 @@ export default function NotesApp() {
       if (activeNoteIdRef.current === id) closeNote();
       await reloadNotes();
       void refreshFolders();
+      void refreshTags();
     },
-    [reloadNotes, refreshFolders, closeNote, showToast, t],
+    [reloadNotes, refreshFolders, refreshTags, closeNote, showToast, t],
   );
 
   const onPurgeNote = useCallback(
@@ -557,7 +625,8 @@ export default function NotesApp() {
     if (!ok) { showToast(t("error.generic"), "error"); return; }
     setDeletePrompt({ open: false });
     void refreshFolders();
-  }, [deletePrompt, selection, setNotes, closeNote, patchFolders, selectView, reloadNotes, refreshFolders, showToast, t]);
+    void refreshTags();
+  }, [deletePrompt, selection, setNotes, closeNote, patchFolders, selectView, reloadNotes, refreshFolders, refreshTags, showToast, t]);
 
   // ── Editor auto-save ────────────────────────────────────────────────────
 
@@ -585,14 +654,19 @@ export default function NotesApp() {
         if (derived) title = derived;
       }
 
+      /* Live session: the body travels as the Yjs state and is MERGED by
+         the server — no concurrency token, so a collaborator's save can
+         never bounce ours as a "conflict". */
+      const collab = !!updates.collab || updates.yjs_update !== undefined;
       const patch: NotePatch = {};
       if (title !== undefined) patch.title = title;
-      if (updates.body_json !== undefined) patch.body_json = updates.body_json;
+      if (updates.yjs_update !== undefined) patch.yjs_update = updates.yjs_update;
+      else if (updates.body_json !== undefined) patch.body_json = updates.body_json;
       if (updates.color !== undefined) patch.color = updates.color;
       if (updates.tags !== undefined) patch.tags = updates.tags;
 
       const res = await updateNote(id, patch, {
-        base: baseRef.current.get(id) ?? null,
+        base: collab ? null : baseRef.current.get(id) ?? null,
         keepalive: opts?.keepalive,
       });
 
@@ -600,9 +674,11 @@ export default function NotesApp() {
         bumpBase(baseRef.current, id, res.updated_at);
         const nowIso = res.updated_at ?? new Date().toISOString();
         const preview =
-          updates.body_json !== undefined
-            ? extractPlainText(updates.body_json).slice(0, NOTE_LIMITS.preview)
-            : undefined;
+          res.body_plain !== undefined
+            ? res.body_plain
+            : updates.body_json !== undefined
+              ? extractPlainText(updates.body_json).slice(0, NOTE_LIMITS.preview)
+              : undefined;
         // Reflect the change in the list without a full reload.
         setNotes((prev) =>
           sortNotes(
@@ -620,7 +696,14 @@ export default function NotesApp() {
             ),
           ),
         );
-        setActiveNote((cur) => (cur?.id === id ? { ...cur, ...patch, updated_at: nowIso } : cur));
+        const { yjs_update: _y, ...local } = patch;
+        void _y;
+        setActiveNote((cur) =>
+          cur?.id === id
+            ? { ...cur, ...local, ...(updates.body_json !== undefined ? { body_json: updates.body_json } : {}), updated_at: nowIso }
+            : cur,
+        );
+        if (updates.tags !== undefined) void refreshTags();
         setSaving("saved");
         savedTimer.current = setTimeout(() => setSaving((s) => (s === "saved" ? "idle" : s)), 1200);
         return "ok";
@@ -648,7 +731,7 @@ export default function NotesApp() {
       setSaving("error");
       return "error";
     },
-    [setNotes, showToast, t],
+    [setNotes, refreshTags, showToast, t],
   );
 
   const onRemoteApplied = useCallback(
@@ -738,6 +821,8 @@ export default function NotesApp() {
   const selectionLabel =
     selection.kind === "folder"
       ? folders.find((f) => f.id === selection.id)?.name ?? "—"
+      : selection.kind === "tag"
+      ? `#${selection.tag}`
       : selection.key === "all"
         ? t("smart.allNotes")
         : selection.key === "pinned"
@@ -773,20 +858,33 @@ export default function NotesApp() {
     <select
       className="md:hidden mt-2 w-full h-9 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
       aria-label={t("list.folder")}
-      value={selection.kind === "folder" ? `folder:${selection.id}` : `smart:${selection.key}`}
+      value={selection.kind === "folder" ? `folder:${selection.id}` : selection.kind === "tag" ? `tag:${selection.tag}` : `smart:${selection.key}`}
       onChange={(e) => {
-        const [kind, val] = e.target.value.split(":");
+        const v = e.target.value;
+        const i = v.indexOf(":");
+        const kind = v.slice(0, i);
+        const val = v.slice(i + 1);
         if (kind === "folder") selectView({ kind: "folder", id: val });
+        else if (kind === "tag") selectView({ kind: "tag", tag: val });
         else selectView({ kind: "smart", key: val as "all" | "pinned" | "none" | "shared" | "trash" });
       }}
     >
       <option value="smart:all">{t("smart.allNotes")}</option>
       <option value="smart:pinned">{t("smart.pinned")}</option>
       <option value="smart:none">{t("smart.none")}</option>
-      <option value="smart:shared">{t("smart.shared")}</option>
+      <option value="smart:shared">
+        {t("smart.shared")}{sharedUnread.length ? ` (${sharedUnread.length})` : ""}
+      </option>
       {folderPaths.map((f) => (
         <option key={f.id} value={`folder:${f.id}`}>{f.path}</option>
       ))}
+      {tags.length > 0 && (
+        <optgroup label={t("tags.title")}>
+          {tags.map((tg) => (
+            <option key={tg.tag} value={`tag:${tg.tag}`}>#{tg.tag} ({tg.count})</option>
+          ))}
+        </optgroup>
+      )}
       <option value="smart:trash">{t("smart.trash")}</option>
     </select>
   );
@@ -918,6 +1016,8 @@ export default function NotesApp() {
               onAskRenameFolder={onAskRenameFolder}
               onAskDeleteFolder={onAskDeleteFolder}
               notesCountByFolder={folderCounts}
+              tags={tags}
+              sharedUnread={sharedUnread.length}
             />
           </div>
 
@@ -926,7 +1026,7 @@ export default function NotesApp() {
             <NotesList
               notes={notes}
               activeId={activeNoteId}
-              onSelect={setActiveNoteId}
+              onSelect={openNote}
               onCreate={() => { void onCreateNote(); }}
               onTogglePin={(id, next) => { void onTogglePin(id, next); }}
               onRename={onAskRenameNote}
@@ -953,6 +1053,8 @@ export default function NotesApp() {
               titleSignal={titleSignal}
               notify={showToast}
               onBack={closeNote}
+              onOpenNote={openNote}
+              onDuplicate={() => { void onDuplicateNote(); }}
               onShare={() => { if (activeNote) setShareOpen(true); }}
               onChange={onNoteChange}
               onRemoteApplied={onRemoteApplied}

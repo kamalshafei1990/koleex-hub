@@ -42,7 +42,7 @@ check("send lib forwards clientMsgId in the mutate payload",
   /clientMsgId\?: string/.test(lib) && /clientMsgId: input\.clientMsgId \?\? null/.test(lib));
 
 /* ── B. Server: insert the key + conflict = idempotent success ────────────── */
-check("server reads clientMsgId from the request", /const clientMsgId = str\(p\.clientMsgId\)/.test(route));
+check("server reads clientMsgId from the request (UUID-checked)", /const rawClientMsgId = str\(p\.clientMsgId\)/.test(route) && /const clientMsgId = rawClientMsgId && UUID_RE\.test\(rawClientMsgId\)/.test(route));
 check("server persists it on insert", /client_msg_id: clientMsgId/.test(route));
 check("unique_violation (23505) is handled, not surfaced as an error",
   /error\.code === "23505"/.test(route));

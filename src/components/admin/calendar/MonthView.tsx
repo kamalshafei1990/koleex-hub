@@ -8,11 +8,16 @@
    "+" (on hover, on focus, always on touch screens) → new event that day.
    "+N more" → the day view of that date.
    Click an event chip → open it.
+   Drag an editable chip to another day → it moves there, keeping its time
+   (HTML5 drag: a mouse or pen; touch screens do not start it). The drop
+   carries the day the chip was picked up from, so a multi-day item moves by
+   the difference.
 
    Dates are WALL dates of the calendar's timezone (see calendar-utils); the
    day's items arrive grouped once by CalendarApp.
    --------------------------------------------------------------------------- */
 
+import { useState } from "react";
 import { PlusIcon } from "@/components/icons/ui";
 import type { AccountPreferences } from "@/types/supabase";
 import type { CalendarFeedEvent } from "@/lib/calendar-types";
@@ -30,7 +35,7 @@ import {
   weekdayOrder,
   type WeekStart,
 } from "@/lib/calendar-utils";
-import EventChip, { type ChipLabels } from "./EventChip";
+import EventChip, { EVENT_DRAG_MIME, type ChipLabels } from "./EventChip";
 
 interface Props {
   focusDate: Date;
@@ -47,6 +52,9 @@ interface Props {
   onDayClick?: (d: Date) => void;
   onNewEventOnDay?: (d: Date) => void;
   onEventClick?: (e: CalendarFeedEvent) => void;
+  canDrag?: (e: CalendarFeedEvent) => boolean;
+  /** A chip picked up on `fromKey` was dropped on `toKey` (YYYY-MM-DD). */
+  onEventDropDay?: (e: CalendarFeedEvent, fromKey: string, toKey: string) => void;
 }
 
 const MAX_CHIPS = 3;
@@ -64,8 +72,20 @@ export default function MonthView({
   onDayClick,
   onNewEventOnDay,
   onEventClick,
+  canDrag,
+  onEventDropDay,
 }: Props) {
   const { t } = useTranslation(calendarT);
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  const dnd = !!onEventDropDay;
+
+  function findEvent(id: string): CalendarFeedEvent | undefined {
+    for (const list of eventsByDay.values()) {
+      const hit = list.find((e) => e.id === id);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
   const days = monthGrid(focusDate, weekStart);
   const columnDays = weekdayOrder(weekStart);   // ISO numbers, in column order
   const workingDays = preferences.calendar?.working_hours?.days || [1, 2, 3, 4, 5];
@@ -121,7 +141,28 @@ export default function MonthView({
                   : "bg-[var(--bg-primary)]/60 hover:bg-[var(--bg-surface-subtle)]/60"
               }`}
               onClick={() => onDayClick?.(day)}
+              onDragOver={dnd ? (e) => {
+                if (!e.dataTransfer.types.includes(EVENT_DRAG_MIME)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dropKey !== key) setDropKey(key);
+              } : undefined}
+              onDragLeave={dnd ? (e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropKey((k) => (k === key ? null : k));
+              } : undefined}
+              onDrop={dnd ? (e) => {
+                const raw = e.dataTransfer.getData(EVENT_DRAG_MIME);
+                setDropKey(null);
+                if (!raw) return;
+                e.preventDefault();
+                const [id, fromKey] = raw.split("|");
+                const ev = findEvent(id);
+                if (ev && fromKey && fromKey !== key) onEventDropDay?.(ev, fromKey, key);
+              } : undefined}
             >
+              {dropKey === key && (
+                <div aria-hidden className="pointer-events-none absolute inset-1 rounded-lg border-2 border-dashed border-[#567FB2] dark:border-[#7FA9D6] bg-[#567FB2]/[0.06]" />
+              )}
               {/* Day number (opens the day — the keyboard way in) + quick-create */}
               <div className="flex items-center justify-between mb-1">
                 <button
@@ -176,7 +217,14 @@ export default function MonthView({
               {/* Event chips */}
               <div className="space-y-1">
                 {shown.map((ev) => (
-                  <EventChip key={ev.id} ev={ev} labels={chipLabels} onClick={onEventClick} />
+                  <EventChip
+                    key={ev.id}
+                    ev={ev}
+                    labels={chipLabels}
+                    onClick={onEventClick}
+                    now={today}
+                    dragData={dnd && canDrag?.(ev) ? `${ev.id}|${key}` : undefined}
+                  />
                 ))}
                 {extra > 0 && (
                   <button

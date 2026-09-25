@@ -17,7 +17,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id, tid } = await params;
-  const gate = await assertTaskAccess(auth, id);
+  const gate = await assertTaskAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   const { data: entry } = await supabaseServer

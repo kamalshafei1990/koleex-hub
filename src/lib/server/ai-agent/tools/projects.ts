@@ -14,9 +14,13 @@ import "server-only";
    never needs rates, and the safest way not to leak a field is to not fetch it.
    --------------------------------------------------------------------------- */
 
+import { NextResponse } from "next/server";
 import { supabaseServer } from "../../supabase-server";
 import { recomputeProjectProgress } from "../../project-progress";
-import { loadStages, reconcileStageStatus } from "../../project-task-rules";
+import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "../../project-task-rules";
+import { assertProjectAccess, canManageProject, involvedProjectsOr, memberRole, type MemberRole } from "../../project-access";
+import { syncProjectMembersFromAssignees, upsertProjectMembers } from "../../project-members";
+import { notifyTaskAssigned } from "../../project-notify";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
@@ -64,6 +68,10 @@ async function loadVisibleTask(
       .or(`manager_account_id.eq.${ctx.auth.account_id},created_by_account_id.eq.${ctx.auth.account_id}`)
       .maybeSingle();
     if (proj) return t;
+    /* A project member (any role but viewer) reaches its tasks too —
+       the same rule assertTaskAccess applies with { write: true }. */
+    const role = await memberRole({ account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: false }, t.project_id);
+    if (role === "manager" || role === "member") return t;
   }
   return null;
 }
@@ -104,18 +112,9 @@ const listMyProjects: ToolDef<
       .eq("is_template", false);
 
     if (!ctx.isSuperAdmin) {
-      const { data: myTaskProjects } = await supabaseServer
-        .from("project_tasks")
-        .select("project_id")
-        .eq("tenant_id", tenantId)
-        .eq("assignee_account_id", accountId);
-      const ids = [...new Set((myTaskProjects ?? []).map((r) => (r as { project_id: string }).project_id))];
-      const orParts = [
-        `manager_account_id.eq.${accountId}`,
-        `created_by_account_id.eq.${accountId}`,
-      ];
-      if (ids.length > 0) orParts.push(`id.in.(${ids.join(",")})`);
-      q = q.or(orParts.join(","));
+      /* manager / creator / project member / task assignee — the list
+         route's exact scope (project-access.ts). */
+      q = q.or(await involvedProjectsOr(tenantId, accountId));
     }
 
     if (args.status) q = q.eq("status", String(args.status));
@@ -204,29 +203,53 @@ const listProjectTasks: ToolDef<
   },
 };
 
-/* ── Create project task (with confirm) ── */
+/* ── Create project task (with confirm) ──
+   Goes through the SAME validators as POST /api/projects/tasks:
+   validateTaskWrite (enums, real dates, assignee in the tenant),
+   checkDateOrder (start ≤ due), reconcileStageStatus (default stage), and
+   the project write gate (viewers cannot add tasks). */
+type AccessCtx = { auth: { account_id: string; tenant_id: string }; isSuperAdmin: boolean };
+const accessAuth = (ctx: AccessCtx) => ({ account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: ctx.isSuperAdmin });
+
+/** "me", an account uuid, or a username → account id in the tenant. */
+async function resolveAccount(ctx: AccessCtx, raw: unknown): Promise<string | null | undefined> {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const v = String(raw).trim();
+  if (v.toLowerCase() === "me") return ctx.auth.account_id;
+  if (v.toLowerCase() === "none" || v.toLowerCase() === "unassigned") return null;
+  if (isUuid(v)) return v;
+  const { data } = await supabaseServer
+    .from("accounts").select("id").eq("tenant_id", ctx.auth.tenant_id).ilike("username", v.replace(/[%_\\]/g, "\\$&")).limit(2);
+  const rows = (data ?? []) as { id: string }[];
+  return rows.length === 1 ? rows[0].id : "";
+}
+
 const createProjectTask: ToolDef<
   {
     project_id?: string;
     title?: string;
     description?: string;
     priority?: string;
+    start_date?: string;
     due_date?: string;
+    assignee?: string;
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
 > = {
   name: "createProjectTask",
   description:
-    "Create a NEW task inside a project, assigned to the current user. You MUST have a real project_id first — call listMyProjects to find it if the user names a project. ALWAYS call this WITHOUT confirm to preview; only call again with confirm:true after the user explicitly agrees.",
+    "Create a NEW task inside a project. You MUST have a real project_id first — call listMyProjects to find it if the user names a project. Optional start_date / due_date (YYYY-MM-DD; start must be on or before due) and assignee ('me' — the default —, 'none', an account id, or an exact username). ALWAYS call this WITHOUT confirm to preview; only call again with confirm:true after the user explicitly agrees.",
   parameters: {
     type: "object",
     properties: {
       project_id: { type: "string", description: "The id of the project to add the task to (required — resolve via listMyProjects)." },
       title: { type: "string", description: "The task title (required)." },
       description: { type: "string", description: "Optional description." },
-      priority: { type: "string", description: "low | normal | high. Default normal.", enum: ["low", "normal", "high"] },
-      due_date: { type: "string", description: "Optional ISO due date." },
+      priority: { type: "string", description: "low | normal | high | urgent. Default normal.", enum: ["low", "normal", "high", "urgent"] },
+      start_date: { type: "string", description: "Optional start day, YYYY-MM-DD." },
+      due_date: { type: "string", description: "Optional due day, YYYY-MM-DD." },
+      assignee: { type: "string", description: "Who does it: 'me' (default), 'none', an account id, or an exact username." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
     },
     required: ["project_id", "title"],
@@ -237,86 +260,153 @@ const createProjectTask: ToolDef<
     const projectId = String(args.project_id ?? "").trim();
     const title = String(args.title ?? "").trim();
     if (!projectId) return { ok: false, permissionStatus: "allowed", data: null, message: "Which project should the task go in? I can list your projects." };
+    if (!isUuid(projectId)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
     if (!title) return { ok: false, permissionStatus: "allowed", data: null, message: "What should the task be called?" };
-    const priority = ["low", "normal", "high"].includes(String(args.priority)) ? String(args.priority) : "normal";
 
-    // Verify the project is visible to this user (same scope as listMyProjects
-    // read), so the AI can't drop a task into a project they can't see.
-    let projQ = supabaseServer.from("projects").select("id, name").eq("tenant_id", ctx.auth.tenant_id).eq("id", projectId);
-    if (!ctx.isSuperAdmin) {
-      const { data: myTaskProjects } = await supabaseServer
-        .from("project_tasks").select("project_id").eq("tenant_id", ctx.auth.tenant_id).eq("assignee_account_id", ctx.auth.account_id);
-      const ids = [...new Set((myTaskProjects ?? []).map((r) => (r as { project_id: string }).project_id))];
-      const orParts = [`manager_account_id.eq.${ctx.auth.account_id}`, `created_by_account_id.eq.${ctx.auth.account_id}`];
-      if (ids.length > 0) orParts.push(`id.in.(${ids.join(",")})`);
-      projQ = projQ.or(orParts.join(","));
+    /* The app's own write gate: visible AND not a view-only member. */
+    const gate = await assertProjectAccess(accessAuth(ctx), projectId, { write: true });
+    if (gate instanceof NextResponse) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: gate.status === 403 ? "You can view that project but not add tasks to it." : "I can't find that project among the ones you can access." };
     }
-    const { data: proj } = await projQ.maybeSingle();
-    if (!proj) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that project among the ones you can access." };
-    const projectName = (proj as { name: string }).name;
+    const { data: proj } = await supabaseServer.from("projects").select("name").eq("tenant_id", ctx.auth.tenant_id).eq("id", projectId).maybeSingle();
+    const projectName = (proj as { name: string } | null)?.name ?? "project";
 
-    const normalized = {
-      project_id: projectId,
+    const assignee = await resolveAccount(ctx, args.assignee);
+    if (assignee === "") return { ok: false, permissionStatus: "allowed", data: null, message: `I couldn't match "${args.assignee}" to exactly one person — give me their exact username.` };
+
+    const stages = await loadStages(ctx.auth.tenant_id, projectId);
+    const body: Record<string, unknown> = {
       title,
       description: args.description ? String(args.description) : null,
-      priority,
-      due_date: args.due_date ? String(args.due_date) : null,
+      priority: args.priority ? String(args.priority) : "normal",
+      assignee_account_id: assignee === undefined ? ctx.auth.account_id : assignee,
     };
+    if (args.start_date) body.start_date = String(args.start_date).trim();
+    if (args.due_date) body.due_date = String(args.due_date).trim();
+    const checked = await validateTaskWrite({
+      tenantId: ctx.auth.tenant_id,
+      projectId,
+      taskId: null,
+      body,
+      allowed: ["title", "description", "priority", "start_date", "due_date", "assignee_account_id"],
+      stages,
+    });
+    if ("error" in checked) return { ok: false, permissionStatus: "allowed", data: null, message: `That task isn't valid: ${checked.error}.` };
+    const dateErr = checkDateOrder(null, checked.patch);
+    if (dateErr) return { ok: false, permissionStatus: "allowed", data: null, message: `${dateErr}.` };
+    const fields = checked.patch;
+    const who = (fields.assignee_account_id as string | null) ?? null;
 
     if (args.confirm !== true) {
-      const due = normalized.due_date ? ` · due ${normalized.due_date}` : "";
+      const parts = [`priority ${fields.priority ?? "normal"}`];
+      if (fields.start_date) parts.push(`starts ${fields.start_date}`);
+      if (fields.due_date) parts.push(`due ${fields.due_date}`);
+      const whoText = who === ctx.auth.account_id ? "assigned to you" : who ? "assigned as requested" : "unassigned";
       return {
         ok: true,
         permissionStatus: "approval_required",
-        data: { preview: { ...normalized, project: projectName } },
-        message: `Ready to add this task to "${projectName}": "${title}" (priority ${priority}${due}), assigned to you. Confirm and I'll create it.`,
-        pendingAction: { tool: "createProjectTask", args: { ...normalized, confirm: true } },
+        data: { preview: { project_id: projectId, project: projectName, ...fields } },
+        message: `Ready to add this task to "${projectName}": "${title}" (${parts.join(", ")}), ${whoText}. Confirm and I'll create it.`,
+        pendingAction: { tool: "createProjectTask", args: { ...args, project_id: projectId, confirm: true } },
       };
     }
 
-    // Default stage = the project's is_default_new stage (as the route does).
-    const { data: stage } = await supabaseServer
-      .from("project_stages").select("id")
-      .eq("tenant_id", ctx.auth.tenant_id).eq("project_id", projectId).eq("is_default_new", true).maybeSingle();
-
+    const row = reconcileStageStatus(null, { ...fields, stage_id: stages.find((s) => s.is_default_new)?.id ?? null }, stages);
     const { data, error } = await supabaseServer
       .from("project_tasks")
       .insert({
-        tenant_id: ctx.auth.tenant_id,
-        project_id: projectId,
-        stage_id: (stage as { id: string } | null)?.id ?? null,
-        parent_task_id: null,
-        title: normalized.title,
-        description: normalized.description,
-        priority: normalized.priority,
-        assignee_account_id: ctx.auth.account_id,
         followers_account_ids: [],
         tag_ids: [],
         blocked_by_task_ids: [],
-        due_date: normalized.due_date,
-        start_date: null,
-        estimated_hours: null,
-        linked_planning_item_id: null,
-        linked_entity_type: null,
-        linked_entity_id: null,
-        linked_entity_label: null,
+        ...row,
+        tenant_id: ctx.auth.tenant_id,
+        project_id: projectId,
+        parent_task_id: null,
         created_by_account_id: ctx.auth.account_id,
       })
-      .select("id, project_id, title, status, priority, due_date, created_at")
+      .select("id, project_id, title, status, priority, start_date, due_date, assignee_account_id, created_at")
       .single();
 
     if (error) {
       console.error("[tool.createProjectTask]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the project task — please try again." };
     }
-    // A new open task changes the project's % — same recompute as the route.
+    // Same side effects as the route: progress, assignment notice, membership.
     await recomputeProjectProgress(ctx.auth.tenant_id, projectId);
+    const created = data as { id: string; title: string; project_id: string; due_date: string | null; assignee_account_id: string | null };
+    if (who) {
+      await notifyTaskAssigned(ctx.auth, created);
+      await syncProjectMembersFromAssignees(ctx.auth, projectId, [who]);
+    }
     return {
       ok: true,
       permissionStatus: "allowed",
       data: data as Record<string, unknown>,
-      message: `Added "${title}" to project "${projectName}", assigned to you.`,
+      message: `Added "${title}" to project "${projectName}".`,
       sources: ["project_tasks(insert)"],
+    };
+  },
+};
+
+/* ── Add a member to a project (with confirm) ──
+   Same rules as POST /api/projects/[id]/members: the caller must manage the
+   project (super admin, manager, creator, or member with role manager).
+   New members also join the project's Discuss chat. */
+const addProjectMember: ToolDef<
+  { project_id?: string; account?: string; role?: string; confirm?: boolean },
+  Record<string, unknown> | { preview: Record<string, unknown> }
+> = {
+  name: "addProjectMember",
+  description:
+    "Add a person to a project's members (or change their role). Resolve project_id via listMyProjects first. account is an account id or exact username. role: manager | member (default) | viewer (read-only). ALWAYS call first WITHOUT confirm to preview; only call again with confirm:true after the user explicitly agrees.",
+  parameters: {
+    type: "object",
+    properties: {
+      project_id: { type: "string", description: "The project's id (from listMyProjects)." },
+      account: { type: "string", description: "Account id or exact username of the person to add." },
+      role: { type: "string", description: "manager | member | viewer. Default member.", enum: ["manager", "member", "viewer"] },
+      confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
+    },
+    required: ["project_id", "account"],
+  },
+  requiredModule: PROJECTS_MODULE,
+  requiredAction: "edit",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
+    const projectId = String(args.project_id ?? "").trim();
+    if (!isUuid(projectId)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
+    const role = (["manager", "member", "viewer"].includes(String(args.role)) ? String(args.role) : "member") as MemberRole;
+
+    const auth = accessAuth(ctx);
+    const gate = await assertProjectAccess(auth, projectId, { write: true });
+    if (gate instanceof NextResponse) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that project among the ones you can manage." };
+    if (!(await canManageProject(auth, gate))) {
+      return { ok: false, permissionStatus: "denied", data: null, message: "Only the project's managers can add members." };
+    }
+    const accountId = await resolveAccount(ctx, args.account);
+    if (!accountId) return { ok: false, permissionStatus: "allowed", data: null, message: `I couldn't match "${args.account ?? ""}" to exactly one person — give me their exact username.` };
+    const { data: acct } = await supabaseServer.from("accounts").select("id, username").eq("tenant_id", ctx.auth.tenant_id).eq("id", accountId).maybeSingle();
+    if (!acct) return { ok: false, permissionStatus: "allowed", data: null, message: "That person isn't in this workspace." };
+    const username = (acct as { username: string }).username;
+    const { data: proj } = await supabaseServer.from("projects").select("name").eq("tenant_id", ctx.auth.tenant_id).eq("id", projectId).maybeSingle();
+    const projectName = (proj as { name: string } | null)?.name ?? "project";
+
+    if (args.confirm !== true) {
+      return {
+        ok: true,
+        permissionStatus: "approval_required",
+        data: { preview: { project_id: projectId, project: projectName, account_id: accountId, username, role } },
+        message: `Ready to add @${username} to "${projectName}" as ${role}. Confirm?`,
+        pendingAction: { tool: "addProjectMember", args: { project_id: projectId, account: accountId, role, confirm: true } },
+      };
+    }
+    const res = await upsertProjectMembers(ctx.auth, projectId, [{ account_id: accountId, role }]);
+    if ("error" in res) return { ok: false, permissionStatus: "allowed", data: null, message: res.error };
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { project_id: projectId, account_id: accountId, role, added: res.added.length > 0 },
+      message: res.added.length > 0 ? `Added @${username} to "${projectName}" as ${role}.` : `@${username} is now ${role} on "${projectName}".`,
+      sources: ["project_members(upsert)"],
     };
   },
 };
@@ -540,6 +630,7 @@ export const projectTools: ToolDef[] = [
   listMyProjects as ToolDef,
   listProjectTasks as ToolDef,
   createProjectTask as ToolDef,
+  addProjectMember as ToolDef,
   completeProjectTask as ToolDef,
   updateProjectTask as ToolDef,
   deleteProjectTask as ToolDef,

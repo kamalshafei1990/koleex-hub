@@ -30,7 +30,9 @@ import "server-only";
      · the stream self-terminates before maxDuration; EventSource reconnects
        with ?since=<newest seen> so the gap is replayed (bounded, deduped)
      · every ~3s an `chg` event names channels touched by an edit / delete /
-       reaction / pin, so those reach open clients without a broadcast ping
+       reaction / pin, so those reach open clients without a broadcast ping;
+       `meta: true` on it marks a sidebar-level change (rename, archive, the
+       caller joining or being removed) so the client refetches its list
 
    Delivery latency: poll cadence /2 (~0.5s median) + SSE push ≈ WeChat-feel,
    independent of Supabase websocket reachability. The Supabase broadcast path
@@ -52,6 +54,12 @@ export const maxDuration = 300;
 const MEMBERS = "discuss_members";
 const MESSAGES = "discuss_messages";
 const CHANNELS = "discuss_channels";
+
+/** Sidebar-level identity of a channel: a change here is a rename,
+ *  re-description or archive (reported to the client as `meta`). */
+function sigOf(ch: { name: string | null; description: string | null; archived_at: string | null }): string {
+  return `${ch.name ?? ""}\u0000${ch.description ?? ""}\u0000${ch.archived_at ?? ""}`;
+}
 
 async function myChannelIds(me: string): Promise<string[]> {
   const { data } = await supabaseServer
@@ -121,6 +129,22 @@ export async function GET(req: Request) {
          only ids inside the overlap window can ever be re-read. */
       const sent = new Map<string, number>();
       let changeCursor = new Date(nowMs - 5_000).toISOString();
+      /* name / description / archived_at per channel, to tell a rename or an
+         archive (sidebar-level, `meta`) from an edit / reaction / pin. */
+      const metaSig = new Map<string, string>();
+      const seedSigs = async (ids: string[]) => {
+        if (ids.length === 0) return;
+        try {
+          const { data: rows } = await supabaseServer
+            .from(CHANNELS)
+            .select("id, name, description, archived_at")
+            .in("id", ids);
+          for (const r of (rows ?? []) as Array<{ id: string; name: string | null; description: string | null; archived_at: string | null }>) {
+            if (!metaSig.has(r.id)) metaSig.set(r.id, sigOf(r));
+          }
+        } catch { /* unseeded channels just report their first change as a plain chg */ }
+      };
+      await seedSigs(channelIds);
       const started = Date.now();
       let iter = 0;
 
@@ -135,7 +159,20 @@ export async function GET(req: Request) {
         iter += 1;
 
         if (iter % MEMBERSHIP_EVERY === 0) {
-          try { channelIds = await myChannelIds(me); } catch { /* keep old set */ }
+          try {
+            const next = await myChannelIds(me);
+            /* Joined / removed / left elsewhere: tell the client its channel
+               LIST changed (meta) so the sidebar refetches — the Supabase
+               account ping that normally carries this never reaches the
+               mainland. */
+            const before = new Set(channelIds);
+            const after = new Set(next);
+            for (const id of next) if (!before.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true })}\n\n`);
+            for (const id of channelIds) if (!after.has(id)) send(`event: chg\ndata: ${JSON.stringify({ channelId: id, at: new Date().toISOString(), meta: true })}\n\n`);
+            const added = next.filter((id) => !before.has(id));
+            channelIds = next;
+            await seedSigs(added);
+          } catch { /* keep old set */ }
         }
         if (iter % HEARTBEAT_EVERY === 0) send(`: hb ${Date.now()}\n\n`);
         if (channelIds.length === 0) continue;
@@ -183,16 +220,22 @@ export async function GET(req: Request) {
           try {
             const { data: touched } = await supabaseServer
               .from(CHANNELS)
-              .select("id, updated_at, last_message_at")
+              .select("id, updated_at, last_message_at, name, description, archived_at")
               .in("id", channelIds)
               .gt("updated_at", changeCursor)
               .limit(100);
-            for (const ch of (touched ?? []) as Array<{ id: string; updated_at: string; last_message_at: string | null }>) {
+            for (const ch of (touched ?? []) as Array<{ id: string; updated_at: string; last_message_at: string | null; name: string | null; description: string | null; archived_at: string | null }>) {
               if (ch.updated_at > changeCursor) changeCursor = ch.updated_at;
               const upd = Date.parse(ch.updated_at);
               const last = ch.last_message_at ? Date.parse(ch.last_message_at) : 0;
-              if (upd - last > CHANGE_SLACK_MS) {
-                send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at })}\n\n`);
+              /* Rename / re-describe / archive: a sidebar-level change. The
+                 first sighting of a channel only records its signature. */
+              const sig = sigOf(ch);
+              const prevSig = metaSig.get(ch.id);
+              metaSig.set(ch.id, sig);
+              const meta = prevSig !== undefined && prevSig !== sig;
+              if (upd - last > CHANGE_SLACK_MS || meta) {
+                send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at, ...(meta ? { meta: true } : {}) })}\n\n`);
                 lastActivity = Date.now();
               }
             }

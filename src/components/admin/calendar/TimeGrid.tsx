@@ -10,11 +10,17 @@
      account's working hours; the day headers and the strip stay put.
    · Every hour slot is a button (keyboard, screen readers).
    · The "now" line follows `now`, which CalendarApp advances every minute.
+   · Drag to reschedule: an editable timed block (`canDrag`) moves with the
+     mouse or pen — up/down in 15-minute steps, across to another day — and
+     its bottom edge resizes it. Pointer events; a touch never starts a drag,
+     so a phone keeps scrolling and tapping. Escape cancels. On release the
+     shell gets the new WALL start/end (`onEventMove`) and saves it.
+   · An event with a meeting link on today carries a Join button.
 
    All dates are WALL dates of the calendar's timezone (calendar-utils).
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AccountPreferences } from "@/types/supabase";
 import type { CalendarFeedEvent } from "@/lib/calendar-types";
 import type { HolidayInstance } from "@/lib/calendar-holidays";
@@ -33,11 +39,14 @@ import {
   isToday,
   isoDateKey,
   isoWeekday,
+  joinableNow,
   laneStyle,
   nowOffsetPx,
+  snapMinutes,
+  startOfDay,
   workingHoursBand,
 } from "@/lib/calendar-utils";
-import EventChip, { type ChipLabels } from "./EventChip";
+import EventChip, { JoinLink, type ChipLabels } from "./EventChip";
 
 interface Props {
   days: Date[];
@@ -58,9 +67,28 @@ interface Props {
   onDayClick?: (d: Date) => void;
   onNewEventAtSlot?: (d: Date) => void;
   onEventClick?: (e: CalendarFeedEvent) => void;
+  /** May this block be dragged (rescheduled) here? */
+  canDrag?: (e: CalendarFeedEvent) => boolean;
+  /** A drag ended on a new time: the new WALL start and end. */
+  onEventMove?: (e: CalendarFeedEvent, start: Date, end: Date) => void;
 }
 
+interface DragState {
+  ev: CalendarFeedEvent;
+  mode: "move" | "resize";
+  x0: number;
+  y0: number;
+  dayIndex: number;
+  startMin: number;
+  endMin: number;
+  moved: boolean;
+}
+
+interface Preview { id: string; ev: CalendarFeedEvent; dayIndex: number; startMin: number; endMin: number }
+
 const STRIP_MAX = 3;
+const DAY_MIN = 24 * 60;
+const minuteOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
 const HOLIDAY_COLOR = EVENT_TYPE_COLORS.holiday;
 const DEFAULT_WH = { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] };
 
@@ -81,6 +109,8 @@ export default function TimeGrid({
   onDayClick,
   onNewEventAtSlot,
   onEventClick,
+  canDrag,
+  onEventMove,
 }: Props) {
   const { t } = useTranslation(calendarT);
   const wh = preferences.calendar?.working_hours || DEFAULT_WH;
@@ -94,9 +124,125 @@ export default function TimeGrid({
     if (scrollRef.current) scrollRef.current.scrollTop = openAt;
   }, [openAt]);
 
-  const perDay = days.map((day) => {
+  /* ── Drag to reschedule ── */
+  const colRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const dragRef = useRef<DragState | null>(null);
+  const suppressClickRef = useRef(false);
+  const [preview, setPreview] = useState<Preview | null>(null);
+
+  /** A block can be dragged when the shell allows it and it sits inside one
+   *  day (a block running past midnight is edited in the form). */
+  function draggable(ev: CalendarFeedEvent): boolean {
+    if (!onEventMove || !canDrag?.(ev)) return false;
+    const s = new Date(ev.start_at);
+    const e = new Date(ev.end_at);
+    return isSameDay(s, new Date(Math.max(s.getTime(), e.getTime() - 1)));
+  }
+
+  /* The block can change column mid-drag (it is re-drawn in the day it would
+     land on), so the drag listens on the window, not on the element. The
+     listeners read the latest state through refs. */
+  const previewRef = useRef<Preview | null>(null);
+  const handlersRef = useRef<{ move: (e: PointerEvent) => void; end: (commit: boolean) => void } | null>(null);
+
+  function showPreview(p: Preview | null) {
+    previewRef.current = p;
+    setPreview(p);
+  }
+
+  function beginDrag(e: React.PointerEvent<HTMLElement>, ev: CalendarFeedEvent, dayIndex: number, mode: DragState["mode"]) {
+    if (e.pointerType === "touch" || e.button !== 0 || dragRef.current) return;
+    e.stopPropagation();
+    const s = new Date(ev.start_at);
+    const en = new Date(ev.end_at);
+    const startMin = minuteOfDay(s);
+    const endMin = isSameDay(s, en) ? minuteOfDay(en) : DAY_MIN;
+    dragRef.current = { ev, mode, x0: e.clientX, y0: e.clientY, dayIndex, startMin, endMin, moved: false };
+
+    const onMove = (pe: PointerEvent) => handlersRef.current?.move(pe);
+    const onUp = () => { cleanup(); handlersRef.current?.end(true); };
+    const onCancel = () => { cleanup(); handlersRef.current?.end(false); };
+    const onKey = (ke: KeyboardEvent) => {
+      if (ke.key !== "Escape") return;
+      ke.stopPropagation();
+      cleanup();
+      handlersRef.current?.end(false);
+    };
+    function cleanup() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey, true);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey, true);
+  }
+
+  function columnAt(x: number, fallback: number): number {
+    const i = colRefs.current.findIndex((el) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return x >= r.left && x < r.right;
+    });
+    return i < 0 ? fallback : i;
+  }
+
+  function moveDrag(e: PointerEvent) {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x0;
+    const dy = e.clientY - d.y0;
+    if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    d.moved = true;
+    e.preventDefault();
+    const dMin = (dy / hourHeight) * 60;
+    const dur = d.endMin - d.startMin;
+    if (d.mode === "resize") {
+      const endMin = Math.min(DAY_MIN, Math.max(d.startMin + 15, snapMinutes(d.endMin + dMin)));
+      showPreview({ id: d.ev.id, ev: d.ev, dayIndex: d.dayIndex, startMin: d.startMin, endMin });
+      return;
+    }
+    const startMin = Math.min(DAY_MIN - Math.max(dur, 15), Math.max(0, snapMinutes(d.startMin + dMin)));
+    showPreview({ id: d.ev.id, ev: d.ev, dayIndex: columnAt(e.clientX, d.dayIndex), startMin, endMin: startMin + dur });
+  }
+
+  function endDrag(commit: boolean) {
+    const d = dragRef.current;
+    dragRef.current = null;
+    const p = previewRef.current;
+    showPreview(null);
+    if (!d || !d.moved) return;
+    /* The click that follows the release must not open the event. */
+    suppressClickRef.current = true;
+    setTimeout(() => { suppressClickRef.current = false; }, 0);
+    if (!commit || !p) return;
+    if (p.dayIndex === d.dayIndex && p.startMin === d.startMin && p.endMin === d.endMin) return;
+    const base = startOfDay(days[p.dayIndex] ?? days[d.dayIndex]);
+    const start = new Date(base);
+    start.setMinutes(p.startMin);
+    const end = new Date(base);
+    end.setMinutes(p.endMin);
+    onEventMove?.(d.ev, start, end);
+  }
+
+  useEffect(() => {
+    handlersRef.current = { move: moveDrag, end: endDrag };
+  });
+
+  const perDay = days.map((day, index) => {
     const key = isoDateKey(day);
-    const list = eventsByDay.get(key) ?? [];
+    let list = eventsByDay.get(key) ?? [];
+    /* While dragging, the block is drawn where it would land. */
+    if (preview) {
+      list = list.filter((e) => e.id !== preview.id);
+      if (index === preview.dayIndex) {
+        const s = new Date(startOfDay(day)); s.setMinutes(preview.startMin);
+        const en = new Date(startOfDay(day)); en.setMinutes(preview.endMin);
+        list = [...list, { ...preview.ev, start_at: s.toISOString(), end_at: en.toISOString() }];
+      }
+    }
     return {
       day,
       key,
@@ -178,7 +324,7 @@ export default function TimeGrid({
                       </div>
                     ))}
                     {shown.map((ev) => (
-                      <EventChip key={ev.id} ev={ev} labels={chipLabels} onClick={onEventClick} showTime={false} />
+                      <EventChip key={ev.id} ev={ev} labels={chipLabels} onClick={onEventClick} showTime={false} now={now} />
                     ))}
                     {extra > 0 && (
                       <button
@@ -213,13 +359,14 @@ export default function TimeGrid({
           </div>
 
           {/* Day columns */}
-          {perDay.map(({ day, key, timed }) => {
+          {perDay.map(({ day, key, timed }, dayIndex) => {
             const isWorking = wh.days.includes(isoWeekday(day));
             const lanes = dayLanes(timed, day, hourHeight);
             const nowPx = isToday(day, today) ? nowOffsetPx(now, hourHeight) : null;
             return (
               <div
                 key={key}
+                ref={(el) => { colRefs.current[dayIndex] = el; }}
                 className={`relative border-s border-[var(--border-subtle)] ${isWorking ? "" : "bg-[var(--bg-primary)]/30"}`}
               >
                 {isWorking && band.heightPx > 0 && (
@@ -245,36 +392,59 @@ export default function TimeGrid({
                   const color = colorForEvent(ev);
                   const declined = ev.invite_status === "declined";
                   const range = `${formatTime(new Date(ev.start_at))} – ${formatTime(new Date(ev.end_at))}`;
+                  const canMove = draggable(ev);
+                  const isPreview = preview?.id === ev.id;
+                  const join = ev.meeting_url && joinableNow(ev, now) ? ev.meeting_url : null;
+                  const tip = `${ev.title} · ${formatDMY(new Date(ev.start_at))} ${range}${declined ? ` · ${chipLabels.declined}` : ""}${canMove ? ` · ${chipLabels.dragHint}` : ""}`;
                   return (
-                    <button
+                    <div
                       key={ev.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick?.(ev);
-                      }}
-                      className={`absolute text-start overflow-hidden hover:brightness-125 transition-all ${roomy ? "rounded-lg px-3 py-2" : "rounded-md px-1.5 py-1 text-[10px] font-medium"} ${declined ? "opacity-60" : ""}`}
+                      className={`absolute overflow-hidden transition-[filter,box-shadow] ${roomy ? "rounded-lg" : "rounded-md"} ${declined ? "opacity-60" : ""} ${isPreview ? "z-20 shadow-lg ring-2 ring-[#567FB2] dark:ring-[#7FA9D6]" : ""} ${canMove ? (isPreview ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""}`}
                       style={{
-                        ...laneStyle(lanes.get(ev.id), roomy ? 8 : 4, roomy ? 4 : 2),
+                        ...laneStyle(isPreview ? undefined : lanes.get(ev.id), roomy ? 8 : 4, roomy ? 4 : 2),
                         top: topPx,
                         height: heightPx,
-                        backgroundColor: color + "22",
+                        backgroundColor: color + (isPreview ? "33" : "22"),
                         color,
                         borderInlineStart: `3px solid ${color}`,
                       }}
-                      title={`${ev.title} · ${formatDMY(new Date(ev.start_at))} ${range}${declined ? ` · ${chipLabels.declined}` : ""}`}
+                      onPointerDown={canMove ? (e) => beginDrag(e, ev, dayIndex, "move") : undefined}
                     >
-                      <div className={`font-semibold truncate ${roomy ? "text-[12px]" : ""} ${declined ? "line-through" : ""}`}>{ev.title}</div>
-                      {heightPx >= (roomy ? 40 : 32) && (
-                        <div className={`${roomy ? "text-[10px]" : "text-[9px]"} opacity-80 truncate tabular-nums`}>{range}</div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (suppressClickRef.current) return;
+                          onEventClick?.(ev);
+                        }}
+                        className={`block w-full h-full text-start hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--border-focus)] ${roomy ? "px-3 py-2" : "px-1.5 py-1 text-[10px] font-medium"} ${canMove ? "cursor-[inherit]" : ""}`}
+                        title={tip}
+                        aria-label={tip}
+                      >
+                        <div className={`font-semibold truncate ${roomy ? "text-[12px]" : ""} ${declined ? "line-through" : ""} ${join ? (roomy ? "pe-16" : "pe-5") : ""}`}>{ev.title}</div>
+                        {heightPx >= (roomy ? 40 : 32) && (
+                          <div className={`${roomy ? "text-[10px]" : "text-[9px]"} opacity-80 truncate tabular-nums`}>{range}</div>
+                        )}
+                        {roomy && ev.location && heightPx >= 60 && (
+                          <div className="text-[10px] opacity-70 truncate mt-0.5">{ev.location}</div>
+                        )}
+                        {!roomy && !isSameDay(new Date(ev.start_at), day) && (
+                          <div className="text-[9px] opacity-70">{t("week.continues")}</div>
+                        )}
+                      </button>
+                      {join && (
+                        <div className="absolute top-1 end-1">
+                          <JoinLink url={join} label={chipLabels.join} title={ev.title} compact={!roomy} />
+                        </div>
                       )}
-                      {roomy && ev.location && heightPx >= 60 && (
-                        <div className="text-[10px] opacity-70 truncate mt-0.5">{ev.location}</div>
+                      {canMove && (
+                        <div
+                          aria-hidden
+                          className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+                          onPointerDown={(e) => beginDrag(e, ev, dayIndex, "resize")}
+                        />
                       )}
-                      {!roomy && !isSameDay(new Date(ev.start_at), day) && (
-                        <div className="text-[9px] opacity-70">{t("week.continues")}</div>
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
 

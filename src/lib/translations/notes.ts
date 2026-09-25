@@ -224,4 +224,109 @@ export const notesT: Translations = {
   "fmt.link":          { en: "Link",                 zh: "链接",               ar: "رابط" },
   "fmt.undo":          { en: "Undo",                 zh: "撤销",               ar: "تراجع" },
   "fmt.redo":          { en: "Redo",                 zh: "重做",               ar: "إعادة" },
+
+  /* ── 2026-09-26 additions ── */
+  /* Note actions menu */
+  "more.title":        { en: "More actions",         zh: "更多操作",           ar: "إجراءات أخرى" },
+  "act.duplicate":     { en: "Duplicate",            zh: "创建副本",           ar: "تكرار" },
+  "act.duplicated":    { en: "Note duplicated.",     zh: "已创建副本。",       ar: "تم تكرار الملاحظة." },
+  "act.copySuffix":    { en: "(copy)",               zh: "（副本）",           ar: "(نسخة)" },
+  "act.exportMd":      { en: "Export as Markdown",   zh: "导出为 Markdown",    ar: "تصدير بصيغة Markdown" },
+  "act.print":         { en: "Print / Save as PDF",  zh: "打印 / 另存为 PDF",  ar: "طباعة / حفظ PDF" },
+  "act.sendDiscuss":   { en: "Send to Discuss",      zh: "发送到讨论",         ar: "إرسال إلى المحادثات" },
+  "act.history":       { en: "Version history",      zh: "版本历史",           ar: "سجل النسخ" },
+  "act.saveVersion":   { en: "Save version",         zh: "保存版本",           ar: "حفظ نسخة" },
+  "act.versionSaved":  { en: "Version saved.",       zh: "版本已保存。",       ar: "تم حفظ النسخة." },
+  "act.ai":            { en: "Koleex AI",            zh: "Koleex AI",          ar: "Koleex AI" },
+
+  /* Koleex AI panel */
+  "ai.summary":        { en: "Summarise",            zh: "生成摘要",           ar: "تلخيص" },
+  "ai.actions":        { en: "Action items",         zh: "行动项",             ar: "بنود العمل" },
+  "ai.intro":          { en: "Ask Koleex AI to summarise this note or pull out its action items. Nothing changes until you insert it.",
+                         zh: "让 Koleex AI 总结此笔记或提取行动项。插入前不会修改笔记。",
+                         ar: "اطلب من Koleex AI تلخيص هذه الملاحظة أو استخراج بنود العمل. لا يتغير شيء حتى تُدرجه." },
+  "ai.working":        { en: "Koleex AI is reading the note…", zh: "Koleex AI 正在阅读笔记…", ar: "يقرأ Koleex AI الملاحظة…" },
+  "ai.insert":         { en: "Insert into note",     zh: "插入到笔记",         ar: "إدراج في الملاحظة" },
+  "ai.inserted":       { en: "Inserted into the note.", zh: "已插入笔记。",    ar: "تم الإدراج في الملاحظة." },
+  "ai.noActions":      { en: "No action items found in this note.", zh: "此笔记中没有发现行动项。", ar: "لم يتم العثور على بنود عمل في هذه الملاحظة." },
+  "ai.busy":           { en: "Koleex AI is busy — try again in a few minutes.", zh: "Koleex AI 繁忙，请几分钟后再试。", ar: "Koleex AI مشغول — حاول بعد دقائق." },
+  "ai.forbidden":      { en: "Koleex AI is available to internal accounts only.", zh: "Koleex AI 仅供内部账户使用。", ar: "Koleex AI متاح للحسابات الداخلية فقط." },
+  "ai.empty":          { en: "This note is empty — write something first.", zh: "此笔记为空，请先输入内容。", ar: "هذه الملاحظة فارغة — اكتب شيئًا أولًا." },
+  "ai.failed":         { en: "Koleex AI couldn't answer. Please try again.", zh: "Koleex AI 无法回答，请重试。", ar: "تعذّر على Koleex AI الإجابة. حاول مرة أخرى." },
+  "ai.unsaved":        { en: "Koleex AI reads the last saved version of the note.", zh: "Koleex AI 读取的是笔记最近保存的版本。", ar: "يقرأ Koleex AI آخر نسخة محفوظة من الملاحظة." },
+  "ai.summaryHeading": { en: "Summary",              zh: "摘要",               ar: "الملخص" },
+  "ai.actionsHeading": { en: "Action items",         zh: "行动项",             ar: "بنود العمل" },
+  "ai.again":          { en: "Try again",            zh: "重新生成",           ar: "إعادة المحاولة" },
+
+  /* Version history */
+  "history.title":     { en: "Version history",      zh: "版本历史",           ar: "سجل النسخ" },
+  "history.empty":     { en: "No versions yet. A version is saved automatically as you edit (at most every 10 minutes), or use Save version.",
+                         zh: "暂无版本。编辑时会自动保存版本（最多每 10 分钟一次），也可点击“保存版本”。",
+                         ar: "لا توجد نسخ بعد. تُحفظ نسخة تلقائيًا أثناء التحرير (مرة كل 10 دقائق على الأكثر)، أو استخدم «حفظ نسخة»." },
+  "history.unavailable":{ en: "Version history isn't available yet.", zh: "版本历史暂不可用。", ar: "سجل النسخ غير متاح بعد." },
+  "history.restore":   { en: "Restore this version", zh: "恢复此版本",         ar: "استعادة هذه النسخة" },
+  "history.restored":  { en: "Version restored. The previous content was saved as a version.",
+                         zh: "已恢复版本。之前的内容已保存为一个版本。",
+                         ar: "تمت استعادة النسخة. حُفظ المحتوى السابق كنسخة." },
+  "history.restoreTitle":{ en: "Restore this version?", zh: "恢复此版本？",   ar: "استعادة هذه النسخة؟" },
+  "history.restoreDesc":{ en: "The note's current content is saved as a version first, so you can always go back.",
+                          zh: "笔记当前内容会先保存为一个版本，您随时可以恢复。",
+                          ar: "يُحفظ المحتوى الحالي للملاحظة كنسخة أولًا، لتتمكن دائمًا من الرجوع." },
+  "history.select":    { en: "Select a version to preview it.", zh: "选择一个版本进行预览。", ar: "اختر نسخة لمعاينتها." },
+  "history.by":        { en: "by",                   zh: "由",                 ar: "بواسطة" },
+  "history.list":      { en: "Versions",             zh: "版本",               ar: "النسخ" },
+
+  /* Backlinks + [[ note links */
+  "backlinks.title":   { en: "Linked from",          zh: "被以下笔记引用",     ar: "مرتبطة من" },
+  "backlinks.empty":   { en: "No notes link here yet. Type [[ in any note to link to another.",
+                         zh: "还没有笔记链接到这里。在任意笔记中输入 [[ 即可链接其他笔记。",
+                         ar: "لا توجد ملاحظات ترتبط هنا بعد. اكتب [[ في أي ملاحظة لربطها بأخرى." },
+  "linkPicker.title":  { en: "Link to a note",       zh: "链接到笔记",         ar: "ربط بملاحظة" },
+  "linkPicker.empty":  { en: "No matching notes",    zh: "没有匹配的笔记",     ar: "لا توجد ملاحظات مطابقة" },
+  "slash.title":       { en: "Insert block",         zh: "插入块",             ar: "إدراج كتلة" },
+  "slash.empty":       { en: "No matching blocks",   zh: "没有匹配的块",       ar: "لا توجد كتل مطابقة" },
+  "slash.table":       { en: "Table",                zh: "表格",               ar: "جدول" },
+  "slash.image":       { en: "Image",                zh: "图片",               ar: "صورة" },
+  "slash.hint":        { en: "Type / for blocks, [[ to link a note",
+                         zh: "输入 / 插入块，输入 [[ 链接笔记",
+                         ar: "اكتب / للكتل، و[[ لربط ملاحظة" },
+
+  /* Checklist → To-do */
+  "todo.create":       { en: "Create to-do",         zh: "创建待办",           ar: "إنشاء مهمة" },
+  "todo.open":         { en: "Open to-do",           zh: "打开待办",           ar: "فتح المهمة" },
+  "todo.created":      { en: "To-do created and linked to this item.", zh: "已创建待办并关联到此项。", ar: "تم إنشاء المهمة وربطها بهذا البند." },
+  "todo.forbidden":    { en: "You don't have permission to create to-dos.", zh: "您没有创建待办的权限。", ar: "ليست لديك صلاحية إنشاء المهام." },
+  "todo.emptyItem":    { en: "Write the checklist item first.", zh: "请先填写清单项。", ar: "اكتب بند القائمة أولًا." },
+  "todo.fromNote":     { en: "From the note",        zh: "来自笔记",           ar: "من الملاحظة" },
+
+  /* Send to Discuss */
+  "discuss.title":     { en: "Send to Discuss",      zh: "发送到讨论",         ar: "إرسال إلى المحادثات" },
+  "discuss.search":    { en: "Search conversations…", zh: "搜索会话…",         ar: "ابحث في المحادثات…" },
+  "discuss.empty":     { en: "No conversations found.", zh: "未找到会话。",     ar: "لم يتم العثور على محادثات." },
+  "discuss.send":      { en: "Send",                 zh: "发送",               ar: "إرسال" },
+  "discuss.sent":      { en: "Sent to Discuss.",     zh: "已发送到讨论。",     ar: "تم الإرسال إلى المحادثات." },
+  "discuss.accessNote":{ en: "Only people this note is shared with can open the link.",
+                         zh: "只有与之共享此笔记的人才能打开该链接。",
+                         ar: "لا يمكن فتح الرابط إلا لمن تمت مشاركة الملاحظة معهم." },
+  "discuss.message":   { en: "Shared a note",        zh: "分享了一条笔记",     ar: "شارك ملاحظة" },
+  "discuss.direct":    { en: "Direct message",       zh: "私信",               ar: "رسالة مباشرة" },
+  "discuss.channel":   { en: "Conversation",         zh: "会话",               ar: "محادثة" },
+
+  /* Tags */
+  "tags.title":        { en: "Tags",                 zh: "标签",               ar: "الوسوم" },
+  "tags.filterAria":   { en: "Show notes tagged",    zh: "显示带有此标签的笔记", ar: "عرض الملاحظات الموسومة بـ" },
+
+  /* Shared-with-me unread */
+  "shared.unreadAria": { en: "not opened yet",       zh: "尚未打开",           ar: "لم تُفتح بعد" },
+  "list.new":          { en: "New",                  zh: "新",                 ar: "جديد" },
+
+  /* Live co-editing */
+  "collab.live":       { en: "Live",                 zh: "实时",               ar: "مباشر" },
+  "collab.liveTip":    { en: "Live co-editing — everyone's changes appear instantly",
+                         zh: "实时协作编辑 — 所有人的修改即时显示",
+                         ar: "تحرير مشترك مباشر — تظهر تعديلات الجميع فورًا" },
+  "collab.connecting": { en: "Connecting…",          zh: "正在连接…",          ar: "جارٍ الاتصال…" },
+
+  /* Mobile formatting bar */
+  "mobileBar.label":   { en: "Formatting",           zh: "格式",               ar: "التنسيق" },
 };

@@ -9,6 +9,13 @@ import {
   planningReadScopeOr,
   PLANNING_ERR,
 } from "@/lib/server/planning-access";
+import { checkPlanningConflicts, conflictBody } from "@/lib/server/planning-conflicts";
+import {
+  expandWeekly,
+  parsePlanningRecurrence,
+  parsePlanningTz,
+  recurrenceRuleText,
+} from "@/lib/planning-recurrence";
 import {
   PLANNING_ITEM_TYPES,
   PLANNING_STATUSES,
@@ -32,7 +39,15 @@ import {
        limit=N            max rows (default + cap 2000)
      Non-super-admins only ever see: items they created, items on their own
      resource, and open shifts (see lib/server/planning-access.ts).
-   POST /api/planning/items — create a new item (draft by default). */
+   POST /api/planning/items — create a new item (draft by default).
+     Extra body fields (besides the item's columns):
+       recurrence: { weekdays: 0-6[], until: "YYYY-MM-DD" } — expand into a
+                   weekly series of concrete rows sharing one series id
+                   (recurrence_parent_id = the first row's id);
+       tz:         the planner's IANA zone (series wall time, leave days);
+       force:      super admin only — save despite schedule conflicts.
+     Every create runs the conflict check (lib/server/planning-conflicts):
+     409 { error: "schedule_conflict", conflicts, total, can_override }. */
 
 const MAX_ROWS = 2000;
 
@@ -156,6 +171,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: badRef === "resource_id" ? "invalid_resource" : "invalid_role", field: badRef }, { status: 400 });
   }
 
+  const extra = raw as Record<string, unknown>;
+  const tz = parsePlanningTz(extra.tz) ?? "UTC";
+  const force = extra.force === true && auth.is_super_admin;
+  const recurrence = parsePlanningRecurrence(extra.recurrence);
+  if (recurrence === null) {
+    return NextResponse.json({ error: "invalid_recurrence", field: "recurrence" }, { status: 400 });
+  }
+
   const now = new Date().toISOString();
   const status = body.status ?? "draft";
   const row = {
@@ -165,8 +188,8 @@ export async function POST(req: Request) {
     notes: body.notes ?? null,
     resource_id: body.resource_id ?? null,
     role_id: body.role_id ?? null,
-    start_at: body.start_at,
-    end_at: body.end_at,
+    start_at: body.start_at as string,
+    end_at: body.end_at as string,
     allocated_hours: body.allocated_hours ?? null,
     allocated_pct: body.allocated_pct ?? null,
     linked_entity_type: body.linked_entity_type ?? null,
@@ -179,17 +202,38 @@ export async function POST(req: Request) {
     completed_at: status === "completed" ? now : null,
     cancelled_at: status === "cancelled" ? now : null,
     recurrence_rule: body.recurrence_rule ?? null,
+    recurrence_parent_id: null as string | null,
     created_by_account_id: auth.account_id,
   };
 
-  const { data, error } = await supabaseServer
-    .from("planning_items")
-    .insert(row)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[api/planning/items POST]", error.message);
+  /* One row, or a weekly series expanded into concrete rows. */
+  let rows: Array<typeof row & { id?: string }> = [row];
+  if (recurrence) {
+    const occ = expandWeekly(row.start_at, row.end_at, recurrence, tz);
+    if (!occ) return NextResponse.json({ error: "invalid_recurrence", field: "recurrence" }, { status: 400 });
+    const ids = occ.map(() => crypto.randomUUID());
+    const rule = recurrenceRuleText(recurrence);
+    rows = occ.map((o, i) => ({ ...row, ...o, id: ids[i], recurrence_parent_id: ids[0], recurrence_rule: rule }));
+  }
+
+  try {
+    const check = await checkPlanningConflicts(auth.tenant_id, rows, { tz });
+    if (check.total > 0 && !force) {
+      return NextResponse.json(conflictBody(check, auth.is_super_admin), { status: 409 });
+    }
+  } catch (e) {
+    console.error("[api/planning/items POST] conflicts:", e instanceof Error ? e.message : e);
     return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
   }
-  return NextResponse.json({ item: data });
+
+  const { data, error } = await supabaseServer
+    .from("planning_items")
+    .insert(rows)
+    .select("*");
+  if (error || !data?.length) {
+    console.error("[api/planning/items POST]", error?.message ?? "no row");
+    return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
+  }
+  const saved = [...data].sort((x, y) => String(x.start_at).localeCompare(String(y.start_at)));
+  return NextResponse.json({ item: saved[0], items: saved });
 }

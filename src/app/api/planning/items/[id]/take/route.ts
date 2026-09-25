@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyPlanningTaken } from "@/lib/server/planning-notify";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { PLANNING_ERR } from "@/lib/server/planning-access";
+import { checkPlanningConflicts, conflictBody } from "@/lib/server/planning-conflicts";
 import { isPlanningUuid } from "@/lib/planning-validate";
 
 /* POST /api/planning/items/:id/take — claim an open shift.
@@ -13,11 +14,13 @@ import { isPlanningUuid } from "@/lib/planning-validate";
    assigned. Answers:
      404 not_found     — no such item in this tenant
      409 conflict      — already taken, or not a published open shift
-     400 no_resource   — the caller has no employee resource */
+     400 no_resource   — the caller has no employee resource
+     409 schedule_conflict — the caller is already booked / on leave then
+                         (super admin may pass ?force=1) */
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, { params }: RouteCtx) {
+export async function POST(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Planning", "create");
@@ -28,7 +31,7 @@ export async function POST(_req: Request, { params }: RouteCtx) {
   const [itemRes, resRes] = await Promise.all([
     supabaseServer
       .from("planning_items")
-      .select("id, status, resource_id")
+      .select("id, status, resource_id, title, start_at, end_at")
       .eq("id", id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
@@ -51,13 +54,27 @@ export async function POST(_req: Request, { params }: RouteCtx) {
     console.error("[api/planning/items/take]", itemRes.error?.message ?? resRes.error?.message);
     return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
   }
-  const item = itemRes.data as { id: string; status: string; resource_id: string | null } | null;
+  const item = itemRes.data as { id: string; status: string; resource_id: string | null; title: string | null; start_at: string; end_at: string } | null;
   if (!item) return NextResponse.json({ error: PLANNING_ERR[404] }, { status: 404 });
   if (item.resource_id || item.status !== "published") {
     return NextResponse.json({ error: PLANNING_ERR[409] }, { status: 409 });
   }
   const res = (resRes.data ?? [])[0] as { id: string } | undefined;
   if (!res) return NextResponse.json({ error: "no_resource" }, { status: 400 });
+
+  const url = new URL(req.url);
+  const force = url.searchParams.get("force") === "1" && auth.is_super_admin;
+  try {
+    const check = await checkPlanningConflicts(
+      auth.tenant_id,
+      [{ id: item.id, title: item.title, resource_id: res.id, start_at: item.start_at, end_at: item.end_at, status: item.status }],
+      { tz: url.searchParams.get("tz") },
+    );
+    if (check.total > 0 && !force) return NextResponse.json(conflictBody(check, auth.is_super_admin), { status: 409 });
+  } catch (e) {
+    console.error("[api/planning/items/take] conflicts:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
+  }
 
   // Conditional update closes the race where two people hit "Take" at once.
   const { data, error } = await supabaseServer

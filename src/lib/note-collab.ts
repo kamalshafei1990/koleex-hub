@@ -6,8 +6,12 @@
 
      1. Presence — who else is in this note right now (viewing / editing).
      2. Change pings — after a collaborator's save LANDS, peers receive a
-        content-free ping and re-fetch the note through the authorized API,
-        so note text never travels over the realtime socket.
+        content-free ping and re-fetch the note through the authorized API.
+     3. Live co-editing (when a NoteYjsSession is passed) — Yjs updates and
+        awareness ride broadcast event "y" on this same channel, END-TO-END
+        ENCRYPTED with a per-note key from the authorized collab endpoint
+        (see src/lib/notes-yjs.ts), so no readable note text ever travels
+        over the realtime socket.
 
    Presence is keyed per TAB (a random client id), not per account: the same
    person with the note open in two tabs is two peers, so the tabs sync with
@@ -21,6 +25,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
+import type { NoteYjsSession } from "@/lib/notes-yjs";
 
 export type CollabStatus = "viewing" | "editing";
 
@@ -44,7 +49,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** One id per browser tab, for the life of the page. */
 let tabClientId: string | null = null;
-function getTabClientId(): string {
+export function getTabClientId(): string {
   if (!tabClientId) {
     try { tabClientId = crypto.randomUUID(); } catch { tabClientId = `c${Date.now()}${Math.random().toString(36).slice(2)}`; }
   }
@@ -57,11 +62,13 @@ export function useNoteCollab(opts: {
   status: CollabStatus;
   enabled: boolean;
   onRemoteUpdate: (u: NoteUpdate) => void;
+  /** Live co-editing session for this note (shared notes only). */
+  yjs?: NoteYjsSession | null;
 }): {
   peers: NotePeer[];
   broadcastUpdate: () => void;
 } {
-  const { noteId, me, status, enabled, onRemoteUpdate } = opts;
+  const { noteId, me, status, enabled, onRemoteUpdate, yjs = null } = opts;
   const [peers, setPeers] = useState<NotePeer[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const statusRef = useRef<CollabStatus>(status);
@@ -72,6 +79,21 @@ export function useNoteCollab(opts: {
   // Keep the latest callback without re-subscribing the channel.
   const onRemoteRef = useRef(onRemoteUpdate);
   useEffect(() => { onRemoteRef.current = onRemoteUpdate; }, [onRemoteUpdate]);
+
+  /* The Yjs session can change (joined after the channel, rebuilt on a key
+     refresh) without re-subscribing the channel. */
+  const yjsRef = useRef<NoteYjsSession | null>(yjs);
+  const subscribedRef = useRef(false);
+  const sendY = useCallback((payload: Record<string, unknown>) => {
+    const ch = channelRef.current;
+    if (!ch) return;
+    try { void ch.send({ type: "broadcast", event: "y", payload }); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    yjsRef.current = yjs;
+    if (yjs && subscribedRef.current) yjs.attach(sendY);
+    return () => { yjs?.detach(); };
+  }, [yjs, sendY]);
 
   const active = enabled && !!noteId && UUID_RE.test(noteId || "") && !!me;
   const meId = me?.id ?? null;
@@ -118,7 +140,10 @@ export function useNoteCollab(opts: {
     channel
       .on("presence", { event: "sync" }, syncPeers)
       .on("presence", { event: "join" }, syncPeers)
-      .on("presence", { event: "leave" }, syncPeers)
+      .on("presence", { event: "leave" }, ({ key }: { key: string }) => {
+        syncPeers();
+        yjsRef.current?.peerLeft(key);
+      })
       .on("broadcast", { event: "ping" }, ({ payload: p }) => {
         const u = p as Partial<NoteUpdate>;
         if (!u || u.by === clientId) return; // ignore our own tab's echo
@@ -127,15 +152,28 @@ export function useNoteCollab(opts: {
           at: typeof u.at === "string" ? u.at : new Date().toISOString(),
         });
       })
+      .on("broadcast", { event: "y" }, ({ payload: p }) => {
+        void yjsRef.current?.receive(p);
+      })
       .subscribe((s) => {
-        if (s === "SUBSCRIBED") void channel.track(payload());
+        if (s === "SUBSCRIBED") {
+          subscribedRef.current = true;
+          void channel.track(payload());
+          // (Re)connected: sync the live document with whoever is here.
+          yjsRef.current?.attach(sendY);
+        } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
+          subscribedRef.current = false;
+          yjsRef.current?.detach();
+        }
       });
 
     return () => {
+      subscribedRef.current = false;
+      yjsRef.current?.detach();
       channelRef.current = null;
       try { supa.removeChannel(channel); } catch { /* ignore */ }
     };
-  }, [active, noteId, meId]);
+  }, [active, noteId, meId, sendY]);
 
   // Re-track presence on viewing↔editing change without re-subscribing.
   useEffect(() => {

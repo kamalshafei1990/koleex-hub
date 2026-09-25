@@ -5,8 +5,13 @@
 
    Views:
      • Projects        — grid of project cards, click to drill into detail
-     • Project detail  — kanban of tasks by stage, inline stage management
-     • My Tasks        — flat list across all projects, filtered to me
+                         (archived projects: Archived filter, Restore)
+     • Project detail  — Board / List / Timeline (Gantt) of the project's
+                         tasks, shared filters + saved filters, multi-select
+                         bulk actions, quick-add per column, members drawer,
+                         project chat, budget vs actual meter
+     • My Tasks        — flat list across all projects, filtered to me, with
+                         the "due today & overdue" strip on top
      • All Tasks       — flat list across all projects
      • Reporting       — KPI strip + progress / priority / assignee breakdown
      • Configuration   — tag CRUD
@@ -37,7 +42,6 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
-import FlagIcon from "@/components/icons/ui/FlagIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CogIcon from "@/components/icons/ui/CogIcon";
@@ -49,6 +53,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { ArchiveIcon, GanttChartIcon, MessageSquareIcon, UndoIcon, UsersIcon } from "@/components/icons/ui";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
@@ -57,7 +62,23 @@ import Button from "@/components/ui/Button";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import {
+  applyTaskFilter,
+  BulkBar,
+  DueTodayStrip,
+  filterDefaults,
+  QuickAddTask,
+  SelectBox,
+  TaskFilterBar,
+  useAccounts,
+  useBulkRunner,
+  useTaskSelection,
+  type TaskFilterState,
+} from "./TaskToolkit";
+import { BudgetMeter, budgetSummary, sumLoggedHours } from "./ProjectBudget";
+import type { DatePatch } from "./ProjectTimeline";
+import {
   accountLabel,
+  archiveProject,
   createStage,
   createTag,
   deleteStage,
@@ -69,12 +90,15 @@ import {
   fetchStages,
   fetchTagsStrict,
   fetchTasks,
+  formatDMY,
   formatDueDate,
   isOverdue,
   openProjectBoardChannel,
+  openProjectChat,
   PRIORITY_COLOR,
   ProjectsApiError,
   reorderTasks,
+  restoreProject,
   updateProject,
   updateStage,
   updateTag,
@@ -84,7 +108,6 @@ import {
   type ProjectStage,
   type ProjectStatus,
   type ProjectTag,
-  type TaskPriority,
   type TaskRow,
   type TaskStatus,
 } from "@/lib/projects";
@@ -97,6 +120,8 @@ const ProjectFormModal = dynamic(() => import("./ProjectModals").then((m) => m.P
 const TaskFormModal = dynamic(() => import("./ProjectModals").then((m) => m.TaskFormModal), { ssr: false });
 const FlatTaskFormModal = dynamic(() => import("./ProjectModals").then((m) => m.FlatTaskFormModal), { ssr: false });
 const MilestoneStrip = dynamic(() => import("./TaskExtras").then((m) => m.MilestoneStrip), { ssr: false });
+const ProjectTimeline = dynamic(() => import("./ProjectTimeline"), { ssr: false, loading: () => <CenteredSpinner /> });
+const ProjectMembersPanel = dynamic(() => import("./ProjectMembersPanel"), { ssr: false });
 
 type TabId = "projects" | "mine" | "all" | "reporting" | "config";
 
@@ -371,6 +396,10 @@ function ProjectsListView({
               onEdit={() => { setEditingProject(p); setFormOpen(true); }}
               onToggleFavourite={() => run(p.id, () => updateProject(p.id, { is_favorite: !p.is_favorite }))}
               onDuplicate={() => run(p.id, () => duplicateProject(p))}
+              onRestore={p.status === "archived" ? () => run(p.id, async () => {
+                await restoreProject(p.id);
+                showToast(t("restore.done"), "success");
+              }) : undefined}
             />
           ))}
         </div>
@@ -396,6 +425,7 @@ function ProjectCard({
   onEdit,
   onToggleFavourite,
   onDuplicate,
+  onRestore,
 }: {
   project: ProjectRow;
   busy: boolean;
@@ -403,6 +433,8 @@ function ProjectCard({
   onEdit: () => void;
   onToggleFavourite: () => void;
   onDuplicate: () => void;
+  /** Archived cards only. */
+  onRestore?: () => void;
 }) {
   const { t } = useTranslation(projectsT);
   /* Server-side counts (GET /api/projects) — no task download. Progress is
@@ -477,7 +509,13 @@ function ProjectCard({
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-1.5 text-[11px]">
+        <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+          {project.status === "archived" && (
+            <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-dim)] font-semibold inline-flex items-center gap-1">
+              <ArchiveIcon size={10} />
+              {project.archived_at ? t("archive.since").replace("{date}", formatDMY(project.archived_at)) : t("filter.archived")}
+            </span>
+          )}
           <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-muted)] font-semibold">
             {c.open} {c.open === 1 ? t("card.taskSingular") : t("card.tasks")}
           </span>
@@ -485,6 +523,15 @@ function ProjectCard({
             <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 font-semibold">
               {c.overdue} {t("card.overdue")}
             </span>
+          )}
+          {onRestore && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRestore(); }}
+              className="ms-auto h-6 px-2 rounded-full border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-semibold inline-flex items-center gap-1"
+            >
+              <UndoIcon size={10} /> {t("action.restore")}
+            </button>
           )}
         </div>
       </div>
@@ -521,8 +568,14 @@ function ProjectDetailView({
   const [newStageName, setNewStageName] = useState("");
   const [addingStage, setAddingStage] = useState(false);
   const [projectFormOpen, setProjectFormOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"board" | "list">("board");
+  const [viewMode, setViewMode] = useState<"board" | "list" | "timeline">("board");
   const [billing, setBilling] = useState(false);
+  const accounts = useAccounts();
+  const [filter, setFilter] = useState<TaskFilterState>(() => filterDefaults("all"));
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
 
   const fail = useCallback(
     (key: "toast.saveFailed" | "toast.deleteFailed" | "toast.moveFailed", e: unknown) => {
@@ -565,7 +618,7 @@ function ProjectDetailView({
   /* Background refresh must never fight the user. It is skipped while an
      editor is open (the form would otherwise receive new props mid-edit),
      while a drag/reorder is in flight, and while the tab is hidden. */
-  const modalOpen = taskModal.open || projectFormOpen;
+  const modalOpen = taskModal.open || projectFormOpen || membersOpen;
   const pauseRef = useRef({ modal: false, reordering: false });
   useEffect(() => {
     pauseRef.current.modal = modalOpen;
@@ -613,9 +666,12 @@ function ProjectDetailView({
   };
 
   const stageIds = useMemo(() => new Set(stages.map((s) => s.id)), [stages]);
+  /* Filters apply to every view (board, list, timeline) client-side — the
+     board already holds every task of the project. */
+  const visibleTasks = useMemo(() => applyTaskFilter(tasks, filter), [tasks, filter]);
   const tasksByStage = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
-    for (const tk of tasks) {
+    for (const tk of visibleTasks) {
       /* A task whose stage was deleted (FK SET NULL) — or points at a stage
          that no longer exists — goes to the Unstaged column instead of
          silently vanishing from the board. */
@@ -628,8 +684,48 @@ function ProjectDetailView({
       arr.sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
     }
     return map;
-  }, [tasks, stageIds]);
+  }, [visibleTasks, stageIds]);
   const unstaged = tasksByStage.get(UNSTAGED) ?? [];
+
+  /* Multi-select: visual order (Unstaged, then stage columns top→bottom),
+     so a shift-click range is what the user sees between the two cards. */
+  const orderedIds = useMemo(
+    () => [UNSTAGED, ...stages.map((s) => s.id)].flatMap((k) => (tasksByStage.get(k) ?? []).map((tk) => tk.id)),
+    [tasksByStage, stages],
+  );
+  const selection = useTaskSelection(orderedIds);
+  const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
+  const runBulk = useBulkRunner({ ids: selectedIds, onDone: refresh, clear: selection.clear, toast: showToast });
+  const selecting = selection.count > 0;
+  const { clear: clearSelection } = selection;
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !pauseRef.current.modal && !document.querySelector('[role="alertdialog"]')) clearSelection();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selecting, clearSelection]);
+
+  /* Timeline drag/resize: optimistic, one PATCH (server validates
+     start ≤ due), and on failure only THIS task's dates roll back. */
+  const updateDates = useCallback(
+    async (task: TaskRow, patch: DatePatch) => {
+      setTasks((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, ...patch } : tk)));
+      pauseRef.current.reordering = true;
+      try {
+        await updateTask(task.id, patch);
+        pauseRef.current.reordering = false;
+        await refresh();
+      } catch (e) {
+        setTasks((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, start_date: task.start_date ?? null, due_date: task.due_date } : tk)));
+        fail("toast.saveFailed", e);
+      } finally {
+        pauseRef.current.reordering = false;
+      }
+    },
+    [refresh, fail],
+  );
 
   /* Reorder within (or across) a stage. `beforeTaskId` = the card the
      dragged task should land in front of, or null to append. Optimistic:
@@ -721,6 +817,38 @@ function ProjectDetailView({
     }
   }, { confirmLabel: t("bill.do", "Create invoice"), tone: "neutral" });
 
+  const openChat = async () => {
+    if (chatBusy) return;
+    setChatBusy(true);
+    try {
+      const channelId = await openProjectChat(projectId);
+      router.push(`/discuss?channel=${channelId}`);
+    } catch (e) {
+      const msg = e instanceof ProjectsApiError && e.code === "not_migrated" ? t("chat.notAvailable") : t("toast.saveFailed").replace("{err}", errText(e));
+      showToast(msg, "error");
+      setChatBusy(false);
+    }
+  };
+
+  const toggleArchive = (archived: boolean) => {
+    const go = async () => {
+      if (archiveBusy) return;
+      setArchiveBusy(true);
+      try {
+        if (archived) await restoreProject(projectId);
+        else await archiveProject(projectId);
+        showToast(archived ? t("restore.done") : t("archive.done"), "success");
+        await refresh();
+      } catch (e) {
+        fail("toast.saveFailed", e);
+      } finally {
+        setArchiveBusy(false);
+      }
+    };
+    if (archived) void go();
+    else askConfirm(t("archive.confirm"), go, { confirmLabel: t("action.archive"), tone: "neutral" });
+  };
+
   if (state === "loading") {
     return (
       <div className="h-full bg-[var(--bg-primary)] flex items-center justify-center">
@@ -747,6 +875,31 @@ function ProjectDetailView({
   const customerName = project.customer?.display_name ?? project.customer?.company_name;
   const color = project.color ?? HUB_BLUE;
   const openTask = (tk: TaskRow) => setTaskModal({ open: true, editing: tk });
+  const isArchived = project.status === "archived";
+  const budget = budgetSummary(project, sumLoggedHours(tasks));
+  const headerBtn = "h-8 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 text-[11px] font-semibold shrink-0 disabled:opacity-50";
+  const viewSwitch = (
+    <div className="flex items-center rounded-lg border border-[var(--border-subtle)] overflow-hidden shrink-0" role="group" aria-label={`${t("view.board", "Board")} / ${t("view.list", "List")} / ${t("view.timeline")}`}>
+      {(["board", "list", "timeline"] as const).map((m) => {
+        const label = m === "board" ? t("view.board", "Board") : m === "list" ? t("view.list", "List") : t("view.timeline");
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setViewMode(m)}
+            aria-pressed={viewMode === m}
+            aria-label={label}
+            className={`h-8 px-2.5 flex items-center gap-1 text-[11px] font-semibold transition-colors ${
+              viewMode === m ? "kx-seg-on rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "kx-seg-off rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            {m === "board" ? <LayoutGridIcon size={12} /> : m === "list" ? <ListTodoIcon size={12} /> : <GanttChartIcon size={12} />}
+            <span className="hidden md:inline">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   const listRow = (tk: TaskRow) => {
     const overdue = isOverdue(tk.due_date) && tk.status === "open";
@@ -758,8 +911,11 @@ function ProjectDetailView({
         tabIndex={0}
         onClick={() => openTask(tk)}
         onKeyDown={(e) => { if (e.key === "Enter") openTask(tk); }}
-        className="kx-glass flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] cursor-pointer transition-colors"
+        className={`kx-glass flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border hover:border-[var(--border-focus)] cursor-pointer transition-colors ${
+          selection.selected.has(tk.id) ? "border-[#567FB2]/60 bg-[#567FB2]/5" : "border-[var(--border-subtle)]"
+        }`}
       >
+        <SelectBox checked={selection.selected.has(tk.id)} onToggle={(shift) => selection.toggle(tk.id, shift)} label={`${t("bulk.select")}: ${tk.title}`} />
         <span className="w-1 h-4 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[tk.priority] }} />
         <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}><AutoTranslatedText text={tk.title} /></span>
         {due && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? "bg-rose-500/15 text-rose-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"}`}>{due}</span>}
@@ -800,23 +956,6 @@ function ProjectDetailView({
                 {project.is_billable ? ` · ${t("form.billable")}` : ""}
               </div>
             </div>
-            <div className="hidden sm:flex items-center rounded-lg border border-[var(--border-subtle)] overflow-hidden shrink-0" role="group" aria-label={t("view.board", "Board")}>
-              {(["board", "list"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setViewMode(m)}
-                  aria-pressed={viewMode === m}
-                  aria-label={m === "board" ? t("view.board", "Board") : t("view.list", "List")}
-                  className={`h-8 px-2.5 flex items-center gap-1 text-[11px] font-semibold transition-colors ${
-                    viewMode === m ? "kx-seg-on rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "kx-seg-off rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {m === "board" ? <LayoutGridIcon size={12} /> : <ListTodoIcon size={12} />}
-                  <span className="hidden md:inline">{m === "board" ? t("view.board", "Board") : t("view.list", "List")}</span>
-                </button>
-              ))}
-            </div>
             {project.is_billable && (
               <button
                 type="button"
@@ -830,6 +969,26 @@ function ProjectDetailView({
                 <span className="hidden md:inline">{t("bill.btn", "Invoice time")}</span>
               </button>
             )}
+            <button type="button" onClick={() => setMembersOpen(true)} aria-label={t("mem.open")} title={t("mem.open")} className={headerBtn}>
+              <UsersIcon size={12} />
+              <span className="hidden md:inline">{t("mem.title")}</span>
+              {memberCount != null && <span className="tabular-nums text-[var(--text-ghost)]">{memberCount}</span>}
+            </button>
+            <button type="button" onClick={() => { void openChat(); }} disabled={chatBusy} aria-label={t("chat.open")} title={t("chat.open")} className={headerBtn}>
+              {chatBusy ? <SpinnerIcon className="h-3 w-3" /> : <MessageSquareIcon size={12} />}
+              <span className="hidden lg:inline">{t("chat.short")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleArchive(isArchived)}
+              disabled={archiveBusy}
+              aria-label={isArchived ? t("action.restore") : t("action.archive")}
+              title={isArchived ? t("action.restore") : t("action.archive")}
+              className={headerBtn}
+            >
+              {archiveBusy ? <SpinnerIcon className="h-3 w-3" /> : isArchived ? <UndoIcon size={12} /> : <ArchiveIcon size={12} />}
+              <span className="hidden lg:inline">{isArchived ? t("action.restore") : t("action.archive")}</span>
+            </button>
             <button
               type="button"
               onClick={() => setProjectFormOpen(true)}
@@ -843,12 +1002,44 @@ function ProjectDetailView({
               <span className="hidden sm:inline">{t("btn.addTask")}</span>
             </Button>
           </div>
+          {(budget.hasBudget || budget.loggedHours > 0) && (
+            <div className="pb-3" role="group" aria-label={t("budget.title")}>
+              <BudgetMeter summary={budget} compact />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Kanban / List */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0">
+          {isArchived && (
+            <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+              <ArchiveIcon size={13} className="shrink-0" />
+              <span className="flex-1 min-w-0">
+                {t("archive.banner")}
+                {project.archived_at ? ` ${t("archive.since").replace("{date}", formatDMY(project.archived_at))}` : ""}
+              </span>
+              <button type="button" onClick={() => toggleArchive(true)} disabled={archiveBusy} className="h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11px] font-semibold hover:text-[var(--text-primary)] disabled:opacity-50">
+                {t("action.restore")}
+              </button>
+            </div>
+          )}
+          <div className="mb-3">
+            <TaskFilterBar value={filter} onChange={setFilter} defaults={filterDefaults("all")} scope="project" tags={tags} accounts={accounts} trailing={viewSwitch} />
+          </div>
+          {viewMode === "timeline" && (
+            <div className="pb-4">
+              <ProjectTimeline
+                projectId={project.id}
+                tasks={visibleTasks}
+                allTasks={tasks}
+                stages={stages}
+                onUpdateDates={updateDates}
+                onOpenTask={openTask}
+              />
+            </div>
+          )}
           {viewMode === "list" && (
             <div className="space-y-4 pb-4">
               {listGroups.map((g) => (
@@ -865,7 +1056,7 @@ function ProjectDetailView({
               ))}
             </div>
           )}
-          <div className={`flex gap-3 overflow-x-auto pb-4 scrollbar-none ${viewMode === "list" ? "hidden" : ""}`}>
+          <div className={`flex gap-3 overflow-x-auto pb-4 scrollbar-none ${viewMode !== "board" ? "hidden" : ""}`}>
             {/* Unstaged — tasks whose stage was deleted. Cards drag OUT of it
                 into a real column; nothing drops INTO it. */}
             {unstaged.length > 0 && (
@@ -879,7 +1070,15 @@ function ProjectDetailView({
                 </div>
                 <div className="p-2 space-y-2">
                   {unstaged.map((tk) => (
-                    <TaskCard key={tk.id} task={tk} tags={tags} onClick={() => openTask(tk)} />
+                    <TaskCard
+                      key={tk.id}
+                      task={tk}
+                      tags={tags}
+                      onClick={() => openTask(tk)}
+                      selected={selection.selected.has(tk.id)}
+                      selecting={selecting}
+                      onToggleSelect={(shift) => selection.toggle(tk.id, shift)}
+                    />
                   ))}
                 </div>
               </div>
@@ -925,7 +1124,14 @@ function ProjectDetailView({
                         }}
                         className={dropBeforeId === tk.id ? "rounded-xl ring-2 ring-[#567FB2]/60" : ""}
                       >
-                        <TaskCard task={tk} tags={tags} onClick={() => openTask(tk)} />
+                        <TaskCard
+                          task={tk}
+                          tags={tags}
+                          onClick={() => openTask(tk)}
+                          selected={selection.selected.has(tk.id)}
+                          selecting={selecting}
+                          onToggleSelect={(shift) => selection.toggle(tk.id, shift)}
+                        />
                       </div>
                     ))}
                     {cellTasks.length === 0 && (
@@ -933,13 +1139,28 @@ function ProjectDetailView({
                         {t("empty.noTasks")}
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setTaskModal({ open: true, editing: null, presetStageId: stage.id })}
-                      className="w-full h-8 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center gap-1.5"
-                    >
-                      <PlusIcon size={11} /> {t("btn.addTask")}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <QuickAddTask
+                          projectId={project.id}
+                          stageId={stage.id}
+                          onCreated={(task) => {
+                            setTasks((prev) => (prev.some((x) => x.id === task.id) ? prev : [...prev, task]));
+                            void refresh();
+                          }}
+                          onError={(e) => fail("toast.saveFailed", e)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTaskModal({ open: true, editing: null, presetStageId: stage.id })}
+                        aria-label={`${t("btn.addTask")} — ${stage.name}`}
+                        title={t("btn.addTask")}
+                        className="h-8 w-8 shrink-0 rounded-lg border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center"
+                      >
+                        <PencilIcon className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -978,8 +1199,31 @@ function ProjectDetailView({
           <div className="mt-3">
             <EntityPlanningStrip entityType="project" entityId={project.id} />
           </div>
+
+          {viewMode !== "timeline" && (
+            <BulkBar
+              count={selection.count}
+              total={orderedIds.length}
+              onSelectAll={selection.selectAll}
+              onClear={selection.clear}
+              stages={stages}
+              accounts={accounts}
+              onRun={runBulk}
+            />
+          )}
         </div>
       </div>
+
+      {membersOpen && (
+        <ProjectMembersPanel
+          projectId={project.id}
+          open={membersOpen}
+          accounts={accounts}
+          onClose={() => setMembersOpen(false)}
+          onChanged={setMemberCount}
+          onError={(msg) => showToast(msg, "error")}
+        />
+      )}
 
       {taskModal.open && (
         <TaskFormModal
@@ -1114,10 +1358,17 @@ function TaskCard({
   task,
   tags,
   onClick,
+  selected = false,
+  selecting = false,
+  onToggleSelect,
 }: {
   task: TaskRow;
   tags: ProjectTag[];
   onClick: () => void;
+  selected?: boolean;
+  /** Any card selected → every checkbox stays visible. */
+  selecting?: boolean;
+  onToggleSelect?: (shift: boolean) => void;
 }) {
   const { t, lang } = useTranslation(projectsT);
   const dueLabel = formatDueDate(task.due_date, lang, dueLabels(t));
@@ -1137,11 +1388,19 @@ function TaskCard({
       }}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
-      className={`cursor-grab active:cursor-grabbing rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-2.5 hover:border-[var(--border-focus)] transition-all space-y-1.5 ${
+      className={`group cursor-grab active:cursor-grabbing rounded-xl bg-[var(--bg-surface)] border p-2.5 hover:border-[var(--border-focus)] transition-all space-y-1.5 ${
         task.status === "done" ? "opacity-60" : ""
-      }`}
+      } ${selected ? "border-[#567FB2] ring-1 ring-[#567FB2]/40" : "border-[var(--border-subtle)]"}`}
     >
       <div className="flex items-start gap-1.5">
+        {onToggleSelect && (
+          <SelectBox
+            checked={selected}
+            onToggle={onToggleSelect}
+            label={`${t("bulk.select")}: ${task.title}`}
+            className={`mt-0.5 ${selecting || selected ? "" : revealCls}`}
+          />
+        )}
         <div className="w-1 rounded-full shrink-0 self-stretch" style={{ background: color, minHeight: 20 }} />
         <div className="flex-1 min-w-0">
           {blocked && (
@@ -1201,38 +1460,53 @@ function TaskCard({
 function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const { t } = useTranslation(projectsT);
   const { showToast, toastElement } = useToast();
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("open");
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
-  const [searchInput, setSearchInput] = useState("");
+  const accounts = useAccounts();
+  const defaults = useMemo(() => filterDefaults("open"), []);
+  const [filter, setFilter] = useState<TaskFilterState>(defaults);
   const [search, setSearch] = useState("");
-  const [overdueOnly, setOverdueOnly] = useState(false);
   const [editing, setEditing] = useState<TaskRow | null>(null);
   /* Optimistic status flips, keyed by task id, until the refetch lands. */
   const [overrides, setOverrides] = useState<Record<string, TaskStatus>>({});
+  /* Bumped after every write so the Due-today strip refreshes with the list. */
+  const [version, setVersion] = useState(0);
 
   // Debounce search so each keystroke doesn't fire a request.
   useEffect(() => {
-    const id = setTimeout(() => setSearch(searchInput.trim()), 300);
+    const id = setTimeout(() => setSearch(filter.search.trim()), 300);
     return () => clearTimeout(id);
-  }, [searchInput]);
+  }, [filter.search]);
 
-  const isDefault = statusFilter === "open" && priorityFilter === "all" && !search;
+  /* Status / priority / assignee / tag / search are server-side; "overdue"
+     is a client-side view over the result. Only the default view is warm. */
+  const isDefault = filter.status === "open" && filter.priority === "all" && !filter.assignee && !filter.tag && !search;
   const warmKey = isDefault ? (mine ? "projects:mytasks" : "projects:alltasks") : "";
   const loadTasks = useCallback(
-    () => fetchTasks({ mine, status: statusFilter, priority: priorityFilter === "all" ? undefined : priorityFilter, search: search || undefined, limit: 1000 }),
-    [mine, statusFilter, priorityFilter, search],
+    () => fetchTasks({
+      mine,
+      status: filter.status,
+      priority: filter.priority === "all" ? undefined : filter.priority,
+      assignee: filter.assignee ?? undefined,
+      tag: filter.tag ?? undefined,
+      search: search || undefined,
+      limit: 1000,
+    }),
+    [mine, filter.status, filter.priority, filter.assignee, filter.tag, search],
   );
   const { data, loading, error, reload } = useWarmData(warmKey, loadTasks, DEFAULT_MAX_AGE_MS, 0);
   const tasks = useMemo(
     () => (data ?? []).map((tk) => (overrides[tk.id] ? { ...tk, status: overrides[tk.id] } : tk)),
     [data, overrides],
   );
+  const afterWrite = useCallback(async () => {
+    setVersion((v) => v + 1);
+    await reload();
+  }, [reload]);
 
   const toggleStatus = async (tk: TaskRow, next: TaskStatus) => {
     setOverrides((o) => ({ ...o, [tk.id]: next }));
     try {
       await updateTask(tk.id, { status: next });
-      await reload();
+      await afterWrite();
     } catch (e) {
       showToast(t("toast.saveFailed").replace("{err}", errText(e)), "error");
     } finally {
@@ -1247,86 +1521,51 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const grouped = useMemo(() => {
     const byStatus: Record<string, TaskRow[]> = { open: [], done: [], cancelled: [] };
     for (const tk of tasks) {
-      if (overdueOnly && !(tk.status === "open" && isOverdue(tk.due_date))) continue;
+      if (filter.overdue && !(tk.status === "open" && isOverdue(tk.due_date))) continue;
       byStatus[tk.status]?.push(tk);
     }
     return byStatus;
-  }, [tasks, overdueOnly]);
+  }, [tasks, filter.overdue]);
 
-  const priorities: (TaskPriority | "all")[] = ["all", "urgent", "high", "normal", "low"];
+  const shownStatuses = (["open", "done", "cancelled"] as const).filter(
+    (st) => grouped[st].length > 0 && (filter.status === "all" || filter.status === st),
+  );
+  const orderedIds = useMemo(
+    () => (["open", "done", "cancelled"] as const)
+      .filter((st) => filter.status === "all" || filter.status === st)
+      .flatMap((st) => grouped[st].map((tk) => tk.id)),
+    [grouped, filter.status],
+  );
+  const selection = useTaskSelection(orderedIds);
+  const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
+  const runBulk = useBulkRunner({ ids: selectedIds, onDone: afterWrite, clear: selection.clear, toast: showToast });
 
   return (
     <div className="space-y-4">
       {toastElement}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-56">
-          <SearchIcon size={13} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
-          <input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("task.searchPh", "Search tasks…")}
-            aria-label={t("task.searchPh", "Search tasks…")}
-            className="h-7 w-full ps-8 pe-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-          />
-        </div>
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none" role="group" aria-label={t("task.status")}>
-          {(["open", "done", "cancelled", "all"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusFilter(s)}
-              aria-pressed={statusFilter === s}
-              className={`h-7 px-3 rounded-full text-[11px] font-semibold border whitespace-nowrap transition-colors ${statusFilter === s ? chipOn : chipOff}`}
-            >
-              {s === "all" ? t("filter.all") : t(`status.${s}`)}
-            </button>
-          ))}
-        </div>
-        <div className="w-px h-4 bg-[var(--border-subtle)]" />
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none" role="group" aria-label={t("task.priority")}>
-          {priorities.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPriorityFilter(p)}
-              aria-pressed={priorityFilter === p}
-              className={`h-7 px-2.5 rounded-full text-[11px] font-semibold border whitespace-nowrap flex items-center gap-1 transition-colors ${
-                priorityFilter === p
-                  ? "kx-seg-on text-[var(--text-primary)] border-[var(--border-focus)] bg-[var(--bg-surface-active)]"
-                  : chipOff
-              }`}
-            >
-              <FlagIcon size={10} />
-              {p === "all" ? t("filter.all") : t(`priority.${p}`)}
-            </button>
-          ))}
-        </div>
-        <div className="w-px h-4 bg-[var(--border-subtle)]" />
-        <button
-          type="button"
-          onClick={() => setOverdueOnly((v) => !v)}
-          aria-pressed={overdueOnly}
-          className={`h-7 px-3 rounded-full text-[11px] font-semibold border whitespace-nowrap transition-colors ${
-            overdueOnly ? "bg-rose-500/15 text-rose-400 border-rose-500/30" : chipOff
-          }`}
-        >
-          {t("filter.overdue", "Overdue")}
-        </button>
-      </div>
+      {mine && <DueTodayStrip version={version} onOpen={setEditing} />}
+      <TaskFilterBar
+        value={filter}
+        onChange={setFilter}
+        defaults={defaults}
+        scope={mine ? "mine" : "all"}
+        tags={tags}
+        accounts={accounts}
+        hideAssignee={mine}
+      />
 
       {loading ? (
         <CenteredSpinner />
       ) : error && !data ? (
         <LoadError onRetry={() => { void reload(); }} />
-      ) : tasks.length === 0 ? (
+      ) : shownStatuses.length === 0 ? (
         <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center text-[13px] text-[var(--text-dim)]">
           {t("empty.noTasks")}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(["open", "done", "cancelled"] as const).map((st) => {
+          {shownStatuses.map((st) => {
             const list = grouped[st];
-            if (list.length === 0 || (statusFilter !== "all" && statusFilter !== st)) return null;
             return (
               <div key={st} className="space-y-2">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] px-1">
@@ -1340,6 +1579,8 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
                       tags={tags}
                       onClick={() => setEditing(tk)}
                       onToggleStatus={(next) => { void toggleStatus(tk, next); }}
+                      selected={selection.selected.has(tk.id)}
+                      onToggleSelect={(shift) => selection.toggle(tk.id, shift)}
                     />
                   ))}
                 </div>
@@ -1349,13 +1590,22 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
         </div>
       )}
 
+      <BulkBar
+        count={selection.count}
+        total={orderedIds.length}
+        onSelectAll={selection.selectAll}
+        onClear={selection.clear}
+        accounts={accounts}
+        onRun={runBulk}
+      />
+
       {editing && (
         <FlatTaskFormModal
           key={editing.id}
           editing={editing}
           tags={tags}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); void reload(); }}
+          onSaved={() => { setEditing(null); void afterWrite(); }}
         />
       )}
     </div>
@@ -1367,11 +1617,15 @@ function FlatTaskRow({
   tags,
   onClick,
   onToggleStatus,
+  selected,
+  onToggleSelect,
 }: {
   task: TaskRow;
   tags: ProjectTag[];
   onClick: () => void;
   onToggleStatus: (next: TaskStatus) => void;
+  selected: boolean;
+  onToggleSelect: (shift: boolean) => void;
 }) {
   const { t, lang } = useTranslation(projectsT);
   const dueLabel = formatDueDate(task.due_date, lang, dueLabels(t));
@@ -1387,9 +1641,12 @@ function FlatTaskRow({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onClick(); }}
-      className="kx-glass w-full cursor-pointer text-start rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] p-3 transition-all space-y-1.5"
+      className={`kx-glass w-full cursor-pointer text-start rounded-xl bg-[var(--bg-secondary)] border hover:border-[var(--border-focus)] p-3 transition-all space-y-1.5 ${
+        selected ? "border-[#567FB2]/60 bg-[#567FB2]/5" : "border-[var(--border-subtle)]"
+      }`}
     >
       <div className="flex items-start gap-2">
+        <SelectBox checked={selected} onToggle={onToggleSelect} label={`${t("bulk.select")}: ${task.title}`} className="mt-0.5" />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleStatus(done ? "open" : "done"); }}

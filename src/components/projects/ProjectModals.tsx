@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { useTranslation } from "@/lib/i18n";
+import { usePermissions } from "@/lib/permissions";
 import { projectsT } from "@/lib/translations/projects";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -32,11 +33,13 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import { ArchiveIcon, UndoIcon } from "@/components/icons/ui";
 import EntityPicker from "@/components/planning/EntityPicker";
 import { createItem as createPlanningItem } from "@/lib/planning";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import {
   accountLabel,
+  archiveProject,
   createProject,
   createTask,
   deleteProject,
@@ -45,6 +48,7 @@ import {
   fetchProjects,
   fetchStages,
   PRIORITY_COLOR,
+  restoreProject,
   todayLocalISO,
   updateProject,
   updateTask,
@@ -250,6 +254,9 @@ export function ProjectFormModal({
   const [budgetHours, setBudgetHours] = useState<string>(editing?.budget_hours?.toString() ?? "");
   const [budgetAmount, setBudgetAmount] = useState<string>(editing?.budget_amount?.toString() ?? "");
   const [billingRate, setBillingRate] = useState<string>(editing?.billing_rate?.toString() ?? "");
+  const [currency, setCurrency] = useState<string>(editing?.currency ?? "");
+  const { isSuperAdmin } = usePermissions();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [isTemplate, setIsTemplate] = useState(editing?.is_template ?? false);
   const [templateId, setTemplateId] = useState<string>("");
   const [templates, setTemplates] = useState<ProjectRow[]>([]);
@@ -298,6 +305,9 @@ export function ProjectFormModal({
       budget_hours: budgetHours ? Number(budgetHours) : null,
       budget_amount: budgetAmount ? Number(budgetAmount) : null,
       billing_rate: billingRate ? Number(billingRate) : null,
+      /* Only sent when set/changed, so a DB without the column (migration
+         pending) never sees it on an ordinary edit. */
+      ...(currency.trim() || editing?.currency ? { currency: currency.trim().toUpperCase() || null } : {}),
       is_template: isTemplate,
       status,
       customer_id: customerId,
@@ -314,16 +324,32 @@ export function ProjectFormModal({
     }
   };
 
-  const remove = () => {
+  /* Archive is the everyday "remove" — restorable. Permanent delete is for
+     super admins only, behind a typed-name confirm (the server enforces
+     the SA rule too). */
+  const archived = editing?.status === "archived";
+  const toggleArchive = () => {
     if (!editing) return;
-    askConfirm(t("project.deleteConfirm", "Delete this project and all its tasks?"), async () => {
+    const go = async () => {
       try {
-        await deleteProject(editing.id);
-        onDeleted();
+        const saved = archived ? await restoreProject(editing.id) : await archiveProject(editing.id);
+        onSaved(saved);
       } catch (e) {
-        showToast(t("toast.deleteFailed").replace("{err}", errText(e)), "error");
+        showToast(t("toast.saveFailed").replace("{err}", errText(e)), "error");
       }
-    }, { confirmLabel: t("btn.delete") });
+    };
+    if (archived) void go();
+    else askConfirm(t("archive.confirm"), go, { confirmLabel: t("action.archive"), tone: "neutral" });
+  };
+  const removeForever = async () => {
+    if (!editing) return;
+    try {
+      await deleteProject(editing.id);
+      onDeleted();
+    } catch (e) {
+      setDeleteOpen(false);
+      showToast(t("toast.deleteFailed").replace("{err}", errText(e)), "error");
+    }
   };
 
   return (
@@ -333,10 +359,15 @@ export function ProjectFormModal({
       onClose={onClose}
       footer={
         <>
-          <div>
+          <div className="flex items-center gap-1">
             {editing && (
-              <button type="button" onClick={remove} className="h-10 px-5 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
-                <TrashIcon className="h-3.5 w-3.5" /> {t("btn.delete")}
+              <button type="button" onClick={toggleArchive} className="h-10 px-4 rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] text-[13px] font-medium flex items-center gap-1.5 transition-colors">
+                {archived ? <UndoIcon size={13} /> : <ArchiveIcon size={13} />} {archived ? t("action.restore") : t("action.archive")}
+              </button>
+            )}
+            {editing && isSuperAdmin && (
+              <button type="button" onClick={() => setDeleteOpen(true)} className="h-10 px-4 rounded-xl text-red-400 hover:bg-red-500/10 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
+                <TrashIcon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("delete.permanent")}</span>
               </button>
             )}
           </div>
@@ -349,6 +380,9 @@ export function ProjectFormModal({
     >
       {confirmDialog}
       {toastElement}
+      {deleteOpen && editing && (
+        <TypedDeleteConfirm name={editing.name} onCancel={() => setDeleteOpen(false)} onConfirm={removeForever} />
+      )}
       <div className="px-5 py-4 space-y-3 overflow-y-auto">
         {!editing && templates.length > 0 && (
           <Field label={t("form.template", "Start from template")}>
@@ -413,7 +447,17 @@ export function ProjectFormModal({
             <input type="number" min={0} value={billingRate} onChange={(e) => setBillingRate(e.target.value)} className={inputCls} />
           </Field>
           <Field label={t("form.budgetAmount", "Budget amount")}>
-            <input type="number" min={0} value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} className={inputCls} />
+            <div className="flex gap-1.5">
+              <input type="number" min={0} value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} className={`${inputCls} flex-1 min-w-0`} />
+              <input
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase())}
+                placeholder="USD"
+                aria-label={t("form.currency")}
+                title={t("form.currency")}
+                className={`${inputCls} !w-20 text-center uppercase`}
+              />
+            </div>
           </Field>
           <Field label={t("form.budgetHours")}>
             <input type="number" min={0} value={budgetHours} onChange={(e) => setBudgetHours(e.target.value)} className={inputCls} />
@@ -493,6 +537,7 @@ export function TaskFormModal({
   );
   const [priority, setPriority] = useState<TaskPriority>(editing?.priority ?? "normal");
   const [dueDate, setDueDate] = useState(editing?.due_date ?? "");
+  const [startDate, setStartDate] = useState(editing?.start_date ?? "");
   const [estimated, setEstimated] = useState<string>(editing?.estimated_hours?.toString() ?? "");
   const [progress, setProgress] = useState<number>(editing?.progress_pct ?? 0);
   const [status, setStatus] = useState<TaskStatus>(editing?.status ?? "open");
@@ -517,6 +562,9 @@ export function TaskFormModal({
       stage_id: stageId || null,
       priority,
       due_date: dueDate || null,
+      /* Only when set or previously set — never blank a start date the
+         caller's row simply didn't carry. */
+      ...(startDate || editing?.start_date ? { start_date: startDate || null } : {}),
       estimated_hours: estimated ? Number(estimated) : null,
       progress_pct: progress,
       status,
@@ -710,9 +758,12 @@ export function TaskFormModal({
           <AccountSelect value={assigneeId} onChange={setAssigneeId} placeholder={t("task.unassigned", "Unassigned")} label={t("task.assignee", "Assignee")} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Field label={t("task.startDate")}>
+            <input type="date" value={startDate} max={dueDate || undefined} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
+          </Field>
           <Field label={t("task.dueDate")}>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+            <input type="date" value={dueDate} min={startDate || undefined} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
           </Field>
           <Field label={t("task.estimated")}>
             <input type="number" min={0} value={estimated} onChange={(e) => setEstimated(e.target.value)} className={inputCls} />
@@ -859,5 +910,45 @@ export function FlatTaskFormModal({
       onClose={onClose}
       onSaved={onSaved}
     />
+  );
+}
+
+/** Permanent-delete confirm: the project's exact name must be typed. */
+function TypedDeleteConfirm({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => Promise<void> }) {
+  const { t } = useTranslation(projectsT);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const titleId = useId();
+  const match = typed.trim() === name.trim();
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm" onClick={onCancel} role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className="kx-glass-pop w-full max-w-sm rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-4 py-3.5 space-y-2.5">
+          <p id={titleId} className="text-[13px] font-semibold text-[var(--text-primary)]">{t("delete.permanent")}</p>
+          <p className="text-[12px] text-[var(--text-muted)]">{t("delete.typeName")}</p>
+          <p className="text-[12px] font-bold text-[var(--text-primary)] break-words" dir="auto">{name}</p>
+          <input
+            autoFocus
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }}
+            placeholder={t("delete.namePh")}
+            aria-label={t("delete.namePh")}
+            className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]">{t("btn.cancel")}</button>
+          <button
+            type="button"
+            disabled={!match || busy}
+            onClick={async () => { setBusy(true); await onConfirm(); setBusy(false); }}
+            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] font-semibold text-rose-400 hover:bg-rose-500/15 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {busy ? t("btn.saving") : t("delete.permanent")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

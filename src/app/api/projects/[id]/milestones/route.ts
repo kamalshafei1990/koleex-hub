@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "create");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertProjectAccess(auth, id);
+  const gate = await assertProjectAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   const body = (await req.json().catch(() => ({}))) as { name?: string; due_date?: string | null; color?: string | null; sort_order?: number };

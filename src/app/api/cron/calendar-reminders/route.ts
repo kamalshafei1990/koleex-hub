@@ -19,6 +19,11 @@ import "server-only";
    (the longest reminder is a week). Earliest first, so a backlog is worked
    through in order.
 
+   A series' "this occurrence only" changes are honoured
+   (lib/calendar-recurrence nextEffectiveOccurrence): a deleted occurrence
+   is never reminded, a moved one is reminded at its new time, with its own
+   title and meeting link. The link, when there is one, is in the text.
+
    Guarded by CRON_SECRET, and CLOSED when it is unset: this route sends
    notifications to real people and must never be callable anonymously. */
 
@@ -27,8 +32,10 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
-import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
+import { nextEffectiveOccurrence, type CalendarRec } from "@/lib/calendar-recurrence";
 import { accountTimezones, eventLink, formatWhen } from "@/lib/server/calendar-notify";
+import { isMissingSchema } from "@/lib/server/calendar-access";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +51,7 @@ interface EvRow {
   reminded_at: string | null;
   recurrence: CalendarRec;
   recurrence_until: string | null;
+  meeting_url?: string | null;
 }
 
 const MIN = 60_000;
@@ -91,36 +99,48 @@ export async function GET(req: Request) {
   const ahead = new Date(nowMs + 8 * 24 * 60 * MIN).toISOString();
   const today = now.toISOString().slice(0, 10);
 
-  const { data, error } = await supabaseServer
+  const COLS = "id, tenant_id, account_id, title, start_at, end_at, all_day, reminder_minutes, reminded_at, recurrence, recurrence_until";
+  const load = (cols: string) => supabaseServer
     .from(EVENTS)
-    .select("id, tenant_id, account_id, title, start_at, end_at, all_day, reminder_minutes, reminded_at, recurrence, recurrence_until")
+    .select(cols)
     .not("reminder_minutes", "is", null)
     .or(`recurrence.not.is.null,and(start_at.gte.${horizon},start_at.lte.${ahead})`)
     .or(`recurrence_until.is.null,recurrence_until.gte.${today}`)
     .order("start_at", { ascending: true })
     .limit(500);
+  /* The meeting link is read once the 2026-09-26 migration has added it. */
+  let { data, error } = await load(`${COLS}, meeting_url`);
+  if (isMissingSchema(error, "meeting_url")) ({ data, error } = await load(COLS));
 
   if (error) {
     console.error("[cron/calendar-reminders]", error.message);
     return NextResponse.json({ error: "Failed to load reminders" }, { status: 500 });
   }
 
-  const rows = (data ?? []) as EvRow[];
-  /* One round trip for every organizer's zone: a series' next date is on
-     its organizer's clock. */
-  const tzByAccount = await accountTimezones(rows.map((r) => r.account_id));
+  const rows = (data ?? []) as unknown as EvRow[];
+  /* One round trip for every organizer's zone (a series' next date is on
+     its organizer's clock), one for every series' exceptions. */
+  const [tzByAccount, exceptions] = await Promise.all([
+    accountTimezones(rows.map((r) => r.account_id)),
+    loadExceptions(rows.filter((r) => r.recurrence).map((r) => r.id)),
+  ]);
 
-  const due: Array<{ ev: EvRow; occ: Date; tz: string }> = [];
+  type Due = { ev: EvRow; occ: Date; end: Date; tz: string };
+  const due: Due[] = [];
   const missed: Array<{ ev: EvRow; occ: Date }> = [];
-  for (const ev of rows) {
-    const tz = tzByAccount.get(ev.account_id) ?? "UTC";
-    const occ = nextOccurrenceStart(ev.start_at, ev.recurrence, ev.recurrence_until, now, tz);
-    if (!occ) continue;
+  for (const row of rows) {
+    const tz = tzByAccount.get(row.account_id) ?? "UTC";
+    const next = nextEffectiveOccurrence(row.start_at, row.end_at, row.recurrence, row.recurrence_until, now, exceptions.get(row.id), tz);
+    if (!next) continue;
+    const occ = next.start;
     const occMs = occ.getTime();
-    if (nowMs < occMs - (ev.reminder_minutes ?? 0) * MIN) continue; // not time yet
-    if (ev.reminded_at && Date.parse(ev.reminded_at) >= occMs) continue; // this occurrence is done
+    if (nowMs < occMs - (row.reminder_minutes ?? 0) * MIN) continue; // not time yet
+    if (row.reminded_at && Date.parse(row.reminded_at) >= occMs) continue; // this occurrence is done
+    /* This occurrence's own title / link, when it was changed on its own. */
+    const ov = next.override;
+    const ev: EvRow = ov ? { ...row, title: ov.title || row.title, meeting_url: ov.meeting_url ?? row.meeting_url ?? null } : row;
     if (nowMs > occMs + 60 * MIN) missed.push({ ev, occ });
-    else due.push({ ev, occ, tz });
+    else due.push({ ev, occ, end: next.end, tz });
   }
 
   /* Missed window — stamp it so a stale one-off stops being evaluated. */
@@ -142,15 +162,15 @@ export async function GET(req: Request) {
   }
 
   let fired = 0;
-  for (const { ev, occ, tz } of due) {
+  for (const { ev, occ, end, tz } of due) {
     const occISO = occ.toISOString();
     if (!(await claim(ev.id, occISO))) continue; // another run has it
 
     const recipients = Array.from(new Set([ev.account_id, ...(guestsByEvent.get(ev.id) ?? [])]));
-    const durationMs = Math.max(0, Date.parse(ev.end_at) - Date.parse(ev.start_at));
-    const when = formatWhen(occISO, new Date(occ.getTime() + durationMs).toISOString(), ev.all_day, tz);
+    const when = formatWhen(occISO, end.toISOString(), ev.all_day, tz);
     const left = timeLeft(occ.getTime() - Date.now());
     const lead = left === "now" ? "starting now" : left;
+    const join = ev.meeting_url ? ` Join: ${ev.meeting_url}` : "";
 
     const meta = { type: "calendar_reminder", event_id: ev.id };
     try {
@@ -162,7 +182,7 @@ export async function GET(req: Request) {
           tenant_id: ev.tenant_id,
           category: "calendar",
           subject: `Starting soon: ${ev.title}`,
-          body: `${when} (${lead}).`,
+          body: `${when} (${lead}).${join}`,
           link: eventLink(ev.id),
           metadata: meta,
         })),
@@ -170,7 +190,7 @@ export async function GET(req: Request) {
       await emitPings(recipients.map((id) => ({ topic: rtTopic.inbox(id) })));
       await sendPushToAccounts(recipients, {
         title: ev.title,
-        body: `${when} (${lead})`,
+        body: `${when} (${lead})${join ? ` ·${join}` : ""}`,
         url: eventLink(ev.id),
         tag: `calendar-reminder-${ev.id}`,
         kind: "calendar_reminder",

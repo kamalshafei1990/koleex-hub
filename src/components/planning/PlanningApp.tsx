@@ -5,14 +5,32 @@
    deliveries, maintenance, project tasks, room bookings). Built to mirror
    Odoo Planning semantics in Hub's visual language.
 
-   Five tabs (kept in ?tab=, so a tab is linkable):
-     • Schedule       — week grid by resource or role
+   Six tabs (kept in ?tab=, so a tab is linkable):
+     • Schedule       — week grid by resource or role, or an hour Timeline
+                        (?view=timeline, ?range=week) — Day/Week, drag to
+                        move / resize (dynamic chunk)
      • Open Shifts    — published, unassigned items — anyone can Take
      • My Planning    — items on the caller's own resource (last 7 days on)
      • Utilization    — scheduled vs capacity per employee (dynamic chunk)
-     • Configuration  — manage roles + non-employee resources (dynamic chunk)
+     • Workload       — heat grid of planned hours per person per day
+                        (GET /api/planning/workload; dynamic chunk)
+     • Configuration  — roles, non-employee resources, shift templates
    ?item=<id> opens that item's modal (inbox notifications and the entity
    strips link here).
+
+   WEEK ACTIONS. "Copy last week" and "Publish week" preview a count first
+   (server-side, only rows the caller may edit, only resources on screen)
+   and act on confirm. "Add from template" on a cell drops a template's
+   times onto that day.
+
+   CONFLICTS. Every write can answer 409 schedule_conflict (double booking,
+   approved leave — lib/server/planning-conflicts). The board rolls back
+   and shows ConflictDialog; a super admin may "Save anyway", which retries
+   the same write with force.
+
+   TIME ZONE. The Calendar's timezone preference when set, else the
+   browser's — used by the timeline, templates, recurrence and the server's
+   leave-day check.
 
    DATA. Resources and roles load once per visit through useWarmData (they
    paint from the last answer instantly); only items + leave are keyed by
@@ -23,7 +41,7 @@
    with Retry, never an empty week.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
@@ -38,19 +56,38 @@ import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import TableIcon from "@/components/icons/ui/TableIcon";
+import TimelineIcon from "@/components/icons/ui/TimelineIcon";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
+import ConflictDialog from "@/components/planning/ConflictDialog";
+import type { TimelinePatch, TimelineRow } from "@/components/planning/TimelineView";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { browserTimeZone, safeTimeZone, zonedToUtc } from "@/lib/calendar-tz";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import type { ItemModalPreset } from "@/components/planning/ItemModal";
+import type { ItemModalPreset, ItemSaveOptions } from "@/components/planning/ItemModal";
 import { planningErrorKey } from "@/components/planning/planningErrors";
 import {
   addDays,
-  createItemOrThrow,
+  conflictInfo,
+  copyLastWeek,
+  createItemsOrThrow,
   dateKey,
   deleteItem,
+  fetchTemplates,
+  publishWeek,
+  updateItems,
+  type PlanningConflictInfo,
+  type PlanningTemplate,
+  type SeriesScope,
+  type WeekActionBody,
   durationHours,
   fetchItem,
   fetchItems,
@@ -83,11 +120,26 @@ const UtilizationView = dynamic(() => import("@/components/planning/UtilizationV
   ssr: false,
   loading: () => <CenteredSpinner />,
 });
+const WorkloadView = dynamic(() => import("@/components/planning/WorkloadView"), {
+  ssr: false,
+  loading: () => <CenteredSpinner />,
+});
+const TimelineView = dynamic(() => import("@/components/planning/TimelineView"), {
+  ssr: false,
+  loading: () => <CenteredSpinner />,
+});
 
-type TabId = "schedule" | "open" | "mine" | "utilization" | "config";
+type TabId = "schedule" | "open" | "mine" | "utilization" | "workload" | "config";
 
 /* Strip order — feeds the directional tab motion (kx-tab-fwd / kx-tab-back). */
-const TAB_ORDER: TabId[] = ["schedule", "open", "mine", "utilization", "config"];
+const TAB_ORDER: TabId[] = ["schedule", "open", "mine", "utilization", "workload", "config"];
+
+type SchedMode = "grid" | "timeline";
+type TlRange = "day" | "week";
+
+const noopSubscribe = () => () => {};
+const fillVars = (s: string, vars: Record<string, string | number>) =>
+  s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
 
 /* Items/leave revalidate after 15s (other planners edit the same board);
    resources/roles use the warm-cache default. */
@@ -128,6 +180,12 @@ export default function PlanningApp() {
   const { isSuperAdmin: isSA } = usePermissions();
   const meId = getCurrentAccountIdSync();
   const { showToast, toastElement } = useToast();
+  /* The planner's clock: the Calendar timezone preference, else the browser's. */
+  const boot = useMeBootstrap();
+  const prefTz = (boot.data?.header as { preferences?: { calendar?: { timezone?: string | null } } } | null | undefined)
+    ?.preferences?.calendar?.timezone;
+  const deviceTz = useSyncExternalStore(noopSubscribe, browserTimeZone, () => "UTC");
+  const tz = prefTz ? safeTimeZone(prefTz) : deviceTz;
   /* SA audience lens — "own" | "all" | resource account_id. */
   const [saView, setSaView] = useState<string>("own");
   const searchPlaceholder = useSearchPlaceholder("planning");
@@ -141,6 +199,17 @@ export default function PlanningApp() {
     writeUrlParams({ tab: next === "schedule" ? null : next });
   }, []);
   const [search, setSearch] = useState("");
+  /* Schedule view (?view=timeline, ?range=week) — lives here so it survives tab switches. */
+  const [schedMode, setSchedModeState] = useState<SchedMode>(() => (readUrlParam("view") === "timeline" ? "timeline" : "grid"));
+  const [tlRange, setTlRangeState] = useState<TlRange>(() => (readUrlParam("range") === "week" ? "week" : "day"));
+  const setSchedMode = useCallback((m: SchedMode) => {
+    setSchedModeState(m);
+    writeUrlParams({ view: m === "timeline" ? "timeline" : null });
+  }, []);
+  const setTlRange = useCallback((r: TlRange) => {
+    setTlRangeState(r);
+    writeUrlParams({ range: r === "week" ? "week" : null });
+  }, []);
   /* Bumped after every successful mutation — My Planning refetches on it. */
   const [version, setVersion] = useState(0);
 
@@ -149,8 +218,12 @@ export default function PlanningApp() {
   /* ── Reference data: resources + roles (not week-keyed) ── */
   const loadResources = useCallback(() => fetchResources(), []);
   const loadRoles = useCallback(() => fetchRoles(), []);
+  const loadTemplates = useCallback(() => fetchTemplates(), []);
   const resQ = useWarmData<PlanningResource[]>("planning:resources", loadResources);
   const rolesQ = useWarmData<PlanningRole[]>("planning:roles", loadRoles);
+  /* Templates never block the board: a failure just means no template menu. */
+  const tplQ = useWarmData<PlanningTemplate[]>("planning:templates", loadTemplates);
+  const templates = useMemo(() => tplQ.data ?? [], [tplQ.data]);
   const resources = useMemo(() => resQ.data ?? [], [resQ.data]);
   const roles = useMemo(() => rolesQ.data ?? [], [rolesQ.data]);
 
@@ -241,6 +314,22 @@ export default function PlanningApp() {
     },
     [enrich, inWeek],
   );
+  const replaceMany = useCallback(
+    (list: PlanningItem[], rows: PlanningItem[]) => rows.reduce((acc, r) => replaceItem(acc, r), list),
+    [replaceItem],
+  );
+
+  /* A retried write (conflict → "Save anyway") runs after later renders, so
+     it reads the board through this ref, never a stale closure. */
+  const latest = useRef({
+    items: [] as PlanningItem[],
+    showItems: (() => {}) as (next: PlanningItem[], commit: boolean) => void,
+    replaceMany,
+  });
+
+  useEffect(() => {
+    latest.current = { items, showItems, replaceMany };
+  }, [items, showItems, replaceMany]);
 
   /* ── Scope: SA audience lens + search ── */
   const itemInvolves = useCallback((it: PlanningItem, id: string | null) => {
@@ -300,31 +389,51 @@ export default function PlanningApp() {
     );
   }, [toastError]);
 
+  /* ── Conflicts: 409 schedule_conflict → dialog (+ "Save anyway" for SA) ── */
+  const [conflict, setConflict] = useState<{ info: PlanningConflictInfo; retry: () => Promise<void> } | null>(null);
+  /** Show the conflict dialog when `e` is a schedule conflict; true if shown. */
+  const offerConflict = useCallback((e: unknown, retry: () => Promise<void>) => {
+    const info = conflictInfo(e);
+    if (!info) return false;
+    setConflict({ info, retry });
+    return true;
+  }, []);
+
   /* ── Mutations ── */
   const handleSave = useCallback(
-    async (payload: Partial<PlanningItem> & { start_at: string; end_at: string }) => {
+    async (payload: Partial<PlanningItem> & { start_at: string; end_at: string }, opts: ItemSaveOptions) => {
       const editingItem = modal.editing;
-      try {
-        const saved = editingItem ? await updateItem(editingItem.id, payload) : await createItemOrThrow(payload);
-        showItems(replaceItem(items, saved), true);
+      const attempt = async (force: boolean) => {
+        const rows = editingItem
+          ? await updateItems(editingItem.id, payload, { scope: opts.scope, recurrence: opts.recurrence, tz, force })
+          : await createItemsOrThrow(payload, { recurrence: opts.recurrence, tz, force });
+        const L = latest.current;
+        L.showItems(L.replaceMany(L.items, rows), true);
         setVersion((v) => v + 1);
         closeModal();
         showToast(t("toast.saved"), "success");
+      };
+      try {
+        await attempt(false);
       } catch (e) {
-        toastError(e);
+        if (!offerConflict(e, () => attempt(true))) toastError(e);
         throw e; // keep the modal open with the user's edits
       }
     },
-    [modal.editing, items, replaceItem, showItems, closeModal, showToast, t, toastError],
+    [modal.editing, tz, closeModal, showToast, t, toastError, offerConflict],
   );
 
   const handleDelete = useCallback(
-    async (id: string) => {
+    async (id: string, scope: SeriesScope = "this") => {
       const before = items;
-      showItems(items.filter((i) => i.id !== id), false);
+      const target = items.find((i) => i.id === id);
+      const series = target?.recurrence_parent_id;
+      const doomed = (i: PlanningItem) =>
+        i.id === id || (scope === "future" && !!series && i.recurrence_parent_id === series && !!target && i.start_at >= target.start_at && canWrite(i));
+      showItems(items.filter((i) => !doomed(i)), false);
       try {
-        await deleteItem(id);
-        showItems(before.filter((i) => i.id !== id), true);
+        const ids = new Set(await deleteItem(id, scope));
+        showItems(before.filter((i) => !ids.has(i.id)), true);
         setVersion((v) => v + 1);
         closeModal();
         showToast(t("toast.deleted"), "success");
@@ -334,7 +443,7 @@ export default function PlanningApp() {
         throw e;
       }
     },
-    [items, showItems, closeModal, showToast, t, toastError],
+    [items, canWrite, showItems, closeModal, showToast, t, toastError],
   );
 
   const [taking, setTaking] = useState<string | null>(null);
@@ -342,12 +451,17 @@ export default function PlanningApp() {
     async (id: string) => {
       if (taking) return;
       setTaking(id);
-      try {
-        const taken = await takeOpenShift(id);
-        showItems(replaceItem(items, taken), true);
+      const attempt = async (force: boolean) => {
+        const taken = await takeOpenShift(id, { force, tz });
+        const L = latest.current;
+        L.showItems(L.replaceMany(L.items, [taken]), true);
         setVersion((v) => v + 1);
         showToast(t("toast.taken"), "success");
+      };
+      try {
+        await attempt(false);
       } catch (e) {
+        if (offerConflict(e, () => attempt(true))) return;
         toastError(e);
         /* Someone else got there first / it vanished: show the truth. */
         if (e instanceof PlanningApiError && (e.status === 409 || e.status === 404)) void itemsQ.reload();
@@ -355,12 +469,39 @@ export default function PlanningApp() {
         setTaking(null);
       }
     },
-    [taking, items, replaceItem, showItems, showToast, t, toastError, itemsQ],
+    [taking, tz, showToast, t, toastError, itemsQ, offerConflict],
   );
 
-  /** Move a dragged item to a new (resource, day) cell. Keeps the original
-   *  time-of-day and duration — only the date and assignee change.
-   *  Optimistic: the pill moves at once and snaps back if refused. */
+  /** Move / resize / re-assign one item. Optimistic: it moves at once and
+   *  snaps back if refused; a conflict offers "Save anyway" to managers. */
+  const moveItem = useCallback(
+    async (itemId: string, patch: { start_at: string; end_at: string; resource_id: string | null }) => {
+      const run = async (force: boolean) => {
+        const L0 = latest.current;
+        const existing = L0.items.find((i) => i.id === itemId);
+        if (!existing) return;
+        const before = L0.items;
+        L0.showItems(L0.replaceMany(before, [{ ...existing, ...patch }]), false);
+        try {
+          const saved = await updateItem(itemId, patch, { tz, force });
+          L0.showItems(L0.replaceMany(before, [saved]), true);
+          setVersion((v) => v + 1);
+        } catch (e) {
+          latest.current.showItems(before, false); // rollback
+          throw e;
+        }
+      };
+      try {
+        await run(false);
+      } catch (e) {
+        if (!offerConflict(e, () => run(true))) toastError(e);
+      }
+    },
+    [tz, toastError, offerConflict],
+  );
+
+  /** Grid drag: move to a new (resource, day) cell, keeping the time of day
+   *  and duration — only the date and assignee change. */
   const handleItemDrop = useCallback(
     async (itemId: string, targetResourceId: string | null, targetDate: Date) => {
       const existing = items.find((i) => i.id === itemId);
@@ -374,25 +515,92 @@ export default function PlanningApp() {
       const newEnd = new Date(newStart.getTime() + durationMs);
       // No-op if nothing changed (e.g. dropped on same cell).
       if (dateKey(oldStart) === dateKey(newStart) && existing.resource_id === targetResourceId) return;
+      await moveItem(itemId, { start_at: newStart.toISOString(), end_at: newEnd.toISOString(), resource_id: targetResourceId });
+    },
+    [items, moveItem],
+  );
 
-      const before = items;
-      const patch = {
-        start_at: newStart.toISOString(),
-        end_at: newEnd.toISOString(),
-        resource_id: targetResourceId,
+  const handleTimelineMove = useCallback(
+    (itemId: string, patch: TimelinePatch) => void moveItem(itemId, patch),
+    [moveItem],
+  );
+
+  /** "Add from template" on a cell: a draft at the template's times, that day. */
+  const handleTemplateCreate = useCallback(
+    async (tpl: PlanningTemplate, resourceId: string | null, day: Date) => {
+      const [h, mi] = tpl.start_time.split(":").map(Number);
+      const start = zonedToUtc(day.getFullYear(), day.getMonth() + 1, day.getDate(), h, mi, 0, 0, tz);
+      const payload = {
+        type: tpl.type,
+        title: tpl.name,
+        notes: tpl.default_note,
+        role_id: tpl.role_id,
+        resource_id: resourceId,
+        start_at: new Date(start).toISOString(),
+        end_at: new Date(start + tpl.duration_hours * 3_600_000).toISOString(),
+        status: "draft" as const,
       };
-      showItems(replaceItem(items, { ...existing, ...patch }), false);
-      try {
-        const saved = await updateItem(itemId, patch);
-        showItems(replaceItem(before, saved), true);
+      const attempt = async (force: boolean) => {
+        const rows = await createItemsOrThrow(payload, { tz, force });
+        const L = latest.current;
+        L.showItems(L.replaceMany(L.items, rows), true);
         setVersion((v) => v + 1);
+        showToast(t("toast.saved"), "success");
+      };
+      try {
+        await attempt(false);
       } catch (e) {
-        showItems(before, false); // rollback
-        toastError(e);
+        if (!offerConflict(e, () => attempt(true))) toastError(e);
       }
     },
-    [items, replaceItem, showItems, toastError],
+    [tz, showToast, t, toastError, offerConflict],
   );
+
+  /* ── Week actions: preview → confirm ── */
+  const [weekBusy, setWeekBusy] = useState<"copy" | "publish" | null>(null);
+  const [weekAction, setWeekAction] = useState<
+    { kind: "copy" | "publish"; body: WeekActionBody; count: number; skipped: number; people: number } | null
+  >(null);
+  const startWeekAction = useCallback(
+    async (kind: "copy" | "publish", resourceIds: string[] | null) => {
+      if (weekBusy) return;
+      const body: WeekActionBody = { week_start: weekStart.toISOString(), resource_ids: resourceIds, include_open: true, tz };
+      setWeekBusy(kind);
+      try {
+        if (kind === "copy") {
+          const r = await copyLastWeek(body, true);
+          if (r.count === 0) showToast(t("copy.none"), "info");
+          else setWeekAction({ kind, body, count: r.count, skipped: r.skipped, people: 0 });
+        } else {
+          const r = await publishWeek(body, true);
+          if (r.count === 0) showToast(t("publish.none"), "info");
+          else setWeekAction({ kind, body, count: r.count, skipped: 0, people: r.people });
+        }
+      } catch (e) {
+        toastError(e);
+      } finally {
+        setWeekBusy(null);
+      }
+    },
+    [weekBusy, weekStart, tz, showToast, t, toastError],
+  );
+  const confirmWeekAction = useCallback(async () => {
+    const a = weekAction;
+    if (!a || weekBusy) return;
+    setWeekBusy(a.kind);
+    try {
+      const r = a.kind === "copy" ? await copyLastWeek(a.body, false) : await publishWeek(a.body, false);
+      const L = latest.current;
+      L.showItems(L.replaceMany(L.items, r.items), true);
+      setVersion((v) => v + 1);
+      showToast(fillVars(t(a.kind === "copy" ? "toast.copied" : "toast.published"), { n: r.count }), "success");
+      setWeekAction(null);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setWeekBusy(null);
+    }
+  }, [weekAction, weekBusy, showToast, t, toastError]);
 
   /* ── Load state ── */
   const coreError = itemsQ.error ?? resQ.error ?? rolesQ.error;
@@ -410,6 +618,7 @@ export default function PlanningApp() {
       { key: "open", icon: "paper-plane", label: t("tab.openShifts") },
       { key: "mine", icon: "clock", label: t("tab.myPlanning") },
       { key: "utilization", icon: "clock", label: t("tab.utilization") },
+      { key: "workload", icon: "users", label: t("tab.workload") },
       { key: "config", icon: "cog", label: t("tab.configuration") },
     ] as const
   ).map((n) => ({ key: n.key, icon: n.icon, label: n.label, active: tab === n.key, onClick: () => setTab(n.key) }));
@@ -508,9 +717,31 @@ export default function PlanningApp() {
                   onCellClick={(resource_id, date) => setModal({ open: true, editing: null, preset: { resource_id, date } })}
                   onItemClick={openItem}
                   onItemDrop={handleItemDrop}
+                  tz={tz}
+                  mode={schedMode}
+                  onMode={setSchedMode}
+                  tlRange={tlRange}
+                  onTlRange={setTlRange}
+                  templates={templates}
+                  canWrite={canWrite}
+                  onTemplateCreate={handleTemplateCreate}
+                  onTimelineMove={handleTimelineMove}
+                  onTimelineCreate={(resource_id, start) => setModal({ open: true, editing: null, preset: { resource_id, date: start, start } })}
+                  weekBusy={weekBusy}
+                  onWeekAction={startWeekAction}
                 />
               ) : tab === "utilization" ? (
                 <UtilizationView items={lensItems} resources={resources} leaves={leaves} weekStart={weekStart} />
+              ) : tab === "workload" ? (
+                <WorkloadView
+                  weekStart={weekStart}
+                  resources={resources}
+                  tz={tz}
+                  version={version}
+                  onPrev={() => setAnchor(addDays(weekStart, -7))}
+                  onNext={() => setAnchor(addDays(weekStart, 7))}
+                  onToday={() => setAnchor(startOfWeek(new Date()))}
+                />
               ) : tab === "open" ? (
                 <OpenShiftsView
                   items={scopedItems.filter((i) => !i.resource_id)}
@@ -526,8 +757,10 @@ export default function PlanningApp() {
                 <ConfigurationView
                   roles={roles}
                   resources={resources}
+                  templates={templates}
                   onRolesChanged={rolesQ.reload}
                   onResourcesChanged={resQ.reload}
+                  onTemplatesChanged={tplQ.reload}
                   onError={toastError}
                 />
               )}
@@ -545,11 +778,45 @@ export default function PlanningApp() {
           resources={resources}
           roles={roles}
           readOnly={!!modal.editing && !canWrite(modal.editing)}
+          templates={templates}
+          tz={tz}
           onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}
         />
       )}
+      <ConflictDialog
+        info={conflict?.info ?? null}
+        onClose={() => setConflict(null)}
+        onOverride={async () => {
+          const c = conflict;
+          if (!c) return;
+          try {
+            await c.retry();
+            setConflict(null);
+          } catch (e) {
+            setConflict(null);
+            if (!offerConflict(e, c.retry)) toastError(e);
+          }
+        }}
+      />
+      <ConfirmDialog
+        open={!!weekAction}
+        tone="neutral"
+        title={weekAction?.kind === "publish" ? t("publish.title") : t("copy.title")}
+        message={
+          weekAction
+            ? weekAction.kind === "publish"
+              ? fillVars(t("publish.preview"), { n: weekAction.count, p: weekAction.people })
+              : `${fillVars(t("copy.preview"), { n: weekAction.count })}${weekAction.skipped ? ` ${fillVars(t("copy.skipped"), { n: weekAction.skipped })}` : ""}`
+            : undefined
+        }
+        confirmLabel={weekBusy ? t("btn.saving") : weekAction?.kind === "publish" ? t("publish.confirm") : t("copy.confirm")}
+        cancelLabel={t("btn.cancel")}
+        busy={!!weekBusy}
+        onConfirm={() => void confirmWeekAction()}
+        onCancel={() => { if (!weekBusy) setWeekAction(null); }}
+      />
       {toastElement}
     </div>
   );
@@ -608,6 +875,18 @@ function ScheduleView({
   onCellClick,
   onItemClick,
   onItemDrop,
+  tz,
+  mode,
+  onMode,
+  tlRange,
+  onTlRange,
+  templates,
+  canWrite,
+  onTemplateCreate,
+  onTimelineMove,
+  onTimelineCreate,
+  weekBusy,
+  onWeekAction,
 }: {
   weekStart: Date;
   items: PlanningItem[];
@@ -620,6 +899,18 @@ function ScheduleView({
   onCellClick: (resource_id: string | null, date: Date) => void;
   onItemClick: (item: PlanningItem) => void;
   onItemDrop: (itemId: string, resourceId: string | null, date: Date) => void | Promise<void>;
+  tz: string;
+  mode: SchedMode;
+  onMode: (m: SchedMode) => void;
+  tlRange: TlRange;
+  onTlRange: (r: TlRange) => void;
+  templates: PlanningTemplate[];
+  canWrite: (i: PlanningItem) => boolean;
+  onTemplateCreate: (tpl: PlanningTemplate, resourceId: string | null, day: Date) => void | Promise<void>;
+  onTimelineMove: (itemId: string, patch: TimelinePatch) => void;
+  onTimelineCreate: (resourceId: string | null, start: Date) => void;
+  weekBusy: "copy" | "publish" | null;
+  onWeekAction: (kind: "copy" | "publish", resourceIds: string[] | null) => void;
 }) {
   // Track the cell currently under the dragged pointer so we can style it.
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
@@ -728,6 +1019,24 @@ function ScheduleView({
   const weekdayLabel = (d: Date) => d.toLocaleDateString(lang, { weekday: "short" });
   const todayCls = "text-[#567FB2] dark:text-[#7FA9D6]";
 
+  const isTimeline = mode === "timeline";
+  /* Stable per day/week so the timeline keeps its scroll position across saves. */
+  const tlDays = useMemo(() => (tlRange === "day" ? [activeDay] : days), [tlRange, activeDay, days]);
+  /* Week actions act on what is on screen: the visible resources (and the
+     open-shifts row), or everything when grouped by role. */
+  const weekScopeIds = groupBy === "resource" || isTimeline ? visibleResources.map((r) => r.id) : null;
+  const draftCount = items.filter((i) => i.status === "draft" && canWrite(i)).length;
+  const tlRows: TimelineRow[] = [
+    { id: "__open__", name: t("sched.openShiftsRow"), sub: t("sched.unassigned"), color: null, resourceId: null },
+    ...visibleResources.map((r) => ({ id: r.id, name: r.name, sub: resourceSub(r), color: r.color, resourceId: r.id })),
+  ];
+  const segBtn = (on: boolean) =>
+    `h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors inline-flex items-center gap-1.5 ${
+      on ? "kx-seg-on bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "kx-seg-off text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+    }`;
+  const toolBtn =
+    "h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed";
+
   return (
     <div className="space-y-3">
       {conflictIds.size > 0 && (
@@ -772,6 +1081,28 @@ function ScheduleView({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5" role="group" aria-label={t("aria.viewMode")}>
+            <button type="button" onClick={() => onMode("grid")} aria-pressed={!isTimeline} className={segBtn(!isTimeline)}>
+              <TableIcon size={11} />
+              {t("sched.view.grid")}
+            </button>
+            <button type="button" onClick={() => onMode("timeline")} aria-pressed={isTimeline} className={segBtn(isTimeline)}>
+              <TimelineIcon size={11} />
+              {t("sched.view.timeline")}
+            </button>
+          </div>
+
+          {isTimeline && (
+            <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5" role="group" aria-label={t("aria.range")}>
+              {(["day", "week"] as const).map((r) => (
+                <button key={r} type="button" onClick={() => onTlRange(r)} aria-pressed={tlRange === r} className={segBtn(tlRange === r)}>
+                  {t(r === "day" ? "sched.range.day" : "sched.range.week")}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!isTimeline && (
           <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5" role="group">
             {(["resource", "role"] as const).map((g) => (
               <button
@@ -789,8 +1120,9 @@ function ScheduleView({
               </button>
             ))}
           </div>
+          )}
 
-          {groupBy === "resource" && (
+          {(groupBy === "resource" || isTimeline) && (
             <select
               value={resourceType}
               onChange={(e) => setResourceType(e.target.value as PlanningResourceType | "all")}
@@ -805,11 +1137,44 @@ function ScheduleView({
               <option value="other">{t("sched.other")}</option>
             </select>
           )}
+
+          <div className="flex items-center gap-1.5 ms-auto">
+            <button
+              type="button"
+              onClick={() => onWeekAction("copy", weekScopeIds)}
+              disabled={weekBusy !== null}
+              aria-busy={weekBusy === "copy"}
+              className={toolBtn}
+            >
+              {weekBusy === "copy" ? <SpinnerIcon className="h-3 w-3" /> : <CopyIcon size={12} />}
+              <span className="hidden sm:inline">{t("sched.copyLastWeek")}</span>
+              <span className="sr-only sm:hidden">{t("sched.copyLastWeek")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onWeekAction("publish", weekScopeIds)}
+              disabled={weekBusy !== null}
+              aria-busy={weekBusy === "publish"}
+              className={toolBtn}
+            >
+              {weekBusy === "publish" ? <SpinnerIcon className="h-3 w-3" /> : <PaperPlaneIcon size={12} />}
+              <span className="hidden sm:inline">{t("sched.publishWeek")}</span>
+              <span className="sr-only sm:hidden">{t("sched.publishWeek")}</span>
+              {draftCount > 0 && (
+                <span className="min-w-4 h-4 px-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold inline-flex items-center justify-center tabular-nums">
+                  {draftCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
+        {isTimeline && tz !== browserTimeZone() && (
+          <p className="text-[11px] text-[var(--text-dim)]">{fillVars(t("tl.tzNote"), { tz })}</p>
+        )}
       </div>
 
-      {/* ── Mobile: day pager + single-day list ── */}
-      <div className="md:hidden space-y-3">
+      {/* ── Day pager (mobile list; every breakpoint for the Day timeline) ── */}
+      <div className={`${isTimeline && tlRange === "day" ? "" : "md:hidden"} space-y-3 ${isTimeline && tlRange !== "day" ? "hidden" : ""}`}>
         <div
           className="kx-glass flex items-center gap-1 overflow-x-auto scrollbar-none bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-1"
           role="group"
@@ -839,7 +1204,26 @@ function ScheduleView({
             );
           })}
         </div>
+      </div>
 
+      {isTimeline && (
+        <TimelineView
+          days={tlDays}
+          range={tlRange}
+          rows={tlRows}
+          items={items}
+          tz={tz}
+          conflictIds={conflictIds}
+          leaveCells={leaveCells}
+          canWrite={canWrite}
+          onItemClick={onItemClick}
+          onMove={onTimelineMove}
+          onCreateAt={onTimelineCreate}
+        />
+      )}
+
+      {/* ── Mobile: single-day list ── */}
+      <div className={`md:hidden ${isTimeline ? "hidden" : ""}`}>
         <div className="kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
           {rows.map((row) => {
             const key = `${row.id}|${activeDayKey}`;
@@ -853,6 +1237,14 @@ function ScheduleView({
                     <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{row.name}</div>
                     {row.sub && <div className="text-[10px] text-[var(--text-dim)] truncate">{row.sub}</div>}
                   </div>
+                  {groupBy === "resource" && templates.length > 0 && (
+                    <TemplateMenu
+                      templates={templates}
+                      label={`${t("sched.addFromTemplate")}: ${row.name}`}
+                      onPick={(tpl) => void onTemplateCreate(tpl, resourceId, activeDay)}
+                      size="md"
+                    />
+                  )}
                   {groupBy === "resource" && (
                     <button
                       type="button"
@@ -894,7 +1286,7 @@ function ScheduleView({
       <div
         role="grid"
         aria-label={rangeLabel}
-        className="kx-glass hidden md:block rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden"
+        className={`kx-glass hidden ${isTimeline ? "" : "md:block"} rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden`}
       >
         {/* Header row */}
         <div role="row" className="grid border-b border-[var(--border-subtle)]" style={{ gridTemplateColumns: "220px repeat(7, 1fr)" }}>
@@ -977,14 +1369,24 @@ function ScheduleView({
                     <ItemPill key={it.id} item={it} onClick={onItemClick} draggable={droppable} conflict={conflictIds.has(it.id)} />
                   ))}
                   {droppable && (
-                    <button
-                      type="button"
-                      onClick={() => onCellClick(resourceId, d)}
-                      aria-label={`${t("sched.addItem")}: ${row.name}, ${weekdayLabel(d)} ${d.getDate()}`}
-                      className="absolute top-1 end-1 h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                    >
-                      <PlusIcon size={10} />
-                    </button>
+                    <div className="absolute top-1 end-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity">
+                      {templates.length > 0 && (
+                        <TemplateMenu
+                          templates={templates}
+                          label={`${t("sched.addFromTemplate")}: ${row.name}, ${weekdayLabel(d)} ${d.getDate()}`}
+                          onPick={(tpl) => void onTemplateCreate(tpl, resourceId, d)}
+                          size="sm"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onCellClick(resourceId, d)}
+                        aria-label={`${t("sched.addItem")}: ${row.name}, ${weekdayLabel(d)} ${d.getDate()}`}
+                        className="h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center justify-center"
+                      >
+                        <PlusIcon size={10} />
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -995,6 +1397,104 @@ function ScheduleView({
           <div className="px-6 py-10 text-center text-[12px] text-[var(--text-dim)]">{t("sched.noResources")}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** "Add from template" — a small menu button on a schedule cell. */
+function TemplateMenu({
+  templates,
+  label,
+  onPick,
+  size,
+}: {
+  templates: PlanningTemplate[];
+  label: string;
+  onPick: (tpl: PlanningTemplate) => void;
+  size: "sm" | "md";
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+        (wrapRef.current?.querySelector("button") as HTMLButtonElement | null)?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    // Focus the first entry so the keyboard lands in the menu.
+    (wrapRef.current?.querySelector('[role="menuitem"]') as HTMLElement | null)?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+
+  const moveFocus = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const list = [...(wrapRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const i = list.indexOf(document.activeElement as HTMLElement);
+    list[(i + (e.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]?.focus();
+  };
+
+  return (
+    <div ref={wrapRef} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={label}
+        title={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        className={
+          size === "sm"
+            ? "h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center justify-center"
+            : "h-7 w-7 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
+        }
+      >
+        <LayersIcon size={size === "sm" ? 10 : 12} />
+      </button>
+      {open && (
+        <div
+          id={menuId}
+          role="menu"
+          aria-label={label}
+          onKeyDown={moveFocus}
+          className="kx-glass-pop absolute top-full end-0 mt-1 z-30 w-56 max-h-64 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-xl"
+        >
+          {templates.map((tpl) => (
+            <button
+              key={tpl.id}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onPick(tpl);
+              }}
+              className="w-full text-start rounded-lg px-2 py-1.5 flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] focus-visible:bg-[var(--bg-surface-hover)] outline-none"
+            >
+              <span className="w-1.5 h-6 rounded-full shrink-0" style={{ background: tpl.color ?? ITEM_TYPE_COLOR[tpl.type] }} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-semibold text-[var(--text-primary)] truncate">{tpl.name}</span>
+                <span className="block text-[10px] tabular-nums text-[var(--text-dim)]">
+                  {tpl.start_time}–{tpl.end_time}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

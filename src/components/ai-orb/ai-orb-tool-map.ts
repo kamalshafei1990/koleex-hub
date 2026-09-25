@@ -27,6 +27,11 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   listMyProjects: "retrieving-data",
   listProjectTasks: "retrieving-data",
   createProjectTask: "creating-record",
+  addProjectMember: "updating-record",
+  /* notes.ts */
+  searchNotes: "searching",
+  readNote: "retrieving-data",
+  createNote: "creating-record",
   /* products.ts */
   searchProducts: "searching",
   countProducts: "analyzing",
@@ -47,6 +52,8 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   completeProjectTask: "updating-record",
   deleteProjectTask: "executing-action",
   updatePlanningItem: "updating-record",
+  copyLastWeek: "creating-record",
+  publishWeek: "updating-record",
   deletePlanningItem: "executing-action",
   updateCalendarEvent: "updating-record",
   deleteCalendarEvent: "executing-action",

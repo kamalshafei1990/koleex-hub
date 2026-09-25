@@ -59,6 +59,7 @@ import { todoTools } from "./tools/todos";
 import { projectTools } from "./tools/projects";
 import { planningTools } from "./tools/planning";
 import { calendarTools } from "./tools/calendar";
+import { notesTools } from "./tools/notes";
 import { userMemoryTools } from "./tools/user-memory";
 import { teamKnowledgeTools } from "./tools/team-knowledge";
 import { knowledgeSearchTools } from "./tools/knowledge-search";
@@ -87,6 +88,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...projectTools,
       ...planningTools,
       ...calendarTools,
+      ...notesTools,
   ...userMemoryTools,
   ...teamKnowledgeTools,
   ...knowledgeSearchTools,

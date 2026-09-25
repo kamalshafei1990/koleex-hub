@@ -28,11 +28,46 @@ import { fmtDMY } from "./finance/format";
 export class PlanningApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string) {
+  /** The parsed JSON error body (a schedule conflict carries its list). */
+  body: Record<string, unknown> | null;
+  constructor(status: number, code: string, body: Record<string, unknown> | null = null) {
     super(code || `HTTP ${status}`);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
+}
+
+/* ── Schedule conflicts (409 schedule_conflict) ── */
+
+export interface PlanningConflict {
+  kind: "double_booking" | "leave";
+  index: number;
+  item_id: string | null;
+  title: string | null;
+  resource_id: string;
+  resource_name: string | null;
+  start_at: string;
+  end_at: string;
+  other_id?: string | null;
+  other_title?: string | null;
+  other_start_at?: string;
+  other_end_at?: string;
+  leave_start?: string;
+  leave_end?: string;
+}
+
+export interface PlanningConflictInfo {
+  conflicts: PlanningConflict[];
+  total: number;
+  canOverride: boolean;
+}
+
+/** The conflict list of a refused write, or null for any other failure. */
+export function conflictInfo(e: unknown): PlanningConflictInfo | null {
+  if (!(e instanceof PlanningApiError) || e.status !== 409 || e.code !== "schedule_conflict" || !e.body) return null;
+  const list = Array.isArray(e.body.conflicts) ? (e.body.conflicts as PlanningConflict[]) : [];
+  return { conflicts: list, total: Number(e.body.total ?? list.length), canOverride: e.body.can_override === true };
 }
 
 async function send<T>(url: string, init: RequestInit): Promise<T> {
@@ -44,10 +79,12 @@ async function send<T>(url: string, init: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     let code = "";
+    let body: Record<string, unknown> | null = null;
     try {
-      code = String(((await res.json()) as { error?: unknown }).error ?? "");
+      body = (await res.json()) as Record<string, unknown>;
+      code = String(body.error ?? "");
     } catch { /* non-JSON error body */ }
-    throw new PlanningApiError(res.status, code);
+    throw new PlanningApiError(res.status, code, body);
   }
   return (await res.json()) as T;
 }
@@ -209,12 +246,37 @@ export async function fetchItem(id: string): Promise<PlanningItem> {
   return item;
 }
 
+/** Weekly recurrence sent with a create (or an edit that starts a series).
+ *  weekdays: 0 = Sunday … 6 = Saturday; until: "YYYY-MM-DD" inclusive. */
+export interface RecurrenceInput {
+  weekdays: number[];
+  until: string;
+}
+
+/** Extra write options every item write understands. */
+export interface WriteOptions {
+  /** Super admin only: save despite a schedule conflict. */
+  force?: boolean;
+  /** The planner's IANA zone (series wall time, leave days). */
+  tz?: string;
+  recurrence?: RecurrenceInput;
+}
+
+export type ItemPayload = Partial<PlanningItem> & { start_at: string; end_at: string };
+
+/** Create — throws PlanningApiError on failure. A recurring create answers
+ *  every row of the new series in `items`. */
+export async function createItemsOrThrow(body: ItemPayload, opts: WriteOptions = {}): Promise<PlanningItem[]> {
+  const res = await send<{ item: PlanningItem; items?: PlanningItem[] }>(
+    "/api/planning/items",
+    jsonInit("POST", { ...body, ...opts }),
+  );
+  return res.items?.length ? res.items : [res.item];
+}
+
 /** Create — throws PlanningApiError on failure. */
-export async function createItemOrThrow(
-  body: Partial<PlanningItem> & { start_at: string; end_at: string },
-): Promise<PlanningItem> {
-  const { item } = await send<{ item: PlanningItem }>("/api/planning/items", jsonInit("POST", body));
-  return item;
+export async function createItemOrThrow(body: ItemPayload, opts: WriteOptions = {}): Promise<PlanningItem> {
+  return (await createItemsOrThrow(body, opts))[0];
 }
 
 /** Create — null on failure (contract kept for Projects' caller). */
@@ -228,18 +290,142 @@ export async function createItem(
   }
 }
 
-export async function updateItem(id: string, patch: Partial<PlanningItem>): Promise<PlanningItem> {
-  const { item } = await send<{ item: PlanningItem }>(`/api/planning/items/${encodeURIComponent(id)}`, jsonInit("PATCH", patch));
+/** "this" = only this row; "future" = this row and every later row of its series. */
+export type SeriesScope = "this" | "future";
+
+export async function updateItem(id: string, patch: Partial<PlanningItem>, opts: WriteOptions = {}): Promise<PlanningItem> {
+  return (await updateItems(id, patch, opts))[0];
+}
+
+/** Update; answers every row that changed (a series edit touches many). */
+export async function updateItems(
+  id: string,
+  patch: Partial<PlanningItem>,
+  opts: WriteOptions & { scope?: SeriesScope } = {},
+): Promise<PlanningItem[]> {
+  const { scope, ...rest } = opts;
+  const q = scope === "future" ? "?scope=future" : "";
+  const res = await send<{ item: PlanningItem; items?: PlanningItem[] }>(
+    `/api/planning/items/${encodeURIComponent(id)}${q}`,
+    jsonInit("PATCH", { ...patch, ...rest }),
+  );
+  return res.items?.length ? res.items : [res.item];
+}
+
+/** Delete; answers the ids removed (a series delete removes many). */
+export async function deleteItem(id: string, scope: SeriesScope = "this"): Promise<string[]> {
+  const q = scope === "future" ? "?scope=future" : "";
+  const res = await send<{ ok: true; ids?: string[] }>(`/api/planning/items/${encodeURIComponent(id)}${q}`, jsonInit("DELETE"));
+  return res.ids ?? [id];
+}
+
+export async function takeOpenShift(id: string, opts: { force?: boolean; tz?: string } = {}): Promise<PlanningItem> {
+  const q = new URLSearchParams();
+  if (opts.force) q.set("force", "1");
+  if (opts.tz) q.set("tz", opts.tz);
+  const qs = q.toString();
+  const { item } = await send<{ item: PlanningItem }>(
+    `/api/planning/items/${encodeURIComponent(id)}/take${qs ? `?${qs}` : ""}`,
+    jsonInit("POST"),
+  );
   return item;
 }
 
-export async function deleteItem(id: string): Promise<void> {
-  await send<{ ok: true }>(`/api/planning/items/${encodeURIComponent(id)}`, jsonInit("DELETE"));
+/** The series a row belongs to (recurrence_parent_id holds the series id). */
+export function seriesIdOf(item: Pick<PlanningItem, "recurrence_parent_id">): string | null {
+  return item.recurrence_parent_id ?? null;
 }
 
-export async function takeOpenShift(id: string): Promise<PlanningItem> {
-  const { item } = await send<{ item: PlanningItem }>(`/api/planning/items/${encodeURIComponent(id)}/take`, jsonInit("POST"));
-  return item;
+/* ── Week actions ── */
+
+export interface WeekActionBody {
+  /** The instant the visible week starts. */
+  week_start: string;
+  /** Resources on screen (null = all). */
+  resource_ids: string[] | null;
+  include_open: boolean;
+  tz: string;
+}
+
+export async function copyLastWeek(body: WeekActionBody, preview: boolean): Promise<{ count: number; skipped: number; items: PlanningItem[] }> {
+  return send("/api/planning/week/copy", jsonInit("POST", { ...body, preview }));
+}
+
+export async function publishWeek(body: WeekActionBody, preview: boolean): Promise<{ count: number; people: number; items: PlanningItem[] }> {
+  return send("/api/planning/week/publish", jsonInit("POST", { ...body, preview }));
+}
+
+/* ── Shift templates ── */
+
+export interface PlanningTemplate {
+  id: string;
+  name: string;
+  type: PlanningItemType;
+  role_id: string | null;
+  resource_id: string | null;
+  color: string | null;
+  /** "HH:MM" */
+  start_time: string;
+  /** "HH:MM" — earlier than start_time means it ends the next day. */
+  end_time: string;
+  duration_hours: number;
+  default_note: string | null;
+}
+
+export type TemplateInput = {
+  name: string;
+  type: PlanningItemType;
+  start_time: string;
+  end_time: string;
+  role_id: string | null;
+  resource_id: string | null;
+  color: string | null;
+};
+
+export async function fetchTemplates(): Promise<PlanningTemplate[]> {
+  const { templates } = await read<{ templates: PlanningTemplate[] }>("/api/planning/templates");
+  return templates ?? [];
+}
+
+export async function createTemplate(body: TemplateInput): Promise<PlanningTemplate> {
+  const { template } = await send<{ template: PlanningTemplate }>("/api/planning/templates", jsonInit("POST", body));
+  return template;
+}
+
+export async function updateTemplate(id: string, patch: Partial<TemplateInput>): Promise<PlanningTemplate> {
+  const { template } = await send<{ template: PlanningTemplate }>(`/api/planning/templates/${encodeURIComponent(id)}`, jsonInit("PATCH", patch));
+  return template;
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  await send<{ ok: true }>(`/api/planning/templates/${encodeURIComponent(id)}`, jsonInit("DELETE"));
+}
+
+/* ── Workload (planned hours per person per day) ── */
+
+export interface WorkloadPerson {
+  account_id: string;
+  name: string;
+  resource_ids: string[];
+  capacity_hours_per_day: number;
+  days: Record<string, number>;
+  total: number;
+}
+
+export interface WorkloadResponse {
+  from: string;
+  to: string;
+  tz: string;
+  days: string[];
+  people: WorkloadPerson[];
+}
+
+/** GET /api/planning/workload — also the feed Projects can call. */
+export async function fetchWorkload(params: { from: string; to: string; tz?: string; accounts?: string[] }): Promise<WorkloadResponse> {
+  const q = new URLSearchParams({ from: params.from, to: params.to });
+  if (params.tz) q.set("tz", params.tz);
+  if (params.accounts?.length) q.set("accounts", params.accounts.join(","));
+  return read<WorkloadResponse>(`/api/planning/workload?${q.toString()}`);
 }
 
 /* ── Roles ── */

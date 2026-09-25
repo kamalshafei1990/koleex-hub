@@ -13,7 +13,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertStageAccess(auth, id);
+  const gate = await assertStageAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "delete");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertStageAccess(auth, id);
+  const gate = await assertStageAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   /* A board with no columns has nowhere to put a task — keep at least one. */

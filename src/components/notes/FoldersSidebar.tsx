@@ -3,7 +3,9 @@
 /* ---------------------------------------------------------------------------
    FoldersSidebar — left pane. Lists smart folders at the top (All,
    Pinned, Unfiled, Shared with me), then user folders with multi-level
-   nesting, then Trash. Each folder row has add-subfolder / rename / delete
+   nesting, then Tags (the caller's tags with counts — a tag is a filter
+   view), then Trash. "Shared with me" carries a badge with the number of
+   shared notes not opened yet. Each folder row has add-subfolder / rename / delete
    actions (shown on hover, keyboard focus, and always on touch screens).
    Counts come from the server (live notes per folder), not the visible list.
    --------------------------------------------------------------------------- */
@@ -21,11 +23,15 @@ import FileIcon from "@/components/icons/ui/FileIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
-import type { NotesFolderRow } from "@/lib/notes";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import type { NotesFolderRow, TagCount } from "@/lib/notes";
 
 export type FolderSelection =
   | { kind: "folder"; id: string }
+  | { kind: "tag"; tag: string }
   | { kind: "smart"; key: "all" | "pinned" | "none" | "shared" | "trash" };
+
+const TAGS_COLLAPSED = 12;
 
 export default function FoldersSidebar({
   folders,
@@ -35,6 +41,8 @@ export default function FoldersSidebar({
   onAskRenameFolder,
   onAskDeleteFolder,
   notesCountByFolder,
+  tags = [],
+  sharedUnread = 0,
 }: {
   folders: NotesFolderRow[];
   selection: FolderSelection;
@@ -45,9 +53,14 @@ export default function FoldersSidebar({
   onAskRenameFolder: (folder: NotesFolderRow) => void;
   onAskDeleteFolder: (id: string) => void;
   notesCountByFolder: Record<string, number>;
+  tags?: TagCount[];
+  /** Notes shared with me that I have not opened yet. */
+  sharedUnread?: number;
 }) {
   const { t } = useTranslation(notesT);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [allTags, setAllTags] = useState(false);
+  const shownTags = allTags ? tags : tags.slice(0, TAGS_COLLAPSED);
 
   // Build a tree from the flat folder list.
   const tree = useMemo(() => {
@@ -110,6 +123,7 @@ export default function FoldersSidebar({
           tint="text-[#567FB2] dark:text-[#7FA9D6]"
           active={selection.kind === "smart" && selection.key === "shared"}
           onClick={() => onSelect({ kind: "smart", key: "shared" })}
+          badge={sharedUnread > 0 ? { count: sharedUnread, label: t("shared.unreadAria") } : undefined}
         />
       </nav>
 
@@ -146,6 +160,52 @@ export default function FoldersSidebar({
         />
       </div>
 
+      {/* Tags */}
+      {tags.length > 0 && (
+        <nav aria-label={t("tags.title")} className="mt-5">
+          <div className="px-3 flex items-center gap-1.5 mb-1.5">
+            <TagsIcon className="h-3 w-3 text-[var(--text-dim)]" />
+            <span className="text-[10px] uppercase tracking-[1.5px] font-semibold text-[var(--text-dim)]">
+              {t("tags.title")}
+            </span>
+          </div>
+          <ul className="px-2 space-y-0.5">
+            {shownTags.map((tg) => {
+              const active = selection.kind === "tag" && selection.tag === tg.tag;
+              return (
+                <li key={tg.tag}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect({ kind: "tag", tag: tg.tag })}
+                    aria-current={active ? "true" : undefined}
+                    aria-label={`${t("tags.filterAria")} #${tg.tag} (${tg.count})`}
+                    className={`w-full h-7 px-2.5 rounded-lg flex items-center gap-2 text-[12.5px] transition-all ${
+                      active
+                        ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold"
+                        : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <span aria-hidden className={active ? "text-[#567FB2] dark:text-[#7FA9D6]" : "text-[var(--text-faint)]"}>#</span>
+                    <span dir="auto" className="truncate flex-1 text-start">{tg.tag}</span>
+                    <span className="text-[10.5px] text-[var(--text-faint)] shrink-0 tabular-nums">{tg.count}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {tags.length > TAGS_COLLAPSED && (
+            <button
+              type="button"
+              onClick={() => setAllTags((v) => !v)}
+              aria-expanded={allTags}
+              className="mx-2 mt-0.5 h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+            >
+              {allTags ? t("folder.collapse") : `${t("folder.expand")} (${tags.length - TAGS_COLLAPSED})`}
+            </button>
+          )}
+        </nav>
+      )}
+
       {/* Trash */}
       <nav className="px-2 mt-5 pt-3 border-t border-[var(--border-subtle)] space-y-0.5">
         <SmartItem
@@ -166,12 +226,14 @@ function SmartItem({
   tint,
   active,
   onClick,
+  badge,
 }: {
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
   tint: string;
   active: boolean;
   onClick: () => void;
+  badge?: { count: number; label: string };
 }) {
   return (
     <button
@@ -185,7 +247,13 @@ function SmartItem({
       }`}
     >
       <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-[var(--text-primary)]" : tint}`} />
-      <span className="truncate">{label}</span>
+      <span className="truncate flex-1 text-start">{label}</span>
+      {badge && (
+        <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#567FB2] text-white text-[10px] font-bold leading-[18px] text-center tabular-nums">
+          {badge.count > 99 ? "99+" : badge.count}
+          <span className="sr-only"> {badge.label}</span>
+        </span>
+      )}
     </button>
   );
 }

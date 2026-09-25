@@ -104,3 +104,38 @@ export function expandHolidays(
   }
   return out;
 }
+
+/* ── Super Admin: add / remove (the routes refuse anyone else) ── */
+
+export interface HolidayInput {
+  name: string;
+  holiday_type: HolidayType;
+  country?: string | null;
+  holiday_date?: string | null;
+  weekday?: number | null;
+  recurs_annually?: boolean;
+}
+
+export async function createHoliday(input: HolidayInput): Promise<HolidayRow | null> {
+  try {
+    const res = await fetch("/api/calendar/holidays", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, scope_type: "country" }),
+    });
+    if (!res.ok) return null;
+    return ((await res.json()) as { holiday?: HolidayRow }).holiday ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteHoliday(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/calendar/holidays/${id}`, { method: "DELETE", credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

@@ -257,6 +257,12 @@ const NoteRowItem = memo(function NoteRowItem({
             <span dir="auto" className="text-[13px] font-semibold text-[var(--text-primary)] truncate flex-1">
               {displayTitle}
             </span>
+            {note.unread && (
+              <span className="shrink-0 h-4 px-1.5 rounded-full bg-[#567FB2] text-white text-[9.5px] font-bold leading-4">
+                {t("list.new")}
+                <span className="sr-only"> — {t("shared.unreadAria")}</span>
+              </span>
+            )}
             {note.shared_role && note.owner_name && (
               <span className="text-[10px] text-[var(--text-dim)] shrink-0 truncate max-w-[80px]">{note.owner_name}</span>
             )}

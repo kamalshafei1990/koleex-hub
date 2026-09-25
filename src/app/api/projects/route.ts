@@ -1,10 +1,11 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { assertProjectAccess, involvedProjectsOr, orLikeTerm, UUID_RE } from "@/lib/server/project-access";
-import { validateProjectFields } from "@/lib/server/project-validate";
+import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, UUID_RE } from "@/lib/server/project-access";
+import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
+import { upsertProjectMembers } from "@/lib/server/project-members";
 
 /* GET  /api/projects — list projects (tenant-scoped).
      Query:
@@ -88,7 +89,8 @@ export async function GET(req: Request) {
   if (customerId && !UUID_RE.test(customerId)) return NextResponse.json({ projects: [], counts: {} });
 
   /* Scope: non-SA callers see only projects they're involved in —
-     manager, creator, or holding at least one task assigned to them.
+     manager, creator, project member, or holding at least one task
+     assigned to them.
      Templates stay org-wide (reusable blueprints, not work items).
      A super admin may narrow to another account's involvement (lens). */
   let scopeOr: string | null = null;
@@ -112,27 +114,33 @@ export async function GET(req: Request) {
     return x;
   };
 
-  let q = scoped(
-    supabaseServer.from("projects").select(
-      `id, tenant_id, name, code, description, color, icon, status,
-       is_billable, is_template, is_favorite,
-       customer_id, manager_account_id, created_by_account_id,
-       planned_start, planned_end, budget_hours, budget_amount, billing_rate, progress_pct,
-       sort_order, created_at, updated_at,
-       customer:customer_id ( id, display_name, company_name ),
-       manager:manager_account_id ( id, username )`,
-    ),
-  );
-  if (!templatesOnly && status !== "all") q = q.eq("status", status);
-  q = q
-    .order("is_favorite", { ascending: false })
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: false });
+  /* archived_at / currency come from 20260926_projects_additions.sql; the
+     list retries without them until it is applied. */
+  const listQuery = (withPending: boolean): Builder => {
+    let q = scoped(
+      supabaseServer.from("projects").select(
+        `id, tenant_id, name, code, description, color, icon, status,
+         is_billable, is_template, is_favorite,
+         customer_id, manager_account_id, created_by_account_id,
+         planned_start, planned_end, budget_hours, budget_amount, billing_rate, progress_pct,
+         ${withPending ? "archived_at, currency," : ""}
+         sort_order, created_at, updated_at,
+         customer:customer_id ( id, display_name, company_name ),
+         manager:manager_account_id ( id, username )`,
+      ),
+    );
+    if (!templatesOnly && status !== "all") q = q.eq("status", status);
+    return q
+      .order("is_favorite", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+  };
 
-  const [listRes, statusRes] = await Promise.all([
-    q,
+  const [firstRes, statusRes] = await Promise.all([
+    listQuery(true),
     templatesOnly ? Promise.resolve({ data: [], error: null }) : scoped(supabaseServer.from("projects").select("status")),
   ]);
+  const listRes = firstRes.error && isMissingColumn(firstRes.error) ? await listQuery(false) : firstRes;
   if (listRes.error) {
     console.error("[api/projects GET]", listRes.error.message);
     return NextResponse.json({ error: "Failed to load projects" }, { status: 500 });
@@ -151,13 +159,15 @@ export async function GET(req: Request) {
     /* `involved` for the SA "My view" lens — for everyone else the scope
        already guarantees it. */
     auth.is_super_admin && !templatesOnly && ids.length > 0
-      ? supabaseServer
-          .from("project_tasks")
-          .select("project_id")
-          .eq("tenant_id", auth.tenant_id)
-          .eq("assignee_account_id", auth.account_id)
-          .in("project_id", ids)
-          .then((r) => new Set((r.data ?? []).map((x) => (x as { project_id: string }).project_id)))
+      ? Promise.all([
+          supabaseServer
+            .from("project_tasks")
+            .select("project_id")
+            .eq("tenant_id", auth.tenant_id)
+            .eq("assignee_account_id", auth.account_id)
+            .in("project_id", ids),
+          memberProjectIds(auth.tenant_id, auth.account_id),
+        ]).then(([r, m]) => new Set([...(r.data ?? []).map((x) => (x as { project_id: string }).project_id), ...m]))
       : Promise.resolve(null),
   ]);
 
@@ -186,7 +196,7 @@ export async function POST(req: Request) {
   }
   const checked = await validateProjectFields(auth.tenant_id, body, [
     "name", "code", "description", "color", "icon", "status", "customer_id", "manager_account_id",
-    "is_billable", "planned_start", "planned_end", "budget_hours", "budget_amount", "billing_rate", "is_template",
+    "is_billable", "planned_start", "planned_end", "budget_hours", "budget_amount", "billing_rate", "currency", "is_template",
   ]);
   if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
   const f = checked.patch;
@@ -204,29 +214,31 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: project, error } = await supabaseServer
-    .from("projects")
-    .insert({
-      tenant_id: auth.tenant_id,
-      name: f.name,
-      code: f.code ?? null,
-      description: f.description ?? null,
-      color: f.color ?? "#567FB2",
-      icon: f.icon ?? null,
-      status: f.status ?? "active",
-      customer_id: f.customer_id ?? null,
-      manager_account_id: "manager_account_id" in f ? f.manager_account_id ?? auth.account_id : auth.account_id,
-      is_billable: f.is_billable ?? false,
-      planned_start: f.planned_start ?? null,
-      planned_end: f.planned_end ?? null,
-      budget_hours: f.budget_hours ?? null,
-      budget_amount: f.budget_amount ?? null,
-      billing_rate: f.billing_rate ?? null,
-      is_template: f.is_template ?? false,
-      created_by_account_id: auth.account_id,
-    })
-    .select("*")
-    .single();
+  const row: Record<string, unknown> = {
+    tenant_id: auth.tenant_id,
+    name: f.name,
+    code: f.code ?? null,
+    description: f.description ?? null,
+    color: f.color ?? "#567FB2",
+    icon: f.icon ?? null,
+    status: f.status ?? "active",
+    customer_id: f.customer_id ?? null,
+    manager_account_id: "manager_account_id" in f ? f.manager_account_id ?? auth.account_id : auth.account_id,
+    is_billable: f.is_billable ?? false,
+    planned_start: f.planned_start ?? null,
+    planned_end: f.planned_end ?? null,
+    budget_hours: f.budget_hours ?? null,
+    budget_amount: f.budget_amount ?? null,
+    billing_rate: f.billing_rate ?? null,
+    is_template: f.is_template ?? false,
+    created_by_account_id: auth.account_id,
+    ...(f.currency ? { currency: f.currency } : {}),
+  };
+  let ins = await supabaseServer.from("projects").insert(row).select("*").single();
+  if (ins.error && isMissingColumn(ins.error)) {
+    ins = await supabaseServer.from("projects").insert(withoutPendingColumns(row)).select("*").single();
+  }
+  const { data: project, error } = ins;
 
   if (error || !project) {
     console.error("[api/projects POST]", error?.message);
@@ -239,6 +251,13 @@ export async function POST(req: Request) {
     await copyFromTemplate(auth.tenant_id, templateId, project.id, body.copy_tasks !== false);
   } else {
     await seedDefaultStages(auth.tenant_id, project.id);
+  }
+
+  /* The manager starts as a member (role manager) so the Members panel and
+     the project chat include them from day one. */
+  const managerId = (project as { manager_account_id: string | null }).manager_account_id;
+  if (managerId && !project.is_template) {
+    after(async () => { await upsertProjectMembers(auth, project.id, [{ account_id: managerId, role: "manager" }]); });
   }
 
   return NextResponse.json({ project });

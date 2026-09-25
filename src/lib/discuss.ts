@@ -60,7 +60,7 @@ const rtAccountTopic = (accountId: string) => `discuss:account:${accountId}`;
 async function discussMutate<T = unknown>(
   action: string,
   payload: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: T; error?: string }> {
+): Promise<{ ok: boolean; data?: T; error?: string; status?: number }> {
   try {
     const res = await fetch("/api/discuss/mutate", {
       method: "POST",
@@ -75,7 +75,7 @@ async function discussMutate<T = unknown>(
     };
     if (!res.ok || !json.ok) {
       console.error("[Discuss] mutate", action, json.error ?? `HTTP ${res.status}`);
-      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+      return { ok: false, error: json.error ?? `HTTP ${res.status}`, status: res.status };
     }
 /* Any state change (read, pin, mute, hide, send…) may alter the
        myChannels projection — drop the coalesced copy so the very next
@@ -213,9 +213,22 @@ export async function createChannel(input: {
    nothing after it. See the note inside fetchMyChannels. */
 let shellChannelsUsed = false;
 
+/** Fields the sidebar read adds on top of DiscussChannelWithState:
+ *   · muted_unread_count — unread messages of a MUTED conversation. For a
+ *     muted row `unread_count` is 0 so every badge that sums unread_count
+ *     (bell, home tile, floating panel) leaves it out, WeChat-style; Discuss
+ *     still shows this count on the row.
+ *   · linked_project_id — set when the conversation belongs to a Project
+ *     (column added by the Projects migration; absent until it is applied). */
+export type DiscussChannelExtras = {
+  muted_unread_count?: number;
+  linked_project_id?: string | null;
+};
+export type DiscussChannelListRow = DiscussChannelWithState & DiscussChannelExtras;
+
 export async function fetchMyChannels(
   accountId: string,
-): Promise<DiscussChannelWithState[]> {
+): Promise<DiscussChannelListRow[]> {
   void accountId; // identity comes from the session server-side
 
   /* THE FIRST READ OF THE PAGE RIDES THE SHELL BATCH, which already carries
@@ -233,7 +246,7 @@ export async function fetchMyChannels(
     try {
       const { getShell } = await import("./client-cache");
       const shell = await getShell();
-      const seeded = (shell?.channels as { data?: DiscussChannelWithState[] } | null)?.data;
+      const seeded = (shell?.channels as { data?: DiscussChannelListRow[] } | null)?.data;
       if (Array.isArray(seeded)) return seeded;
     } catch { /* fall through to the endpoint */ }
   }
@@ -246,7 +259,7 @@ export async function fetchMyChannels(
      and every discuss mutate invalidates this key so mark-read / pin /
      mute never read their own stale snapshot. */
   try {
-    const json = await cachedGet<{ ok?: boolean; data?: DiscussChannelWithState[] }>(
+    const json = await cachedGet<{ ok?: boolean; data?: DiscussChannelListRow[] }>(
       "/api/discuss/read?resource=myChannels", 8_000,
     );
     return json?.data ?? [];
@@ -280,6 +293,41 @@ export async function markChannelRead(
 ): Promise<boolean> {
   void accountId; // identity comes from the session server-side
   return (await discussMutate("markRead", { channelId })).ok;
+}
+
+/** Mark EVERY conversation I am in as read (sidebar menu). */
+export async function markAllChannelsRead(): Promise<boolean> {
+  return (await discussMutate("markAllRead", {})).ok;
+}
+
+/* ── Channel administration (details pane) ─────────────────────────────
+   The server re-checks everything: add → any active member (accounts must
+   be in my tenant); rename / archive / remove / role → channel admin. A
+   failure carries the server's message so the pane can say why. */
+type AdminResult = { ok: boolean; error?: string };
+const adminResult = (r: { ok: boolean; error?: string }): AdminResult => ({ ok: r.ok, error: r.error });
+
+export async function addChannelMembers(channelId: string, accountIds: string[]): Promise<AdminResult> {
+  return adminResult(await discussMutate("addMembers", { channelId, accountIds }));
+}
+export async function removeChannelMember(channelId: string, accountId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("removeMember", { channelId, accountId }));
+}
+export async function setChannelMemberRole(
+  channelId: string,
+  accountId: string,
+  role: "admin" | "member",
+): Promise<AdminResult> {
+  return adminResult(await discussMutate("setMemberRole", { channelId, accountId, role }));
+}
+export async function renameChannel(channelId: string, name: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("updateChannel", { channelId, patch: { name } }));
+}
+export async function leaveChannel(channelId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("leaveChannel", { channelId }));
+}
+export async function archiveChannel(channelId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("archiveChannel", { channelId }));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -338,6 +386,29 @@ export async function sendDiscussMessage(input: {
     clientMsgId: input.clientMsgId ?? null,
   });
   return res.ok ? (res.data ?? null) : null;
+}
+
+/** Same as sendDiscussMessage, but says WHY a send failed so the composer can
+ *  keep a "Not sent — Retry" bubble for failures a retry can fix (network,
+ *  timeout, 5xx, rate limit) and drop the bubble for ones it cannot (not a
+ *  member, too long, invalid). Retrying MUST reuse the same clientMsgId: the
+ *  server dedupes on (channel_id, client_msg_id), so a send that committed
+ *  but whose answer was lost comes back as the original row. */
+export async function sendDiscussMessageResult(
+  input: Parameters<typeof sendDiscussMessage>[0],
+): Promise<{ row: DiscussMessageRow | null; retryable: boolean; error?: string }> {
+  const res = await discussMutate<DiscussMessageRow>("sendMessage", {
+    channelId: input.channelId,
+    body: input.body,
+    kind: input.kind ?? "text",
+    replyToMessageId: input.replyToMessageId ?? null,
+    metadata: input.metadata ?? {},
+    clientMsgId: input.clientMsgId ?? null,
+  });
+  if (res.ok && res.data) return { row: res.data, retryable: false };
+  const st = res.status;
+  const retryable = st === undefined || st >= 500 || st === 408 || st === 429;
+  return { row: null, retryable, error: res.error };
 }
 
 /** Edit the BODY of your own message. Sets `edited_at` so the UI can show
@@ -859,7 +930,10 @@ let sseSource: EventSource | null = null;
 let sseHealthy = false;
 let sseRefs = 0;
 const sseListeners = new Set<(m: DiscussMessageWithAuthor) => void>();
-const sseChangeListeners = new Set<(channelId: string) => void>();
+/** `meta` = a sidebar-level change (rename, archive, membership) rather than
+ *  an edit / reaction / pin inside the conversation. */
+export type DiscussStreamChange = { meta?: boolean };
+const sseChangeListeners = new Set<(channelId: string, info: DiscussStreamChange) => void>();
 /* Newest created_at seen on the stream — sent as ?since= on reconnect so a
    dropped connection (routine on the China link) replays the gap instead of
    losing it. The server bounds the replay; frames are deduped below. */
@@ -910,11 +984,12 @@ function sseOpen() {
     /* An edit / delete / reaction / pin touched this channel. Marks it
        dirty for the reconcile loop and tells listeners to refresh. */
     try {
-      const { channelId } = JSON.parse((ev as MessageEvent).data) as { channelId?: string };
+      const { channelId, meta } = JSON.parse((ev as MessageEvent).data) as { channelId?: string; meta?: boolean };
       if (!channelId) return;
       lastPingAt.set(channelId, performance.now());
+      const info: DiscussStreamChange = { meta: meta === true };
       for (const l of sseChangeListeners) {
-        try { l(channelId); } catch { /* isolate listeners */ }
+        try { l(channelId, info); } catch { /* isolate listeners */ }
       }
     } catch { /* malformed frame — ignore */ }
   });
@@ -974,7 +1049,7 @@ function sseRetain(): () => void {
  *  that channel — no row data, the consumer refetches what it shows. */
 export function connectDiscussStream(
   onMessage: (m: DiscussMessageWithAuthor) => void,
-  onChange?: (channelId: string) => void,
+  onChange?: (channelId: string, info: DiscussStreamChange) => void,
 ): () => void {
   sseListeners.add(onMessage);
   if (onChange) sseChangeListeners.add(onChange);

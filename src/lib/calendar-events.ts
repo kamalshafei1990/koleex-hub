@@ -14,7 +14,7 @@ import type {
   CalendarEventInsert,
   CalendarEventUpdate,
 } from "@/types/supabase";
-import type { CalendarFeedEvent } from "@/lib/calendar-types";
+import type { BusyBlock, CalendarFeedEvent, CalendarSearchHit } from "@/lib/calendar-types";
 
 export interface CalendarAttendee {
   account_id: string;
@@ -24,7 +24,10 @@ export interface CalendarAttendee {
 }
 
 /** A single event as GET /api/calendar/events/[id] returns it. */
-export type CalendarEventDetail = CalendarEventRow & { invited?: boolean; start_date?: string; end_date?: string };
+export type CalendarEventDetail = CalendarEventRow & { invited?: boolean; start_date?: string; end_date?: string; meeting_url?: string | null };
+
+/** What the editor writes: the row plus the meeting link. */
+export type CalendarEventWrite = CalendarEventInsert & { meeting_url?: string | null };
 
 function logUnlessDenied(what: string, status: number, quiet: number[] = [401, 403]) {
   if (!quiet.includes(status)) console.error(`[Calendar] ${what}:`, status);
@@ -69,7 +72,7 @@ export async function fetchEventById(id: string): Promise<CalendarEventDetail | 
 
 /* ── Mutations ── */
 
-export async function createEvent(input: CalendarEventInsert): Promise<CalendarEventRow | null> {
+export async function createEvent(input: CalendarEventWrite): Promise<CalendarEventRow | null> {
   try {
     const res = await fetch("/api/calendar/events", {
       method: "POST",
@@ -86,7 +89,7 @@ export async function createEvent(input: CalendarEventInsert): Promise<CalendarE
   }
 }
 
-export async function updateEvent(id: string, patch: CalendarEventUpdate): Promise<CalendarEventRow | null> {
+export async function updateEvent(id: string, patch: CalendarEventUpdate & { meeting_url?: string | null }): Promise<CalendarEventRow | null> {
   try {
     const res = await fetch("/api/calendar/events/" + id, {
       method: "PATCH",
@@ -158,5 +161,68 @@ export async function respondToInvite(eventId: string, status: "accepted" | "dec
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/* ── One occurrence of a series ── */
+
+export interface OccurrenceChange {
+  title?: string;
+  start_at?: string;
+  end_at?: string;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+/** Change or delete ONE occurrence of a recurring event ("This event").
+ *  `occurrenceStart` is the occurrence's ORIGINAL start (the feed's
+ *  occurrence_start). `unavailable` = the server cannot store single
+ *  occurrences yet (migration not applied). */
+export async function changeOccurrence(
+  eventId: string,
+  occurrenceStart: string,
+  change: { action: "skip" } | ({ action: "override" } & OccurrenceChange),
+): Promise<{ ok: boolean; unavailable?: boolean }> {
+  try {
+    const res = await fetch(`/api/calendar/events/${eventId}/occurrences`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ occurrence_start: occurrenceStart, ...change }),
+    });
+    if (res.ok) return { ok: true };
+    logUnlessDenied("changeOccurrence", res.status, [401, 403, 404, 503]);
+    return { ok: false, unavailable: res.status === 503 };
+  } catch (e) {
+    console.error("[Calendar] changeOccurrence failed:", e);
+    return { ok: false };
+  }
+}
+
+/* ── Free/busy and search ── */
+
+/** Busy intervals of colleagues in [from, to) — never event details beyond
+ *  a title the caller may already read. null = the read failed. */
+export async function fetchFreeBusy(accountIds: string[], from: Date, to: Date, signal?: AbortSignal): Promise<Record<string, BusyBlock[]> | null> {
+  if (accountIds.length === 0) return {};
+  const params = new URLSearchParams({ accounts: accountIds.join(","), from: from.toISOString(), to: to.toISOString() });
+  try {
+    const res = await fetch("/api/calendar/freebusy?" + params.toString(), { credentials: "include", signal });
+    if (!res.ok) return null;
+    return ((await res.json()) as { busy?: Record<string, BusyBlock[]> }).busy ?? {};
+  } catch {
+    return null;
+  }
+}
+
+/** The viewer's own and invited events matching `q`, ±3 months. null = failed. */
+export async function searchEvents(q: string, signal?: AbortSignal): Promise<CalendarSearchHit[] | null> {
+  try {
+    const res = await fetch("/api/calendar/search?q=" + encodeURIComponent(q), { credentials: "include", signal });
+    if (!res.ok) return null;
+    return ((await res.json()) as { hits?: CalendarSearchHit[] }).hits ?? [];
+  } catch (e) {
+    if ((e as { name?: string })?.name !== "AbortError") console.error("[Calendar] searchEvents failed:", e);
+    return null;
   }
 }

@@ -316,9 +316,15 @@ export async function GET(req: Request) {
           })
           .map((ch) => {
             const st = readState.get(ch.id);
+            const unreadN = unreadMap.get(ch.id) ?? 0;
             return {
               ...ch,
-              unread_count: unreadMap.get(ch.id) ?? 0,
+              /* Muted conversations do not count toward any badge (bell, home
+                 tile, floating panel — they all sum unread_count), exactly
+                 like WeChat. Their count still travels, separately, as
+                 muted_unread_count so Discuss can show it on the row. */
+              unread_count: st?.muted ? 0 : unreadN,
+              muted_unread_count: st?.muted ? unreadN : 0,
               last_read_at: st?.last_read_at ?? null,
               muted: st?.muted ?? false,
               notification_pref: st?.notification_pref ?? "all",

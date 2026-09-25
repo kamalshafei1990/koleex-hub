@@ -14,6 +14,7 @@ import { projectsT } from "@/lib/translations/projects";
 import SharedKpiCard from "@/components/ui/KpiCard";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { summarizeProgress } from "@/lib/project-progress";
+import { BudgetMeter, budgetSummary, sumLoggedHours } from "./ProjectBudget";
 import {
   fetchProjectList,
   fetchTasks,
@@ -107,6 +108,21 @@ export default function ProjectsReporting() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 
+  /* Budget vs actual — hours from the tasks already loaded above (no extra
+     request); amount = hours × billing rate where a rate exists. Most
+     consumed first, so over-budget projects lead. */
+  const budgetRows = projects
+    .filter((p) => !p.is_template)
+    .map((p) => ({ p, s: budgetSummary(p, sumLoggedHours(tasksByProject.get(p.id) ?? [])) }))
+    .filter((r) => r.s.hasBudget)
+    .map((r) => {
+      const hRatio = r.s.budgetHours ? r.s.loggedHours / r.s.budgetHours : 0;
+      const aRatio = r.s.budgetAmount && r.s.actualAmount != null ? r.s.actualAmount / r.s.budgetAmount : 0;
+      return { ...r, ratio: Math.max(hRatio, aRatio) };
+    })
+    .sort((a, b) => b.ratio - a.ratio)
+    .slice(0, 8);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -138,6 +154,27 @@ export default function ProjectsReporting() {
           ))}
         </div>
       )}
+
+      <div className={panel}>
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+          {t("report.budget")}
+        </h3>
+        {budgetRows.length === 0 ? (
+          <div className="text-[11px] text-[var(--text-dim)]">{t("report.noBudgets")}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {budgetRows.map(({ p, s }) => (
+              <div key={p.id} className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)] min-w-0">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: p.color ?? "#567FB2" }} />
+                  <span className="truncate">{p.name}</span>
+                </div>
+                <BudgetMeter summary={s} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className={panel}>

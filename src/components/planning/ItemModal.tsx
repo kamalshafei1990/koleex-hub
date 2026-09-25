@@ -13,19 +13,36 @@
    the click silently). The server validates again and is authoritative.
 
    Saving: the parent's onSave THROWS on failure. The modal stays open with
-   the user's edits intact, the parent shows a toast, and Save/Publish/
-   Delete are disabled while a request is in flight (no double submit).
+   the user's edits intact, the parent shows a toast (or the conflict
+   dialog), and Save/Publish/Delete are disabled while a request is in
+   flight (no double submit).
+
+   Recurrence: a new item (or one not yet in a series) can repeat weekly on
+   chosen weekdays until a date — the server expands it into concrete rows
+   (lib/planning-recurrence); the live count comes from the same expander.
+   A row that belongs to a series asks whether a save / delete applies to
+   "this item only" or "this and following".
+
+   Templates: "Start from a template" fills type, title, role, resource and
+   the template's times on the chosen day (in the planner's zone).
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "@/components/kds/Modal";
 import { useConfirm } from "@/components/kds/useConfirm";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import RepeatIcon from "@/components/icons/ui/RepeatIcon";
 import EntityPicker from "@/components/planning/EntityPicker";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
+import { fmtDMY } from "@/lib/finance/format";
+import { zonedParts, zonedToUtc } from "@/lib/calendar-tz";
+import { expandWeekly } from "@/lib/planning-recurrence";
 import {
   ITEM_TYPE_LABELS,
+  type PlanningTemplate,
+  type RecurrenceInput,
+  type SeriesScope,
   type PickerEntityType,
   type PlanningItem,
   type PlanningItemType,
@@ -37,6 +54,28 @@ import { PLANNING_LIMITS } from "@/lib/planning-validate";
 export interface ItemModalPreset {
   resource_id?: string | null;
   date?: Date;
+  /** Exact start (timeline click); end defaults to +1h. */
+  start?: Date;
+  end?: Date;
+}
+
+export interface ItemSaveOptions {
+  recurrence?: RecurrenceInput;
+  scope?: SeriesScope;
+}
+
+/* Monday-first weekday order (JS numbers: 0 = Sunday). */
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+/** A Monday, so WEEK_ORDER maps to a real date for localised names. */
+const REF_MONDAY = new Date(2026, 0, 5);
+
+function weekdayInZone(ms: number, tz: string): number {
+  const p = zonedParts(ms, tz);
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay();
+}
+function dateKeyInZone(ms: number, tz: string): string {
+  const p = zonedParts(ms, tz);
+  return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
 }
 
 /* Linked types the modal offers for NEW links. "contact" searches every
@@ -54,6 +93,8 @@ export default function ItemModal({
   resources,
   roles,
   readOnly = false,
+  templates = [],
+  tz,
   onClose,
   onSave,
   onDelete,
@@ -66,12 +107,15 @@ export default function ItemModal({
   /** The caller may view but not change this item (server enforces too). */
   readOnly?: boolean;
   onClose: () => void;
+  templates?: PlanningTemplate[];
+  /** The planner's zone (templates + recurrence weekdays). */
+  tz: string;
   /** Throws on failure — the modal then stays open. */
-  onSave: (payload: Partial<PlanningItem> & { start_at: string; end_at: string }) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onSave: (payload: Partial<PlanningItem> & { start_at: string; end_at: string }, opts: ItemSaveOptions) => Promise<void>;
+  onDelete: (id: string, scope: SeriesScope) => Promise<void>;
 }) {
   const { askConfirm, confirmDialog } = useConfirm();
-  const { t } = useTranslation(planningT);
+  const { t, lang } = useTranslation(planningT);
   const [type, setType] = useState<PlanningItemType>("shift");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -85,6 +129,17 @@ export default function ItemModal({
   const [status, setStatus] = useState<PlanningItem["status"]>("draft");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState(false);
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [until, setUntil] = useState("");
+  const [scope, setScope] = useState<SeriesScope>("this");
+  const inSeries = !!editing?.recurrence_parent_id;
+  /* Read through a ref: the zone can resolve a moment after the modal opens
+     (bootstrap), and that must not reseed — and wipe — the form. */
+  const tzRef = useRef(tz);
+  useEffect(() => {
+    tzRef.current = tz;
+  }, [tz]);
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +147,13 @@ export default function ItemModal({
        props, not derived state — the user edits these fields afterwards. */
     setError(null);
     setSaving(false);
+    setRepeat(false);
+    setScope("this");
+    {
+      const baseMs = editing ? Date.parse(editing.start_at) : (preset?.start ?? preset?.date ?? new Date()).getTime();
+      setWeekdays([weekdayInZone(baseMs, tzRef.current)]);
+      setUntil(dateKeyInZone(baseMs + 27 * 86_400_000, tzRef.current));
+    }
     if (editing) {
       setType(editing.type);
       setTitle(editing.title);
@@ -111,10 +173,10 @@ export default function ItemModal({
       setResourceId(preset?.resource_id ?? "");
       setRoleId("");
       const base = preset?.date ?? new Date();
-      const startD = new Date(base);
-      startD.setHours(9, 0, 0, 0);
-      const endD = new Date(base);
-      endD.setHours(17, 0, 0, 0);
+      const startD = preset?.start ? new Date(preset.start) : new Date(base);
+      if (!preset?.start) startD.setHours(9, 0, 0, 0);
+      const endD = preset?.end ? new Date(preset.end) : preset?.start ? new Date(startD.getTime() + 3_600_000) : new Date(base);
+      if (!preset?.start && !preset?.end) endD.setHours(17, 0, 0, 0);
       setStartAt(toDTLocal(startD.toISOString()));
       setEndAt(toDTLocal(endD.toISOString()));
       setLinkedType("");
@@ -148,13 +210,39 @@ export default function ItemModal({
   const datesMissing = !startAt || !endAt || Number.isNaN(startMs) || Number.isNaN(endMs);
   const endBeforeStart = !datesMissing && endMs <= startMs;
   const titleTooLong = title.trim().length > PLANNING_LIMITS.title;
+  const canRepeat = !readOnly && !inSeries;
+  const recurrence: RecurrenceInput | undefined = canRepeat && repeat ? { weekdays, until } : undefined;
+  const occurrences = useMemo(() => {
+    if (!canRepeat || !repeat || datesMissing || endBeforeStart || !until || weekdays.length === 0) return null;
+    return expandWeekly(new Date(startMs).toISOString(), new Date(endMs).toISOString(), { weekdays, until }, tz)?.length ?? null;
+  }, [canRepeat, repeat, datesMissing, endBeforeStart, until, weekdays, startMs, endMs, tz]);
   const invalidKey = datesMissing
     ? "val.required"
     : endBeforeStart
       ? "val.endAfterStart"
       : titleTooLong
         ? "val.titleLong"
-        : null;
+        : recurrence && occurrences == null
+          ? "val.recurrence"
+          : null;
+
+  /** Fill the form from a template, on the day currently chosen. */
+  const applyTemplate = (id: string) => {
+    const tpl = templates.find((x) => x.id === id);
+    if (!tpl) return;
+    const dayMs = Number.isNaN(startMs) ? Date.now() : startMs;
+    const p = zonedParts(dayMs, tz);
+    const [h, mi] = tpl.start_time.split(":").map(Number);
+    const s0 = zonedToUtc(p.y, p.m, p.d, h, mi, 0, 0, tz);
+    const e0 = s0 + tpl.duration_hours * 3_600_000;
+    setType(tpl.type);
+    if (!title.trim()) setTitle(tpl.name);
+    if (tpl.role_id) setRoleId(tpl.role_id);
+    if (tpl.resource_id && !resourceId) setResourceId(tpl.resource_id);
+    if (tpl.default_note && !notes.trim()) setNotes(tpl.default_note);
+    setStartAt(toDTLocal(new Date(s0).toISOString()));
+    setEndAt(toDTLocal(new Date(e0).toISOString()));
+  };
 
   const buildPayload = (overrides: Partial<PlanningItem> = {}) => ({
     type,
@@ -180,7 +268,7 @@ export default function ItemModal({
     setError(null);
     setSaving(true);
     try {
-      await onSave(buildPayload(overrides));
+      await onSave(buildPayload(overrides), { recurrence, scope: inSeries ? scope : undefined });
     } catch {
       /* The parent already showed a toast; keep the form open and editable. */
     } finally {
@@ -191,11 +279,11 @@ export default function ItemModal({
   const remove = () => {
     if (!editing || saving || readOnly) return;
     askConfirm(
-      t("modal.deleteConfirm"),
+      inSeries && scope === "future" ? t("rec.deleteSeries") : t("modal.deleteConfirm"),
       async () => {
         setSaving(true);
         try {
-          await onDelete(editing.id);
+          await onDelete(editing.id, inSeries ? scope : "this");
         } catch {
           /* toast shown by the parent */
         } finally {
@@ -269,6 +357,54 @@ export default function ItemModal({
       <fieldset disabled={readOnly || saving} className="space-y-3 min-w-0">
         {readOnly && (
           <p className="text-[12px] text-[var(--text-dim)]">{t("err.forbidden")}</p>
+        )}
+
+        {/* Start from a template (new items) */}
+        {!editing && templates.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => applyTemplate(e.target.value)}
+            aria-label={t("modal.template")}
+            className={selectCls}
+          >
+            <option value="">{t("modal.template")}…</option>
+            {templates.map((tpl) => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.name} · {tpl.start_time}–{tpl.end_time}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Series scope (rows of a recurring series) */}
+        {inSeries && !readOnly && (
+          <div className="rounded-lg border border-[#567FB2]/30 bg-[#567FB2]/[0.06] px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#567FB2] dark:text-[#7FA9D6]">
+              <RepeatIcon size={12} />
+              {t("rec.series")}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span id="pl-scope-label" className="text-[11px] text-[var(--text-dim)]">{t("rec.applyTo")}</span>
+              <div role="radiogroup" aria-labelledby="pl-scope-label" className="flex gap-1">
+                {(["this", "future"] as const).map((sc) => (
+                  <button
+                    key={sc}
+                    type="button"
+                    role="radio"
+                    aria-checked={scope === sc}
+                    onClick={() => setScope(sc)}
+                    className={`h-7 px-2.5 rounded-md text-[11px] font-semibold border transition-colors ${
+                      scope === sc
+                        ? "kx-seg-on bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                        : "kx-seg-off bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {t(sc === "this" ? "rec.this" : "rec.future")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Type + Title */}
@@ -370,6 +506,68 @@ export default function ItemModal({
           <p id="pl-date-error" role="alert" className="text-[12px] text-red-600 dark:text-red-400">
             {t(shownError)}
           </p>
+        )}
+
+        {/* Weekly recurrence */}
+        {canRepeat && (
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 text-[12px] font-semibold text-[var(--text-primary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={repeat}
+                onChange={(e) => setRepeat(e.target.checked)}
+                className="h-4 w-4 accent-[#567FB2]"
+              />
+              <RepeatIcon size={12} className="text-[var(--text-dim)]" />
+              {t("rec.repeat")}
+            </label>
+            {repeat && (
+              <div className="ps-6 space-y-2">
+                <div className="space-y-1">
+                  <div id="pl-rec-days" className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("rec.on")}</div>
+                  <div role="group" aria-labelledby="pl-rec-days" className="flex gap-1 flex-wrap">
+                    {WEEK_ORDER.map((wd, i) => {
+                      const on = weekdays.includes(wd);
+                      const d = new Date(REF_MONDAY);
+                      d.setDate(REF_MONDAY.getDate() + i);
+                      return (
+                        <button
+                          key={wd}
+                          type="button"
+                          aria-pressed={on}
+                          aria-label={d.toLocaleDateString(lang, { weekday: "long" })}
+                          onClick={() => setWeekdays((cur) => (on ? cur.filter((x) => x !== wd) : [...cur, wd]))}
+                          className={`h-8 min-w-9 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
+                            on
+                              ? "kx-seg-on bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                              : "kx-seg-off bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          {d.toLocaleDateString(lang, { weekday: "short" })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-end">
+                  <Field label={t("rec.until")} htmlFor="pl-rec-until">
+                    <input
+                      id="pl-rec-until"
+                      type="date"
+                      value={until}
+                      onChange={(e) => setUntil(e.target.value)}
+                      aria-invalid={occurrences == null}
+                      className={inputCls}
+                    />
+                  </Field>
+                  <p className="text-[12px] text-[var(--text-dim)] pb-2.5" aria-live="polite">
+                    {until ? fmtDMY(new Date(`${until}T00:00:00`)) : "—"}
+                    {occurrences != null ? ` · ${t("rec.count").replace("{n}", String(occurrences))}` : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Linked entity — a real picker for every offered type; free text

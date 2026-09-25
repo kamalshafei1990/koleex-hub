@@ -1,9 +1,8 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { sanitizeEventInput } from "@/lib/server/calendar-access";
+import { insertEventRow, sanitizeEventInput } from "@/lib/server/calendar-access";
 import { feedWindow, loadCalendarFeed } from "@/lib/server/calendar-feed";
 
 /* GET /api/calendar/events?accountId=&from=&to=
@@ -76,11 +75,7 @@ export async function POST(req: Request) {
   const input = sanitizeEventInput(body, "create");
   if (!input.ok) return NextResponse.json({ error: input.error }, { status: 400 });
 
-  const { data, error } = await supabaseServer
-    .from("koleex_calendar_events")
-    .insert({ ...input.row, account_id: targetAccountId, tenant_id: auth.tenant_id })
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await insertEventRow({ ...input.row, account_id: targetAccountId, tenant_id: auth.tenant_id });
 
   if (error) {
     console.error("[api/calendar/events POST]", error.message);

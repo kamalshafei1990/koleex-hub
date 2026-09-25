@@ -13,9 +13,9 @@ import type { CalendarFeedEvent } from "@/lib/calendar-types";
 import type { HolidayInstance } from "@/lib/calendar-holidays";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
-import { colorForEvent, formatEventTimeRange, isoDateKey } from "@/lib/calendar-utils";
+import { colorForEvent, formatEventTimeRange, isTentative, isoDateKey, joinableNow } from "@/lib/calendar-utils";
 import TimeGrid from "./TimeGrid";
-import type { ChipLabels } from "./EventChip";
+import { JoinLink, type ChipLabels } from "./EventChip";
 
 interface Props {
   focusDate: Date;
@@ -28,11 +28,13 @@ interface Props {
   chipLabels: ChipLabels;
   onNewEventAtSlot?: (d: Date) => void;
   onEventClick?: (e: CalendarFeedEvent) => void;
+  canDrag?: (e: CalendarFeedEvent) => boolean;
+  onEventMove?: (e: CalendarFeedEvent, start: Date, end: Date) => void;
 }
 
 export default function DayView(props: Props) {
   const { t } = useTranslation(calendarT);
-  const { focusDate, eventsByDay, chipLabels, onEventClick } = props;
+  const { focusDate, eventsByDay, chipLabels, onEventClick, now } = props;
   const dayEvents = eventsByDay.get(isoDateKey(focusDate)) ?? [];
 
   return (
@@ -59,12 +61,14 @@ export default function DayView(props: Props) {
             {dayEvents.map((ev) => {
               const color = colorForEvent(ev);
               const declined = ev.invite_status === "declined";
+              const tentative = isTentative(ev);
+              const join = ev.meeting_url && joinableNow(ev, now) ? ev.meeting_url : null;
               return (
+                <div key={ev.id} className="relative">
                 <button
-                  key={ev.id}
                   type="button"
                   onClick={() => onEventClick?.(ev)}
-                  className={`w-full text-start rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] p-3 transition-all ${declined ? "opacity-60" : ""}`}
+                  className={`w-full text-start rounded-xl bg-[var(--bg-surface-subtle)] border hover:border-[var(--border-focus)] p-3 transition-all border-[var(--border-subtle)] ${tentative ? "border-dashed" : ""} ${declined ? "opacity-60" : ""} ${join ? "pe-20" : ""}`}
                 >
                   <div className="flex items-start gap-2">
                     <span className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
@@ -72,7 +76,7 @@ export default function DayView(props: Props) {
                       <p className={`text-[13px] font-semibold text-[var(--text-primary)] truncate ${declined ? "line-through" : ""}`}>{ev.title}</p>
                       <p className="text-[11px] text-[var(--text-dim)] mt-0.5 tabular-nums">
                         {formatEventTimeRange(ev, chipLabels.allDay)}
-                        {ev.source === "leave" && ` · ${chipLabels.readOnly}`}
+                        {ev.source === "leave" && ` · ${tentative ? chipLabels.pending : chipLabels.readOnly}`}
                         {declined && ` · ${chipLabels.declined}`}
                       </p>
                       {ev.location && (
@@ -81,6 +85,12 @@ export default function DayView(props: Props) {
                     </div>
                   </div>
                 </button>
+                {join && (
+                  <div className="absolute top-3 end-3">
+                    <JoinLink url={join} label={chipLabels.join} title={ev.title} />
+                  </div>
+                )}
+                </div>
               );
             })}
           </div>

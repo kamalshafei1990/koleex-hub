@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { canReadEvent, isEventOwner, loadCalendarEvent } from "@/lib/server/calendar-access";
-import { notifyInvited, notifyRsvp, withdrawInvites } from "@/lib/server/calendar-notify";
-import { internalAccountIds } from "@/lib/server/internal-accounts";
+import { notifyRsvp } from "@/lib/server/calendar-notify";
+import { replaceGuests } from "@/lib/server/calendar-guests";
 import { isCalendarAttendeeStatus } from "@/lib/calendar-enums";
 
 /* Guests of a calendar event.
@@ -16,8 +16,9 @@ import { isCalendarAttendeeStatus } from "@/lib/calendar-enums";
              has none — the client words the fallback in its language.
      PUT   → { accountIds: string[] } replaces the whole guest list.
              Organizer or Super Admin, with the Calendar "edit" action.
-             Guests are ACTIVE INTERNAL accounts of the tenant, never the
-             organizer. The newly added are invited; the removed have their
+             lib/server/calendar-guests (shared with the AI tools): guests
+             are ACTIVE INTERNAL accounts of the tenant, never the
+             organizer; the newly added are invited, the removed have their
              unread invitation withdrawn.
      PATCH → { status: "accepted" | "declined" } — the caller answers their
              OWN invitation; the organizer is told. */
@@ -81,32 +82,9 @@ export async function PUT(
   if (!body || !Array.isArray(body.accountIds)) {
     return NextResponse.json({ error: "accountIds must be an array" }, { status: 400 });
   }
-  const requested = body.accountIds
-    .filter((x): x is string => typeof x === "string" && !!x)
-    .filter((x) => x !== ev.account_id) // the organizer is never their own guest
-    .slice(0, 100);
-  const wanted = await internalAccountIds(requested, ev.tenant_id);
-
-  const { data: current } = await supabaseServer.from(ATTENDEES).select("account_id").eq("event_id", id);
-  const currentIds = new Set((current ?? []).map((r) => (r as { account_id: string }).account_id));
-  const wantedSet = new Set(wanted);
-  const toAdd = wanted.filter((a) => !currentIds.has(a));
-  const toRemove = [...currentIds].filter((a) => !wantedSet.has(a));
-
-  if (toRemove.length) {
-    const { error } = await supabaseServer.from(ATTENDEES).delete().eq("event_id", id).in("account_id", toRemove);
-    if (error) return NextResponse.json({ error: "Failed to update attendees" }, { status: 500 });
-    await withdrawInvites(id, toRemove);
-  }
-  if (toAdd.length) {
-    const { error } = await supabaseServer.from(ATTENDEES).insert(
-      toAdd.map((account_id) => ({ event_id: id, account_id, status: "invited", tenant_id: ev.tenant_id })),
-    );
-    if (error) return NextResponse.json({ error: "Failed to update attendees" }, { status: 500 });
-    await notifyInvited(ev, toAdd, auth.account_id);
-  }
-
-  return NextResponse.json({ ok: true, count: wanted.length, added: toAdd.length, removed: toRemove.length });
+  const res = await replaceGuests(ev, body.accountIds, auth.account_id);
+  if (!res.ok) return NextResponse.json({ error: "Failed to update attendees" }, { status: 500 });
+  return NextResponse.json(res);
 }
 
 export async function PATCH(

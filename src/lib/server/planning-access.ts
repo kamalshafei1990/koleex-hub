@@ -44,6 +44,17 @@ export function planningReadScopeOr(accountId: string, resourceIds: string[]): s
   return parts.join(",");
 }
 
+/** The WRITE rule over an already-loaded row, given the caller's resource ids. */
+export function canWritePlanningRow(
+  caller: PlanningCaller,
+  callerRids: readonly string[],
+  row: { resource_id: string | null; created_by_account_id: string | null },
+): boolean {
+  if (caller.is_super_admin) return true;
+  if (row.created_by_account_id === caller.account_id) return true;
+  return !!row.resource_id && callerRids.includes(row.resource_id);
+}
+
 export type PlanningAccessResult<T> =
   | { ok: true; item: T }
   | { ok: false; status: 400 | 403 | 404 | 500 };

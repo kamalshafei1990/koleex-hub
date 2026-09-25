@@ -5,8 +5,9 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned, clearTaskNotifications } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { assertTaskAccess } from "@/lib/server/project-access";
-import { loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
+import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
 import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
+import { syncProjectMembersFromAssignees } from "@/lib/server/project-members";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -58,7 +59,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertTaskAccess(auth, id);
+  const gate = await assertTaskAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
   const prev = gate.task;
 
@@ -75,6 +76,8 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     stages,
   });
   if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
+  const dateErr = checkDateOrder(prev, checked.patch);
+  if (dateErr) return NextResponse.json({ error: dateErr, code: "date_order" }, { status: 400 });
   const patch = reconcileStageStatus({ status: prev.status, stage_id: prev.stage_id }, checked.patch, stages);
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
@@ -97,7 +100,10 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const newAssignee = data?.assignee_account_id as string | null;
   const becameDone = data?.status === "done" && prev.status !== "done";
   after(async () => {
-    if (newAssignee && newAssignee !== prev.assignee_account_id) await notifyTaskAssigned(auth, data);
+    if (newAssignee && newAssignee !== prev.assignee_account_id) {
+      await notifyTaskAssigned(auth, data);
+      await syncProjectMembersFromAssignees(auth, prev.project_id, [newAssignee]);
+    }
     if (becameDone) await clearTaskNotifications(id);
     await recomputeProjectProgress(auth.tenant_id, prev.project_id);
   });
@@ -111,7 +117,7 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "delete");
   if (deny) return deny;
   const { id } = await params;
-  const gate = await assertTaskAccess(auth, id);
+  const gate = await assertTaskAccess(auth, id, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   /* Collect storage paths BEFORE the cascade removes the attachment rows

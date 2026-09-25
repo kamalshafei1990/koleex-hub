@@ -63,6 +63,12 @@ export const NOTE_LIMITS = {
   list: 200,
   /** body_plain is truncated to this many chars in list rows. */
   preview: 200,
+  /** Base64 Yjs state of a shared note (≈3 MB binary). */
+  yjsStateChars: 4_000_000,
+  /** Version history kept per note (oldest pruned). */
+  versions: 50,
+  /** Minimum gap between automatic version snapshots of one note. */
+  versionEveryMs: 10 * 60 * 1000,
 } as const;
 
 /** Stored values of `notes.color`: a hex tint (legacy + palette) or a paper key. */

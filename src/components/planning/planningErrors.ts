@@ -12,6 +12,8 @@ export function planningErrorKey(e: unknown): string {
   if (!(e instanceof PlanningApiError)) return "err.generic";
   if (e.status === 0) return "err.network";
   if (e.code === "no_resource") return "err.noResource";
+  if (e.code === "schedule_conflict") return "err.scheduleConflict";
+  if (e.code === "invalid_recurrence") return "err.recurrence";
   if (e.code === "invalid_resource" || e.code === "invalid_role") return "err.invalidRef";
   if (e.code === "end_before_start") return "val.endAfterStart";
   if (e.code === "start_end_required") return "val.required";

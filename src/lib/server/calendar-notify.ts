@@ -32,6 +32,7 @@ type EventLike = {
   end_at?: string | null;
   all_day?: boolean | null;
   location?: string | null;
+  meeting_url?: string | null;
 };
 
 const DEFAULT_TZ = "Asia/Dubai";
@@ -133,15 +134,20 @@ export async function notifyInvited(ev: EventLike, recipients: string[], actorId
     ev, recipients, actorId,
     type: "calendar_invite",
     subject: `Invitation: ${ev.title ?? "Event"}`,
-    body: `You are invited — ${when}${ev.location ? ` · ${ev.location}` : ""}. Open it to accept or decline.`,
+    body: `You are invited — ${when}${ev.location ? ` · ${ev.location}` : ""}${ev.meeting_url ? ` · Join: ${ev.meeting_url}` : ""}. Open it to accept or decline.`,
     tag: `calendar-invite-${ev.id}`,
   });
 }
 
-/** The organizer moved, relocated or cancelled the event → every guest
- *  hears, once per event: an older unread notice about the same event is
- *  superseded. `rescheduled` = the time changed (the place may have too);
- *  `moved` = only the place changed.
+/** The organizer moved, relocated, re-linked or cancelled the event →
+ *  every guest hears, once per event: an older unread notice about the same
+ *  event is superseded. `rescheduled` = the time changed (the place or link
+ *  may have too); `moved` = only the place changed; `link` = only the
+ *  meeting link changed.
+ *
+ *  `occurrence` (the ORIGINAL start of one occurrence of a series) says the
+ *  change is to that occurrence only — `ev` then carries its new time — and
+ *  the notice says the rest of the series stays as it was.
  *
  *  The inbox and push have no per-recipient language yet, so these stay in
  *  English — the Hub's shared notification language. */
@@ -149,27 +155,46 @@ export async function notifyEventChanged(
   ev: EventLike,
   recipients: string[],
   actorId: string | null,
-  kind: "rescheduled" | "moved" | "cancelled",
+  kind: "rescheduled" | "moved" | "link" | "cancelled",
+  opts: { occurrence?: string } = {},
 ): Promise<void> {
   if (recipients.length === 0) return;
   const title = ev.title ?? "Event";
   const type = kind === "cancelled" ? "calendar_cancelled" : "calendar_rescheduled";
+  const tz = await accountTimezone(ev.account_id);
   await supersedeUnread({ recipients, meta: { event_id: ev.id } });
+  const onDay = opts.occurrence ? ` on ${formatWhen(opts.occurrence, null, ev.all_day, tz).split(" ")[0]}` : "";
+  const rest = opts.occurrence ? " The rest of the series is unchanged." : "";
   if (kind === "cancelled") {
-    await deliver({ ev, recipients, actorId, type, subject: `Cancelled: ${title}`, body: `"${title}" has been cancelled by the organizer.` });
+    await deliver({
+      ev, recipients, actorId, type,
+      subject: `Cancelled: ${title}${onDay}`,
+      body: `"${title}"${onDay} has been cancelled by the organizer.${rest}`,
+    });
     return;
   }
-  const when = formatWhen(ev.start_at, ev.end_at, ev.all_day, await accountTimezone(ev.account_id));
+  const when = formatWhen(ev.start_at, ev.end_at, ev.all_day, tz);
   const where = ev.location ? ` · ${ev.location}` : "";
+  const join = ev.meeting_url ? ` Join: ${ev.meeting_url}` : "";
+  if (kind === "link") {
+    await deliver({
+      ev, recipients, actorId, type,
+      subject: `New meeting link: ${title}`,
+      body: ev.meeting_url
+        ? `"${title}" (${when}) has a new meeting link.${join}${rest}`
+        : `"${title}" (${when}) no longer has a meeting link.${rest}`,
+    });
+    return;
+  }
   if (kind === "moved") {
     await deliver({
       ev, recipients, actorId, type,
       subject: `New location: ${title}`,
-      body: ev.location ? `"${title}" (${when}) is now at ${ev.location}.` : `"${title}" (${when}) no longer has a location.`,
+      body: (ev.location ? `"${title}" (${when}) is now at ${ev.location}.` : `"${title}" (${when}) no longer has a location.`) + join + rest,
     });
     return;
   }
-  await deliver({ ev, recipients, actorId, type, subject: `Rescheduled: ${title}`, body: `"${title}" is now ${when}${where}.` });
+  await deliver({ ev, recipients, actorId, type, subject: `Rescheduled: ${title}${onDay}`, body: `"${title}"${onDay} is now ${when}${where}.${join}${rest}` });
 }
 
 /** A guest answered → the organizer hears. */

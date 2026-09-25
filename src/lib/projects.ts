@@ -64,6 +64,11 @@ export interface ProjectRow {
   budget_amount: number | null;
   billing_rate: number | null;
   progress_pct: number | null;
+  /** ISO currency code for budget_amount / billing_rate (null = none set).
+   *  Absent until 20260926_projects_additions.sql is applied. */
+  currency?: string | null;
+  /** When the project was archived (status "archived"); null otherwise. */
+  archived_at?: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -238,8 +243,61 @@ export async function updateProject(id: string, patch: Partial<ProjectRow>): Pro
   return (await send<{ project: ProjectRow }>(`/api/projects/${id}`, "PATCH", patch)).project;
 }
 
+/** Permanent delete — super admins only (the server refuses everyone else;
+ *  they archive instead). */
 export async function deleteProject(id: string): Promise<void> {
   await send(`/api/projects/${id}`, "DELETE");
+}
+
+/** Archive (restorable): status "archived", the server stamps archived_at. */
+export async function archiveProject(id: string): Promise<ProjectRow> {
+  return updateProject(id, { status: "archived" });
+}
+
+/** Restore an archived project to Active. */
+export async function restoreProject(id: string): Promise<ProjectRow> {
+  return updateProject(id, { status: "active" });
+}
+
+/* ── Project members ──────────────────────────────── */
+
+export type ProjectMemberRole = "manager" | "member" | "viewer";
+
+export interface ProjectMember {
+  account_id: string;
+  role: ProjectMemberRole;
+  added_by: string | null;
+  created_at: string;
+  account?: { id: string; username: string } | null;
+}
+
+export interface ProjectMembersResponse {
+  /** false until the members migration is applied. */
+  available: boolean;
+  members: ProjectMember[];
+  can_manage: boolean;
+  manager_account_id: string | null;
+}
+
+export async function fetchProjectMembers(projectId: string): Promise<ProjectMembersResponse> {
+  return api<ProjectMembersResponse>(`/api/projects/${projectId}/members`);
+}
+
+export async function addProjectMembers(projectId: string, accountIds: string[], role: ProjectMemberRole = "member"): Promise<void> {
+  await send(`/api/projects/${projectId}/members`, "POST", { account_ids: accountIds, role });
+}
+
+export async function updateProjectMemberRole(projectId: string, accountId: string, role: ProjectMemberRole): Promise<void> {
+  await send(`/api/projects/${projectId}/members`, "PATCH", { account_id: accountId, role });
+}
+
+export async function removeProjectMember(projectId: string, accountId: string): Promise<void> {
+  await send(`/api/projects/${projectId}/members?account_id=${encodeURIComponent(accountId)}`, "DELETE");
+}
+
+/** Find-or-create the project's Discuss chat; returns the channel id. */
+export async function openProjectChat(projectId: string): Promise<string> {
+  return (await send<{ channel_id: string }>(`/api/projects/${projectId}/chat`, "POST")).channel_id;
 }
 
 /** Duplicate a project as a fresh starter — core fields + its stage
@@ -294,6 +352,9 @@ export async function fetchTasks(params: {
   search?: string;
   linked_entity_type?: string;
   linked_entity_id?: string;
+  assignee?: string;
+  tag?: string;
+  due_lte?: string;
   limit?: number;
 } = {}): Promise<TaskRow[]> {
   const q = new URLSearchParams();
@@ -318,6 +379,43 @@ export async function updateTask(id: string, patch: Partial<TaskRow>): Promise<T
 
 export async function deleteTask(id: string): Promise<void> {
   await send(`/api/projects/tasks/${id}`, "DELETE");
+}
+
+export type BulkTaskAction =
+  | { action: "stage"; value: string | null }
+  | { action: "status"; value: TaskStatus }
+  | { action: "assign"; value: string | null }
+  | { action: "due"; value: string | null }
+  | { action: "priority"; value: TaskPriority }
+  | { action: "delete"; value?: undefined };
+
+/** One request for a multi-select action (server applies access + the
+ *  stage⇄status rules per task; all-or-nothing). */
+export async function bulkTasks(taskIds: string[], op: BulkTaskAction): Promise<void> {
+  await send("/api/projects/tasks/bulk", "POST", { task_ids: taskIds, ...op });
+}
+
+/* ── Saved filters (per user, accounts.preferences) ── */
+
+export interface SavedTaskFilter {
+  id: string;
+  name: string;
+  /** Where it was saved: My Tasks, All Tasks, or a project board. */
+  scope: "mine" | "all" | "project";
+  assignee: string | null;
+  tag: string | null;
+  status: TaskStatus | "all";
+  priority: TaskPriority | "all";
+  search: string;
+  overdue: boolean;
+}
+
+export async function fetchSavedFilters(): Promise<SavedTaskFilter[]> {
+  return (await api<{ filters: SavedTaskFilter[] }>("/api/projects/saved-filters")).filters ?? [];
+}
+
+export async function saveSavedFilters(filters: SavedTaskFilter[]): Promise<SavedTaskFilter[]> {
+  return (await send<{ filters: SavedTaskFilter[] }>("/api/projects/saved-filters", "PUT", { filters })).filters ?? [];
 }
 
 /** One board drop → one request. `orderedIds` is the whole target column
@@ -519,6 +617,28 @@ export function parseLocalDate(iso: string | null | undefined): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return null;
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Local Date → "YYYY-MM-DD". */
+export function toISODay(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** "YYYY-MM-DD" shifted by `n` calendar days (DST-safe: local noon math). */
+export function addDaysISO(iso: string, n: number): string {
+  const d = parseLocalDate(iso);
+  if (!d) return iso;
+  d.setHours(12);
+  d.setDate(d.getDate() + n);
+  return toISODay(d);
+}
+
+/** Whole calendar days from a to b (b − a). */
+export function daysBetween(a: string, b: string): number {
+  const da = parseLocalDate(a);
+  const db = parseLocalDate(b);
+  if (!da || !db) return 0;
+  return Math.round((Date.UTC(db.getFullYear(), db.getMonth(), db.getDate()) - Date.UTC(da.getFullYear(), da.getMonth(), da.getDate())) / 86400000);
 }
 
 /** Today's LOCAL calendar day as "YYYY-MM-DD". */

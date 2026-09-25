@@ -3,8 +3,8 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    calendar-feed — one account's calendar within [from, to): its own events,
    the occurrences of its recurring series, the events it is invited to, and
-   read-only mirrors of Planning, To-do, Projects, approved leave and report
-   deadlines. Written once; GET /api/calendar/events and the AI agent's
+   read-only mirrors of Planning, To-do, Projects (tasks and milestones),
+   leave (approved, and pending as tentative) and report deadlines. Written once; GET /api/calendar/events and the AI agent's
    listMyCalendar both read it, so the assistant sees what the grid shows.
 
    Access is the CALLER's job (the route answers 403 before calling this for
@@ -18,12 +18,21 @@ import "server-only";
    start_at / end_at on those items are that span in the calendar owner's
    zone, kept for sorting and older readers only.
 
+   A series is expanded with its "this occurrence only" exceptions
+   (lib/server/calendar-exceptions): a skipped occurrence is gone, an
+   overridden one carries its own title / time / place / link. Every
+   occurrence says which it is (`occurrence_start` = its original start, the
+   key such a change is stored under) and has a STABLE id `<base>~<ms of that
+   start>`, the same whichever window it was read in.
+
    The sources are independent, so they are fetched together.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
-import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
+import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
+import { loadExceptions } from "@/lib/server/calendar-exceptions";
+import { involvedProjectsOr } from "@/lib/server/project-access";
 import { allDayKeys, zonedDateKey, zonedToUtc } from "@/lib/calendar-tz";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
 import { logPrivateCalendarReads } from "@/lib/server/calendar-access";
@@ -33,7 +42,7 @@ import { reportTemplate } from "@/lib/reports/templates";
 import { reportsT } from "@/lib/translations/reports";
 import { HUB, STATUS } from "@/components/kds/colors";
 import type { CalendarAttendeeStatus } from "@/types/supabase";
-import type { CalendarFeedEvent } from "@/lib/calendar-types";
+import type { BusyBlock, CalendarEventException, CalendarFeedEvent } from "@/lib/calendar-types";
 
 type Row = Record<string, unknown> & {
   id: string;
@@ -74,21 +83,38 @@ function withDates(e: CalendarFeedEvent, tz: string): CalendarFeedEvent {
   return { ...e, start_date: k.start, end_date: k.end };
 }
 
-function expandRow(base: Row, w: FeedWindow, tz: string): CalendarFeedEvent[] {
-  const occ = expandRecurrence(base.start_at, base.end_at, base.recurrence, base.recurrence_until ?? null, w.winFrom, w.winTo, 400, tz);
-  return occ.map((o, i) => withDates({
-    ...(base as unknown as CalendarFeedEvent),
-    id: `${base.id}~${i}`,
-    series_base_id: base.id,
-    start_at: o.start.toISOString(),
-    end_at: o.end.toISOString(),
-  }, tz));
+function expandRow(base: Row, w: FeedWindow, tz: string, exceptions?: CalendarEventException[]): CalendarFeedEvent[] {
+  const occ = expandWithExceptions(base.start_at, base.end_at, base.recurrence, base.recurrence_until ?? null, w.winFrom, w.winTo, exceptions, 400, tz);
+  return occ.map((o) => {
+    const ov = o.override;
+    return withDates({
+      ...(base as unknown as CalendarFeedEvent),
+      id: `${base.id}~${o.original.getTime()}`,
+      series_base_id: base.id,
+      occurrence_start: o.original.toISOString(),
+      start_at: o.start.toISOString(),
+      end_at: o.end.toISOString(),
+      ...(ov ? {
+        overridden: true,
+        ...(ov.title ? { title: ov.title } : {}),
+        ...(ov.location != null ? { location: ov.location } : {}),
+        ...(ov.meeting_url != null ? { meeting_url: ov.meeting_url } : {}),
+      } : {}),
+    }, tz);
+  });
 }
 
 /** The account's own rows: one-offs in the window plus every series that
  *  could have an occurrence in it, expanded on the organizer's clock. */
-async function ownEvents(auth: ServerAuthContext, accountId: string, viewingOwn: boolean, w: FeedWindow, tz: string): Promise<CalendarFeedEvent[]> {
-  const hidePrivate = !viewingOwn && !auth.can_view_private;
+async function ownEvents(
+  auth: ServerAuthContext, accountId: string, viewingOwn: boolean, w: FeedWindow, tz: string,
+  opts: { includePrivate?: boolean } = {},
+): Promise<CalendarFeedEvent[]> {
+  /* includePrivate: the free/busy view counts private time as busy but never
+     shows it (the caller strips titles) — nothing private is disclosed, so
+     nothing is logged. */
+  const hidePrivate = !opts.includePrivate && !viewingOwn && !auth.can_view_private;
+  const logPrivate = !opts.includePrivate;
   let oneOff = supabaseServer
     .from("koleex_calendar_events")
     .select("*")
@@ -113,12 +139,13 @@ async function ownEvents(auth: ServerAuthContext, accountId: string, viewingOwn:
 
   const rows = (data ?? []) as Row[];
   const seriesRows = (recRows ?? []) as Row[];
-  if (!viewingOwn && auth.can_view_private) {
+  if (!viewingOwn && auth.can_view_private && logPrivate) {
     logPrivateCalendarReads(auth, [...rows, ...seriesRows].filter((e) => e.is_private).map((e) => e.id));
   }
+  const exceptions = await loadExceptions(seriesRows.map((r) => r.id));
   return [
     ...rows.map((r) => withDates(r as unknown as CalendarFeedEvent, tz)),
-    ...seriesRows.flatMap((r) => expandRow(r, w, tz)),
+    ...seriesRows.flatMap((r) => expandRow(r, w, tz, exceptions.get(r.id))),
   ];
 }
 
@@ -154,13 +181,16 @@ async function invitedEvents(auth: ServerAuthContext, accountId: string, w: Feed
   }
   const rows = [...(a.data ?? []), ...(b.data ?? [])] as Array<Row & { koleex_calendar_event_attendees?: Array<{ status: CalendarAttendeeStatus }> | { status: CalendarAttendeeStatus } | null }>;
   if (rows.length === 0) return [];
-  const tzs = await accountTimezones(rows.map((r) => r.account_id));
+  const [tzs, exceptions] = await Promise.all([
+    accountTimezones(rows.map((r) => r.account_id)),
+    loadExceptions(rows.filter((r) => r.recurrence).map((r) => r.id)),
+  ]);
   return rows.flatMap((row) => {
     const { koleex_calendar_event_attendees: att, ...rest } = row;
     const status = (Array.isArray(att) ? att[0]?.status : att?.status) ?? "invited";
     const base = { ...rest, invited: true, invite_status: status } as Row;
     const tz = tzs.get(row.account_id) ?? "UTC";
-    if (row.recurrence) return expandRow(base, w, tz);
+    if (row.recurrence) return expandRow(base, w, tz, exceptions.get(row.id));
     return [withDates(base as unknown as CalendarFeedEvent, tz)];
   });
 }
@@ -283,21 +313,74 @@ async function projectTaskMirror(auth: ServerAuthContext, accountId: string, w: 
     });
 }
 
-/** APPROVED leave of the employee behind the account, as out-of-office. HR's
- *  record stays the only record; nothing is written to the events table.
+/** Milestones of the projects the calendar's account is involved in — the
+ *  Projects list rule (lib/server/project-access involvedProjectsOr:
+ *  manager, creator, or assignee of a task in it), never wider, so nothing
+ *  the account could not open in Projects appears here. Templates stay out.
+ *  All-day on the due date; a reached milestone is muted. */
+async function milestoneMirror(auth: ServerAuthContext, accountId: string, w: FeedWindow, tz: string): Promise<CalendarFeedEvent[]> {
+  if (!auth.tenant_id) return [];
+  try {
+    const or = await involvedProjectsOr(auth.tenant_id, accountId);
+    const { data: projects, error: pErr } = await supabaseServer
+      .from("projects")
+      .select("id, name, color, is_template")
+      .eq("tenant_id", auth.tenant_id)
+      .or(or)
+      .limit(500);
+    if (pErr) { console.error("[calendar-feed] milestones/projects:", pErr.message); return []; }
+    const list = ((projects ?? []) as Array<{ id: string; name: string | null; color: string | null; is_template?: boolean | null }>).filter((p) => !p.is_template);
+    if (list.length === 0) return [];
+    const byId = new Map(list.map((p) => [p.id, p]));
+    const { data, error } = await supabaseServer
+      .from("project_milestones")
+      .select("id, project_id, name, due_date, is_reached, color")
+      .eq("tenant_id", auth.tenant_id)
+      .in("project_id", list.map((p) => p.id))
+      .gte("due_date", w.fromDate)
+      .lte("due_date", w.toDate)
+      .limit(500);
+    if (error) { console.error("[calendar-feed] milestones:", error.message); return []; }
+    return ((data ?? []) as Array<{ id: string; project_id: string; name: string; due_date: string | null; is_reached: boolean | null; color: string | null }>)
+      .flatMap((m) => {
+        if (!m.due_date) return [];
+        const day = String(m.due_date).slice(0, 10);
+        const project = byId.get(m.project_id);
+        return [allDayMirror({ start: day, end: day }, tz, {
+          id: `milestone:${m.id}`,
+          accountId, tenantId: auth.tenant_id,
+          title: m.name,
+          description: project?.name ?? null,
+          color: m.is_reached ? MUTED : m.color || project?.color || ACCENT,
+          event_type: "event",
+          source: "project",
+          source_kind: m.is_reached ? "milestone_reached" : "milestone",
+          extra: { project_id: m.project_id, milestone_id: m.id },
+        })];
+      });
+  } catch (e) {
+    console.error("[calendar-feed] milestones:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+/** APPROVED leave of the employee behind the account, as out-of-office, and
+ *  PENDING leave as tentative (source_kind "pending" — the views draw it
+ *  dashed). HR's record stays the only record; nothing is written to the
+ *  events table.
  *  The title is the leave type's own name ("" when it has none — the views
  *  word it); a half day carries its period for the views to translate. */
 async function leaveMirror(auth: ServerAuthContext, accountId: string, w: FeedWindow, tz: string): Promise<CalendarFeedEvent[]> {
   let q = supabaseServer
     .from("hr_leave_requests")
-    .select("id, start_date, end_date, half_day, half_day_period, hr_leave_types(name), employee:employee_id!inner ( account_id, tenant_id )")
+    .select("id, status, start_date, end_date, half_day, half_day_period, hr_leave_types(name), employee:employee_id!inner ( account_id, tenant_id )")
     .eq("employee.account_id", accountId)
-    .eq("status", "approved")
+    .in("status", ["approved", "pending"])
     .lte("start_date", w.toDate).gte("end_date", w.fromDate).limit(200);
   if (auth.tenant_id) q = q.eq("employee.tenant_id", auth.tenant_id);
   const { data, error } = await q;
   if (error) { console.error("[calendar-feed] leave:", error.message); return []; }
-  return ((data ?? []) as Array<{ id: string; start_date: string; end_date: string; half_day: boolean; half_day_period: string | null; hr_leave_types?: { name?: string } | { name?: string }[] | null }>)
+  return ((data ?? []) as Array<{ id: string; status: string; start_date: string; end_date: string; half_day: boolean; half_day_period: string | null; hr_leave_types?: { name?: string } | { name?: string }[] | null }>)
     .map((l) => {
       const t = Array.isArray(l.hr_leave_types) ? l.hr_leave_types[0] : l.hr_leave_types;
       return allDayMirror({ start: String(l.start_date).slice(0, 10), end: String(l.end_date).slice(0, 10) }, tz, {
@@ -308,7 +391,7 @@ async function leaveMirror(auth: ServerAuthContext, accountId: string, w: FeedWi
         color: null,
         event_type: "out_of_office",
         source: "leave",
-        source_kind: "approved",
+        source_kind: l.status === "pending" ? "pending" : "approved",
         extra: { leave_request_id: l.id, half_day_period: l.half_day ? l.half_day_period ?? null : null },
       });
     });
@@ -439,14 +522,74 @@ export async function loadCalendarFeed(
 ): Promise<CalendarFeedEvent[]> {
   const viewingOwn = accountId === auth.account_id;
   const tz = await accountTimezone(accountId);
-  const [own, invited, planning, todos, projects, leave, reports] = await Promise.all([
+  const [own, invited, planning, todos, projects, milestones, leave, reports] = await Promise.all([
     ownEvents(auth, accountId, viewingOwn, w, tz),
     viewingOwn ? invitedEvents(auth, accountId, w) : Promise.resolve([]),
     viewingOwn ? planningMirror(auth, accountId, w) : Promise.resolve([]),
     todoMirror(auth, accountId, w, tz),
     projectTaskMirror(auth, accountId, w, tz),
+    milestoneMirror(auth, accountId, w, tz),
     leaveMirror(auth, accountId, w, tz),
     reportMirror(auth, accountId, viewingOwn, w),
   ]);
-  return [...own, ...invited, ...planning, ...todos, ...projects, ...leave, ...reports];
+  return [...own, ...invited, ...planning, ...todos, ...projects, ...milestones, ...leave, ...reports];
+}
+
+/** One account's BUSY time in the window, for the free/busy view of the
+ *  event editor: its own events (private ones too — as time only), the
+ *  events it is invited to and has not declined (an unanswered invitation
+ *  is tentative), each series with its exceptions, and leave (pending =
+ *  tentative). Mirrors that are not time (to-dos, tasks, deadlines) are not
+ *  busy.
+ *
+ *  Titles are the CALLER's to see only when the caller could open the event
+ *  itself: not private, and the caller organizes it, is invited to it, or is
+ *  a Super Admin. Private time never carries a title. The caller checks that
+ *  the account is a colleague in the tenant before calling. */
+export async function loadBusyBlocks(
+  auth: ServerAuthContext,
+  accountId: string,
+  w: FeedWindow,
+): Promise<BusyBlock[]> {
+  const tz = await accountTimezone(accountId);
+  const [own, invited, leave] = await Promise.all([
+    ownEvents(auth, accountId, false, w, tz, { includePrivate: true }),
+    invitedEvents(auth, accountId, w),
+    leaveMirror(auth, accountId, w, tz),
+  ]);
+  const events = [...own, ...invited.filter((e) => e.invite_status !== "declined")];
+
+  /* Which of these the caller is a guest of — one read. */
+  const baseIds = Array.from(new Set(events.map((e) => e.series_base_id ?? e.id)));
+  const callerInvited = new Set<string>();
+  if (baseIds.length && accountId !== auth.account_id) {
+    const { data } = await supabaseServer
+      .from("koleex_calendar_event_attendees")
+      .select("event_id")
+      .eq("account_id", auth.account_id)
+      .in("event_id", baseIds.slice(0, 500));
+    for (const r of (data ?? []) as Array<{ event_id: string }>) callerInvited.add(r.event_id);
+  }
+  const titleFor = (e: CalendarFeedEvent): string | undefined => {
+    if (e.is_private) return undefined;
+    const base = e.series_base_id ?? e.id;
+    const mayRead = e.account_id === auth.account_id || callerInvited.has(base) || auth.is_super_admin;
+    return mayRead ? e.title || undefined : undefined;
+  };
+
+  const out: BusyBlock[] = events.map((e) => ({
+    start: e.start_at,
+    end: e.end_at,
+    ...(e.all_day ? { all_day: true, start_date: e.start_date, end_date: e.end_date } : {}),
+    kind: "event" as const,
+    ...(e.invite_status === "invited" ? { tentative: true } : {}),
+    ...(titleFor(e) ? { title: titleFor(e) } : {}),
+  }));
+  for (const l of leave) {
+    out.push({
+      start: l.start_at, end: l.end_at, all_day: true, start_date: l.start_date, end_date: l.end_date,
+      kind: "leave", ...(l.source_kind === "pending" ? { tentative: true } : {}),
+    });
+  }
+  return out.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
 }

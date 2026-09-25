@@ -125,6 +125,7 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   listMyProjects: { domain: "work", risk: "read_only" },
   listProjectTasks: { domain: "work", risk: "read_only" },
   createProjectTask: { domain: "work", risk: "high_risk_write" },
+  addProjectMember: { domain: "work", risk: "high_risk_write" },
   completeProjectTask: { domain: "work", risk: "high_risk_write" },
   updateProjectTask: { domain: "work", risk: "high_risk_write" },
   deleteProjectTask: { domain: "work", risk: "destructive" },
@@ -132,12 +133,20 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   listMyPlanning: { domain: "work", risk: "read_only" },
   createPlanningItem: { domain: "work", risk: "high_risk_write" },
   updatePlanningItem: { domain: "work", risk: "high_risk_write" },
+  copyLastWeek: { domain: "work", risk: "high_risk_write" },
+  publishWeek: { domain: "work", risk: "high_risk_write" },
   deletePlanningItem: { domain: "work", risk: "destructive" },
 
   listMyCalendar: { domain: "work", risk: "read_only" },
   createCalendarEvent: { domain: "work", risk: "high_risk_write" },
   updateCalendarEvent: { domain: "work", risk: "high_risk_write" },
   deleteCalendarEvent: { domain: "work", risk: "destructive" },
+
+  /* Notes: reads are scoped to the caller's own + shared-with-them notes;
+     createNote only ever creates the caller's OWN new note (two-phase). */
+  searchNotes: { domain: "work", risk: "read_only" },
+  readNote: { domain: "work", risk: "read_only" },
+  createNote: { domain: "work", risk: "high_risk_write" },
 
   /* ── knowledge ─────────────────────────────────────────────────────── */
   search_knowledge: { domain: "knowledge", risk: "read_only" },

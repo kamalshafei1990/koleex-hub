@@ -262,3 +262,15 @@ export function reconcileStageStatus(
   }
   return patch;
 }
+
+/** A task may not start after it is due. `prev` supplies the stored values
+ *  for a partial PATCH (null on create). Returns an error message or null. */
+export function checkDateOrder(
+  prev: { start_date: string | null; due_date: string | null } | null,
+  patch: Record<string, unknown>,
+): string | null {
+  const start = ("start_date" in patch ? patch.start_date : prev?.start_date) as string | null | undefined;
+  const due = ("due_date" in patch ? patch.due_date : prev?.due_date) as string | null | undefined;
+  if (start && due && start > due) return "Start date must be on or before the due date";
+  return null;
+}

@@ -10,6 +10,8 @@
 
    Click an empty slot → create new event at that time.
    Click a day header → that day. Click an event → open it.
+   Drag an editable event (mouse/pen) → move it; drag its bottom edge →
+   resize it (TimeGrid).
    --------------------------------------------------------------------------- */
 
 import type { AccountPreferences } from "@/types/supabase";
@@ -32,6 +34,8 @@ interface Props {
   onDayClick?: (d: Date) => void;
   onNewEventAtSlot?: (d: Date) => void;
   onEventClick?: (e: CalendarFeedEvent) => void;
+  canDrag?: (e: CalendarFeedEvent) => boolean;
+  onEventMove?: (e: CalendarFeedEvent, start: Date, end: Date) => void;
 }
 
 export default function WeekView({ focusDate, weekStart, ...rest }: Props) {

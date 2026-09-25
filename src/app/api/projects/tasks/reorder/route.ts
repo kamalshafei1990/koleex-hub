@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   }
   const ids = ordered as string[];
 
-  const gate = await assertProjectAccess(auth, projectId);
+  const gate = await assertProjectAccess(auth, projectId, { write: true });
   if (gate instanceof NextResponse) return gate;
 
   const stages = await loadStages(auth.tenant_id, projectId);

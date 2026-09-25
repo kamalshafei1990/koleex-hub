@@ -61,7 +61,8 @@ function bad(message: string, status = 400) {
               removing one's OWN message (whoever may send may take it back;
               editMessage is author-only, deleteMessage re-checks below).
    · edit   — changing shared content: channel settings, pinning to a
-              channel.
+              channel, removing a member or changing a member's role
+              (each also requires channel-admin, checked in the action).
    · delete — removing SOMEONE ELSE's message (channel-admin moderation);
               checked inside deleteMessage once the author is known. */
 const ACTION_PERMISSION: Record<string, ModuleAction> = {
@@ -73,12 +74,15 @@ const ACTION_PERMISSION: Record<string, ModuleAction> = {
   toggleReaction: "create",
   updateChannel: "edit",
   archiveChannel: "edit",
+  removeMember: "edit",
+  setMemberRole: "edit",
   editMessage: "create",
   deleteMessage: "create",
   pinMessage: "edit",
   unpinMessage: "edit",
   leaveChannel: "view",
   markRead: "view",
+  markAllRead: "view",
   setChannelPinned: "view",
   setChannelHidden: "view",
   markChannelUnread: "view",
@@ -91,6 +95,9 @@ const ACTION_PERMISSION: Record<string, ModuleAction> = {
 };
 
 const NOTIFICATION_PREFS = new Set(["all", "mentions", "none"]);
+const MEMBER_ROLES = new Set(["admin", "member"]);
+/* client_msg_id is a uuid column: anything else would 500 the insert. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: Request) {
   const timing = stageTimer("discuss.mutate"); /* kx-perf: stage breakdown for hot ops */
@@ -338,6 +345,14 @@ export async function POST(req: Request) {
           if (k in patch) clean[k] = typeof patch[k] === "string" ? (patch[k] as string).slice(0, max) : null;
         }
         if (Object.keys(clean).length === 0) return bad("Nothing to update");
+        if ("name" in clean) {
+          const name = typeof clean.name === "string" ? clean.name.trim() : "";
+          if (!name) return bad("Name required");
+          clean.name = name;
+        }
+        const { data: target } = await supabaseServer.from(CHANNELS).select("kind").eq("id", channelId).maybeSingle();
+        if (!target) return bad("Channel not found", 404);
+        if ((target as { kind: string }).kind === "direct") return bad("Direct messages cannot be renamed", 400);
         const { error } = await supabaseServer.from(CHANNELS).update(clean).eq("id", channelId);
         if (error) return bad(error.message, 500);
         await emitPings([{ topic: rtTopic.channel(channelId) }, ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) }))]);
@@ -348,6 +363,9 @@ export async function POST(req: Request) {
         const channelId = str(p.channelId);
         if (!channelId) return bad("channelId required");
         if (!(await isChannelAdmin(channelId))) return bad("Admins only", 403);
+        const { data: target } = await supabaseServer.from(CHANNELS).select("kind").eq("id", channelId).maybeSingle();
+        if (!target) return bad("Channel not found", 404);
+        if ((target as { kind: string }).kind === "direct") return bad("Direct messages cannot be archived", 400);
         const { error } = await supabaseServer
           .from(CHANNELS)
           .update({ archived_at: new Date().toISOString() })
@@ -368,6 +386,10 @@ export async function POST(req: Request) {
         if (accountIds.length === 0) return NextResponse.json({ ok: true, data: 0 });
         const err = await ensureMembers(channelId, accountIds);
         if (err) return bad(err, 500);
+        /* SSE-only clients (no broadcast from the mainland) learn about the
+           membership change from the channel touch — see the stream's `meta`
+           change events. */
+        await touchChannel(channelId);
         await emitPings([
           { topic: rtTopic.channel(channelId) },
           ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })),
@@ -378,16 +400,93 @@ export async function POST(req: Request) {
       case "leaveChannel": {
         const channelId = str(p.channelId);
         if (!channelId) return bad("channelId required");
+        const { data: mine } = await supabaseServer
+          .from(MEMBERS)
+          .select("role")
+          .eq("channel_id", channelId)
+          .eq("account_id", me)
+          .is("left_at", null)
+          .maybeSingle();
         const { error } = await supabaseServer
           .from(MEMBERS)
-          .update({ left_at: new Date().toISOString() })
+          .update({ left_at: new Date().toISOString(), pinned_at: null, marked_unread: false })
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        /* The last admin walking out would leave a channel nobody can rename,
+           archive or moderate: hand the role to the longest-standing member. */
+        if ((mine as { role?: string } | null)?.role === "admin") {
+          await promoteIfNoAdmin(channelId);
+        }
+        await touchChannel(channelId);
         await emitPings([
           { topic: rtTopic.account(me) },
+          { topic: rtTopic.channel(channelId) },
           ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })),
         ]);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "removeMember": {
+        const channelId = str(p.channelId);
+        const accountId = str(p.accountId);
+        if (!channelId || !accountId) return bad("channelId and accountId required");
+        if (accountId === me) return bad("Use leaveChannel to leave", 400);
+        if (!(await isChannelAdmin(channelId))) return bad("Admins only", 403);
+        const { data: ch } = await supabaseServer.from(CHANNELS).select("kind").eq("id", channelId).maybeSingle();
+        if (!ch) return bad("Channel not found", 404);
+        if ((ch as { kind: string }).kind === "direct") return bad("Cannot remove members from a direct message", 400);
+        const { data: target } = await supabaseServer
+          .from(MEMBERS)
+          .select("id")
+          .eq("channel_id", channelId)
+          .eq("account_id", accountId)
+          .is("left_at", null)
+          .maybeSingle();
+        if (!target) return bad("Not a member of this channel", 404);
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ left_at: new Date().toISOString(), pinned_at: null, marked_unread: false })
+          .eq("id", (target as { id: string }).id);
+        if (error) return bad(error.message, 500);
+        /* A super-admin (not a member) may remove the only admin. */
+        await promoteIfNoAdmin(channelId);
+        await touchChannel(channelId);
+        await emitPings([
+          { topic: rtTopic.channel(channelId) },
+          { topic: rtTopic.account(accountId) },
+          ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })),
+        ]);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "setMemberRole": {
+        const channelId = str(p.channelId);
+        const accountId = str(p.accountId);
+        const role = str(p.role);
+        if (!channelId || !accountId || !role) return bad("channelId, accountId and role required");
+        if (!MEMBER_ROLES.has(role)) return bad("Invalid role");
+        if (!(await isChannelAdmin(channelId))) return bad("Admins only", 403);
+        const { data: ch } = await supabaseServer.from(CHANNELS).select("kind").eq("id", channelId).maybeSingle();
+        if (!ch) return bad("Channel not found", 404);
+        if ((ch as { kind: string }).kind === "direct") return bad("Direct messages have no roles", 400);
+        const { data: rows } = await supabaseServer
+          .from(MEMBERS)
+          .select("id, account_id, role")
+          .eq("channel_id", channelId)
+          .is("left_at", null);
+        const active = (rows ?? []) as Array<{ id: string; account_id: string; role: string }>;
+        const target = active.find((r) => r.account_id === accountId);
+        if (!target) return bad("Not a member of this channel", 404);
+        if (target.role === role) return NextResponse.json({ ok: true });
+        /* Never demote the last admin — the channel would be unmanageable. */
+        if (role !== "admin" && target.role === "admin" && active.filter((r) => r.role === "admin").length <= 1) {
+          return bad("A channel needs at least one admin", 409);
+        }
+        const { error } = await supabaseServer.from(MEMBERS).update({ role }).eq("id", target.id);
+        if (error) return bad(error.message, 500);
+        await touchChannel(channelId);
+        await emitPings([{ topic: rtTopic.channel(channelId) }]);
         return NextResponse.json({ ok: true });
       }
 
@@ -402,6 +501,19 @@ export async function POST(req: Request) {
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "markAllRead": {
+        /* Every conversation I am in, in one statement. Per-user state only,
+           so no membership gate beyond "my own rows". */
+        const { error } = await supabaseServer
+          .from(MEMBERS)
+          .update({ last_read_at: new Date().toISOString(), marked_unread: false })
+          .eq("account_id", me)
+          .is("left_at", null);
+        if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.account(me) }]);
         return NextResponse.json({ ok: true });
       }
 
@@ -502,7 +614,8 @@ export async function POST(req: Request) {
            so "send timed out but actually committed" + retry is safe.
            NULL is allowed and unconstrained, so legacy rows and any client
            that omits the key keep working exactly as before. */
-        const clientMsgId = str(p.clientMsgId);
+        const rawClientMsgId = str(p.clientMsgId);
+        const clientMsgId = rawClientMsgId && UUID_RE.test(rawClientMsgId) ? rawClientMsgId : null;
         const { data, error } = await supabaseServer
           .from(MESSAGES)
           .insert({
@@ -531,6 +644,11 @@ export async function POST(req: Request) {
               .eq("channel_id", channelId)
               .eq("client_msg_id", clientMsgId)
               .single();
+            /* The key is only ever MY retry: a row with the same key by
+               someone else is not my message and must not be handed back. */
+            if (existing && (existing as { author_account_id: string | null }).author_account_id !== me) {
+              return bad("Duplicate message id", 409);
+            }
             if (existing) {
               timing.mark("idempotent_replay");
               const { header } = timing.done({ action: "sendMessage" });
@@ -868,4 +986,23 @@ async function ensureMembers(channelId: string, accountIds: string[]): Promise<s
     if (error) return error.message;
   }
   return null;
+}
+
+/** If a group/channel has active members but no active admin, promote the
+ *  longest-standing member. Best-effort: a failure leaves the channel as it
+ *  was (the leave itself already succeeded). */
+async function promoteIfNoAdmin(channelId: string): Promise<void> {
+  try {
+    const { data: ch } = await supabaseServer.from(CHANNELS).select("kind").eq("id", channelId).maybeSingle();
+    if (!ch || (ch as { kind: string }).kind === "direct") return;
+    const { data: rows } = await supabaseServer
+      .from(MEMBERS)
+      .select("id, role, joined_at")
+      .eq("channel_id", channelId)
+      .is("left_at", null)
+      .order("joined_at", { ascending: true });
+    const active = (rows ?? []) as Array<{ id: string; role: string }>;
+    if (active.length === 0 || active.some((r) => r.role === "admin")) return;
+    await supabaseServer.from(MEMBERS).update({ role: "admin" }).eq("id", active[0].id);
+  } catch { /* best-effort */ }
 }

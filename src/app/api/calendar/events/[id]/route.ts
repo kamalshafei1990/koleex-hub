@@ -10,8 +10,10 @@ import {
   isUuid,
   loadCalendarEvent,
   sanitizeEventInput,
+  updateEventRow,
   type CalendarEventCore,
 } from "@/lib/server/calendar-access";
+import { clearExceptions } from "@/lib/server/calendar-exceptions";
 import { accountTimezone, clearEventNotifications, notifyEventChanged } from "@/lib/server/calendar-notify";
 import { deleteLinkedTodos, syncLinkedTodo } from "@/lib/server/calendar-todo-bridge";
 import { allDayKeys } from "@/lib/calendar-tz";
@@ -26,8 +28,10 @@ import { allDayKeys } from "@/lib/calendar-tz";
               All-day events carry start_date / end_date in the organizer's
               timezone, like the list.
      PATCH  — the owner or a Super Admin. Only the writable columns are
-              accepted; a time or place change re-arms the reminder / tells
-              guests. The To-do the Calendar made from a "task" event
+              accepted; a time, place or meeting-link change re-arms the
+              reminder / tells guests. Moving a series (its start or its
+              rule) drops its "this occurrence only" changes, which were
+              keyed on the old occurrences. The To-do the Calendar made from a "task" event
               follows its title, description and date.
      DELETE — the owner or a Super Admin. Guests hear it was cancelled,
               every unread notification about the event is closed, and the
@@ -88,21 +92,18 @@ export async function PATCH(
   if (!input.ok) return NextResponse.json({ error: input.error }, { status: 400 });
   if (Object.keys(input.row).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  const { data, error } = await supabaseServer
-    .from("koleex_calendar_events")
-    .update(input.row)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await updateEventRow(id, input.row);
   if (error) {
     console.error("[api/calendar/events PATCH]", error.message);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 
   const updated = { ...existing, ...(data as object) } as CalendarEventCore;
-  if (input.timeChanged || input.locationChanged) {
+  if (input.seriesChanged && (existing.recurrence || updated.recurrence)) await clearExceptions(id);
+  const linkChanged = input.meetingUrlChanged && (updated.meeting_url ?? null) !== (existing.meeting_url ?? null);
+  if (input.timeChanged || input.locationChanged || linkChanged) {
     const guests = await eventAttendeeIds(id, { excludeDeclined: true });
-    await notifyEventChanged(updated, guests, auth.account_id, input.timeChanged ? "rescheduled" : "moved");
+    await notifyEventChanged(updated, guests, auth.account_id, input.timeChanged ? "rescheduled" : input.locationChanged ? "moved" : "link");
   }
   if (input.timeChanged || "title" in input.row || "description" in input.row) {
     await syncLinkedTodo(updated);
