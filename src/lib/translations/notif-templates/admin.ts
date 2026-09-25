@@ -107,4 +107,10 @@ export const adminTpl: Translations = {
      same audited action by one person on one day into this one line
      (lib/notification-view — "Delete — product × 6"). */
   "sa_alert.digest.s": { en: "{action:sa_action} — {entity:sa_entity} × {count}", zh: "{action:sa_action} — {entity:sa_entity} × {count}", ar: "{action:sa_action} — {entity:sa_entity} × {count}" },
+
+  /* Lock-screen folding (service worker): when a push lands on a tag that is
+     still showing, the device counts them and shows this title instead —
+     `{n}` is filled ON THE DEVICE (the server passes it through as "{n}"). */
+  "push_group.alerts.s": { en: "{actor} — {n} alerts", zh: "{actor} — {n} 条提醒", ar: "{actor} — تنبيهات: {n}" },
+  "push_group.messages.s": { en: "{actor} · {n} new messages", zh: "{actor} · {n} 条新消息", ar: "{actor} · رسائل جديدة: {n}" },
 };

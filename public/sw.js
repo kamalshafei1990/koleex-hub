@@ -126,7 +126,19 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = payload.title || "Koleex Hub";
+  event.waitUntil(showPush(payload));
+});
+
+/* FOLDING. A push that carries `group` (security alerts per person per day,
+   a busy chat) and lands on a tag that is still on the screen does not stack
+   a second card, and does not silently replace the first either: the
+   device counts them and shows the group's title — "Salt Leo — 6 alerts",
+   already in the reader's language, with `{n}` left for this count. The
+   body stays the newest one. The count lives on the notification itself, so
+   opening or clearing it starts over at one. Where getNotifications is not
+   available the push simply shows on its own, as before. */
+async function showPush(payload) {
+  let title = payload.title || "Koleex Hub";
   const options = {
     body: payload.body || "",
     icon: payload.icon || "/icon-192.png",
@@ -136,11 +148,21 @@ self.addEventListener("push", (event) => {
     timestamp: Date.now(),
     /* No url → the Hub home. The old default sent every kind-less push to a
        Super-Admin page most recipients cannot open. */
-    data: { url: payload.url || "/" },
+    data: { url: payload.url || "/", count: 1 },
   };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
+  if (payload.tag && payload.group && payload.group.title) {
+    try {
+      const showing = await self.registration.getNotifications({ tag: payload.tag });
+      const prev = showing[0];
+      const count = prev ? ((prev.data && prev.data.count) || 1) + 1 : 1;
+      options.data.count = count;
+      if (count > 1) title = String(payload.group.title).replace("{n}", String(count));
+    } catch {
+      /* no getNotifications — the single push shows as it always did */
+    }
+  }
+  return self.registration.showNotification(title, options);
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

@@ -87,13 +87,20 @@ const PUSH_TEMPLATED: ReadonlySet<AlertKind> = new Set(["new_device", "failed_lo
 function buildPushPayload(alert: SaAlert, subject: string, actorName: string | null, tpl: NotifTpl | null) {
   const actionText = alert.action || subject;
   const body = alert.location ? `${actionText} · from ${alert.location}` : actionText;
+  const who = actorName || "Koleex Hub";
   return {
-    title: actorName || "Koleex Hub",
+    title: who,
     body,
     url: alert.link ?? "/super-admin/activity",
-    tag: alert.kind,
+    /* One lock-screen notification per kind, per person, per day: six
+       deletions by one person fold into "Salt Leo — 6 alerts" (the device
+       counts, public/sw.js), and a different person's alerts never overwrite
+       them. The tag used to be the kind alone, so every deletion by anyone
+       silently replaced the last one. */
+    tag: `sa:${alert.kind}:${alert.actorAccountId ?? "-"}:${new Date().toISOString().slice(0, 10)}`,
     kind: alert.kind,
     tpl: PUSH_TEMPLATED.has(alert.kind) ? tpl : null,
+    group: { tpl: { k: "push_group.alerts", p: { actor: who, n: "{n}" } } },
   };
 }
 

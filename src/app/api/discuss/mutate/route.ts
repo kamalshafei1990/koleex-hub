@@ -728,6 +728,10 @@ export async function POST(req: Request) {
                     url: `/discuss?channel=${encodeURIComponent(channelId)}&msg=${encodeURIComponent(messageId)}`,
                     tag: `discuss:${channelId}`,
                     kind: "discuss_message",
+                    /* A busy chat folds on the lock screen into one line that
+                       counts ("Mona · 5 new messages"), not five stacked
+                       pushes or one that silently replaced four. */
+                    group: { tpl: { k: "push_group.messages", p: { actor: auth.username || "Koleex", n: "{n}" } } },
                   },
                   { actorAccountId: me },
                 );

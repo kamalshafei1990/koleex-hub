@@ -64,6 +64,11 @@ export interface PushPayload {
    *  recipient's push is written in the language their account reads
    *  (preferences.language); title/body above stay the English. */
   tpl?: NotifTpl | null;
+  /** Lock-screen folding for a noisy tag (security alerts, a busy chat):
+   *  the title to show — in the reader's language — once several pushes of
+   *  this `tag` are on the screen. Its template keeps `{n}` for the device
+   *  to fill (public/sw.js counts them). */
+  group?: { tpl: NotifTpl } | null;
 }
 
 interface SubRow {
@@ -171,14 +176,20 @@ export async function sendPushToAccounts(
      audited route (see the note at the top). */
   const langs = new Set<Lang>(subs.map((s) => langOf.get(s.account_id) ?? "en"));
   const bodies = new Map<Lang, string>();
-  const tr = payload.tpl && [...langs].some((l) => l !== "en") ? await import("@/lib/notification-templates") : null;
+  const tr = (payload.tpl && [...langs].some((l) => l !== "en")) || (payload.group && payload.tag)
+    ? await import("@/lib/notification-templates")
+    : null;
   for (const lang of langs) {
-    const r = tr && lang !== "en" ? tr.renderNotification({ tpl: payload.tpl }, lang) : null;
+    const r = tr && lang !== "en" && payload.tpl ? tr.renderNotification({ tpl: payload.tpl }, lang) : null;
+    const groupTitle = tr && payload.group && payload.tag
+      ? tr.fillTemplate(`${payload.group.tpl.k}.s`, lang, payload.group.tpl.p ?? {})
+      : null;
     bodies.set(lang, JSON.stringify({
       title: r ? tr!.partsText(r.subject) : payload.title,
       body: r?.body ? tr!.partsText(r.body) : payload.body ?? "",
       url: payload.url ?? "/",
       tag: payload.tag,
+      ...(groupTitle ? { group: { title: groupTitle } } : {}),
     }));
   }
 
