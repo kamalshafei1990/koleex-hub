@@ -1588,7 +1588,16 @@ console.log("\n── An Arabic opening before an English code block reads right
      must not be the thing holding the gate. If any of those stops being true,
      this fails — it cannot quietly become "no gate". */
   const shell = readFileSync("src/components/layout/RootShell.tsx", "utf8");
-  const gate = readFileSync("src/components/admin/AuthGate.tsx", "utf8");
+  /* The flag-OFF branch is <AdminAuthGate> since d911bb7a: it shows the Hub
+     from the same session flag AdminAuth reads, and loads AdminAuth (the
+     sign-in screen) only when signed out. The pin reads AuthGate's own body
+     with comments stripped, so a gate kept only in a comment, a pass-through
+     defined in place of the import, or an extra `return` ahead of the two
+     branches all fail it. */
+  const gate = stripComments(readFileSync("src/components/admin/AuthGate.tsx", "utf8"));
+  const gateStart = gate.indexOf("export default function AuthGate(");
+  const gateEnd = gate.indexOf("\nfunction SupabaseGate(", gateStart);
+  const gateBody = gateStart >= 0 && gateEnd > gateStart ? gate.slice(gateStart, gateEnd) : "";
   /* Comments stripped: this page EXPLAINS why the second gate went, so the
      word appears in prose. The pin is about the code. */
   const aiPage = stripComments(readFileSync("src/app/ai/page.tsx", "utf8"), { line: "keep" });
@@ -1598,8 +1607,10 @@ console.log("\n── An Arabic opening before an English code block reads right
     !/"\/ai"/.test(/const BYPASS_(SUFFIXES|PREFIXES)[^;]*;/.exec(shell)?.[0] ?? "") &&
     /if \(isBypassed\(pathname\)\) \{\s*return <>\{children\}<\/>;\s*\}\s*return \(\s*<AuthGate>/.test(shell));
   check("  …and AuthGate gates on BOTH branches, so the flag cannot open a hole",
-    /if \(!useSupabase\) \{\s*return \(\s*<AdminAuth>\{children\}<\/AdminAuth>\s*\);\s*\}/.test(gate) &&
-    /return <SupabaseGate>\{children\}<\/SupabaseGate>;/.test(gate));
+    /^import AdminAuthGate from "\.\/AdminAuthGate";$/m.test(gate) &&
+    /if \(!useSupabase\) \{\s*return \(\s*<AdminAuthGate>\{children\}<\/AdminAuthGate>\s*\);\s*\}/.test(gateBody) &&
+    /return <SupabaseGate>\{children\}<\/SupabaseGate>;/.test(gateBody) &&
+    (gateBody.match(/\breturn\b/g) ?? []).length === 2);
   check("  …so the page carries no second gate of its own, and no longer imports one",
     !/AdminAuth/.test(aiPage) && /export default function AiPage\(\) \{\s*return <KoleexAiApp \/>;\s*\}/.test(aiPage));
 
