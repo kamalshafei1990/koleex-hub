@@ -856,6 +856,9 @@ interface DetailValuation {
   last_in_cost: number | null;
   currency: string;
   locations: DetailValuationLocation[];
+  /** No «private records» switch on the role: the cost fields came as 0 and
+   *  show «•••»; the quantities are real (src/lib/experience). */
+  cost_hidden?: boolean;
 }
 
 function ItemDetailDrawer({
@@ -1022,18 +1025,18 @@ function ItemDetailDrawer({
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.balances.col.avg_cost", "Avg cost")}</div>
-                  <div className="mt-0.5 text-[15px] tabular-nums font-mono">{fmtMoney(valuation.weighted_avg_cost)}</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono">{valuation.cost_hidden ? "•••" : fmtMoney(valuation.weighted_avg_cost)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.stock_value", "Stock value")}</div>
-                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{fmtMoney(valuation.total_value)}</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{valuation.cost_hidden ? "•••" : fmtMoney(valuation.total_value)}</div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
                 <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                   <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.items.last_in_cost", "Last in cost")}</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono text-[var(--text-muted)]">
-                    {valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
+                    {valuation.cost_hidden ? "•••" : valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
                   </div>
                   <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
@@ -1054,8 +1057,8 @@ function ItemDetailDrawer({
                         <tr key={l.warehouse_id} className="border-b border-[var(--border-subtle)] last:border-b-0">
                           <td className="px-2 py-1.5 text-[var(--text-muted)]">{l.warehouse_code} <span className="text-[var(--text-dim)]">· {l.warehouse_name}</span></td>
                           <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtQty(l.qty_on_hand)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtMoney(l.average_cost)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtMoney(l.inventory_value)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{valuation.cost_hidden ? "•••" : fmtMoney(l.average_cost)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{valuation.cost_hidden ? "•••" : fmtMoney(l.inventory_value)}</td>
                         </tr>
                       ))}
                     </tbody>

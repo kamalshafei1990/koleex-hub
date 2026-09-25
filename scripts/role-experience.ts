@@ -46,6 +46,8 @@ import {
   canSeeBankAndProfit,
   canSeeCostData,
   getUserExperience,
+  hideBankBalances,
+  hideInventoryCost,
   requireFinanceNumbers,
 } from "../src/lib/experience";
 
@@ -138,6 +140,26 @@ async function main() {
     expSa.can_see_cost_data && expSa.can_see_bank_balances && expSa.can_see_profit && expSa.can_approve && expSa.is_super_admin
       && expCvp.can_see_cost_data && !expCvp.can_see_bank_balances && !expCvp.can_see_profit && !expCvp.can_approve && !expCvp.is_super_admin,
     `sa=${JSON.stringify(expSa)} switch=${JSON.stringify(expCvp)}`,
+  );
+
+  /* The hiding helpers the bank-account and valuation routes use: every
+     balance / cost field to 0 (a missing figure stays null), the rest of the
+     row untouched, and a flag the screens turn into «•••». An account with no
+     ledger entries reports minus its balance as the difference — that goes
+     too. */
+  const bank = hideBankBalances({ bank_name: "HSBC", current_balance: 5000, available_balance: 4000, ledger_difference: -5000, unreconciled_count: 3 });
+  ok(
+    `${String(n++).padStart(2, "0")}  hideBankBalances zeroes every balance, keeps the rest, says so`,
+    bank.current_balance === 0 && bank.available_balance === 0 && bank.ledger_difference === 0
+      && bank.bank_name === "HSBC" && bank.unreconciled_count === 3 && bank.balances_hidden === true,
+    JSON.stringify(bank),
+  );
+  const cost = hideInventoryCost({ qty_on_hand: 7, average_cost: 12.5, inventory_value: 87.5, last_in_cost: null, unit_cost: 3 });
+  ok(
+    `${String(n++).padStart(2, "0")}  hideInventoryCost zeroes every cost (null stays null), keeps the quantity, says so`,
+    cost.average_cost === 0 && cost.inventory_value === 0 && cost.unit_cost === 0 && cost.last_in_cost === null
+      && cost.qty_on_hand === 7 && cost.cost_hidden === true,
+    JSON.stringify(cost),
   );
 
   console.log("─".repeat(72));

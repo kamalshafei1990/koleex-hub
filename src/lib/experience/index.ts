@@ -80,6 +80,48 @@ export async function requireFinanceNumbers(auth: ServerAuthContext): Promise<Ne
   return requireModuleAccess(auth, "Finance");
 }
 
+/* ── Bank balances on the wire ────────────────────────────────────────────
+   For a caller without «Bank & Profit» the balances go out as 0 — numbers
+   stay numbers, so no screen's arithmetic breaks — and the row carries
+   `balances_hidden: true`. The flag travels WITH the row (into a warm cache,
+   into an edit form), so a screen shows «•••» instead of a zero that reads
+   as an empty account. ledger_difference goes too: an account with no ledger
+   entries reports minus its balance there. Whether the books agree with the
+   statement is `ledger_gap`, computed before this runs.
+
+   Can't read → can't write: an edit form sends the whole row back, zeros
+   included, so every writer drops BANK_BALANCE_INPUTS for such a caller
+   instead of writing a balance they were never shown. */
+export const BANK_BALANCE_FIELDS = [
+  "opening_balance", "current_balance", "available_balance", "pending_balance", "restricted_balance",
+  "ledger_balance", "ledger_base", "ledger_difference",
+] as const;
+export const BANK_BALANCE_INPUTS = ["opening_balance", "available_balance", "pending_balance", "restricted_balance"] as const;
+
+export function hideBankBalances<T extends object>(row: T): T & { balances_hidden: true } {
+  const out = { ...row } as Record<string, unknown>;
+  for (const f of BANK_BALANCE_FIELDS) if (f in out) out[f] = 0;
+  out.balances_hidden = true;
+  return out as T & { balances_hidden: true };
+}
+
+/* ── Inventory cost on the wire ───────────────────────────────────────────
+   The same move for cost data (the role's «private records» switch): every
+   cost field a valuation row can carry goes out as 0 — or stays null where
+   "no figure" was the answer — and the row says `cost_hidden: true`, so the
+   screen shows «•••». Quantities are not cost and stay. */
+export const INVENTORY_COST_FIELDS = [
+  "cost_price", "average_cost", "avg_cost", "weighted_avg_cost", "last_in_cost",
+  "inventory_value", "total_value", "unit_cost", "total_cost",
+] as const;
+
+export function hideInventoryCost<T extends object>(row: T): T & { cost_hidden: true } {
+  const out = { ...row } as Record<string, unknown>;
+  for (const f of INVENTORY_COST_FIELDS) if (f in out) out[f] = out[f] == null ? null : 0;
+  out.cost_hidden = true;
+  return out as T & { cost_hidden: true };
+}
+
 export interface UserExperience {
   account_id: string;
   can_see_cost_data: boolean;

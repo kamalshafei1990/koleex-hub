@@ -313,6 +313,9 @@ export interface BankAccount {
   available_balance: number;
   pending_balance: number;
   restricted_balance: number;
+  /** Set when the caller has no «Bank & Profit»: the balance fields above
+   *  arrived as 0 and show as «•••» (src/lib/experience, hideBankBalances). */
+  balances_hidden?: boolean;
   status: BankAccountStatus;
   is_primary: boolean;
   last_reconciled_at: string | null;

@@ -467,6 +467,9 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
   const [currency, setCurrency] = useState(baseCurrency);
   const [opening, setOpening] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /* Without «Bank & Profit» the balances arrive as 0 and a non-zero opening
+     balance is refused (src/lib/experience): show «•••» and no input. */
+  const [balancesHidden, setBalancesHidden] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -474,6 +477,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
       const r = await fetch("/api/finance/bank-accounts", { credentials: "include", cache: "no-store" });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "Failed"); return; }
+      setBalancesHidden(j.visibility?.can_see_bank_balances === false);
       setRows(((j.accounts ?? []) as BankRow[]).filter((b) => b.status !== "archived"));
     } finally { setLoading(false); }
   }, []);
@@ -521,7 +525,11 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
             <input placeholder={t("setup.banks.ibanPlaceholder", "IBAN")}            value={iban}          onChange={(e) => setIban(e.target.value.toUpperCase())}  className={`${inputCls} font-mono uppercase`} />
             <input placeholder={t("setup.banks.ccyPlaceholder", "Currency (USD)")}  value={currency}      onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
           </div>
-          <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
+          {balancesHidden ? (
+            <div className="text-[11px] text-[var(--text-dim)]">{t("setup.banks.balancesHidden", "Opening balances are shown and set only with «Bank & Profit» in Roles & Permissions.")}</div>
+          ) : (
+            <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
+          )}
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
           <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
         </div>
@@ -538,7 +546,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
                     <div className="text-[var(--text-highlight)]">{b.account_name ?? b.bank_name ?? "—"} <span className="text-[var(--text-dim)]">· {b.currency}</span></div>
                     <div className="text-[10.5px] text-[var(--text-dim)] font-mono">{b.account_number ?? "—"}{b.swift_code ? ` · ${b.swift_code}` : ""}</div>
                   </div>
-                  <span className="font-mono tabular-nums">{Number(b.opening_balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono tabular-nums">{balancesHidden ? "•••" : Number(b.opening_balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </li>
               ))}
             </ul>

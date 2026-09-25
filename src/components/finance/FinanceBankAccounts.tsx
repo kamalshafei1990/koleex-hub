@@ -53,6 +53,10 @@ const DICT = { ...FIN_BANKACCOUNTS, ...FIN_BANKIMPORTS } as const;
    Helpers
    ──────────────────────────────────────────────────────────────────────── */
 
+/** What a balance shows to a caller without «Bank & Profit» — the Finance
+ *  workspace's mark for the same thing. */
+const HIDDEN = "•••";
+
 function maskAccountNumber(raw: string | null | undefined): string {
   if (!raw) return "—";
   const stripped = raw.replace(/\s/g, "");
@@ -124,20 +128,24 @@ export default function FinanceBankAccounts() {
 
   useEffect(() => { if (openAccountId) void loadDetail(openAccountId); else setDetail(null); }, [openAccountId, loadDetail]);
 
-  /* ── KPI strip across the whole tenant. ── */
+  /* ── KPI strip across the whole tenant. ──
+     Without «Bank & Profit» every row arrives with its balances as 0 and
+     balances_hidden (src/lib/experience); the sums then show «•••», never a
+     zero that reads as an empty bank. */
   const tenantKpi = useMemo(() => {
     let avail = 0, pending = 0, restricted = 0, unrec = 0, gapCount = 0;
     let primary: BankAccountListItem | null = null;
+    const hidden = accounts.some((a) => a.balances_hidden);
     for (const a of accounts) {
       if (a.status !== "active") continue;
       avail     += a.available_balance;
       pending   += a.pending_balance;
       restricted += a.restricted_balance;
       unrec     += a.unreconciled_count;
-      if (Math.abs(a.ledger_difference ?? 0) >= 0.01) gapCount += 1;
+      if (a.ledger_gap ?? Math.abs(a.ledger_difference ?? 0) >= 0.01) gapCount += 1;
       if (a.is_primary && !primary) primary = a;
     }
-    return { avail, pending, restricted, unrec, gapCount, primary, total: accounts.length };
+    return { avail, pending, restricted, unrec, gapCount, primary, total: accounts.length, hidden };
   }, [accounts]);
 
   /* ── Group accounts by currency for the grid. ── */
@@ -160,6 +168,7 @@ export default function FinanceBankAccounts() {
     available_balance: 0,
     pending_balance: 0,
     restricted_balance: 0,
+    balances_hidden: tenantKpi.hidden || undefined,
     is_primary: accounts.length === 0,
   });
   /* ?new=1 (Smart Create) opens the new-account form once the list is in,
@@ -189,9 +198,9 @@ export default function FinanceBankAccounts() {
         />
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label={t("bankAccounts.kpi.available", "Available")} value={tenantKpi.avail} unit={baseCurrency} hint={t("bankAccounts.kpi.availableHint", "Across active accounts")} loading={loading} />
-          <MetricCard label={t("bankAccounts.kpi.pending", "Pending")} value={tenantKpi.pending} unit={baseCurrency} hint={t("bankAccounts.kpi.pendingHint", "Not yet cleared")} loading={loading} />
-          <MetricCard label={t("bankAccounts.kpi.restricted", "Restricted")} value={tenantKpi.restricted} unit={baseCurrency} hint={t("bankAccounts.kpi.restrictedHint", "Holds + reserves")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.available", "Available")} value={tenantKpi.hidden ? HIDDEN : tenantKpi.avail} unit={baseCurrency} hint={t("bankAccounts.kpi.availableHint", "Across active accounts")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.pending", "Pending")} value={tenantKpi.hidden ? HIDDEN : tenantKpi.pending} unit={baseCurrency} hint={t("bankAccounts.kpi.pendingHint", "Not yet cleared")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.restricted", "Restricted")} value={tenantKpi.hidden ? HIDDEN : tenantKpi.restricted} unit={baseCurrency} hint={t("bankAccounts.kpi.restrictedHint", "Holds + reserves")} loading={loading} />
           <MetricCard label={t("bankAccounts.kpi.ledgerGap", "Ledger vs statement")} value={tenantKpi.gapCount} unit={t("bankAccounts.kpi.accountsUnit", "acct.")} hint={tenantKpi.gapCount === 0 ? t("bankAccounts.kpi.ledgerGapOk", "Every account agrees with the books") : t("bankAccounts.kpi.ledgerGapHint", "Accounts whose books differ from the statement")} loading={loading} />
         </div>
 
@@ -324,7 +333,9 @@ function AccountCard({
   const inactive = status !== "active";
   const dsReconciled = daysSince(account.last_reconciled_at);
   const dsImport = daysSince(account.last_import_at);
-  const lowCash = account.available_balance < 25_000 && status === "active";
+  const hidden = !!account.balances_hidden;
+  const lowCash = !hidden && account.available_balance < 25_000 && status === "active";
+  const gap = account.ledger_gap ?? Math.abs(account.ledger_difference) >= 0.01;
 
   return (
     <div
@@ -364,18 +375,18 @@ function AccountCard({
 
       {/* Balance grid */}
       <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
-        <BalanceCell label={t("bankAccounts.balance.available", "Available")} value={account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
-        <BalanceCell label={t("bankAccounts.balance.pending", "Pending")}   value={account.pending_balance}   ccy={account.currency} tone="neutral" />
-        <BalanceCell label={t("bankAccounts.balance.restricted", "Restricted")} value={account.restricted_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.available", "Available")} value={hidden ? null : account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
+        <BalanceCell label={t("bankAccounts.balance.pending", "Pending")}   value={hidden ? null : account.pending_balance}   ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.restricted", "Restricted")} value={hidden ? null : account.restricted_balance} ccy={account.currency} tone="neutral" />
       </div>
 
       {/* Books vs statement — the number the ledger holds for this account
           against the balance typed from the bank. A difference is work for
           reconciliation, not a display choice. */}
       <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-faint)] px-3 py-2.5">
-        <BalanceCell label={t("bankAccounts.balance.ledger", "Ledger")} value={account.ledger_balance} ccy={account.currency} tone="neutral" />
-        <BalanceCell label={t("bankAccounts.balance.statement", "Statement")} value={account.current_balance} ccy={account.currency} tone="neutral" />
-        <BalanceCell label={t("bankAccounts.balance.difference", "Difference")} value={account.ledger_difference} ccy={account.currency} tone={Math.abs(account.ledger_difference) >= 0.01 ? "warning" : "neutral"} />
+        <BalanceCell label={t("bankAccounts.balance.ledger", "Ledger")} value={hidden ? null : account.ledger_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.statement", "Statement")} value={hidden ? null : account.current_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.difference", "Difference")} value={hidden ? null : account.ledger_difference} ccy={account.currency} tone={gap ? "warning" : "neutral"} />
       </div>
 
       {/* Operational counters */}
@@ -453,12 +464,13 @@ function AccountCard({
   );
 }
 
-function BalanceCell({ label, value, ccy, tone }: { label: string; value: number; ccy: string; tone: "neutral" | "warning" }) {
+/** A balance, or «•••» when the caller has no «Bank & Profit» (value null). */
+function BalanceCell({ label, value, ccy, tone }: { label: string; value: number | null; ccy: string; tone: "neutral" | "warning" }) {
   const cls = tone === "warning" ? "text-amber-600 dark:text-amber-300" : "text-[var(--text-primary)]";
   return (
     <div className="min-w-0">
       <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
-      <div className={`mt-0.5 truncate text-[14px] font-bold tabular-nums ${cls}`}>{fmtMoney(value, ccy, { compact: true })}</div>
+      <div className={`mt-0.5 truncate text-[14px] font-bold tabular-nums ${cls}`}>{value == null ? HIDDEN : fmtMoney(value, ccy, { compact: true })}</div>
     </div>
   );
 }
@@ -478,8 +490,9 @@ function AccountDetail({
   const { t } = useTranslation(DICT);
   const a = detail.account;
   const { movements, imports, reconciliation, counters } = detail;
-  const lowCash = a.available_balance < 25_000;
-  const idleCash = a.available_balance > 250_000 && counters.unreconciled_count === 0;
+  const hidden = !!a.balances_hidden;
+  const lowCash = !hidden && a.available_balance < 25_000;
+  const idleCash = !hidden && a.available_balance > 250_000 && counters.unreconciled_count === 0;
 
   return (
     <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
@@ -529,10 +542,10 @@ function AccountDetail({
 
       {/* Overview */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MetricCard label={t("bankAccounts.balance.available", "Available")} value={a.available_balance} unit={a.currency} tone={lowCash ? "warning" : "neutral"} hint={t("bankAccounts.balance.spendable", "Spendable today")} loading={false} />
-        <MetricCard label={t("bankAccounts.balance.pending", "Pending")}   value={a.pending_balance}   unit={a.currency} hint={t("bankAccounts.balance.awaiting", "Awaiting clearance")} loading={false} />
-        <MetricCard label={t("bankAccounts.balance.restricted", "Restricted")} value={a.restricted_balance} unit={a.currency} hint={t("bankAccounts.balance.holds", "Holds + reserves")} loading={false} />
-        <MetricCard label={t("bankAccounts.balance.current", "Current")}   value={a.current_balance}   unit={a.currency} hint={t("bankAccounts.balance.sum", "Sum of all positions")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.available", "Available")} value={hidden ? HIDDEN : a.available_balance} unit={a.currency} tone={lowCash ? "warning" : "neutral"} hint={t("bankAccounts.balance.spendable", "Spendable today")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.pending", "Pending")}   value={hidden ? HIDDEN : a.pending_balance}   unit={a.currency} hint={t("bankAccounts.balance.awaiting", "Awaiting clearance")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.restricted", "Restricted")} value={hidden ? HIDDEN : a.restricted_balance} unit={a.currency} hint={t("bankAccounts.balance.holds", "Holds + reserves")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.current", "Current")}   value={hidden ? HIDDEN : a.current_balance}   unit={a.currency} hint={t("bankAccounts.balance.sum", "Sum of all positions")} loading={false} />
       </div>
 
       {/* Risk + activity strip */}

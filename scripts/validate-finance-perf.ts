@@ -330,7 +330,7 @@ const EXEC = "src/app/api/executive/snapshot/route.ts";
 const OPS = "src/app/api/reports/operational/route.ts";
 /** An exported function's text, from its signature to its closing brace. */
 function fnBody(c: string, name: string): string {
-  const at = c.search(new RegExp(`^export (?:async )?function ${name}\\(`, "m"));
+  const at = c.search(new RegExp(`^export (?:async )?function ${name}(?:<[^>]*>)?\\(`, "m"));
   if (at < 0) return "";
   const end = c.indexOf("\n}\n", at);
   return c.slice(at, end < 0 ? undefined : end);
@@ -509,6 +509,131 @@ rule("the department guess cannot come back", EXEC, guessProblems, [
   { label: "a route that reads dashboard_role again", caught: /uses dashboard_role/,
     mutate: (s) => once(s, "    const cost = canSeeCostData(auth);\n",
       '    const cost = canSeeCostData(auth) || (auth as { dashboard_role?: string }).dashboard_role === "ceo";\n') },
+]);
+
+/* The same rule where the same numbers were still going out (owner, 26 Sep
+   2026): the bank accounts sent every balance to anyone with Finance, and the
+   valuations every cost to anyone with Inventory. A caller without the right
+   now gets the rows with those fields at 0 and a flag (balances_hidden /
+   cost_hidden) the screens turn into «•••». And because an edit form sends
+   the whole row back, zeros included, the bank-account writers drop the
+   balance fields for such a caller — can't read → can't write. */
+const BA = "src/app/api/finance/bank-accounts/route.ts";
+const BA_ID = "src/app/api/finance/bank-accounts/[id]/route.ts";
+const BA_ARCHIVE = "src/app/api/finance/bank-accounts/[id]/archive/route.ts";
+const BA_PRIMARY = "src/app/api/finance/bank-accounts/[id]/set-primary/route.ts";
+const BA_DIALOG = "src/components/finance/FinanceBankAccounts.dialogs.tsx";
+const VAL = "src/app/api/inventory/valuation/route.ts";
+const VAL_ITEM = "src/app/api/inventory/items/[id]/valuation/route.ts";
+
+rule("the hiding helpers zero every balance and cost field and say so", EXP, (c) => {
+  const p: string[] = [];
+  const list = (name: string) => /\[([^\]]*)\]/.exec(c.slice(c.indexOf(`export const ${name} =`)))?.[1] ?? "";
+  for (const f of ["opening_balance", "current_balance", "available_balance", "pending_balance", "restricted_balance", "ledger_balance", "ledger_base", "ledger_difference"]) {
+    if (!list("BANK_BALANCE_FIELDS").includes(`"${f}"`)) p.push(`the bank balance fields miss ${f}`);
+  }
+  for (const f of ["opening_balance", "available_balance", "pending_balance", "restricted_balance"]) {
+    if (!list("BANK_BALANCE_INPUTS").includes(`"${f}"`)) p.push(`the bank balance inputs miss ${f}`);
+  }
+  for (const f of ["cost_price", "average_cost", "avg_cost", "weighted_avg_cost", "last_in_cost", "inventory_value", "total_value", "unit_cost", "total_cost"]) {
+    if (!list("INVENTORY_COST_FIELDS").includes(`"${f}"`)) p.push(`the inventory cost fields miss ${f}`);
+  }
+  const bank = fnBody(c, "hideBankBalances");
+  if (!/for \(const f of BANK_BALANCE_FIELDS\) if \(f in out\) out\[f\] = 0;/.test(bank) || !/out\.balances_hidden = true;/.test(bank)) p.push("hideBankBalances does not zero and flag the balances");
+  const cost = fnBody(c, "hideInventoryCost");
+  if (!/for \(const f of INVENTORY_COST_FIELDS\) if \(f in out\) out\[f\] = out\[f\] == null \? null : 0;/.test(cost) || !/out\.cost_hidden = true;/.test(cost)) p.push("hideInventoryCost does not zero and flag the cost");
+  return p;
+}, [
+  { label: "an account with no ledger entries shows minus its balance", caught: /bank balance fields miss ledger_difference/,
+    mutate: (s) => once(s, '"ledger_balance", "ledger_base", "ledger_difference",', '"ledger_balance", "ledger_base",') },
+  { label: "a cost row that does not say it is hidden", caught: /hideInventoryCost does not zero and flag/,
+    mutate: (s) => once(s, "  out.cost_hidden = true;\n", "") },
+]);
+
+rule("the bank-account list and create keep balances to «Bank & Profit»", BA, (c) => {
+  const p: string[] = [];
+  const get = bodyOf(c, "GET"), post = bodyOf(c, "POST");
+  if (!/^\s*canSeeBankAndProfit\(auth\),/m.test(get)) p.push("the list does not ask «Bank & Profit»");
+  if (!/accounts: bankAndProfit \? items : items\.map\(hideBankBalances\),/.test(get)) p.push("the list sends balances to every Finance viewer");
+  if (!/ledger_gap: Math\.abs\(ledger_difference\) >= 0\.01,/.test(get)) p.push("the list loses whether the books agree once balances are hidden");
+  const refuseAt = post.search(/if \(!bankAndProfit && BANK_BALANCE_INPUTS\.some\(\(f\) => Number\(body\[f\] \?\? 0\) !== 0\)\) \{\s*return NextResponse\.json\(/);
+  const insertAt = post.search(/\.insert\(\{/);
+  if (refuseAt < 0 || (insertAt >= 0 && refuseAt > insertAt)) p.push("a balance is set by a caller who cannot see it");
+  if (!/account: bankAndProfit \? \(data as BankAccount\) : hideBankBalances\(data as BankAccount\)/.test(post)) p.push("create answers with the balances");
+  return p;
+}, [
+  { label: "the list unmasked", caught: /the list sends balances to every Finance viewer/,
+    mutate: (s) => once(s, "accounts: bankAndProfit ? items : items.map(hideBankBalances),", "accounts: items,") },
+  { label: "an opening balance set without the right", caught: /a balance is set by a caller who cannot see it/,
+    mutate: (s) => once(s, "if (!bankAndProfit && BANK_BALANCE_INPUTS.some(", "if (false && BANK_BALANCE_INPUTS.some(") },
+]);
+
+rule("an account's detail hides its balances, and an edit never writes one the caller never saw", BA_ID, (c) => {
+  const p: string[] = [];
+  const get = bodyOf(c, "GET"), patch = bodyOf(c, "PATCH");
+  if (!/account: bankAndProfit \? account : hideBankBalances\(account\),/.test(get)) p.push("the detail sends the balances");
+  const dropAt = patch.search(/^\s*if \(!bankAndProfit\) for \(const f of BANK_BALANCE_INPUTS\) delete body\[f\];/m);
+  const buildAt = patch.search(/^\s*const patch: Record<string, unknown> = \{\};/m);
+  if (dropAt < 0 || buildAt < 0 || dropAt > buildAt) p.push("an edit writes a balance the caller never saw");
+  if (!/account: bankAndProfit \? saved : hideBankBalances\(saved\)/.test(patch)) p.push("an edit answers with the balances");
+  return p;
+}, [
+  { label: "the edit form's zeros written over the balances", caught: /an edit writes a balance the caller never saw/,
+    mutate: (s) => once(s, "  if (!bankAndProfit) for (const f of BANK_BALANCE_INPUTS) delete body[f];\n", "") },
+  { label: "the balances dropped only after the patch is built", caught: /an edit writes a balance the caller never saw/,
+    mutate: (s) => once(once(s, "  if (!bankAndProfit) for (const f of BANK_BALANCE_INPUTS) delete body[f];\n", ""),
+      "  const patch: Record<string, unknown> = {};\n",
+      "  const patch: Record<string, unknown> = {};\n  if (!bankAndProfit) for (const f of BANK_BALANCE_INPUTS) delete body[f];\n") },
+  { label: "the detail unmasked", caught: /the detail sends the balances/,
+    mutate: (s) => once(s, "account: bankAndProfit ? account : hideBankBalances(account),", "account,") },
+]);
+
+const answersMasked = (c: string) =>
+  c.includes("(await canSeeBankAndProfit(auth)) ? (data as BankAccount) : hideBankBalances(data as BankAccount)") ? [] : ["it answers with the balances"];
+rule("archiving answers without the balances", BA_ARCHIVE, answersMasked, [
+  { label: "archive unmasked", caught: /answers with the balances/,
+    mutate: (s) => once(s, "(await canSeeBankAndProfit(auth)) ? (data as BankAccount) : hideBankBalances(data as BankAccount)", "data as BankAccount") },
+]);
+rule("making an account primary answers without the balances", BA_PRIMARY, answersMasked, [
+  { label: "set-primary unmasked", caught: /answers with the balances/,
+    mutate: (s) => once(s, "(await canSeeBankAndProfit(auth)) ? (data as BankAccount) : hideBankBalances(data as BankAccount)", "data as BankAccount") },
+]);
+
+rule("the edit form offers no balance inputs to a caller who cannot see them", BA_DIALOG, (c) => {
+  const at = c.search(/\{local\.balances_hidden \? \(/);
+  const input = c.search(/value=\{local\.available_balance \?\? 0\}/);
+  return at >= 0 && input > at ? [] : ["the edit form shows balance inputs to everyone"];
+}, [
+  { label: "the inputs for everyone", caught: /shows balance inputs to everyone/,
+    mutate: (s) => once(s, "{local.balances_hidden ? (", "{false ? (") },
+]);
+
+rule("the valuations keep cost to the «private records» switch", VAL, (c) => {
+  const p: string[] = [];
+  const get = bodyOf(c, "GET");
+  if (!/const cost = canSeeCostData\(auth\);/.test(get)) p.push("the valuation does not ask canSeeCostData");
+  if (!/rows: cost \? filtered : filtered\.map\(hideInventoryCost\),/.test(get)) p.push("the drilled rows carry cost to everyone");
+  if (!/rows: cost \? rows : rows\.map\(hideInventoryCost\),/.test(get)) p.push("the snapshot rows carry cost to everyone");
+  if ((get.match(/totals: cost \? totals : hideTotalsCost\(totals\),/g) ?? []).length !== 2) p.push("the totals carry value to everyone");
+  const hide = /function hideTotalsCost\([\s\S]*?\n\}/.exec(c)?.[0] ?? "";
+  if (!/total_value: 0,/.test(hide) || !/top_holders: \[\],/.test(hide)) p.push("the hidden totals keep a value or the ranking by value");
+  return p;
+}, [
+  { label: "the snapshot unmasked", caught: /the snapshot rows carry cost/,
+    mutate: (s) => once(s, "rows: cost ? rows : rows.map(hideInventoryCost),", "rows,") },
+  { label: "the top holders kept (a ranking by value)", caught: /keep a value or the ranking/,
+    mutate: (s) => once(s, "    top_holders: [],\n", "") },
+]);
+rule("an item's valuation keeps cost to the «private records» switch", VAL_ITEM, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  if (!/if \(canSeeCostData\(auth\)\) return NextResponse\.json\(\{ valuation: summary \}\);/.test(get)) p.push("the item valuation does not ask canSeeCostData");
+  if (!/\.\.\.hideInventoryCost\(summary\),/.test(get) || !/locations: summary\.locations\.map\(hideInventoryCost\),/.test(get)
+    || !/recent_movements: summary\.recent_movements\.map\(hideInventoryCost\),/.test(get)) p.push("the item valuation leaves a cost in the summary, a location or a movement");
+  return p;
+}, [
+  { label: "the locations unmasked", caught: /leaves a cost in the summary, a location or a movement/,
+    mutate: (s) => once(s, "locations: summary.locations.map(hideInventoryCost),", "locations: summary.locations,") },
 ]);
 
 console.log(`\n${pass} passed, ${fail} failed`);

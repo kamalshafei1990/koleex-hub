@@ -156,6 +156,14 @@ export function EditDrawer({
                 </select>
               </Field>
             </div>
+            {/* Without «Bank & Profit» the row came with its balances as 0
+                (balances_hidden) and the server ignores them on save — so the
+                inputs are not offered at all, rather than showing zeros. */}
+            {local.balances_hidden ? (
+              <p className="rounded-lg border border-[var(--border-faint)] px-3 py-2 text-[11.5px] text-[var(--text-dim)]">
+                {t("bank.field.balancesHidden", "Balances are shown and set only with «Bank & Profit» in Roles & Permissions.")}
+              </p>
+            ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label={t("bank.field.available", "Available")}>
                 <input type="number" inputMode="decimal" className={INPUT + " tabular-nums"} value={local.available_balance ?? 0}
@@ -174,6 +182,7 @@ export function EditDrawer({
                   onChange={(e) => setLocal({ ...local, opening_balance: Number(e.target.value) || 0 })} />
               </Field>
             </div>
+            )}
             <label className="inline-flex items-center gap-2 text-[12px] text-[var(--text-highlight)]">
               <input type="checkbox" checked={!!local.is_primary} onChange={(e) => setLocal({ ...local, is_primary: e.target.checked })} />
               {t("bank.field.makePrimary", "Make primary for this currency")}
