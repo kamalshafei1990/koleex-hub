@@ -39,6 +39,9 @@ interface SetupCard {
   status: CardStatus;
   count: number;
   total: number;
+  /** A figure this role may not see (src/lib/experience, hideSetupCardTotal):
+   *  it came as 0 and shows «•••». */
+  total_hidden?: boolean;
   currency: string;
   href: string;
 }
@@ -169,7 +172,7 @@ export default function FinanceSetup() {
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("setup.card.total", "Total")}</div>
-                  <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : fmtMoney(c.total, c.currency)}</div>
+                  <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : c.total_hidden ? "•••" : fmtMoney(c.total, c.currency)}</div>
                 </div>
               </div>
             </button>
@@ -793,7 +796,11 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
 
 type OBCategory = "cash" | "owner_capital" | "loan" | "customer_receivable" | "supplier_payable" | "fixed_asset" | "inventory" | "other";
 
-interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string }
+/* amount_hidden: a line this role may not see (src/lib/experience,
+   openingCategoryRefusal) — cash, capital, loans and other need «Bank &
+   Profit», the inventory opening the «private records» switch. It came as 0
+   and shows «•••»; such a role neither adds nor removes one. */
+interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string; amount_hidden?: boolean }
 
 function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { category: OBCategory; baseCurrency: string; onClose: () => void; onChange: () => void }) {
   const { t } = useTranslation(FIN_SETUP);
@@ -810,6 +817,9 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   const meta = CATEGORY_META[category];
   const [rows, setRows] = useState<OBRow[]>([]);
   const [loading, setLoading] = useState(true);
+  /* The server's answer for this category, so a drawer with no lines yet
+     knows too. */
+  const [amountsHidden, setAmountsHidden] = useState(false);
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(baseCurrency);
@@ -821,7 +831,10 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
     setLoading(true);
     const r = await fetch(`/api/finance/setup/opening-balances?category=${encodeURIComponent(category)}`, { credentials: "include", cache: "no-store" });
     const j = await r.json();
-    if (r.ok) setRows((j.entries ?? []) as OBRow[]);
+    if (r.ok) {
+      setRows((j.entries ?? []) as OBRow[]);
+      setAmountsHidden(j.amounts_hidden === true);
+    }
     setLoading(false);
   }, [category]);
   useEffect(() => { void load(); }, [load]);
@@ -859,6 +872,8 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   };
 
   const totalsByCurrency = useMemo(() => {
+    /* A sum of hidden zeros is not a total. */
+    if (rows.some((r) => r.amount_hidden)) return [];
     const m = new Map<string, number>();
     for (const r of rows) m.set(r.currency, (m.get(r.currency) ?? 0) + Number(r.amount || 0));
     return Array.from(m.entries());
@@ -877,6 +892,13 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
       />
       <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
         <div className="space-y-4">
+          {amountsHidden ? (
+            <div className="rounded-md border border-[var(--border-subtle)] px-3 py-2 text-[11px] text-[var(--text-dim)]">
+              {category === "inventory"
+                ? t("setup.ob.hidden.cost", "Inventory opening values are shown and set only with «Can see private data» in Roles & Permissions.")
+                : t("setup.ob.hidden.bankProfit", "These opening figures are shown and set only with «Bank & Profit» in Roles & Permissions.")}
+            </div>
+          ) : (
           <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
             <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
             <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
@@ -888,6 +910,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
             {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
             <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
           </div>
+          )}
 
           <div>
             <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
@@ -902,8 +925,10 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
                       <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
-                      <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
+                      <div className="font-mono tabular-nums">{r.amount_hidden ? "•••" : `${Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${r.currency}`}</div>
+                      {!r.amount_hidden && (
+                        <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
+                      )}
                     </div>
                   </li>
                 ))}

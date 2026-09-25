@@ -4,6 +4,10 @@ import "server-only";
    GET    /api/inventory/variants/[id]   detail
    PATCH  /api/inventory/variants/[id]   limited update
    DELETE /api/inventory/variants/[id]   soft delete (status='archived')
+
+   Cost as on the list (src/lib/experience): 0 with cost_hidden without the
+   private-records switch, and dropped from such a caller's edit.
+   Guarded by validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -14,6 +18,7 @@ import {
   updateVariant,
   type UpdateVariantInput,
 } from "@/lib/inventory/variants";
+import { canSeeCostData, hideInventoryCost, INVENTORY_COST_INPUTS } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -26,7 +31,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const variant = await getVariant(auth.tenant_id, id);
   if (!variant) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ variant });
+  return NextResponse.json({ variant: canSeeCostData(auth) ? variant : hideInventoryCost(variant) });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -38,10 +43,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const patch = (await req.json().catch(() => null)) as UpdateVariantInput | null;
   if (!patch) return NextResponse.json({ error: "JSON body required" }, { status: 400 });
+  const cost = canSeeCostData(auth);
+  if (!cost) for (const f of INVENTORY_COST_INPUTS) delete patch[f];
 
   const r = await updateVariant(auth.tenant_id, id, patch);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });
-  return NextResponse.json({ variant: r.variant });
+  return NextResponse.json({ variant: cost || !r.variant ? r.variant : hideInventoryCost(r.variant) });
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {

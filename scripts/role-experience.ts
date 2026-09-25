@@ -33,6 +33,8 @@
      ..  the hiding helpers: bank balances, inventory cost, and an order's
          profit and supplier cost — each with its own flag, what is still
          owed kept; the «Bank & Profit» door; what is owed on a supplier line
+     ..  supplier totals, opening lines and setup cards: hidden by the same
+         two answers, receivables and payables kept
 
    The per-role answer for a real role (a koleex_permissions row) is
    requireModuleAccess's, covered where that helper is; the static guard that
@@ -51,7 +53,11 @@ import {
   getUserExperience,
   hideBankBalances,
   hideInventoryCost,
+  hideOpeningAmount,
   hideOrderFigures,
+  hideSetupCardTotal,
+  hideSupplierTotals,
+  openingCategoryRefusal,
   requireBankAndProfit,
   requireFinanceNumbers,
 } from "../src/lib/experience";
@@ -218,6 +224,54 @@ async function main() {
     supplierOutstanding({ supplier_cost: 0, paid_amount: 0, outstanding_amount: 300 }) === 300
       && supplierOutstanding({ supplier_cost: 700, paid_amount: 400 }) === 300
       && supplierOutstanding({ supplier_cost: 100, paid_amount: 150 }) === 0,
+  );
+
+  /* Supplier accounts: what was bought and paid is the supplier cost; what
+     is still owed is a payable and stays. */
+  const sup = hideSupplierTotals({ supplier_name: "Yili", total_purchases: 700, paid_amount: 400, unpaid_amount: 300, outstanding_payable: 300 });
+  ok(
+    `${String(n++).padStart(2, "0")}  hideSupplierTotals zeroes what was bought and paid, keeps what is owed, says so`,
+    sup.total_purchases === 0 && sup.paid_amount === 0 && sup.unpaid_amount === 300 && sup.outstanding_payable === 300
+      && sup.supplier_name === "Yili" && sup.cost_hidden === true,
+    JSON.stringify(sup),
+  );
+
+  /* Opening balances: cash, capital, loans, other → «Bank & Profit»; the
+     inventory opening → the switch; receivables, payables, fixed assets open. */
+  const neither = { bankAndProfit: false, cost: false };
+  const both = { bankAndProfit: true, cost: true };
+  const refusals = ["cash", "owner_capital", "loan", "other", "inventory", "customer_receivable", "supplier_payable", "fixed_asset"]
+    .map((cat) => `${cat}:${openingCategoryRefusal(cat, neither) ?? "open"}`).join(" ");
+  ok(
+    `${String(n++).padStart(2, "0")}  opening lines: cash/capital/loans/other need «Bank & Profit», inventory the switch, receivables/payables/assets stay open`,
+    refusals === "cash:needs_bank_profit owner_capital:needs_bank_profit loan:needs_bank_profit other:needs_bank_profit inventory:needs_private_data customer_receivable:open supplier_payable:open fixed_asset:open"
+      && ["cash", "inventory", "loan"].every((cat) => openingCategoryRefusal(cat, both) === null)
+      && openingCategoryRefusal("inventory", { bankAndProfit: true, cost: false }) === "needs_private_data"
+      && openingCategoryRefusal("cash", { bankAndProfit: false, cost: true }) === "needs_bank_profit",
+    refusals,
+  );
+  const line = hideOpeningAmount({ category: "cash", label: "Petty cash", amount: 1200, currency: "CNY" });
+  ok(
+    `${String(n++).padStart(2, "0")}  hideOpeningAmount zeroes the amount, keeps the label, says so`,
+    line.amount === 0 && line.label === "Petty cash" && line.currency === "CNY" && line.amount_hidden === true,
+    JSON.stringify(line),
+  );
+
+  /* Setup cards total the same figures. */
+  const cards = [
+    { key: "bank_accounts", total: 900 }, { key: "cash_accounts", total: 50 }, { key: "loans", total: 300 },
+    { key: "equity", total: 1000 }, { key: "opening_balances", total: 2250 }, { key: "customers_ar", total: 70 },
+    { key: "suppliers_ap", total: 40 }, { key: "assets", total: 500 },
+  ];
+  const shown = (can: { bankAndProfit: boolean; cost: boolean }) =>
+    cards.map((c) => hideSetupCardTotal(c, can)).filter((c) => !c.total_hidden).map((c) => c.key).join(",");
+  ok(
+    `${String(n++).padStart(2, "0")}  setup cards: bank/cash/loans/capital need «Bank & Profit», the starting position needs both`,
+    shown(neither) === "customers_ar,suppliers_ap,assets"
+      && shown({ bankAndProfit: true, cost: false }) === "bank_accounts,cash_accounts,loans,equity,customers_ar,suppliers_ap,assets"
+      && shown(both) === cards.map((c) => c.key).join(",")
+      && hideSetupCardTotal(cards[0], neither).total === 0,
+    `neither=${shown(neither)} bank-only=${shown({ bankAndProfit: true, cost: false })}`,
   );
 
   console.log("─".repeat(72));

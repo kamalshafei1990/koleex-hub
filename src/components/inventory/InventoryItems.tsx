@@ -154,6 +154,9 @@ export default function InventoryItems() {
   const [error, setError] = useState<string | null>(null);
 
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  /* The list answers whether this role may see (and so set) item costs —
+     its «private records» switch (src/lib/experience). */
+  const [canSeeCost, setCanSeeCost] = useState(true);
   /* INV-H9 — card-based internal-item drawer. */
   const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
   const [typesPanelOpen, setTypesPanelOpen] = useState(false);
@@ -196,6 +199,7 @@ export default function InventoryItems() {
       setRows(nextRows);
       setTypes(nextTypes);
       setWarehouses(nextWh);
+      setCanSeeCost(iJ.can_see_cost_data !== false);
       /* Mirror the DEFAULT view only — see the note on the key. */
       if (!searchKey && !filterTypeId && filterStatus === "active" && !lowStock) {
         try {
@@ -458,6 +462,7 @@ export default function InventoryItems() {
         <QuickAddDrawer
           types={types}
           warehouses={warehouses}
+          canSeeCost={canSeeCost}
           onClose={() => setQuickAddOpen(false)}
           onSuccess={() => { setQuickAddOpen(false); void load(); }}
         />
@@ -514,10 +519,11 @@ function DrawerShell({
 }
 
 function QuickAddDrawer({
-  types, warehouses, onClose, onSuccess,
+  types, warehouses, canSeeCost, onClose, onSuccess,
 }: {
   types: ItemType[];
   warehouses: Warehouse[];
+  canSeeCost: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -540,6 +546,10 @@ function QuickAddDrawer({
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  /* Can't read → can't write: without the switch there is no cost field —
+     the server refuses one (code needs_private_data), and says so if the
+     list had not answered yet. */
+  const [costLocked, setCostLocked] = useState(!canSeeCost);
   const [currency, setCurrency] = useState("USD");
   const [reorderPoint, setReorderPoint] = useState("");
   const [minStock, setMinStock] = useState("");
@@ -599,7 +609,7 @@ function QuickAddDrawer({
         if (brand) payload.brand = brand;
         if (sku) payload.sku = sku;
         if (barcode) payload.barcode = barcode;
-        if (costPrice) payload.cost_price = Number(costPrice) || 0;
+        if (costPrice && !costLocked) payload.cost_price = Number(costPrice) || 0;
         if (currency) payload.currency = currency;
         if (reorderPoint) payload.reorder_point = Number(reorderPoint);
         if (minStock) payload.min_stock = Number(minStock);
@@ -613,7 +623,16 @@ function QuickAddDrawer({
         body: JSON.stringify(payload),
       });
       const j = await r.json();
-      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+      if (!r.ok) {
+        if (j.code === "needs_private_data") {
+          setCostLocked(true);
+          setCostPrice("");
+          setError(t("inv.items.costHidden", "Item costs are shown and set only with «Can see private data» in Roles & Permissions."));
+          return;
+        }
+        setError(humanizeError(j.error ?? `HTTP ${r.status}`));
+        return;
+      }
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -802,7 +821,7 @@ function QuickAddDrawer({
               <input placeholder="SKU"          value={sku}          onChange={(e) => setSku(e.target.value)}          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
               <input placeholder="Barcode"      value={barcode}      onChange={(e) => setBarcode(e.target.value)}      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
               <input placeholder="Currency"     value={currency}     onChange={(e) => setCurrency(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              {!costLocked && <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />}
               <input type="number" placeholder="Reorder point" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
               <input type="number" placeholder="Min stock"     value={minStock}     onChange={(e) => setMinStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
               <input type="number" placeholder="Max stock"     value={maxStock}     onChange={(e) => setMaxStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
@@ -846,6 +865,8 @@ interface DetailItem {
   linked_product_id: string | null;
   created_at: string;
   updated_at: string;
+  /** No «private records» switch: cost_price came as 0 and shows «•••». */
+  cost_hidden?: boolean;
 }
 interface DetailStockBucket {
   warehouse_id: string;
@@ -1099,7 +1120,7 @@ function ItemDetailDrawer({
               <DT label="Brand"       value={item.brand ?? "—"} />
               <DT label="SKU"         value={item.sku ?? "—"} />
               <DT label="Barcode"     value={item.barcode ?? "—"} />
-              <DT label="Cost"        value={item.cost_price != null ? `${Number(item.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.currency ?? ""}` : "—"} />
+              <DT label="Cost"        value={item.cost_hidden ? "•••" : item.cost_price != null ? `${Number(item.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.currency ?? ""}` : "—"} />
               <DT label="Reorder"     value={item.reorder_point != null ? fmtQty(item.reorder_point) : "—"} />
               <DT label="Min stock"   value={item.min_stock != null ? fmtQty(item.min_stock) : "—"} />
               <DT label="Max stock"   value={item.max_stock != null ? fmtQty(item.max_stock) : "—"} />
@@ -1295,6 +1316,8 @@ interface VariantDto {
   attributes: Record<string, unknown>;
   cost_price: number | null;
   status: "active" | "inactive" | "archived";
+  /** No «private records» switch: cost_price came as 0 and shows «•••». */
+  cost_hidden?: boolean;
 }
 
 function ItemVariantsSection({ itemId }: { itemId: string }) {
@@ -1478,7 +1501,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
                       .join(", ") || "—"}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">
-                    {v.cost_price != null
+                    {v.cost_hidden ? "•••" : v.cost_price != null
                       ? Number(v.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : "—"}
                   </td>

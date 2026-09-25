@@ -31,4 +31,7 @@ export const FIN_SUPPLIERS: Translations = {
   "suppliers.generate":          { en: "Generate Supplier Statement", zh: "生成供应商对账单",       ar: "إنشاء كشف مورد" },
   "suppliers.preparing":         { en: "Preparing…",                zh: "正在准备…",               ar: "جارٍ الإعداد…" },
   "suppliers.exportFailed":      { en: "Failed ({n})",              zh: "失败 ({n})",              ar: "فشل ({n})" },
+  "suppliers.costHidden":     { en: "Purchases and payments show with «Can see private data» in Roles & Permissions — what is still owed is shown in full.",
+                                zh: "采购额与付款额需要在角色与权限中开启「可查看私密数据」才能查看——仍欠款项完整显示。",
+                                ar: "المشتريات والمدفوعات تظهر مع «يرى البيانات الخاصة» في الأدوار والصلاحيات — والمبالغ المستحقة تظهر كاملة." },
 };

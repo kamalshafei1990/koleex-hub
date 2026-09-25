@@ -610,4 +610,10 @@ export const inventoryT: Translations = {
   "inv.common.stock_value_label": { en: "Stock value:", zh: "库存金额：", ar: "قيمة المخزون:" },
   "inv.common.void_reason": { en: "Void reason:", zh: "作废原因：", ar: "سبب الإلغاء:" },
   "inv.common.open": { en: "Open", zh: "打开", ar: "فتح" },
+
+  /* Item cost without the «private records» switch (src/lib/experience):
+     the quick-add form's refusal line. */
+  "inv.items.costHidden":     { en: "Item costs are shown and set only with «Can see private data» in Roles & Permissions.",
+                                zh: "只有在角色与权限中开启「可查看私密数据」才能查看和设置物品成本。",
+                                ar: "تكاليف الأصناف تُعرض وتُضبط فقط مع «يرى البيانات الخاصة» في الأدوار والصلاحيات." },
 };

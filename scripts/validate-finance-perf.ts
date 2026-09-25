@@ -547,7 +547,7 @@ rule("the hiding helpers zero every balance and cost field and say so", EXP, (c)
   { label: "an account with no ledger entries shows minus its balance", caught: /bank balance fields miss ledger_difference/,
     mutate: (s) => once(s, '"ledger_balance", "ledger_base", "ledger_difference",', '"ledger_balance", "ledger_base",') },
   { label: "a cost row that does not say it is hidden", caught: /hideInventoryCost does not zero and flag/,
-    mutate: (s) => once(s, "  out.cost_hidden = true;\n  return out as T & { cost_hidden: true };", "  return out as T & { cost_hidden: true };") },
+    mutate: (s) => once(s, "if (f in out) out[f] = out[f] == null ? null : 0;\n  out.cost_hidden = true;\n  return out as T & { cost_hidden: true };\n}\n\n/** What an item", "if (f in out) out[f] = out[f] == null ? null : 0;\n  return out as T & { cost_hidden: true };\n}\n\n/** What an item") },
 ]);
 
 rule("the bank-account list and create keep balances to «Bank & Profit»", BA, (c) => {
@@ -906,6 +906,190 @@ rule("the statement-import picker shows «•••» for a hidden balance", FBI
 }, [
   { label: "the picker's balance printed", caught: /prints a hidden balance as 0/,
     mutate: (s) => once(s, '{a.balances_hidden ? "•••" : fmtMoney(a.available_balance, a.currency, { compact: true })}', "{fmtMoney(a.available_balance, a.currency, { compact: true })}") },
+]);
+
+/* The last four (owner, 26 Sep 2026: «طبّق نفس القاعدة على الأربعة الباقيين»).
+   Supplier accounts hide what was bought and paid (the switch) and keep what
+   is owed, ranked by it; the drilled stock balances, an item's and a
+   variant's cost follow the switch, and a caller without it never writes a
+   cost (dropped from an edit, refused on a create). Opening balances: cash,
+   capital, loans and other need «Bank & Profit», the inventory opening the
+   switch; receivables, payables and fixed assets stay — a hidden line is
+   shown as «•••», and neither added nor removed by such a caller. The setup
+   cards total the same figures and hide the same way. */
+const SUP = "src/app/api/finance/suppliers/route.ts";
+const BAL = "src/app/api/inventory/balances/route.ts";
+const ITEM_ID = "src/app/api/inventory/items/[id]/route.ts";
+const VAR = "src/app/api/inventory/variants/route.ts";
+const VAR_ID = "src/app/api/inventory/variants/[id]/route.ts";
+const OB = "src/app/api/finance/setup/opening-balances/route.ts";
+const OB_ID = "src/app/api/finance/setup/opening-balances/[id]/route.ts";
+const SETUP_STATUS = "src/app/api/finance/setup/status/route.ts";
+const FSUP = "src/components/finance/FinanceSuppliers.tsx";
+const IBAL = "src/components/inventory/InventoryBalances.tsx";
+const IITEMS = "src/components/inventory/InventoryItems.tsx";
+const FSETUP = "src/components/finance/FinanceSetup.tsx";
+
+rule("supplier totals, opening lines and setup cards hide by the same two answers — never what is owed", EXP, (c) => {
+  const p: string[] = [];
+  const list = (name: string) => /\[([^\]]*)\]/.exec(c.slice(c.indexOf(`export const ${name} =`)))?.[1] ?? "";
+  for (const f of ["total_purchases", "paid_amount"]) if (!list("SUPPLIER_TOTAL_COST_FIELDS").includes(`"${f}"`)) p.push(`the supplier cost fields miss ${f}`);
+  if (/outstanding|unpaid/.test(list("SUPPLIER_TOTAL_COST_FIELDS"))) p.push("what is owed to a supplier is hidden as if it were a cost");
+  const sup = fnBody(c, "hideSupplierTotals");
+  if (!/for \(const f of SUPPLIER_TOTAL_COST_FIELDS\) if \(f in out\) out\[f\] = out\[f\] == null \? null : 0;/.test(sup) || !/out\.cost_hidden = true;/.test(sup)) p.push("hideSupplierTotals does not zero and flag the totals");
+  if (!list("INVENTORY_COST_INPUTS").includes('"cost_price"')) p.push("an item's cost_price is not a guarded input");
+  for (const f of ["cash", "owner_capital", "loan", "other"]) if (!list("OPENING_BANK_PROFIT_CATEGORIES").includes(`"${f}"`)) p.push(`the «Bank & Profit» opening lines miss ${f}`);
+  if (!list("OPENING_COST_CATEGORIES").includes('"inventory"')) p.push("the inventory opening is not a cost");
+  if (/customer_receivable|supplier_payable/.test(list("OPENING_BANK_PROFIT_CATEGORIES") + list("OPENING_COST_CATEGORIES"))) p.push("what customers owe or is owed to suppliers is hidden");
+  const refusal = fnBody(c, "openingCategoryRefusal");
+  if (!/if \(!can\.bankAndProfit && \(OPENING_BANK_PROFIT_CATEGORIES as readonly string\[\]\)\.includes\(category\)\) return "needs_bank_profit";/.test(refusal)
+    || !/if \(!can\.cost && \(OPENING_COST_CATEGORIES as readonly string\[\]\)\.includes\(category\)\) return "needs_private_data";/.test(refusal)) p.push("openingCategoryRefusal does not ask the two answers");
+  const ob = fnBody(c, "hideOpeningAmount");
+  if (!/out\.amount = out\.amount == null \? null : 0;/.test(ob) || !/out\.amount_hidden = true;/.test(ob)) p.push("hideOpeningAmount does not zero and flag the line");
+  for (const k of ["bank_accounts", "cash_accounts", "loans", "equity"]) if (!list("SETUP_BANK_PROFIT_CARDS").includes(`"${k}"`)) p.push(`the setup card ${k} is not «Bank & Profit»`);
+  const card = fnBody(c, "hideSetupCardTotal");
+  if (!/card\.key === "opening_balances"\s*\? !\(can\.bankAndProfit && can\.cost\)/.test(card)) p.push("the starting-position total does not need both answers");
+  if (!/\{ \.\.\.card, total: 0, total_hidden: true as const \}/.test(card)) p.push("a hidden card total is not zeroed and flagged");
+  return p;
+}, [
+  { label: "a supplier's paid amount left in the clear", caught: /the supplier cost fields miss paid_amount/,
+    mutate: (s) => once(s, '["total_purchases", "paid_amount"]', '["total_purchases"]') },
+  { label: "cash left out of the hidden opening lines", caught: /the «Bank & Profit» opening lines miss cash/,
+    mutate: (s) => once(s, '["cash", "owner_capital", "loan", "other"]', '["owner_capital", "loan", "other"]') },
+  { label: "receivables hidden as if they were a bank balance", caught: /what customers owe or is owed to suppliers is hidden/,
+    mutate: (s) => once(s, '["cash", "owner_capital", "loan", "other"]', '["cash", "owner_capital", "loan", "other", "customer_receivable"]') },
+  { label: "the starting position shown to a role without the switch", caught: /starting-position total does not need both/,
+    mutate: (s) => once(s, "? !(can.bankAndProfit && can.cost)", "? !can.bankAndProfit") },
+  { label: "a hidden opening line that does not say so", caught: /hideOpeningAmount does not zero and flag/,
+    mutate: (s) => once(s, "  out.amount_hidden = true;\n", "") },
+]);
+
+rule("supplier accounts hide what was bought and paid, ranked by what is owed", SUP, (c) => {
+  const get = bodyOf(c, "GET");
+  const p: string[] = [];
+  const maskAt = get.search(/if \(!canSeeCostData\(auth\)\) \{\s*const hidden = out\.map\(hideSupplierTotals\);\s*hidden\.sort\(\(a, b\) => \(b\.outstanding_payable \?\? 0\) - \(a\.outstanding_payable \?\? 0\)\);\s*return NextResponse\.json\(\{ suppliers: hidden \}\);\s*\}/);
+  const rankAt = get.search(/out\.sort\(\(a, b\) => \(b\.total_purchases \?\? 0\) - \(a\.total_purchases \?\? 0\)\);/);
+  if (maskAt < 0) p.push("the supplier totals go to every Finance viewer, or ranked by the hidden purchases");
+  else if (rankAt >= 0 && rankAt < maskAt) p.push("the list is ranked by purchases before the mask");
+  return p;
+}, [
+  { label: "the supplier list unmasked", caught: /go to every Finance viewer/,
+    mutate: (s) => once(s, "  if (!canSeeCostData(auth)) {\n    const hidden", "  if (false) {\n    const hidden") },
+  { label: "the hidden list ranked by purchases", caught: /go to every Finance viewer, or ranked by the hidden purchases/,
+    mutate: (s) => once(s, "hidden.sort((a, b) => (b.outstanding_payable ?? 0) - (a.outstanding_payable ?? 0));", "hidden.sort((a, b) => (b.total_purchases ?? 0) - (a.total_purchases ?? 0));") },
+]);
+
+rule("the drilled stock balances keep cost to the switch", BAL, (c) => {
+  return /balances: canSeeCostData\(auth\) \? filtered : filtered\.map\(hideInventoryCost\),/.test(bodyOf(c, "GET")) ? [] : ["the drilled balances carry avg cost and value to everyone"];
+}, [
+  { label: "drilled balances unmasked", caught: /carry avg cost and value to everyone/,
+    mutate: (s) => once(s, "balances: canSeeCostData(auth) ? filtered : filtered.map(hideInventoryCost),", "balances: filtered,") },
+]);
+
+/** Reads the cost to everyone? Writes one the caller never saw? */
+function costWriterProblems(verbRead: string, readRe: RegExp, verbWrite: string, dropRe: RegExp, writerCall: RegExp, answerRe: RegExp) {
+  return (c: string): string[] => {
+    const p: string[] = [];
+    if (!readRe.test(bodyOf(c, verbRead))) p.push("the read sends the cost to everyone");
+    const w = bodyOf(c, verbWrite);
+    const guardAt = w.search(dropRe);
+    const writeAt = w.search(writerCall);
+    if (guardAt < 0 || writeAt < 0 || guardAt > writeAt) p.push("a write takes a cost from a caller who cannot see it");
+    if (!answerRe.test(w)) p.push("a write answers with the cost");
+    return p;
+  };
+}
+const REFUSE_COST = /if \(!cost && INVENTORY_COST_INPUTS\.some\(\(f\) => \(Number\(body\[f\]\) \|\| 0\) !== 0\)\) \{\s*return NextResponse\.json\(/;
+const DROP_COST = /^\s*if \(!cost\) for \(const f of INVENTORY_COST_INPUTS\) delete patch\[f\];/m;
+
+rule("an item's detail hides its cost, and an edit never writes one the caller never saw", ITEM_ID,
+  costWriterProblems("GET", /item: canSeeCostData\(auth\) \? item : hideInventoryCost\(item\)/, "PATCH", DROP_COST, /updateInventoryItem\(/, /item: cost \|\| !r\.item \? r\.item : hideInventoryCost\(r\.item\)/), [
+  { label: "the edit's 0 written over the item's cost", caught: /a write takes a cost/,
+    mutate: (s) => once(s, "  if (!cost) for (const f of INVENTORY_COST_INPUTS) delete patch[f];\n", "") },
+  { label: "the item detail unmasked", caught: /the read sends the cost to everyone/,
+    mutate: (s) => once(s, "item: canSeeCostData(auth) ? item : hideInventoryCost(item)", "item") },
+]);
+
+rule("creating an item never takes a cost from a caller who cannot see it", INV, (c) => {
+  const post = bodyOf(c, "POST");
+  const p: string[] = [];
+  const refuseAt = post.search(REFUSE_COST);
+  const createAt = post.search(/createInventoryItem\(/);
+  if (refuseAt < 0 || createAt < 0 || refuseAt > createAt) p.push("a new item takes a cost from a caller who cannot see it");
+  if (!/item: cost \|\| !r\.item \? r\.item : hideInventoryCost\(r\.item\)/.test(post)) p.push("a new item answers with the cost");
+  return p;
+}, [
+  { label: "a cost accepted on create from anyone", caught: /a new item takes a cost/,
+    mutate: (s) => once(s, "if (!cost && INVENTORY_COST_INPUTS.some(", "if (false && INVENTORY_COST_INPUTS.some(") },
+]);
+
+rule("the variant list hides the cost and a new variant never takes one the caller cannot see", VAR,
+  costWriterProblems("GET", /variants: canSeeCostData\(auth\) \? variants : variants\.map\(hideInventoryCost\)/, "POST", REFUSE_COST, /createVariant\(/, /variant: cost \|\| !r\.variant \? r\.variant : hideInventoryCost\(r\.variant\)/), [
+  { label: "the variant list unmasked", caught: /the read sends the cost to everyone/,
+    mutate: (s) => once(s, "variants: canSeeCostData(auth) ? variants : variants.map(hideInventoryCost)", "variants") },
+  { label: "a variant cost accepted from anyone", caught: /a write takes a cost/,
+    mutate: (s) => once(s, "if (!cost && INVENTORY_COST_INPUTS.some(", "if (false && INVENTORY_COST_INPUTS.some(") },
+]);
+
+rule("a variant's detail hides the cost and an edit never writes one", VAR_ID,
+  costWriterProblems("GET", /variant: canSeeCostData\(auth\) \? variant : hideInventoryCost\(variant\)/, "PATCH", DROP_COST, /updateVariant\(/, /variant: cost \|\| !r\.variant \? r\.variant : hideInventoryCost\(r\.variant\)/), [
+  { label: "the variant edit's 0 written over the cost", caught: /a write takes a cost/,
+    mutate: (s) => once(s, "  if (!cost) for (const f of INVENTORY_COST_INPUTS) delete patch[f];\n", "") },
+]);
+
+rule("opening balances hide the lines the role may not see, and it adds none", OB, (c) => {
+  const p: string[] = [];
+  const get = bodyOf(c, "GET"), post = bodyOf(c, "POST");
+  if (!/openingCategoryRefusal\(r\.category, can\) \? hideOpeningAmount\(r\) : r\)/.test(get)) p.push("the opening lines go to every Finance viewer");
+  if (!/amounts_hidden: category \? openingCategoryRefusal\(category, can\) !== null : undefined/.test(get)) p.push("an empty drawer is not told its lines are hidden");
+  const refuseAt = post.search(/const refusal = openingCategoryRefusal\(body\.category, \{ bankAndProfit: await canSeeBankAndProfit\(auth\), cost: canSeeCostData\(auth\) \}\);\s*if \(refusal\) \{\s*return NextResponse\.json\(/);
+  const insertAt = post.search(/\.insert\(\{/);
+  if (refuseAt < 0 || insertAt < 0 || refuseAt > insertAt) p.push("a hidden opening line is added by a caller who cannot see it");
+  return p;
+}, [
+  { label: "the opening lines unmasked", caught: /go to every Finance viewer/,
+    mutate: (s) => once(s, "openingCategoryRefusal(r.category, can) ? hideOpeningAmount(r) : r)", "r)") },
+  { label: "a cash opening added without «Bank & Profit»", caught: /a hidden opening line is added/,
+    mutate: (s) => once(s, "  if (refusal) {\n    return NextResponse.json({\n", "  if (false) {\n    return NextResponse.json({\n") },
+]);
+
+rule("a hidden opening line is not removed by a role that cannot see it", OB_ID, (c) => {
+  const del = bodyOf(c, "DELETE");
+  const p: string[] = [];
+  if (!/\.select\("id, category, accounting_entry_id, accounting_status"\)/.test(del)) p.push("the line's category is not read before removing it");
+  const refuseAt = del.search(/if \(refusal\) \{\s*return NextResponse\.json\(/);
+  const voidAt = del.search(/voidJournalEntry\(/);
+  if (refuseAt < 0 || voidAt < 0 || refuseAt > voidAt) p.push("a hidden line's journal is voided by a caller who cannot see it");
+  return p;
+}, [
+  { label: "a hidden line removed by anyone", caught: /voided by a caller who cannot see it/,
+    mutate: (s) => once(s, "  if (refusal) {\n", "  if (false) {\n") },
+]);
+
+rule("the setup cards hide the totals the role may not see", SETUP_STATUS, (c) => {
+  return /cards: snapshot\.cards\.map\(\(c\) => hideSetupCardTotal\(c, can\)\)/.test(bodyOf(c, "GET")) ? [] : ["the setup cards total bank, cash, loans and capital for everyone"];
+}, [
+  { label: "the setup totals unmasked", caught: /total bank, cash, loans and capital for everyone/,
+    mutate: (s) => once(s, "return NextResponse.json({ snapshot: { ...snapshot, cards: snapshot.cards.map((c) => hideSetupCardTotal(c, can)) } });", "return NextResponse.json({ snapshot });") },
+]);
+
+rule("the four screens show «•••» for what the role may not see and offer no input for it", FSUP, (c) => {
+  const p: string[] = [];
+  if (!/value=\{kpi\.costHidden \? HIDDEN : formatCompact\(kpi\.purchases\)\}/.test(c) || !/value=\{kpi\.costHidden \? HIDDEN : formatCompact\(kpi\.paid\)\}/.test(c)) p.push("the supplier totals print hidden zeros");
+  if ((c.match(/value=\{r\.cost_hidden \? HIDDEN : fmtMoney\(r\.(total_purchases|paid_amount)/g) ?? []).length !== 2) p.push("a supplier card prints hidden zeros");
+  if (!/\{!r\.cost_hidden && \(\s*<div className="mt-3">\s*<div className="flex items-center justify-between text-\[10px\]/.test(c)) p.push("the payment progress is drawn from hidden zeros");
+  const bal = code(read(IBAL));
+  if ((bal.match(/\{r\.cost_hidden \? "•••" : r\.avg_cost\.toFixed\(4\)\}/g) ?? []).length !== 2 || !/cur\.cost_hidden = cur\.cost_hidden \|\| !!r\.cost_hidden;/.test(bal)) p.push("the drilled balances print hidden zeros");
+  const items = code(read(IITEMS));
+  if (!/item\.cost_hidden \? "•••"/.test(items) || !/v\.cost_hidden \? "•••"/.test(items)) p.push("the item drawer prints a hidden cost");
+  if (!/const \[costLocked, setCostLocked\] = useState\(!canSeeCost\);/.test(items) || !/\{!costLocked && <input type="number" placeholder="Cost price"/.test(items)) p.push("the quick-add offers a cost to a role that cannot see it");
+  const setup = code(read(FSETUP));
+  if (!/c\.total_hidden \? "•••" : fmtMoney\(c\.total, c\.currency\)/.test(setup) || !/r\.amount_hidden \? "•••"/.test(setup)) p.push("the setup screen prints hidden zeros");
+  if (!/\{amountsHidden \? \(/.test(setup) || !/\{!r\.amount_hidden && \(/.test(setup)) p.push("the setup drawer offers to add or remove a hidden line");
+  return p;
+}, [
+  { label: "the supplier purchases printed", caught: /the supplier totals print hidden zeros/,
+    mutate: (s) => once(s, "value={kpi.costHidden ? HIDDEN : formatCompact(kpi.purchases)}", "value={formatCompact(kpi.purchases)}") },
 ]);
 
 console.log(`\n${pass} passed, ${fail} failed`);

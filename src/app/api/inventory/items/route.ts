@@ -17,7 +17,7 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 import { listInventoryItems } from "@/lib/inventory/queries";
 import { createInventoryItem, getItemTypeRequiresProduct } from "@/lib/inventory/items";
 import type { CreateItemInput } from "@/lib/inventory/types";
-import { canSeeCostData } from "@/lib/experience";
+import { canSeeCostData, hideInventoryCost, INVENTORY_COST_INPUTS } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -71,6 +71,17 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as CreateItemBody | null;
   if (!body?.item_name) return NextResponse.json({ error: "item_name required" }, { status: 400 });
 
+  /* Can't read → can't write: without the private-records switch the item's
+     cost — and the opening stock value it prices — is not this caller's to
+     set (src/lib/experience). Guarded by validate:finance-perf §G. */
+  const cost = canSeeCostData(auth);
+  if (!cost && INVENTORY_COST_INPUTS.some((f) => (Number(body[f]) || 0) !== 0)) {
+    return NextResponse.json(
+      { error: "Item costs are set only with «Can see private data» in Roles & Permissions.", code: "needs_private_data" },
+      { status: 403 },
+    );
+  }
+
   /* INV-H5B guard: branch on the item type's requires_product flag.
      - product_related types (machines, parts, finished products...) still
        need a Product unless the caller opts into admin_repair.
@@ -110,5 +121,5 @@ export async function POST(req: Request) {
       : body.metadata,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });
-  return NextResponse.json({ item: r.item, opening_movement_id: r.opening_movement_id });
+  return NextResponse.json({ item: cost || !r.item ? r.item : hideInventoryCost(r.item), opening_movement_id: r.opening_movement_id });
 }

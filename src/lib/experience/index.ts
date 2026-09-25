@@ -122,6 +122,69 @@ export function hideInventoryCost<T extends object>(row: T): T & { cost_hidden: 
   return out as T & { cost_hidden: true };
 }
 
+/** What an item or variant writer takes as a cost. Without the switch it is
+ *  dropped from an edit (the form sends back the 0 it was shown) and a
+ *  non-zero one is refused on a create — can't read → can't write. */
+export const INVENTORY_COST_INPUTS = ["cost_price"] as const;
+
+/* ── Supplier accounts (/api/finance/suppliers) ───────────────────────────
+   What was bought from a supplier and what was paid on it are the supplier
+   cost the orders hide (the switch): 0 with cost_hidden. What is still owed
+   (unpaid_amount, outstanding_payable) is a payable and stays. */
+export const SUPPLIER_TOTAL_COST_FIELDS = ["total_purchases", "paid_amount"] as const;
+
+export function hideSupplierTotals<T extends object>(row: T): T & { cost_hidden: true } {
+  const out = { ...row } as Record<string, unknown>;
+  for (const f of SUPPLIER_TOTAL_COST_FIELDS) if (f in out) out[f] = out[f] == null ? null : 0;
+  out.cost_hidden = true;
+  return out as T & { cost_hidden: true };
+}
+
+/* ── Opening balances (/api/finance/setup/opening-balances) ───────────────
+   A line is hidden where the screen that shows the same figure later is:
+   cash, and the balance-sheet-only lines — owner capital, loans, other —
+   are the statements' («Bank & Profit»); the inventory opening is a cost
+   (the switch). What customers owe and what is owed to suppliers stay, as
+   in the aging; fixed assets stay, as in the asset register. A hidden line
+   is neither added nor removed by such a caller: removing one voids its
+   journal, a change to figures they cannot see. */
+export const OPENING_BANK_PROFIT_CATEGORIES = ["cash", "owner_capital", "loan", "other"] as const;
+export const OPENING_COST_CATEGORIES = ["inventory"] as const;
+
+/** The refusal code for an opening category this caller may not see or
+ *  write, or null when they may. */
+export function openingCategoryRefusal(
+  category: string,
+  can: { bankAndProfit: boolean; cost: boolean },
+): "needs_bank_profit" | "needs_private_data" | null {
+  if (!can.bankAndProfit && (OPENING_BANK_PROFIT_CATEGORIES as readonly string[]).includes(category)) return "needs_bank_profit";
+  if (!can.cost && (OPENING_COST_CATEGORIES as readonly string[]).includes(category)) return "needs_private_data";
+  return null;
+}
+
+export function hideOpeningAmount<T extends object>(row: T): T & { amount_hidden: true } {
+  const out = { ...row } as Record<string, unknown>;
+  if ("amount" in out) out.amount = out.amount == null ? null : 0;
+  out.amount_hidden = true;
+  return out as T & { amount_hidden: true };
+}
+
+/* The Finance setup cards (/api/finance/setup/status) total the same
+   figures: bank, cash, loans and capital are «Bank & Profit»; the starting
+   position adds up every opening line, inventory included, so it needs
+   both. The rest — customers, suppliers, assets — stay. */
+export const SETUP_BANK_PROFIT_CARDS = ["bank_accounts", "cash_accounts", "loans", "equity"] as const;
+
+export function hideSetupCardTotal<T extends { key: string; total: number }>(
+  card: T,
+  can: { bankAndProfit: boolean; cost: boolean },
+): T & { total_hidden?: true } {
+  const hidden = card.key === "opening_balances"
+    ? !(can.bankAndProfit && can.cost)
+    : !can.bankAndProfit && (SETUP_BANK_PROFIT_CARDS as readonly string[]).includes(card.key);
+  return hidden ? { ...card, total: 0, total_hidden: true as const } : card;
+}
+
 /* ── Sales orders (/api/finance/orders) ───────────────────────────────────
    An order carries both kinds: its profit («Bank & Profit») and what its
    suppliers cost (the private-records switch). Each goes out as 0 with its

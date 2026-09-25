@@ -53,6 +53,9 @@ interface DrilledRow {
   avg_cost: number;
   inventory_value: number;
   currency: string;
+  /** No «private records» switch: avg_cost and inventory_value came as 0 and
+   *  show «•••»; the quantity is real (src/lib/experience). */
+  cost_hidden?: boolean;
 }
 
 type GroupBy = "item" | "variant" | "batch";
@@ -264,6 +267,7 @@ export default function InventoryBalances() {
                           avg_cost: 0,
                           inventory_value: 0,
                           currency: r.currency,
+                          cost_hidden: false,
                         };
                         const newQty = cur.qty_on_hand + r.qty_on_hand;
                         cur.avg_cost = newQty > 0
@@ -271,6 +275,7 @@ export default function InventoryBalances() {
                           : 0;
                         cur.qty_on_hand = newQty;
                         cur.inventory_value = cur.inventory_value + r.inventory_value;
+                        cur.cost_hidden = cur.cost_hidden || !!r.cost_hidden;
                         buckets.set(key, cur);
                       }
                       return Array.from(buckets.values()).map((r, idx) => (
@@ -279,8 +284,8 @@ export default function InventoryBalances() {
                           <td className="px-4 py-2 text-[var(--text-primary)]">{r.variant_id ? variantNames.get(r.variant_id) ?? r.variant_id.slice(0, 8) : "—"}</td>
                           <td className="px-4 py-2 text-[var(--text-muted)]">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
                           <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.avg_cost.toFixed(4)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums font-mono">{r.inventory_value.toFixed(2)} {r.currency}</td>
+                          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.cost_hidden ? "•••" : r.avg_cost.toFixed(4)}</td>
+                          <td className="px-4 py-2 text-right tabular-nums font-mono">{r.cost_hidden ? "•••" : <>{r.inventory_value.toFixed(2)} {r.currency}</>}</td>
                         </tr>
                       ));
                     }
@@ -291,8 +296,8 @@ export default function InventoryBalances() {
                         <td className="px-4 py-2 text-[var(--text-primary)]">{r.batch_id ? batchNos.get(r.batch_id) ?? r.batch_id.slice(0, 8) : "—"}</td>
                         <td className="px-4 py-2 text-[var(--text-muted)]">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
                         <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                        <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.avg_cost.toFixed(4)}</td>
-                        <td className="px-4 py-2 text-right tabular-nums font-mono">{r.inventory_value.toFixed(2)} {r.currency}</td>
+                        <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.cost_hidden ? "•••" : r.avg_cost.toFixed(4)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums font-mono">{r.cost_hidden ? "•••" : <>{r.inventory_value.toFixed(2)} {r.currency}</>}</td>
                       </tr>
                     ));
                   })()

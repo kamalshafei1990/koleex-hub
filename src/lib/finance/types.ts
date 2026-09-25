@@ -616,6 +616,9 @@ export interface FinanceSupplierAccount {
   unpaid_amount?: number;
   outstanding_payable?: number;
   next_due_date?: string | null;
+  /** No private-records switch: total_purchases and paid_amount came as 0
+   *  and show «•••»; what is still owed is real (src/lib/experience). */
+  cost_hidden?: boolean;
 }
 
 /* ── Notifications ──────────────────────────────────────────────── */

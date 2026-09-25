@@ -16,6 +16,10 @@ import { fmtMoney } from "@/lib/finance/calc";
 import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
+/** What a figure shows to a role that may not see it — the Finance
+ *  workspace's mark for the same thing. */
+const HIDDEN = "•••";
+
 export default function FinanceSuppliers() {
   const { showToast, toastElement } = useToast();
   const { t } = useTranslation(FIN_SUPPLIERS);
@@ -56,7 +60,11 @@ export default function FinanceSuppliers() {
     const purchases = rows.reduce((s, r) => s + (r.total_purchases ?? 0), 0);
     const paid = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
     const payable = rows.reduce((s, r) => s + (r.outstanding_payable ?? 0), 0);
-    return { purchases, paid, payable };
+    /* Without the «private records» switch the server sends what was bought
+       and paid as 0 with cost_hidden (src/lib/experience); what is still owed
+       is real. The same answer for every row of one caller. */
+    const costHidden = rows.some((r) => r.cost_hidden);
+    return { purchases, paid, payable, costHidden };
   }, [rows]);
 
   return (
@@ -70,10 +78,13 @@ export default function FinanceSuppliers() {
 
         <DashboardSection eyebrow={t("suppliers.section.eyebrow", "Supplier accounts")} title={t("suppliers.section.title", "Total exposure across every supplier")}>
           <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-3">
-            <DisplayKpi label={t("suppliers.kpi.purchases",   "Total Purchases")} value={formatCompact(kpi.purchases)} hint={`USD · ${t("suppliers.kpi.allSuppliers", "all suppliers")}`} tone="info" loading={loading} />
+            <DisplayKpi label={t("suppliers.kpi.purchases",   "Total Purchases")} value={kpi.costHidden ? HIDDEN : formatCompact(kpi.purchases)} hint={`USD · ${t("suppliers.kpi.allSuppliers", "all suppliers")}`} tone="info" loading={loading} />
             <DisplayKpi label={t("suppliers.kpi.outstanding", "Outstanding")}     value={formatCompact(kpi.payable)}   hint={`USD · ${t("suppliers.kpi.toPay",        "still to pay")}`} tone="warning" loading={loading} />
-            <DisplayKpi label={t("suppliers.kpi.paid",        "Paid")}            value={formatCompact(kpi.paid)}      hint={`USD · ${t("suppliers.kpi.wired",        "already wired")}`} tone="positive" loading={loading} />
+            <DisplayKpi label={t("suppliers.kpi.paid",        "Paid")}            value={kpi.costHidden ? HIDDEN : formatCompact(kpi.paid)}      hint={`USD · ${t("suppliers.kpi.wired",        "already wired")}`} tone="positive" loading={loading} />
           </div>
+          {kpi.costHidden && (
+            <p className="mt-4 text-[11px] text-[var(--text-dim)]">{t("suppliers.costHidden", "Purchases and payments show with «Can see private data» in Roles & Permissions — what is still owed is shown in full.")}</p>
+          )}
         </DashboardSection>
 
         <div className="mt-6">
@@ -90,10 +101,12 @@ export default function FinanceSuppliers() {
                     <div className="mt-1 text-[11px] text-[var(--text-dim)]">{r.payment_terms ?? t("suppliers.noTerms", "No payment terms set")}</div>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
-                    <Mini label={t("suppliers.mini.purchases", "Purchases")} value={fmtMoney(r.total_purchases ?? 0,    r.default_currency, { compact: true })} accent="default" />
-                    <Mini label={t("suppliers.mini.paid",      "Paid")}      value={fmtMoney(r.paid_amount ?? 0,        r.default_currency, { compact: true })} accent="emerald" />
+                    <Mini label={t("suppliers.mini.purchases", "Purchases")} value={r.cost_hidden ? HIDDEN : fmtMoney(r.total_purchases ?? 0,    r.default_currency, { compact: true })} accent="default" />
+                    <Mini label={t("suppliers.mini.paid",      "Paid")}      value={r.cost_hidden ? HIDDEN : fmtMoney(r.paid_amount ?? 0,        r.default_currency, { compact: true })} accent="emerald" />
                     <Mini label={t("suppliers.mini.toPay",     "To pay")}    value={fmtMoney(r.outstanding_payable ?? 0,r.default_currency, { compact: true })} accent="amber" />
                   </div>
+                  {/* Paid ÷ purchases — both hidden without the switch. */}
+                  {!r.cost_hidden && (
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-[10px] text-[var(--text-dim)]">
                       <span>{t("suppliers.paymentProgress", "Payment progress")}</span>
@@ -101,6 +114,7 @@ export default function FinanceSuppliers() {
                     </div>
                     <div className="mt-1"><ProgressBar value={r.paid_amount ?? 0} max={r.total_purchases ?? 0} color="emerald" /></div>
                   </div>
+                  )}
                   <div className="mt-3">
                     <button
                       type="button"

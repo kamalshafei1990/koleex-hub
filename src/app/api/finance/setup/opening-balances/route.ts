@@ -11,6 +11,13 @@ import "server-only";
    idempotently (the row id is the journal's source id). Owner capital is
    the balancing side of every other line, so it is recorded but never
    posted on its own.
+
+   Who sees and writes which line (src/lib/experience, openingCategoryRefusal):
+   cash, owner capital, loans and other need «Bank & Profit»; the inventory
+   opening needs the private-records switch; what customers owe, what is owed
+   to suppliers and fixed assets stay open. A hidden line goes out with amount
+   0 and amount_hidden, and is not added by such a caller. Guarded by
+   validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -18,6 +25,7 @@ import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/ser
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import { postOpeningBalance } from "@/lib/accounting/posting";
+import { canSeeBankAndProfit, canSeeCostData, hideOpeningAmount, openingCategoryRefusal } from "@/lib/experience";
 
 const ALLOWED_CATEGORIES = [
   "cash", "owner_capital", "loan",
@@ -63,9 +71,13 @@ export async function GET(req: Request) {
     .eq("tenant_id", auth.tenant_id)
     .order("created_at", { ascending: false });
   if (category) q = q.eq("category", category);
-  const { data, error } = await q;
+  const [{ data, error }, bankAndProfit] = await Promise.all([q, canSeeBankAndProfit(auth)]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ entries: data ?? [] });
+  const can = { bankAndProfit, cost: canSeeCostData(auth) };
+  const entries = ((data ?? []) as Array<{ category: string }>).map((r) =>
+    openingCategoryRefusal(r.category, can) ? hideOpeningAmount(r) : r);
+  /* For the asked category, so a drawer with no lines yet knows too. */
+  return NextResponse.json({ entries, amounts_hidden: category ? openingCategoryRefusal(category, can) !== null : undefined });
 }
 
 export async function POST(req: Request) {
@@ -78,6 +90,15 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: "JSON body required" }, { status: 400 });
   if (!(ALLOWED_CATEGORIES as readonly string[]).includes(body.category)) {
     return NextResponse.json({ error: "category not allowed" }, { status: 400 });
+  }
+  const refusal = openingCategoryRefusal(body.category, { bankAndProfit: await canSeeBankAndProfit(auth), cost: canSeeCostData(auth) });
+  if (refusal) {
+    return NextResponse.json({
+      error: refusal === "needs_bank_profit"
+        ? "These opening figures are set only with «Bank & Profit» in Roles & Permissions."
+        : "Inventory opening values are set only with «Can see private data» in Roles & Permissions.",
+      code: refusal,
+    }, { status: 403 });
   }
   if (!body.label?.trim()) return NextResponse.json({ error: "label required" }, { status: 400 });
   const amount = Number(body.amount);

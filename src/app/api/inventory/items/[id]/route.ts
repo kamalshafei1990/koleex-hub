@@ -4,6 +4,11 @@ import "server-only";
    GET    /api/inventory/items/[id]   item detail + per-warehouse stock
    PATCH  /api/inventory/items/[id]   limited update
    DELETE /api/inventory/items/[id]   soft archive (status='archived')
+
+   The item's cost goes only to the private-records switch (src/lib/experience):
+   anyone else gets cost_price 0 with cost_hidden, and an edit from them never
+   writes one — the form sends back the 0 it was shown. Guarded by
+   validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -12,6 +17,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { getItemStockSummary } from "@/lib/inventory/queries";
 import { updateInventoryItem, archiveInventoryItem } from "@/lib/inventory/items";
 import type { InventoryItem } from "@/lib/inventory/types";
+import { canSeeCostData, hideInventoryCost, INVENTORY_COST_INPUTS } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -32,7 +38,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const stock = await getItemStockSummary(auth.tenant_id, id);
-  return NextResponse.json({ item: data as InventoryItem, stock });
+  const item = data as InventoryItem;
+  return NextResponse.json({ item: canSeeCostData(auth) ? item : hideInventoryCost(item), stock });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -44,6 +51,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const patch = (await req.json().catch(() => null)) as Partial<InventoryItem> | null;
   if (!patch) return NextResponse.json({ error: "JSON body required" }, { status: 400 });
+  const cost = canSeeCostData(auth);
+  if (!cost) for (const f of INVENTORY_COST_INPUTS) delete patch[f];
 
   const r = await updateInventoryItem(auth.tenant_id, id, patch, {
     actor_id: auth.account_id,
@@ -55,7 +64,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       { status: 422 },
     );
   }
-  return NextResponse.json({ item: r.item });
+  return NextResponse.json({ item: cost || !r.item ? r.item : hideInventoryCost(r.item) });
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
