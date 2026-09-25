@@ -11,10 +11,16 @@ import "server-only";
      report_approval_request   → approvals (the word "approval" wins)
      report_decided            → reports_activity
      report_comment            → comments_activity
+
+   The nudges (report_reminder / report_escalation, from nudges.ts) and the
+   event requests (report_request, from events.ts) are ONE row about possibly
+   SEVERAL owed reports. Sending a report settles it in each of them
+   (settleOwedReport): a row still listing other owed reports stays.
    --------------------------------------------------------------------------- */
 
 import { notifyLite } from "@/lib/server/notify-lite";
-import { clearUnreadByMeta, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { clearUnreadByMeta, settleListedItems, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { requestIdOf } from "@/lib/reports/events";
 import type { ReportRow } from "@/lib/server/reports/core";
 import { pickWord, readSnapshot, templateOf } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
@@ -70,6 +76,22 @@ export async function notifyReportComment(r: ReportRow, participantIds: string[]
     type: "report_comment",
     metadata: { report_id: r.id },
   });
+}
+
+/** The report is sent: every reminder, escalation and request that was waiting
+ *  on it lets go of it — for the author, and for the manager who was told it
+ *  was missing. Items are matched as nudges.ts / events.ts wrote them. */
+export async function settleOwedReport(r: ReportRow): Promise<void> {
+  if (!r.period_key) return;
+  const owed = { key: r.template_key, period_key: r.period_key };
+  const requestId = requestIdOf(r.period_key);
+  await Promise.all([
+    settleListedItems({ type: "report_reminder", listKey: "reminders", items: [owed], recipients: [r.author_account_id] }),
+    settleListedItems({ type: "report_escalation", listKey: "escalations", items: [{ author: r.author_account_id, ...owed }] }),
+    requestId
+      ? settleListedItems({ type: "report_request", listKey: "requests", items: [requestId], recipients: [r.author_account_id] })
+      : null,
+  ]);
 }
 
 /** The reader opened it — their own unread copies are done. */

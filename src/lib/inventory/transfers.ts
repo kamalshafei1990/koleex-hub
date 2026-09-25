@@ -441,6 +441,8 @@ export async function transitionTransfer(
       type: `transfer_${next}`,
       metadata: { source: "inventory", transfer_id: transferId },
       tag: `transfer:${transferId}`,
+      /* Only the transfer's latest state matters: it replaces an unread older one. */
+      supersede: { transfer_id: transferId },
     });
   }
 
@@ -599,6 +601,8 @@ export async function shipTransfer(
     type: "transfer_shipped",
     metadata: { source: "inventory", transfer_id: transferId },
     tag: `transfer:${transferId}`,
+    /* Only the transfer's latest state matters: it replaces an unread older one. */
+    supersede: { transfer_id: transferId },
   });
   /* Stock just LEFT the source warehouse — low-stock check per item. */
   for (const it of items) {
@@ -764,6 +768,8 @@ export async function receiveTransfer(
     type: "transfer_received",
     metadata: { source: "inventory", transfer_id: transferId },
     tag: `transfer:${transferId}`,
+    /* Only the transfer's latest state matters: it replaces an unread older one. */
+    supersede: { transfer_id: transferId },
   });
 
   return { ok: true };

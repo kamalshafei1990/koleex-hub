@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { notifyPlanningPublished, notifyPlanningPublishedBatch } from "@/lib/server/planning-notify";
+import { leftPublished, notifyPlanningPublished, notifyPlanningPublishedBatch, settlePlanningPublished } from "@/lib/server/planning-notify";
 import { requireAuth, requireModuleAccess, requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import {
   callerResourceIds,
@@ -215,6 +215,9 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     created = (ins ?? []) as Record<string, unknown>[];
   }
 
+  if (leftPublished(prev, data)) {
+    after(() => settlePlanningPublished(auth.tenant_id, [{ id: prev.id, resource_id: prev.resource_id }]));
+  }
   const becamePublished = prev.status !== "published" && data.status === "published";
   if (becamePublished && data.resource_id) {
     if (created.length > 0) {
@@ -344,6 +347,11 @@ async function patchSeriesFuture(
   }
 
   const prevStatus = new Map(rows.map((r) => [r.id, r.status]));
+  const prevById = new Map(rows.map((r) => [r.id, r]));
+  const unannounced = saved
+    .filter((d) => { const b = prevById.get(d.id as string); return !!b && leftPublished(b, d); })
+    .map((d) => ({ id: d.id as string, resource_id: prevById.get(d.id as string)!.resource_id }));
+  if (unannounced.length > 0) after(() => settlePlanningPublished(auth.tenant_id, unannounced));
   const newlyPublished = saved.filter((d) => d.status === "published" && prevStatus.get(d.id as string) !== "published");
   if (newlyPublished.length > 0) {
     const list = newlyPublished as unknown as Parameters<typeof notifyPlanningPublishedBatch>[1];
@@ -370,6 +378,7 @@ export async function DELETE(req: Request, { params }: RouteCtx) {
   if (!r.ok) return err(r.status);
 
   let ids = [id];
+  let doomed: PrevRow[] = [r.item];
   if (scopeFuture && r.item.recurrence_parent_id) {
     const [rowsRes, rids] = await Promise.all([
       supabaseServer
@@ -385,8 +394,9 @@ export async function DELETE(req: Request, { params }: RouteCtx) {
       console.error("[api/planning/items DELETE future]", rowsRes.error.message);
       return err(500);
     }
-    const more = ((rowsRes.data ?? []) as unknown as PrevRow[]).filter((x) => canWritePlanningRow(auth, rids, x)).map((x) => x.id);
-    ids = [...new Set([id, ...more])];
+    const more = ((rowsRes.data ?? []) as unknown as PrevRow[]).filter((x) => canWritePlanningRow(auth, rids, x));
+    ids = [...new Set([id, ...more.map((x) => x.id)])];
+    doomed = [r.item, ...more];
   }
 
   const { error } = await supabaseServer
@@ -398,5 +408,7 @@ export async function DELETE(req: Request, { params }: RouteCtx) {
     console.error("[api/planning/items DELETE]", error.message);
     return err(500);
   }
+  const wasPublished = doomed.filter((x) => x.status === "published").map((x) => ({ id: x.id, resource_id: x.resource_id }));
+  if (wasPublished.length > 0) after(() => settlePlanningPublished(auth.tenant_id, wasPublished));
   return NextResponse.json({ ok: true, ids });
 }

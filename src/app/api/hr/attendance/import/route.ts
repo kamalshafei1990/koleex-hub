@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { lateMinutes, loadPolicy, resolveEmployeeCountry, type AttendancePolicy } from "@/lib/server/work-calendar";
+import { settleClockoutReminders } from "@/lib/server/attendance-records";
 
 const MAX_ROWS = 5000;
 
@@ -139,10 +140,12 @@ export async function POST(req: Request) {
   if (dryRun) return NextResponse.json({ dryRun: true, rows: records.length, problems, sample: records.slice(0, 10) });
   if (records.length === 0) return NextResponse.json({ imported: 0, problems });
 
-  const { error } = await supabaseServer.from("hr_attendance_records").upsert(records, { onConflict: "employee_id,date" });
+  const { data: saved, error } = await supabaseServer.from("hr_attendance_records")
+    .upsert(records, { onConflict: "employee_id,date" }).select("id, clock_out");
   if (error) {
     console.error("[api/hr/attendance/import]", error.message);
     return NextResponse.json({ error: "Import failed.", detail: error.message }, { status: 500 });
   }
+  await settleClockoutReminders(((saved ?? []) as Array<{ id: string; clock_out: string | null }>).filter((r) => r.clock_out).map((r) => r.id));
   return NextResponse.json({ imported: records.length, problems });
 }

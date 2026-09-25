@@ -13,7 +13,9 @@
         unregistered type — it would land under "Other", unmutable)
      D  every registered type has a live emitter (the owner's rule: no switch,
         no key, without something real behind it)
-     E  the open lifecycle gaps are counted, so their closing is visible
+     E  every declared lifecycle is backed by code: a clear/supersede key is
+        passed to a lifecycle verb somewhere, a settle list is settled
+     F  the open lifecycle gaps are counted, so their closing is visible
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -40,7 +42,9 @@ const block = regSrc.slice(regSrc.indexOf("export const NOTIFICATION_TYPES"), re
 /* Any key at the object's first level starts an entry — so an entry split
    over several lines is reported as unparseable, never silently skipped. */
 const ENTRY_START = /^ {2}["']?([A-Za-z][\w-]*)["']?\s*:/;
-const ENTRY = /^\s+([a-z][a-z0-9_]*):\s*\{\s*app:\s*"([a-z-]+)",\s*activity:\s*(null|"([a-z_]+)")(?:,\s*activityNote:\s*(SA_CRITICAL|"[^"]+"))?,\s*severity:\s*"(info|action|warning|critical)",\s*lifecycle:\s*(todoClear|\{[^{}]*\})\s*\},?\s*$/;
+const ENTRY = /^\s+([a-z][a-z0-9_]*):\s*\{\s*app:\s*"([a-z-]+)",\s*activity:\s*(null|"([a-z_]+)")(?:,\s*activityNote:\s*(SA_CRITICAL|"[^"]+"))?,\s*severity:\s*"(info|action|warning|critical)",\s*lifecycle:\s*([A-Za-z]\w*|\{[^{}]*\})\s*\},?\s*$/;
+/* Shared lifecycles (`const qaOpen = { … } as const;`) resolve to their text. */
+const SHARED = new Map([...regSrc.matchAll(/^const ([A-Za-z]\w*) = (\{[^{}]*\}) as const;/gm)].map((m) => [m[1], m[2]]));
 type Entry = { app: string; activity: string | null; note: string | null; lifecycle: string };
 const entries = new Map<string, Entry>();
 const unparsed: string[] = [];
@@ -48,7 +52,9 @@ for (const line of block.split("\n")) {
   if (!ENTRY_START.test(line)) continue;
   const m = ENTRY.exec(line);
   if (!m) { unparsed.push(line.trim().slice(0, 60)); continue; }
-  entries.set(m[1], { app: m[2], activity: m[4] ?? null, note: m[5] ?? null, lifecycle: m[7] });
+  const lifecycle = m[7].startsWith("{") ? m[7] : SHARED.get(m[7]);
+  if (!lifecycle) { unparsed.push(`${m[1]}: unknown lifecycle ${m[7]}`); continue; }
+  entries.set(m[1], { app: m[2], activity: m[4] ?? null, note: m[5] ?? null, lifecycle });
 }
 
 console.log("\nA. every entry is well-formed");
@@ -149,9 +155,40 @@ for (const exp of Object.values(TEMPLATES)) for (const t of exp) quoted.add(t);
 const dead = [...entries.keys()].filter((t) => !quoted.has(t));
 check("no registered type without an emitter", dead.length === 0, dead.join(", "));
 
-/* ── E: the open gaps ───────────────────────────────────────────────── */
+/* ── E: every declared lifecycle has code behind it ─────────────────── */
+console.log("\nE. every declared lifecycle is backed by code");
+/* The files that call a lifecycle verb (or hand notifyLite a `supersede`),
+   and the property / string tokens they use. A declared key found nowhere
+   among them is a lifecycle that exists only on paper. */
+const VERB = /\b(?:supersedeUnread|clearUnreadByMeta|clearUnreadByMetaIn|settleListedItems)\(|\bsupersede:\s*[{\w]/;
+const verbTokens = new Set<string>();
+const settledLists = new Set<string>();
+for (const f of files) {
+  const rel = path.relative(ROOT, f);
+  if (rel === REGISTRY) continue;
+  const src = stripComments(fs.readFileSync(f, "utf8"));
+  if (!VERB.test(src)) continue;
+  for (const m of src.matchAll(/\b([a-z][a-z0-9_]*)\s*:|"([a-z][a-z0-9_]*)"/g)) verbTokens.add(m[1] ?? m[2]);
+  for (const m of src.matchAll(/settleListedItems\(\{[^}]*?listKey:\s*"([a-z_]+)"/g)) settledLists.add(m[1]);
+}
+/* "subject" is supersedeUnread's own `subject` filter; "type" is always
+   carried in the metadata the verbs match on. */
+const unbacked: string[] = [];
+for (const [t, e] of entries) {
+  const kind = /kind:\s*"(\w[\w-]*)"/.exec(e.lifecycle)?.[1];
+  if (kind === "clear" || kind === "supersede") {
+    const key = /key:\s*"([^"]+)"/.exec(e.lifecycle)?.[1] ?? "";
+    for (const k of key.split("+")) if (!verbTokens.has(k)) unbacked.push(`${t}: ${kind} key "${k}"`);
+  } else if (kind === "settle") {
+    const list = /list:\s*"([^"]+)"/.exec(e.lifecycle)?.[1] ?? "";
+    if (!settledLists.has(list)) unbacked.push(`${t}: settle list "${list}"`);
+  }
+}
+check("every clear / supersede key and settle list reaches a lifecycle verb", unbacked.length === 0, unbacked.join("; "));
+
+/* ── F: the open gaps ───────────────────────────────────────────────── */
 const gaps = [...entries].filter(([, e]) => /kind:\s*"gap"/.test(e.lifecycle)).map(([t]) => t);
-console.log(`\nE. open lifecycle gaps: ${gaps.length} of ${entries.size} types`);
+console.log(`\nF. open lifecycle gaps: ${gaps.length} of ${entries.size} types`);
 for (const g of gaps) console.log(`  · ${g}`);
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);

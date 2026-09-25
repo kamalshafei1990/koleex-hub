@@ -19,6 +19,7 @@ import { setDayTimes } from "@/lib/server/attendance-records";
 import { employeeAccountId } from "@/lib/server/leave-review";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
+import { dmyDate } from "@/lib/work-reports";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -67,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const to = emp ? await employeeAccountId(emp as { account_id: string | null; person_id: string | null }) : null;
   after(() => notifyLite({
     tenantId: auth.tenant_id, recipients: [to], senderId: auth.account_id,
-    subject: decision === "approve" ? `Attendance correction approved — ${r.date}` : `Attendance correction not approved — ${r.date}`,
+    subject: decision === "approve" ? `Attendance correction approved — ${dmyDate(r.date)}` : `Attendance correction not approved — ${dmyDate(r.date)}`,
     body: note || null, link: "/me?tab=attendance", type: "hr_attendance_correction_decided",
     metadata: { attendance_correction_id: id }, tag: `att-correction-${id}`,
   }));

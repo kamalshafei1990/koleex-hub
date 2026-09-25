@@ -18,7 +18,7 @@ import { missingSections, normalizeSections, reportLinks } from "@/lib/reports/t
 import { templateOf } from "@/lib/reports/custom-templates";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { REPORT_COLS, listPeople, loadForViewer, requireReportsUser, type ReportRow } from "@/lib/server/reports/core";
-import { notifyReportSubmitted } from "@/lib/server/reports/notify";
+import { notifyReportSubmitted, settleOwedReport } from "@/lib/server/reports/notify";
 import { markRequestSent } from "@/lib/server/reports/events";
 import { loadReportData } from "@/lib/server/reports/report-data";
 import { withBlockData } from "@/lib/reports/report-data";
@@ -73,5 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const authorName = people.find((p) => p.id === auth.account_id)?.name ?? "A colleague";
   const ids = recipients.map((r) => r.account_id);
   after(() => notifyReportSubmitted(report, ids, authorName));
+  /* What was owed is sent: its reminders, escalation and request settle. */
+  after(() => settleOwedReport(report));
   return NextResponse.json({ ok: true, submittedAt: now });
 }

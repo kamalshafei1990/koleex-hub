@@ -28,6 +28,7 @@ import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
 import { lateMinutes, loadPolicy, overtimeMinutes, resolveEmployeeCountry } from "@/lib/server/work-calendar";
 import { hrReviewerAccountIds } from "@/lib/server/leave-review";
 import { notifyLite } from "@/lib/server/notify-lite";
+import { settleClockoutReminders } from "@/lib/server/attendance-records";
 
 const COLS = "id, date, clock_in, clock_out, break_minutes, total_hours, status";
 
@@ -80,6 +81,7 @@ export async function POST(req: Request) {
     console.error("[api/me/hr/attendance out]", error.message);
     return NextResponse.json({ error: "Could not clock out." }, { status: 500 });
   }
+  after(() => settleClockoutReminders([rec.id]));
   /* Overtime after the policy's end time waits for HR or the owner. */
   const policy = await loadPolicy(await resolveEmployeeCountry(me.id));
   const otMin = overtimeMinutes(rec.clock_in, now, today, policy);

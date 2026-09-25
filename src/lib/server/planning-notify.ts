@@ -17,6 +17,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { clearUnreadByMetaIn, settleListedItems } from "@/lib/server/inbox-lifecycle";
 
 interface AuthCtx {
   account_id: string;
@@ -85,6 +86,41 @@ export async function notifyPlanningPublished(auth: AuthCtx, item: PlanningItemL
     console.error("[planning-notify] published:", e instanceof Error ? e.message : e);
   }
 }
+
+/** These published items no longer stand as announced — cancelled, back to
+ *  draft, completed, moved to someone else, or deleted. Pass each with the
+ *  resource it was published FOR: that person's unopened "Scheduled" notice
+ *  is settled (a one-item notice archived; a week notice drops these items
+ *  and is archived once empty). */
+export async function settlePlanningPublished(
+  tenantId: string,
+  items: Array<{ id: string; resource_id: string | null }>,
+): Promise<void> {
+  try {
+    const ids = items.map((i) => i.id);
+    if (ids.length === 0) return;
+    await clearUnreadByMetaIn({ type: "planning_published" }, "planning_item_id", ids);
+    const resIds = [...new Set(items.map((i) => i.resource_id).filter((x): x is string => !!x))];
+    if (resIds.length === 0) return;
+    const { data: res } = await supabaseServer
+      .from("planning_resources")
+      .select("account_id")
+      .eq("tenant_id", tenantId)
+      .in("id", resIds);
+    const recipients = [...new Set(((res ?? []) as Array<{ account_id: string | null }>).map((r) => r.account_id).filter((x): x is string => !!x))];
+    if (recipients.length === 0) return;
+    await settleListedItems({ type: "planning_published", listKey: "planning_item_ids", items: ids, recipients });
+  } catch (e) {
+    console.error("[planning-notify] settle:", e instanceof Error ? e.message : e);
+  }
+}
+
+/** A published item stops standing as announced when it leaves "published"
+ *  or moves to another resource. */
+export const leftPublished = (
+  before: { status: string; resource_id: string | null },
+  after: { status?: unknown; resource_id?: unknown },
+): boolean => before.status === "published" && (after.status !== "published" || after.resource_id !== before.resource_id);
 
 /** Someone claimed an open shift: tell the person who created it. */
 export async function notifyPlanningTaken(auth: AuthCtx, item: PlanningItemLike): Promise<void> {

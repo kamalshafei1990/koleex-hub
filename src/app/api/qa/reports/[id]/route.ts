@@ -13,7 +13,7 @@ import {
   type Priority,
 } from "@/lib/qa/types";
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
-import { notifyIssue, reporterIssueLink, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
+import { SETTLED_STATUSES, notifyIssue, reporterIssueLink, settleIssueNotifications, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
 import { loadFixEvidence } from "@/lib/qa/evidence";
 
@@ -296,7 +296,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   /* ── Notifications (best-effort) ──────────────────────────────────────
      Derived from the final patch diff so ordering between branches never
-     matters. notifyIssue suppresses the actor and dedupes per recipient. */
+     matters. notifyIssue suppresses the actor and dedupes per recipient.
+     A settling status first retires every unread row about the issue. */
+  if (patch.status && patch.status !== cur.status && SETTLED_STATUSES.has(patch.status as IssueStatus)) {
+    await settleIssueNotifications([id]);
+  }
   {
     const actor = auth.username ?? "Someone";
     const title = (cur.title as string) ?? "an issue";

@@ -14,6 +14,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { getReplyLanguage } from "@/lib/server/ai/reply-language";
 import { normalizeAiPersonalization } from "@/lib/ai-personalization";
 import { buildBriefCounts, briefText, hourIn, dayIn } from "@/lib/server/ai/brief";
@@ -80,6 +81,8 @@ export async function GET(req: Request) {
     );
     const lang = (await getReplyLanguage(a.id)) ?? "en";
     const text = briefText(counts, lang);
+    /* Today's brief replaces yesterday's if it was never opened. */
+    await supersedeUnread({ recipients: [a.id], meta: { type: "ai_brief" } });
     const { error: inboxErr } = await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: a.id,
       sender_account_id: null,

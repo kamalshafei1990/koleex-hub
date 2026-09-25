@@ -20,11 +20,14 @@
      lifecycle  what makes an unread copy go away without a click:
                 clear       — resolved when its cause finishes (by `key`)
                 supersede   — a newer one about the same `key` replaces it
+                settle      — ONE row about SEVERAL things (its `list`): each
+                              finished thing leaves the list, the row goes
+                              when the list is empty
                 info        — a record of something that happened; stays
                               until read
                 push-only   — never an inbox row (Discuss messages)
                 gap         — KNOWN missing lifecycle; `note` says what it
-                              should be. Phase C2 closes these.
+                              should be and what blocks it.
 
    Pure data, no imports beyond types: the server writers, the bell and the
    push sender all read it. validate:notification-types keeps it honest —
@@ -45,6 +48,7 @@ export type NotifSeverity = "info" | "action" | "warning" | "critical";
 export type NotifLifecycle =
   | { kind: "clear"; key: string; when: string }
   | { kind: "supersede"; key: string }
+  | { kind: "settle"; list: string; when: string }
   | { kind: "info" }
   | { kind: "push-only" }
   | { kind: "gap"; note: string };
@@ -60,6 +64,10 @@ export interface NotificationTypeDef {
 
 const SA_CRITICAL = "Super-Admin critical alert: deliberately never mutable.";
 const todoClear = { kind: "clear", key: "todo_id", when: "the task is done or deleted (plus the feed reconcile)" } as const;
+/* QA threads per issue: any newer update replaces the recipient's unread
+   one (notifyIssue), and a settling status retires them all (lib/qa/notify). */
+const qaThread = { kind: "supersede", key: "entity_id" } as const;
+const qaOpen = { kind: "clear", key: "entity_id", when: "the issue is verified, closed, rejected or a duplicate (a newer update on it replaces it first)" } as const;
 
 export const NOTIFICATION_TYPES = {
   /* ── To-do ─────────────────────────────────────────────────────────── */
@@ -81,25 +89,25 @@ export const NOTIFICATION_TYPES = {
   calendar_rsvp_declined:   { app: "calendar", activity: "calendar_events", severity: "info", lifecycle: { kind: "supersede", key: "event_id" } },
 
   /* ── Issue reports (QA) ────────────────────────────────────────────── */
-  qa_issue_assigned:        { app: "issue-reports", activity: "qa_reports", severity: "action", lifecycle: { kind: "gap", note: "clear by issue_id when the issue is closed/verified" } },
-  qa_issue_reassigned:      { app: "issue-reports", activity: "qa_reports", severity: "action", lifecycle: { kind: "gap", note: "clear by issue_id when the issue is closed/verified" } },
-  qa_comment_added:         { app: "issue-reports", activity: "comments_activity", severity: "info", lifecycle: { kind: "gap", note: "clear by issue_id when the issue is closed/verified" } },
-  qa_status_changed:        { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: { kind: "gap", note: "supersede by issue_id — only the latest status matters" } },
-  qa_priority_changed:      { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: { kind: "gap", note: "supersede by issue_id — only the latest priority matters" } },
-  qa_issue_reopened:        { app: "issue-reports", activity: "qa_reports", severity: "warning", lifecycle: { kind: "gap", note: "clear by issue_id when the issue is closed/verified" } },
-  qa_issue_verified:        { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: { kind: "info" } },
-  qa_issue_closed:          { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: { kind: "info" } },
-  qa_issue_mentioned:       { app: "issue-reports", activity: "mentions", severity: "info", lifecycle: { kind: "gap", note: "clear by issue_id when the issue is closed/verified" } },
-  qa_issue_duplicate_marked: { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: { kind: "info" } },
+  qa_issue_assigned:        { app: "issue-reports", activity: "qa_reports", severity: "action", lifecycle: qaOpen },
+  qa_issue_reassigned:      { app: "issue-reports", activity: "qa_reports", severity: "action", lifecycle: qaOpen },
+  qa_comment_added:         { app: "issue-reports", activity: "comments_activity", severity: "info", lifecycle: qaOpen },
+  qa_status_changed:        { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: qaThread },
+  qa_priority_changed:      { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: qaThread },
+  qa_issue_reopened:        { app: "issue-reports", activity: "qa_reports", severity: "warning", lifecycle: qaOpen },
+  qa_issue_verified:        { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: qaThread },
+  qa_issue_closed:          { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: qaThread },
+  qa_issue_mentioned:       { app: "issue-reports", activity: "mentions", severity: "info", lifecycle: qaOpen },
+  qa_issue_duplicate_marked: { app: "issue-reports", activity: "qa_reports", severity: "info", lifecycle: qaThread },
 
   /* ── Reports ───────────────────────────────────────────────────────── */
   report_approval_request:  { app: "reports", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "report_id", when: "the report is approved or returned" } },
   report_submitted:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_decided:           { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_comment:           { app: "reports", activity: "comments_activity", severity: "info", lifecycle: { kind: "supersede", key: "report_id" } },
-  report_reminder:          { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "gap", note: "clear when the owed report is sent" } },
-  report_escalation:        { app: "reports", activity: "reports_activity", severity: "warning", lifecycle: { kind: "gap", note: "clear when the owed report is sent" } },
-  report_request:           { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "gap", note: "clear when the requested report is sent (request_id)" } },
+  report_reminder:          { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "reminders", when: "each listed report is sent" } },
+  report_escalation:        { app: "reports", activity: "reports_activity", severity: "warning", lifecycle: { kind: "settle", list: "escalations", when: "each missing report is sent" } },
+  report_request:           { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "requests", when: "each requested report is sent" } },
 
   /* ── HR (the approver's side) ──────────────────────────────────────── */
   leave_approval_request:   { app: "hr", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "leave_request_id", when: "the step is decided" } },
@@ -112,32 +120,32 @@ export const NOTIFICATION_TYPES = {
   hr_attendance_correction_decided: { app: "me", activity: "hr_activity", severity: "info", lifecycle: { kind: "info" } },
   hr_attendance_overtime_decided:   { app: "me", activity: "hr_activity", severity: "info", lifecycle: { kind: "info" } },
   hr_attendance_auto_closed:        { app: "me", activity: "hr_activity", severity: "info", lifecycle: { kind: "info" } },
-  hr_attendance_clockout_reminder:  { app: "me", activity: "hr_activity", severity: "info", lifecycle: { kind: "gap", note: "clear when the employee clocks out (or the day auto-closes)" } },
+  hr_attendance_clockout_reminder:  { app: "me", activity: "hr_activity", severity: "info", lifecycle: { kind: "clear", key: "attendance_record_id", when: "the day gets a clock-out: the button, an HR edit or correction, the device import, or the nightly auto-close" } },
 
   /* ── Projects & Planning ───────────────────────────────────────────── */
   project_task_assigned:    { app: "projects", activity: "projects_planning", severity: "action", lifecycle: { kind: "clear", key: "task_id", when: "the task is completed" } },
   project_task_comment:     { app: "projects", activity: "comments_activity", severity: "info", lifecycle: { kind: "clear", key: "task_id", when: "the task is completed" } },
   project_task_due:         { app: "projects", activity: "projects_planning", severity: "warning", lifecycle: { kind: "clear", key: "task_id", when: "the task is completed (the reminder cron also replaces its own)" } },
-  planning_published:       { app: "planning", activity: "projects_planning", severity: "info", lifecycle: { kind: "gap", note: "clear by item id when the shift is taken by someone else or unpublished" } },
+  planning_published:       { app: "planning", activity: "projects_planning", severity: "info", lifecycle: { kind: "settle", list: "planning_item_ids", when: "the shift is cancelled, back to draft, completed, moved to someone else or deleted (a one-item notice: by planning_item_id)" } },
   planning_taken:           { app: "planning", activity: "projects_planning", severity: "info", lifecycle: { kind: "info" } },
 
   /* ── Inventory ─────────────────────────────────────────────────────── */
-  transfer_approved:        { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "gap", note: "supersede by transfer_id — only the latest state matters" } },
-  transfer_cancelled:       { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "gap", note: "supersede by transfer_id — only the latest state matters" } },
-  transfer_shipped:         { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "gap", note: "supersede by transfer_id — only the latest state matters" } },
-  transfer_received:        { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "gap", note: "supersede by transfer_id — only the latest state matters" } },
-  low_stock_alert:          { app: "inventory", activity: "low_stock", severity: "warning", lifecycle: { kind: "gap", note: "clear by item when stock is back above its minimum (24 h dedupe exists)" } },
+  transfer_approved:        { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
+  transfer_cancelled:       { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
+  transfer_shipped:         { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
+  transfer_received:        { app: "inventory", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "transfer_id" } },
+  low_stock_alert:          { app: "inventory", activity: "low_stock", severity: "warning", lifecycle: { kind: "clear", key: "item_id", when: "stock posted IN brings the item back above its minimum (a newer alert also replaces it)" } },
 
   /* ── Commercial & finance ──────────────────────────────────────────── */
-  quotation_updated:        { app: "quotations", activity: "quotation_activity", severity: "info", lifecycle: { kind: "gap", note: "supersede by quotation id — 5 unread copies of one quotation measured 26/09" } },
+  quotation_updated:        { app: "quotations", activity: "quotation_activity", severity: "info", lifecycle: { kind: "supersede", key: "quotation_id" } },
   invoice_sent:             { app: "invoices", activity: "finance_activity", severity: "info", lifecycle: { kind: "info" } },
-  finance_reminder:         { app: "finance", activity: "finance_activity", severity: "action", lifecycle: { kind: "gap", note: "clear by reminder_id when marked collected/paid/cancelled" } },
+  finance_reminder:         { app: "finance", activity: "finance_activity", severity: "action", lifecycle: { kind: "clear", key: "reminder_id", when: "the reminder is marked done, cancelled or snoozed (a re-fire also replaces it)" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },
-  membership_request:       { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "gap", note: "clear when the request is approved or rejected" } },
-  support_request:          { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "gap", note: "clear when the sign-in help request is handled" } },
-  ai_brief:                 { app: "ai", activity: null, activityNote: "OPEN: no Settings switch for the daily brief yet — lands under Other.", severity: "info", lifecycle: { kind: "gap", note: "supersede — today's brief replaces yesterday's unread one" } },
+  membership_request:       { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "clear", key: "membership_request_id", when: "the request is approved or rejected" } },
+  support_request:          { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "gap", note: "BLOCKED: nothing in the Hub marks a sign-in help request handled — support_requests has no resolve action to clear it from" } },
+  ai_brief:                 { app: "ai", activity: null, activityNote: "OPEN: no Settings switch for the daily brief yet — lands under Other.", severity: "info", lifecycle: { kind: "supersede", key: "type" } },
   discuss_message:          { app: "discuss", activity: "discuss_messages", severity: "info", lifecycle: { kind: "push-only" } },
   test:                     { app: "settings", activity: null, activityNote: "The user's own test push (Settings → Notifications) — muting it would defeat the test.", severity: "info", lifecycle: { kind: "push-only" } },
 

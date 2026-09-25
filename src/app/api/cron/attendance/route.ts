@@ -22,6 +22,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { dayEndIso, loadPolicyRows, pickPolicy, resolveEmployeeCountries, todayInZone, workedHours } from "@/lib/server/work-calendar";
 import { employeeAccountId } from "@/lib/server/leave-review";
 import { notifyLite } from "@/lib/server/notify-lite";
+import { settleClockoutReminders } from "@/lib/server/attendance-records";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -80,6 +81,7 @@ export async function GET(req: Request) {
       }).eq("id", r.id).is("clock_out", null).select("id").maybeSingle();
       if (!closed) continue;
       autoClosed++;
+      await settleClockoutReminders([r.id]);
       if (who) {
         await notifyLite({
           tenantId: who.tenantId, recipients: [who.accountId],

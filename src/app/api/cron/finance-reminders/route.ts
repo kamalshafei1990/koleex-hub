@@ -92,6 +92,8 @@ export async function GET(req: Request) {
       type: "finance_reminder",
       metadata: { source: "finance", reminder_id: r.id, reference_type: r.type, due_date: r.due_date },
       tag: `finance-reminder:${r.id}`,
+      /* A snoozed reminder firing again replaces its own unread copy. */
+      supersede: { type: "finance_reminder", reminder_id: r.id },
     });
     /* Stamp regardless of recipients so a tenant with nobody to tell does
        not re-fire every morning. */

@@ -13,6 +13,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { lateMinutes, workedHours, type AttendancePolicy } from "@/lib/server/work-calendar";
+import { clearUnreadByMetaIn } from "@/lib/server/inbox-lifecycle";
 
 export const RECORD_COLS =
   "id, employee_id, date, clock_in, clock_out, break_minutes, total_hours, status, source, remote, auto_closed, corrected, reminded_at, overtime_status, overtime_approved_minutes";
@@ -70,7 +71,16 @@ export async function setDayTimes(opts: { employeeId: string; date: string; time
     console.error("[attendance-records setDayTimes]", error?.message);
     return { ok: false, error: "save_failed" };
   }
-  return { ok: true, before, after: data as AttendanceRecord };
+  const after = data as AttendanceRecord;
+  if (after.clock_out) await settleClockoutReminders([after.id]);
+  return { ok: true, before, after };
+}
+
+/** These days have a clock-out now — however it got there (the button, an HR
+ *  edit, an approved correction, the device import, the nightly auto-close):
+ *  their "Don't forget to clock out" reminders are answered. */
+export async function settleClockoutReminders(recordIds: string[]): Promise<void> {
+  await clearUnreadByMetaIn({ type: "hr_attendance_clockout_reminder" }, "attendance_record_id", recordIds);
 }
 
 /** The audit row every change leaves behind. */

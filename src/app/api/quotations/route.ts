@@ -330,6 +330,8 @@ export async function POST(req: Request) {
         type: "quotation_updated",
         metadata: { source: "quotations", quotation_id: body.id },
         tag: `quotation:${body.id}`,
+        /* Five saves were five unread rows about one quotation: the newest replaces them. */
+        supersede: { type: "quotation_updated", quotation_id: body.id },
       });
     }
     if (data) {

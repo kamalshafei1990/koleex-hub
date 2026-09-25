@@ -30,6 +30,8 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { clearUnreadByMetaIn, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import type { IssueStatus } from "@/lib/qa/types";
 
 export type QaNotificationType =
   | "qa_issue_assigned"
@@ -114,20 +116,14 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
   }));
 
   // Thread per issue: collapse repeated updates into ONE notification per
-  // recipient per issue instead of piling up a new row for every change. We
-  // clear any still-UNREAD QA notification for this issue (any qa_type) for
-  // these recipients, then insert the fresh one — so the inbox shows a single,
-  // latest entry per issue. Read notifications are left untouched (history).
+  // recipient per issue instead of piling up a new row for every change. Any
+  // still-UNREAD QA notification for this issue (any qa_type) is superseded
+  // for these recipients, then the fresh one lands — so the inbox shows a
+  // single, latest entry per issue. Read notifications are left untouched
+  // (history). Superseded = archived like every other module's, no longer
+  // hard-deleted.
   const recipientIds = Array.from(byRecipient.keys());
-  const { error: delErr } = await supabaseServer
-    .from("inbox_messages")
-    .delete()
-    .eq("tenant_id", ctx.tenantId)
-    .in("recipient_account_id", recipientIds)
-    .is("read_at", null)
-    .eq("metadata->>entity_type", "qa_issue")
-    .eq("metadata->>entity_id", ctx.issueId);
-  if (delErr) console.error("[qa notify] collapse", delErr.message);
+  await supersedeUnread({ recipients: recipientIds, meta: { entity_type: "qa_issue", entity_id: ctx.issueId } });
 
   const { error } = await supabaseServer.from("inbox_messages").insert(rows);
   if (error) { console.error("[qa notify]", error.message); return; }
@@ -151,6 +147,19 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
       ).catch((e) => console.error("[qa notify] push:", e instanceof Error ? e.message : e)),
     ),
   );
+}
+
+/* ── Settled issues ────────────────────────────────────────────────────────
+   Verified, closed, rejected or a duplicate: nothing about the issue waits on
+   anyone any more. Every recipient's unread QA row for it is finished
+   business — not only the people the status change itself notifies (an
+   assignee who closes their own issue is never notified, and their
+   "assigned to you" used to stay unread forever). Call BEFORE notifyIssue,
+   so the notice of the settling status itself survives. */
+export const SETTLED_STATUSES: ReadonlySet<IssueStatus> = new Set<IssueStatus>(["verified", "closed", "rejected", "duplicate"]);
+
+export async function settleIssueNotifications(issueIds: string[]): Promise<void> {
+  await clearUnreadByMetaIn({ entity_type: "qa_issue" }, "entity_id", issueIds);
 }
 
 /* ── Mentions ──────────────────────────────────────────────────────────────
