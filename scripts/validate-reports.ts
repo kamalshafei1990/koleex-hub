@@ -308,11 +308,14 @@ expect((NOTIFICATION_ACTIVITIES as readonly string[]).includes("reports_activity
     ["src/lib/access-control.ts", /reports_activity: true/],
     ["src/components/settings/tabs/NotificationsTab.tsx", /key: "reports_activity"/],
     ["src/components/settings/tabs/SoundsTab.tsx", /reports_activity: "act\.reports"/],
-    ["src/components/layout/NotificationBell.tsx", /key: "reports_activity"/],
     ["src/lib/translations/settings.ts", /"act\.reports":/],
   ];
+  /* The bell no longer lists a chip per switch (its redesign, 26 Sep 2026 —
+     5dc391a8: tabs by what a row asks of you, the filter-chip row gone), so
+     the switch is Settings' and Sounds' alone; the notification registry
+     (validate:notification-types) files every report type under it. */
   const gaps = where.filter(([f, re]) => !re.test(code(read(f)))).map(([f, re]) => `${f} ${re}`);
-  expect(gaps.length === 0, "the switch exists in Sounds, the defaults, both Settings screens, the bell filter and the dictionary", gaps.join("; "));
+  expect(gaps.length === 0, "the switch exists in Sounds, the defaults, both Settings screens and the dictionary", gaps.join("; "));
   const notify = code(read("src/lib/server/reports/notify.ts"));
   const types = [...notify.matchAll(/"(report_[a-z_]+)"/g)].map((m) => m[1]);
   const unclassified = [...new Set(types)].filter((t) => !classifyNotificationActivity(t));
