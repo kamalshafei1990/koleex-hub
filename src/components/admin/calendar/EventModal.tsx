@@ -472,7 +472,7 @@ export default function EventModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={ids.heading}
-        className="kx-glass-pop relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
+        className="kx-app kx-glass-pop relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

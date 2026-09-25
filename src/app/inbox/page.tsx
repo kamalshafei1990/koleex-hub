@@ -2324,14 +2324,15 @@ function ProductPickerModal({
      this modal.
 
      Same escape the KDS menus already use (Select, PopoverPanel both portal to
-     body). The wrapper re-declares `kx-app` because leaving the app subtree
+     body). The PANEL re-declares `kx-app` because leaving the app subtree
      also leaves the var remap behind — without it the modal would read its
      tokens from :root and render in Core colours while the page around it is
-     Aurora. */
+     Aurora. (On the panel, not the scrim: with a wallpaper on, a `kx-app`
+     root goes transparent, and the scrim would lose its dim.) */
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="kx-app fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh] overflow-y-auto bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh] overflow-y-auto bg-black/70 backdrop-blur-sm">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">

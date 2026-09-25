@@ -573,9 +573,12 @@ body {
    reach a dropdown or a modal, which need their opaque ground precisely
    because a wallpaper is now behind everything.
 
-   The named classes stay: some app roots sit outside the scroll host. */
+   The named classes stay: some app roots sit outside the scroll host.
+   A DIALOG is not a root: every popup panel carries `kx-app` as its own
+   Aurora scope (so its fields and buttons read Aurora on <body>, outside any
+   app — owner, 26 Sep 2026), and a panel must keep its ground. */
 [data-kx-wallpaper="on"] #main-scroll-container > *,
-[data-kx-wallpaper="on"] .kx-app,
+[data-kx-wallpaper="on"] .kx-app:not(.kx-glass-pop, .kx-glass-drawer),
 [data-kx-wallpaper="on"] .kx-pd,
 [data-kx-wallpaper="on"] .kx-wp-root {
   background-color: transparent;

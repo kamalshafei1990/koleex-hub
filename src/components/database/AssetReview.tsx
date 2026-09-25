@@ -12,6 +12,7 @@
    decision is persisted + logged to the asset History timeline. KOLEEX dark.
    --------------------------------------------------------------------------- */
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import type {
   ReviewRecommendation, AssetReview as AssetReviewRow, ReviewChecklist,
@@ -328,9 +329,11 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
     }, 250);
     return () => { alive = false; clearTimeout(t); };
   }, [q, excludeId]);
-  return (
+  /* On <body>: this picker opens from inside the asset drawer, whose glass (backdrop-filter) would otherwise hold a fixed overlay inside its own box. */
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 backdrop-blur-sm pt-24" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.review.pickerTitle", "Link replacement (approved assets)")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
@@ -354,7 +357,8 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
             ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -63,7 +63,7 @@ export function useInput() {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3.5">

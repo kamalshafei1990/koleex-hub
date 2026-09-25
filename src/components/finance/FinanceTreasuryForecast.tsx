@@ -258,7 +258,7 @@ export default function FinanceTreasuryForecast() {
         {/* Save-as-plan drawer */}
         {saveDraft && base && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={() => setSaveDraft(null)}>
-            <div className="relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
                 <div>
                   <h2 className="text-[14px] font-semibold">{t("forecast.save.title", "Save scenario as plan")}</h2>

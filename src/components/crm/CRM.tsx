@@ -2249,7 +2249,7 @@ function OpportunityModal({
       className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-6"
     >
       {confirmDialog}
-      <div className="bg-[var(--bg-primary)] w-full md:max-w-4xl md:max-h-[92vh] h-full md:h-auto md:rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden flex flex-col">
+      <div className="kx-app kx-glass-pop kx-pop-in relative bg-[var(--bg-primary)] w-full md:max-w-4xl md:max-h-[92vh] h-full md:h-auto md:rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3.5 border-b border-[var(--border-subtle)] shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -3820,7 +3820,7 @@ function GenerateLeadsModal({
       }}
       className="fixed inset-0 z-[210] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <div className="bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
+      <div className="kx-app kx-glass-pop kx-pop-in relative bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
             <SparklesIcon className="h-4 w-4 text-[var(--text-dim)]" />
@@ -4009,7 +4009,7 @@ function StageEditModal({
       className="fixed inset-0 z-[210] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
     >
       {confirmDialog}
-      <div className="bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
+      <div className="kx-app kx-glass-pop kx-pop-in relative bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
             {t("stage.edit.title")}

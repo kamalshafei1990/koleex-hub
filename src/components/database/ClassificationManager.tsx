@@ -551,7 +551,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
 
   return (
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 backdrop-blur-sm pt-20" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.class.pickTitle", "Choose an icon from the Visual Library")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>

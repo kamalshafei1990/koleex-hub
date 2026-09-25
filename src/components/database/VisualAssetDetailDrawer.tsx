@@ -250,7 +250,7 @@ export default function VisualAssetDetailDrawer({
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex h-full w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-drawer relative flex h-full w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="border-b border-[var(--border-subtle)] px-5 pt-4">
           <div className="flex items-start justify-between gap-3">

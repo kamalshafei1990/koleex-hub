@@ -1014,7 +1014,7 @@ function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOp
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3 min-w-0">
@@ -1298,7 +1298,7 @@ function SupplierPickerModal({
       aria-modal="true"
       aria-label={t("sup.linkSupplier", "Link a supplier")}
     >
-      <div className="w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden kx-pop-in">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden kx-pop-in">
         {/* Header + search */}
         <div className="shrink-0 p-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-2.5 px-1">

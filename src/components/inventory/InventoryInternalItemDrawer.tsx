@@ -565,7 +565,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl sm:h-auto sm:max-h-[90vh] sm:w-[min(760px,94vw)] sm:rounded-2xl sm:border sm:border-[var(--border-color)]"
+        className="kx-app kx-glass-pop kx-pop-in relative flex h-full w-full flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl sm:h-auto sm:max-h-[90vh] sm:w-[min(760px,94vw)] sm:rounded-2xl sm:border sm:border-[var(--border-color)]"
       >
         {/* ── Header ──────────────────────────────────────────── */}
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-color)] px-5 py-4">

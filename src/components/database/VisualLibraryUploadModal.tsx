@@ -125,7 +125,7 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("vl.upload.title", "New visual entity")}</h3>
           <button type="button" onClick={onClose} aria-label={t("vl.upload.close", "Close")} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>

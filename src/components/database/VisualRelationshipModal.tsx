@@ -106,7 +106,7 @@ export default function VisualRelationshipModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="kx-app kx-glass-pop kx-pop-in relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("vl.rel.title", "Add relationship")}</h3>

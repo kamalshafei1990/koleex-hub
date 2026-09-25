@@ -1417,7 +1417,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
       aria-modal="true"
       aria-labelledby="saved-title"
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 max-w-md w-full">
+      <div className="kx-app kx-glass-pop kx-pop-in relative bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 max-w-md w-full">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-500/10">
             <CheckIcon size={20} className="text-emerald-400" />

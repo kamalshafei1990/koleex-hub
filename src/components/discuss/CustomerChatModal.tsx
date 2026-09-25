@@ -214,7 +214,7 @@ export default function CustomerChatModal({
       }}
     >
       <div
-        className="w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
         style={{ maxWidth: 520 }}
       >
         {/* Header */}

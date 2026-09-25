@@ -151,7 +151,7 @@ function BrandModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[440px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[440px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{editValue ? `Edit ${l.title}` : `New ${l.title}`}</h2>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><CrossIcon className="h-4 w-4" /></button>
@@ -257,7 +257,7 @@ function ClassificationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[480px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div>
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{editItem ? `Edit ${typeLabel}` : `New ${typeLabel}`}</h2>
@@ -319,7 +319,7 @@ function DeleteModal({ open, onClose, title, message, warning, onConfirm, deleti
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="px-6 py-5">
           <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{title}</h2>
           <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{message}</p>

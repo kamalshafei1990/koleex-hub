@@ -167,7 +167,7 @@ function BrandModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[480px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">
             {brand ? t("vl.brands.editBrand", "Edit Brand") : t("vl.brands.newBrand", "New Brand")}
@@ -278,7 +278,7 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[400px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[400px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
         <div className="px-6 py-5">
           <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">{t("vl.brands.deleteBrand", "Delete Brand")}</h2>
           <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">

@@ -64,7 +64,7 @@ export default function DiscussModalShell({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden outline-none"
+        className="kx-app kx-glass-pop kx-pop-in relative m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden outline-none"
         style={{ maxWidth: width }}
       >
         <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">

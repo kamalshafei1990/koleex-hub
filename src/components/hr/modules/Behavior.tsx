@@ -377,7 +377,7 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
 
       {viewing && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewing(null)}>
-          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[14px] font-bold text-[var(--text-primary)]">{t(TYPE_KEY[viewing.header.assessment_type] ?? "hr.bhv.typeManager")} · {t("hr.bhv.finalized")}</h3>
               <button type="button" onClick={() => setViewing(null)} aria-label={t("hr.bhv.close")} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={13} /></button>

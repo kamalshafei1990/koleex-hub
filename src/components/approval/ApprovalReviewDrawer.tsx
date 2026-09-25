@@ -136,7 +136,7 @@ export default function ApprovalReviewDrawer({
     <div className="fixed inset-0 z-[200] flex">
       <button aria-label="Close" onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-[2px]" />
 
-      <aside className="flex h-full w-full flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] sm:max-w-[560px]">
+      <aside className="kx-app kx-glass-drawer relative flex h-full w-full flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] sm:max-w-[560px]">
         {/* Header */}
         <header className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
           <div className="min-w-0 flex-1">

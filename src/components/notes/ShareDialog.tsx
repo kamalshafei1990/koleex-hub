@@ -166,7 +166,7 @@ export default function ShareDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-md rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[76vh]"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[76vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

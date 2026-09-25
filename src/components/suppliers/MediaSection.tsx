@@ -488,7 +488,7 @@ export default function MediaSection({
       {/* ── upload modal ── */}
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !busy && setOpen(false)}>
-          <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <UploadIcon className="h-4 w-4 text-[var(--text-secondary)]" />
               <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("ms.addAssetTitle", "Add evidence asset")}</span>

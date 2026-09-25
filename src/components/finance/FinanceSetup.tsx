@@ -345,7 +345,7 @@ function DrawerShell({
   const { t } = useTranslation(FIN_SETUP);
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
+      <div onClick={(e) => e.stopPropagation()} className="kx-app kx-glass-drawer relative flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">{title}</h2>
@@ -604,7 +604,9 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
   };
 
   return (
-    <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         title={t("setup.fx.removeConfirm", "Remove this rate?")}
@@ -612,40 +614,42 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
-          <div className="grid grid-cols-3 gap-2">
-            <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input placeholder={t("setup.fx.toPlaceholder", "To")}   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input type="number" min="0" step="0.00000001" placeholder={t("setup.fx.ratePlaceholder", "Rate")} value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
+      <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
+            <div className="grid grid-cols-3 gap-2">
+              <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+              <input placeholder={t("setup.fx.toPlaceholder", "To")}   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
+              <input type="number" min="0" step="0.00000001" placeholder={t("setup.fx.ratePlaceholder", "Rate")} value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
+            </div>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+            <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
           </div>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-          <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
-        </div>
 
-        <div>
-          <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
-                  </div>
-                  <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div>
+            <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    </div>
+                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
@@ -719,7 +723,9 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
   };
 
   return (
-    <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         tone="neutral"
@@ -728,48 +734,50 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
-          <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder={t("setup.assets.categoryPlaceholder", "Category (e.g. Machinery)")} value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.01" placeholder={t("setup.assets.valuePlaceholder", "Purchase value")} value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.1" placeholder={t("setup.assets.lifePlaceholder", "Useful life (years)")} value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-              {DEPRECIATION_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            <input placeholder={t("setup.assets.currencyPlaceholder", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+      <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
+            <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder={t("setup.assets.categoryPlaceholder", "Category (e.g. Machinery)")} value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
+              <input type="number" min="0" step="0.01" placeholder={t("setup.assets.valuePlaceholder", "Purchase value")} value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+              <input type="number" min="0" step="0.1" placeholder={t("setup.assets.lifePlaceholder", "Useful life (years)")} value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+                {DEPRECIATION_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              <input placeholder={t("setup.assets.currencyPlaceholder", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            </div>
+            <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
           </div>
-          <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
-        </div>
 
-        <div>
-          <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.assets.empty", "No assets registered yet.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((a) => (
-                <li key={a.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]">{a.name} {a.category && <span className="text-[var(--text-dim)]">· {a.category}</span>}</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
-                    <button onClick={() => remove(a.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.assets.archive", "Archive")}</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div>
+            <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.assets.empty", "No assets registered yet.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]">{a.name} {a.category && <span className="text-[var(--text-dim)]">· {a.category}</span>}</div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
+                      <button onClick={() => remove(a.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.assets.archive", "Archive")}</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
@@ -849,7 +857,9 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   }, [rows]);
 
   return (
-    <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         title={t("setup.ob.removeConfirm", "Remove this entry?")}
@@ -857,52 +867,54 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
-          <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input type="number" min="0" step="0.01" placeholder={t("setup.ob.entry.amount", "Amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <input placeholder={t("setup.ob.entry.currency", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
-          </div>
-          <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
-        </div>
-
-        <div>
-          <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]">{r.label}</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
-                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {totalsByCurrency.length > 0 && (
-            <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-right text-[11px] tabular-nums">
-              {totalsByCurrency.map(([cur, tot]) => (
-                <div key={cur}>
-                  <span className="text-[var(--text-dim)]">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
-                  <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-              ))}
+      <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
+            <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min="0" step="0.01" placeholder={t("setup.ob.entry.amount", "Amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <input placeholder={t("setup.ob.entry.currency", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
             </div>
-          )}
+            <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
+          </div>
+
+          <div>
+            <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]">{r.label}</div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
+                      <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {totalsByCurrency.length > 0 && (
+              <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-right text-[11px] tabular-nums">
+                {totalsByCurrency.map(([cur, tot]) => (
+                  <div key={cur}>
+                    <span className="text-[var(--text-dim)]">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
+                    <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
