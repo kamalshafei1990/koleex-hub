@@ -519,20 +519,30 @@ function Reader({ t, lang, detail, onChange }: { t: T; lang: string; detail: Rep
         </section>
       </article>
 
-      <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+      {/* ON A PHONE THE DECISION COMES FIRST. The grid is one column there, so
+          the aside dissolves (display: contents) and the decision card moves
+          above the report while the readers and Print stay after it. Measured
+          25/09/2026: a real reviewer on an iPhone approved three reports she
+          had been asked to return — the card sat under the whole report and
+          the comment box, with Approve the only strong button in it. Now the
+          two choices are equal in size and weight, side by side. */}
+      <aside className="contents lg:block lg:space-y-3 lg:sticky lg:top-4 lg:self-start">
         {hasActions && (
-          <div className={`${CARD} space-y-2 p-4`}>
+          <div className={`${CARD} order-first space-y-2 p-4 lg:order-none`}>
             {problem && <p role="alert" className="text-[12.5px] text-red-500">{problem}</p>}
             {can.decide && !returning && (
               <>
-                <button type="button" onClick={() => void act("approve")} disabled={!!busy}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] text-[13px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
-                  {busy === "approve" ? <SpinnerIcon size={14} /> : <RrIcon name="check" size={14} />}{t("reader.approve")}
-                </button>
-                <button type="button" onClick={() => setReturning(true)} disabled={!!busy}
-                  className="flex h-9 w-full items-center justify-center rounded-xl border border-[var(--border-subtle)] text-[12.5px] font-medium text-[var(--text-secondary)]">
-                  {t("reader.return")}
-                </button>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">{t("reader.decisionTitle")}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => void act("approve")} disabled={!!busy}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-2 text-[13px] font-semibold leading-tight text-[var(--text-inverted)] disabled:opacity-60">
+                    {busy === "approve" ? <SpinnerIcon size={14} /> : <RrIcon name="check" size={14} />}{t("reader.approve")}
+                  </button>
+                  <button type="button" onClick={() => setReturning(true)} disabled={!!busy}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-2 text-[13px] font-semibold leading-tight text-amber-500 disabled:opacity-60">
+                    <span className="inline-flex rtl:rotate-180"><RrIcon name="arrow-left" size={14} /></span>{t("reader.returnShort")}
+                  </button>
+                </div>
               </>
             )}
             {can.decide && returning && (
