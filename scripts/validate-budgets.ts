@@ -164,7 +164,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      PRINT_AND_DOC_STYLES like every house document; it only ever loads in
      the reader's hidden print iframe. 26/09/2026: 604 → 589 KB and 777 →
      748 KB once each Reports screen downloaded only its own words
-     (translations/report-ui — validate:reports §26). */
+     (translations/report-ui — validate:reports §26); 590 and 756 KB with
+     Phase 5D's executive and control types. */
   "reports/[id]": { chunks: 10, kbytes: 657 },
   "reports/[id]/print": { chunks: 14, kbytes: 832 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
@@ -270,7 +271,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      instead of the whole catalog of sections; the builder tab keeps that →
      616 KB once it downloaded only its own words (translations/report-ui) →
      569 KB once the descriptions became their own chunk, loaded beside the
-     list behind a skeleton (validate:reports §27). */
+     list behind a skeleton (validate:reports §27) → 572 KB with Phase 5D
+     (the executive and control types, the scheduled drafts' setup). */
   "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },

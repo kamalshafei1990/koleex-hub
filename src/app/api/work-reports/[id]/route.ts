@@ -33,6 +33,7 @@ import { sectionFamilies } from "@/lib/reports/catalog";
 import { syncReportLinks } from "@/lib/server/reports/links";
 import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
+import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 import { loadCarry } from "@/lib/server/reports/carry";
 import { loadAppFeed } from "@/lib/server/reports/app-feed";
 import { gateForReader, loadLiveData, loadReportData } from "@/lib/server/reports/report-data";
@@ -219,5 +220,7 @@ export async function DELETE(req: Request, { params }: Params) {
   }
   const paths = ((files ?? []) as { storage_path: string; thumb_path: string | null }[]).flatMap((f) => [f.storage_path, f.thumb_path]);
   if (paths.length) after(() => removeUnreferenced(paths));
+  /* 5D: a draft the system prepared, deleted — its "ready to write" goes. */
+  after(() => clearUnreadByMeta({ type: "report_scheduled", report_id: loaded.row.id }));
   return NextResponse.json({ ok: true });
 }

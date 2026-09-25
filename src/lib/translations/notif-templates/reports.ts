@@ -52,6 +52,16 @@ export const reportsTpl: Translations = {
   "report_request.one.raw.s": { en: "New report to write: {type} — {subject}", zh: "新报告待撰写：{type} — {subject}", ar: "تقرير جديد مطلوب كتابته: {type} — {subject}" },
   "report_request.many.s": { en: "{count} new reports to write", zh: "{count} 份新报告待撰写", ar: "تقارير جديدة مطلوب كتابتها: {count}" },
 
+  /* A draft the system prepared on schedule (5D) — the type's name and the
+     period (D/M/Y) as the writer builds them. Worded for every type: some
+     carry the app's numbers, some are only written (a weekly plan). */
+  "report_scheduled.s": { en: "Ready to write: {type} — {period}", zh: "可以撰写了：{type} — {period}", ar: "جاهز للكتابة: {type} — {period}" },
+  "report_scheduled.b": {
+    en: "Koleex prepared the period's draft. Check it, add what it needs, and send it.",
+    zh: "Koleex 已准备好本期草稿。请核对、补充后发送。",
+    ar: "جهّز Koleex مسودة الفترة. راجعها وأكمل ما ينقصها، ثم أرسلها.",
+  },
+
   /* The en-GB short weekday the request's due time is written with. */
   "enum.weekdayShort.Mon": { en: "Mon", zh: "周一", ar: "الاثنين" },
   "enum.weekdayShort.Tue": { en: "Tue", zh: "周二", ar: "الثلاثاء" },

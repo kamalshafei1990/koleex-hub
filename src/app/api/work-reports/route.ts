@@ -28,14 +28,15 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, type ServerAuthContext } from "@/lib/server/auth";
 import { applyServerList } from "@/lib/server-list/apply";
 import { parseListParams, type ServerListConfig } from "@/lib/server-list/types";
-import { REPORT_LIMITS, normalizeSections, periodFor, type ReportTemplateDef } from "@/lib/reports/templates";
+import { REPORT_LIMITS, periodFor, type ReportTemplateDef } from "@/lib/reports/templates";
 import { REPORT_TEMPLATES, reportTemplate } from "@/lib/reports/catalog";
 import { isCustomKey, snapshotOf, type TemplateSnapshot } from "@/lib/reports/custom-templates";
 import { customAsTemplate, loadCustomTemplate, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 import { prefillSections, requestPeriodKey, type RequestFacts } from "@/lib/reports/events";
 import { reportsT } from "@/lib/translations/reports";
+import { insertDraft, periodReport } from "@/lib/server/reports/drafts";
 import {
-  REPORT_LIST_COLS, canStartTemplate, defaultRecipients, isUuid, listPeople, loadOrgTree, requireReportsUser, superAdminIds,
+  REPORT_LIST_COLS, canStartTemplate, isUuid, listPeople, loadOrgTree, requireReportsUser,
 } from "@/lib/server/reports/core";
 
 export const dynamic = "force-dynamic";
@@ -158,11 +159,8 @@ export async function POST(req: Request) {
     const r = rq as { id: string; template_key: string; event_day: string; prefill: RequestFacts; status: string } | null;
     if (!r || r.status !== "open" || r.template_key !== tpl.key) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const periodKey = requestPeriodKey(r.id);
-    let dq = supabaseServer.from("work_reports").select("id").eq("author_account_id", auth.account_id)
-      .eq("template_key", tpl.key).eq("period_key", periodKey).eq("superseded", false).order("version", { ascending: false }).limit(1);
-    if (auth.tenant_id) dq = dq.eq("tenant_id", auth.tenant_id);
-    const { data: existing } = await dq.maybeSingle();
-    if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });
+    const existing = await periodReport(auth, tpl.key, periodKey);
+    if (existing) return NextResponse.json({ id: existing.id, existing: true });
     const lang = body.lang === "zh" || body.lang === "ar" ? body.lang : "en";
     const word = (key: string) => ((reportsT[key]?.[lang] ?? reportsT[key]?.en) as string | undefined) ?? "";
     const facts = prefillSections(r.prefill, word);
@@ -183,11 +181,8 @@ export async function POST(req: Request) {
   /* One daily per day, one weekly per week, one monthly per month: the
      existing one (draft or sent) opens instead. */
   if (tpl.cadence) {
-    let dq = supabaseServer.from("work_reports").select("id").eq("author_account_id", auth.account_id)
-      .eq("template_key", tpl.key).eq("period_key", period.key).eq("superseded", false).order("version", { ascending: false }).limit(1);
-    if (auth.tenant_id) dq = dq.eq("tenant_id", auth.tenant_id);
-    const { data: existing } = await dq.maybeSingle();
-    if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });
+    const existing = await periodReport(auth, tpl.key, period.key);
+    if (existing) return NextResponse.json({ id: existing.id, existing: true });
   }
 
   const title = tpl.customTitle && typeof body?.title === "string" ? body.title.trim().slice(0, REPORT_LIMITS.title) : "";
@@ -195,25 +190,10 @@ export async function POST(req: Request) {
 }
 
 /** A new draft addressed to the template's default readers — a builder
- *  type's with its copy of the type (4E). */
+ *  type's with its copy of the type (4E). The row itself is written in one
+ *  place (lib/server/reports/drafts — the scheduled drafts use it too). */
 async function createDraft(auth: ServerAuthContext, tpl: ReportTemplateDef, period: { start: string; end: string; key: string }, title: string, sections: unknown, snapshot: TemplateSnapshot | null = null) {
-  const { data: created, error } = await supabaseServer.from("work_reports").insert({
-    tenant_id: auth.tenant_id, template_key: tpl.key, author_account_id: auth.account_id, title,
-    period_start: period.start, period_end: period.end, period_key: period.key,
-    sections: normalizeSections(tpl, sections), status: "draft",
-    confidential: tpl.confidential, review_required: tpl.reviewRequired,
-    template_snapshot: snapshot,
-  }).select("id").single();
-  if (error || !created) {
-    console.error("[api/work-reports POST]", error?.message);
-    return NextResponse.json({ error: "Could not create the report." }, { status: 500 });
-  }
-  const id = (created as { id: string }).id;
-  const to = await defaultRecipients(tpl, auth).catch(async () => (await superAdminIds(auth.tenant_id)).filter((x) => x !== auth.account_id));
-  if (to.length) {
-    const { error: rErr } = await supabaseServer.from("work_report_recipients")
-      .insert(to.slice(0, REPORT_LIMITS.recipients).map((account_id) => ({ report_id: id, account_id, role: "to" })));
-    if (rErr) console.error("[api/work-reports POST] recipients:", rErr.message);
-  }
+  const id = await insertDraft(auth, tpl, period, title, sections, snapshot);
+  if (!id) return NextResponse.json({ error: "Could not create the report." }, { status: 500 });
   return NextResponse.json({ id, existing: false }, { status: 201 });
 }

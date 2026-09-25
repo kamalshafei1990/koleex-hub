@@ -210,6 +210,16 @@ export const saveObligations = (body: { trackingFrom?: string | null; reminders?
  *  (nothing is sent). */
 export interface NudgePreview { planned?: Array<{ key: string; periodKey: string; kind: "reminder" | "escalation"; dueAt: string; authorName: string; recipients: string[] }> }
 export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
+/** 5D: the drafts the system prepares on schedule — set like «who must
+ *  write what» (a super admin or HR · edit). */
+export interface ScheduleSetup {
+  schedules: Array<{ accountId: string; templateKey: string; active: boolean; lastPeriod: string | null; lastReportId: string | null }>;
+  /** The types that may be scheduled: a week's or a month's. */
+  types: string[];
+}
+export const fetchSchedules = () => call<ScheduleSetup>("/api/work-reports/schedules");
+export const saveSchedule = (body: { accountId: string; templateKey: string; active?: boolean; remove?: true }) =>
+  call<ScheduleSetup>("/api/work-reports/schedules", { method: "PUT", body: JSON.stringify(body) });
 
 /* ── The team summary (5A) ── */
 export interface TeamSummaryResult {

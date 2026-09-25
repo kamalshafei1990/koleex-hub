@@ -108,6 +108,7 @@ export const NOTIFICATION_TYPES = {
   report_reminder:          { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "reminders", when: "each listed report is sent" } },
   report_escalation:        { app: "reports", activity: "reports_activity", severity: "warning", lifecycle: { kind: "settle", list: "escalations", when: "each missing report is sent" } },
   report_request:           { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "requests", when: "each requested report is sent" } },
+  report_scheduled:         { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "clear", key: "report_id", when: "the prepared report is sent or deleted" } },
 
   /* ── HR (the approver's side) ──────────────────────────────────────── */
   leave_approval_request:   { app: "hr", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "leave_request_id", when: "the step is decided" } },

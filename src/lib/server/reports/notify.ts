@@ -98,6 +98,8 @@ export async function settleOwedReport(r: ReportRow): Promise<void> {
     requestId
       ? settleListedItems({ type: "report_request", listKey: "requests", items: [requestId], recipients: [r.author_account_id] })
       : null,
+    /* 5D: a draft the system prepared — its "ready to write" goes. */
+    clearUnreadByMeta({ type: "report_scheduled", report_id: r.id }),
   ]);
 }
 

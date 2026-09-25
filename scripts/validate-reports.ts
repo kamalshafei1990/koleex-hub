@@ -93,6 +93,10 @@
  *      worked out (never mixing currencies, never guessing a date), each
  *      block's own right for the writer AND for every reader, Koleex AI
  *      reading the company only with «Management Reports».
+ *   §29 Phase 5D — the drafts the system prepares on schedule: which types,
+ *      which period (the one that just ended, from 07:00 in the writer's own
+ *      time), claimed once, only for someone who may start the type, never
+ *      sent by itself, the notice gone when the report is sent or deleted.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -118,6 +122,7 @@ import {
   NO_DEPT_KEY, accessRows, addMonths, attendanceByDept, contractDateRows, deptKpiRows, moneyRows, presentRate, reportsByDept, salesRows, stockRows, usageRows,
 } from "../src/lib/reports/numbers-5d";
 import { COMPANY_MATERIAL, companyMaterial } from "../src/lib/reports/ai-draft";
+import { SCHEDULE_HOUR, localMinutesOf, periodToPrepare, schedulable } from "../src/lib/reports/schedules";
 import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
 import { FAMILY_GROUPS as HEAD_GROUPS, REPORT_HEADS, reportHead } from "../src/lib/reports/catalog-heads";
 import { headOf, renderReportHeads, HEADS_FILE } from "./lib/reports-heads";
@@ -345,7 +350,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 18, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type, the team summary)`);
+  expect(files.length === 19, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type, the team summary, the schedules)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -1004,8 +1009,8 @@ console.log("\n§13 reminders and escalation");
     (src) => src.replace(".filter((x) => x !== author)", ""));
   const CR = "src/app/api/cron/report-reminders/route.ts";
   rule("the job's answer carries counts, never a name", CR,
-    (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations, asked: events\.created, cancelled: events\.cancelled \}/.test(c) ? [] : ["the job can answer with names"]),
-    (src) => src.replace("return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations, asked: events.created, cancelled: events.cancelled }", "return NextResponse.json({ ok: true, ...run, events }"));
+    (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations, asked: events\.created, cancelled: events\.cancelled, prepared: scheduled\?\.prepared\.length \?\? 0 \}/.test(c) ? [] : ["the job can answer with names"]),
+    (src) => src.replace("return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations, asked: events.created, cancelled: events.cancelled, prepared: scheduled?.prepared.length ?? 0 }", "return NextResponse.json({ ok: true, ...run, events, scheduled }"));
   rule("the preview is a signed-in super admin's only", CR,
     (c) => (/const auth = await requireAuth\(req\);[\s\S]*?if \(!auth\.is_super_admin\) return NextResponse\.json\(\{ error: "forbidden" \}, \{ status: 403 \}\);[\s\S]*?dryRun: true/.test(c) ? [] : ["the preview is open"]),
     (src) => src.replace('if (!auth.is_super_admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });', ""));
@@ -1281,8 +1286,8 @@ console.log("\n§15 reports that events ask for");
     (c) => (/select\("id, template_key, event_day, prefill, status"\)\s*\.eq\("id", body\.request\)\.eq\("account_id", auth\.account_id\)\.maybeSingle\(\)/.test(c) && /if \(!r \|\| r\.status !== "open" \|\| r\.template_key !== tpl\.key\) return NextResponse\.json\(\{ error: "not_found" \}, \{ status: 404 \}\);/.test(c) ? [] : ["anyone's request can start a report"]),
     (src) => src.replace('.eq("id", body.request).eq("account_id", auth.account_id).maybeSingle()', '.eq("id", body.request).maybeSingle()'));
   rule("one report per request: a second start opens the same one", WR,
-    (c) => { const a = c.indexOf('.eq("period_key", periodKey)'); const b = c.indexOf("if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });", a); const d = c.indexOf("return createDraft(auth, tpl, { start: day, end: day, key: periodKey }"); return a > 0 && b > a && d > b ? [] : ["a request can collect several reports"]; },
-    (src) => src.replace("    if (existing) return NextResponse.json({ id: (existing as { id: string }).id, existing: true });\n    const lang", "    const lang"));
+    (c) => { const a = c.indexOf("const existing = await periodReport(auth, tpl.key, periodKey);"); const b = c.indexOf("if (existing) return NextResponse.json({ id: existing.id, existing: true });", a); const d = c.indexOf("return createDraft(auth, tpl, { start: day, end: day, key: periodKey }"); return a > 0 && b > a && d > b ? [] : ["a request can collect several reports"]; },
+    (src) => src.replace("    if (existing) return NextResponse.json({ id: existing.id, existing: true });\n    const lang", "    const lang"));
   rule("a request-only type (the probation review) never starts on its own", WR,
     (c) => (/if \(tpl\.requestOnly\) return NextResponse\.json\(\{ error: "request_only" \}, \{ status: 403 \}\);/.test(c) ? [] : ["anyone can write a probation review about anyone"]),
     (src) => src.replace('  if (tpl.requestOnly) return NextResponse.json({ error: "request_only" }, { status: 403 });\n', ""));
@@ -1926,7 +1931,8 @@ console.log("\n§20 the template builder");
     (c) => (c.includes('if (!hideableBuiltin(key)) return NextResponse.json({ error: "not_hideable" }, { status: 400 });') ? [] : ["the daily can be hidden"]),
     (src) => src.replace('if (!hideableBuiltin(key)) return NextResponse.json({ error: "not_hideable" }, { status: 400 });', ""));
   rule("a builder report starts from the type's current, active version — and keeps a copy of it", `${API}/route.ts`,
-    (c) => (c.includes('if (!row || row.status !== "active") return NextResponse.json({ error: "unknown_template" }, { status: 400 });') && c.includes("snapshot = snapshotOf(row.def, row.words, row.version);") && c.includes("template_snapshot: snapshot,") ? [] : ["an archived type starts reports, or a report keeps no copy"]),
+    (c) => (c.includes('if (!row || row.status !== "active") return NextResponse.json({ error: "unknown_template" }, { status: 400 });') && c.includes("snapshot = snapshotOf(row.def, row.words, row.version);") && c.includes("const id = await insertDraft(auth, tpl, period, title, sections, snapshot);")
+      && code(read("src/lib/server/reports/drafts.ts")).includes("template_snapshot: snapshot,") ? [] : ["an archived type starts reports, or a report keeps no copy"]),
     (src) => src.replace('if (!row || row.status !== "active")', "if (!row)"));
   rule("a hidden built-in starts no new report — an event's request still does", `${API}/route.ts`,
     (c) => { const req = c.indexOf("if (body?.request !== undefined) {"); const hid = c.indexOf('if (hidden.includes(tpl.key)) return NextResponse.json({ error: "hidden" }, { status: 403 });'); return req > 0 && hid > req ? [] : ["a hidden type still starts, or blocks an event's request"]; },
@@ -2836,6 +2842,74 @@ console.log("\n§28 the executive and control types (Phase 5D)");
   expect(!!copy5d && copy5d.def.mgmtOnly === true && checkTemplate(copy5d.def, copy5d.words).def.mgmtOnly === true, "a builder copy of an executive type keeps «Management Reports»");
   const writes5d = [ED, CD, "src/lib/reports/numbers-5d.ts"].filter((f) => /\.(insert|update|upsert|delete)\(|\.rpc\(/.test(code(read(f))));
   expect(writes5d.length === 0, "the executive and control numbers only read", writes5d.join(", "));
+}
+
+/* ── §29 the drafts the system prepares on schedule (5D, 26 Sep 2026) ─ */
+console.log("\n§29 the drafts the system prepares on schedule");
+{
+  expect(schedulable(reportTemplate("exec_weekly")) && schedulable(reportTemplate("fin_expenses")) && schedulable(reportTemplate("cmp_access_review"))
+    && !["daily", "weekly", "monthly", "probation_review", "customer_visit"].some((k) => schedulable(reportTemplate(k)))
+    && !schedulable({ key: "c-abcdefghij", cadence: "weekly", base: "weekly" }) && schedulable({ key: "c-abcdefghij", cadence: "monthly", base: "exec_monthly_review" }),
+    "only a week's or a month's type — never the owed daily, weekly or monthly (a builder copy of one included), a request-only type or one without a period");
+  const H = SCHEDULE_HOUR * 60;
+  eq([periodToPrepare("weekly", "2026-09-28", H - 1), periodToPrepare("weekly", "2026-09-28", H), periodToPrepare("weekly", "2026-09-30", 0)], [null, "2026-09-21", "2026-09-21"],
+    "a week's draft: the week that just ended, from 07:00 on Monday — a missed Monday catches up");
+  eq([periodToPrepare("monthly", "2026-10-01", H - 1), periodToPrepare("monthly", "2026-10-01", H), periodToPrepare("monthly", "2026-10-15", 30), periodToPrepare("monthly", "2027-01-01", H)],
+    [null, "2026-09-30", "2026-09-30", "2026-12-31"], "a month's draft: the month that just ended, from 07:00 on the 1st — December's on New Year's Day");
+  expect(periodToPrepare(null, "2026-09-28", H) === null && periodToPrepare("daily", "2026-09-28", H) === null, "nothing for a type without a week or a month");
+  eq([localMinutesOf("2026-09-26T00:30:00Z", "UTC"), localMinutesOf("2026-09-26T00:30:00Z", "Asia/Shanghai")], [30, 510], "07:00 is the writer's own 07:00 — read in their time zone");
+
+  const API = "src/app/api/work-reports";
+  const SC = "src/lib/server/reports/schedules.ts";
+  rule("a period is claimed before anything is written — a second run prepares nothing twice", SC,
+    (c) => (c.includes('claim = r.last_period === null ? claim.is("last_period", null) : claim.eq("last_period", r.last_period);') && c.includes("if (!won?.length) continue;")
+      && c.indexOf("if (!won?.length) continue;") < c.indexOf("const id = await insertDraft(") ? [] : ["two runs can prepare the same draft"]),
+    (src) => src.replace("      if (!won?.length) continue;\n", ""));
+  rule("only for someone who may start the type — read every time", SC,
+    (c) => (c.includes("if (!auth || !(await canStartTemplate(tpl, auth))) { out.skipped++; continue; }") ? [] : ["a schedule grants a type to someone without its right"]),
+    (src) => src.replace("if (!auth || !(await canStartTemplate(tpl, auth))) { out.skipped++; continue; }", "if (!auth) { out.skipped++; continue; }"));
+  rule("a report the writer already has for the period is left alone — nothing new, nothing said", SC,
+    (c) => { const e = c.indexOf("const existing = await periodReport(auth, tpl.key, period.key);"); const k = c.indexOf("continue;", e); const i = c.indexOf("const id = await insertDraft("); const n = c.indexOf("await notifyLite({"); return e > 0 && k > e && k < i && i < n ? [] : ["a second draft, or a notice about a report already sent"]; },
+    (src) => src.replace("const existing = await periodReport(auth, tpl.key, period.key);", "const existing = null as { id: string } | null;"));
+  rule("a draft that could not be written gives its period back", SC,
+    (c) => (c.includes('await supabaseServer.from("work_report_schedules").update({ last_period: r.last_period }).eq("id", r.id).eq("last_period", period.key);') ? [] : ["a failed write loses the period for good"]),
+    (src) => src.replace('await supabaseServer.from("work_report_schedules").update({ last_period: r.last_period }).eq("id", r.id).eq("last_period", period.key);', ""));
+  expect(!/submitted|\/submit|notifyReportSubmitted|submitReport/.test(code(read(SC))) && code(read("src/lib/server/reports/drafts.ts")).includes('status: "draft",'),
+    "nothing is ever sent by itself — the system writes a draft, never a sent report");
+  expect(code(read(SC)).includes('type: "report_scheduled",') && code(read(SC)).includes("link: `/reports/${id}`,") && code(read(SC)).includes("recipients: [auth.account_id],"),
+    "the writer — and only the writer — is told, with a link to the draft");
+  /* validate:notification-types §I reads date-named keys only (date, due,
+     from, to…); this notice's is `period`, so it is guarded here. */
+  rule("the notice writes its period day first (rangeLabel — D/M/Y, proven above)", SC,
+    (c) => (c.includes('tpl: { k: "report_scheduled", p: { type, period: rangeLabel(period.start, period.end) } },') ? [] : ["the notice says 2026-09-21 instead of 21/09/2026"]),
+    (src) => src.replace("period: rangeLabel(period.start, period.end) }", "period: `${period.start} – ${period.end}` }"));
+  rule("the notice goes when the report is sent", "src/lib/server/reports/notify.ts",
+    (c) => (c.includes('clearUnreadByMeta({ type: "report_scheduled", report_id: r.id }),') ? [] : ["a sent report still says 'ready to write'"]),
+    (src) => src.replace('    clearUnreadByMeta({ type: "report_scheduled", report_id: r.id }),\n', ""));
+  rule("…or deleted", `${API}/[id]/route.ts`,
+    (c) => (c.includes('after(() => clearUnreadByMeta({ type: "report_scheduled", report_id: loaded.row.id }));') ? [] : ["a deleted draft still says 'ready to write'"]),
+    (src) => src.replace('  after(() => clearUnreadByMeta({ type: "report_scheduled", report_id: loaded.row.id }));\n', ""));
+  rule("the report job prepares them after the reminders, and a failure never costs the reminders", "src/app/api/cron/report-reminders/route.ts",
+    (c) => { const n = c.indexOf("const run = await runReportNudges();"); const s2 = c.indexOf("const scheduled = await runReportSchedules({ deadline: started + 45_000 }).catch("); return n > 0 && s2 > n && c.includes("runReportSchedules({ dryRun: true, tenantId: auth.tenant_id }),") ? [] : ["the schedules run before or instead of the reminders"]; },
+    (src) => src.replace("const scheduled = await runReportSchedules({ deadline: started + 45_000 }).catch(", "const scheduled = await runReportSchedules({ deadline: started + 45_000 }).then((x) => x, "));
+  rule("the job stops starting new drafts before its time runs out — none is cut off halfway with its period claimed", SC,
+    (c) => (c.includes("if (opts.deadline && Date.now() > opts.deadline) { out.waiting += rows.length - i; break; }") && c.indexOf("if (opts.deadline && Date.now() > opts.deadline)") < c.indexOf('let claim = supabaseServer.from("work_report_schedules").update({ last_period: period.key') ? [] : ["a slow run is killed between the claim and the draft, and that period is lost"]),
+    (src) => src.replace("if (opts.deadline && Date.now() > opts.deadline) { out.waiting += rows.length - i; break; }", ""));
+  rule("a new schedule starts with the NEXT period — no past draft the moment it is set", SC,
+    (c) => (c.includes("const startAfter = due ? periodFor(cadence, due).key : null;") && c.includes("last_period: startAfter, created_by: auth.account_id,") ? [] : ["setting a schedule prepares last month's draft at once"]),
+    (src) => src.replace("last_period: startAfter, created_by: auth.account_id,", "created_by: auth.account_id,"));
+  rule("…and so does one switched back on after a pause — the periods it was off for are not prepared late", SC,
+    (c) => (c.includes("const resumes = !!was && !was.active && s.active !== false && !!startAfter && was.last_period !== startAfter;") && c.includes("...(resumes ? { last_period: startAfter, last_report_id: null } : {}),") ? [] : ["switching a schedule back on prepares a period long gone"]),
+    (src) => src.replace("...(resumes ? { last_period: startAfter, last_report_id: null } : {}),", ""));
+  const SR = `${API}/schedules/route.ts`;
+  rule("the schedules are set like «who must write what» — a super admin or HR · edit, the tenant's own people, a type that may be scheduled", SR,
+    (c) => ((c.match(/if \(!\(await canSetUp\(auth\)\)\) return forbidden\(\);/g) ?? []).length === 2 && c.includes('if (!(await ownerIds(auth)).has(body.accountId)) return NextResponse.json({ error: "not_found" }, { status: 404 });')
+      && c.includes('if (done === "bad_type") return NextResponse.json({ error: "bad_type" }, { status: 400 });') ? [] : ["anyone schedules drafts for anyone"]),
+    (src) => src.replace('  if (!(await ownerIds(auth)).has(body.accountId)) return NextResponse.json({ error: "not_found" }, { status: 404 });\n', ""));
+  const mig = stripComments(read("supabase/migrations/20260926_reports_schedules.sql"), { lang: "sql" });
+  expect(/CREATE TABLE IF NOT EXISTS work_report_schedules/.test(mig) && /ALTER TABLE work_report_schedules ENABLE ROW LEVEL SECURITY;/.test(mig) && /UNIQUE \(account_id, template_key\)/.test(mig)
+    && !/\bDROP\b|ALTER TABLE (?!work_report_schedules)/.test(mig), "the table is additive: one new table, one row per person and type, server-only (RLS on, no policy)");
+  expect(code(read("src/components/reports/app/ComplianceTab.tsx")).includes("<ScheduleSetup t={t} people={data.rows.map((r) => r.person)} />"), "the setup lives with «who must write what», in the Compliance tab");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

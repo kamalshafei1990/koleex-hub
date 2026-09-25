@@ -50,4 +50,16 @@ export const reportComplianceT: Translations = {
   "nudge.previewNone":   { en: "Nobody would be told anything right now.", zh: "此刻不会通知任何人。", ar: "مفيش حد هيوصله حاجة دلوقتي." },
   "nudge.kind.reminder":   { en: "Reminder", zh: "提醒", ar: "تذكير" },
   "nudge.kind.escalation": { en: "Manager told", zh: "通知主管", ar: "تبليغ المدير" },
+  /* 5D: the drafts the system prepares on schedule. */
+  "compliance.sched.title": { en: "Drafts prepared on schedule", zh: "按计划准备的草稿", ar: "مسودات بتتجهز لوحدها" },
+  "compliance.sched.hint": { en: "When the week or month a type covers has ended, Koleex prepares that period's draft at 07:00 in the person's own time and tells them — the first one when the current week or month ends. Nothing is ever sent by itself, and a schedule gives nobody a right they don't have.", zh: "当某类报告对应的一周或一个月结束后，Koleex 会在此人当地时间 07:00 准备好该期草稿并通知对方——第一份在本周或本月结束时准备。不会自动发送任何报告，排程也不会授予任何人原本没有的权限。", ar: "لما الأسبوع أو الشهر اللي النوع بيغطيه يخلص، Koleex بيجهّز مسودة الفترة دي الساعة 7 الصبح بتوقيت الشخص، ويبعتله إشعار — وأول واحدة لما الأسبوع أو الشهر الحالي يخلص. مفيش حاجة بتتبعت لوحدها، والجدولة مش بتدي حد صلاحية مش معاه." },
+  "compliance.sched.person": { en: "Person", zh: "人员", ar: "الشخص" },
+  "compliance.sched.type": { en: "Report type", zh: "报告类型", ar: "نوع التقرير" },
+  "compliance.sched.add": { en: "Add", zh: "添加", ar: "ضيف" },
+  "compliance.sched.none": { en: "No drafts are prepared on schedule yet.", zh: "尚未安排任何草稿。", ar: "مفيش مسودات بتتجهز لوحدها لسه." },
+  "compliance.sched.last": { en: "Last prepared: {period}", zh: "上次准备：{period}", ar: "آخر مسودة: {period}" },
+  "compliance.sched.remove": { en: "Remove", zh: "移除", ar: "شيل" },
+  "compliance.open": { en: "Open it", zh: "打开", ar: "افتحها" },
+  "compliance.sched.weekly": { en: "every Monday, the week that ended", zh: "每周一，准备上周的", ar: "كل اتنين، للأسبوع اللي خلص" },
+  "compliance.sched.monthly": { en: "on the 1st, the month that ended", zh: "每月1日，准备上个月的", ar: "أول كل شهر، للشهر اللي خلص" },
 };

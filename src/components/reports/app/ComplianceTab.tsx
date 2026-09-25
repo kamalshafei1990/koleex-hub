@@ -20,8 +20,12 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DatePicker from "@/components/ui/DatePicker";
 import { addDays } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
-import { dmyDate, dmyTime, fetchCompliance, fetchObligations, localToday, previewNudges, saveObligations, type ComplianceBoard, type NudgePreview, type ObligationSetup } from "@/lib/work-reports";
-import { Avatar, CARD, type T } from "./shared";
+import {
+  dmyDate, dmyTime, fetchCompliance, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
+  type ComplianceBoard, type NudgePreview, type ObligationSetup, type ReportPerson, type ScheduleSetup as ScheduleData,
+} from "@/lib/work-reports";
+import { reportHead } from "@/lib/reports/catalog-heads";
+import { Avatar, CARD, FIELD, type T } from "./shared";
 import type { Lang } from "@/lib/i18n";
 import { reportComplianceT } from "@/lib/translations/report-ui/compliance";
 
@@ -329,8 +333,112 @@ function Setup({ t, lang, onChanged }: { t: T; lang: string; onChanged: () => vo
               </li>
             ))}
           </ul>
+          <ScheduleSetup t={t} people={data.rows.map((r) => r.person)} />
         </>
       )}
     </section>
+  );
+}
+
+/** A period key in words, day first: a month "09/2026", an ISO week its
+ *  Monday to Sunday. */
+function periodText(key: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (m) return `${m[2]}/${m[1]}`;
+  const w = /^(\d{4})-W(\d{2})$/.exec(key);
+  if (!w) return key;
+  const DAY = 86_400_000;
+  const jan4 = Date.UTC(Number(w[1]), 0, 4);
+  const monday = jan4 - ((new Date(jan4).getUTCDay() + 6) % 7) * DAY + (Number(w[2]) - 1) * 7 * DAY;
+  return `${dmyDate(new Date(monday).toISOString().slice(0, 10))} – ${dmyDate(new Date(monday + 6 * DAY).toISOString().slice(0, 10))}`;
+}
+
+/* ── 5D: the drafts the system prepares on schedule ──────────────────
+   A person × a week's or a month's type: when that period ends, Koleex
+   prepares its draft (07:00 in the person's own time) and tells them —
+   nothing is sent by itself, and a schedule gives nobody a right. */
+function ScheduleSetup({ t, people }: { t: T; people: ReportPerson[] }) {
+  const [data, setData] = useState<ScheduleData | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [problem, setProblem] = useState(false);
+  const [who, setWho] = useState("");
+  const [what, setWhat] = useState("");
+  useEffect(() => { void Promise.resolve().then(async () => { const res = await fetchSchedules(); if (res.ok) setData(res.data); else setProblem(true); }); }, []);
+  const save = async (tag: string, body: Parameters<typeof saveSchedule>[0]): Promise<boolean> => {
+    setBusy(tag); setProblem(false);
+    const res = await saveSchedule(body);
+    setBusy(null);
+    if (res.ok) { setData(res.data); return true; }
+    setProblem(true);
+    return false;
+  };
+  const nameOf = new Map(people.map((p) => [p.id, p.name]));
+  const taken = new Set((data?.schedules ?? []).map((x) => `${x.accountId}|${x.templateKey}`));
+
+  return (
+    <div className="mt-6 border-t border-[var(--border-subtle)] pt-4" role="group" aria-labelledby="kx-rep-sched">
+      <h3 id="kx-rep-sched" className="text-[13px] font-semibold text-[var(--text-primary)]">{t("compliance.sched.title")}</h3>
+      <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-dim)]">{t("compliance.sched.hint")}</p>
+      {problem && <p role="alert" className="mt-2 text-[12px] text-red-500">{t("err.generic")}</p>}
+      {!data ? <div className="grid place-items-center py-6"><SpinnerIcon size={14} /></div> : (
+        <>
+          {data.schedules.length === 0 ? <p className="mt-3 text-[12px] text-[var(--text-dim)]">{t("compliance.sched.none")}</p> : (
+            <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+              {data.schedules.map((x) => {
+                const tag = `${x.accountId}|${x.templateKey}`;
+                const cadence = reportHead(x.templateKey)?.cadence;
+                const when = cadence === "weekly" || cadence === "monthly" ? t(`compliance.sched.${cadence}`) : "";
+                /* Only a draft that was really prepared — a new schedule's
+                   starting period is not one. */
+                const last = x.lastPeriod && x.lastReportId ? t("compliance.sched.last").replace("{period}", periodText(x.lastPeriod)) : "";
+                return (
+                  <li key={tag} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12.5px] font-medium text-[var(--text-primary)]">{nameOf.get(x.accountId) ?? "—"} · {t(`tpl.${x.templateKey}.name`, x.templateKey)}</span>
+                      <span className="block truncate text-[11px] text-[var(--text-dim)]">
+                        {[when, last].filter(Boolean).join(" · ")}
+                        {x.lastReportId && <> · <Link href={`/reports/${x.lastReportId}`} className="underline">{t("compliance.open")}</Link></>}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <button type="button" role="switch" aria-checked={x.active} aria-label={t(`tpl.${x.templateKey}.name`, x.templateKey)} disabled={!!busy}
+                        onClick={() => void save(tag, { accountId: x.accountId, templateKey: x.templateKey, active: !x.active })}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 disabled:opacity-60 ${x.active ? "bg-emerald-500" : "bg-[var(--bg-surface)] ring-1 ring-inset ring-[var(--border-subtle)]"}`}>
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${x.active ? "start-[22px]" : "start-0.5"}`} />
+                      </button>
+                      <button type="button" disabled={!!busy} onClick={() => void save(`rm:${tag}`, { accountId: x.accountId, templateKey: x.templateKey, remove: true })}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-60">
+                        {busy === `rm:${tag}` ? <SpinnerIcon size={11} /> : <RrIcon name="trash" size={11} />}{t("compliance.sched.remove")}
+                      </button>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="min-w-[160px] flex-1">
+              <span className="mb-1 block text-[11px] text-[var(--text-dim)]">{t("compliance.sched.person")}</span>
+              <select value={who} onChange={(e) => setWho(e.target.value)} className={FIELD}>
+                <option value="">—</option>
+                {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+            <label className="min-w-[200px] flex-[2]">
+              <span className="mb-1 block text-[11px] text-[var(--text-dim)]">{t("compliance.sched.type")}</span>
+              <select value={what} onChange={(e) => setWhat(e.target.value)} className={FIELD}>
+                <option value="">—</option>
+                {data.types.map((k) => <option key={k} value={k} disabled={!!who && taken.has(`${who}|${k}`)}>{t(`tpl.${k}.name`, k)}</option>)}
+              </select>
+            </label>
+            <button type="button" disabled={!who || !what || !!busy || taken.has(`${who}|${what}`)}
+              onClick={() => void save("add", { accountId: who, templateKey: what, active: true }).then((ok) => { if (ok) setWhat(""); })}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 text-[12px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">
+              {busy === "add" ? <SpinnerIcon size={11} /> : <RrIcon name="plus" size={11} />}{t("compliance.sched.add")}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
