@@ -7,24 +7,56 @@
    series edit is a single-row edit. The reminder cron uses nextOccurrenceStart
    to know when the next alert is due.
 
-   Times are shifted on the UTC instant, preserving the UTC time-of-day — exact
-   for fixed-offset timezones (the Hub's model); DST transitions can nudge an
-   occurrence by an hour, acceptable for v1.
+   Occurrence n is always computed FROM THE BASE, never by stepping from the
+   previous occurrence: a monthly series on the 31st lands on 31 Jan, 28/29 Feb,
+   31 Mar … (clamped to the month's last day), where stepping drifted to
+   3 Mar, 3 Apr for ever after.
+
+   Occurrences keep the base's WALL-CLOCK time in the organizer's timezone
+   (`tz`), so a 09:00 weekly meeting stays at 09:00 across a DST change.
+   Without a `tz` the arithmetic runs in UTC — the old behaviour, which the
+   callers outside the Calendar (dashboard, brief, reports feed) still use.
+   (The table only allows daily/weekly/monthly; there is no yearly cadence.)
    --------------------------------------------------------------------------- */
+
+import { safeTimeZone, zonedParts, zonedToUtc, type WallParts } from "@/lib/calendar-tz";
 
 export type CalendarRec = "daily" | "weekly" | "monthly" | null | undefined;
 
-function addPeriod(d: Date, rec: CalendarRec, n: number): Date {
-  const x = new Date(d.getTime());
-  if (rec === "daily") x.setUTCDate(x.getUTCDate() + n);
-  else if (rec === "weekly") x.setUTCDate(x.getUTCDate() + 7 * n);
-  else if (rec === "monthly") x.setUTCMonth(x.getUTCMonth() + n);
-  return x;
+const DAY = 86_400_000;
+
+function daysInMonth(y: number, m1: number): number {
+  return new Date(Date.UTC(y, m1, 0)).getUTCDate();
 }
 
-function untilBoundary(untilDate: string | null | undefined): number | null {
-  if (!untilDate) return null;
-  const t = new Date(`${untilDate}T23:59:59.999Z`).getTime();
+/** Occurrence n of a series whose base wall clock is `b`, as a UTC instant. */
+function occurrence(b: WallParts, rec: CalendarRec, n: number, tz: string): number {
+  if (rec === "daily" || rec === "weekly") {
+    const step = rec === "daily" ? n : 7 * n;
+    return zonedToUtc(b.y, b.m, b.d + step, b.h, b.mi, b.s, b.ms, tz);
+  }
+  /* monthly: base month + n, day clamped to the month's end */
+  const total = b.m - 1 + n;
+  const y = b.y + Math.floor(total / 12);
+  const m1 = (((total % 12) + 12) % 12) + 1;
+  const d = Math.min(b.d, daysInMonth(y, m1));
+  return zonedToUtc(y, m1, d, b.h, b.mi, b.s, b.ms, tz);
+}
+
+/** A first index guaranteed not to be past `targetMs` (a small undershoot is
+ *  fine — the caller walks forward from it). */
+function firstIndexNear(baseMs: number, rec: CalendarRec, targetMs: number): number {
+  if (targetMs <= baseMs) return 0;
+  const span = targetMs - baseMs;
+  const approx = rec === "daily" ? span / DAY : rec === "weekly" ? span / (7 * DAY) : span / (31 * DAY);
+  return Math.max(0, Math.floor(approx) - 2);
+}
+
+/** Last instant of the `until` date, in the organizer's zone. */
+function untilBoundary(untilDate: string | null | undefined, tz: string): number | null {
+  if (!untilDate || !/^\d{4}-\d{2}-\d{2}/.test(untilDate)) return null;
+  const [y, m, d] = untilDate.slice(0, 10).split("-").map(Number);
+  const t = zonedToUtc(y, m, d, 23, 59, 59, 999, tz);
   return Number.isFinite(t) ? t : null;
 }
 
@@ -38,32 +70,30 @@ export function expandRecurrence(
   winFrom: Date,
   winTo: Date,
   cap = 400,
+  tz = "UTC",
 ): Array<{ start: Date; end: Date }> {
   if (!rec) return [];
-  const bStart = new Date(baseStartISO);
-  const bEnd = new Date(baseEndISO);
-  if (!Number.isFinite(bStart.getTime()) || !Number.isFinite(bEnd.getTime())) return [];
-  const durationMs = Math.max(0, bEnd.getTime() - bStart.getTime());
-  const until = untilBoundary(untilDate);
+  const bStart = Date.parse(baseStartISO);
+  const bEnd = Date.parse(baseEndISO);
+  if (!Number.isFinite(bStart) || !Number.isFinite(bEnd)) return [];
+  const zone = safeTimeZone(tz);
+  const durationMs = Math.max(0, bEnd - bStart);
+  const until = untilBoundary(untilDate, zone);
   const fromMs = winFrom.getTime();
   const toMs = winTo.getTime();
-
-  // Fast-forward to the first occurrence that could overlap the window.
-  let s = new Date(bStart.getTime());
-  let guard = 0;
-  while (s.getTime() + durationMs < fromMs && guard < 6000) {
-    s = addPeriod(s, rec, 1);
-    guard++;
-  }
+  const base = zonedParts(bStart, zone);
 
   const out: Array<{ start: Date; end: Date }> = [];
-  guard = 0;
-  while (s.getTime() < toMs && guard < cap) {
-    if (until != null && s.getTime() > until) break;
-    const e = new Date(s.getTime() + durationMs);
-    if (e.getTime() >= fromMs) out.push({ start: new Date(s.getTime()), end: e });
-    s = addPeriod(s, rec, 1);
-    guard++;
+  let n = firstIndexNear(bStart, rec, fromMs - durationMs);
+  for (let guard = 0; guard < cap + 64; guard++, n++) {
+    const s = occurrence(base, rec, n, zone);
+    if (s >= toMs) break;
+    if (until != null && s > until) break;
+    const e = s + durationMs;
+    if (e >= fromMs) {
+      out.push({ start: new Date(s), end: new Date(e) });
+      if (out.length >= cap) break;
+    }
   }
   return out;
 }
@@ -76,18 +106,21 @@ export function nextOccurrenceStart(
   rec: CalendarRec,
   untilDate: string | null | undefined,
   now: Date,
+  tz = "UTC",
 ): Date | null {
-  const bStart = new Date(baseStartISO);
-  if (!Number.isFinite(bStart.getTime())) return null;
-  if (!rec) return bStart;
+  const bStart = Date.parse(baseStartISO);
+  if (!Number.isFinite(bStart)) return null;
+  if (!rec) return new Date(bStart);
+  const zone = safeTimeZone(tz);
   const floor = now.getTime() - 60_000;
-  const until = untilBoundary(untilDate);
-  let s = new Date(bStart.getTime());
-  let guard = 0;
-  while (s.getTime() < floor && guard < 6000) {
-    s = addPeriod(s, rec, 1);
-    guard++;
+  const until = untilBoundary(untilDate, zone);
+  const base = zonedParts(bStart, zone);
+  let n = firstIndexNear(bStart, rec, floor);
+  for (let guard = 0; guard < 64; guard++, n++) {
+    const s = occurrence(base, rec, n, zone);
+    if (s < floor) continue;
+    if (until != null && s > until) return null;
+    return new Date(s);
   }
-  if (until != null && s.getTime() > until) return null;
-  return s;
+  return null;
 }

@@ -1,11 +1,12 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   NotesList — middle pane. Shows pinned-first, time-grouped notes with
-   a preview snippet. Has a sticky search bar + "new note" button.
+   NotesList — middle pane (the whole screen on phones when no note is
+   open). Pinned-first, time-grouped notes with a preview snippet. Search and
+   New Note live in the page header above.
    --------------------------------------------------------------------------- */
 
-import { useMemo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -16,11 +17,15 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import {
   formatNoteTimestamp,
   groupNotesByDate,
+  type DateBucket,
   type NoteRow,
 } from "@/lib/notes";
+
+type T = (k: string) => string;
 
 export default function NotesList({
   notes,
@@ -33,12 +38,13 @@ export default function NotesList({
   onRestore,
   onPurge,
   onEmptyTrash,
-  search,
-  onSearchChange,
+  hasSearch,
   isTrashView,
   selectionLabel,
+  headerExtra,
 }: {
-  notes: NoteRow[];
+  /** null while the first answer for this view is still loading. */
+  notes: NoteRow[] | null;
   activeId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -48,65 +54,73 @@ export default function NotesList({
   onRestore: (id: string) => void;
   onPurge: (id: string) => void;
   onEmptyTrash: () => void;
-  search: string;
-  onSearchChange: (s: string) => void;
+  hasSearch: boolean;
   isTrashView: boolean;
   selectionLabel: string;
+  /** Extra controls under the pane title (the phone folder picker). */
+  headerExtra?: ReactNode;
 }) {
-  const { t } = useTranslation(notesT);
+  const { t, lang } = useTranslation(notesT);
+  const rows = useMemo(() => notes ?? [], [notes]);
 
   const { pinned, groups } = useMemo(() => {
     if (isTrashView) {
       // Trash view: flat group by date, no pinned split.
-      return {
-        pinned: [] as NoteRow[],
-        groups: groupNotesByDate(notes),
-      };
+      return { pinned: [] as NoteRow[], groups: groupNotesByDate(rows, lang) };
     }
-    const pinnedNotes = notes.filter((n) => n.is_pinned);
-    const others = notes.filter((n) => !n.is_pinned);
     return {
-      pinned: pinnedNotes,
-      groups: groupNotesByDate(others),
+      pinned: rows.filter((n) => n.is_pinned),
+      groups: groupNotesByDate(rows.filter((n) => !n.is_pinned), lang),
     };
-  }, [notes, isTrashView]);
+  }, [rows, isTrashView, lang]);
+
+  const rowProps = { onSelect, onTogglePin, onRename, onDelete, onRestore, onPurge, t };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Pane header — shows the selected folder name + count. The
-          global search + New Note controls live in the page header
-          above, so we don't duplicate them here. */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 py-3 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">
-            {selectionLabel}
+      {/* Pane header — the selected folder name + count. */}
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">
+              {selectionLabel}
+            </div>
+            <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+              {rows.length} {t(rows.length === 1 ? "count.note" : "count.notes")}
+            </div>
           </div>
-          <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
-            {notes.length} {notes.length === 1 ? "note" : "notes"}
-          </div>
+          {isTrashView && rows.length > 0 && (
+            <button
+              type="button"
+              onClick={onEmptyTrash}
+              className="h-7 px-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-700 dark:text-red-400 text-[11px] font-semibold hover:bg-red-500/25 transition-all shrink-0"
+            >
+              {t("emptyTrash")}
+            </button>
+          )}
         </div>
-        {isTrashView && notes.length > 0 && (
-          <button
-            onClick={onEmptyTrash}
-            className="h-7 px-2.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-[11px] font-semibold hover:bg-red-500/30 transition-all shrink-0"
-          >
-            {t("emptyTrash")}
-          </button>
-        )}
+        {headerExtra}
       </div>
 
       {/* List body */}
-      <div className="flex-1 overflow-y-auto py-1">
-        {notes.length === 0 && (
+      <div className="flex-1 overflow-y-auto py-1" role="list" aria-label={selectionLabel}>
+        {notes === null && (
+          <div className="h-full min-h-[240px] flex items-center justify-center gap-2 text-[12px] text-[var(--text-dim)]" role="status">
+            <SpinnerIcon className="h-4 w-4" /> {t("list.loading")}
+          </div>
+        )}
+
+        {notes !== null && rows.length === 0 && (
           <div className="h-full min-h-[240px] flex flex-col items-center justify-center gap-3 px-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-faint)]">
               <NotesIcon size={22} />
             </div>
             <div className="text-[13px] text-[var(--text-muted)]">
-              {search.trim() ? t("noMatch") : t("nothing")}
+              {hasSearch ? t("noMatch") : t("nothing")}
             </div>
-            {!search.trim() && !isTrashView && (
+            {!hasSearch && !isTrashView && (
               <button
+                type="button"
                 onClick={onCreate}
                 className="mt-1 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-all flex items-center gap-1.5"
               >
@@ -117,42 +131,16 @@ export default function NotesList({
           </div>
         )}
 
-        {pinned.length > 0 && (
-          <SectionHeader label={t("pinned")} />
-        )}
+        {pinned.length > 0 && <SectionHeader label={t("pinned")} />}
         {pinned.map((n) => (
-          <NoteRowItem
-            t={t}
-            key={n.id}
-            note={n}
-            active={n.id === activeId}
-            onSelect={onSelect}
-            onTogglePin={onTogglePin}
-            onRename={onRename}
-            onDelete={onDelete}
-            onRestore={onRestore}
-            onPurge={onPurge}
-            isTrashView={false}
-          />
+          <NoteRowItem key={n.id} note={n} active={n.id === activeId} isTrashView={false} {...rowProps} />
         ))}
 
         {groups.map((g) => (
-          <div key={g.label}>
-            <SectionHeader label={labelize(g.label, t)} />
+          <div key={g.key}>
+            <SectionHeader label={bucketLabel(g.bucket, t)} />
             {g.notes.map((n) => (
-              <NoteRowItem
-            t={t}
-                key={n.id}
-                note={n}
-                active={n.id === activeId}
-                onSelect={onSelect}
-                onTogglePin={onTogglePin}
-                onRename={onRename}
-                onDelete={onDelete}
-                onRestore={onRestore}
-                onPurge={onPurge}
-                isTrashView={isTrashView}
-              />
+              <NoteRowItem key={n.id} note={n} active={n.id === activeId} isTrashView={isTrashView} {...rowProps} />
             ))}
           </div>
         ))}
@@ -161,14 +149,14 @@ export default function NotesList({
   );
 }
 
-function labelize(label: string, t: (k: string) => string): string {
-  const map: Record<string, string> = {
-    Today: t("section.today"),
-    Yesterday: t("section.yesterday"),
-    "Previous 7 Days": t("section.previous7Days"),
-    "Previous 30 Days": t("section.previous30Days"),
-  };
-  return map[label] ?? label;
+function bucketLabel(b: DateBucket, t: T): string {
+  switch (b.kind) {
+    case "today": return t("section.today");
+    case "yesterday": return t("section.yesterday");
+    case "week": return t("section.previous7Days");
+    case "month": return t("section.previous30Days");
+    default: return b.label;
+  }
 }
 
 function SectionHeader({ label }: { label: string }) {
@@ -179,7 +167,10 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-function NoteRowItem({
+const ACTION_BTN =
+  "w-7 h-7 md:w-6 md:h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)] outline-none focus-visible:ring-2 focus-visible:ring-[#567FB2]";
+
+const NoteRowItem = memo(function NoteRowItem({
   note,
   active,
   onSelect,
@@ -201,15 +192,14 @@ function NoteRowItem({
   onPurge: (id: string) => void;
   isTrashView: boolean;
   /* Passed down rather than re-subscribed: this row renders once per note,
-     and useTranslation() in here would open a subscription per row. Same
-     reason labelize() above takes it as an argument. */
-  t: (k: string) => string;
+     and useTranslation() in here would open a subscription per row. */
+  t: T;
 }) {
   const plain = (note.body_plain || "").replace(/\s+/g, " ").trim();
   // List preview — title line if the user typed one, otherwise first
   // line/sentence of the body. Apple Notes uses the same rule.
+  const explicit = note.title?.trim();
   const displayTitle = (() => {
-    const explicit = note.title?.trim();
     if (explicit) return explicit;
     if (plain) {
       const firstSentence = plain.split(/(?<=[.?!])\s+/)[0];
@@ -220,9 +210,7 @@ function NoteRowItem({
   })();
   // Second line — whatever comes after the title in the body, truncated.
   const preview = (() => {
-    const explicit = note.title?.trim();
     if (!explicit) {
-      // Title is derived from body; preview is the REMAINING body.
       const sentences = plain.split(/(?<=[.?!])\s+/);
       if (sentences.length > 1) {
         const rest = sentences.slice(1).join(" ");
@@ -232,106 +220,105 @@ function NoteRowItem({
     }
     return plain.length > 80 ? plain.slice(0, 80) + "…" : plain;
   })();
+  /* A note someone else shared with me: the owner's organisation (rename,
+     pin, trash) is not mine to change. */
+  const ownerActions = !note.shared_role;
+  const label = displayTitle;
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      /* KDS row rule: a full-bleed row declares `role="button"` only so it can
-         be opened from the keyboard — it is not a control. Without this, the
-         Aurora skin's control-hover rule paints a Hub-Blue border and a 3%
-         white fill over it with `!important`, which on a square full-bleed row
-         is a hard blue box, and it also overrode the row's own
-         `hover:bg-[var(--bg-surface)]` below. */
-      data-kx-keep-hover=""
-      onClick={() => onSelect(note.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(note.id); }
-      }}
-      className={`group w-full text-start px-3 py-2.5 border-b border-[var(--border-faint)] transition-all cursor-pointer outline-none focus-visible:bg-[var(--bg-surface)] ${
+      role="listitem"
+      className={`group relative w-full border-b border-[var(--border-faint)] transition-all ${
         active
-          ? "bg-[#0066FF]/[0.10] border-s-[3px] border-s-[#0066FF]"
-          : "hover:bg-[var(--bg-surface)]"
+          ? "bg-[#567FB2]/[0.12] border-s-[3px] border-s-[#567FB2] dark:border-s-[#7FA9D6]"
+          : "hover:bg-[var(--bg-surface)] focus-within:bg-[var(--bg-surface)]"
       }`}
     >
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
+      <div className="flex items-start gap-2 px-3 py-2.5">
+        {/* The row's main control. `data-kx-keep-hover`: KDS row rule — a
+            full-bleed row must not get the Aurora control-hover box. */}
+        <button
+          type="button"
+          data-kx-keep-hover=""
+          onClick={() => onSelect(note.id)}
+          aria-current={active ? "true" : undefined}
+          className="flex-1 min-w-0 text-start outline-none focus-visible:underline"
+        >
           <div className="flex items-center gap-1.5 mb-0.5">
             {note.is_pinned && (
-              <PinIcon className="h-2.5 w-2.5 text-[#0066FF] shrink-0" />
+              <PinIcon className="h-2.5 w-2.5 text-[#567FB2] dark:text-[#7FA9D6] shrink-0" />
             )}
             {(note.is_shared || note.shared_role) && (
-              <UsersIcon
-                className="h-3 w-3 text-[#0066FF] shrink-0"
-                aria-label={note.shared_role ? "Shared with you" : "Shared"}
-              />
+              <span className="shrink-0 text-[#567FB2] dark:text-[#7FA9D6]" title={note.shared_role ? t("list.sharedWithYou") : t("list.shared")}>
+                <UsersIcon className="h-3 w-3" />
+                <span className="sr-only">{note.shared_role ? t("list.sharedWithYou") : t("list.shared")}</span>
+              </span>
             )}
-            <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate flex-1">
+            <span dir="auto" className="text-[13px] font-semibold text-[var(--text-primary)] truncate flex-1">
               {displayTitle}
-            </div>
+            </span>
             {note.shared_role && note.owner_name && (
               <span className="text-[10px] text-[var(--text-dim)] shrink-0 truncate max-w-[80px]">{note.owner_name}</span>
             )}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
-            <span className="shrink-0">{formatNoteTimestamp(note.updated_at)}</span>
-            <span className="truncate">{preview || t("list.noText")}</span>
+            <span className="shrink-0">{formatNoteTimestamp(note.updated_at, t)}</span>
+            <span dir="auto" className="truncate">{preview || t("list.noText")}</span>
           </div>
-        </div>
+        </button>
 
-        {/* Row actions */}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+        {/* Row actions — hover, keyboard focus, and always on touch/phones */}
+        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
           {!isTrashView ? (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRename(note.id);
-                }}
-                title="Rename"
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-              >
-                <PencilIcon className="h-3 w-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTogglePin(note.id, !note.is_pinned);
-                }}
-                title={note.is_pinned ? "Unpin" : "Pin"}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[#0066FF] hover:bg-[var(--bg-surface-subtle)]"
-              >
-                <PinIcon className="h-3 w-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(note.id);
-                }}
-                title="Move to Trash"
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface-subtle)]"
-              >
-                <TrashIcon className="h-3 w-3" />
-              </button>
-            </>
+            ownerActions && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onRename(note.id)}
+                  title={t("rename")}
+                  aria-label={`${t("rename")} — ${label}`}
+                  className={`${ACTION_BTN} hover:text-[var(--text-primary)]`}
+                >
+                  <PencilIcon className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTogglePin(note.id, !note.is_pinned)}
+                  title={note.is_pinned ? t("unpin") : t("pin")}
+                  aria-label={`${note.is_pinned ? t("unpin") : t("pin")} — ${label}`}
+                  aria-pressed={note.is_pinned}
+                  className={`${ACTION_BTN} hover:text-[#567FB2] dark:hover:text-[#7FA9D6]`}
+                >
+                  <PinIcon className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(note.id)}
+                  title={t("moveToTrash")}
+                  aria-label={`${t("moveToTrash")} — ${label}`}
+                  className={`${ACTION_BTN} hover:text-red-700 dark:hover:text-red-400`}
+                >
+                  <TrashIcon className="h-3 w-3" />
+                </button>
+              </>
+            )
           ) : (
             <>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRestore(note.id);
-                }}
-                title="Restore"
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-emerald-400 hover:bg-[var(--bg-surface-subtle)]"
+                type="button"
+                onClick={() => onRestore(note.id)}
+                title={t("restore")}
+                aria-label={`${t("restore")} — ${label}`}
+                className={`${ACTION_BTN} hover:text-emerald-700 dark:hover:text-emerald-400`}
               >
                 <RefreshCcwIcon className="h-3 w-3" />
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPurge(note.id);
-                }}
-                title="Delete forever"
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface-subtle)]"
+                type="button"
+                onClick={() => onPurge(note.id)}
+                title={t("deleteForever")}
+                aria-label={`${t("deleteForever")} — ${label}`}
+                className={`${ACTION_BTN} hover:text-red-700 dark:hover:text-red-400`}
               >
                 <CrossIcon className="h-3 w-3" />
               </button>
@@ -341,4 +328,4 @@ function NoteRowItem({
       </div>
     </div>
   );
-}
+});

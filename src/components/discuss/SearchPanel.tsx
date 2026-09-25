@@ -24,6 +24,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { searchDiscussMessages } from "@/lib/discuss";
+import { discussListStamp } from "@/lib/discuss-time";
 import type {
   DiscussChannelKind,
   DiscussSearchResult,
@@ -51,6 +52,8 @@ export interface SearchPanelProps {
   /** Optional initial query (e.g. when opened from a "search in channel"
    *  button with pre-filled context). */
   initialQuery?: string;
+  /** App language, for result timestamps. */
+  lang?: string;
   /** i18n helper. */
   t: (key: string, fallback?: string) => string;
 }
@@ -61,9 +64,22 @@ export function SearchPanel({
   onJump,
   scopedChannelId,
   initialQuery = "",
+  lang = "en",
   t,
 }: SearchPanelProps) {
   const [query, setQuery] = useState(initialQuery);
+  /* Opened from a conversation: search that conversation first, with a
+     one-tap switch to everywhere. */
+  const [scoped, setScoped] = useState(!!scopedChannelId);
+  const effectiveScope = scoped ? scopedChannelId ?? null : null;
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const [results, setResults] = useState<DiscussSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const debounced = useDebounced(query, 240);
@@ -80,7 +96,7 @@ export function SearchPanel({
     searchDiscussMessages({
       accountId: currentAccountId,
       query: q,
-      channelId: scopedChannelId ?? undefined,
+      channelId: effectiveScope ?? undefined,
       limit: 40,
     })
       .then((rows) => {
@@ -97,7 +113,7 @@ export function SearchPanel({
     return () => {
       cancelled = true;
     };
-  }, [debounced, currentAccountId, scopedChannelId]);
+  }, [debounced, currentAccountId, effectiveScope]);
 
   /* Group hits by channel — easier to scan "look, three hits in #general". */
   const grouped = useMemo(() => {
@@ -122,7 +138,11 @@ export function SearchPanel({
   );
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col bg-[var(--bg-primary)]/95 backdrop-blur-md border-s border-[var(--border-subtle)]">
+    <div
+      role="dialog"
+      aria-label={t("search.panel.title", "Search Discuss")}
+      className="absolute inset-0 z-30 flex flex-col bg-[var(--bg-primary)]/95 backdrop-blur-md border-s border-[var(--border-subtle)]"
+    >
       {/* Header + input */}
       <div className="shrink-0 px-4 pt-4 pb-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center justify-between mb-3">
@@ -155,6 +175,7 @@ export function SearchPanel({
             <button
               type="button"
               onClick={() => setQuery("")}
+              aria-label={t("btn.clear", "Clear")}
               className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"
             >
               <CrossIcon className="h-3.5 w-3.5" />
@@ -162,11 +183,24 @@ export function SearchPanel({
           )}
         </div>
         {scopedChannelId && (
-          <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
-            {t(
-              "search.panel.scoped",
-              "Showing results from this channel only",
-            )}
+          <div className="mt-2 flex items-center gap-1" role="group">
+            {([true, false] as const).map((on) => (
+              <button
+                key={String(on)}
+                type="button"
+                aria-pressed={scoped === on}
+                onClick={() => setScoped(on)}
+                className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
+                  scoped === on
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {on
+                  ? t("search.panel.thisChannel", "This channel only")
+                  : t("search.panel.everywhere", "Everywhere")}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -238,7 +272,7 @@ export function SearchPanel({
                         </span>
                         <span className="text-[var(--text-dim)]">·</span>
                         <span className="tabular-nums text-[10.5px]">
-                          {formatSearchTime(hit.created_at)}
+                          {discussListStamp(hit.created_at, lang, t("thread.yesterday", "Yesterday"))}
                         </span>
                       </div>
                       <div className="mt-0.5 text-[12px] text-[var(--text-muted)] leading-relaxed break-words line-clamp-3">
@@ -277,7 +311,7 @@ function renderSnippet(snippet: string): React.ReactNode {
       return (
         <mark
           key={i}
-          className="bg-yellow-400/20 text-yellow-200 px-0.5 rounded-sm not-italic"
+          className="bg-[#567FB2]/25 text-[var(--text-primary)] px-0.5 rounded-sm not-italic"
         >
           {p}
         </mark>
@@ -287,17 +321,4 @@ function renderSnippet(snippet: string): React.ReactNode {
   });
 }
 
-function formatSearchTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays === 0) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+export default SearchPanel;

@@ -9,11 +9,17 @@
    - Read that account's preferences (timezone, working hours, first day of
      week) — the viewer's own from the bootstrap payload every screen already
      has, another account's from the account route.
-   - Manage the focus date + view (month / week / day) and fetch the visible
-     window through the gated route.
+   - Show the calendar on THAT timezone's clock: every instant is turned into
+     a wall date of the zone (lib/calendar-tz) before the views see it, and
+     back when a slot is clicked. A notice says so when the device runs on
+     another zone.
+   - Manage the focus date + view (month / week / day / agenda) and fetch the
+     visible window through the gated route — cached per (account, window),
+     shown at once from the cache and refreshed behind it, with the previous
+     and next windows fetched while the browser is idle.
    - Open `?event=<id>` from a notification, on its date.
-   - Delegate rendering to MonthView / WeekView / DayView and open EventModal
-     to create, edit or (for a guest) view and answer.
+   - Delegate rendering to the views and open EventModal to create, edit or
+     (for a guest) view and answer.
 
    The picker used to be built from the full account directory filtered by a
    browser-side scope context: a regular employee without the Accounts module
@@ -22,37 +28,34 @@
    calendar; the picker is a Super Admin tool.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
-import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
-import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
-import PlusIcon from "@/components/icons/ui/PlusIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
-import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
-import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import { AngleLeftIcon, AngleRightIcon, ExclamationIcon, PlusIcon, SpinnerIcon, UserCircle2Icon } from "@/components/icons/ui";
 import CalendarIcon from "@/components/icons/CalendarIcon";
-import type {
-  AccountPreferences,
-  AccountRow,
-  AccountWithLinks,
-  CalendarEventRow,
-  CalendarViewEvent,
-} from "@/types/supabase";
+import { ConfirmDialog, useToast } from "@/components/kds";
+import type { AccountPreferences, AccountRow, AccountWithLinks } from "@/types/supabase";
+import type { CalendarFeedEvent } from "@/lib/calendar-types";
 import { fetchAccounts, fetchAccountWithLinks } from "@/lib/accounts-admin";
-import { fetchEventsInRange, deleteEvent, fetchEventById } from "@/lib/calendar-events";
-import { fetchHolidays, expandHolidays, type HolidayRow } from "@/lib/calendar-holidays";
+import { fetchEventsInRange, deleteEvent, fetchEventById, type CalendarEventDetail } from "@/lib/calendar-events";
+import { fetchHolidays, expandHolidays, type HolidayInstance, type HolidayRow } from "@/lib/calendar-holidays";
 import { withDefaults } from "@/lib/access-control";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import { CALENDAR_EVENT_TYPES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
+import { allDayKeys, browserTimeZone, fromWall, safeTimeZone, toWall } from "@/lib/calendar-tz";
 import {
   addDays,
   addMonths,
+  formatDMY,
   formatFullDay,
   formatMonthYear,
   formatWeekRange,
+  fromDateInput,
+  groupEventsByDay,
+  isoDateKey,
   roundToNextHalfHour,
   startOfDay,
   startOfMonth,
@@ -63,10 +66,18 @@ import {
 import MonthView from "./MonthView";
 import WeekView from "./WeekView";
 import DayView from "./DayView";
-import EventModal, { type EventDraft, type EventModalMode } from "./EventModal";
+import AgendaView from "./AgendaView";
+import type { EventDraft, EventModalMode } from "./EventModal";
+import type { ChipLabels } from "./EventChip";
 
-type ViewKey = "month" | "week" | "day";
-const VIEWS: ViewKey[] = ["month", "week", "day"];
+/* The modal is the heaviest piece and only needed on a click. */
+const EventModal = dynamic(() => import("./EventModal"), { ssr: false });
+
+type ViewKey = "month" | "week" | "day" | "agenda";
+const VIEWS: ViewKey[] = ["month", "week", "day", "agenda"];
+const AGENDA_DAYS = 14;
+const FRESH_MS = 60_000;
+const DEFAULT_TZ = "Asia/Dubai";
 
 interface ModalState {
   draft: EventDraft;
@@ -74,13 +85,25 @@ interface ModalState {
   mode: EventModalMode;
 }
 
-type OpenableEvent = CalendarEventRow & { invited?: boolean };
+interface PendingDelete {
+  id: string;
+  title: string;
+  series: boolean;
+  hasGuests: boolean;
+  task: boolean;
+}
+
+type OpenableEvent = CalendarEventDetail & { invited?: boolean };
+
+/** One cached window. `tick` is the reload generation it answers. */
+interface Entry { at: number; tick: number; ok: boolean; events: CalendarFeedEvent[] }
+const CACHE_LIMIT = 16;
 
 /** Where a report deadline leads (Reports Phase 3C). A sent report opens
  *  itself; on the viewer's own calendar a draft started opens too, and a
  *  report still owed opens ready to write. Someone else's deadline leads to
  *  the compliance board — a draft is only ever its author's to open. */
-function reportHref(e: CalendarViewEvent, own: boolean): string {
+function reportHref(e: CalendarFeedEvent, own: boolean): string {
   const sent = e.source_kind === "sent" || e.source_kind === "late";
   if (e.report_id && (sent || own)) return `/reports/${e.report_id}`;
   if (!own) return "/reports?tab=compliance";
@@ -91,12 +114,50 @@ function reportHref(e: CalendarViewEvent, own: boolean): string {
   return "/reports";
 }
 
+/** The window a view shows around a (wall) focus date, as wall dates. */
+function wallRange(view: ViewKey, focus: Date, weekStart: WeekStart): { from: Date; to: Date } {
+  if (view === "month") {
+    const gridStart = startOfWeek(startOfMonth(focus), weekStart);
+    return { from: gridStart, to: addDays(gridStart, 42) };
+  }
+  if (view === "week") {
+    const from = startOfWeek(focus, weekStart);
+    return { from, to: addDays(from, 7) };
+  }
+  const from = startOfDay(focus);
+  return { from, to: addDays(from, view === "agenda" ? AGENDA_DAYS : 1) };
+}
+
+function shiftFocus(view: ViewKey, d: Date, dir: 1 | -1): Date {
+  if (view === "month") return addMonths(d, dir);
+  return addDays(d, dir * (view === "week" ? 7 : view === "agenda" ? AGENDA_DAYS : 1));
+}
+
+/* Phone detection without a hydration mismatch (the server says "not a
+   phone"; the client answers from the media query). */
+const PHONE_QUERY = "(max-width: 639px)";
+function subscribePhone(cb: () => void) {
+  const mq = window.matchMedia(PHONE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+const isPhoneNow = () => window.matchMedia(PHONE_QUERY).matches;
+const notPhone = () => false;
+const noop = () => () => {};
+
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+}
+
 export default function CalendarApp() {
   const { t, lang } = useTranslation(calendarT);
   const boot = useMeBootstrap();
   const viewer = boot.data?.auth ?? null;
   const viewerId = viewer?.account_id ?? null;
   const isSA = boot.data?.isSuperAdmin === true;
+  const { showToast, toastElement } = useToast();
 
   /* ── Whose calendar ── */
   const [accounts, setAccounts] = useState<AccountRow[] | null>(null); // SA directory; null = not loaded
@@ -133,65 +194,167 @@ export default function CalendarApp() {
     return withDefaults(otherAccount && otherAccount.id === activeAccountId ? otherAccount.preferences : null);
   }, [viewingOwn, boot.data?.header, otherAccount, activeAccountId]);
   const weekStart: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
-  const timezone = preferences.calendar?.timezone || "Asia/Dubai";
+  const timezone = safeTimeZone(preferences.calendar?.timezone || DEFAULT_TZ);
+  const deviceTz = useSyncExternalStore(noop, browserTimeZone, () => null);
 
-  /* ── View state ── */
-  const [view, setView] = useState<ViewKey>("month");
-  const [focusDate, setFocusDate] = useState<Date>(() => new Date());
+  /* ── Clock: the zone's "now", advanced every minute (now line, today) ── */
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const today = useMemo(() => toWall(nowMs, timezone), [nowMs, timezone]);
+
+  /* ── View state ── Phones open on the agenda. */
+  const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, notPhone);
+  const [viewChoice, setViewChoice] = useState<ViewKey | null>(null);
+  const view: ViewKey = viewChoice ?? (isPhone ? "agenda" : "month");
+  const [focusChoice, setFocusChoice] = useState<Date | null>(null); // null = today
+  /* Today's date as a stable value — `today` itself ticks every minute. */
+  const todayKey = isoDateKey(today);
+  const todayDate = useMemo(() => fromDateInput(todayKey), [todayKey]);
+  const focusDate = focusChoice ?? todayDate;
 
   /* The visible window: the grid and the fetch must agree on the first day
      of week, or the month view would request the wrong leading days. */
-  const visibleRange = useMemo(() => {
-    if (view === "month") {
-      const gridStart = startOfWeek(startOfMonth(focusDate), weekStart);
-      return { from: gridStart, to: addDays(gridStart, 42) };
-    }
-    if (view === "week") {
-      const from = startOfWeek(focusDate, weekStart);
-      return { from, to: addDays(from, 7) };
-    }
-    const from = startOfDay(focusDate);
-    return { from, to: addDays(from, 1) };
-  }, [view, focusDate, weekStart]);
+  const range = useMemo(() => wallRange(view, focusDate, weekStart), [view, focusDate, weekStart]);
+  const visibleDays = useMemo(() => {
+    const out: Date[] = [];
+    for (let d = range.from; d < range.to; d = addDays(d, 1)) out.push(d);
+    return out;
+  }, [range]);
+  const keyFor = useCallback(
+    (acct: string, r: { from: Date; to: Date }) => `${acct}|${fromWall(r.from, timezone).toISOString()}|${fromWall(r.to, timezone).toISOString()}`,
+    [timezone],
+  );
+  const fetchKey = activeAccountId ? keyFor(activeAccountId, range) : "";
 
-  /* ── Events ── */
-  const [events, setEvents] = useState<CalendarViewEvent[]>([]);
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  /* ── Events: cache per window, stale-while-revalidate ── */
+  const [store, setStore] = useState<Map<string, Entry>>(() => new Map());
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; }, [store]);
   const [reloadTick, setReloadTick] = useState(0);
-  const fetchKey = `${activeAccountId ?? ""}|${visibleRange.from.getTime()}|${visibleRange.to.getTime()}|${reloadTick}`;
-  const loadingEvents = !!activeAccountId && loadedKey !== fetchKey;
   const reload = useCallback(() => setReloadTick((n) => n + 1), []);
+
+  const put = useCallback((key: string, entry: Entry) => {
+    setStore((prev) => {
+      const next = new Map(prev);
+      next.set(key, entry);
+      if (next.size > CACHE_LIMIT) {
+        const oldest = [...next.entries()].sort((a, b) => a[1].at - b[1].at)[0]?.[0];
+        if (oldest && oldest !== key) next.delete(oldest);
+      }
+      return next;
+    });
+  }, []);
+
+  /** One window from the route, as a cache entry. A failed load keeps the
+   *  events last known for the window and says it failed. */
+  const fetchWindow = useCallback(async (acct: string, r: { from: Date; to: Date }, key: string, tick: number): Promise<Entry> => {
+    const res = await fetchEventsInRange(acct, fromWall(r.from, timezone), fromWall(r.to, timezone));
+    const prev = storeRef.current.get(key);
+    return res.ok
+      ? { at: Date.now(), tick, ok: true, events: res.events }
+      : { at: prev?.at ?? 0, tick, ok: false, events: prev?.events ?? [] };
+  }, [timezone]);
+
+  /* The fetch runs per window key; what it needs to warm the neighbours is
+     read from here so a re-render cannot re-trigger it. */
+  const navRef = useRef({ range, view, focusDate, weekStart });
+  useEffect(() => { navRef.current = { range, view, focusDate, weekStart }; }, [range, view, focusDate, weekStart]);
 
   useEffect(() => {
     if (!activeAccountId) return;
-    let alive = true;
-    fetchEventsInRange(activeAccountId, visibleRange.from, visibleRange.to).then((rows) => {
-      if (!alive) return;
-      setEvents(rows);
-      setLoadedKey(fetchKey);
+    const cached = storeRef.current.get(fetchKey);
+    if (cached && cached.ok && cached.tick === reloadTick && Date.now() - cached.at < FRESH_MS) return;
+    let cancelled = false;
+    let idle: number | ReturnType<typeof setTimeout> | null = null;
+    const nav = navRef.current;
+    void fetchWindow(activeAccountId, nav.range, fetchKey, reloadTick).then((fresh) => {
+      put(fetchKey, fresh);
+      if (!fresh.ok || cancelled) return;
+      /* Warm the neighbours once the browser has nothing better to do. */
+      const warm = () => {
+        for (const dir of [1, -1] as const) {
+          const r = wallRange(nav.view, shiftFocus(nav.view, nav.focusDate, dir), nav.weekStart);
+          const k = keyFor(activeAccountId, r);
+          const c = storeRef.current.get(k);
+          if (!c || Date.now() - c.at > FRESH_MS) {
+            void fetchWindow(activeAccountId, r, k, reloadTick).then((e) => { if (e.ok) put(k, e); });
+          }
+        }
+      };
+      idle = typeof window.requestIdleCallback === "function" ? window.requestIdleCallback(warm) : setTimeout(warm, 300);
     });
-    return () => { alive = false; };
-  }, [activeAccountId, visibleRange, fetchKey]);
+    return () => {
+      cancelled = true;
+      if (idle !== null) {
+        if (typeof idle === "number" && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+        else clearTimeout(idle as ReturnType<typeof setTimeout>);
+      }
+    };
+  }, [activeAccountId, fetchKey, reloadTick, keyFor, fetchWindow, put]);
 
-  /* Report deadlines arrive worded in English; here they take the viewer's
-     language and say what became of them (sent, late, missing). */
-  const shownEvents = useMemo(() => events.map((e) => {
-    if (e.source !== "report" || !e.report_key) return e;
-    const k = e.source_kind;
-    const state = k === "sent" || k === "late" || k === "missing" ? ` · ${t(`report.${k}`)}` : "";
-    const about = e.report_subject ? ` · ${e.report_subject}` : "";
-    return { ...e, title: `${t(`report.${e.report_key}`, e.title)}${about}${state}` };
-  }), [events, t]);
+  /* What is on screen belongs to THIS window of THIS account — switching
+     account never shows the previous person's events, not even for a frame. */
+  const entry = activeAccountId ? store.get(fetchKey) : undefined;
+  const events = useMemo(() => entry?.events ?? [], [entry]);
+  const loadingEvents = !!activeAccountId && (!entry || entry.tick !== reloadTick);
+  const loadFailed = !!entry && !entry.ok && !loadingEvents;
 
-  /* A guest's calendar changes when the organizer moves or cancels a
-     meeting; coming back to the tab refetches the window. */
+  /* Coming back to the tab refetches the window (a guest's calendar changes
+     when the organizer moves a meeting) — at most once a minute. */
+  const lastFocusReload = useRef(0);
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const nowT = Date.now();
+      if (nowT - lastFocusReload.current < FRESH_MS) return;
+      lastFocusReload.current = nowT;
+      reload();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [reload]);
 
-  /* ── Holidays (report GEN-10): tenant reference data, expanded per window ── */
+  /* ── Display: worded in the viewer's language, on the zone's clock ── */
+  const byId = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+  const shownEvents = useMemo(() => events.map((e): CalendarFeedEvent => {
+    let title = e.title;
+    if (e.source === "report" && e.report_key) {
+      /* Report deadlines arrive worded in English; here they take the
+         viewer's language and say what became of them. */
+      const k = e.source_kind;
+      const state = k === "sent" || k === "late" || k === "missing" ? ` · ${t(`report.${k}`)}` : "";
+      const about = e.report_subject ? ` · ${e.report_subject}` : "";
+      title = `${t(`report.${e.report_key}`, e.title)}${about}${state}`;
+    } else if (e.source === "leave") {
+      const half = e.half_day_period ? ` (${t(`leave.half.${e.half_day_period}`, e.half_day_period)})` : "";
+      title = `${e.title || t("leave.default")}${half}`;
+    } else if (e.source === "planning" && !e.title) {
+      const type = e.planning_type ?? "other";
+      title = `[${t(`planning.type.${type}`, type)}]`;
+    }
+    if (e.all_day) {
+      const k = e.start_date && e.end_date ? { start: e.start_date, end: e.end_date } : allDayKeys(e.start_at, e.end_at, timezone);
+      return { ...e, title, start_date: k.start, end_date: k.end };
+    }
+    return {
+      ...e,
+      title,
+      start_at: toWall(e.start_at, timezone).toISOString(),
+      end_at: toWall(e.end_at, timezone).toISOString(),
+    };
+  }), [events, t, timezone]);
+  const eventsByDay = useMemo(() => groupEventsByDay(shownEvents, visibleDays), [shownEvents, visibleDays]);
+  const chipLabels: ChipLabels = useMemo(
+    () => ({ allDay: t("f.allDay"), readOnly: t("readOnly"), declined: t("invite.declinedTag") }),
+    [t],
+  );
+
+  /* ── Holidays (report GEN-10): tenant reference data, expanded per window.
+     Weekly rest days are ONE hint (legend + a dot on the weekday), not a
+     chip repeated on every Friday and Saturday. ── */
   const [holidayRows, setHolidayRows] = useState<HolidayRow[]>([]);
   const [holidayCountry, setHolidayCountry] = useState<string>(""); // "" = all
   useEffect(() => {
@@ -205,24 +368,29 @@ export default function CalendarApp() {
     () => Array.from(new Set(holidayRows.map((h) => h.country).filter(Boolean) as string[])).sort(),
     [holidayRows],
   );
-  const holidaysByDay = useMemo(() => {
+  const holidayView = useMemo(() => {
     const rows = holidayCountry
       ? holidayRows.filter((h) => h.country === holidayCountry || h.scope_type === "customer")
       : holidayRows;
-    return expandHolidays(rows, visibleRange.from, visibleRange.to);
-  }, [holidayRows, holidayCountry, visibleRange]);
-
-  /* ── Feedback ── */
-  const [toast, setToast] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(id);
-  }, [toast]);
+    const restDays = new Map<number, string>();
+    for (const h of rows) {
+      if (h.is_active && h.holiday_type === "weekly" && h.weekday != null) restDays.set(h.weekday === 0 ? 7 : h.weekday, h.name);
+    }
+    const dated: Record<string, HolidayInstance[]> = {};
+    for (const [k, list] of Object.entries(expandHolidays(rows.filter((h) => h.holiday_type !== "weekly"), range.from, addDays(range.to, -1)))) {
+      dated[k] = list;
+    }
+    return { restDays, dated };
+  }, [holidayRows, holidayCountry, range]);
+  const restDayLabel = useMemo(() => {
+    if (holidayView.restDays.size === 0) return null;
+    return [...holidayView.restDays.keys()].sort((a, b) => a - b).map((iso) => t(`wd.${iso}`)).join(" · ");
+  }, [holidayView.restDays, t]);
 
   /* ── Modal ── */
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openModalFor = useCallback((e: OpenableEvent) => {
     const editable = !e.invited && !!viewerId && (isSA || e.account_id === viewerId);
@@ -243,6 +411,8 @@ export default function CalendarApp() {
         reminder_minutes: e.reminder_minutes ?? null,
         recurrence: e.recurrence ?? null,
         recurrence_until: e.recurrence_until ?? null,
+        start_date: e.all_day ? e.start_date : undefined,
+        end_date: e.all_day ? e.end_date : undefined,
       },
     });
   }, [viewerId, isSA]);
@@ -262,33 +432,52 @@ export default function CalendarApp() {
     window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
     fetchEventById(eventId).then((ev) => {
       if (!ev) return;
-      setFocusDate(new Date(ev.start_at));
+      setFocusChoice(toWall(ev.start_at, timezone));
       if (isSA && ev.account_id !== viewerId && !ev.invited) setPickedAccountId(ev.account_id);
       openModalFor(ev);
     });
-  }, [viewerId, isSA, openModalFor]);
+  }, [viewerId, isSA, openModalFor, timezone]);
 
   /* ── Navigation ── */
-  function goPrev() {
-    setFocusDate((d) => (view === "month" ? addMonths(d, -1) : addDays(d, view === "week" ? -7 : -1)));
-  }
-  function goNext() {
-    setFocusDate((d) => (view === "month" ? addMonths(d, 1) : addDays(d, view === "week" ? 7 : 1)));
-  }
-  function goToday() {
-    setFocusDate(new Date());
-  }
+  const goPrev = useCallback(() => setFocusChoice(shiftFocus(view, focusDate, -1)), [view, focusDate]);
+  const goNext = useCallback(() => setFocusChoice(shiftFocus(view, focusDate, 1)), [view, focusDate]);
+  const goToday = useCallback(() => setFocusChoice(null), []);
+  const openDay = useCallback((d: Date) => { setFocusChoice(d); setViewChoice("day"); }, []);
+
+  /* Keyboard: T today, ←/→ previous/next, M/W/D/A views — never while
+     typing, and never under the modal or the confirm dialog. */
+  const modalOpen = !!modal || !!pendingDelete;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (modalOpen || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      const rtl = document.documentElement.dir === "rtl";
+      const k = e.key.toLowerCase();
+      if (k === "t") goToday();
+      else if (e.key === "ArrowLeft") (rtl ? goNext : goPrev)();
+      else if (e.key === "ArrowRight") (rtl ? goPrev : goNext)();
+      else if (k === "m") setViewChoice("month");
+      else if (k === "w") setViewChoice("week");
+      else if (k === "d") setViewChoice("day");
+      else if (k === "a") setViewChoice("agenda");
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalOpen, goToday, goPrev, goNext]);
 
   /* ── Event open handlers ── */
   function openNewEvent(dayHint?: Date) {
     if (!activeAccountId) return;
     const defaultLen = preferences.calendar?.default_meeting_duration_min ?? 30;
-    const start = dayHint ? new Date(dayHint) : roundToNextHalfHour(new Date());
+    /* Wall time on the calendar's clock → the instant. */
+    const startWall = dayHint ? new Date(dayHint) : roundToNextHalfHour(toWall(Date.now(), timezone));
     // A day hint (midnight) starts at the account's working-hour start.
     if (dayHint && dayHint.getHours() === 0 && dayHint.getMinutes() === 0) {
       const [h, m] = (preferences.calendar?.working_hours?.start || "09:00").split(":").map(Number);
-      start.setHours(h || 9, m || 0, 0, 0);
+      startWall.setHours(h || 9, m || 0, 0, 0);
     }
+    const start = fromWall(startWall, timezone);
     const end = new Date(start.getTime() + defaultLen * 60 * 1000);
     setModal({
       existingId: null,
@@ -313,53 +502,93 @@ export default function CalendarApp() {
   /* ?new=1 (Smart Create) opens a new event once the viewer is known. */
   useOpenOnNewParam(openNewEvent, !!activeAccountId);
 
-  async function openEvent(e: CalendarViewEvent) {
+  async function openEvent(shown: CalendarFeedEvent) {
+    /* The views hold wall-clock copies; open the real row. */
+    const e = byId.get(shown.id) ?? shown;
     /* Mirrors are read-only shadows of another module. A To-do, a project
-       task or a report deadline deep-links to its app; the rest are inert. */
+       task, a planning item or a report deadline deep-links to its app;
+       approved leave says where it lives. */
     if (e.source === "todo" && e.todo_id) { window.location.assign(`/todo?task=${e.todo_id}`); return; }
-    if (e.source === "project") { window.location.assign("/projects"); return; }
+    if (e.source === "project") {
+      window.location.assign(e.project_id && e.project_task_id ? `/projects?project=${e.project_id}&task=${e.project_task_id}` : "/projects");
+      return;
+    }
+    if (e.source === "planning" && e.planning_item_id) { window.location.assign(`/planning?item=${e.planning_item_id}`); return; }
     if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }
+    if (e.source === "leave") { showToast(t("readOnly.leave"), "info"); return; }
     if (e.source) return;
 
     /* An occurrence of a series edits the WHOLE series: open the base row
        (its true start/end + recurrence rule). */
     if (e.series_base_id) {
       const base = await fetchEventById(e.series_base_id);
-      if (!base) { setError(t("err.openSeries")); return; }
+      if (!base) { showToast(t("err.openSeries"), "error"); return; }
       openModalFor({ ...base, invited: e.invited || base.invited });
       return;
     }
     openModalFor(e);
   }
 
-  async function handleDeleteEvent(id: string) {
-    const ok = await deleteEvent(id);
-    if (!ok) { setError(t("err.delete")); return; }
-    setToast(t("toast.deleted"));
-    setModal(null);
+  /* After a write every cached window may be wrong (a series edit changes
+     every month it touches): keep only the one on screen, then refetch it. */
+  function invalidate() {
+    setStore((prev) => {
+      const next = new Map<string, Entry>();
+      const cur = prev.get(fetchKey);
+      if (cur) next.set(fetchKey, cur);
+      return next;
+    });
     reload();
   }
 
-  /* After a write the window is refetched rather than patched in place: a
-     series edit changes every occurrence, a delete removes rows whose ids
-     (`<base>~<i>`) never matched the base id. */
-  function handleSaved() {
-    setToast(modal?.existingId ? t("toast.updated") : t("toast.created"));
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const ok = await deleteEvent(pendingDelete.id);
+    setDeleting(false);
+    setPendingDelete(null);
+    if (!ok) { showToast(t("err.delete"), "error"); return; }
+    showToast(t("toast.deleted"));
     setModal(null);
-    reload();
+    invalidate();
+  }
+
+  function handleSaved() {
+    showToast(modal?.existingId ? t("toast.updated") : t("toast.created"));
+    setModal(null);
+    invalidate();
   }
   function handleResponded() {
-    setToast(t("toast.responded"));
+    showToast(t("toast.responded"));
     setModal(null);
-    reload();
+    invalidate();
   }
 
   const viewTitle =
     view === "month" ? formatMonthYear(focusDate, lang)
       : view === "week" ? formatWeekRange(focusDate, lang, weekStart)
-        : formatFullDay(focusDate, lang);
+        : view === "agenda" ? `${formatDMY(range.from)} – ${formatDMY(addDays(range.to, -1))}`
+          : formatFullDay(focusDate, lang);
 
   const loadingAccounts = isSA && accounts === null;
+  const tzDiffers = !!deviceTz && deviceTz !== timezone;
+  const deleteMessage = pendingDelete
+    ? [
+        t(pendingDelete.series ? "confirm.delete.series" : "confirm.delete.one").replace("{title}", pendingDelete.title),
+        pendingDelete.hasGuests ? t("confirm.delete.guests") : null,
+        pendingDelete.task ? t("confirm.delete.todo") : null,
+      ].filter(Boolean).join(" ")
+    : "";
+
+  const gridProps = {
+    today,
+    eventsByDay,
+    preferences,
+    holidaysByDay: holidayView.dated,
+    restDays: holidayView.restDays,
+    chipLabels,
+    onEventClick: (e: CalendarFeedEvent) => { void openEvent(e); },
+  };
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -376,10 +605,11 @@ export default function CalendarApp() {
             controls={
               isSA ? (
                 <div className="flex items-center gap-2">
-                  <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" />
+                  <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" aria-hidden />
                   <select
                     value={activeAccountId || ""}
                     onChange={(e) => setPickedAccountId(e.target.value || null)}
+                    aria-label={t("accounts.pick", "Calendar of")}
                     className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
                     disabled={loadingAccounts}
                   >
@@ -408,24 +638,12 @@ export default function CalendarApp() {
         </div>
 
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
-          {toast && (
-            <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-              <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{toast}</span>
-            </div>
-          )}
-          {error && (
-            <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-              <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
           {/* ── Toolbar (nav + view switcher) ── */}
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 onClick={goToday}
+                title="T"
                 className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
               >
                 {t("today")}
@@ -448,21 +666,30 @@ export default function CalendarApp() {
                   <AngleRightIcon className="h-4 w-4 rtl:rotate-180" />
                 </button>
               </div>
-              <h2 className="ms-2 text-[16px] md:text-[18px] font-bold text-[var(--text-primary)]">{viewTitle}</h2>
+              <h2 className="ms-2 text-[16px] md:text-[18px] font-bold text-[var(--text-primary)] truncate" aria-live="polite">{viewTitle}</h2>
+              {loadingEvents && (
+                <SpinnerIcon size={16} className="text-[var(--text-dim)] shrink-0" aria-label={t("events.loading")} />
+              )}
             </div>
 
             {/* View switcher */}
-            <div className="inline-flex items-center bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] rounded-xl p-1">
+            <div
+              role="group"
+              aria-label={t("views.label")}
+              title={t("shortcuts")}
+              className="inline-flex items-center bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] rounded-xl p-1"
+            >
               {VIEWS.map((v) => {
                 const active = view === v;
                 return (
                   <button
                     key={v}
-                    onClick={() => setView(v)}
-                    className={`h-8 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
+                    onClick={() => setViewChoice(v)}
+                    aria-pressed={active}
+                    className={`h-8 px-3 sm:px-4 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
                       active
-                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                        ? "kx-seg-on bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                        : "kx-seg-off text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {t(`view.${v}`)}
@@ -472,9 +699,14 @@ export default function CalendarApp() {
             </div>
           </div>
 
-          {/* Holiday country filter (report GEN-10) — only when holidays exist
-              and we're in the month grid (the view that overlays them). */}
-          {view === "month" && holidayCountries.length > 0 && (
+          {tzDiffers && (
+            <p className="mb-3 text-[11px] text-[var(--text-dim)]">
+              {t("tz.notice").replace("{tz}", timezone).replace("{device}", deviceTz ?? "")}
+            </p>
+          )}
+
+          {/* Holiday country filter (report GEN-10) — only when holidays exist. */}
+          {holidayCountries.length > 0 && (
             <div className="mb-3 flex items-center gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
                 {t("holidays")}
@@ -484,6 +716,7 @@ export default function CalendarApp() {
                 onChange={(e) => setHolidayCountry(e.target.value)}
                 className="h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
                 title={t("holidays.filter")}
+                aria-label={t("holidays.filter")}
               >
                 <option value="">{t("holidays.all")}</option>
                 {holidayCountries.map((c) => (
@@ -493,47 +726,62 @@ export default function CalendarApp() {
             </div>
           )}
 
+          {loadFailed && (
+            <div role="alert" className="mb-3 rounded-xl border border-[var(--state-error)]/30 bg-[var(--state-error)]/[0.08] text-[var(--state-error)] px-4 py-2.5 text-[13px] flex items-center gap-2">
+              <ExclamationIcon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">{t("err.load")}</span>
+              <button
+                type="button"
+                onClick={reload}
+                className="h-8 px-3 rounded-lg border border-[var(--state-error)]/30 text-[12px] font-semibold hover:bg-[var(--state-error)]/10 transition-colors"
+              >
+                {t("retry")}
+              </button>
+            </div>
+          )}
+
           {/* ── View body ──
               The month grid is ONE glass surface, so the frost costs one pass.
               The day cells inside stay tints on purpose — backdrop-filter is
               priced per element. Same call as Planning's schedule grid. */}
-          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden" aria-busy={loadingEvents}>
             {!activeAccountId ? (
               <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">{t("empty.pickAccount")}</div>
-            ) : loadingEvents && events.length === 0 ? (
-              <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">{t("events.loading")}</div>
             ) : view === "month" ? (
               <MonthView
+                {...gridProps}
                 focusDate={focusDate}
-                events={shownEvents}
-                preferences={preferences}
                 weekStart={weekStart}
-                holidaysByDay={holidaysByDay}
-                onDayClick={(d) => { setFocusDate(d); setView("day"); }}
+                onDayClick={openDay}
                 onNewEventOnDay={(d) => openNewEvent(d)}
-                onEventClick={(e) => { void openEvent(e); }}
               />
             ) : view === "week" ? (
               <WeekView
+                {...gridProps}
                 focusDate={focusDate}
-                events={shownEvents}
-                preferences={preferences}
+                now={today}
                 weekStart={weekStart}
+                onDayClick={openDay}
                 onNewEventAtSlot={(d) => openNewEvent(d)}
-                onEventClick={(e) => { void openEvent(e); }}
+              />
+            ) : view === "day" ? (
+              <DayView
+                {...gridProps}
+                focusDate={focusDate}
+                now={today}
+                onNewEventAtSlot={(d) => openNewEvent(d)}
               />
             ) : (
-              <DayView
-                focusDate={focusDate}
-                events={shownEvents}
-                preferences={preferences}
-                onNewEventAtSlot={(d) => openNewEvent(d)}
-                onEventClick={(e) => { void openEvent(e); }}
+              <AgendaView
+                {...gridProps}
+                days={visibleDays}
+                onDayClick={openDay}
               />
             )}
           </div>
 
-          {/* Legend — the same colors the chips and the modal's default swatch use */}
+          {/* Legend — the same colors the chips and the modal's default swatch
+              use, plus the weekly rest days as one hint. */}
           <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-dim)]">
             {CALENDAR_EVENT_TYPES.map((type) => (
               <span key={type} className="inline-flex items-center gap-1.5">
@@ -541,6 +789,12 @@ export default function CalendarApp() {
                 {t(`type.${type}`)}
               </span>
             ))}
+            {restDayLabel && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full" style={{ backgroundColor: EVENT_TYPE_COLORS.holiday }} />
+                {t("weekend")}: {restDayLabel}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -551,13 +805,34 @@ export default function CalendarApp() {
           existingId={modal.existingId}
           mode={modal.mode}
           viewerId={viewerId}
+          timezone={timezone}
           onClose={() => setModal(null)}
           onSaved={handleSaved}
-          onDelete={modal.mode === "edit" && modal.existingId ? () => handleDeleteEvent(modal.existingId as string) : undefined}
+          onDelete={modal.mode === "edit" && modal.existingId
+            ? ({ hasGuests }) => setPendingDelete({
+                id: modal.existingId as string,
+                title: modal.draft.title,
+                series: !!modal.draft.recurrence,
+                hasGuests,
+                task: modal.draft.event_type === "task",
+              })
+            : undefined}
           onResponded={handleResponded}
-          onError={(m) => setError(m)}
+          onError={(m) => showToast(m, "error")}
         />
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={pendingDelete?.series ? t("confirm.deleteSeries") : t("confirm.delete")}
+        message={deleteMessage}
+        confirmLabel={t("modal.delete")}
+        cancelLabel={t("modal.cancel")}
+        busy={deleting}
+        onConfirm={() => { void confirmDelete(); }}
+        onCancel={() => { if (!deleting) setPendingDelete(null); }}
+      />
+      {toastElement}
     </div>
   );
 }

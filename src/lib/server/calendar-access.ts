@@ -32,6 +32,7 @@ export interface CalendarEventCore {
   reminder_minutes: number | null;
   recurrence: CalendarRecurrence;
   recurrence_until: string | null;
+  color: string | null;
 }
 
 export interface CalendarActor {
@@ -39,8 +40,8 @@ export interface CalendarActor {
   isSuperAdmin: boolean;
 }
 
-export const EVENT_CORE_COLUMNS =
-  "id, account_id, tenant_id, title, description, location, start_at, end_at, all_day, event_type, is_private, reminder_minutes, recurrence, recurrence_until";
+const EVENT_CORE_COLUMNS =
+  "id, account_id, tenant_id, title, description, location, start_at, end_at, all_day, event_type, is_private, reminder_minutes, recurrence, recurrence_until, color";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string): boolean => UUID_RE.test(v);
@@ -59,7 +60,7 @@ export function isEventOwner(ev: Pick<CalendarEventCore, "account_id">, actor: C
   return actor.isSuperAdmin || ev.account_id === actor.accountId;
 }
 
-export async function isEventAttendee(eventId: string, accountId: string): Promise<boolean> {
+async function isEventAttendee(eventId: string, accountId: string): Promise<boolean> {
   const { data } = await supabaseServer
     .from("koleex_calendar_event_attendees")
     .select("id")
@@ -70,10 +71,41 @@ export async function isEventAttendee(eventId: string, accountId: string): Promi
   return !!data;
 }
 
-/** Owner, super admin, or an invited attendee. */
-export async function canReadEvent(ev: Pick<CalendarEventCore, "id" | "account_id">, actor: CalendarActor): Promise<boolean> {
-  if (isEventOwner(ev, actor)) return true;
-  return isEventAttendee(ev.id, actor.accountId);
+/** Who is reading, as far as the private-record rule cares. */
+export interface CalendarReader {
+  account_id: string;
+  role_id: string | null;
+  is_super_admin: boolean;
+  can_view_private: boolean;
+}
+
+/** Break-glass: a private record read on someone else's calendar is logged.
+ *  Fire-and-forget — the log must never fail the read. */
+export function logPrivateCalendarReads(reader: CalendarReader, eventIds: string[]): void {
+  if (eventIds.length === 0) return;
+  void supabaseServer.from("koleex_private_access_log").insert(
+    eventIds.map((id) => ({
+      account_id: reader.account_id,
+      role_id: reader.role_id,
+      module_name: "Calendar",
+      record_type: "koleex_calendar_events",
+      record_id: id,
+      access_reason: null,
+    })),
+  ).then(({ error }) => { if (error) console.error("[calendar-access] private log:", error.message); });
+}
+
+/** The same rule as the calendar list: the owner and an invited guest read
+ *  the event; a super admin reads someone else's event unless it is private,
+ *  and a private one only with can_view_private (break-glass, logged). */
+export async function canReadEvent(ev: Pick<CalendarEventCore, "id" | "account_id" | "is_private">, reader: CalendarReader): Promise<boolean> {
+  if (ev.account_id === reader.account_id) return true;
+  if (await isEventAttendee(ev.id, reader.account_id)) return true;
+  if (!reader.is_super_admin) return false;
+  if (!ev.is_private) return true;
+  if (!reader.can_view_private) return false;
+  logPrivateCalendarReads(reader, [ev.id]);
+  return true;
 }
 
 /** The attendee account ids of an event; declined guests can be left out
@@ -97,7 +129,7 @@ const WRITABLE_KEYS = [
 ] as const;
 
 export type SanitizedEvent =
-  | { ok: true; row: Record<string, unknown>; timeChanged: boolean }
+  | { ok: true; row: Record<string, unknown>; timeChanged: boolean; locationChanged: boolean }
   | { ok: false; error: string };
 
 function optString(v: unknown, max: number): string | null | undefined {
@@ -113,7 +145,7 @@ function optString(v: unknown, max: number): string | null | undefined {
 export function sanitizeEventInput(
   body: Record<string, unknown>,
   mode: "create" | "update",
-  existing?: Pick<CalendarEventCore, "start_at" | "end_at">,
+  existing?: Pick<CalendarEventCore, "start_at" | "end_at"> & Partial<Pick<CalendarEventCore, "color" | "location">>,
 ): SanitizedEvent {
   const row: Record<string, unknown> = {};
   for (const k of WRITABLE_KEYS) if (k in body) row[k] = body[k];
@@ -151,6 +183,11 @@ export function sanitizeEventInput(
   if ("color" in row) {
     const v = optString(row.color, 32);
     if (v === undefined) return { ok: false, error: "color must be text" };
+    /* #RRGGBB only — the views append an alpha pair to it. A colour stored
+       before this rule is kept when an edit sends it back unchanged. */
+    if (v !== null && !/^#[0-9a-fA-F]{6}$/.test(v) && v !== existing?.color) {
+      return { ok: false, error: "color must be #RRGGBB" };
+    }
     row.color = v;
   }
   if ("reminder_minutes" in row) {
@@ -177,6 +214,7 @@ export function sanitizeEventInput(
   /* A rescheduled event re-arms its reminder: the stamp the cron left for
      the old time must not silence the new one. */
   if (mode === "update" && timeChanged) row.reminded_at = null;
+  const locationChanged = mode === "update" && "location" in row && (row.location ?? null) !== (existing?.location ?? null);
 
-  return { ok: true, row, timeChanged };
+  return { ok: true, row, timeChanged, locationChanged };
 }

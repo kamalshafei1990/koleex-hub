@@ -13,7 +13,7 @@
      ...
      [Composer for a new reply]
 
-   The composer here is intentionally minimal: plain text + emoji only.
+   The composer here is intentionally minimal: plain text only.
    Voice messages, file attachments, and product mentions stay in the
    main channel composer so threads feel focused on back-and-forth
    discussion, not side-channel file drops.
@@ -27,17 +27,19 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { fpAvatar } from "@/lib/cdn";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
+  connectDiscussStream,
   fetchThreadMessages,
   sendDiscussMessage,
   toggleReaction,
   subscribeToChannel,
 } from "@/lib/discuss";
+import { discussTime } from "@/lib/discuss-time";
 import { TranslatableBody } from "./TranslatableBody";
+import { DiscussAvatar } from "./DiscussAvatar";
 import type { DiscussMessageWithAuthor } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -53,14 +55,23 @@ export interface ThreadPaneProps {
   channelId: string;
   /** Close the thread drawer. */
   onClose: () => void;
-  /** Callback fired after a successful reply so the parent can refresh
-   *  the thread indicator on the message bubble in the main channel. */
-  onReplySent?: () => void;
   /** Auto-translate incoming replies into `targetLang` (mirrors the channel). */
   autoTranslate?: boolean;
   targetLang?: string;
+  /** App language, for times. */
+  lang?: string;
   /** i18n helper. */
   t: (key: string, fallback?: string) => string;
+}
+
+/* Replace-or-append by id, keeping chronological order. */
+function upsertById(list: DiscussMessageWithAuthor[], m: DiscussMessageWithAuthor): DiscussMessageWithAuthor[] {
+  const i = list.findIndex((x) => x.id === m.id);
+  if (i === -1) return [...list, m].sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+  const next = list.slice();
+  /* The stream frame has no reactions — keep the ones we already know. */
+  next[i] = { ...m, reactions: m.reactions?.length ? m.reactions : list[i].reactions };
+  return next;
 }
 
 export function ThreadPane({
@@ -68,23 +79,30 @@ export function ThreadPane({
   currentAccountId,
   channelId,
   onClose,
-  onReplySent,
   autoTranslate = false,
   targetLang = "en",
+  lang = "en",
   t,
 }: ThreadPaneProps) {
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  /* Initial + refetch on parent change. */
-  const load = useCallback(async () => {
-    setLoading(true);
+  /* Fetch the thread. Only the FIRST load (per parent) shows the spinner —
+     every later refresh (a reply arrived, an edit, my own send) swaps the
+     rows in silently instead of blanking the list to a spinner each time. */
+  const loadSeq = useRef(0);
+  const load = useCallback(async (silent = false) => {
+    const seq = ++loadSeq.current;
+    if (!silent) setLoading(true);
     const rows = await fetchThreadMessages(parent.id, currentAccountId);
-    setMessages(rows);
+    if (seq !== loadSeq.current) return; // a newer load superseded this one
+    /* A failed silent refresh returns [] — never wipe a visible thread. */
+    setMessages((prev) => (silent && rows.length === 0 && prev.length > 0 ? prev : rows));
     setLoading(false);
   }, [parent.id, currentAccountId]);
 
@@ -97,58 +115,75 @@ export function ThreadPane({
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages.length]);
 
-  /* Subscribe to realtime inserts on the channel and pick up any new
-     message whose reply_to_message_id matches the parent. The shared
-     subscribeToChannel helper returns a cleanup function so we just
-     hand it back from useEffect. */
+  /* Live updates, two paths (same as the main list):
+       · broadcast ping (where the Supabase websocket works) → refetch;
+       · first-party SSE stream (the China-proof path) → a reply to this
+         parent is appended straight from the frame; an edit / delete /
+         reaction in this channel triggers a silent refetch. */
   useEffect(() => {
     const cleanup = subscribeToChannel(channelId, {
       onMessageInsert: (row) => {
         if (row.reply_to_message_id !== parent.id) return;
-        /* Refetch the thread — small enough that this is cheaper than
-           trying to hand-merge a half-hydrated row. */
-        void load();
+        void load(true);
       },
       onMessageUpdate: (row) => {
-        /* Parent edits / deletes bubble through here. Only bother
-           reloading when the update touches our parent or one of its
-           children (we don't know children ids ahead of time, so we
-           just reload for any reply_to hit). */
         if (row.id === parent.id || row.reply_to_message_id === parent.id) {
-          void load();
+          void load(true);
         }
       },
     });
-    return cleanup;
+    let changeTimer: number | null = null;
+    const unsubStream = connectDiscussStream(
+      (m) => {
+        if (m.channel_id !== channelId) return;
+        if (m.reply_to_message_id !== parent.id) return;
+        setMessages((prev) => (prev.length === 0 ? prev : upsertById(prev, m)));
+      },
+      (changed) => {
+        if (changed !== channelId) return;
+        if (changeTimer != null) window.clearTimeout(changeTimer);
+        changeTimer = window.setTimeout(() => void load(true), 400);
+      },
+    );
+    return () => {
+      cleanup();
+      unsubStream();
+      if (changeTimer != null) window.clearTimeout(changeTimer);
+    };
   }, [channelId, parent.id, load]);
 
   const handleSend = useCallback(async () => {
     const body = composerBody.trim();
     if (!body || sending) return;
     setSending(true);
+    setSendError(false);
     const row = await sendDiscussMessage({
       channelId,
       authorId: currentAccountId,
       body,
       kind: "text",
       replyToMessageId: parent.id,
+      clientMsgId: crypto.randomUUID(),
     });
     setSending(false);
     if (row) {
       setComposerBody("");
-      /* Optimistically reload immediately — realtime will also trigger
-         but this feels more responsive. */
-      void load();
-      onReplySent?.();
+      void load(true);
       /* Refocus composer so users can keep hammering replies. */
       textareaRef.current?.focus();
+    } else {
+      /* Keep the text so nothing typed is lost; say it failed. */
+      setSendError(true);
     }
-  }, [composerBody, sending, channelId, currentAccountId, parent.id, load, onReplySent]);
+  }, [composerBody, sending, channelId, currentAccountId, parent.id, load]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      /* IME guard — same as the main composer: while a CJK input method is
+         composing, Enter confirms the candidate; it must not send. */
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         void handleSend();
@@ -157,9 +192,8 @@ export function ThreadPane({
     [handleSend],
   );
 
-  const handleToggleReaction = useCallback(
-    async (messageId: string, emoji: string) => {
-      /* Optimistic: flip reacted_by_me + count before the round-trip. */
+  const applyReaction = useCallback(
+    (messageId: string, emoji: string) => {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;
@@ -168,10 +202,7 @@ export function ThreadPane({
             const on = existing.reacted_by_me;
             const nextCount = existing.count + (on ? -1 : 1);
             if (nextCount <= 0) {
-              return {
-                ...m,
-                reactions: m.reactions.filter((r) => r.emoji !== emoji),
-              };
+              return { ...m, reactions: m.reactions.filter((r) => r.emoji !== emoji) };
             }
             return {
               ...m,
@@ -193,19 +224,23 @@ export function ThreadPane({
             ...m,
             reactions: [
               ...m.reactions,
-              {
-                emoji,
-                count: 1,
-                account_ids: [currentAccountId],
-                reacted_by_me: true,
-              },
+              { emoji, count: 1, account_ids: [currentAccountId], reacted_by_me: true },
             ],
           };
         }),
       );
-      await toggleReaction(messageId, currentAccountId, emoji);
     },
     [currentAccountId],
+  );
+
+  const handleToggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      /* Optimistic flip; a failed write flips it straight back. */
+      applyReaction(messageId, emoji);
+      const res = await toggleReaction(messageId, currentAccountId, emoji);
+      if (res === null) applyReaction(messageId, emoji);
+    },
+    [currentAccountId, applyReaction],
   );
 
   /* Count replies only (parent excluded). */
@@ -215,7 +250,7 @@ export function ThreadPane({
   );
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-primary)] border-s border-[var(--border-subtle)]">
+    <div className="flex flex-col h-full w-full bg-[var(--bg-primary)] border-s border-[var(--border-subtle)]">
       {/* Header */}
       <div className="shrink-0 h-14 px-4 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <div className="min-w-0">
@@ -245,7 +280,7 @@ export function ThreadPane({
 
       {/* Messages list */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
-        {loading ? (
+        {loading && messages.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-[var(--text-dim)]">
             <SpinnerIcon className="h-4 w-4" />
           </div>
@@ -257,9 +292,10 @@ export function ThreadPane({
                 msg={m}
                 isParent={idx === 0}
                 currentAccountId={currentAccountId}
-                onToggleReaction={(emoji) => handleToggleReaction(m.id, emoji)}
+                onToggleReaction={(emoji) => void handleToggleReaction(m.id, emoji)}
                 autoTranslate={autoTranslate}
                 targetLang={targetLang}
+                lang={lang}
                 t={t}
               />
             ))}
@@ -274,36 +310,34 @@ export function ThreadPane({
 
       {/* Composer */}
       <div className="shrink-0 px-3 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-        <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+        {sendError && (
+          <div role="alert" className="mb-2 text-[11px] text-[var(--text-muted)]">
+            {t("status.failed", "Failed to send")}
+          </div>
+        )}
+        <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
           <textarea
             ref={textareaRef}
             value={composerBody}
             onChange={(e) => setComposerBody(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t("thread.reply.placeholder", "Reply to thread…")}
+            aria-label={t("thread.reply.placeholder", "Reply to thread…")}
             rows={2}
             className="w-full px-3 pt-2.5 pb-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none resize-none max-h-[140px]"
             disabled={sending}
           />
-          <div className="px-2 pb-2 flex items-center justify-between">
+          <div className="px-2 pb-2 flex items-center justify-end">
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)] transition-colors"
-              aria-label="Emoji"
-              disabled
-            >
-              <SmileIcon className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={!composerBody.trim() || sending}
-              className="h-7 px-3 rounded-md bg-blue-500 text-white text-[11px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
+              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
             >
               {sending ? (
-                <SpinnerIcon className="h-3 w-3" />
+                <SpinnerIcon className="h-3.5 w-3.5" />
               ) : (
-                <PaperPlaneIcon className="h-3 w-3" />
+                <PaperPlaneIcon className="h-3.5 w-3.5" />
               )}
               {t("thread.reply.send", "Reply")}
             </button>
@@ -327,6 +361,7 @@ function ThreadMessage({
   onToggleReaction,
   autoTranslate = false,
   targetLang = "en",
+  lang = "en",
   t,
 }: {
   msg: DiscussMessageWithAuthor;
@@ -335,19 +370,17 @@ function ThreadMessage({
   onToggleReaction: (emoji: string) => void;
   autoTranslate?: boolean;
   targetLang?: string;
+  lang?: string;
   t: (key: string, fallback?: string) => string;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const authorName =
-    msg.author?.full_name || msg.author?.username || "Unknown";
+    msg.author?.full_name || msg.author?.username || t("channel.unknown", "Unknown");
   const authorAlt = (() => {
     const alt = (msg.author?.name_alt ?? "").trim();
     return alt && alt !== (msg.author?.full_name ?? "").trim() ? alt : null;
   })();
-  const timeStr = new Date(msg.created_at).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const timeStr = discussTime(msg.created_at, lang);
 
   const body = msg.deleted_at ? null : msg.body ?? "";
 
@@ -356,27 +389,12 @@ function ThreadMessage({
       className={`group relative rounded-lg px-3 py-2 ${
         isParent
           ? "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
-          : "hover:bg-[var(--bg-surface)]"
+          : "hover:bg-[var(--bg-surface)] focus-within:bg-[var(--bg-surface)]"
       }`}
     >
       <div className="flex items-start gap-2.5">
-        {/* Avatar bubble */}
-        <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[11px] font-semibold overflow-hidden">
-          {msg.author?.avatar_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={fpAvatar(msg.author.avatar_url)}
-              alt={authorName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            authorName
-              .split(/\s+/)
-              .slice(0, 2)
-              .map((p) => p[0]?.toUpperCase() ?? "")
-              .join("")
-          )}
-        </div>
+        {/* Same avatar as the main message list (grayscale + initials). */}
+        <DiscussAvatar name={authorName} url={msg.author?.avatar_url ?? null} size={32} />
 
         {/* Body column */}
         <div className="min-w-0 flex-1">
@@ -389,12 +407,12 @@ function ThreadMessage({
                 </span>
               )}
             </span>
-            <span className="text-[9.5px] text-[var(--text-dim)] shrink-0">
+            <span className="text-[9.5px] text-[var(--text-dim)] shrink-0 tabular-nums">
               {timeStr}
             </span>
             {msg.edited_at && !msg.deleted_at && (
               <span className="text-[9.5px] text-[var(--text-dim)] italic">
-                (edited)
+                ({t("thread.edited", "edited")})
               </span>
             )}
           </div>
@@ -402,7 +420,7 @@ function ThreadMessage({
           {/* Markdown body */}
           {msg.deleted_at ? (
             <div className="text-[11.5px] text-[var(--text-dim)] italic mt-0.5">
-              This message was deleted
+              {t("thread.deleted", "This message was deleted")}
             </div>
           ) : (
             <TranslatableBody
@@ -418,7 +436,7 @@ function ThreadMessage({
             />
           )}
 
-          {/* Reactions row */}
+          {/* Reactions row — same look as the main list. */}
           {msg.reactions.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {msg.reactions.map((rx) => (
@@ -426,51 +444,59 @@ function ThreadMessage({
                   key={rx.emoji}
                   type="button"
                   onClick={() => onToggleReaction(rx.emoji)}
-                  className={`h-5 px-1.5 inline-flex items-center gap-1 rounded-full border text-[10.5px] transition-colors ${
+                  aria-pressed={rx.reacted_by_me}
+                  className={`h-6 px-1.5 inline-flex items-center gap-1 rounded-full border text-[11px] tabular-nums transition-colors ${
                     rx.reacted_by_me
-                      ? "border-blue-500/50 bg-blue-500/15 text-blue-200"
-                      : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
+                      ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)]"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                   }`}
                 >
                   <span>{rx.emoji}</span>
-                  <span className="tabular-nums">{rx.count}</span>
+                  <span className="font-semibold">{rx.count}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Hover actions — reaction picker */}
-        <div className="relative shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            type="button"
-            onClick={() => setPickerOpen((v) => !v)}
-            className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
-            aria-label="React"
-          >
-            <SmileIcon className="h-3.5 w-3.5" />
-          </button>
-          {pickerOpen && (
-            <div
-              className="absolute right-0 top-7 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-lg"
-              onMouseLeave={() => setPickerOpen(false)}
+        {/* Hover / focus actions — reaction picker */}
+        {!msg.deleted_at && (
+          <div className="relative shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => setPickerOpen((v) => !v)}
+              className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+              aria-label={t("msg.react", "Add reaction")}
+              aria-expanded={pickerOpen}
             >
-              {QUICK_REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => {
-                    onToggleReaction(emoji);
-                    setPickerOpen(false);
-                  }}
-                  className="h-7 w-7 rounded-md text-[14px] hover:bg-[var(--bg-surface)] transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+              <SmileIcon className="h-3.5 w-3.5" />
+            </button>
+            {pickerOpen && (
+              <div
+                className="absolute end-0 top-7 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-lg"
+                onMouseLeave={() => setPickerOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setPickerOpen(false);
+                }}
+              >
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    aria-label={emoji}
+                    onClick={() => {
+                      onToggleReaction(emoji);
+                      setPickerOpen(false);
+                    }}
+                    className="h-7 w-7 rounded-md text-[14px] hover:bg-[var(--bg-surface)] transition-colors"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

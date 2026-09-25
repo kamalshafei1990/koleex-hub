@@ -15,7 +15,8 @@ import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import { useAiChat } from "@/lib/ai/useAiChat";
 
-const SUGGESTIONS = [
+/* English fallbacks — the caller passes translated labels. */
+const DEFAULT_SUGGESTIONS = [
   "Summarise today's activity",
   "Draft a message to the team",
   "What changed this week?",
@@ -32,6 +33,10 @@ export default function DiscussAiChat({
     subtitle?: string;
     placeholder?: string;
     empty?: string;
+    thinking?: string;
+    back?: string;
+    send?: string;
+    suggestions?: string[];
   };
 }) {
   const {
@@ -50,6 +55,10 @@ export default function DiscussAiChat({
   const subtitle = labels?.subtitle ?? "Your assistant · always here";
   const placeholder = labels?.placeholder ?? "Ask Koleex AI anything…";
   const empty = labels?.empty ?? "Ask me anything — I can help across the Hub.";
+  const thinking = labels?.thinking ?? "Thinking…";
+  const backLabel = labels?.back ?? "Back";
+  const sendLabel = labels?.send ?? "Send";
+  const suggestions = labels?.suggestions?.length ? labels.suggestions : DEFAULT_SUGGESTIONS;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -70,7 +79,7 @@ export default function DiscussAiChat({
             type="button"
             onClick={onBack}
             className="md:hidden -ms-2 h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-            aria-label="Back"
+            aria-label={backLabel}
           >
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
@@ -83,7 +92,7 @@ export default function DiscussAiChat({
             {title}
           </div>
           <div className="text-[11px] text-[var(--text-dim)] truncate">
-            {aiSending ? "Thinking…" : subtitle}
+            {aiSending ? thinking : subtitle}
           </div>
         </div>
       </div>
@@ -103,7 +112,7 @@ export default function DiscussAiChat({
               {empty}
             </div>
             <div className="mt-5 flex flex-col gap-2 w-full max-w-[320px]">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -156,12 +165,14 @@ export default function DiscussAiChat({
             value={aiInput}
             onChange={(e) => setAiInput(e.target.value)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return; // IME
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleAiSend();
               }
             }}
             placeholder={placeholder}
+            aria-label={placeholder}
             className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none py-1.5"
           />
           <MicButton
@@ -180,7 +191,7 @@ export default function DiscussAiChat({
             onClick={handleAiSend}
             disabled={!aiInput.trim() || aiSending}
             className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center transition-colors hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 disabled:pointer-events-none"
-            aria-label="Send"
+            aria-label={sendLabel}
           >
             <PaperPlaneIcon className="h-3.5 w-3.5" />
           </button>

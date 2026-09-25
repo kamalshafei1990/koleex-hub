@@ -4,40 +4,49 @@
    MonthView — 6-row month grid with event chips, anchored on the viewer's
    first day of week (Settings → Language & region).
 
-   Click a day → open day view.
-   Hover a day → show a "+" button to create a new event on that day.
+   Click a day (or its number, from the keyboard) → open day view.
+   "+" (on hover, on focus, always on touch screens) → new event that day.
+   "+N more" → the day view of that date.
    Click an event chip → open it.
+
+   Dates are WALL dates of the calendar's timezone (see calendar-utils); the
+   day's items arrive grouped once by CalendarApp.
    --------------------------------------------------------------------------- */
 
-import PlusIcon from "@/components/icons/ui/PlusIcon";
-import type { CalendarViewEvent, AccountPreferences } from "@/types/supabase";
+import { PlusIcon } from "@/components/icons/ui";
+import type { AccountPreferences } from "@/types/supabase";
+import type { CalendarFeedEvent } from "@/lib/calendar-types";
 import type { HolidayInstance } from "@/lib/calendar-holidays";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
 import { EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
 import {
-  eventsOnDay,
+  formatDMY,
   isSameMonth,
   isToday,
   isoDateKey,
   monthGrid,
-  colorForEvent,
   isoWeekday,
-  formatTime,
   weekdayOrder,
   type WeekStart,
 } from "@/lib/calendar-utils";
+import EventChip, { type ChipLabels } from "./EventChip";
 
 interface Props {
   focusDate: Date;
-  events: CalendarViewEvent[];
+  today: Date;
+  eventsByDay: Map<string, CalendarFeedEvent[]>;
   preferences: AccountPreferences;
   weekStart: WeekStart;
-  /* Report GEN-10 — holiday occurrences keyed by yyyy-mm-dd. */
+  /* Report GEN-10 — dated holiday occurrences keyed by yyyy-mm-dd (weekly
+     rest days are not in here; they are one hint, not a chip per cell). */
   holidaysByDay?: Record<string, HolidayInstance[]>;
+  /** ISO weekday → name of the weekly rest day (e.g. 6 → "Weekend"). */
+  restDays?: Map<number, string>;
+  chipLabels: ChipLabels;
   onDayClick?: (d: Date) => void;
   onNewEventOnDay?: (d: Date) => void;
-  onEventClick?: (e: CalendarViewEvent) => void;
+  onEventClick?: (e: CalendarFeedEvent) => void;
 }
 
 const MAX_CHIPS = 3;
@@ -45,15 +54,18 @@ const HOLIDAY_COLOR = EVENT_TYPE_COLORS.holiday;
 
 export default function MonthView({
   focusDate,
-  events,
+  today,
+  eventsByDay,
   preferences,
   weekStart,
   holidaysByDay,
+  restDays,
+  chipLabels,
   onDayClick,
   onNewEventOnDay,
   onEventClick,
 }: Props) {
-  const { t, lang } = useTranslation(calendarT);
+  const { t } = useTranslation(calendarT);
   const days = monthGrid(focusDate, weekStart);
   const columnDays = weekdayOrder(weekStart);   // ISO numbers, in column order
   const workingDays = preferences.calendar?.working_hours?.days || [1, 2, 3, 4, 5];
@@ -64,14 +76,17 @@ export default function MonthView({
       <div className="grid grid-cols-7 border-b border-[var(--border-subtle)]">
         {columnDays.map((iso) => {
           const isWorking = workingDays.includes(iso);
+          const rest = restDays?.get(iso);
           return (
             <div
               key={iso}
+              title={rest}
               className={`text-[10px] font-semibold uppercase tracking-wider py-3 text-center ${
                 isWorking ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
               }`}
             >
               {t(`wd.${iso}`)}
+              {rest && <span className="ms-1 inline-block h-1 w-1 rounded-full align-middle" style={{ backgroundColor: HOLIDAY_COLOR }} aria-hidden />}
             </div>
           );
         })}
@@ -80,20 +95,23 @@ export default function MonthView({
       {/* Grid */}
       <div className="grid grid-cols-7 auto-rows-fr">
         {days.map((day, idx) => {
+          const key = isoDateKey(day);
           const inMonth = isSameMonth(day, focusDate);
-          const today = isToday(day);
-          const dayEvents = eventsOnDay(events, day);
-          const dayHolidays = holidaysByDay?.[isoDateKey(day)] ?? [];
-          const shown = dayEvents.slice(0, MAX_CHIPS);
+          const isTodayCell = isToday(day, today);
+          const dayEvents = eventsByDay.get(key) ?? [];
+          const dayHolidays = holidaysByDay?.[key] ?? [];
+          const room = Math.max(1, MAX_CHIPS - dayHolidays.length);
+          const shown = dayEvents.slice(0, room);
           const extra = dayEvents.length - shown.length;
           const isWorking = workingDays.includes(isoWeekday(day));
           const isLastCol = (idx + 1) % 7 === 0;
           const isLastRow = idx >= days.length - 7;
+          const dmy = formatDMY(day);
 
           return (
             <div
-              key={day.toISOString()}
-              className={`group relative min-h-[112px] p-1.5 md:p-2 cursor-pointer transition-colors ${
+              key={key}
+              className={`group relative min-h-[88px] sm:min-h-[112px] p-1 sm:p-1.5 md:p-2 cursor-pointer transition-colors ${
                 !isLastCol ? "border-e border-[var(--border-subtle)]" : ""
               } ${!isLastRow ? "border-b border-[var(--border-subtle)]" : ""} ${
                 inMonth
@@ -104,11 +122,15 @@ export default function MonthView({
               }`}
               onClick={() => onDayClick?.(day)}
             >
-              {/* Day number + quick-create */}
+              {/* Day number (opens the day — the keyboard way in) + quick-create */}
               <div className="flex items-center justify-between mb-1">
-                <span
-                  className={`inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full text-[11px] font-bold ${
-                    today
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDayClick?.(day); }}
+                  aria-label={t("day.open").replace("{date}", dmy)}
+                  aria-current={isTodayCell ? "date" : undefined}
+                  className={`inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full text-[11px] font-bold focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--border-focus)] ${
+                    isTodayCell
                       ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                       : inMonth
                         ? "text-[var(--text-primary)]"
@@ -116,16 +138,16 @@ export default function MonthView({
                   }`}
                 >
                   {day.getDate()}
-                </span>
+                </button>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onNewEventOnDay?.(day);
                   }}
-                  className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                  className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-all flex items-center justify-center"
                   title={t("newEvent")}
-                  aria-label={t("newEvent")}
+                  aria-label={`${t("newEvent")} · ${dmy}`}
                 >
                   <PlusIcon className="h-3 w-3" />
                 </button>
@@ -141,7 +163,7 @@ export default function MonthView({
                       style={{
                         backgroundColor: HOLIDAY_COLOR + "22",
                         color: HOLIDAY_COLOR,
-                        borderLeft: `2px solid ${HOLIDAY_COLOR}`,
+                        borderInlineStart: `2px solid ${HOLIDAY_COLOR}`,
                       }}
                       title={`${h.name}${h.country ? " · " + h.country : ""}`}
                     >
@@ -153,37 +175,18 @@ export default function MonthView({
 
               {/* Event chips */}
               <div className="space-y-1">
-                {shown.map((ev) => {
-                  const color = colorForEvent(ev);
-                  return (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick?.(ev);
-                      }}
-                      className="w-full text-left flex items-center gap-1.5 h-[18px] px-1.5 rounded text-[10px] font-medium truncate hover:brightness-125 transition-all"
-                      style={{
-                        backgroundColor: color + "22",
-                        color,
-                        borderLeft: `2px solid ${color}`,
-                      }}
-                      title={`${ev.title} · ${ev.all_day ? t("f.allDay") : formatTime(new Date(ev.start_at), lang)}`}
-                    >
-                      {!ev.all_day && (
-                        <span className="shrink-0 text-[9px] opacity-80">
-                          {formatTime(new Date(ev.start_at), lang)}
-                        </span>
-                      )}
-                      <span className="truncate">{ev.title}</span>
-                    </button>
-                  );
-                })}
+                {shown.map((ev) => (
+                  <EventChip key={ev.id} ev={ev} labels={chipLabels} onClick={onEventClick} />
+                ))}
                 {extra > 0 && (
-                  <p className="text-[10px] text-[var(--text-dim)] ps-1">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDayClick?.(day); }}
+                    aria-label={t("month.moreAria").replace("{n}", String(dayEvents.length)).replace("{date}", dmy)}
+                    className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] ps-1 rounded focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--border-focus)]"
+                  >
                     +{extra} {t("month.more")}
-                  </p>
+                  </button>
                 )}
               </div>
             </div>

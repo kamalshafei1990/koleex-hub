@@ -24,6 +24,11 @@ interface TaskLike {
   assignee_account_id?: string | null;
 }
 
+/** Deep link that opens the project board with the task's modal. */
+function taskLink(task: { id: string; project_id: string | null }): string {
+  return task.project_id ? `/projects?project=${task.project_id}&task=${task.id}` : "/projects";
+}
+
 /** Inbox + push to a freshly-assigned task assignee (skips self-assign). */
 export async function notifyTaskAssigned(auth: AuthCtx, task: TaskLike): Promise<void> {
   try {
@@ -36,7 +41,7 @@ export async function notifyTaskAssigned(auth: AuthCtx, task: TaskLike): Promise
       category: "system",
       subject: `Task assigned: ${task.title}`,
       body: `You've been assigned a task${task.due_date ? ` due ${task.due_date}` : ""}.`,
-      link: "/projects",
+      link: taskLink(task),
       metadata: { source: "projects", type: "project_task_assigned", task_id: task.id, project_id: task.project_id },
     });
     await emitPings([{ topic: rtTopic.inbox(to) }]);
@@ -45,7 +50,7 @@ export async function notifyTaskAssigned(auth: AuthCtx, task: TaskLike): Promise
       {
         title: "Task assigned",
         body: task.title,
-        url: "/projects",
+        url: taskLink(task),
         tag: `ptask:${task.id}`,
         kind: "project_task_assigned",
       },
@@ -88,7 +93,7 @@ export async function notifyTaskComment(
         category: "system",
         subject: `New comment on: ${task.title}`,
         body: preview,
-        link: "/projects",
+        link: taskLink({ id: task.id as string, project_id: task.project_id as string | null }),
         metadata: { source: "projects", type: "project_task_comment", task_id: task.id, project_id: task.project_id },
       })),
     );
@@ -98,7 +103,7 @@ export async function notifyTaskComment(
       {
         title: `Comment on: ${task.title}`,
         body: preview,
-        url: "/projects",
+        url: taskLink({ id: task.id as string, project_id: task.project_id as string | null }),
         tag: `ptask:${task.id}`,
         kind: "project_task_comment",
       },

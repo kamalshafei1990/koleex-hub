@@ -255,6 +255,11 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   const [discussChannels, setDiscussChannels] = useState<
     DiscussChannelWithState[]
   >([]);
+  /* Latest list for the realtime handler (per-channel mute check). */
+  const discussChannelsRef = useRef<DiscussChannelWithState[]>([]);
+  useEffect(() => {
+    discussChannelsRef.current = discussChannels;
+  }, [discussChannels]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   /** Grace-period tracking: after a realtime bump, protect the optimistic
@@ -344,7 +349,11 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
            EXCEPT on /discuss, where DiscussApp raises its own sound with
            per-channel mute/mention rules for the same event. Both firing
            at once was the "two different sounds per message" bug. */
-        if (!window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) playAppSound("message");
+        /* …and never for a conversation the user muted (or set to
+           "Nothing"), the same per-channel rule push and DiscussApp follow. */
+        const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
+        const silenced = !!ch && (ch.muted || ch.notification_pref === "none");
+        if (!silenced && !window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
            (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
@@ -393,7 +402,25 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
      regardless of browser. */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    function onDiscussChange() {
+    function onDiscussChange(e: Event) {
+      /* DiscussApp says exactly what changed (channel + new unread state):
+         patch that row locally instead of re-reading every channel. Only an
+         event without a detail falls back to the full recount. */
+      const d = (e as CustomEvent<{ channelId?: string; unread?: number; markedUnread?: boolean } | undefined>).detail;
+      if (d?.channelId) {
+        setDiscussChannels((prev) =>
+          prev.map((c) =>
+            c.id === d.channelId
+              ? {
+                  ...c,
+                  ...(typeof d.unread === "number" ? { unread_count: d.unread } : {}),
+                  ...(typeof d.markedUnread === "boolean" ? { marked_unread: d.markedUnread } : {}),
+                }
+              : c,
+          ),
+        );
+        return;
+      }
       void recountDiscuss();
     }
     function onResume() {
@@ -451,15 +478,16 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       lastForced = Date.now();
       try {
         const rows = await fetchMyChannels(aid);
-        const newTotal = rows.reduce(
-          (s, c) => s + (c.unread_count ?? 0),
-          0,
-        );
-        setDiscussChannels((prev) => {
-          const oldTotal = prev.reduce(
-            (s, c) => s + (c.unread_count ?? 0),
+        /* Only conversations that are allowed to make a sound count toward
+           "did something new arrive" — a muted chat must not chime. */
+        const audibleUnread = (list: DiscussChannelWithState[]) =>
+          list.reduce(
+            (s, c) => s + (c.muted || c.notification_pref === "none" ? 0 : c.unread_count ?? 0),
             0,
           );
+        const newTotal = audibleUnread(rows);
+        setDiscussChannels((prev) => {
+          const oldTotal = audibleUnread(prev);
           /* Baseline guard: the FIRST fetch compares against the empty
              initial list, so pre-existing unread used to chime (and spin
              up the AudioContext) on every page load. Only rises AFTER a

@@ -3,11 +3,16 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { ilikeAny } from "@/lib/notes-server";
 
 /* GET /api/notes/share-candidates?q=term
    Active accounts in the caller's tenant (excluding self) that a note can be
    shared with. `q` filters by username / email. Service-role read because RLS
-   on `accounts` blocks the anon client from listing peers. */
+   on `accounts` blocks the anon client from listing peers.
+
+   login_email is returned on purpose: the Share dialog shows it under each
+   name so two colleagues with the same display name can be told apart, and
+   people search by it. It never leaves the caller's own tenant. */
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -27,15 +32,12 @@ export async function GET(req: Request) {
     .order("username", { ascending: true })
     .limit(50);
 
-  if (q) {
-    const term = `%${q}%`;
-    query = query.or(`username.ilike.${term},login_email.ilike.${term}`);
-  }
+  if (q) query = query.or(ilikeAny(["username", "login_email"], q));
 
   const { data, error } = await query;
   if (error) {
     console.error("[api/notes/share-candidates]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load people" }, { status: 500 });
   }
 
   const accounts = ((data ?? []) as Array<Record<string, unknown>>).map((row) => {

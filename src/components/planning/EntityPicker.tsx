@@ -2,22 +2,24 @@
 
 /* ---------------------------------------------------------------------------
    EntityPicker — searchable combobox for linking a planning item to a
-   real Hub record (Customer, Supplier, Contact, Product).
+   real Hub record (Customer, Supplier, Contact, Product, Project).
 
-   On select it hands back BOTH the id and the display label so the modal
-   can persist linked_entity_id (for queryability) AND linked_entity_label
-   (for fast rendering without a join).
+   On select it hands back the id, the display label AND the record's real
+   kind, so the modal can persist linked_entity_id (for queryability),
+   linked_entity_label (for fast rendering without a join) and — for a
+   generic contact search — the contact's actual customer/supplier type,
+   which is what the Contacts detail page asks the strip for.
+
+   A failed search reads as an error, not as "No matches".
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import { searchEntities, type EntitySearchResult } from "@/lib/planning";
+import { searchEntities, type EntitySearchResult, type PickerEntityType } from "@/lib/planning";
 import { useTranslation } from "@/lib/i18n";
 import { planningT } from "@/lib/translations/planning";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-
-type EntityType = "customer" | "supplier" | "contact" | "product";
 
 export default function EntityPicker({
   entityType,
@@ -26,10 +28,10 @@ export default function EntityPicker({
   onChange,
   placeholder,
 }: {
-  entityType: EntityType;
+  entityType: PickerEntityType;
   entityId: string | null;
   entityLabel: string | null;
-  onChange: (id: string | null, label: string | null) => void;
+  onChange: (id: string | null, label: string | null, kind?: string) => void;
   placeholder?: string;
 }) {
   const { t } = useTranslation(planningT);
@@ -37,22 +39,21 @@ export default function EntityPicker({
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<EntitySearchResult[]>([]);
+  const [failed, setFailed] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset results when the entity type changes.
-  useEffect(() => {
-    setResults([]);
-    setQuery("");
-  }, [entityType]);
-
+  /* Results belong to the type they answered; a type switch just stops
+     showing them (the modal remounts the picker per type anyway). */
   useEffect(() => {
     if (!open) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       searchEntities(entityType, query)
-        .then(setResults)
+        .then((r) => { setResults(r); setFailed(false); })
+        .catch(() => { setResults([]); setFailed(true); })
         .finally(() => setLoading(false));
     }, 220);
     return () => {
@@ -96,6 +97,11 @@ export default function EntityPicker({
         <div className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center gap-2 focus-within:border-[var(--border-focus)] transition-colors">
           <SearchIcon size={14} className="text-[var(--text-dim)] shrink-0" />
           <input
+            role="combobox"
+            aria-expanded={open && !entityId}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-label={placeholder ?? t("picker.searchPh")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setOpen(true)}
@@ -109,8 +115,13 @@ export default function EntityPicker({
       )}
 
       {open && !entityId && (
-        <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl max-h-64 overflow-y-auto">
-          {results.length === 0 && !loading && (
+        <div id={listId} role="listbox" className="absolute z-20 start-0 end-0 mt-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl max-h-64 overflow-y-auto">
+          {failed && !loading && (
+            <div role="alert" className="px-3 py-2 text-[12px] text-red-600 dark:text-red-400">
+              {t("err.generic")}
+            </div>
+          )}
+          {!failed && results.length === 0 && !loading && (
             <div className="px-3 py-2 text-[12px] text-[var(--text-dim)]">
               {query.trim() ? t("picker.noMatches") : t("picker.typeToSearch")}
             </div>
@@ -118,9 +129,11 @@ export default function EntityPicker({
           {results.map((r) => (
             <button
               type="button"
+              role="option"
+              aria-selected={false}
               key={r.id}
               onClick={() => {
-                onChange(r.id, r.label);
+                onChange(r.id, r.label, r.kind);
                 setOpen(false);
               }}
               className="w-full text-start px-3 py-2 hover:bg-[var(--bg-surface-subtle)] border-b last:border-b-0 border-[var(--border-subtle)]"

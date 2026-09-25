@@ -15,17 +15,23 @@
    the server accepts. The old picker read the full account directory, which
    needs the Accounts module — a regular employee got an empty list and could
    not invite anyone.
+
+   Times are edited on the CALENDAR's clock (`timezone`, the account's
+   Settings → Calendar zone), not the browser's. An all-day event is edited
+   as dates and stored as that zone's midnight → 23:59:59.999.
+
+   The guest list is only written back once it has been READ and CHANGED: a
+   save racing the first load (or after a failed load) used to PUT an empty
+   list and silently uninvite everyone.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
-import TrashIcon from "@/components/icons/ui/TrashIcon";
-import DiskIcon from "@/components/icons/ui/DiskIcon";
-import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
+import { CalendarPlusIcon, CrossIcon, DiskIcon, TrashIcon } from "@/components/icons/ui";
+import { HUB } from "@/components/kds/colors";
 import type {
   CalendarAttendeeStatus,
   CalendarEventRow,
@@ -44,23 +50,27 @@ import {
   type CalendarAttendee,
 } from "@/lib/calendar-events";
 import { CALENDAR_EVENT_TYPES, CALENDAR_RECURRENCES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
-import { toDateTimeLocal, fromDateTimeLocal, toDateInput, fromDateInput } from "@/lib/calendar-utils";
+import { toDateTimeLocal, fromDateTimeLocal } from "@/lib/calendar-utils";
+import { allDayKeys, fromWall, toWall, zonedDateKey, zonedToUtc } from "@/lib/calendar-tz";
 
-/* Preset swatches (type colors + a few neutrals) for the color picker. */
+/* Preset swatches for the color picker — Hub Blue first. */
 const COLOR_PALETTE = [
-  "#3B82F6", "#10B981", "#F59E0B", "#A855F7",
+  HUB.steel, "#10B981", "#F59E0B", "#A855F7",
   "#EC4899", "#EF4444", "#0EA5E9", "#64748B",
 ];
 const REMINDER_MINUTES: Array<number | null> = [null, 0, 5, 10, 15, 30, 60, 1440];
-const DURATION_CHIPS: { label: string; min: number }[] = [
-  { label: "15m", min: 15 },
-  { label: "30m", min: 30 },
-  { label: "1h", min: 60 },
-  { label: "2h", min: 120 },
-];
+const DURATION_CHIPS = [15, 30, 60, 120];
 
-export type EventDraft = CalendarEventInsert;
+/** The row being edited; start_date / end_date ride along on an all-day
+ *  event read from the server (its dates in the ORGANIZER's zone). */
+export type EventDraft = CalendarEventInsert & { start_date?: string; end_date?: string };
 export type EventModalMode = "create" | "edit" | "view";
+
+function keyParts(key: string): [number, number, number] {
+  const [y, m, d] = key.split("-").map(Number);
+  return [y, m, d];
+}
+const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 interface Props {
   draft: EventDraft;
@@ -68,9 +78,12 @@ interface Props {
   mode: EventModalMode;
   /** The signed-in account — the guest whose answer PATCH records. */
   viewerId: string | null;
+  /** The calendar's timezone — times are shown and entered on its clock. */
+  timezone: string;
   onClose: () => void;
   onSaved: (ev: CalendarEventRow) => void;
-  onDelete?: () => void;
+  /** Asks the shell to confirm and delete; says whether guests will hear. */
+  onDelete?: (info: { hasGuests: boolean }) => void;
   onResponded?: (status: CalendarAttendeeStatus) => void;
   onError?: (msg: string) => void;
 }
@@ -81,12 +94,14 @@ const textareaClass =
   "w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors resize-y disabled:opacity-70";
 const labelClass =
   "block text-[10px] font-semibold text-[var(--text-dim)] mb-1.5 uppercase tracking-wider";
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export default function EventModal({
   draft,
   existingId,
   mode,
   viewerId,
+  timezone,
   onClose,
   onSaved,
   onDelete,
@@ -99,17 +114,21 @@ export default function EventModal({
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  // Portal to <body> so the overlay is viewport-level (the calendar page sits
-  // inside a scroll container, which otherwise traps `position: fixed` and lets
-  // the app header paint over the modal's top). mounted guards SSR.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const ids = { title: useId(), heading: useId(), type: useId(), start: useId(), end: useId(), reminder: useId(), repeat: useId(), until: useId(), location: useId(), description: useId(), guests: useId() };
+  // Portalled to <body> so the overlay is viewport-level (the calendar page
+  // sits inside a scroll container, which otherwise traps `position: fixed`
+  // and lets the app header paint over the modal's top). The modal is
+  // loaded client-only (next/dynamic, ssr: false), so document exists.
 
   /* Guests. Stored separately from the event row and persisted via the
-     attendees endpoint after the event itself saves. */
+     attendees endpoint after the event itself saves. `guestsState` says
+     whether the list on screen is the real one: "loading" and "failed" both
+     mean it must not be written back. */
   const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
   const [attendees, setAttendees] = useState<CalendarAttendee[]>([]);
+  const [initialIds, setInitialIds] = useState<string[]>([]);
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
+  const [guestsState, setGuestsState] = useState<"loading" | "ready" | "failed">(existingId ? "loading" : "ready");
   const [attendeeSearch, setAttendeeSearch] = useState("");
   const [showGuests, setShowGuests] = useState(false);
 
@@ -119,13 +138,26 @@ export default function EventModal({
     if (existingId) {
       fetchAttendees(existingId).then((list) => {
         if (!alive) return;
+        if (list === null) { setGuestsState("failed"); return; }
+        const current = list.map((a) => a.account_id);
         setAttendees(list);
-        setAttendeeIds(list.map((a) => a.account_id));
+        setInitialIds(current);
+        setAttendeeIds(current);
+        setGuestsState("ready");
         if (list.length) setShowGuests(true);
       });
     }
     return () => { alive = false; };
   }, [existingId]);
+
+  /* Dialog focus: move in on open, keep Tab inside, give it back on close. */
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    const first = dialogRef.current?.querySelector<HTMLElement>(readOnly ? "button" : "input");
+    first?.focus();
+    return () => { before?.focus?.(); };
+  }, [readOnly]);
 
   const organizerId = form.account_id;
   const myInvite = attendees.find((a) => a.account_id === viewerId) ?? null;
@@ -146,7 +178,7 @@ export default function EventModal({
   const personById = useMemo(() => new Map(people.map((p) => [p.account_id, p])), [people]);
   const nameFor = (id: string) => {
     const p = personById.get(id);
-    return p?.full_name || p?.username || attendees.find((a) => a.account_id === id)?.name || "—";
+    return p?.full_name || p?.username || attendees.find((a) => a.account_id === id)?.name || t("someone");
   };
   /** Native/alternate name (e.g. Chinese) for a person, or null. */
   const altFor = (id: string) => {
@@ -163,41 +195,84 @@ export default function EventModal({
     patch("end_at", new Date(start.getTime() + minutes * 60_000).toISOString());
   }
 
-  // Close on ESC
+  // ESC closes — but not mid-save, and not from under the confirm dialog.
+  // Tab stays inside the dialog.
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !saving) { e.stopPropagation(); onClose(); return; }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const nodes = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (nodes.length === 0) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, saving]);
 
   function patch<K extends keyof EventDraft>(key: K, value: EventDraft[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  /** Toggle all-day: when enabled, round to day boundaries; when disabled,
-      restore sensible hour defaults. */
+  /* The all-day dates on screen: the server's (organizer's zone) until the
+     user changes them, else read from the stored instants. */
+  const dayKeys = form.start_date && form.end_date
+    ? { start: form.start_date, end: form.end_date }
+    : allDayKeys(form.start_at, form.end_at, timezone);
+
+  /** An all-day span as instants: the zone's midnight → 23:59:59.999. */
+  function allDaySpan(startKey: string, endKey: string): Pick<EventDraft, "start_at" | "end_at" | "start_date" | "end_date"> {
+    const [sy, sm, sd] = keyParts(startKey);
+    const [ey, em, ed] = keyParts(endKey < startKey ? startKey : endKey);
+    return {
+      start_at: new Date(zonedToUtc(sy, sm, sd, 0, 0, 0, 0, timezone)).toISOString(),
+      end_at: new Date(zonedToUtc(ey, em, ed, 23, 59, 59, 999, timezone)).toISOString(),
+      start_date: undefined,
+      end_date: undefined,
+    };
+  }
+
+  /** Toggle all-day: when enabled, the same dates as whole days; when
+      disabled, 09:00–10:00 on the first day (calendar's clock). */
   function toggleAllDay(next: boolean) {
-    const start = new Date(form.start_at);
-    const end = new Date(form.end_at);
     if (next) {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-    } else {
-      start.setHours(9, 0, 0, 0);
-      end.setHours(10, 0, 0, 0);
+      const s = zonedDateKey(form.start_at, timezone);
+      const e = zonedDateKey(form.end_at, timezone);
+      setForm({ ...form, all_day: true, ...allDaySpan(s, e) });
+      return;
     }
-    setForm({ ...form, all_day: next, start_at: start.toISOString(), end_at: end.toISOString() });
+    const [y, m, d] = keyParts(dayKeys.start);
+    setForm({
+      ...form,
+      all_day: false,
+      start_at: new Date(zonedToUtc(y, m, d, 9, 0, 0, 0, timezone)).toISOString(),
+      end_at: new Date(zonedToUtc(y, m, d, 10, 0, 0, 0, timezone)).toISOString(),
+      start_date: undefined,
+      end_date: undefined,
+    });
+  }
+
+  /** A datetime-local value (calendar's clock) → the stored instant. */
+  function setTime(key: "start_at" | "end_at", value: string) {
+    if (!value) return;
+    const wall = fromDateTimeLocal(value);
+    if (Number.isNaN(wall.getTime())) return;
+    patch(key, fromWall(wall, timezone).toISOString());
   }
 
   async function handleSave() {
-    if (readOnly) return;
+    if (readOnly || guestsState === "loading") return;
     if (!form.title.trim()) { setLocalError(t("err.titleRequired")); return; }
     if (new Date(form.end_at) < new Date(form.start_at)) { setLocalError(t("err.endBeforeStart")); return; }
     setLocalError(null);
     setSaving(true);
 
-    const payload: EventDraft = {
-      ...form,
+    const { start_date: _sd, end_date: _ed, ...row } = form;
+    void _sd; void _ed;
+    const payload: CalendarEventInsert = {
+      ...row,
       title: form.title.trim(),
       description: form.description?.trim() || null,
       location: form.location?.trim() || null,
@@ -207,7 +282,10 @@ export default function EventModal({
     setSaving(false);
     if (!saved) { onError?.(t("err.save")); return; }
 
-    // Bridge: a NEW Calendar event of type "task" also appears in the To-do app.
+    // Bridge: a NEW Calendar event of type "task" also appears in the To-do
+    // app. Later edits and the delete follow it server-side
+    // (lib/server/calendar-todo-bridge). due_date is a DATE: the start's day
+    // on the calendar's clock.
     if (!existingId && form.event_type === "task") {
       try {
         const { createTodo } = await import("@/lib/todo-admin");
@@ -215,7 +293,7 @@ export default function EventModal({
           title: payload.title,
           description: payload.description,
           priority: "medium",
-          due_date: form.start_at,
+          due_date: zonedDateKey(form.start_at, timezone),
           source: "calendar",
           source_id: saved.id,
           assignee_account_ids: [form.account_id],
@@ -226,10 +304,13 @@ export default function EventModal({
       }
     }
 
-    /* The guest list follows the event. Best-effort — the event is already
-       saved; a failed invite is re-sent on the next edit. */
-    const ok = await saveAttendees(saved.id, attendeeIds);
-    if (!ok) console.error("[Calendar] guests were not saved for", saved.id);
+    /* The guest list follows the event — only when it was read and changed.
+       Best-effort: the event is already saved; a failed invite is re-sent on
+       the next edit. */
+    if (guestsState === "ready" && !sameIds(attendeeIds, initialIds)) {
+      const ok = await saveAttendees(saved.id, attendeeIds);
+      if (!ok) console.error("[Calendar] guests were not saved for", saved.id);
+    }
 
     onSaved(saved);
   }
@@ -248,16 +329,21 @@ export default function EventModal({
   const endDate = new Date(form.end_at);
   const color = form.color || EVENT_TYPE_COLORS[form.event_type];
   const heading = mode === "create" ? t("modal.new") : mode === "edit" ? t("modal.edit") : t("modal.view");
-
-  if (!mounted) return null;
+  const editingSeries = mode === "edit" && !!draft.recurrence;
+  const guestsLoading = guestsState === "loading";
+  const liveGuests = attendees.filter((a) => a.status !== "declined").length > 0;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--bg-overlay)] backdrop-blur-sm"
+      onClick={() => { if (!saving) onClose(); }}
     >
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={ids.heading}
+        className="kx-glass-pop relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -269,11 +355,12 @@ export default function EventModal({
             >
               <CalendarPlusIcon className="h-4 w-4" />
             </div>
-            <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{heading}</h2>
+            <h2 id={ids.heading} className="text-[15px] font-bold text-[var(--text-primary)]">{heading}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             aria-label={t("modal.close")}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center transition-all"
           >
@@ -296,23 +383,30 @@ export default function EventModal({
             </div>
           )}
 
+          {editingSeries && (
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+              {t("modal.series")}
+            </div>
+          )}
+
           {/* Title */}
           <div>
-            <label className={labelClass}>{t("f.title")}</label>
+            <label htmlFor={ids.title} className={labelClass}>{t("f.title")}</label>
             <input
+              id={ids.title}
               className={inputClass}
               value={form.title}
               onChange={(e) => patch("title", e.target.value)}
               placeholder={t("f.title.placeholder")}
-              autoFocus={!readOnly}
               disabled={readOnly}
             />
           </div>
 
           {/* Type */}
           <div>
-            <label className={labelClass}>{t("f.type")}</label>
+            <label htmlFor={ids.type} className={labelClass}>{t("f.type")}</label>
             <select
+              id={ids.type}
               className={inputClass}
               value={form.event_type}
               onChange={(e) => patch("event_type", e.target.value as CalendarEventType)}
@@ -327,8 +421,8 @@ export default function EventModal({
           {/* Color picker — Default (type color) + preset swatches */}
           {!readOnly && (
             <div>
-              <label className={labelClass}>{t("f.color")}</label>
-              <div className="flex items-center gap-2 flex-wrap">
+              <span className={labelClass}>{t("f.color")}</span>
+              <div className="flex items-center gap-2 flex-wrap" role="group" aria-label={t("f.color")}>
                 <button
                   type="button"
                   onClick={() => patch("color", null)}
@@ -347,6 +441,7 @@ export default function EventModal({
                     type="button"
                     onClick={() => patch("color", c)}
                     aria-label={`${t("f.color")} ${c}`}
+                    aria-pressed={form.color === c}
                     className="h-7 w-7 rounded-full border transition-transform hover:scale-110"
                     style={{
                       backgroundColor: c,
@@ -384,53 +479,50 @@ export default function EventModal({
             )}
           </div>
 
-          {/* Start / End */}
+          {/* Start / End — on the calendar's clock */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>{t("f.start")}</label>
+              <label htmlFor={ids.start} className={labelClass}>{t("f.start")}</label>
               {form.all_day ? (
                 <input
+                  id={ids.start}
                   type="date"
                   className={inputClass}
-                  value={toDateInput(startDate)}
+                  value={dayKeys.start}
                   disabled={readOnly}
-                  onChange={(e) => {
-                    const d = fromDateInput(e.target.value);
-                    d.setHours(0, 0, 0, 0);
-                    patch("start_at", d.toISOString());
-                  }}
+                  onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, ...allDaySpan(e.target.value, dayKeys.end < e.target.value ? e.target.value : dayKeys.end) })); }}
                 />
               ) : (
                 <input
+                  id={ids.start}
                   type="datetime-local"
                   className={inputClass}
-                  value={toDateTimeLocal(startDate)}
+                  value={toDateTimeLocal(toWall(startDate, timezone))}
                   disabled={readOnly}
-                  onChange={(e) => patch("start_at", fromDateTimeLocal(e.target.value).toISOString())}
+                  onChange={(e) => setTime("start_at", e.target.value)}
                 />
               )}
             </div>
             <div>
-              <label className={labelClass}>{t("f.end")}</label>
+              <label htmlFor={ids.end} className={labelClass}>{t("f.end")}</label>
               {form.all_day ? (
                 <input
+                  id={ids.end}
                   type="date"
                   className={inputClass}
-                  value={toDateInput(endDate)}
+                  value={dayKeys.end}
+                  min={dayKeys.start}
                   disabled={readOnly}
-                  onChange={(e) => {
-                    const d = fromDateInput(e.target.value);
-                    d.setHours(23, 59, 59, 999);
-                    patch("end_at", d.toISOString());
-                  }}
+                  onChange={(e) => { if (e.target.value) setForm((f) => ({ ...f, ...allDaySpan(dayKeys.start, e.target.value) })); }}
                 />
               ) : (
                 <input
+                  id={ids.end}
                   type="datetime-local"
                   className={inputClass}
-                  value={toDateTimeLocal(endDate)}
+                  value={toDateTimeLocal(toWall(endDate, timezone))}
                   disabled={readOnly}
-                  onChange={(e) => patch("end_at", fromDateTimeLocal(e.target.value).toISOString())}
+                  onChange={(e) => setTime("end_at", e.target.value)}
                 />
               )}
             </div>
@@ -440,20 +532,21 @@ export default function EventModal({
           {!form.all_day && !readOnly && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] text-[var(--text-dim)] me-1">{t("f.duration")}</span>
-              {DURATION_CHIPS.map((d) => {
-                const active = endDate.getTime() - startDate.getTime() === d.min * 60_000;
+              {DURATION_CHIPS.map((min) => {
+                const active = endDate.getTime() - startDate.getTime() === min * 60_000;
                 return (
                   <button
-                    key={d.min}
+                    key={min}
                     type="button"
-                    onClick={() => setDuration(d.min)}
+                    aria-pressed={active}
+                    onClick={() => setDuration(min)}
                     className={`h-7 px-3 rounded-full text-[11px] font-medium border transition-all ${
                       active
                         ? "border-[var(--border-focus)] text-[var(--text-primary)] bg-[var(--bg-surface-subtle)]"
                         : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    {d.label}
+                    {t(`dur.${min}`)}
                   </button>
                 );
               })}
@@ -463,8 +556,9 @@ export default function EventModal({
           {/* Reminder + Repeat */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>{t("f.reminder")}</label>
+              <label htmlFor={ids.reminder} className={labelClass}>{t("f.reminder")}</label>
               <select
+                id={ids.reminder}
                 className={inputClass}
                 value={form.reminder_minutes ?? ""}
                 disabled={readOnly}
@@ -476,8 +570,9 @@ export default function EventModal({
               </select>
             </div>
             <div>
-              <label className={labelClass}>{t("f.repeat")}</label>
+              <label htmlFor={ids.repeat} className={labelClass}>{t("f.repeat")}</label>
               <select
+                id={ids.repeat}
                 className={inputClass}
                 value={form.recurrence ?? ""}
                 disabled={readOnly}
@@ -494,8 +589,9 @@ export default function EventModal({
           {/* Repeat-until (only when a recurrence is set) */}
           {form.recurrence && (
             <div>
-              <label className={labelClass}>{t("f.repeatUntil")}</label>
+              <label htmlFor={ids.until} className={labelClass}>{t("f.repeatUntil")}</label>
               <input
+                id={ids.until}
                 type="date"
                 className={inputClass}
                 value={form.recurrence_until ?? ""}
@@ -512,7 +608,7 @@ export default function EventModal({
           {readOnly ? (
             attendees.length > 0 && (
               <div>
-                <label className={labelClass}>{t("modal.guests")}</label>
+                <span className={labelClass}>{t("modal.guests")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {attendees.map((a) => (
                     <span
@@ -531,6 +627,8 @@ export default function EventModal({
               <button
                 type="button"
                 onClick={() => setShowGuests((s) => !s)}
+                aria-expanded={showGuests}
+                aria-controls={ids.guests}
                 className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
                 <span>{t("f.guests")}</span>
@@ -541,8 +639,14 @@ export default function EventModal({
                 )}
               </button>
 
-              {showGuests && (
-                <div className="mt-2 rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+              {guestsLoading && (
+                <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("modal.guestsLoading")}</p>
+              )}
+              {guestsState === "failed" && (
+                <p className="mt-1 text-[11px] text-[var(--state-error)]">{t("modal.guestsError")}</p>
+              )}
+              {showGuests && guestsState !== "failed" && (
+                <div id={ids.guests} className="mt-2 rounded-xl border border-[var(--border-subtle)] overflow-hidden">
                   {attendeeIds.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
                       {attendeeIds.map((id) => {
@@ -573,6 +677,7 @@ export default function EventModal({
                     </div>
                   )}
                   <input
+                    aria-label={t("f.guests.search")}
                     className="w-full h-9 px-3 text-[13px] bg-transparent outline-none border-b border-[var(--border-subtle)] placeholder:text-[var(--text-dim)]"
                     value={attendeeSearch}
                     onChange={(e) => setAttendeeSearch(e.target.value)}
@@ -589,7 +694,8 @@ export default function EventModal({
                             key={p.account_id}
                             type="button"
                             onClick={() => toggleAttendee(p.account_id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                            aria-pressed={checked}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-start hover:bg-[var(--bg-surface-subtle)] transition-colors"
                           >
                             <span
                               className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
@@ -623,8 +729,9 @@ export default function EventModal({
 
           {/* Location */}
           <div>
-            <label className={labelClass}>{t("f.location")}</label>
+            <label htmlFor={ids.location} className={labelClass}>{t("f.location")}</label>
             <input
+              id={ids.location}
               className={inputClass}
               value={form.location ?? ""}
               disabled={readOnly}
@@ -635,8 +742,9 @@ export default function EventModal({
 
           {/* Description */}
           <div>
-            <label className={labelClass}>{t("f.description")}</label>
+            <label htmlFor={ids.description} className={labelClass}>{t("f.description")}</label>
             <textarea
+              id={ids.description}
               className={textareaClass}
               rows={3}
               value={form.description ?? ""}
@@ -647,7 +755,7 @@ export default function EventModal({
           </div>
 
           {localError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px]">
+            <div role="alert" className="rounded-lg border border-[var(--state-error)]/30 bg-[var(--state-error)]/[0.08] text-[var(--state-error)] px-3 py-2 text-[12px]">
               {localError}
             </div>
           )}
@@ -658,9 +766,9 @@ export default function EventModal({
           {mode === "edit" && onDelete ? (
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => onDelete({ hasGuests: liveGuests })}
               disabled={saving}
-              className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-60"
+              className="h-10 px-4 sm:px-6 rounded-xl bg-[var(--state-error)]/10 border border-[var(--state-error)]/30 text-[var(--state-error)] text-[13px] font-semibold flex items-center gap-2 hover:bg-[var(--state-error)]/20 transition-all disabled:opacity-60"
             >
               <TrashIcon className="h-4 w-4" /> {t("modal.delete")}
             </button>
@@ -682,7 +790,7 @@ export default function EventModal({
                     type="button"
                     onClick={() => respond("declined")}
                     disabled={saving}
-                    className="h-10 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-60"
+                    className="h-10 px-4 rounded-xl bg-[var(--state-error)]/10 border border-[var(--state-error)]/30 text-[var(--state-error)] text-[13px] font-semibold hover:bg-[var(--state-error)]/20 transition-all disabled:opacity-60"
                   >
                     {t("modal.decline")}
                   </button>
@@ -711,7 +819,8 @@ export default function EventModal({
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || guestsLoading}
+                  title={guestsLoading ? t("modal.guestsLoading") : undefined}
                   className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-60"
                 >
                   <DiskIcon className="h-4 w-4" />

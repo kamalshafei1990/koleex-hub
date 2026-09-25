@@ -1,33 +1,32 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   DiscussApp — the main Koleex team chat UI.
+   DiscussApp — the Koleex team chat UI (/discuss).
 
-   Pattern mirrors /inbox/page.tsx so the app feels native inside the hub:
-     · Three-column flexbox (sidebar / thread / details)
-     · Mobile column swap via `mobileView` state
-     · pinned 14px top chrome with back arrow + title + new-chat button
-     · `flex-1 min-h-0` fills below the global MainHeader
-
-   Functionality shipped in Phase A:
-     · Channels + Direct Messages sidebar with unread counts + last-message preview
-     · Message thread with realtime inserts via Supabase postgres_changes
-     · Composer with text + file/photo/video attachments + product mentions + @mentions + emoji
-     · Create-channel and start-DM modals
-     · Channel details pane (members, files, pinned preview)
-     · Mark-read on focus, auto-scroll to bottom on new messages
-     · Typing indicator broadcast via Realtime presence
-     · Read cursor persisted to discuss_members.last_read_at
-
-   Functionality deferred to later phases (see the PLAN in claudemd):
-     · Reactions UI, edit/delete, threading
-     · Voice messages, desktop push, mute/DND
-     · External customer chat, shared team inbox
+     · Three columns (conversation list / thread / details or thread pane),
+       swapped by `mobileView` on phones; fills the shell below MainHeader.
+     · Data: gated reads (/api/discuss/read|state) and writes
+       (/api/discuss/mutate) via @/lib/discuss — identity is the session.
+     · Live delivery: the first-party SSE stream is primary (new rows arrive
+       in full; `chg` events flag edits / deletes / reactions / pins), with
+       Supabase broadcast pings as a supplement and a connection-aware
+       reconcile loop as the safety net.
+     · Deep links: /discuss?channel=<id>&msg=<id> (also #msg-<id>) opens the
+       conversation and scrolls to + highlights the message.
+     · Composer: text, attachments, products, @mentions, emoji, voice;
+       per-channel drafts; idempotent sends (client_msg_id).
+     · Message actions: reactions, reply, threads, edit (body only), delete,
+       pin, star, copy link — via right-click / long-press / the "More"
+       button / the keyboard (Shift+F10 or the ContextMenu key).
+     · Details pane: members, notification prefs, customer card, and
+       Pinned / Starred / Files / Photos lists.
    --------------------------------------------------------------------------- */
 
-import { useScrollLock } from "@/hooks/useScrollLock";
-import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { cdnImage } from "@/lib/cdn";
+import { useSkin } from "@/lib/appearance";
+import { useWarm, writeWarm } from "@/lib/warm-cache";
 import {
   memo,
   useCallback,
@@ -51,22 +50,19 @@ import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
 import ReplyIcon from "@/components/icons/ui/ReplyIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
-import CopyIcon from "@/components/icons/ui/CopyIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
-import DiscussAiChat from "@/components/discuss/DiscussAiChat";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
-import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import MicIcon from "@/components/icons/ui/MicIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
@@ -83,7 +79,6 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
-  addMembers,
   createChannel,
   deleteDiscussMessage,
   editDiscussMessage,
@@ -93,8 +88,9 @@ import {
   isChannelStreamHealthy,
   connectDiscussStream,
   isDiscussStreamHealthy,
-  fetchLinkedContact,
   fetchMyChannels,
+  fetchPinnedMessages,
+  fetchStarredMessages,
   findOrCreateDirectChannel,
   markChannelRead,
   setChannelPinned,
@@ -134,7 +130,6 @@ import {
   DISCUSS_TRANSPORT_MAX_BYTES,
 } from "@/lib/discuss-upload-policy";
 import { record as perfRecord, event as perfEvent, count as perfCount } from "@/lib/perf/client";
-import PerfPanelGate from "@/components/perf/PerfPanelGate";
 import { TranslatableBody } from "./TranslatableBody";
 import {
   TRANSLATE_LANGS,
@@ -146,15 +141,13 @@ import {
   type TranslatePrefs,
 } from "@/lib/discuss-translate";
 import { useDiscussNotifications } from "./useDiscussNotifications";
-import VoiceRecorder, { VoicePlaybackBubble } from "./VoiceRecorder";
-import {
-  CustomerChatModal,
-  CustomerContactCard,
-} from "./CustomerChatModal";
+import { CustomerContactCard } from "./CustomerContactCard";
 import { ThreadPane } from "./ThreadPane";
-import { SearchPanel } from "./SearchPanel";
+import { DiscussAvatar as Avatar } from "./DiscussAvatar";
+import ModalShell from "./DiscussModalShell";
+import { formatBytes, nativeAltOf, type DiscussRecipient } from "./discuss-shared";
+import { discussDayLabel, discussListStamp, discussTime } from "@/lib/discuss-time";
 import { fetchProductsSlim, fetchProductMainImages } from "@/lib/products-admin";
-import { initialsOf } from "@/lib/discuss/initials";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { discussT } from "@/lib/translations/discuss";
@@ -162,13 +155,11 @@ import type {
   DiscussAttachment,
   DiscussChannelKind,
   DiscussChannelWithState,
-  DiscussLinkedContact,
   DiscussMemberRow,
   DiscussMention,
   DiscussMessageKind,
   DiscussMessageMetadata,
   DiscussMediaPublic,
-  DiscussMessageRow,
   DiscussMessageWithAuthor,
   DiscussNotificationPref,
   DiscussProductRef,
@@ -177,116 +168,29 @@ import type {
 } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
+/* Heavy, rarely-opened surfaces load on first use instead of riding the
+   Discuss bundle: pickers, modals, the recorder, the lightbox, the AI chat
+   and search. Client-only (ssr:false) — the whole app is. */
+const ProductPicker = dynamic(() => import("./ProductPicker"), { ssr: false });
+const NewChannelModal = dynamic(() => import("./NewChannelModal"), { ssr: false });
+const CustomerChatModal = dynamic(() => import("./CustomerChatModal"), { ssr: false });
+const EmojiPicker = dynamic(() => import("./EmojiPicker"), { ssr: false });
+const VoiceRecorder = dynamic(() => import("./VoiceRecorder"), { ssr: false });
+const VoicePlaybackBubble = dynamic(
+  () => import("./VoiceRecorder").then((m) => m.VoicePlaybackBubble),
+  { ssr: false },
+);
+const PhotoLightbox = dynamic(() => import("./PhotoLightbox"), { ssr: false });
+const DiscussAiChat = dynamic(() => import("./DiscussAiChat"), { ssr: false });
+const SearchPanel = dynamic(() => import("./SearchPanel"), { ssr: false });
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Small helpers — shared by multiple subsections of the file
    ═══════════════════════════════════════════════════════════════════════════ */
 
-type Recipient = {
-  id: string;
-  username: string;
-  full_name: string | null;
-  name_alt: string | null;
-  avatar_url: string | null;
-  role_name: string | null;
-};
+type Recipient = DiscussRecipient;
+type TFn = (key: string, fallback?: string) => string;
 
-/** Native/alternate name (e.g. Chinese) to show muted beneath the primary
- *  name — only when it exists and differs from the primary. */
-function nativeAltOf(
-  primary: string | null | undefined,
-  alt: string | null | undefined,
-): string | null {
-  const a = (alt ?? "").trim();
-  return a && a !== (primary ?? "").trim() ? a : null;
-}
-
-/** Time formatter that matches WhatsApp / Slack style:
- *    Today      → "14:03"
- *    Yesterday  → "Yesterday"
- *    This week  → "Mon"
- *    Older      → "Jan 12"                                                  */
-function formatSidebarTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-  const diffDays = Math.floor(
-    (now.getTime() - d.getTime()) / 86_400_000,
-  );
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) {
-    return d.toLocaleDateString(undefined, { weekday: "short" });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-/** Full timestamp shown in the thread header or on message hover.
- *  Uses the browser locale so it respects the user's region.           */
-function formatFullTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/** Friendly "day separator" label for grouping messages in the thread. */
-function formatDaySeparator(iso: string, todayText: string, yesterdayText: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) return todayText;
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays === 1) return yesterdayText;
-  return d.toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
-  });
-}
-
-/* Monochrome-first brand: fallback avatars are grayscale, told apart by
-   initials + name rather than colour. Eight neutral steps (light → dark) give
-   just enough separation between adjacent rows without introducing any hue. */
-const AVATAR_GRADIENTS = [
-  "from-neutral-400 to-neutral-500",
-  "from-neutral-500 to-neutral-600",
-  "from-neutral-600 to-neutral-700",
-  "from-neutral-300 to-neutral-500",
-  "from-neutral-500 to-neutral-700",
-  "from-neutral-400 to-neutral-600",
-  "from-neutral-600 to-neutral-800",
-  "from-neutral-300 to-neutral-600",
-];
-
-function gradientFor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) {
-    h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
-}
-
-function formatBytes(bytes: number): string {
-  if (!bytes || bytes < 0) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Human-readable display for a channel row — falls back to the other
- *  member's full_name for DMs, or the channel.name for groups/channels. */
 /* The other party's native/alternate name (people.name_alt, e.g. Chinese),
    for the muted second line under the English name. Direct chats only. */
 function altNameFor(c: DiscussChannelWithState): string | null {
@@ -295,66 +199,62 @@ function altNameFor(c: DiscussChannelWithState): string | null {
   return alt === (c.other?.full_name ?? "").trim() ? null : alt;
 }
 
-function displayNameFor(c: DiscussChannelWithState): string {
+/** Human-readable display for a channel row — the other member's name for
+ *  DMs, the linked customer for customer chats, else channel.name. */
+function displayNameFor(c: DiscussChannelWithState, t: TFn): string {
   if (c.kind === "direct") {
-    return c.other?.full_name || c.other?.username || "Direct message";
+    return c.other?.full_name || c.other?.username || t("channel.direct", "Direct message");
   }
-  return c.name || "Untitled channel";
+  return c.name || c.linked_contact?.display_name || t("channel.untitled", "Untitled channel");
 }
 
 /** Short preview for the last message (used in the sidebar). Collapses
  *  whitespace and caps length so long messages don't break the layout. */
 function previewMessage(
   preview: DiscussChannelWithState["last_message"],
+  t: TFn,
 ): string {
   if (!preview) return "";
-  if (preview.kind === "image") return "📷 Photo";
-  if (preview.kind === "file") return "📎 File";
-  if (preview.kind === "voice") return "Voice message";
-  if (preview.kind === "system") return preview.body ?? "";
-  return (preview.body ?? "").replace(/\s+/g, " ").slice(0, 80);
+  const text = (preview.body ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (preview.kind === "image") return text || t("preview.photo", "📷 Photo");
+  if (preview.kind === "file") return text || t("preview.file", "📎 File");
+  if (preview.kind === "voice") return t("preview.voice", "Voice message");
+  return text;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Avatar primitive — gradient circle with initials fallback
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function Avatar({
-  name,
-  url,
-  size = 36,
-  icon,
-  ring = false,
-}: {
-  name: string;
-  url?: string | null;
-  size?: number;
-  icon?: React.ReactNode;
-  ring?: boolean;
-}) {
-  const classes = `relative shrink-0 rounded-full overflow-hidden bg-gradient-to-br ${gradientFor(name)} flex items-center justify-center text-white font-semibold ${ring ? "ring-2 ring-[var(--border-focus)]" : ""}`;
-  const style = {
-    width: size,
-    height: size,
-    fontSize: Math.max(10, Math.round(size * 0.36)),
-  } as React.CSSProperties;
-  if (url) {
-    /* eslint-disable-next-line @next/next/no-img-element */
-    return (
-      <div className={classes} style={style} aria-hidden>
-        <img
-          src={url}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
-      </div>
-    );
-  }
-  return (
-    <div className={classes} style={style} aria-hidden>
-      {icon ?? initialsOf(name)}
-    </div>
+/** Merge a fresh server page into the list on screen.
+ *   · keeps OLDER messages the user paged in ("load older") that fall before
+ *     the server page;
+ *   · keeps still-pending optimistic bubbles (temp ids) the server has not
+ *     acknowledged yet, so a silent refresh never makes a sending message
+ *     vanish;
+ *   · returns the previous array reference when nothing visible changed
+ *     (ids, edits, deletions, reactions, thread counts) so React can skip. */
+function mergeServerPage(
+  prev: DiscussMessageWithAuthor[],
+  rows: DiscussMessageWithAuthor[],
+  channelId: string,
+): DiscussMessageWithAuthor[] {
+  const mine = prev.filter((m) => m.channel_id === channelId);
+  if (rows.length === 0) return mine.length > 0 ? prev : rows;
+  const ids = new Set(rows.map((r) => r.id));
+  const clientIds = new Set(rows.map((r) => r.client_msg_id).filter(Boolean) as string[]);
+  const firstAt = rows[0].created_at;
+  const older = mine.filter((m) => !m.id.startsWith("temp_") && !ids.has(m.id) && m.created_at < firstAt);
+  const pending = mine.filter(
+    (m) => m.id.startsWith("temp_") && !(m.client_msg_id && clientIds.has(m.client_msg_id)),
   );
+  const next = [...older, ...rows, ...pending];
+  const sig = (list: DiscussMessageWithAuthor[]) =>
+    list
+      .map(
+        (m) =>
+          `${m.id}|${m.edited_at ?? ""}|${m.deleted_at ?? ""}|${m.body?.length ?? 0}|${
+            m.thread?.reply_count ?? 0
+          }|${(m.reactions ?? []).map((r) => `${r.emoji}${r.count}${r.reacted_by_me ? 1 : 0}`).join(",")}`,
+      )
+      .join(";");
+  return sig(next) === sig(prev) ? prev : next;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -372,8 +272,10 @@ const MemoMessageList = memo(MessageList);
 const MemoMessageBubble = memo(MessageBubble);
 
 export default function DiscussApp() {
-  const { t } = useTranslation(discussT);
+  const { t, lang } = useTranslation(discussT);
   const { askConfirm, confirmDialog } = useConfirm();
+  const aurora = useSkin() === "aurora";
+  const searchParams = useSearchParams();
   const { account, loading: accountLoading } = useCurrentAccount();
   const accountId = account?.id ?? null;
   const accountUsername = account?.username ?? "me";
@@ -381,8 +283,11 @@ export default function DiscussApp() {
     account?.person?.full_name || account?.username || "Me";
 
   /* ── Sidebar state ─────────────────────────────────────────────── */
-  const [channels, setChannels] = useState<DiscussChannelWithState[]>([]);
-  const [loadingChannels, setLoadingChannels] = useState(true);
+  /* Warm start: paint the conversation list from the last answer (wiped on
+     sign-out with every other kx: cache) and revalidate behind it. */
+  const warmChannels = useWarm<DiscussChannelWithState[]>("discuss:channels");
+  const [channels, setChannels] = useState<DiscussChannelWithState[]>(() => warmChannels ?? []);
+  const [loadingChannels, setLoadingChannels] = useState(() => !warmChannels?.length);
   const [sidebarFilter, setSidebarFilter] = useState<"all" | "unread">("all");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
@@ -392,6 +297,9 @@ export default function DiscussApp() {
   /* ── Thread state ─────────────────────────────────────────────── */
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  /* "Load older" paging (scroll to the top of the thread). */
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(true);
   const [members, setMembers] = useState<
     Array<DiscussMemberRow & { author: DiscussAuthor }>
   >([]);
@@ -511,13 +419,10 @@ export default function DiscussApp() {
   /** Voice recorder panel toggle. Shown inline inside the composer
    *  when the user clicks the mic button. */
   const [voiceOpen, setVoiceOpen] = useState(false);
-  /** Pinned-panel toggle inside the details pane. */
-  const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false);
-  /** Customer contact card cache keyed by channel id — avoids refetch
-   *  every time the details pane opens. */
-  const [linkedContacts, setLinkedContacts] = useState<
-    Record<string, DiscussLinkedContact | null>
-  >({});
+  /** Message to scroll to + highlight once it is on screen (deep link,
+   *  search hit, details-pane list). */
+  const [pendingJump, setPendingJump] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   /* ── Phase D: notifications ───────────────────────────────────── */
   const notifApi = useDiscussNotifications();
@@ -634,13 +539,34 @@ export default function DiscussApp() {
          subsequent refresh (optimistic refreshes after send, realtime
          repairs, etc.) runs silently in the background so the sidebar
          doesn't flash every time something happens. */
-      if (!silent) setLoadingChannels(true);
+      if (!silent && channelsRef.current.length === 0) setLoadingChannels(true);
       const rows = await fetchMyChannels(accountId);
+      /* fetchMyChannels answers [] on a failed read; never let a network
+         blip wipe a painted sidebar (or memorise [] as the warm answer). */
+      if (rows.length === 0 && channelsRef.current.length > 0) {
+        setLoadingChannels(false);
+        return;
+      }
       setChannels(rows);
+      if (rows.length > 0) writeWarm("discuss:channels", rows);
       setLoadingChannels(false);
     },
     [accountId],
   );
+
+  /* One debounced sidebar refetch shared by every live path (broadcast,
+     stream, unknown-channel messages) so a burst costs one read. */
+  const channelRefreshTimerRef = useRef<number | null>(null);
+  const scheduleChannelRefresh = useCallback(() => {
+    if (channelRefreshTimerRef.current != null) return;
+    channelRefreshTimerRef.current = window.setTimeout(() => {
+      channelRefreshTimerRef.current = null;
+      void loadChannels(true);
+    }, 800);
+  }, [loadChannels]);
+  useEffect(() => () => {
+    if (channelRefreshTimerRef.current != null) window.clearTimeout(channelRefreshTimerRef.current);
+  }, []);
 
   const loadMessages = useCallback(
     async (channelId: string, silent = false) => {
@@ -666,36 +592,64 @@ export default function DiscussApp() {
         return;
       }
 
-      setMessages((prev) => {
-        /* Silent refreshes should never blow away in-flight optimistic
-           state: only replace if the server returned a *newer* set than
-           what we already have. Concretely, we diff by message count and
-           the latest id — if either changed, swap in the server rows,
-           otherwise keep the existing array reference so React doesn't
-           re-render unnecessarily.
-
-           Guard: if the fetch returned an empty array but we already have
-           messages, it's almost certainly a transient network/DB error —
-           keep the existing state instead of blowing away the chat. */
-        if (!silent) return rows;
-        if (rows.length === 0 && prev.length > 0) return prev;
-        if (rows.length !== prev.length) return rows;
-        const lastNew = rows[rows.length - 1]?.id;
-        const lastOld = prev[prev.length - 1]?.id;
-        if (lastNew !== lastOld) return rows;
-        return prev;
-      });
+      /* Merge, don't replace: a silent refresh must keep older pages the
+         user scrolled in, keep still-pending optimistic bubbles, AND pick up
+         edits / deletions / reactions (the old count+last-id diff ignored
+         those, so a reconcile never showed an edit). An empty answer with
+         messages on screen is a transient failure — keep what we have. */
+      setMessages((prev) => mergeServerPage(prev, rows, channelId));
+      if (!silent) {
+        setLoadingMessages(false);
+        setHasOlder(rows.length >= 120);
+      }
       /* Keep the snapshot cache in sync with the freshest server truth. */
       if (rows.length > 0) messagesCacheRef.current.set(channelId, rows);
-      if (!silent) setLoadingMessages(false);
     },
     [accountId],
   );
 
   const loadMembers = useCallback(async (channelId: string) => {
     const rows = await fetchChannelMembers(channelId);
+    /* Same stale-response rule as loadMessages. */
+    if (selectedChannelIdRef.current !== channelId) return;
     setMembers(rows);
   }, []);
+
+  /* Load one older page when the thread is scrolled to the top, keeping the
+     viewport anchored on the message the user was looking at. */
+  const loadOlder = useCallback(async () => {
+    const channelId = selectedChannelIdRef.current;
+    if (!accountId || !channelId || loadingOlder || !hasOlder) return;
+    const first = messagesRef.current.find((m) => !m.id.startsWith("temp_"));
+    if (!first || first.channel_id !== channelId) return;
+    setLoadingOlder(true);
+    const el = threadScrollRef.current;
+    const beforeHeight = el?.scrollHeight ?? 0;
+    const beforeTop = el?.scrollTop ?? 0;
+    const PAGE = 60;
+    const rows = await fetchChannelMessages(channelId, {
+      currentAccountId: accountId,
+      limit: PAGE,
+      before: first.created_at,
+    });
+    if (selectedChannelIdRef.current !== channelId) {
+      setLoadingOlder(false);
+      return;
+    }
+    if (rows.length < PAGE) setHasOlder(false);
+    if (rows.length > 0) {
+      setMessages((prev) => {
+        const have = new Set(prev.map((m) => m.id));
+        const add = rows.filter((r) => !have.has(r.id));
+        return add.length ? [...add, ...prev] : prev;
+      });
+      requestAnimationFrame(() => {
+        const e = threadScrollRef.current;
+        if (e) e.scrollTop = e.scrollHeight - beforeHeight + beforeTop;
+      });
+    }
+    setLoadingOlder(false);
+  }, [accountId, loadingOlder, hasOlder]);
 
   /* ── Prefetch: the deep fix for "still loading when I swipe to another
      conversation". The per-channel snapshot cache only helps on RE-open; the
@@ -731,19 +685,23 @@ export default function DiscussApp() {
     [accountId],
   );
 
-  /* Background sweep — warm every conversation once, shortly after the sidebar
-     loads, throttled to a few concurrent fetches so it never competes with the
-     open channel or janks the UI. Runs on idle time. */
+  /* Background sweep — warm the conversations the user is most likely to
+     open next (unread first, then most recent; at most 8), shortly after the
+     sidebar loads, throttled so it never competes with the open channel.
+     Sweeping EVERY conversation cost one channel read per chat on each
+     visit; the rest still warm on hover / press. Runs on idle time. */
   const bulkPrefetchedRef = useRef(false);
   useEffect(() => {
     if (!accountId || channels.length === 0 || bulkPrefetchedRef.current) return;
     bulkPrefetchedRef.current = true;
 
-    const ids = channels
-      .map((c) => c.id)
-      .filter((id) => id !== selectedChannelIdRef.current);
+    const ids = [...channels]
+      .filter((c) => c.id !== selectedChannelIdRef.current)
+      .sort((a, b) => (b.unread_count > 0 ? 1 : 0) - (a.unread_count > 0 ? 1 : 0))
+      .slice(0, 8)
+      .map((c) => c.id);
     let cursor = 0;
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 2;
     const pump = () => {
       if (cursor >= ids.length) return;
       const id = ids[cursor++];
@@ -811,50 +769,81 @@ export default function DiscussApp() {
          DB round-trips. Instant.
        · onChannelChange → a new channel or archive. Refetch silently
          in the background so the sidebar doesn't flash. */
+  /* Messages already chimed for / already counted as unread, by id. The
+     same message can reach us by the stream, by a broadcast-triggered
+     refetch and by a stream reconnect replay — each must act once. */
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+  const countedIdsRef = useRef<Set<string>>(new Set());
+  /* The open conversation received something from someone else since it
+     was last marked read (see the mark-read effect). */
+  const needsReadRef = useRef(false);
+
+  /* Chime / desktop toast for an inbound message, honouring the channel's
+     mute + notification pref and the global DND (inside notify()). Covers
+     EVERY conversation — the bell stays silent on /discuss, so before this a
+     message in a chat you were not looking at made no sound at all. */
+  const notifyInbound = useCallback(
+    (m: { id: string; channel_id: string; author_account_id: string | null; body: string | null; metadata?: DiscussMessageWithAuthor["metadata"] | null }) => {
+      if (!m.id || !accountId || m.author_account_id === accountId) return;
+      if (notifiedIdsRef.current.has(m.id)) return;
+      notifiedIdsRef.current.add(m.id);
+      if (notifiedIdsRef.current.size > 1000) notifiedIdsRef.current.clear();
+      const ch = channelsRef.current.find((c) => c.id === m.channel_id);
+      const mentionsMe = Array.isArray(m.metadata?.mentions)
+        ? (m.metadata!.mentions as DiscussMention[]).some((x) => x.account_id === accountId)
+        : false;
+      notifApiRef.current.notify(
+        {
+          title: ch ? displayNameFor(ch, tRef.current) : tRef.current("notif.newMessage", "New message"),
+          body: (m.body ?? "").slice(0, 140),
+          channelId: m.channel_id,
+          onClick: () => {
+            setAiChatOpen(false);
+            setSelectedChannelId(m.channel_id);
+            setMobileView("thread");
+          },
+        },
+        {
+          muted: ch?.muted ?? false,
+          pref: (ch?.notification_pref ?? "all") as "all" | "mentions" | "none",
+          mentionsMe,
+        },
+      );
+    },
+    [accountId],
+  );
+
+  /* Keep sidebar in sync in real-time (broadcast ping path — supplements
+     the stream where the Supabase websocket works). The ping carries ids
+     only, so it just bumps the clock and schedules a silent refetch. */
   useEffect(() => {
     if (!accountId) return;
-    let pending = false;
-    const scheduleChannelRefresh = () => {
-      if (pending) return;
-      pending = true;
-      window.setTimeout(() => {
-        pending = false;
-        void loadChannels(true);
-      }, 800);
-    };
     return subscribeToMyChannels({
       onMessageInsert: (msg) => {
+        /* With the first-party stream healthy, the stream frame (full row,
+           real id) owns the unread bump. Bumping here too counted every
+           message twice. */
+        if (isDiscussStreamHealthy()) return;
         const isSelected = selectedChannelIdRef.current === msg.channel_id;
         const isMine = msg.author_account_id === accountId;
         setChannels((prev) => {
           const idx = prev.findIndex((c) => c.id === msg.channel_id);
           if (idx === -1) {
-            /* Message in a channel we're not (yet) a member of, or the
-               channel list hasn't loaded yet. Kick a silent refetch so
-               the new channel appears without flashing. */
+            /* Message in a channel we're not (yet) listing — refetch. */
             scheduleChannelRefresh();
             return prev;
           }
           const existing = prev[idx];
-          /* The realtime ping is a minimal synthetic row (ids only, body null
-             — content never travels over broadcast). Overwriting the preview
-             with it used to blank the row ("—") until the debounced refetch
-             landed. Keep the previous preview text and just bump the clock /
-             unread; the silent refetch brings the real snippet ~1s later. */
+          /* The ping is a minimal synthetic row (body null — content never
+             travels over broadcast). Keep the previous preview text and just
+             bump the clock / unread; the silent refetch brings the real
+             snippet ~1s later. */
           const next: DiscussChannelWithState = {
             ...existing,
             last_message_at: msg.created_at,
-            last_message:
-              msg.body === null && existing.last_message
-                ? { ...existing.last_message, created_at: msg.created_at }
-                : {
-                    id: msg.id,
-                    body: msg.body,
-                    kind: msg.kind,
-                    author_username:
-                      existing.last_message?.author_username ?? null,
-                    created_at: msg.created_at,
-                  },
+            last_message: existing.last_message
+              ? { ...existing.last_message, created_at: msg.created_at }
+              : existing.last_message,
             unread_count:
               isSelected || isMine
                 ? existing.unread_count
@@ -866,64 +855,100 @@ export default function DiscussApp() {
       },
       onChannelChange: scheduleChannelRefresh,
     });
-  }, [accountId, loadChannels]);
+  }, [accountId, scheduleChannelRefresh]);
 
   /* ── First-party SSE delivery (the China-proof fast path) ──────────────
-     Production telemetry showed the Supabase websocket NEVER connects for our
-     users (0 SUBSCRIBED, 333 CHANNEL_ERROR in 6h) — *.supabase.co is blocked
-     from the mainland, so every message limped in via the 5–10s fallback
-     poll. This stream arrives on OUR origin and carries the FULL message row,
-     so the receiver renders it the moment the frame lands — no refetch RTT.
-     Everything here is idempotent with the broadcast/refetch paths: dedupe is
-     by message id, and my own messages are ignored (the optimistic bubble +
-     send response already own that path). */
+     The Supabase websocket rarely connects from the mainland, so this stream
+     (our origin, full rows) is the primary live path. Idempotent with the
+     broadcast/refetch paths: dedupe is by message id, and my own messages
+     are ignored for the thread (the optimistic bubble + send response own
+     that path). */
   useEffect(() => {
     if (!accountId) return;
-    return connectDiscussStream((m) => {
-      if (!m?.id || !m.channel_id) return;
-      const isMine = m.author_account_id === accountId;
+    let changeTimer: number | null = null;
+    const unsub = connectDiscussStream(
+      (m) => {
+        if (!m?.id || !m.channel_id) return;
+        const isMine = m.author_account_id === accountId;
+        const isSelected = selectedChannelIdRef.current === m.channel_id;
+        const known = channelsRef.current.some((c) => c.id === m.channel_id);
 
-      /* Warm the per-channel snapshot cache so switching to that chat shows
-         the new message even before its silent refresh lands. */
-      const cached = messagesCacheRef.current.get(m.channel_id);
-      if (cached && !cached.some((x) => x.id === m.id)) {
-        messagesCacheRef.current.set(m.channel_id, [...cached, m]);
-      }
+        /* A message for a conversation the sidebar does not list yet (new
+           DM, just added to a group): fetch the list so it appears. */
+        if (!known) scheduleChannelRefresh();
 
-      /* Open conversation → append instantly (skip own messages). */
-      if (!isMine && selectedChannelIdRef.current === m.channel_id) {
-        setMessages((prev) =>
-          prev.some((x) => x.id === m.id) ? prev : [...prev, m],
-        );
-      }
+        /* Warm the per-channel snapshot cache so switching to that chat
+           shows the new message even before its silent refresh lands. */
+        const cached = messagesCacheRef.current.get(m.channel_id);
+        if (cached && !cached.some((x) => x.id === m.id)) {
+          messagesCacheRef.current.set(m.channel_id, [...cached, m]);
+        }
 
-      /* Sidebar → bump the row in place with the REAL preview (the stream
-         has content, unlike broadcast pings), move to top, count unread. */
-      setChannels((prev) => {
-        const idx = prev.findIndex((c) => c.id === m.channel_id);
-        if (idx === -1) return prev; // membership refetch paths cover new channels
-        const existing = prev[idx];
-        if (existing.last_message?.id === m.id) return prev; // already applied
-        const next: DiscussChannelWithState = {
-          ...existing,
-          last_message_at: m.created_at,
-          last_message: {
-            id: m.id,
-            body: m.body,
-            kind: m.kind,
-            author_username: m.author?.username ?? null,
-            created_at: m.created_at,
-          },
-          unread_count:
-            isMine || selectedChannelIdRef.current === m.channel_id
-              ? existing.unread_count
-              : existing.unread_count + 1,
-        };
-        const rest = prev.filter((_, i) => i !== idx);
-        return [next, ...rest];
-      });
-    });
-  }, [accountId]);
+        /* Open conversation → append instantly (skip own messages). */
+        if (!isMine && isSelected) {
+          needsReadRef.current = true;
+          setMessages((prev) =>
+            prev.some((x) => x.id === m.id) ? prev : [...prev, m],
+          );
+        }
+
+        if (!isMine) notifyInbound(m);
+
+        /* Sidebar → bump the row in place with the REAL preview, move to
+           top, count unread once per message id. */
+        const firstSighting = !countedIdsRef.current.has(m.id);
+        countedIdsRef.current.add(m.id);
+        if (countedIdsRef.current.size > 2000) countedIdsRef.current.clear();
+        setChannels((prev) => {
+          const idx = prev.findIndex((c) => c.id === m.channel_id);
+          if (idx === -1) return prev;
+          const existing = prev[idx];
+          if (existing.last_message?.id === m.id) return prev; // already applied
+          const next: DiscussChannelWithState = {
+            ...existing,
+            last_message_at: m.created_at,
+            last_message: {
+              id: m.id,
+              body: m.body,
+              kind: m.kind,
+              author_username: m.author?.username ?? null,
+              created_at: m.created_at,
+            },
+            unread_count:
+              isMine || isSelected || !firstSighting
+                ? existing.unread_count
+                : existing.unread_count + 1,
+          };
+          const rest = prev.filter((_, i) => i !== idx);
+          return [next, ...rest];
+        });
+      },
+      (channelId) => {
+        /* An edit / delete / reaction / pin landed somewhere. */
+        if (!channelsRef.current.some((c) => c.id === channelId)) {
+          scheduleChannelRefresh();
+          return;
+        }
+        /* Other conversations: drop the stale snapshot so the next open
+           shows the edit instead of the cached original. */
+        if (selectedChannelIdRef.current !== channelId) {
+          messagesCacheRef.current.delete(channelId);
+          return;
+        }
+        /* The open one: reflect it now (debounced — a reaction burst is one
+           refetch). */
+        if (changeTimer != null) window.clearTimeout(changeTimer);
+        changeTimer = window.setTimeout(() => {
+          changeTimer = null;
+          if (selectedChannelIdRef.current === channelId) void loadMessages(channelId, true);
+        }, 350);
+      },
+    );
+    return () => {
+      unsub();
+      if (changeTimer != null) window.clearTimeout(changeTimer);
+    };
+  }, [accountId, scheduleChannelRefresh, notifyInbound, loadMessages]);
 
   /* Load messages + members when a channel is selected, and subscribe to
      that channel's realtime stream. Cleanup tears down both subscriptions
@@ -954,15 +979,16 @@ export default function DiscussApp() {
            and drop incoming messages). */
         const curMembers = membersRef.current;
         const curAccount = accountRef.current;
-        const curChannels = channelsRef.current;
-        const curNotifApi = notifApiRef.current;
-        const curT = tRef.current;
         const curUsername = curAccount?.username ?? "me";
         const curDisplayName =
           curAccount?.person?.full_name || curAccount?.username || "Me";
 
         setMessages((prev) => {
           if (prev.some((m) => m.id === row.id)) return prev;
+          /* My own send, seen via the ping before its ack reconciled the
+             optimistic bubble — the bubble already shows it. */
+          const cmid = (row as { client_msg_id?: string | null }).client_msg_id;
+          if (cmid && prev.some((m) => m.client_msg_id === cmid)) return prev;
           const selfMatch = row.author_account_id === accountId;
           const member = curMembers.find(
             (m) => m.author.id === row.author_account_id,
@@ -991,37 +1017,12 @@ export default function DiscussApp() {
           if (pingAt) requestAnimationFrame(() => perfRecord("discuss.recv.visible_ms", performance.now() - pingAt));
         }
 
-        /* Phase D: raise a desktop notification + sound for inbound
-           messages in the currently-open channel when the tab isn't
-           focused. For muted / DND / "mentions-only" channels the
-           notify() helper will short-circuit internally. */
+        /* Inbound from someone else: the open conversation now has
+           something to mark read, and it chimes (deduped by id with the
+           stream path, which usually delivers the same row first). */
         if (row.author_account_id !== accountId) {
-          const selfChannel = curChannels.find(
-            (c) => c.id === selectedChannelId,
-          );
-          const body = row.body ?? "";
-          const mentionedMe = Array.isArray(row.metadata?.mentions)
-            ? (row.metadata.mentions as DiscussMention[]).some(
-                (m) => m.account_id === accountId,
-              )
-            : false;
-          curNotifApi.notify(
-            {
-              title: selfChannel?.name
-                ? `#${selfChannel.name}`
-                : curT("notif.newMessage", "New message"),
-              body: body.slice(0, 140),
-              channelId: selectedChannelId,
-            },
-            {
-              muted: selfChannel?.muted ?? false,
-              pref: (selfChannel?.notification_pref ?? "all") as
-                | "all"
-                | "mentions"
-                | "none",
-              mentionsMe: mentionedMe,
-            },
-          );
+          needsReadRef.current = true;
+          notifyInbound(row);
         }
       },
       onMessageUpdate: (row) => {
@@ -1125,7 +1126,7 @@ export default function DiscussApp() {
        notifApi, t, account*) is read via refs above. If we re-added
        any of those here the subscription would flap constantly and
        drop realtime messages. */
-  }, [selectedChannelId, accountId, loadMessages, loadMembers]);
+  }, [selectedChannelId, accountId, loadMessages, loadMembers, notifyInbound]);
 
   /* Connection-aware reconciliation (Phase 3C).
 
@@ -1344,15 +1345,32 @@ export default function DiscussApp() {
      MainHeader drops its badge count immediately. */
   useEffect(() => {
     if (!selectedChannelId || !accountId || messages.length === 0) return;
+    /* Skip the write when there is provably nothing to mark: no unread
+       count, no manual unread dot, and nothing arrived from anyone else
+       since the last mark. (It used to fire on every message-count change,
+       including my own sends and "load older" pages.) */
+    const ch = channelsRef.current.find((c) => c.id === selectedChannelId);
+    if (!needsReadRef.current && (ch?.unread_count ?? 0) === 0 && !ch?.marked_unread) return;
     const id = window.setTimeout(() => {
-      void markChannelRead(selectedChannelId, accountId).then(() => {
+      needsReadRef.current = false;
+      void markChannelRead(selectedChannelId, accountId).then((ok) => {
+        if (!ok) {
+          needsReadRef.current = true;
+          return;
+        }
         setChannels((prev) =>
           prev.map((c) =>
-            c.id === selectedChannelId ? { ...c, unread_count: 0 } : c,
+            c.id === selectedChannelId ? { ...c, unread_count: 0, marked_unread: false } : c,
           ),
         );
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+          /* The detail lets the bell patch its own count locally instead of
+             re-reading every channel. */
+          window.dispatchEvent(
+            new CustomEvent("discuss:unread-changed", {
+              detail: { channelId: selectedChannelId, unread: 0, markedUnread: false },
+            }),
+          );
         }
       });
     }, 600);
@@ -1378,36 +1396,86 @@ export default function DiscussApp() {
     };
   }, [selectedChannelId]);
 
-  /* Drafts: load a saved draft when switching channels, save on change
-     (debounced), clear on send. */
+  /* ── Drafts ────────────────────────────────────────────────────────────
+     The composer text belongs to exactly one channel at a time
+     (`draftOwnerRef`), and is only persisted against THAT channel:
+       · switching away flushes the old channel's pending text to the OLD
+         channel id (the debounce used to be cancelled, losing it — or worse,
+         fire after the switch and save A's text as B's draft);
+       · while the new channel's draft is loading, the owner is null, so
+         nothing is saved at all;
+       · a late fetchDraft answer for a channel you already left is dropped;
+       · clearDraft is sent only when a draft actually exists server-side. */
+  const draftOwnerRef = useRef<string | null>(null);
+  const draftSavedRef = useRef<Map<string, string>>(new Map());
+  const latestBodyRef = useRef("");
+  const draftTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!selectedChannelId || !accountId) return;
-    void fetchDraft(accountId, selectedChannelId).then((draft) => {
-      if (draft) setComposerBody(draft.body ?? "");
-      else setComposerBody("");
-      /* Reset side-payloads since drafts currently store text only. */
-      setComposerAttachments([]);
-    setComposerPreviews([]);
-      setComposerProducts([]);
-      setComposerMentions([]);
-    });
-  }, [selectedChannelId, accountId]);
+    latestBodyRef.current = composerBody;
+  }, [composerBody]);
+
+  const persistDraft = useCallback(
+    (channelId: string, body: string) => {
+      if (!accountId) return;
+      const saved = draftSavedRef.current.get(channelId) ?? "";
+      if (body.trim()) {
+        if (body === saved) return;
+        draftSavedRef.current.set(channelId, body);
+        void saveDraft({ accountId, channelId, body });
+      } else if (saved) {
+        draftSavedRef.current.set(channelId, "");
+        void clearDraft(accountId, channelId);
+      }
+    },
+    [accountId],
+  );
 
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
-    const id = window.setTimeout(() => {
-      if (composerBody.trim()) {
-        void saveDraft({
-          accountId,
-          channelId: selectedChannelId,
-          body: composerBody,
-        });
-      } else {
-        void clearDraft(accountId, selectedChannelId);
+    const channelId = selectedChannelId;
+    /* Fresh composer for the new conversation — never show (or save) the
+       previous chat's text under this one. */
+    setComposerBody("");
+    latestBodyRef.current = "";
+    setComposerAttachments([]);
+    setComposerPreviews([]);
+    setComposerProducts([]);
+    setComposerMentions([]);
+    void fetchDraft(accountId, channelId).then((draft) => {
+      /* Stale-response guard: the user may have moved on already. */
+      if (selectedChannelIdRef.current !== channelId) return;
+      const body = draft?.body ?? "";
+      draftSavedRef.current.set(channelId, body);
+      /* Don't clobber anything typed while the draft was loading. */
+      if (!latestBodyRef.current) setComposerBody(body);
+      draftOwnerRef.current = channelId;
+    });
+    return () => {
+      /* Leaving this channel: flush its pending text to IT. */
+      if (draftTimerRef.current != null) {
+        window.clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
       }
+      if (draftOwnerRef.current === channelId) persistDraft(channelId, latestBodyRef.current);
+      draftOwnerRef.current = null;
+    };
+  }, [selectedChannelId, accountId, persistDraft]);
+
+  useEffect(() => {
+    const owner = draftOwnerRef.current;
+    if (!owner) return;
+    if (draftTimerRef.current != null) window.clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => {
+      draftTimerRef.current = null;
+      if (draftOwnerRef.current === owner) persistDraft(owner, composerBody);
     }, 800);
-    return () => window.clearTimeout(id);
-  }, [composerBody, selectedChannelId, accountId]);
+    return () => {
+      if (draftTimerRef.current != null) {
+        window.clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
+    };
+  }, [composerBody, persistDraft]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      FILTERING / DERIVED STATE
@@ -1416,14 +1484,14 @@ export default function DiscussApp() {
   const filteredChannels = useMemo(() => {
     let list = channels;
     if (sidebarFilter === "unread") {
-      list = list.filter((c) => c.unread_count > 0);
+      list = list.filter((c) => c.unread_count > 0 || c.marked_unread === true);
     }
     const q = sidebarSearch.trim().toLowerCase();
     if (q) {
-      list = list.filter((c) => displayNameFor(c).toLowerCase().includes(q));
+      list = list.filter((c) => displayNameFor(c, t).toLowerCase().includes(q));
     }
     return list;
-  }, [channels, sidebarFilter, sidebarSearch]);
+  }, [channels, sidebarFilter, sidebarSearch, t]);
 
   const groupedChannels = useMemo(() => {
     const dms: DiscussChannelWithState[] = [];
@@ -1460,30 +1528,48 @@ export default function DiscussApp() {
   const showToast = useCallback((text: string) => {
     kdsShowToast(text, "success", 2000);
   }, [kdsShowToast]);
+  const showError = useCallback((text: string) => {
+    kdsShowToast(text, "error", 3500);
+  }, [kdsShowToast]);
 
   const handleSelectChannel = useCallback((channelId: string) => {
     /* Switching conversations tears down every pending bubble in the old one,
        so their previews have no reader left. Releasing here is what stops
        object URLs accumulating for the whole session as the user browses. */
-    releaseAllPreviewUrls();
+    if (selectedChannelIdRef.current !== channelId) releaseAllPreviewUrls();
     setAiChatOpen(false); // redesign: close the AI panel when changing chats
     setSelectedChannelId(channelId);
     setMobileView("thread");
     setProductPickerOpen(false);
     setMentionPickerOpen(false);
     setEmojiPickerOpen(false);
+    /* Per-conversation UI state must not follow you into the next chat:
+       a thread pane, reply banner or inline edit from chat A acting on
+       chat B is a wrong-channel write waiting to happen. */
+    if (selectedChannelIdRef.current !== channelId) {
+      setThreadTarget(null);
+      setReplyTarget(null);
+      setEditingMessageId(null);
+      setEditingDraft("");
+      setVoiceOpen(false);
+      setHasOlder(true);
+      needsReadRef.current = false;
+    }
   }, []);
 
   const handleStartDirect = useCallback(
     async (otherId: string) => {
       if (!accountId) return;
       const id = await findOrCreateDirectChannel(accountId, otherId);
-      if (!id) return;
+      if (!id) {
+        showError(t("new.dm.failed", "Couldn't start the conversation."));
+        return;
+      }
       setNewDmOpen(false);
       await loadChannels(true);
       handleSelectChannel(id);
     },
-    [accountId, loadChannels, handleSelectChannel],
+    [accountId, loadChannels, handleSelectChannel, showError, t],
   );
 
   const handleCreateChannel = useCallback(
@@ -1503,22 +1589,15 @@ export default function DiscussApp() {
       });
       if (!row) {
         /* Keep the modal open so the user doesn't think "nothing
-           happened", and surface a toast explaining the most common
-           cause: the Discuss migration hasn't been applied to
-           Supabase yet. Check the console for the precise DB error. */
-        showToast(
-          t(
-            "new.channel.failed",
-            "Couldn't create the channel. Check your Supabase Discuss migration.",
-          ),
-        );
+           happened", and say it failed (as an ERROR, not a success toast). */
+        showError(t("new.channel.failed", "Couldn't create the channel."));
         return;
       }
       setNewChannelOpen(false);
       await loadChannels(true);
       handleSelectChannel(row.id);
     },
-    [accountId, loadChannels, handleSelectChannel, showToast, t],
+    [accountId, loadChannels, handleSelectChannel, showError, t],
   );
 
   const handleFilePick = useCallback(
@@ -1692,6 +1771,7 @@ export default function DiscussApp() {
     setReplyTarget(null);
 
     const kxReq = performance.now(); /* kx-perf: HTTP round-trip start */
+    const sentChannelId = selectedChannelId;
     const saved = await sendDiscussMessage({
       channelId: selectedChannelId,
       authorId: accountId,
@@ -1731,15 +1811,18 @@ export default function DiscussApp() {
          Releasing here — and only here — frees the Blobs at the exact moment
          they stop being displayed. */
       releasePreviewUrls(clientMsgId);
-      void clearDraft(accountId, selectedChannelId);
+      /* Sent: drop this channel's draft now (no-op when none exists). */
+      persistDraft(selectedChannelId, "");
       /* Silent refresh so the sidebar reflects the new last_message_at
          — the realtime handler will also patch it in place, this is
          just a safety net. No spinner. */
       void loadChannels(true);
     } else {
       perfEvent("discuss.send.failed"); /* kx-perf: no content, just the fact */
-      /* Restore the body so the user can retry without re-typing. */
-      setComposerBody(trimmed);
+      /* Restore the body so the user can retry without re-typing — but only
+         if this chat is still open (the composer now belongs to another). */
+      if (selectedChannelIdRef.current === sentChannelId) setComposerBody(trimmed);
+      showError(t("status.failed", "Failed to send"));
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       /* Today a failed send DISCARDS the optimistic bubble, so nothing renders
          its previews any more and holding the Blobs would leak. Unit 3 will
@@ -1762,6 +1845,9 @@ export default function DiscussApp() {
     accountDisplayName,
     loadChannels,
     replyTarget,
+    persistDraft,
+    showError,
+    t,
   ]);
 
   const handleKeyDown = useCallback(
@@ -1836,11 +1922,11 @@ export default function DiscussApp() {
      Optimistic where safe, refetch where the server is source of truth.
      ═══════════════════════════════════════════════════════════════════════ */
 
-  const handleToggleReaction = useCallback(
-    async (messageId: string, emoji: string) => {
+  /* Optimistic reaction flip — applied again to roll back when the write
+     fails (the flip is its own inverse). */
+  const flipReaction = useCallback(
+    (messageId: string, emoji: string) => {
       if (!accountId) return;
-      /* Optimistic flip. Realtime callbacks may also fire, but our
-         dedupe keeps the list consistent. */
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;
@@ -1883,9 +1969,21 @@ export default function DiscussApp() {
           };
         }),
       );
-      await toggleReaction(messageId, accountId, emoji);
     },
     [accountId],
+  );
+
+  const handleToggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!accountId || messageId.startsWith("temp_")) return;
+      flipReaction(messageId, emoji);
+      const res = await toggleReaction(messageId, accountId, emoji);
+      if (res === null) {
+        flipReaction(messageId, emoji);
+        showError(t("error.reaction", "Couldn't update the reaction."));
+      }
+    },
+    [accountId, flipReaction, showError, t],
   );
 
   const handleStartEdit = useCallback((msg: DiscussMessageWithAuthor) => {
@@ -1905,6 +2003,8 @@ export default function DiscussApp() {
       handleCancelEdit();
       return;
     }
+    /* Body only — attachments, voice, mentions and products stay as they
+       are (the server no longer accepts metadata on edit). */
     const ok = await editDiscussMessage(editingMessageId, trimmed);
     if (ok) {
       setMessages((prev) =>
@@ -1915,8 +2015,10 @@ export default function DiscussApp() {
         ),
       );
       handleCancelEdit();
+    } else {
+      showError(t("error.edit", "Couldn't save the edit."));
     }
-  }, [editingMessageId, editingDraft, handleCancelEdit]);
+  }, [editingMessageId, editingDraft, handleCancelEdit, showError, t]);
 
   const handleDelete = useCallback(
     (messageId: string) => {
@@ -1926,14 +2028,16 @@ export default function DiscussApp() {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === messageId
-                ? { ...m, deleted_at: new Date().toISOString(), body: null }
+                ? { ...m, deleted_at: new Date().toISOString(), body: null, metadata: { media: [] } }
                 : m,
             ),
           );
+        } else {
+          showError(t("error.delete", "Couldn't delete the message."));
         }
       }, { confirmLabel: t("msg.deleteDo", "Delete") });
     },
-    [askConfirm, t],
+    [askConfirm, showError, t],
   );
 
   const handlePin = useCallback(
@@ -1941,8 +2045,9 @@ export default function DiscussApp() {
       if (!selectedChannelId || !accountId) return;
       const ok = await pinMessage(selectedChannelId, messageId, accountId);
       if (ok) showToast(t("msg.pinned", "Pinned to channel"));
+      else showError(t("error.pin", "Couldn't pin the message."));
     },
-    [selectedChannelId, accountId, showToast, t],
+    [selectedChannelId, accountId, showToast, showError, t],
   );
 
   const handleUnpin = useCallback(
@@ -1950,35 +2055,47 @@ export default function DiscussApp() {
       if (!selectedChannelId) return;
       const ok = await unpinMessage(selectedChannelId, messageId);
       if (ok) showToast(t("msg.unpinned", "Unpinned"));
+      else showError(t("error.pin", "Couldn't pin the message."));
     },
-    [selectedChannelId, showToast, t],
+    [selectedChannelId, showToast, showError, t],
   );
 
   const handleStar = useCallback(
     async (messageId: string) => {
       if (!accountId) return;
-      const isNow = await toggleStar(messageId, accountId);
+      /* toggleStar(accountId, messageId) — the arguments were swapped here,
+         so every star request targeted a message id equal to the account
+         id and quietly failed while the toast said "Saved". */
+      const isNow = await toggleStar(accountId, messageId);
+      if (isNow === null) {
+        showError(t("error.star", "Couldn't update saved messages."));
+        return;
+      }
       showToast(
         isNow
           ? t("msg.starred", "Saved for later")
           : t("msg.unstarred", "Removed from saved"),
       );
     },
-    [accountId, showToast, t],
+    [accountId, showToast, showError, t],
   );
 
   const handleCopyLink = useCallback(
     async (messageId: string) => {
       if (!selectedChannelId) return;
-      const url = `${window.location.origin}/discuss/${selectedChannelId}#${messageId}`;
+      /* The one deep-link shape (also used by push + the bell): the app
+         reads ?channel / ?msg on load and scrolls to the message. There is
+         no /discuss/<id> route — the old link 404'd. */
+      const url = `${window.location.origin}/discuss?channel=${encodeURIComponent(selectedChannelId)}&msg=${encodeURIComponent(messageId)}`;
       try {
         await navigator.clipboard.writeText(url);
         showToast(t("link.copied", "Link copied"));
       } catch {
         /* Some browsers block clipboard access without a gesture. */
+        showError(t("error.copy", "Couldn't copy the link."));
       }
     },
-    [selectedChannelId, showToast, t],
+    [selectedChannelId, showToast, showError, t],
   );
 
   const handleStartReply = useCallback(
@@ -2006,28 +2123,40 @@ export default function DiscussApp() {
     const ch = channels.find((c) => c.id === selectedChannelId);
     if (!ch) return;
     const next = !ch.muted;
+    const id = selectedChannelId;
     setChannels((prev) =>
-      prev.map((c) => (c.id === selectedChannelId ? { ...c, muted: next } : c)),
+      prev.map((c) => (c.id === id ? { ...c, muted: next } : c)),
     );
-    await setChannelMuted(selectedChannelId, accountId, next);
+    const ok = await setChannelMuted(id, accountId, next);
+    if (!ok) {
+      setChannels((prev) => prev.map((c) => (c.id === id ? { ...c, muted: !next } : c)));
+      showError(t("error.mute", "Couldn't change notifications."));
+      return;
+    }
     showToast(
       next
         ? t("notif.muted", "Channel muted")
         : t("notif.unmuted", "Channel unmuted"),
     );
-  }, [selectedChannelId, accountId, channels, showToast, t]);
+  }, [selectedChannelId, accountId, channels, showToast, showError, t]);
 
   const handleSetNotificationPref = useCallback(
     async (pref: DiscussNotificationPref) => {
       if (!selectedChannelId || !accountId) return;
+      const id = selectedChannelId;
+      const before = channelsRef.current.find((c) => c.id === id)?.notification_pref ?? "all";
       setChannels((prev) =>
         prev.map((c) =>
-          c.id === selectedChannelId ? { ...c, notification_pref: pref } : c,
+          c.id === id ? { ...c, notification_pref: pref } : c,
         ),
       );
-      await setNotificationPref(selectedChannelId, accountId, pref);
+      const ok = await setNotificationPref(id, accountId, pref);
+      if (!ok) {
+        setChannels((prev) => prev.map((c) => (c.id === id ? { ...c, notification_pref: before } : c)));
+        showError(t("error.mute", "Couldn't change notifications."));
+      }
     },
-    [selectedChannelId, accountId],
+    [selectedChannelId, accountId, showError, t],
   );
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -2051,11 +2180,18 @@ export default function DiscussApp() {
           c.id === ch.id ? { ...c, pinned: next, pinned_at: next ? stamp : null } : c,
         ),
       );
-      await setChannelPinned(ch.id, next);
+      const ok = await setChannelPinned(ch.id, next);
+      if (!ok) {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === ch.id ? { ...c, pinned: ch.pinned, pinned_at: ch.pinned_at ?? null } : c)),
+        );
+        showError(t("error.pin", "Couldn't pin the message."));
+        return;
+      }
       void loadChannels(true);
       showToast(next ? t("conv.pinned", "Pinned to top") : t("conv.unpinned", "Unpinned"));
     },
-    [loadChannels, showToast, t],
+    [loadChannels, showToast, showError, t],
   );
 
   const handleSetConvMuted = useCallback(
@@ -2063,10 +2199,15 @@ export default function DiscussApp() {
       if (!accountId) return;
       const next = !ch.muted;
       setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: next } : c)));
-      await setChannelMuted(ch.id, accountId, next);
+      const ok = await setChannelMuted(ch.id, accountId, next);
+      if (!ok) {
+        setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, muted: !next } : c)));
+        showError(t("error.mute", "Couldn't change notifications."));
+        return;
+      }
       showToast(next ? t("conv.muted", "Muted") : t("conv.unmuted", "Unmuted"));
     },
-    [accountId, showToast, t],
+    [accountId, showToast, showError, t],
   );
 
   const handleToggleConvUnread = useCallback(
@@ -2080,14 +2221,22 @@ export default function DiscussApp() {
           ),
         );
         await markChannelRead(ch.id, accountId);
-        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+        window.dispatchEvent(
+          new CustomEvent("discuss:unread-changed", {
+            detail: { channelId: ch.id, unread: 0, markedUnread: false },
+          }),
+        );
       } else {
         setChannels((prev) =>
           prev.map((c) => (c.id === ch.id ? { ...c, marked_unread: true } : c)),
         );
         await markChannelUnread(ch.id);
         /* Light up the home-tile badge + bell immediately, same as mark-read. */
-        window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+        window.dispatchEvent(
+          new CustomEvent("discuss:unread-changed", {
+            detail: { channelId: ch.id, markedUnread: true },
+          }),
+        );
       }
       void loadChannels(true);
     },
@@ -2142,29 +2291,86 @@ export default function DiscussApp() {
     };
   }, [convMenu, closeConvMenu]);
 
+  /* Voice note: optimistic bubble first (playable from the local blob),
+     then upload + send. Any failure removes the bubble, says so, and THROWS
+     so the recorder drops back to its preview with the clip intact for a
+     retry — it used to close as if the note had been sent. */
   const handleSendVoice = useCallback(
     async (input: { blob: Blob; durationMs: number; waveform: number[] }) => {
-      if (!accountId || !selectedChannelId) return;
+      if (!accountId || !selectedChannelId) throw new Error("no channel");
+      const channelId = selectedChannelId;
+      const clientMsgId = crypto.randomUUID();
+      const tempId = `temp_${clientMsgId}`;
+      createPreviewUrl(clientMsgId, 0, input.blob);
+      const optimistic: DiscussMessageWithAuthor = {
+        id: tempId,
+        channel_id: channelId,
+        author_account_id: accountId,
+        reply_to_message_id: null,
+        kind: "voice",
+        body: null,
+        body_html: null,
+        metadata: {
+          media: [
+            {
+              index: 0,
+              name: "voice-note",
+              type: input.blob.type || "audio/webm",
+              size: input.blob.size,
+              kind: "voice",
+              duration_ms: input.durationMs,
+              waveform: input.waveform,
+            },
+          ],
+        },
+        edited_at: null,
+        deleted_at: null,
+        created_at: new Date().toISOString(),
+        client_msg_id: clientMsgId,
+        author: {
+          id: accountId,
+          username: accountUsername,
+          avatar_url: account?.avatar_url ?? null,
+          full_name: accountDisplayName,
+        },
+        reactions: [],
+        reply_preview: null,
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      const fail = (key: string, fallback: string): never => {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        releasePreviewUrls(clientMsgId);
+        showError(t(key, fallback));
+        throw new Error(fallback);
+      };
+
       const uploaded = await uploadDiscussVoice({
         blob: input.blob,
         durationMs: input.durationMs,
         waveform: input.waveform,
       });
-      if (!uploaded) {
-        showToast(t("voice.uploadFailed", "Voice upload failed"));
-        return;
-      }
-      await sendDiscussMessage({
-        channelId: selectedChannelId,
+      if (!uploaded) fail("voice.uploadFailed", "Voice upload failed");
+      const saved = await sendDiscussMessage({
+        channelId,
         authorId: accountId,
         body: "",
         kind: "voice",
-        metadata: { voice: uploaded },
+        metadata: { voice: uploaded! },
+        clientMsgId,
       });
+      if (!saved) fail("status.failed", "Failed to send");
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId
+            ? { ...m, id: saved!.id, created_at: saved!.created_at, metadata: saved!.metadata ?? m.metadata }
+            : m,
+        ),
+      );
+      releasePreviewUrls(clientMsgId);
       setVoiceOpen(false);
       void loadChannels(true);
     },
-    [accountId, selectedChannelId, showToast, t, loadChannels],
+    [accountId, selectedChannelId, accountUsername, account?.avatar_url, accountDisplayName, showError, t, loadChannels],
   );
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -2180,23 +2386,78 @@ export default function DiscussApp() {
     [loadChannels, handleSelectChannel],
   );
 
-  /* Fetch the linked contact when a customer channel is selected.
-     Reads `channels` through the ref so we don't re-fire every time
-     the sidebar patches in a new last-message. */
+  /* ── Deep links: /discuss?channel=<id>&msg=<id> (or #msg-<id>) ─────────
+     Used by "Copy link", the bell and web-push. Opens the conversation once
+     the list knows it, then hands the message to the jump effect below. */
+  const channelParam = searchParams?.get("channel") ?? null;
+  const msgParam = searchParams?.get("msg") ?? null;
+  const handledLinkRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedChannelId) return;
-    const channel = channelsRef.current.find(
-      (c) => c.id === selectedChannelId,
-    );
-    if (!channel || channel.kind !== "customer") return;
-    if (linkedContacts[selectedChannelId] !== undefined) return;
-    void fetchLinkedContact(selectedChannelId).then((contact) => {
-      setLinkedContacts((prev) => ({
-        ...prev,
-        [selectedChannelId]: contact,
-      }));
-    });
-  }, [selectedChannelId, linkedContacts]);
+    if (!channelParam) {
+      handledLinkRef.current = null;
+      return;
+    }
+    if (loadingChannels) return;
+    const key = `${channelParam}|${msgParam ?? ""}`;
+    if (handledLinkRef.current === key) return;
+    if (!channels.some((c) => c.id === channelParam)) {
+      /* Not in the list (yet): one refetch, then give up quietly. */
+      if (handledLinkRef.current !== `${key}|refetched`) {
+        handledLinkRef.current = `${key}|refetched`;
+        void loadChannels(true);
+      }
+      return;
+    }
+    handledLinkRef.current = key;
+    handleSelectChannel(channelParam);
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const fromHash = hash.startsWith("#msg-") ? hash.slice(5) : null;
+    const target = msgParam || fromHash;
+    if (target) setPendingJump(target);
+    /* Consume the link: a later bell click / push for the SAME conversation
+       then registers as a new link instead of being ignored. */
+    try {
+      window.history.replaceState(window.history.state, "", "/discuss");
+    } catch { /* non-fatal */ }
+  }, [channelParam, msgParam, channels, loadingChannels, loadChannels, handleSelectChannel]);
+
+  /* Scroll to + briefly highlight a message once it is rendered. If it is
+     older than the loaded page, pull older pages (bounded) until found. */
+  const jumpAttemptsRef = useRef(0);
+  useEffect(() => {
+    if (!pendingJump) return;
+    const el = document.getElementById(`msg-${pendingJump}`);
+    if (el) {
+      jumpAttemptsRef.current = 0;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightId(pendingJump);
+      setPendingJump(null);
+      return;
+    }
+    const last = messages[messages.length - 1];
+    if (!last || last.channel_id !== selectedChannelId || loadingMessages || loadingOlder) return;
+    if (hasOlder && jumpAttemptsRef.current < 5) {
+      jumpAttemptsRef.current += 1;
+      void loadOlder();
+    } else {
+      jumpAttemptsRef.current = 0;
+      setPendingJump(null);
+    }
+  }, [pendingJump, messages, selectedChannelId, loadingMessages, loadingOlder, hasOlder, loadOlder]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const clear = window.setTimeout(() => setHighlightId(null), 2400);
+    return () => window.clearTimeout(clear);
+  }, [highlightId]);
+
+  const jumpToMessage = useCallback(
+    (channelId: string, messageId: string) => {
+      handleSelectChannel(channelId);
+      setPendingJump(messageId);
+    },
+    [handleSelectChannel],
+  );
 
   /* ═══════════════════════════════════════════════════════════════════════
      EARLY RETURNS / LOADING STATES
@@ -2217,7 +2478,7 @@ export default function DiscussApp() {
           <DiscussIcon size={20} className="text-[var(--text-dim)]" />
         </div>
         <p className="text-[13px] text-[var(--text-muted)]">
-          You need to sign in to use Discuss.
+          {t("signin.required", "You need to sign in to use Discuss.")}
         </p>
         <Link
           href="/"
@@ -2254,7 +2515,7 @@ export default function DiscussApp() {
          to compute. It also drops the `dvh`, which is taller than its `svh`
          parent whenever a mobile toolbar retracts and recomputes live as it
          hides — the "dancing" reported on quotations and invoices. */
-      className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
+      className="relative flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
     >
       {confirmDialog}
       {/* ═══ Top bar ═══
@@ -2350,12 +2611,14 @@ export default function DiscussApp() {
                 value={sidebarSearch}
                 onChange={(e) => setSidebarSearch(e.target.value)}
                 placeholder={t("sidebar.search")}
+                aria-label={t("sidebar.search")}
                 className="flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none min-w-0"
               />
               {sidebarSearch && (
                 <button
                   type="button"
                   onClick={() => setSidebarSearch("")}
+                  aria-label={t("btn.clear", "Clear")}
                   className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 >
                   <CrossIcon size={14} />
@@ -2368,10 +2631,15 @@ export default function DiscussApp() {
                   key={f}
                   type="button"
                   onClick={() => setSidebarFilter(f)}
+                  aria-pressed={sidebarFilter === f}
+                  /* Core keeps its inverted pill; Aurora answers with the
+                     shared Hub Blue segment (kx-seg-on / kx-seg-off). */
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
                     sidebarFilter === f
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                      : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                      ? aurora
+                        ? "kx-seg-on text-[var(--text-primary)]"
+                        : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      : `${aurora ? "kx-seg-off " : ""}text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]`
                   }`}
                 >
                   {f === "all" ? t("sidebar.filter.all") : t("sidebar.filter.unread")}
@@ -2390,9 +2658,12 @@ export default function DiscussApp() {
             <button
               type="button"
               onClick={openAiChat}
-              className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 flex items-center gap-3 rounded-xl transition-colors ${
+              aria-current={aiChatOpen ? "true" : undefined}
+              className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-start px-3 py-2.5 flex items-center gap-3 rounded-xl transition-colors ${
                 aiChatOpen
-                  ? "bg-[var(--bg-inverted)]"
+                  ? aurora
+                    ? "kx-seg-on"
+                    : "bg-[var(--bg-inverted)]"
                   : "hover:bg-[var(--bg-surface-hover)]"
               }`}
             >
@@ -2402,17 +2673,17 @@ export default function DiscussApp() {
               <div className="flex-1 min-w-0">
                 <div
                   className={`text-[13px] font-semibold truncate ${
-                    aiChatOpen ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
+                    aiChatOpen && !aurora ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
                   }`}
                 >
                   {t("ai.title", "Koleex AI")}
                 </div>
                 <div
                   className={`text-[11.5px] truncate ${
-                    aiChatOpen ? "text-[var(--text-inverted)]/70" : "text-[var(--text-dim)]"
+                    aiChatOpen && !aurora ? "text-[var(--text-inverted)]/70" : "text-[var(--text-dim)]"
                   }`}
                 >
-                  {t("ai.subtitle", "Ask me anything")}
+                  {t("ai.rowHint", "Ask me anything")}
                 </div>
               </div>
             </button>
@@ -2466,6 +2737,9 @@ export default function DiscussApp() {
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
                           onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
+                          aurora={aurora}
+                          lang={lang}
+                          t={t}
                         />
                       ))}
                     </ul>
@@ -2499,6 +2773,9 @@ export default function DiscussApp() {
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
                           onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
+                          aurora={aurora}
+                          lang={lang}
+                          t={t}
                         />
                       ))}
                     </ul>
@@ -2535,6 +2812,14 @@ export default function DiscussApp() {
                 subtitle: t("ai.subtitle", "Your assistant · always here"),
                 placeholder: t("ai.placeholder", "Ask Koleex AI anything…"),
                 empty: t("ai.empty", "Ask me anything — I can help across the Hub."),
+                thinking: t("ai.thinking", "Thinking…"),
+                back: t("back", "Back"),
+                send: t("composer.send", "Send"),
+                suggestions: [
+                  t("ai.suggest.today", "Summarise today's activity"),
+                  t("ai.suggest.draft", "Draft a message to the team"),
+                  t("ai.suggest.week", "What changed this week?"),
+                ],
               }}
             />
           ) : !selectedChannel ? (
@@ -2567,7 +2852,7 @@ export default function DiscussApp() {
                 </button>
                 {selectedChannel.kind === "direct" ? (
                   <Avatar
-                    name={displayNameFor(selectedChannel)}
+                    name={displayNameFor(selectedChannel, t)}
                     url={selectedChannel.other?.avatar_url}
                     size={34}
                   />
@@ -2582,7 +2867,7 @@ export default function DiscussApp() {
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-                    {displayNameFor(selectedChannel)}
+                    {displayNameFor(selectedChannel, t)}
                     {altNameFor(selectedChannel) && (
                       <span lang="zh" className="ms-1.5 text-[12px] font-normal text-[var(--text-dim)]">
                         {altNameFor(selectedChannel)}
@@ -2601,6 +2886,18 @@ export default function DiscussApp() {
                         )}
                   </div>
                 </div>
+                {/* Search lives in the conversation's own toolbar (the
+                    unified app header is untouched). Opens scoped to this
+                    conversation with a switch to search everywhere. */}
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  title={t("header.search", "Search in conversation")}
+                  aria-label={t("header.search", "Search in conversation")}
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </button>
                 <TranslateControl
                   prefs={translatePrefs}
                   open={translateMenuOpen}
@@ -2611,12 +2908,18 @@ export default function DiscussApp() {
                 <button
                   type="button"
                   onClick={() => void handleToggleMute()}
+                  aria-pressed={selectedChannel.muted}
                   className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
                     selectedChannel.muted
-                      ? "text-red-300 hover:bg-red-500/10"
+                      ? "text-[var(--text-secondary)] bg-[var(--bg-surface-active)] hover:bg-[var(--bg-surface-active)]"
                       : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                   }`}
                   title={
+                    selectedChannel.muted
+                      ? t("header.unmute", "Unmute")
+                      : t("header.mute", "Mute")
+                  }
+                  aria-label={
                     selectedChannel.muted
                       ? t("header.unmute", "Unmute")
                       : t("header.mute", "Mute")
@@ -2636,6 +2939,7 @@ export default function DiscussApp() {
                   }}
                   className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   title={t("header.details")}
+                  aria-label={t("header.details")}
                 >
                   <InfoIcon className="h-4 w-4" />
                 </button>
@@ -2644,8 +2948,20 @@ export default function DiscussApp() {
               {/* Message list */}
               <div
                 ref={threadScrollRef}
+                onScroll={(e) => {
+                  /* Near the top → page in older history. */
+                  if (e.currentTarget.scrollTop < 120 && hasOlder && !loadingOlder && !loadingMessages) {
+                    void loadOlder();
+                  }
+                }}
                 className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
               >
+                {loadingOlder && (
+                  <div className="flex justify-center py-2" aria-live="polite">
+                    <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" />
+                    <span className="sr-only">{t("thread.loadMore", "Load earlier messages")}</span>
+                  </div>
+                )}
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center">
                     <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
@@ -2661,6 +2977,8 @@ export default function DiscussApp() {
                     currentAccountId={accountId}
                     channelKind={selectedChannel.kind}
                     channelLastRead={selectedChannel.last_read_at}
+                    lang={lang}
+                    highlightId={highlightId}
                     todayText={t("thread.today")}
                     yesterdayText={t("thread.yesterday")}
                     editedText={t("thread.edited")}
@@ -2720,7 +3038,7 @@ export default function DiscussApp() {
                 voiceOpen={voiceOpen}
                 onOpenVoice={() => setVoiceOpen(true)}
                 onCloseVoice={() => setVoiceOpen(false)}
-                onSendVoice={(v) => void handleSendVoice(v)}
+                onSendVoice={handleSendVoice}
                 uploading={uploading}
                 sending={sending}
                 onSend={handleSend}
@@ -2733,7 +3051,7 @@ export default function DiscussApp() {
                   selectedChannel.kind === "direct"
                     ? t("composer.placeholderDm").replace(
                         "{name}",
-                        displayNameFor(selectedChannel),
+                        displayNameFor(selectedChannel, t),
                       )
                     : selectedChannel.name
                       ? t("composer.placeholder").replace(
@@ -2773,7 +3091,15 @@ export default function DiscussApp() {
             <DetailsPane
               channel={selectedChannel}
               members={members}
-              linkedContact={linkedContacts[selectedChannel.id] ?? null}
+              messages={messages}
+              currentAccountId={accountId}
+              lang={lang}
+              onJump={(messageId) => {
+                setDetailsOpen(false);
+                setMobileView("thread");
+                setPendingJump(messageId);
+              }}
+              onOpenSearch={() => setSearchOpen(true)}
               notificationPref={selectedChannel.notification_pref}
               onSetNotificationPref={handleSetNotificationPref}
               onClose={() => {
@@ -2789,12 +3115,14 @@ export default function DiscussApp() {
         {threadTarget && selectedChannel && accountId && (
           <aside className="shrink-0 md:w-[360px] min-h-0 flex">
             <ThreadPane
+              key={threadTarget.id}
               parent={threadTarget}
               currentAccountId={accountId}
               channelId={selectedChannel.id}
               onClose={() => setThreadTarget(null)}
               autoTranslate={translatePrefs.auto}
               targetLang={translatePrefs.lang}
+              lang={lang}
               t={t}
             />
           </aside>
@@ -2803,18 +3131,13 @@ export default function DiscussApp() {
 
       {/* Search panel (Phase C) — full overlay on the right column */}
       {searchOpen && accountId && (
-        <div className="absolute top-14 bottom-0 end-0 w-full md:w-[420px] z-40">
+        <div className="absolute inset-y-0 end-0 w-full md:w-[420px] z-40">
           <SearchPanel
             currentAccountId={accountId}
+            scopedChannelId={selectedChannelId}
+            lang={lang}
             onClose={() => setSearchOpen(false)}
-            onJump={(channelId, messageId) => {
-              handleSelectChannel(channelId);
-              /* Scroll to the message after the channel switches. */
-              window.setTimeout(() => {
-                const el = document.getElementById(`msg-${messageId}`);
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }, 500);
-            }}
+            onJump={jumpToMessage}
             t={t}
           />
         </div>
@@ -2823,7 +3146,6 @@ export default function DiscussApp() {
       {/* Customer chat modal (Phase E) */}
       {customerChatOpen && accountId && (
         <CustomerChatModal
-          currentAccountId={accountId}
           onCreated={(id) => void handleCustomerCreated(id)}
           onCancel={() => setCustomerChatOpen(false)}
           t={t}
@@ -2943,6 +3265,7 @@ export default function DiscussApp() {
         <EmojiPicker
           onCancel={() => setEmojiPickerOpen(false)}
           onSelect={handleAddEmoji}
+          t={t}
         />
       )}
     </div>
@@ -2959,6 +3282,9 @@ function ChannelRow({
   onSelect,
   onPrefetch,
   onMenu,
+  aurora = false,
+  lang,
+  t,
 }: {
   channel: DiscussChannelWithState;
   selected: boolean;
@@ -2968,15 +3294,22 @@ function ChannelRow({
   /** Open the WeChat-style conversation menu at the given viewport point
    *  (right-click on desktop, ~450ms long-press on touch). */
   onMenu?: (x: number, y: number) => void;
+  /** Aurora skin: the selected row is the Hub Blue segment (kx-seg-on)
+   *  instead of Core's solid inverted pill. */
+  aurora?: boolean;
+  lang: string;
+  t: TFn;
 }) {
-  const name = displayNameFor(channel);
+  const name = displayNameFor(channel, t);
   const altName = channel.kind === "direct" ? altNameFor(channel) : null;
-  const preview = previewMessage(channel.last_message);
+  const preview = previewMessage(channel.last_message, t);
   const time = channel.last_message?.created_at
-    ? formatSidebarTime(channel.last_message.created_at)
+    ? discussListStamp(channel.last_message.created_at, lang, t("thread.yesterday", "Yesterday"))
     : "";
   const isDm = channel.kind === "direct";
   const showUnreadDot = channel.unread_count === 0 && channel.marked_unread === true;
+  /* Inverted text only on Core's solid selected pill. */
+  const inv = selected && !aurora;
   const longPressRef = useRef<number | null>(null);
   const clearLongPress = () => {
     if (longPressRef.current !== null) {
@@ -2993,11 +3326,24 @@ function ChannelRow({
         onMouseEnter={onPrefetch}
         onPointerDown={onPrefetch}
         onFocus={onPrefetch}
+        aria-current={selected ? "true" : undefined}
         onContextMenu={
           onMenu
             ? (e) => {
                 e.preventDefault();
                 onMenu(e.clientX, e.clientY);
+              }
+            : undefined
+        }
+        onKeyDown={
+          onMenu
+            ? (e) => {
+                /* Keyboard route to the conversation menu. */
+                if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  onMenu(r.left + 24, r.bottom - 8);
+                }
               }
             : undefined
         }
@@ -3014,15 +3360,15 @@ function ChannelRow({
         }
         onTouchEnd={onMenu ? clearLongPress : undefined}
         onTouchMove={onMenu ? clearLongPress : undefined}
-        className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-left px-3 py-2.5 rounded-xl transition-colors ${
-          /* Selected row = SOLID --bg-inverted fill (real white in dark, real
-             black in light) so the open chat is unmistakable — a translucent
-             wash over near-black only ever reads as gray. Every text token below
-             flips to --text-inverted / its opacity steps so nothing goes
-             white-on-white. Inset + rounded-xl (no full-bleed, no divider) makes
-             the selection/hover read as a soft pill rather than a sharp band. */
+        className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-start px-3 py-2.5 rounded-xl transition-colors ${
+          /* Selected row = SOLID --bg-inverted fill on Core (real white in
+             dark, real black in light) so the open chat is unmistakable;
+             every text token below flips to --text-inverted. Under Aurora the
+             selection is the shared Hub Blue segment and text stays normal. */
           selected
-            ? "bg-[var(--bg-inverted)]"
+            ? aurora
+              ? "kx-seg-on"
+              : "bg-[var(--bg-inverted)]"
             : "hover:bg-[var(--bg-surface-hover)]"
         }`}
       >
@@ -3031,14 +3377,14 @@ function ChannelRow({
             <Avatar name={name} url={channel.other?.avatar_url} size={40} />
           ) : (
             <div className={`h-10 w-10 shrink-0 rounded-full border flex items-center justify-center ${
-              selected
+              inv
                 ? "bg-[var(--text-inverted)]/10 border-[var(--text-inverted)]/15"
                 : "bg-[var(--bg-surface)] border-[var(--border-subtle)]"
             }`}>
               {channel.kind === "channel" ? (
-                <HashtagIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
+                <HashtagIcon className={`h-4 w-4 ${inv ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               ) : (
-                <UsersIcon className={`h-4 w-4 ${selected ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
+                <UsersIcon className={`h-4 w-4 ${inv ? "text-[var(--text-inverted)]/70" : "text-[var(--text-muted)]"}`} />
               )}
             </div>
           )}
@@ -3046,9 +3392,9 @@ function ChannelRow({
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-[13px] truncate ${
-                  selected
+                  inv
                     ? "font-semibold text-[var(--text-inverted)]"
-                    : channel.unread_count > 0
+                    : selected || channel.unread_count > 0
                     ? "font-semibold text-[var(--text-primary)]"
                     : "font-medium text-[var(--text-muted)]"
                 }`}
@@ -3058,7 +3404,7 @@ function ChannelRow({
                   <span
                     lang="zh"
                     className={`ms-1 text-[0.85em] font-normal ${
-                      selected ? "text-[var(--text-inverted)]/55" : "text-[var(--text-dim)]"
+                      inv ? "text-[var(--text-inverted)]/55" : "text-[var(--text-dim)]"
                     }`}
                   >
                     {altName}
@@ -3067,10 +3413,13 @@ function ChannelRow({
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 {channel.pinned && (
-                  <PinIcon className="h-3 w-3 text-amber-400" aria-label="Pinned" />
+                  <PinIcon
+                    className={`h-3 w-3 ${inv ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}
+                    aria-label={t("conv.pinnedLabel", "Pinned")}
+                  />
                 )}
                 {time && (
-                  <span className={`text-[10px] tabular-nums ${selected ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
+                  <span className={`text-[10px] tabular-nums ${inv ? "text-[var(--text-inverted)]/50" : "text-[var(--text-dim)]"}`}>
                     {time}
                   </span>
                 )}
@@ -3079,7 +3428,7 @@ function ChannelRow({
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className={`text-[11.5px] truncate flex-1 ${
-                  selected
+                  inv
                     ? "text-[var(--text-inverted)]/75"
                     : channel.unread_count > 0
                     ? "text-[var(--text-primary)] font-medium"
@@ -3091,7 +3440,7 @@ function ChannelRow({
                 )}
                 {channel.last_message?.author_username && !isDm ? (
                   <>
-                    <span className={selected ? "text-[var(--text-inverted)]/60" : "text-[var(--text-muted)]"}>
+                    <span className={inv ? "text-[var(--text-inverted)]/60" : "text-[var(--text-muted)]"}>
                       {channel.last_message.author_username}:{" "}
                     </span>
                     {preview}
@@ -3102,21 +3451,25 @@ function ChannelRow({
               </span>
               {channel.unread_count > 0 ? (
                 <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
-                  selected ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  inv ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                 }`}>
                   {channel.unread_count > 99 ? "99+" : channel.unread_count}
                 </span>
               ) : showUnreadDot ? (
                 /* Manually "marked as unread" — a WeChat-style dot with no count. */
                 <span
-                  title="Unread"
+                  title={t("sidebar.unread", "Unread")}
+                  aria-label={t("sidebar.unread", "Unread")}
                   className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-                    selected ? "bg-[var(--text-inverted)]" : "bg-[var(--bg-inverted)]"
+                    inv ? "bg-[var(--text-inverted)]" : "bg-[var(--bg-inverted)]"
                   }`}
                 />
               ) : null}
               {channel.muted && (
-                <BellOffIcon className="h-3 w-3 shrink-0 text-red-500" aria-label="Muted" />
+                <BellOffIcon
+                  className={`h-3 w-3 shrink-0 ${inv ? "text-[var(--text-inverted)]/60" : "text-[var(--text-dim)]"}`}
+                  aria-label={t("conv.mutedLabel", "Muted")}
+                />
               )}
             </div>
           </div>
@@ -3135,6 +3488,8 @@ type MessageListProps = {
   currentAccountId: string;
   channelKind: DiscussChannelKind;
   channelLastRead: string | null;
+  lang: string;
+  highlightId: string | null;
   todayText: string;
   yesterdayText: string;
   editedText: string;
@@ -3164,6 +3519,7 @@ function MessageList(props: MessageListProps) {
     messages,
     currentAccountId,
     channelLastRead,
+    lang,
     todayText,
     yesterdayText,
     editedText,
@@ -3196,7 +3552,7 @@ function MessageList(props: MessageListProps) {
         out.push({
           kind: "sep",
           key: `sep-${dayKey}`,
-          label: formatDaySeparator(m.created_at, todayText, yesterdayText),
+          label: discussDayLabel(m.created_at, lang, todayText, yesterdayText),
         });
         lastDay = dayKey;
         lastAuthor = "";
@@ -3226,7 +3582,7 @@ function MessageList(props: MessageListProps) {
       lastTime = thisTime;
     }
     return out;
-  }, [messages, todayText, yesterdayText, channelLastRead, currentAccountId]);
+  }, [messages, lang, todayText, yesterdayText, channelLastRead, currentAccountId]);
 
   return (
     <div className="flex flex-col gap-1">
@@ -3262,7 +3618,11 @@ function MessageList(props: MessageListProps) {
             editedText={editedText}
             deletedText={deletedText}
             isEditing={props.editingMessageId === row.msg.id}
-            editingDraft={props.editingDraft}
+            /* Only the bubble being edited receives the draft — passing it to
+               every bubble re-rendered the whole list on each keystroke. */
+            editingDraft={props.editingMessageId === row.msg.id ? props.editingDraft : ""}
+            highlighted={props.highlightId === row.msg.id}
+            lang={lang}
             onEditDraftChange={props.onEditDraftChange}
             onStartEdit={props.onStartEdit}
             onCancelEdit={props.onCancelEdit}
@@ -3386,6 +3746,8 @@ function TranslateControl({
 type MessageBubbleProps = {
   msg: DiscussMessageWithAuthor;
   showAuthor: boolean;
+  highlighted: boolean;
+  lang: string;
   isSelf: boolean;
   editedText: string;
   deletedText: string;
@@ -3480,6 +3842,8 @@ function MessageSurface({
 function MessageBubble({
   msg,
   showAuthor,
+  highlighted,
+  lang,
   isSelf,
   editedText,
   deletedText,
@@ -3502,12 +3866,12 @@ function MessageBubble({
   t,
 }: MessageBubbleProps) {
   const author = msg.author;
-  const authorName = author?.full_name || author?.username || "Unknown";
+  const authorName = author?.full_name || author?.username || t("channel.unknown", "Unknown");
   const authorAlt = (() => {
     const a = (author?.name_alt ?? "").trim();
     return a && a !== (author?.full_name ?? "").trim() ? a : null;
   })();
-  const time = formatFullTime(msg.created_at);
+  const time = discussTime(msg.created_at, lang);
   const isDeleted = !!msg.deleted_at;
   const meta = msg.metadata ?? {};
   /* THE client-side media contract: one array, canonical indexes, display
@@ -3541,7 +3905,6 @@ function MessageBubble({
      card IS the message, the message has no surface of its own. */
   const isProductOnly =
     noChrome && attachmentMedia.length === 0 && !!meta.products?.length;
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
      opens an actions menu next to the message instead of a hover bar that
@@ -3550,8 +3913,34 @@ function MessageBubble({
      edge. Closes on outside click / Escape / scroll. */
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  /* Where focus returns when a keyboard-opened menu closes. */
+  const menuOpenerRef = useRef<HTMLElement | null>(null);
   const longPressRef = useRef<number | null>(null);
-  const closeMenu = useCallback(() => setMenuPos(null), []);
+  const closeMenu = useCallback(() => {
+    setMenuPos(null);
+    const opener = menuOpenerRef.current;
+    menuOpenerRef.current = null;
+    if (opener) {
+      try { opener.focus(); } catch { /* gone */ }
+    }
+  }, []);
+  /* Open the menu from the keyboard / the More button, anchored to the
+     element, and move focus into it so arrow/Tab navigation works. */
+  const openMenuFrom = useCallback(
+    (el: HTMLElement) => {
+      if (isDeleted) return;
+      const r = el.getBoundingClientRect();
+      menuOpenerRef.current = el;
+      setMenuPos({ x: Math.max(8, r.left), y: r.bottom + 4 });
+    },
+    [isDeleted],
+  );
+  useEffect(() => {
+    if (!menuPos || !menuOpenerRef.current) return;
+    const first = menuRef.current?.querySelector<HTMLElement>("button");
+    first?.focus();
+  }, [menuPos]);
   const openMenu = useCallback(
     (x: number, y: number) => {
       if (isDeleted) return;
@@ -3566,14 +3955,24 @@ function MessageBubble({
     };
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
+      /* Arrow keys move between menu items. */
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && menuRef.current) {
+        const items = Array.from(menuRef.current.querySelectorAll<HTMLElement>("button"));
+        if (items.length === 0) return;
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement as HTMLElement);
+        const next = e.key === "ArrowDown" ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+        items[next]?.focus();
+      }
     };
+    const onScroll = () => setMenuPos(null);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [menuPos, closeMenu]);
 
@@ -3593,6 +3992,18 @@ function MessageBubble({
   return (
     <div
       id={`msg-${msg.id}`}
+      ref={rowRef}
+      /* Focusable so the keyboard can reach the message menu:
+         Shift+F10 / the ContextMenu key open it (same as right-click). */
+      tabIndex={isDeleted ? undefined : 0}
+      aria-label={isDeleted ? undefined : `${authorName} ${time}`}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          e.preventDefault();
+          openMenuFrom(e.currentTarget);
+        }
+      }}
       onContextMenu={(e) => {
         if (isDeleted) return;
         e.preventDefault();
@@ -3619,10 +4030,24 @@ function MessageBubble({
           longPressRef.current = null;
         }
       }}
-      className={`group relative flex gap-2 px-2 -mx-2 rounded-lg ${
+      className={`group relative flex gap-2 px-2 -mx-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] transition-colors ${
         isSelf ? "flex-row-reverse" : ""
-      } ${showAuthor ? "mt-3" : "mt-0.5"}`}
+      } ${showAuthor ? "mt-3" : "mt-0.5"} ${highlighted ? "bg-[#567FB2]/10" : ""}`}
     >
+      {/* "More" — the pointer-free route to the same menu as right-click /
+          long-press. Appears on hover and on keyboard focus only, beside the
+          bubble, so the approved bubble itself is unchanged. */}
+      {!isDeleted && !isEditing && (
+        <button
+          type="button"
+          onClick={(e) => openMenuFrom(e.currentTarget)}
+          aria-label={t("msg.more", "More actions")}
+          aria-haspopup="menu"
+          className={`absolute top-0 ${isSelf ? "start-2" : "end-2"} z-[1] h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:text-[var(--text-primary)] transition-opacity`}
+        >
+          <MoreHorizontalIcon className="h-3.5 w-3.5" />
+        </button>
+      )}
       {showAuthor ? (
         <Avatar
           name={authorName}
@@ -3724,7 +4149,7 @@ function MessageBubble({
                     first-party route, which re-checks membership on every Range
                     request while seeking. */}
                 <VoicePlaybackBubble
-                  src={discussAttachmentUrl(msg.id, voiceMedia.index)}
+                  src={discussAttachmentUrl(msg.id, voiceMedia.index) ?? localPreviews?.[voiceMedia.index] ?? null}
                   durationMs={voiceMedia.duration_ms ?? 0}
                   waveform={voiceMedia.waveform ?? []}
                 />
@@ -3765,7 +4190,7 @@ function MessageBubble({
             {meta.products && meta.products.length > 0 && (
               <div className={`flex flex-wrap gap-2 ${isProductOnly ? "" : "mt-1.5"}`}>
                 {meta.products.map((p, i) => (
-                  <ProductChip key={`${msg.id}-p-${i}`} product={p} />
+                  <ProductChip key={`${msg.id}-p-${i}`} product={p} t={t} />
                 ))}
               </div>
             )}
@@ -3784,6 +4209,7 @@ function MessageBubble({
                     key={rx.emoji}
                     type="button"
                     onClick={() => onToggleReaction(msg.id, rx.emoji)}
+                    aria-pressed={rx.reacted_by_me}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
                       rx.reacted_by_me
                         ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-secondary)]"
@@ -3796,7 +4222,8 @@ function MessageBubble({
                 ))}
                 <button
                   type="button"
-                  onClick={(e) => openMenu(e.clientX, e.clientY)}
+                  onClick={(e) => openMenuFrom(e.currentTarget)}
+                  aria-label={t("msg.react", "Add reaction")}
                   className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 >
                   <SmileIcon className="h-3 w-3" />
@@ -3845,11 +4272,12 @@ function MessageBubble({
                   <button
                     key={emoji}
                     type="button"
+                    aria-label={emoji}
                     onClick={() => {
                       onToggleReaction(msg.id, emoji);
                       closeMenu();
                     }}
-                    className="h-8 w-8 rounded-lg text-[16px] hover:bg-[var(--bg-surface)] transition-colors"
+                    className="h-8 w-8 rounded-lg text-[16px] hover:bg-[var(--bg-surface)] focus-visible:bg-[var(--bg-surface)] outline-none transition-colors"
                   >
                     {emoji}
                   </button>
@@ -3964,10 +4392,10 @@ function MessageMenuItem({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start transition-colors ${
+      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium text-start outline-none transition-colors ${
         danger
-          ? "text-red-400 hover:bg-red-500/10"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+          ? "text-red-400 hover:bg-red-500/10 focus-visible:bg-red-500/10"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] focus-visible:bg-[var(--bg-surface)] focus-visible:text-[var(--text-primary)]"
       }`}
     >
       <span className={danger ? "text-red-400" : "text-[var(--text-dim)]"}>
@@ -3986,7 +4414,7 @@ function ReplyPreviewPill({
   t: (key: string, fallback?: string) => string;
 }) {
   const author =
-    preview.author_full_name || preview.author_username || "Unknown";
+    preview.author_full_name || preview.author_username || t("channel.unknown", "Unknown");
   const body = preview.deleted_at
     ? t("reply.deletedParent", "Original message deleted")
     : (preview.body ?? "").slice(0, 120);
@@ -4016,105 +4444,6 @@ function ReplyPreviewPill({
    It is never persisted and never reaches another user. When neither URL is
    available the chip renders non-interactive rather than falling back to the
    public URL. (Discuss Stabilization Unit 2 — P0.) */
-/* ── Full-screen photo viewer ─────────────────────────────────────────────
-   Replaces "open the image in a new tab". In the desktop shell a new tab has
-   no chrome and therefore NO WAY BACK — the user is stranded on the picture.
-   This is an in-app overlay instead:
-     · click ANYWHERE outside the picture → close (the backdrop owns the click;
-       the image stops propagation so clicking the photo itself never closes);
-     · Escape → close;
-     · right-click the photo → Save image (the native menu is unavailable in
-       the packaged app, so the action is provided explicitly);
-     · the picture is shown at its natural size, capped to the viewport. */
-function PhotoLightbox({
-  src,
-  downloadHref,
-  name,
-  onClose,
-  t,
-}: {
-  src: string;
-  downloadHref: string | null;
-  name: string;
-  onClose: () => void;
-  t: (key: string, fallback?: string) => string;
-}) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); onClose(); }
-    };
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
-  const save = () => {
-    setMenu(null);
-    const a = document.createElement("a");
-    a.href = downloadHref ?? src;
-    a.download = name || "photo";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={onClose}
-      onContextMenu={(e) => { e.preventDefault(); onClose(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={name}
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t("common.close", "Close")}
-        className="absolute top-4 end-4 h-9 w-9 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
-      >
-        <CrossIcon className="h-4 w-4" />
-      </button>
-
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={name}
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenu({ x: e.clientX, y: e.clientY });
-        }}
-        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl select-none"
-        draggable={false}
-      />
-
-      {menu && (
-        <div
-          className="fixed z-[101] min-w-[160px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl py-1"
-          style={{ left: Math.min(menu.x, window.innerWidth - 180), top: Math.min(menu.y, window.innerHeight - 60) }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={save}
-            className="w-full text-start px-3 py-2 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-          >
-            {t("photo.save", "Save image")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AttachmentChip({
   attachment,
   messageId,
@@ -4147,6 +4476,9 @@ function AttachmentChip({
       <img
         src={imgSrc ?? undefined}
         alt={attachment.name}
+        /* Off-screen history should not download every photo up front. */
+        loading="lazy"
+        decoding="async"
         className={
           bare
             ? "block w-auto max-w-full max-h-[380px] h-auto object-contain"
@@ -4228,7 +4560,7 @@ function AttachmentChip({
    machine on a white studio background is never cropped or tinted, and the
    image rides cdnImage() (first-party, 384px) so it paints fast and stays
    reachable from mainland China. */
-function ProductChip({ product }: { product: DiscussProductRef }) {
+function ProductChip({ product, t }: { product: DiscussProductRef; t: TFn }) {
   return (
     <Link
       href={`/products/${product.slug}`}
@@ -4240,6 +4572,8 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
           <img
             src={cdnImage(product.image, { width: 384, quality: 75 })}
             alt={product.name}
+            width={384}
+            height={288}
             loading="lazy"
             decoding="async"
             className="max-h-full max-w-full object-contain"
@@ -4258,7 +4592,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
           </span>
           <span className="shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors">
             <PackageIcon className="h-3 w-3" />
-            View
+            {t("product.viewShort", "View")}
           </span>
         </div>
       </div>
@@ -4282,7 +4616,7 @@ function ThreadEmptyState({
       <div className="h-14 w-14 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
         {channel.kind === "direct" ? (
           <Avatar
-            name={displayNameFor(channel)}
+            name={displayNameFor(channel, t)}
             url={channel.other?.avatar_url}
             size={44}
           />
@@ -4298,11 +4632,11 @@ function ThreadEmptyState({
           {channel.kind === "direct"
             ? t("thread.empty.direct").replace(
                 "{name}",
-                displayNameFor(channel),
+                displayNameFor(channel, t),
               )
             : t("thread.empty.channel").replace(
                 "{name}",
-                channel.name ?? "channel",
+                displayNameFor(channel, t),
               )}
         </div>
       </div>
@@ -4365,7 +4699,7 @@ function Composer({
     blob: Blob;
     durationMs: number;
     waveform: number[];
-  }) => void;
+  }) => Promise<void>;
   uploading: boolean;
   sending: boolean;
   onSend: () => void;
@@ -4443,7 +4777,7 @@ function Composer({
               )}
             </div>
             <div className="text-[11px] text-[var(--text-muted)] truncate">
-              {(replyTarget.body ?? "").slice(0, 140) || "(no text)"}
+              {(replyTarget.body ?? "").slice(0, 140) || t("reply.noText", "(no text)")}
             </div>
           </div>
           <button
@@ -4461,9 +4795,9 @@ function Composer({
       {voiceOpen && (
         <div className="mb-2">
           <VoiceRecorder
-            onSend={(input) => {
-              onSendVoice(input);
-            }}
+            /* Returned (not voided): a rejected send keeps the recorder in
+               preview so the clip can be retried. */
+            onSend={(input) => onSendVoice(input)}
             onCancel={onCloseVoice}
             labels={{
               start: t("voice.start", "Start"),
@@ -4530,6 +4864,7 @@ function Composer({
               <button
                 type="button"
                 onClick={() => onRemoveAttachment(i)}
+                aria-label={t("composer.removeAttachment", "Remove attachment")}
                 className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors"
               >
                 <CrossIcon className="h-3 w-3" />
@@ -4549,6 +4884,7 @@ function Composer({
               <button
                 type="button"
                 onClick={() => onRemoveProduct(i)}
+                aria-label={t("btn.remove", "Remove")}
                 className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors"
               >
                 <CrossIcon className="h-3 w-3" />
@@ -4566,20 +4902,21 @@ function Composer({
           onChange={onChange}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
+          aria-label={placeholder}
           rows={2}
           className="w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
         />
         <div className="flex items-center gap-1 px-2 pb-2">
-          <ComposerIconButton title="Attach file" onClick={onPickFile}>
+          <ComposerIconButton title={t("composer.attach", "Attach files")} onClick={onPickFile}>
             <PaperclipIcon className="h-4 w-4" />
           </ComposerIconButton>
-          <ComposerIconButton title="Mention" onClick={onOpenMentionPicker}>
+          <ComposerIconButton title={t("composer.mention", "Mention someone")} onClick={onOpenMentionPicker}>
             <AtSignIcon className="h-4 w-4" />
           </ComposerIconButton>
-          <ComposerIconButton title="Product" onClick={onOpenProductPicker}>
+          <ComposerIconButton title={t("composer.product", "Mention product")} onClick={onOpenProductPicker}>
             <PackageIcon className="h-4 w-4" />
           </ComposerIconButton>
-          <ComposerIconButton title="Emoji" onClick={onOpenEmojiPicker}>
+          <ComposerIconButton title={t("composer.emoji", "Emoji")} onClick={onOpenEmojiPicker}>
             <SmileIcon className="h-4 w-4" />
           </ComposerIconButton>
           <ComposerIconButton
@@ -4594,7 +4931,7 @@ function Composer({
           {uploading && (
             <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
               <SpinnerIcon className="h-3 w-3" />
-              Uploading…
+              {t("composer.uploading", "Uploading…")}
             </span>
           )}
 
@@ -4637,6 +4974,7 @@ function ComposerIconButton({
     <button
       type="button"
       title={title}
+      aria-label={title}
       disabled={disabled}
       onClick={onClick}
       className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-30 disabled:pointer-events-none"
@@ -4650,10 +4988,16 @@ function ComposerIconButton({
    DETAILS PANE
    ═══════════════════════════════════════════════════════════════════════════ */
 
+type DetailsView = "main" | "pinned" | "starred" | "files" | "photos";
+
 function DetailsPane({
   channel,
   members,
-  linkedContact,
+  messages,
+  currentAccountId,
+  lang,
+  onJump,
+  onOpenSearch,
   notificationPref,
   onSetNotificationPref,
   onClose,
@@ -4661,34 +5005,206 @@ function DetailsPane({
 }: {
   channel: DiscussChannelWithState;
   members: Array<DiscussMemberRow & { author: DiscussAuthor }>;
-  linkedContact: DiscussLinkedContact | null;
+  /** The loaded thread — Files / Photos are derived from it. */
+  messages: DiscussMessageWithAuthor[];
+  currentAccountId: string;
+  lang: string;
+  onJump: (messageId: string) => void;
+  onOpenSearch: () => void;
   notificationPref: DiscussNotificationPref;
   onSetNotificationPref: (pref: DiscussNotificationPref) => void;
   onClose: () => void;
-  t: (key: string, fallback?: string) => string;
+  t: TFn;
 }) {
   const isCustomer = channel.kind === "customer";
+  const linkedContact = channel.linked_contact ?? null;
+  const [view, setView] = useState<DetailsView>("main");
+  const [remote, setRemote] = useState<{ key: string; rows: DiscussMessageWithAuthor[] } | null>(null);
+
+  /* Pinned / Starred come from the gated state route (membership-checked
+     server-side); keyed by view+channel so a stale answer never shows. */
+  const remoteKey = view === "pinned" || view === "starred" ? `${view}:${channel.id}` : null;
+  useEffect(() => {
+    if (!remoteKey) return;
+    let cancelled = false;
+    const p = view === "pinned"
+      ? fetchPinnedMessages(channel.id, currentAccountId)
+      : fetchStarredMessages(currentAccountId, channel.id);
+    void p.then((rows) => {
+      if (cancelled) return;
+      setRemote({ key: remoteKey, rows });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [remoteKey, view, channel.id, currentAccountId]);
+
+  /* Files / Photos: the media of the messages loaded in this conversation. */
+  const mediaItems = useMemo(() => {
+    const out: Array<{ msg: DiscussMessageWithAuthor; media: DiscussMediaPublic }> = [];
+    for (const m of messages) {
+      if (m.deleted_at || m.id.startsWith("temp_") || m.channel_id !== channel.id) continue;
+      for (const md of (m.metadata?.media ?? []) as DiscussMediaPublic[]) {
+        if (md.kind !== "attachment") continue;
+        out.push({ msg: m, media: md });
+      }
+    }
+    return out.reverse(); // newest first
+  }, [messages, channel.id]);
+  const photos = mediaItems.filter((x) => x.media.type.startsWith("image/"));
+  const files = mediaItems.filter((x) => !x.media.type.startsWith("image/"));
+
+  const viewTitle: Record<DetailsView, string> = {
+    main: t("header.details"),
+    pinned: t("details.pinned", "Pinned messages"),
+    starred: t("sidebar.starred", "Starred"),
+    files: t("details.files", "Shared files"),
+    photos: t("details.photos", "Photos & videos"),
+  };
+
+  const renderMessageRows = (rows: DiscussMessageWithAuthor[], emptyText: string) =>
+    rows.length === 0 ? (
+      <div className="p-6 text-center text-[11.5px] text-[var(--text-dim)]">{emptyText}</div>
+    ) : (
+      <div className="flex flex-col gap-1">
+        {rows.map((m) => {
+          const who = m.author?.full_name || m.author?.username || t("channel.unknown", "Unknown");
+          const media = (m.metadata?.media ?? []) as DiscussMediaPublic[];
+          const text =
+            (m.body ?? "").trim() ||
+            (media.some((x) => x.kind === "voice")
+              ? t("preview.voice", "Voice message")
+              : media.some((x) => x.type.startsWith("image/"))
+                ? t("preview.photo", "📷 Photo")
+                : media.length
+                  ? t("preview.file", "📎 File")
+                  : "");
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onJump(m.id)}
+              className="w-full text-start px-2 py-2 rounded-md hover:bg-[var(--bg-surface)] transition-colors"
+            >
+              <div className="flex items-baseline gap-2 text-[11px]">
+                <span className="font-semibold text-[var(--text-primary)] truncate">{who}</span>
+                <span className="text-[var(--text-dim)] tabular-nums shrink-0">
+                  {discussListStamp(m.created_at, lang, t("thread.yesterday", "Yesterday"))}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[12px] text-[var(--text-muted)] line-clamp-2 break-words">{text}</div>
+            </button>
+          );
+        })}
+      </div>
+    );
+
+  let body: React.ReactNode = null;
+  if (view === "pinned" || view === "starred") {
+    const fresh = !!remote && remote.key === remoteKey;
+    const rows = fresh ? remote.rows : [];
+    body = !fresh ? (
+      <div className="p-6 flex justify-center"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>
+    ) : renderMessageRows(
+      rows,
+      view === "pinned"
+        ? t("pinned.panel.empty", "No pinned messages yet")
+        : t("starred.view.empty", "You haven't saved anything yet"),
+    );
+  } else if (view === "photos") {
+    body = photos.length === 0 ? (
+      <div className="p-6 text-center text-[11.5px] text-[var(--text-dim)]">{t("details.none", "Nothing here yet")}</div>
+    ) : (
+      <div className="grid grid-cols-3 gap-1.5">
+        {photos.map(({ msg, media }) => {
+          const src = discussAttachmentUrl(msg.id, media.index);
+          return (
+            <button
+              key={`${msg.id}-${media.index}`}
+              type="button"
+              onClick={() => onJump(msg.id)}
+              aria-label={media.name}
+              className="aspect-square rounded-md overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+            >
+              {src && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={src} alt={media.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  } else if (view === "files") {
+    body = files.length === 0 ? (
+      <div className="p-6 text-center text-[11.5px] text-[var(--text-dim)]">{t("details.none", "Nothing here yet")}</div>
+    ) : (
+      <div className="flex flex-col gap-1">
+        {files.map(({ msg, media }) => {
+          const href = discussAttachmentUrl(msg.id, media.index, { download: true });
+          return (
+            <div key={`${msg.id}-${media.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface)]">
+              <DocumentIcon className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
+              <button type="button" onClick={() => onJump(msg.id)} className="min-w-0 flex-1 text-start">
+                <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{media.name}</div>
+                <div className="text-[10.5px] text-[var(--text-dim)]">
+                  {formatBytes(media.size)} · {discussListStamp(msg.created_at, lang, t("thread.yesterday", "Yesterday"))}
+                </div>
+              </button>
+              {href && (
+                <a
+                  href={href}
+                  download={media.name}
+                  aria-label={t("file.download", "Download")}
+                  className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+                >
+                  <DownloadIcon className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-0 h-full">
-      <div className="shrink-0 h-14 px-4 flex items-center justify-between border-b border-[var(--border-subtle)]">
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">
-          {t("header.details")}
+      <div className="shrink-0 h-14 px-4 flex items-center justify-between gap-2 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {view !== "main" && (
+            <button
+              type="button"
+              onClick={() => setView("main")}
+              aria-label={t("back", "Back")}
+              className="-ms-2 h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+            >
+              <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
+            </button>
+          )}
+          <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+            {viewTitle[view]}
+          </div>
         </div>
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("btn.close", "Close")}
           className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
         >
           <CrossIcon className="h-4 w-4" />
         </button>
       </div>
 
+      {view !== "main" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">{body}</div>
+      ) : (
       <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-5">
         {/* Channel heading */}
         <div className="flex flex-col items-center text-center gap-2">
           {channel.kind === "direct" ? (
             <Avatar
-              name={displayNameFor(channel)}
+              name={displayNameFor(channel, t)}
               url={channel.other?.avatar_url}
               size={64}
             />
@@ -4704,7 +5220,7 @@ function DetailsPane({
             </div>
           )}
           <div className="text-[15px] font-bold text-[var(--text-primary)]">
-            {displayNameFor(channel)}
+            {displayNameFor(channel, t)}
           </div>
           {channel.kind === "direct" && altNameFor(channel) && (
             <div lang="zh" className="text-[12px] text-[var(--text-dim)] -mt-1">
@@ -4724,7 +5240,7 @@ function DetailsPane({
         </div>
 
         {/* Customer contact card — only for customer-chat channels with a
-            linked CRM contact. Phase E. */}
+            linked CRM contact. Comes with the channel list (myChannels). */}
         {isCustomer && linkedContact && (
           <section>
             <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
@@ -4734,12 +5250,12 @@ function DetailsPane({
           </section>
         )}
 
-        {/* Notification preferences — Phase D */}
+        {/* Notification preferences */}
         <section>
           <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
             {t("details.notifications", "Notifications")}
           </div>
-          <div className="flex flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+          <div role="radiogroup" aria-label={t("details.notifications", "Notifications")} className="flex flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
             <NotifPrefRow
               label={t("details.notif.all", "Everything")}
               active={notificationPref === "all"}
@@ -4804,31 +5320,43 @@ function DetailsPane({
           </section>
         )}
 
-        {/* Quick-actions stub */}
+        {/* Lists — each row opens a real list of this conversation's items. */}
         <section>
           <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
             {t("details.more", "More")}
           </div>
           <div className="flex flex-col gap-1">
             <DetailsRow
+              icon={<SearchIcon className="h-3.5 w-3.5" />}
+              label={t("header.search", "Search in conversation")}
+              onClick={onOpenSearch}
+            />
+            <DetailsRow
               icon={<PinIcon className="h-3.5 w-3.5" />}
               label={t("details.pinned")}
+              onClick={() => setView("pinned")}
             />
             <DetailsRow
               icon={<StarIcon className="h-3.5 w-3.5" />}
               label={t("sidebar.starred")}
+              onClick={() => setView("starred")}
             />
             <DetailsRow
               icon={<DocumentIcon className="h-3.5 w-3.5" />}
               label={t("details.files")}
+              count={files.length}
+              onClick={() => setView("files")}
             />
             <DetailsRow
               icon={<ImageIcon className="h-3.5 w-3.5" />}
               label={t("details.photos")}
+              count={photos.length}
+              onClick={() => setView("photos")}
             />
           </div>
         </section>
       </div>
+      )}
     </div>
   );
 }
@@ -4845,6 +5373,8 @@ function NotifPrefRow({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onClick}
       className={`h-9 px-3 flex items-center gap-2 text-[12px] font-medium transition-colors text-start ${
         active
@@ -4867,285 +5397,27 @@ function NotifPrefRow({
 function DetailsRow({
   icon,
   label,
+  count,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  count?: number;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="h-9 px-2 rounded-md flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
     >
       <span className="text-[var(--text-dim)]">{icon}</span>
-      <span className="flex-1 text-left">{label}</span>
-      <MoreHorizontalIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+      <span className="flex-1 text-start">{label}</span>
+      {typeof count === "number" && count > 0 && (
+        <span className="text-[10.5px] tabular-nums text-[var(--text-dim)]">{count}</span>
+      )}
+      <AngleRightIcon className="h-3.5 w-3.5 text-[var(--text-dim)] rtl:rotate-180" />
     </button>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MODAL SHELL — shared dark-dimmed backdrop + centered card
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function ModalShell({
-  title,
-  onCancel,
-  children,
-  width = 480,
-}: {
-  title: string;
-  onCancel: () => void;
-  children: React.ReactNode;
-  width?: number;
-}) {
-  useScrollLock();
-  /* Dismiss with Escape, and by clicking the dimmed backdrop (target ===
-     currentTarget means the click landed on the overlay itself, not the panel
-     or its contents). Previously the only way out was picking a person or
-     finding the small X — clicking outside did nothing. */
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-  return (
-    <div
-      className="fixed inset-0 z-50 flex overflow-y-auto p-4 bg-black/60 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-      role="presentation"
-    >
-      {/* m-auto centres the panel both axes AND keeps it scrollable if it is
-          ever taller than the viewport (items-center would clip the top). */}
-      <div
-        className="m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
-        style={{ maxWidth: width }}
-      >
-        <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
-          >
-            <CrossIcon className="h-4 w-4" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   NEW CHANNEL MODAL
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function NewChannelModal({
-  recipients,
-  currentAccountId,
-  onCancel,
-  onCreate,
-  t,
-}: {
-  recipients: Recipient[];
-  currentAccountId: string;
-  onCancel: () => void;
-  onCreate: (input: {
-    name: string;
-    description?: string;
-    kind: "group" | "channel";
-    memberIds: string[];
-  }) => void;
-  t: (key: string, fallback?: string) => string;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [kind, setKind] = useState<"group" | "channel">("channel");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-
-  const candidates = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return recipients
-      .filter((r) => r.id !== currentAccountId)
-      .filter(
-        (r) =>
-          !q ||
-          r.username.toLowerCase().includes(q) ||
-          (r.full_name ?? "").toLowerCase().includes(q),
-      );
-  }, [recipients, currentAccountId, search]);
-
-  const canSubmit = name.trim().length > 0;
-
-  return (
-    <ModalShell title={t("new.channel.title")} onCancel={onCancel} width={520}>
-      <div className="p-5 flex flex-col gap-4">
-        {/* Kind toggle */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setKind("channel")}
-            className={`p-3 rounded-lg border text-start transition-colors ${
-              kind === "channel"
-                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
-                : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
-              <HashtagIcon className="h-3.5 w-3.5" />
-              {t("new.channel.public")}
-            </div>
-            <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
-              {t("new.channel.publicDesc")}
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setKind("group")}
-            className={`p-3 rounded-lg border text-start transition-colors ${
-              kind === "group"
-                ? "border-[var(--border-strong)] bg-[var(--bg-surface-active)]"
-                : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
-              <LockIcon className="h-3.5 w-3.5" />
-              {t("new.channel.private")}
-            </div>
-            <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
-              {t("new.channel.privateDesc")}
-            </div>
-          </button>
-        </div>
-
-        {/* Name + description */}
-        <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-            {t("new.channel.name")}
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("new.channel.namePh")}
-            className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] outline-none text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)]"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-            {t("new.channel.description")}
-          </label>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t("new.channel.topicPh")}
-            className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] outline-none text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)]"
-          />
-        </div>
-
-        {/* Members picker */}
-        <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-            {t("details.members")}
-          </label>
-          <div className="rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] max-h-[240px] overflow-hidden flex flex-col">
-            <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
-              <SearchIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("sidebar.search")}
-                className="flex-1 bg-transparent text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
-              />
-            </div>
-            <div className="overflow-y-auto">
-              {candidates.map((r) => {
-                const isOn = selected.has(r.id);
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() =>
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        if (isOn) next.delete(r.id);
-                        else next.add(r.id);
-                        return next;
-                      })
-                    }
-                    className={`w-full px-3 py-2 flex items-center gap-2.5 text-start transition-colors ${
-                      isOn ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-primary)]"
-                    }`}
-                  >
-                    <Avatar
-                      name={r.full_name || r.username}
-                      url={r.avatar_url}
-                      size={28}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">
-                        {r.full_name || r.username}
-                        {nativeAltOf(r.full_name, r.name_alt) && (
-                          <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
-                            {nativeAltOf(r.full_name, r.name_alt)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-[var(--text-dim)] truncate">
-                        @{r.username}
-                        {r.role_name && (
-                          <span className="ms-1.5">· {r.role_name}</span>
-                        )}
-                      </div>
-                    </div>
-                    {isOn && <CheckIcon className="h-4 w-4 text-[var(--text-secondary)]" />}
-                  </button>
-                );
-              })}
-              {candidates.length === 0 && (
-                <div className="p-4 text-center text-[11px] text-[var(--text-dim)]">
-                  {t("search.noResults")}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="shrink-0 h-14 px-4 flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-8 px-3 rounded-lg text-[11.5px] font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-surface)] transition-colors"
-        >
-          {t("btn.cancel")}
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() =>
-            onCreate({
-              name: name.trim(),
-              description: description.trim() || undefined,
-              kind,
-              memberIds: Array.from(selected),
-            })
-          }
-          className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
-        >
-          {t("new.channel.create")}
-        </button>
-      </div>
-    </ModalShell>
   );
 }
 
@@ -5176,7 +5448,7 @@ function NewDmModal({
   }, [recipients, search]);
 
   return (
-    <ModalShell title={t("new.dm.title")} onCancel={onCancel} width={440}>
+    <ModalShell title={t("new.dm.title")} onCancel={onCancel} width={440} closeLabel={t("btn.close", "Close")}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
           <SearchIcon className="h-4 w-4 text-[var(--text-dim)]" />
@@ -5230,337 +5502,6 @@ function NewDmModal({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PRODUCT PICKER MODAL
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/** "industrial-sewing-machines" → "Industrial Sewing Machines". The taxonomy
- *  is stored as slugs; nobody should have to read a slug in a picker. */
-function humanizeSlug(slug: string): string {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((w) => (w.length <= 2 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
-    .join(" ");
-}
-
-/** One filter chip: label + count. Monochrome; the active chip is the only
- *  inverted surface in the rail (Koleex brand — colour is functional only). */
-function FacetChip({
-  label, count, active = false, onClick,
-}: {
-  label: string;
-  count: number;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      className={`shrink-0 h-7 px-2.5 rounded-full border text-[11px] font-medium inline-flex items-center gap-1.5 transition-colors ${
-        active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-          : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      <span className="max-w-[150px] truncate">{label}</span>
-      <span className={`tabular-nums text-[10px] ${active ? "opacity-70" : "text-[var(--text-faint)]"}`}>
-        {count}
-      </span>
-    </button>
-  );
-}
-
-function ProductPicker({
-  products,
-  images,
-  loading = false,
-  onCancel,
-  onSelect,
-  t,
-}: {
-  products: ProductRow[];
-  images: Record<string, string>;
-  /** True while the lazy catalog fetch (first open) is in flight. */
-  loading?: boolean;
-  onCancel: () => void;
-  onSelect: (p: ProductRow) => void;
-  t: (key: string, fallback?: string) => string;
-}) {
-  const [search, setSearch] = useState("");
-  /* ── Classification drill-down ──────────────────────────────────────────
-     ONE row of chips at a time, never a stack. Tapping a category REPLACES
-     the row with that category's subcategories behind a back chip, so the
-     filter never grows past a single line no matter how deep the taxonomy is.
-
-     A level is shown only when it actually discriminates: this catalogue has
-     700 of 706 products in ONE division, so a division row would be a single
-     dead chip. The row is derived from the data rather than hardcoded to
-     division > category > subcategory, so it stays right if that changes. */
-  const [drill, setDrill] = useState<{ category: string | null; subcategory: string | null }>(
-    { category: null, subcategory: null },
-  );
-
-  // Full-text haystack per product (built once): name, code, brand, the whole
-  // classification path, tags, copy, compliance, specs — everything. Lets the
-  // search match on any attribute, not just name/code/brand.
-  const haystacks = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const p of products) m.set(p.id, buildProductHaystack(p));
-    return m;
-  }, [products]);
-
-  /* Counts for the current level. Derived from the products actually in
-     scope, so a chip never promises results it cannot deliver. */
-  const facets = useMemo(() => {
-    const scope = drill.category
-      ? products.filter((p) => p.category_slug === drill.category)
-      : products;
-    const key = drill.category ? "subcategory_slug" : "category_slug";
-    const counts = new Map<string, number>();
-    for (const p of scope) {
-      const v = (p as unknown as Record<string, string | null>)[key];
-      if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
-    }
-    return {
-      scopeTotal: scope.length,
-      items: [...counts.entries()].sort((x, y) => y[1] - x[1]),
-    };
-  }, [products, drill.category]);
-
-  /* Browse order. The default used to be raw API order — newest first — and
-     of the newest 60 exactly ONE had a photo, so the picker looked both empty
-     of images and (capped at 60) missing most of the catalogue. Ordering by
-     "has a photo" then name puts the recognisable products first; everything
-     is still reachable by scrolling or search. */
-  const ordered = useMemo(() => {
-    const withImg = (p: ProductRow) => (images[p.id] ? 0 : 1);
-    const scoped = products.filter(
-      (p) =>
-        (!drill.category || p.category_slug === drill.category) &&
-        (!drill.subcategory || p.subcategory_slug === drill.subcategory),
-    );
-    return [...scoped].sort(
-      (a2, b2) =>
-        withImg(a2) - withImg(b2) ||
-        stripHtmlText(a2.product_name).localeCompare(stripHtmlText(b2.product_name)),
-    );
-  }, [products, images, drill.category, drill.subcategory]);
-
-  const filtered = useMemo(() => {
-    const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return ordered;
-    // Every token must appear (AND) so multi-word queries narrow results.
-    return ordered.filter((p) => {
-      const h = haystacks.get(p.id) ?? "";
-      return tokens.every((tok) => h.includes(tok));
-    });
-  }, [ordered, search, haystacks]);
-
-  /* Progressive reveal instead of a hard cap: 706 cards mounted at once is a
-     long frame, but a 60-item CEILING is what made most of the catalogue
-     unreachable. Render a window and grow it as the user scrolls — every
-     product is reachable, and the first paint stays cheap. */
-  const PAGE = 60;
-  const [visibleCount, setVisibleCount] = useState(PAGE);
-  useEffect(() => { setVisibleCount(PAGE); }, [search, drill.category, drill.subcategory]);
-  const shown = filtered.slice(0, visibleCount);
-
-  return (
-    <ModalShell title={t("composer.product")} onCancel={onCancel} width={640}>
-      <div className="p-5 flex flex-col gap-3">
-        <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-          <SearchIcon className="h-4 w-4 text-[var(--text-dim)]" />
-          <input
-            type="text"
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("composer.productSearch", "Search by name, code, brand, category, tags…")}
-            className="flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
-          />
-        </div>
-        {loading ? (
-          <div className="p-10 flex justify-center">
-            <SpinnerIcon size={18} className="text-[var(--text-dim)]" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-[11px] text-[var(--text-dim)]">
-            {t("search.noResults")}
-          </div>
-        ) : (
-          /* Grid of photo cards — same grammar as the To-do product picker:
-             white photo area (object-contain so machines aren't cropped),
-             model code first, product name beneath. */
-          <>
-          {/* ── One-line classification rail ──────────────────────────────
-              Horizontally scrollable, monochrome (Koleex brand: the active
-              state is the ONLY inverted element — no colour is spent on
-              decoration). Shows counts so the user knows what a chip costs
-              before tapping it. When drilled in, the first chip walks back
-              out — the trail never occupies a second row. */}
-          {facets.items.length > 1 && (
-            <div className="-mx-1 px-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-              {drill.category ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setDrill({ category: null, subcategory: null })}
-                    className="shrink-0 h-7 ps-1.5 pe-2.5 rounded-full border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] inline-flex items-center gap-1 transition-colors"
-                  >
-                    <AngleLeftIcon className="h-3 w-3 rtl:rotate-180" />
-                    {humanizeSlug(drill.category)}
-                  </button>
-                  <FacetChip
-                    label={t("picker.all", "All")}
-                    count={facets.scopeTotal}
-                    active={!drill.subcategory}
-                    onClick={() => setDrill((d) => ({ ...d, subcategory: null }))}
-                  />
-                  {facets.items.map(([slug, n]) => (
-                    <FacetChip
-                      key={slug}
-                      label={humanizeSlug(slug)}
-                      count={n}
-                      active={drill.subcategory === slug}
-                      onClick={() =>
-                        setDrill((d) => ({
-                          ...d,
-                          subcategory: d.subcategory === slug ? null : slug,
-                        }))
-                      }
-                    />
-                  ))}
-                </>
-              ) : (
-                <>
-                  <FacetChip
-                    label={t("picker.all", "All")}
-                    count={products.length}
-                    active
-                    onClick={() => setDrill({ category: null, subcategory: null })}
-                  />
-                  {facets.items.map(([slug, n]) => (
-                    <FacetChip
-                      key={slug}
-                      label={humanizeSlug(slug)}
-                      count={n}
-                      onClick={() => setDrill({ category: slug, subcategory: null })}
-                    />
-                  ))}
-                </>
-              )}
-            </div>
-          )}
-          <p className="text-[10.5px] text-[var(--text-faint)] -mt-1">
-            {t("composer.productCount", "Showing {n} of {total}")
-              .replace("{n}", String(shown.length))
-              .replace("{total}", String(filtered.length))}
-          </p>
-          <div
-            className="max-h-[420px] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 p-0.5"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
-                setVisibleCount((n) => (n < filtered.length ? n + PAGE : n));
-              }
-            }}
-          >
-            {shown.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onSelect(p)}
-                className="group text-start rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)] bg-[var(--bg-surface)] overflow-hidden transition-all"
-                title={stripHtmlText(p.product_name)}
-              >
-                <div className="aspect-square w-full bg-white flex items-center justify-center overflow-hidden p-2">
-                  {images[p.id] ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      /* Thumbnail-sized + first-party: the raw storage URL is a
-                         full-resolution product photo (hundreds of KB each,
-                         and *.supabase.co is unreliable from mainland China).
-                         cdnImage serves a 256px variant through our origin —
-                         orders of magnitude less to paint a grid. Lazy so
-                         off-screen cards cost nothing until scrolled to. */
-                      src={cdnImage(images[p.id], { width: 256, quality: 75 })}
-                      alt={stripHtmlText(p.product_name)}
-                      loading="lazy"
-                      decoding="async"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <PackageIcon className="h-8 w-8 text-black/20" />
-                  )}
-                </div>
-                <div className="p-2">
-                  <p className="text-[11.5px] font-semibold text-[var(--text-primary)] truncate">
-                    {p.slug}
-                  </p>
-                  <p className="text-[10.5px] text-[var(--text-dim)] truncate">
-                    {stripHtmlText(p.product_name)}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-          </>
-        )}
-      </div>
-    </ModalShell>
-  );
-}
-
-/* Some legacy product names carry raw HTML (e.g. "…with 2 iron<div>Table
-   size…</div>" or "<b>With Air Trimmer</b>"). Strip tags so the picker shows
-   clean text instead of leaking markup. */
-function stripHtmlText(s: string): string {
-  return s
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/* Flatten every searchable field of a product into one lowercase string so the
-   picker search matches on anything — identity, classification, copy, specs. */
-function buildProductHaystack(p: ProductRow): string {
-  const parts: Array<string | null | undefined> = [
-    p.product_name,
-    p.slug,
-    p.brand,
-    p.division_slug,
-    p.category_slug,
-    p.subcategory_slug,
-    p.level,
-    p.excerpt,
-    p.description,
-    p.hs_code,
-    p.machine_dimensions,
-    p.warranty,
-    p.warranty_type,
-    ...(p.tags ?? []),
-    ...(p.highlights ?? []),
-    ...(p.colors ?? []),
-    ...(p.voltage ?? []),
-    ...(p.plug_types ?? []),
-  ];
-  // Spec values (sizes, RPM, needle counts…) so they're searchable too.
-  if (p.specs && typeof p.specs === "object") {
-    for (const v of Object.values(p.specs)) {
-      if (v != null && (typeof v === "string" || typeof v === "number")) parts.push(String(v));
-    }
-  }
-  return parts
-    .filter(Boolean)
-    .map((s) => stripHtmlText(String(s)))
-    .join(" ")
-    .toLowerCase();
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
    MENTION PICKER MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -5587,7 +5528,7 @@ function MentionPicker({
   }, [recipients, search]);
 
   return (
-    <ModalShell title={t("composer.mention")} onCancel={onCancel} width={420}>
+    <ModalShell title={t("composer.mention")} onCancel={onCancel} width={420} closeLabel={t("btn.close", "Close")}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
           <AtSignIcon className="h-4 w-4 text-[var(--text-dim)]" />
@@ -5634,46 +5575,3 @@ function MentionPicker({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   EMOJI PICKER — compact static palette (full emoji search ships in Phase B)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-const EMOJI_PALETTE = [
-  "😀", "😁", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍",
-  "🥰", "😘", "😗", "😎", "🤓", "🧐", "🤔", "😐", "😑", "😶",
-  "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱",
-  "😴", "😌", "😛", "😜", "🤪", "😝", "🤤", "😒", "😓", "😔",
-  "😕", "🙁", "☹️", "😖", "😞", "😟", "😤", "😢", "😭", "😦",
-  "👍", "👎", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙",
-  "👏", "🙌", "👐", "🤲", "🤝", "🙏", "💪", "🦾", "❤️", "🧡",
-  "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕",
-  "🔥", "✨", "🎉", "🎊", "💯", "✅", "❌", "⭐", "🌟", "💡",
-  "🚀", "📦", "📩", "📅", "📈", "📉", "💼", "💰", "🎯", "🏆",
-];
-
-function EmojiPicker({
-  onCancel,
-  onSelect,
-}: {
-  onCancel: () => void;
-  onSelect: (emoji: string) => void;
-}) {
-  return (
-    <ModalShell title="Emoji" onCancel={onCancel} width={380}>
-      <div className="p-4">
-        <div className="grid grid-cols-10 gap-1">
-          {EMOJI_PALETTE.map((e, i) => (
-            <button
-              key={`${e}-${i}`}
-              type="button"
-              onClick={() => onSelect(e)}
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[20px] hover:bg-[var(--bg-surface)] transition-colors"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </div>
-    </ModalShell>
-  );
-}

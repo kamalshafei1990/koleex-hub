@@ -2,7 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { NOTE_LIMITS } from "@/lib/notes-policy";
+import { ilikeAny, isUuid, ownsFolder, validateNoteInput } from "@/lib/notes-server";
 
 /* GET  /api/notes — list notes owned by caller.
      Query params:
@@ -11,8 +13,19 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
        folder=all      everywhere (default when nothing else given)
        folder=pinned   only pinned
        folder=trash    only deleted (Recently Deleted)
-       search=X        full-text match on title + body_plain
+       folder=shared   notes other accounts shared with the caller
+       search=X        case-insensitive substring match on title + body_plain
+     List rows carry a SHORT body_plain preview (NOTE_LIMITS.preview chars),
+     never the full text, and at most NOTE_LIMITS.list rows.
    POST /api/notes — create a new note. */
+
+const COLS =
+  "id, account_id, folder_id, title, body_plain, color, tags, is_pinned, deleted_at, created_at, updated_at";
+
+function withPreview<T extends Record<string, unknown>>(row: T): T {
+  const plain = typeof row.body_plain === "string" ? row.body_plain : "";
+  return { ...row, body_plain: plain.slice(0, NOTE_LIMITS.preview) };
+}
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -23,10 +36,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const folderId = url.searchParams.get("folder_id");
   const folder = url.searchParams.get("folder");
-  const search = url.searchParams.get("search")?.trim();
+  const search = url.searchParams.get("search")?.trim().slice(0, NOTE_LIMITS.search);
 
-  const COLS =
-    "id, account_id, folder_id, title, body_plain, color, tags, is_pinned, is_locked, deleted_at, created_at, updated_at";
+  if (folderId && !isUuid(folderId)) {
+    return NextResponse.json({ notes: [] });
+  }
 
   /* ── "Shared with me" — notes owned by OTHER accounts that have been
         shared with the caller. Driven by note_shares, not account_id. ── */
@@ -45,11 +59,8 @@ export async function GET(req: Request) {
       .select(COLS + ", account:accounts!notes_account_id_fkey(username)")
       .in("id", ids)
       .is("deleted_at", null);
-    if (search) {
-      const term = `%${search}%`;
-      sq = sq.or(`title.ilike.${term},body_plain.ilike.${term}`);
-    }
-    sq = sq.order("updated_at", { ascending: false });
+    if (search) sq = sq.or(ilikeAny(["title", "body_plain"], search));
+    sq = sq.order("updated_at", { ascending: false }).limit(NOTE_LIMITS.list);
     const { data: sdata, error: serr } = await sq;
     if (serr) {
       console.error("[api/notes GET shared]", serr.message);
@@ -61,7 +72,7 @@ export async function GET(req: Request) {
       const { account: _drop, ...rest } = n;
       void _drop;
       return {
-        ...rest,
+        ...withPreview(rest),
         shared_role: permByNote.get(n.id as string) === "view" ? "viewer" : "editor",
         owner_name: ownerName ?? null,
       };
@@ -84,36 +95,33 @@ export async function GET(req: Request) {
     // folder === "all" or unspecified → no folder filter
   }
 
-  if (search) {
-    // Simple ilike fallback — avoids issues with tsquery parsing of
-    // partial words + non-English input. Works fine for the data
-    // sizes we're targeting (thousands of notes per user).
-    const term = `%${search}%`;
-    q = q.or(`title.ilike.${term},body_plain.ilike.${term}`);
-  }
+  if (search) q = q.or(ilikeAny(["title", "body_plain"], search));
 
   q = q
     .order("is_pinned", { ascending: false })
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(NOTE_LIMITS.list);
 
-  const { data, error } = await q;
-  if (error) {
-    console.error("[api/notes GET]", error.message);
+  /* The "is shared" flag comes from the caller's own outgoing shares — an
+     independent query, so it runs in parallel with the list instead of
+     waiting for the ids. Only the owner can share, so shared_by = caller
+     covers every share of the caller's notes. */
+  const [listRes, sharedRes] = await Promise.all([
+    q,
+    folder === "trash"
+      ? Promise.resolve({ data: [] as Array<{ note_id: string }> })
+      : supabaseServer.from("note_shares").select("note_id").eq("shared_by_account_id", auth.account_id),
+  ]);
+  if (listRes.error) {
+    console.error("[api/notes GET]", listRes.error.message);
     return NextResponse.json({ error: "Failed to load notes" }, { status: 500 });
   }
 
-  // Flag which of the caller's notes are shared with someone, so the list can
-  // show a "shared" indicator. (Skip for trash.)
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
-  if (folder !== "trash" && rows.length) {
-    const ids = rows.map((r) => r.id as string);
-    const { data: shares } = await supabaseServer
-      .from("note_shares")
-      .select("note_id")
-      .in("note_id", ids);
-    const sharedSet = new Set((shares ?? []).map((s) => s.note_id as string));
-    for (const r of rows) r.is_shared = sharedSet.has(r.id as string);
-  }
+  const sharedSet = new Set(((sharedRes.data ?? []) as Array<{ note_id: string }>).map((s) => s.note_id));
+  const rows = ((listRes.data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    ...withPreview(r),
+    is_shared: sharedSet.has(r.id as string),
+  }));
   return NextResponse.json({ notes: rows });
 }
 
@@ -123,22 +131,26 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Notes", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as {
-    title?: string;
-    body_json?: unknown;
-    body_plain?: string;
-    folder_id?: string | null;
-    is_pinned?: boolean;
-  };
+  let body: unknown;
+  try { body = await req.json(); } catch { body = {}; }
+  const v = validateNoteInput(body, "owner");
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  const input = v.value;
+
+  if (input.folder_id && !(await ownsFolder(input.folder_id, auth.account_id))) {
+    return NextResponse.json({ error: "Folder not found" }, { status: 400 });
+  }
 
   const row = {
     tenant_id: auth.tenant_id,
     account_id: auth.account_id,
-    folder_id: body.folder_id ?? null,
-    title: body.title ?? "",
-    body_json: body.body_json ?? null,
-    body_plain: body.body_plain ?? "",
-    is_pinned: body.is_pinned ?? false,
+    folder_id: input.folder_id ?? null,
+    title: input.title ?? "",
+    body_json: input.body_json ?? null,
+    body_plain: input.body_plain ?? "",
+    color: input.color ?? null,
+    tags: input.tags ?? [],
+    is_pinned: input.is_pinned ?? false,
   };
 
   const { data, error } = await supabaseServer
@@ -148,7 +160,7 @@ export async function POST(req: Request) {
     .single();
   if (error) {
     console.error("[api/notes POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create note" }, { status: 500 });
   }
-  return NextResponse.json({ note: data });
+  return NextResponse.json({ note: { ...data, role: "owner", is_shared: false } });
 }

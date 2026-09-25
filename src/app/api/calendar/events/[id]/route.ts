@@ -10,20 +10,28 @@ import {
   isUuid,
   loadCalendarEvent,
   sanitizeEventInput,
+  type CalendarEventCore,
 } from "@/lib/server/calendar-access";
-import { clearEventNotifications, notifyEventChanged } from "@/lib/server/calendar-notify";
+import { accountTimezone, clearEventNotifications, notifyEventChanged } from "@/lib/server/calendar-notify";
+import { deleteLinkedTodos, syncLinkedTodo } from "@/lib/server/calendar-todo-bridge";
+import { allDayKeys } from "@/lib/calendar-tz";
 
 /* /api/calendar/events/[id]
    One event. The caller's tenant is part of every load, so a cross-tenant or
    malformed id is a 404 rather than a leak of its existence.
 
-     GET    — the owner, a Super Admin, or an INVITED guest (the guest needs
-              the base row to open a recurring occurrence and to answer the
-              invitation; the old 403 broke both).
+     GET    — the owner, an INVITED guest, or a Super Admin under the same
+              private-record rule as the calendar list: someone else's
+              private event needs can_view_private (break-glass, logged).
+              All-day events carry start_date / end_date in the organizer's
+              timezone, like the list.
      PATCH  — the owner or a Super Admin. Only the writable columns are
-              accepted; a time change re-arms the reminder and tells guests.
-     DELETE — the owner or a Super Admin. Guests hear it was cancelled and
-              every unread notification about the event is closed. */
+              accepted; a time or place change re-arms the reminder / tells
+              guests. The To-do the Calendar made from a "task" event
+              follows its title, description and date.
+     DELETE — the owner or a Super Admin. Guests hear it was cancelled,
+              every unread notification about the event is closed, and the
+              To-do the Calendar made from it goes with it. */
 
 export async function GET(
   _req: Request,
@@ -43,11 +51,19 @@ export async function GET(
     console.error("[api/calendar/events GET one]", error.message);
     return NextResponse.json({ error: "Failed to load" }, { status: 500 });
   }
-  const ev = data as { id: string; account_id: string } | null;
+  const ev = data as { id: string; account_id: string; is_private: boolean | null; all_day: boolean; start_at: string; end_at: string } | null;
   if (!ev) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const actor = { accountId: auth.account_id, isSuperAdmin: auth.is_super_admin };
-  if (!(await canReadEvent(ev, actor))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  return NextResponse.json({ event: { ...ev, invited: !isEventOwner(ev, actor) } });
+  if (!(await canReadEvent({ ...ev, is_private: !!ev.is_private }, auth))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const dates = ev.all_day ? allDayKeys(ev.start_at, ev.end_at, await accountTimezone(ev.account_id)) : null;
+  return NextResponse.json({
+    event: {
+      ...ev,
+      ...(dates ? { start_date: dates.start, end_date: dates.end } : {}),
+      invited: !isEventOwner(ev, { accountId: auth.account_id, isSuperAdmin: auth.is_super_admin }),
+    },
+  });
 }
 
 export async function PATCH(
@@ -83,9 +99,13 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 
-  if (input.timeChanged) {
+  const updated = { ...existing, ...(data as object) } as CalendarEventCore;
+  if (input.timeChanged || input.locationChanged) {
     const guests = await eventAttendeeIds(id, { excludeDeclined: true });
-    await notifyEventChanged({ ...existing, ...(data as object) } as typeof existing, guests, auth.account_id, "rescheduled");
+    await notifyEventChanged(updated, guests, auth.account_id, input.timeChanged ? "rescheduled" : "moved");
+  }
+  if (input.timeChanged || "title" in input.row || "description" in input.row) {
+    await syncLinkedTodo(updated);
   }
   return NextResponse.json({ event: data });
 }
@@ -117,5 +137,6 @@ export async function DELETE(
 
   await clearEventNotifications(id);
   await notifyEventChanged(existing, guests, auth.account_id, "cancelled");
+  await deleteLinkedTodos(id, existing.tenant_id);
   return NextResponse.json({ ok: true });
 }

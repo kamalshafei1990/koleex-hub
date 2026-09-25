@@ -176,7 +176,7 @@ export const discussT: Translations = {
   "new.channel.private":    { en: "Private",               zh: "私密",                 ar: "خاصة" },
   "new.channel.privateDesc":{ en: "Only invited members can join", zh: "只有被邀请的成员可以加入", ar: "يمكن فقط للأعضاء المدعوين الانضمام" },
   "new.channel.create":     { en: "Create Channel",        zh: "创建频道",              ar: "إنشاء القناة" },
-  "new.channel.failed":     { en: "Couldn't create the channel. Check the browser console for details.", zh: "无法创建频道。详情请查看浏览器控制台。", ar: "تعذر إنشاء القناة. تحقق من وحدة تحكم المتصفح للحصول على التفاصيل." },
+  "new.channel.failed":     { en: "Couldn't create the channel.", zh: "无法创建频道。", ar: "تعذر إنشاء القناة." },
   "new.dm.title":           { en: "New Direct Message",    zh: "新建私信",              ar: "رسالة مباشرة جديدة" },
   "new.dm.to":              { en: "To",                    zh: "收件人",               ar: "إلى" },
   "new.dm.toPh":            { en: "Type a name…",          zh: "输入姓名...",           ar: "اكتب اسماً..." },
@@ -307,7 +307,7 @@ export const discussT: Translations = {
   /* ═══════════════════════════════════════════════════════════════════════════
      PHASE B — INLINE EDIT / REACTIONS / LINK COPY
      ═══════════════════════════════════════════════════════════════════════════ */
-  "edit.saveHint":           { en: "Enter to save · Esc to cancel", zh: "Enter 保存 · Esc 取消", ar: "Enter للحفظ · Esc للإلغاء" },
+  "edit.saveHint":           { en: "Ctrl/⌘+Enter to save · Esc to cancel", zh: "Ctrl/⌘+Enter 保存 · Esc 取消", ar: "Ctrl/⌘+Enter للحفظ · Esc للإلغاء" },
   "edit.save":               { en: "Save changes",            zh: "保存更改",              ar: "حفظ التغييرات" },
   "reactions.pick":          { en: "Pick a reaction",         zh: "选择反应",              ar: "اختر تفاعلاً" },
   "reactions.you":           { en: "You",                     zh: "你",                   ar: "أنت" },
@@ -381,4 +381,90 @@ export const discussT: Translations = {
   "customer.email":          { en: "Email",                   zh: "邮箱",                 ar: "البريد الإلكتروني" },
   "customer.phone":          { en: "Phone",                   zh: "电话",                 ar: "الهاتف" },
   "customer.type":           { en: "Type",                    zh: "类型",                 ar: "النوع" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     AUDIT 2026-09-25 — keys the code already used but the dictionary lacked
+     (they rendered their English fallback in every language), plus the
+     strings that were hard-coded English.
+     ═══════════════════════════════════════════════════════════════════════════ */
+  /* Koleex AI conversation */
+  "ai.title":                { en: "Koleex AI",               zh: "Koleex AI",            ar: "Koleex AI" },
+  "ai.rowHint":              { en: "Ask me anything",         zh: "有问题尽管问",           ar: "اسألني أي شيء" },
+  "ai.subtitle":             { en: "Your assistant · always here", zh: "您的助手 · 随时在线", ar: "مساعدك · متواجد دائمًا" },
+  "ai.placeholder":          { en: "Ask Koleex AI anything…", zh: "向 Koleex AI 提问…",     ar: "اسأل Koleex AI أي شيء…" },
+  "ai.empty":                { en: "Ask me anything — I can help across the Hub.", zh: "有问题尽管问——我可以在整个中心为您提供帮助。", ar: "اسألني أي شيء — يمكنني المساعدة في كل أرجاء المركز." },
+  "ai.thinking":             { en: "Thinking…",               zh: "思考中…",               ar: "جارٍ التفكير…" },
+  "ai.suggest.today":        { en: "Summarise today's activity", zh: "总结今天的动态",       ar: "لخّص نشاط اليوم" },
+  "ai.suggest.draft":        { en: "Draft a message to the team", zh: "给团队起草一条消息",  ar: "صُغ رسالة إلى الفريق" },
+  "ai.suggest.week":         { en: "What changed this week?", zh: "本周有哪些变化？",       ar: "ما الذي تغيّر هذا الأسبوع؟" },
+
+  /* Sidebar / conversation menu */
+  "sidebar.new":             { en: "New",                     zh: "新建",                 ar: "جديد" },
+  "conv.pin":                { en: "Sticky on top",           zh: "置顶聊天",              ar: "تثبيت في الأعلى" },
+  "conv.unpin":              { en: "Unpin",                   zh: "取消置顶",              ar: "إلغاء التثبيت" },
+  "conv.pinned":             { en: "Pinned to top",           zh: "已置顶",               ar: "تم التثبيت في الأعلى" },
+  "conv.unpinned":           { en: "Unpinned",                zh: "已取消置顶",            ar: "تم إلغاء التثبيت" },
+  "conv.pinnedLabel":        { en: "Pinned",                  zh: "已置顶",               ar: "مثبّتة" },
+  "conv.markRead":           { en: "Mark as read",            zh: "标为已读",              ar: "وضع علامة كمقروء" },
+  "conv.markUnread":         { en: "Mark as unread",          zh: "标为未读",              ar: "وضع علامة كغير مقروء" },
+  "conv.mute":               { en: "Mute notifications",      zh: "消息免打扰",            ar: "كتم الإشعارات" },
+  "conv.unmute":             { en: "Unmute notifications",    zh: "取消免打扰",            ar: "إلغاء كتم الإشعارات" },
+  "conv.muted":              { en: "Muted",                   zh: "已开启免打扰",          ar: "تم الكتم" },
+  "conv.unmuted":            { en: "Unmuted",                 zh: "已关闭免打扰",          ar: "تم إلغاء الكتم" },
+  "conv.mutedLabel":         { en: "Muted",                   zh: "免打扰",               ar: "مكتومة" },
+  "conv.hide":               { en: "Remove from list",        zh: "从列表中移除",          ar: "إزالة من القائمة" },
+  "conv.hidden":             { en: "Removed from list",       zh: "已从列表中移除",        ar: "تمت الإزالة من القائمة" },
+  "conv.delete":             { en: "Delete",                  zh: "删除",                 ar: "حذف" },
+  "conv.deleteDo":           { en: "Delete",                  zh: "删除",                 ar: "حذف" },
+  "conv.deleteConfirm":      { en: "Delete this conversation? It will be removed from your list.", zh: "删除此对话？它将从您的列表中移除。", ar: "حذف هذه المحادثة؟ ستُزال من قائمتك." },
+  "conv.deleted":            { en: "Conversation deleted",    zh: "对话已删除",            ar: "تم حذف المحادثة" },
+
+  /* Names / previews */
+  "channel.direct":          { en: "Direct message",          zh: "私信",                 ar: "رسالة مباشرة" },
+  "channel.untitled":        { en: "Untitled channel",        zh: "未命名频道",            ar: "قناة بدون اسم" },
+  "channel.unknown":         { en: "Unknown",                 zh: "未知",                 ar: "غير معروف" },
+  "preview.photo":           { en: "📷 Photo",                zh: "📷 图片",               ar: "📷 صورة" },
+  "preview.file":            { en: "📎 File",                 zh: "📎 文件",               ar: "📎 ملف" },
+  "preview.voice":           { en: "Voice message",           zh: "语音消息",              ar: "رسالة صوتية" },
+  "product.viewShort":       { en: "View",                    zh: "查看",                 ar: "عرض" },
+  "reply.noText":            { en: "(no text)",               zh: "（无文字）",            ar: "(بدون نص)" },
+  "signin.required":         { en: "You need to sign in to use Discuss.", zh: "请先登录以使用讨论。", ar: "يجب تسجيل الدخول لاستخدام المحادثات." },
+
+  /* Message actions + feedback */
+  "msg.more":                { en: "More actions",            zh: "更多操作",              ar: "مزيد من الإجراءات" },
+  "msg.deleteDo":            { en: "Delete",                  zh: "删除",                 ar: "حذف" },
+  "msg.pinned":              { en: "Pinned to channel",       zh: "已置顶到频道",          ar: "تم التثبيت في القناة" },
+  "msg.unpinned":            { en: "Unpinned",                zh: "已取消置顶",            ar: "تم إلغاء التثبيت" },
+  "msg.starred":             { en: "Saved for later",         zh: "已保存",               ar: "تم الحفظ لاحقاً" },
+  "msg.unstarred":           { en: "Removed from saved",      zh: "已从保存中移除",        ar: "تمت الإزالة من المحفوظات" },
+  "error.reaction":          { en: "Couldn't update the reaction.", zh: "无法更新表情回应。", ar: "تعذر تحديث التفاعل." },
+  "error.edit":              { en: "Couldn't save the edit.", zh: "无法保存修改。",         ar: "تعذر حفظ التعديل." },
+  "error.delete":            { en: "Couldn't delete the message.", zh: "无法删除消息。",    ar: "تعذر حذف الرسالة." },
+  "error.pin":               { en: "Couldn't pin the message.", zh: "无法置顶消息。",       ar: "تعذر تثبيت الرسالة." },
+  "error.star":              { en: "Couldn't update saved messages.", zh: "无法更新已保存消息。", ar: "تعذر تحديث الرسائل المحفوظة." },
+  "error.mute":              { en: "Couldn't change notifications.", zh: "无法更改通知设置。", ar: "تعذر تغيير الإشعارات." },
+  "error.copy":              { en: "Couldn't copy the link.", zh: "无法复制链接。",         ar: "تعذر نسخ الرابط." },
+  "new.dm.failed":           { en: "Couldn't start the conversation.", zh: "无法开始对话。", ar: "تعذر بدء المحادثة." },
+
+  /* Thread pane / voice */
+  "thread.pane.empty":       { en: "No replies yet",          zh: "暂无回复",              ar: "لا توجد ردود بعد" },
+  "thread.reply.send":       { en: "Reply",                   zh: "回复",                 ar: "رد" },
+  "voice.record":            { en: "Record voice",            zh: "录制语音",              ar: "تسجيل صوتي" },
+  "voice.recording":         { en: "Recording…",              zh: "录音中…",               ar: "جارٍ التسجيل…" },
+  "voice.uploadFailed":      { en: "Voice upload failed",     zh: "语音上传失败",          ar: "فشل رفع الرسالة الصوتية" },
+
+  /* Details pane */
+  "details.more":            { en: "More",                    zh: "更多",                 ar: "المزيد" },
+  "details.customer":        { en: "Customer",                zh: "客户",                 ar: "العميل" },
+  "details.none":            { en: "Nothing here yet",        zh: "这里还没有内容",         ar: "لا يوجد شيء هنا بعد" },
+
+  /* Search / pickers / generic */
+  "search.panel.placeholder":{ en: "Search messages, people, files…", zh: "搜索消息、成员、文件…", ar: "ابحث عن رسائل، أشخاص، ملفات…" },
+  "search.panel.prompt":     { en: "Type at least 2 characters to search", zh: "至少输入 2 个字符进行搜索", ar: "اكتب حرفين على الأقل للبحث" },
+  "search.panel.emptyHint":  { en: "Try different words or shorter phrases.", zh: "请尝试其他词语或更短的短语。", ar: "جرّب كلمات مختلفة أو عبارات أقصر." },
+  "composer.productSearch":  { en: "Search by name, code, brand, category, tags…", zh: "按名称、型号、品牌、类别、标签搜索…", ar: "ابحث بالاسم أو الرمز أو العلامة التجارية أو الفئة أو الوسوم…" },
+  "customer.newChat.error":  { en: "Couldn't start the conversation", zh: "无法开始对话",      ar: "تعذر بدء المحادثة" },
+  "customer.newChat.noResultsHint": { en: "Add them in the CRM first, then come back here.", zh: "请先在 CRM 中添加，然后再回到这里。", ar: "أضفهم في CRM أولاً ثم عد إلى هنا." },
+  "btn.clear":               { en: "Clear",                   zh: "清除",                 ar: "مسح" },
+  "btn.creating":            { en: "Starting…",               zh: "正在开始…",             ar: "جارٍ البدء…" },
 };

@@ -52,6 +52,7 @@ import {
   markChannelRead,
   subscribeToMyChannels,
   subscribeToChannel,
+  connectDiscussStream,
 } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
 import { useSkin } from "@/lib/appearance";
@@ -192,6 +193,8 @@ export default function FloatingPanel() {
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [msgInput, setMsgInput] = useState("");
+  /* Dock send failed — shown above the input until the next attempt. */
+  const [dockSendError, setDockSendError] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "ai"; text: string }>>([]);
   /* ── Same-brain mode (owner directive 2026-08-03): the FAB's AI tab is
@@ -323,7 +326,9 @@ export default function FloatingPanel() {
     setMessages([]);
     try {
       const msgs = await fetchChannelMessages(ch.id, { currentAccountId: aid, limit: 40 });
-      setMessages(msgs.reverse()); // oldest first
+      /* The read endpoint already returns oldest → newest. Reversing it here
+         put the newest message at the TOP of the dock. */
+      setMessages(msgs);
       await markChannelRead(ch.id, aid);
       setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, unread_count: 0 } : c));
       window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
@@ -338,6 +343,8 @@ export default function FloatingPanel() {
       onMessageInsert: (msg) => {
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
+          const cmid = (msg as { client_msg_id?: string | null }).client_msg_id;
+          if (cmid && prev.some(m => m.client_msg_id === cmid)) return prev;
           return [...prev, msg as unknown as DiscussMessageWithAuthor];
         });
         // Auto mark read
@@ -351,7 +358,27 @@ export default function FloatingPanel() {
       onReactionInsert: () => {},
       onReactionDelete: () => {},
     });
-    return unsub;
+    /* The first-party stream is the path that actually reaches users on the
+       China link (the broadcast above rarely connects there). */
+    const channelId = activeChannel.id;
+    const unsubStream = connectDiscussStream((m) => {
+      if (m.channel_id !== channelId) return;
+      const aid = accountIdRef.current;
+      setMessages((prev) => {
+        if (prev.some((x) => x.id === m.id)) return prev;
+        /* My own send already shows as its optimistic bubble. */
+        if (m.client_msg_id && prev.some((x) => x.client_msg_id === m.client_msg_id)) return prev;
+        return [...prev, m];
+      });
+      if (aid && m.author_account_id !== aid) {
+        void markChannelRead(channelId, aid);
+        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, unread_count: 0 } : c));
+      }
+    });
+    return () => {
+      unsub();
+      unsubStream();
+    };
   }, [activeChannel]);
 
   /* ── Auto scroll ── */
@@ -364,16 +391,53 @@ export default function FloatingPanel() {
     const aid = accountIdRef.current;
     if (!aid || !activeChannel || !msgInput.trim()) return;
     const body = msgInput.trim();
+    /* Optimistic bubble keyed by the same idempotency id the server uses,
+       so a retry can never double-post and the canonical row replaces it. */
+    const clientMsgId = crypto.randomUUID();
+    const tempId = `temp_${clientMsgId}`;
+    const optimistic = {
+      id: tempId,
+      channel_id: activeChannel.id,
+      author_account_id: aid,
+      reply_to_message_id: null,
+      kind: "text",
+      body,
+      body_html: null,
+      metadata: { media: [] },
+      edited_at: null,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      client_msg_id: clientMsgId,
+      author: null,
+      reactions: [],
+    } as unknown as DiscussMessageWithAuthor;
+    setMessages((prev) => [...prev, optimistic]);
     setMsgInput("");
+    setDockSendError(false);
     setSending(true);
+    let saved: Awaited<ReturnType<typeof sendDiscussMessage>> = null;
     try {
-      await sendDiscussMessage({
+      saved = await sendDiscussMessage({
         channelId: activeChannel.id,
         authorId: aid,
         body,
         kind: "text",
+        clientMsgId,
       });
-    } catch { /* ignore */ }
+    } catch { saved = null; }
+    if (saved) {
+      const row = saved;
+      setMessages((prev) => {
+        /* The stream may have delivered the canonical row first. */
+        if (prev.some((m) => m.id === row.id)) return prev.filter((m) => m.id !== tempId);
+        return prev.map((m) => (m.id === tempId ? { ...m, id: row.id, created_at: row.created_at } : m));
+      });
+    } else {
+      /* Keep what was typed (unless a new message was started) and say so. */
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMsgInput((cur) => (cur ? cur : body));
+      setDockSendError(true);
+    }
     setSending(false);
   }, [activeChannel, msgInput]);
 
@@ -659,6 +723,7 @@ export default function FloatingPanel() {
     setActiveChannel(null);
     setMessages([]);
     setMsgInput("");
+    setDockSendError(false);
   };
 
   /* ── Sorted channels ── */
@@ -1090,6 +1155,11 @@ export default function FloatingPanel() {
           {/* ── Input bar ── */}
           {(tab === "ai" || (tab === "discuss" && activeChannel)) && (
             <div className={`shrink-0 border-t ${border} px-3 py-2.5`}>
+              {tab === "discuss" && dockSendError && (
+                <p role="alert" className={`mb-1.5 text-[11px] ${textM}`}>
+                  {t("panel.sendFailed", "Message not sent — try again")}
+                </p>
+              )}
               <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
                 dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.06] bg-black/[0.02]"
               }`}>
@@ -1099,6 +1169,7 @@ export default function FloatingPanel() {
                   value={tab === "ai" ? aiInput : msgInput}
                   onChange={(e) => tab === "ai" ? setAiInput(e.target.value) : setMsgInput(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return; // IME
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       tab === "ai" ? handleAiSend() : handleSend();

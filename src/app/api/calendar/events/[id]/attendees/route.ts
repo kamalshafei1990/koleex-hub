@@ -10,8 +10,10 @@ import { isCalendarAttendeeStatus } from "@/lib/calendar-enums";
 
 /* Guests of a calendar event.
      GET   → { attendees: [{ account_id, status, name }] }
-             for the organizer, a Super Admin, or a guest of the event —
-             any Calendar user in the tenant could read any guest list before.
+             for the organizer, a guest of the event, or a Super Admin under
+             the calendar's private-record rule (someone else's private event
+             needs can_view_private, logged). `name` is null when the account
+             has none — the client words the fallback in its language.
      PUT   → { accountIds: string[] } replaces the whole guest list.
              Organizer or Super Admin, with the Calendar "edit" action.
              Guests are ACTIVE INTERNAL accounts of the tenant, never the
@@ -34,7 +36,7 @@ export async function GET(
 
   const ev = await loadCalendarEvent(id, auth.tenant_id);
   if (!ev) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await canReadEvent(ev, { accountId: auth.account_id, isSuperAdmin: auth.is_super_admin }))) {
+  if (!(await canReadEvent(ev, auth))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -42,7 +44,7 @@ export async function GET(
   const list = (rows ?? []) as Array<{ account_id: string; status: string }>;
 
   /* account_id has no FK to accounts — resolve names in one round trip. */
-  const nameById = new Map<string, string>();
+  const nameById = new Map<string, string | null>();
   if (list.length) {
     const { data: accts } = await supabaseServer
       .from("accounts")
@@ -50,12 +52,12 @@ export async function GET(
       .in("id", list.map((r) => r.account_id));
     for (const a of (accts ?? []) as Array<{ id: string; username: string | null; person: { full_name: string | null } | { full_name: string | null }[] | null }>) {
       const p = Array.isArray(a.person) ? a.person[0] : a.person;
-      nameById.set(a.id, p?.full_name || a.username || "Someone");
+      nameById.set(a.id, p?.full_name || a.username || null);
     }
   }
 
   return NextResponse.json({
-    attendees: list.map((r) => ({ account_id: r.account_id, status: r.status, name: nameById.get(r.account_id) ?? "Someone" })),
+    attendees: list.map((r) => ({ account_id: r.account_id, status: r.status, name: nameById.get(r.account_id) ?? null })),
   });
 }
 

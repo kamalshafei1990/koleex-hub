@@ -10,16 +10,19 @@
      access-control.ts and accounts.preferences.calendar.working_hours.days).
    - Grids start on the viewer's first day of week (Settings → Language &
      region); Monday is the default because that is the ISO week.
-   - Everything operates in the browser's local timezone; the account's
-     preferred zone is shown in the header for orientation only.
+   - The grid works on WALL dates of the calendar's timezone (the account's
+     Settings → Calendar zone): CalendarApp converts every instant with
+     toWall (lib/calendar-tz) before it reaches these helpers, so the local
+     fields they read ARE that zone's clock, whatever the browser's zone.
+   - All-day items are dates: they carry start_date / end_date and are put
+     on a day by date key, never by instant overlap.
    - Text is rendered with the active UI language (`locale`), never the
-     browser's default, so an Arabic Hub shows Arabic month names.
+     browser's default, so an Arabic Hub shows Arabic month names. Dates read
+     D/M/Y and times are 24-hour (house rule).
    --------------------------------------------------------------------------- */
 
 import type { CalendarEventRow } from "@/types/supabase";
 import { EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
-
-export { EVENT_TYPE_COLORS };
 
 /* ── Day helpers ────────────────────────────────────────────────────────── */
 
@@ -53,8 +56,9 @@ export function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-export function isToday(d: Date): boolean {
-  return isSameDay(d, new Date());
+/** `today` is the wall "now" of the calendar's zone. */
+export function isToday(d: Date, today: Date): boolean {
+  return isSameDay(d, today);
 }
 
 /** yyyy-mm-dd of a local date — the key the holiday overlay uses. */
@@ -109,22 +113,53 @@ export function monthGrid(d: Date, weekStart: WeekStart = 1): Date[] {
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
-/* ── Event overlap / layout ─────────────────────────────────────────────── */
+/* ── Grouping by day ────────────────────────────────────────────────────── */
 
-/** True if the event overlaps the [from, to) window. */
-export function eventOverlapsRange(event: CalendarEventRow, from: Date, to: Date): boolean {
-  const start = new Date(event.start_at);
-  const end = new Date(event.end_at);
-  return start < to && end >= from;
+type Dated = CalendarEventRow & { start_date?: string; end_date?: string };
+
+/** An all-day item's first and last day (YYYY-MM-DD, end inclusive). */
+function allDayRange(e: Dated): { start: string; end: string } {
+  const start = e.start_date ?? isoDateKey(new Date(e.start_at));
+  const end = e.end_date ?? isoDateKey(new Date(e.end_at));
+  return { start, end: end < start ? start : end };
 }
 
-/** Only the events that touch this day, earliest first. */
-export function eventsOnDay<E extends CalendarEventRow>(events: E[], day: Date): E[] {
-  const from = startOfDay(day);
-  const to = addDays(from, 1);
-  return events
-    .filter((e) => eventOverlapsRange(e, from, to))
-    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+/** Every visible day's items, grouped ONCE (instead of filtering the whole
+ *  list per cell): all-day items by date key, timed items by the wall days
+ *  their span touches. Each day lists all-day items first, then by start. */
+export function groupEventsByDay<E extends Dated>(events: E[], days: Date[]): Map<string, E[]> {
+  const out = new Map<string, E[]>();
+  if (days.length === 0) return out;
+  const keys = days.map(isoDateKey);
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  for (const k of keys) out.set(k, []);
+  const firstMs = startOfDay(days[0]).getTime();
+  const endMs = addDays(startOfDay(days[days.length - 1]), 1).getTime();
+  for (const e of events) {
+    if (e.all_day) {
+      const r = allDayRange(e);
+      if (r.end < first || r.start > last) continue;
+      for (const k of keys) if (k >= r.start && k <= r.end) out.get(k)!.push(e);
+      continue;
+    }
+    const s = new Date(e.start_at).getTime();
+    const en = new Date(e.end_at).getTime();
+    if (s >= endMs || en < firstMs) continue;
+    for (let i = 0; i < days.length; i++) {
+      const from = startOfDay(days[i]).getTime();
+      const to = addDays(days[i], 1).getTime();
+      /* An event ending exactly at midnight does not spill into the next day,
+         but a zero-length one at midnight still shows on its own day. */
+      if (s < to && (en > from || (en === from && s === from))) out.get(keys[i])!.push(e);
+    }
+  }
+  for (const list of out.values()) {
+    list.sort((a, b) =>
+      (a.all_day === b.all_day ? 0 : a.all_day ? -1 : 1) ||
+      new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+  }
+  return out;
 }
 
 /** The color an event renders with: its override, else its type's. */
@@ -132,7 +167,9 @@ export function colorForEvent(event: Pick<CalendarEventRow, "color" | "event_typ
   return event.color || EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.event;
 }
 
-/* ── Formatting (in the UI language) ────────────────────────────────────── */
+/* ── Formatting (in the UI language; D/M/Y, 24-hour) ───────────────────── */
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export function formatMonthYear(d: Date, locale: string): string {
   return d.toLocaleDateString(locale, { month: "long", year: "numeric" });
@@ -154,26 +191,44 @@ export function formatFullDay(d: Date, locale: string): string {
   return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
-export function formatTime(d: Date, locale: string): string {
-  return d.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+/** "14:05" — 24-hour, whatever the language. */
+export function formatTime(d: Date): string {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-/** The label of an hour row on the time grid ("9 AM", "09"). */
-export function formatHourLabel(h: number, locale: string): string {
-  const d = new Date();
-  d.setHours(h, 0, 0, 0);
-  return d.toLocaleTimeString(locale, { hour: "numeric" });
+/** "25/09/2026". */
+export function formatDMY(d: Date): string {
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-/** "14:00 – 15:00", or a two-day span; `allDayLabel` is the translated
- *  "All day". */
-export function formatEventTimeRange(event: CalendarEventRow, locale: string, allDayLabel: string): string {
-  if (event.all_day) return allDayLabel;
+/** "25/09/2026" from a "2026-09-25" key. */
+function formatDateKeyDMY(key: string): string {
+  const [y, m, d] = key.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** The label of an hour row on the time grid ("09:00"). */
+export function formatHourLabel(h: number): string {
+  return `${pad2(h)}:00`;
+}
+
+/** "14:00 – 15:00", a two-day span "25/09/2026 22:00 → 26/09/2026 01:00",
+ *  or for an all-day item its date(s) after `allDayLabel`. */
+export function formatEventTimeRange(event: Dated, allDayLabel: string): string {
+  if (event.all_day) {
+    const r = allDayRange(event);
+    return r.start === r.end ? allDayLabel : `${allDayLabel} · ${formatDateKeyDMY(r.start)} → ${formatDateKeyDMY(r.end)}`;
+  }
   const s = new Date(event.start_at);
   const e = new Date(event.end_at);
-  if (isSameDay(s, e)) return `${formatTime(s, locale)} – ${formatTime(e, locale)}`;
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" };
-  return `${s.toLocaleString(locale, opts)} → ${e.toLocaleString(locale, opts)}`;
+  if (isSameDay(s, e)) return `${formatTime(s)} – ${formatTime(e)}`;
+  return `${formatDMY(s)} ${formatTime(s)} → ${formatDMY(e)} ${formatTime(e)}`;
+}
+
+/** The tooltip of a chip: "Title · 25/09/2026 14:00 – 15:00". */
+export function chipTooltip(event: Dated, title: string, allDayLabel: string): string {
+  if (event.all_day) return `${title} · ${formatEventTimeRange(event, allDayLabel)}`;
+  return `${title} · ${formatDMY(new Date(event.start_at))} ${formatEventTimeRange(event, allDayLabel)}`;
 }
 
 /* ── Input helpers ──────────────────────────────────────────────────────── */
@@ -199,10 +254,6 @@ export function fromDateInput(value: string): Date {
   return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
 }
 
-export function toDateInput(d: Date): string {
-  return isoDateKey(d);
-}
-
 /* ── Time grid helpers for week / day views ─────────────────────────────── */
 
 /** Hours 0..23 used by the time grid on the week / day views. */
@@ -221,9 +272,8 @@ export function workingHoursBand(
   return { topPx: startH * hourHeight, heightPx: Math.max(0, endH - startH) * hourHeight };
 }
 
-/** Where the "now" line sits on a time grid. */
-export function nowOffsetPx(hourHeight: number): number {
-  const now = new Date();
+/** Where the "now" line sits on a time grid; `now` is the wall "now". */
+export function nowOffsetPx(now: Date, hourHeight: number): number {
   return (now.getHours() + now.getMinutes() / 60) * hourHeight;
 }
 

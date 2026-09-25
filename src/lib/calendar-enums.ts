@@ -23,7 +23,7 @@ export const CALENDAR_RECURRENCES: readonly NonNullable<CalendarRecurrence>[] = 
 ];
 
 export type CalendarAttendeeStatus = "invited" | "accepted" | "declined";
-export const CALENDAR_ATTENDEE_STATUSES: readonly CalendarAttendeeStatus[] = [
+const CALENDAR_ATTENDEE_STATUSES: readonly CalendarAttendeeStatus[] = [
   "invited",
   "accepted",
   "declined",
@@ -42,9 +42,10 @@ export function isCalendarAttendeeStatus(v: unknown): v is CalendarAttendeeStatu
 }
 
 /** Event type → default color. One place, so the legend, the chips and the
- *  modal's default swatch agree. */
+ *  modal's default swatch agree. A meeting — the default type — is Hub Blue
+ *  (KDS HUB.steel); a colour stored on an event always wins over these. */
 export const EVENT_TYPE_COLORS: Record<CalendarEventType, string> = {
-  meeting: "#3B82F6",
+  meeting: "#567FB2",
   task: "#10B981",
   reminder: "#F59E0B",
   event: "#A855F7",

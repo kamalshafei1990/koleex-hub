@@ -6,10 +6,12 @@
    change a permission, or remove. A non-owner collaborator sees the roster
    read-only and can leave the note.
 
-   Same Hub modal language as NotesDialog.
+   Every mutation checks its result: on failure the roster is reloaded from
+   the server (so nothing looks changed that wasn't) and a toast says so.
+   Real modal: role="dialog", aria-modal, Escape closes.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import KdsAvatar from "@/components/kds/Avatar";
 import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
@@ -18,6 +20,7 @@ import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import SignOutIcon from "@/components/icons/ui/SignOutIcon";
 import {
   fetchNoteShares,
   fetchShareCandidates,
@@ -40,14 +43,23 @@ export default function ShareDialog({
   open,
   onClose,
   onChanged,
+  meId,
+  onLeft,
+  notify,
 }: {
   noteId: string | null;
   open: boolean;
   onClose: () => void;
-  /** Fired after any share mutation so the parent can refresh badges. */
+  /** Fired after any successful share mutation so the parent can refresh badges. */
   onChanged?: () => void;
+  /** Caller's account id — finds their own share for "Leave note". */
+  meId: string | null;
+  /** Fired after the caller left a note shared with them. */
+  onLeft?: (noteId: string) => void;
+  notify?: (msg: string, kind?: "success" | "error" | "info") => void;
 }) {
   const { t } = useTranslation(notesT);
+  const titleId = useId();
   const [data, setData] = useState<NoteSharesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -56,6 +68,7 @@ export default function ShareDialog({
   const [candidates, setCandidates] = useState<ShareAccount[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbort = useRef<AbortController | null>(null);
 
   const reload = useCallback(async () => {
     if (!noteId) return;
@@ -73,49 +86,76 @@ export default function ShareDialog({
     }
   }, [open, noteId, reload]);
 
+  // Escape closes.
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); closeRef.current(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const isOwner = data?.isOwner ?? false;
   const sharedIds = new Set((data?.shares ?? []).map((s) => s.account_id));
 
-  // Debounced candidate search (owner only).
+  // Debounced candidate search (owner only); a newer query aborts the older one.
   useEffect(() => {
     if (!open || !isOwner) return;
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(async () => {
+      searchAbort.current?.abort();
+      const ctrl = new AbortController();
+      searchAbort.current = ctrl;
       setSearching(true);
-      const list = await fetchShareCandidates(query);
-      setCandidates(list.filter((a) => !sharedIds.has(a.id)));
+      const list = await fetchShareCandidates(query, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      setCandidates((list ?? []).filter((a) => !sharedIds.has(a.id)));
       setSearching(false);
     }, 250);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, open, isOwner, data]);
+  useEffect(() => () => searchAbort.current?.abort(), []);
+
+  /** Run one mutation; on failure reload the truth and say so. */
+  const mutate = async (busyKey: string, run: () => Promise<boolean>): Promise<boolean> => {
+    if (!noteId) return false;
+    setBusyId(busyKey);
+    const ok = await run();
+    await reload();
+    setBusyId(null);
+    if (ok) onChanged?.();
+    else notify?.(t("share.failed"), "error");
+    return ok;
+  };
 
   const add = async (accountId: string) => {
     if (!noteId) return;
-    setBusyId(accountId);
-    await addNoteShare(noteId, accountId, "edit");
-    await reload();
-    setBusyId(null);
-    setQuery("");
-    onChanged?.();
+    const ok = await mutate(accountId, () => addNoteShare(noteId, accountId, "edit"));
+    if (ok) setQuery("");
   };
 
-  const changePermission = async (shareId: string, permission: "view" | "edit") => {
+  const changePermission = (shareId: string, permission: "view" | "edit") => {
     if (!noteId) return;
-    setBusyId(shareId);
-    await updateNoteShare(noteId, shareId, permission);
-    await reload();
-    setBusyId(null);
-    onChanged?.();
+    void mutate(shareId, () => updateNoteShare(noteId, shareId, permission));
   };
 
-  const remove = async (shareId: string) => {
+  const remove = (shareId: string) => {
     if (!noteId) return;
-    setBusyId(shareId);
-    await removeNoteShare(noteId, shareId);
-    await reload();
+    void mutate(shareId, () => removeNoteShare(noteId, shareId));
+  };
+
+  const myShare = !isOwner && meId ? (data?.shares ?? []).find((s) => s.account_id === meId) ?? null : null;
+  const leave = async () => {
+    if (!noteId || !myShare) return;
+    setBusyId(myShare.id);
+    const ok = await removeNoteShare(noteId, myShare.id);
     setBusyId(null);
-    onChanged?.();
+    if (!ok) { notify?.(t("share.failed"), "error"); return; }
+    notify?.(t("share.left"), "success");
+    onLeft?.(noteId);
+    onClose();
   };
 
   if (!open) return null;
@@ -123,18 +163,21 @@ export default function ShareDialog({
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[12vh] p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full max-w-md rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[76vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)] shrink-0">
           <div>
-            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("share.title")}</h2>
+            <h2 id={titleId} className="text-[14px] font-semibold text-[var(--text-primary)]">{t("share.title")}</h2>
             <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
               {isOwner ? t("share.subtitle") : t("share.subtitleRO")}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
+          <button type="button" onClick={onClose} aria-label={t("share.close")} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
             <CrossIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
           </button>
         </div>
@@ -150,6 +193,8 @@ export default function ShareDialog({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("share.search")}
+                  aria-label={t("share.search")}
+                  dir="auto"
                   className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10"
                 />
                 {searching && <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />}
@@ -159,20 +204,21 @@ export default function ShareDialog({
                 <div className="mt-2 rounded-xl border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)] overflow-hidden">
                   {candidates.slice(0, 6).map((a) => (
                     <button
+                      type="button"
                       key={a.id}
                       onClick={() => void add(a.id)}
                       disabled={busyId === a.id}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors text-left disabled:opacity-50"
+                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors text-start disabled:opacity-50"
                     >
-                      <Avatar name={shareAccountLabel(a)} src={fpAvatar(a.avatar_url)} />
+                      <Avatar name={shareAccountLabel(a, t)} src={fpAvatar(a.avatar_url)} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(a)}</div>
+                        <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(a, t)}</div>
                         <div className="text-[11px] text-[var(--text-dim)] truncate">{a.login_email || a.role || ""}</div>
                       </div>
                       {busyId === a.id ? (
                         <SpinnerIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                       ) : (
-                        <span className="text-[11px] font-semibold text-[#0066FF]">{t("share.add")}</span>
+                        <span className="text-[11px] font-semibold text-[#567FB2] dark:text-[#7FA9D6]">{t("share.add")}</span>
                       )}
                     </button>
                   ))}
@@ -199,10 +245,10 @@ export default function ShareDialog({
                 {/* Owner */}
                 {data?.owner && (
                   <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
-                    <Avatar name={shareAccountLabel(data.owner.account)} src={fpAvatar(data.owner.account?.avatar_url)} />
+                    <Avatar name={shareAccountLabel(data.owner.account, t)} src={fpAvatar(data.owner.account?.avatar_url)} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
-                        {shareAccountLabel(data.owner.account)}
+                        {shareAccountLabel(data.owner.account, t)}
                       </div>
                       <div className="text-[11px] text-[var(--text-dim)] truncate">
                         {data.owner.account?.login_email || ""}
@@ -217,9 +263,9 @@ export default function ShareDialog({
                 {/* Shares */}
                 {(data?.shares ?? []).map((s) => (
                   <div key={s.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
-                    <Avatar name={shareAccountLabel(s.account)} src={fpAvatar(s.account?.avatar_url)} />
+                    <Avatar name={shareAccountLabel(s.account, t)} src={fpAvatar(s.account?.avatar_url)} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(s.account)}</div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(s.account, t)}</div>
                       <div className="text-[11px] text-[var(--text-dim)] truncate">{s.account?.login_email || ""}</div>
                     </div>
 
@@ -228,17 +274,20 @@ export default function ShareDialog({
                         <select
                           value={s.permission}
                           disabled={busyId === s.id}
-                          onChange={(e) => void changePermission(s.id, e.target.value as "view" | "edit")}
+                          onChange={(e) => changePermission(s.id, e.target.value as "view" | "edit")}
+                          aria-label={`${t("share.peopleWithAccess")} — ${shareAccountLabel(s.account, t)}`}
                           className="h-7 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
                         >
                           <option value="edit">{t("share.canEdit")}</option>
                           <option value="view">{t("share.canView")}</option>
                         </select>
                         <button
-                          onClick={() => void remove(s.id)}
+                          type="button"
+                          onClick={() => remove(s.id)}
                           disabled={busyId === s.id}
-                          title="Remove"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
+                          title={t("share.remove")}
+                          aria-label={`${t("share.remove")} — ${shareAccountLabel(s.account, t)}`}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
                         >
                           {busyId === s.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <TrashIcon className="h-3.5 w-3.5" />}
                         </button>
@@ -262,8 +311,20 @@ export default function ShareDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-5 py-3.5 border-t border-[var(--border-subtle)] shrink-0">
+        <div className="flex items-center justify-between gap-2 px-5 py-3.5 border-t border-[var(--border-subtle)] shrink-0">
+          {myShare ? (
+            <button
+              type="button"
+              onClick={() => void leave()}
+              disabled={busyId === myShare.id}
+              className="h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-medium text-red-700 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+            >
+              {busyId === myShare.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <SignOutIcon className="h-3.5 w-3.5" />}
+              {t("share.leave")}
+            </button>
+          ) : <span />}
           <button
+            type="button"
             onClick={onClose}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
           >

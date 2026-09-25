@@ -2,14 +2,25 @@ import "server-only";
 
 /* GET /api/cron/calendar-reminders (every 2 minutes, vercel.json)
    For each event with a reminder, the NEXT occurrence is computed (one-off =
-   the event itself; a series = its next date) and, once now is within
-   [start - reminder, start + 1h], the organizer and every guest who has not
-   declined get an inbox row + web push. `reminded_at` stores the occurrence
-   start last alerted for, so a series re-arms for its next period and never
-   double-fires the same one; a reschedule resets it (calendar-access).
+   the event itself; a series = its next date, on the organizer's clock) and,
+   once now is within [start - reminder, start + 1h], the organizer and every
+   guest who has not declined get an inbox row + web push. `reminded_at`
+   stores the occurrence start last alerted for, so a series re-arms for its
+   next period and never double-fires the same one; a reschedule resets it
+   (calendar-access).
 
-   Guarded by CRON_SECRET like the other crons (skipped when unset for local
-   hand-runs). */
+   No double sends: before anything is sent the occurrence is CLAIMED with a
+   conditional update (reminded_at is null or older than this occurrence);
+   only the run whose update returned the row sends. Two overlapping runs, or
+   a run retried by the platform, cannot both win the same claim.
+
+   Candidates are bounded: a series still running (no end, or an end date not
+   yet past), or a one-off starting between two days ago and a week ahead
+   (the longest reminder is a week). Earliest first, so a backlog is worked
+   through in order.
+
+   Guarded by CRON_SECRET, and CLOSED when it is unset: this route sends
+   notifications to real people and must never be callable anonymously. */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -17,8 +28,7 @@ import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
-import { eventAttendeeIds } from "@/lib/server/calendar-access";
-import { accountTimezone, eventLink, formatWhen } from "@/lib/server/calendar-notify";
+import { accountTimezones, eventLink, formatWhen } from "@/lib/server/calendar-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -36,79 +46,142 @@ interface EvRow {
   recurrence_until: string | null;
 }
 
+const MIN = 60_000;
+const EVENTS = "koleex_calendar_events";
+
+/** "in 5 min", "in 1 h 30 min", "in 2 days", "now" — from what is actually
+ *  left, not from the configured lead (a late run would otherwise say "in
+ *  15 min" about a meeting starting in 3). */
+function timeLeft(ms: number): string {
+  const mins = Math.round(ms / MIN);
+  if (mins <= 0) return "now";
+  if (mins < 60) return `in ${mins} min`;
+  if (mins < 48 * 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `in ${h} h ${m} min` : `in ${h} h`;
+  }
+  return `in ${Math.round(mins / 1440)} days`;
+}
+
+/** Stamp the occurrence as handled — only if no other run has. */
+async function claim(id: string, occISO: string): Promise<boolean> {
+  const { data, error } = await supabaseServer
+    .from(EVENTS)
+    .update({ reminded_at: occISO })
+    .eq("id", id)
+    .or(`reminded_at.is.null,reminded_at.lt.${occISO}`)
+    .select("id");
+  if (error) {
+    console.error("[cron/calendar-reminders] claim:", error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
   }
 
   const now = new Date();
   const nowMs = now.getTime();
+  const horizon = new Date(nowMs - 2 * 24 * 60 * MIN).toISOString();
+  const ahead = new Date(nowMs + 8 * 24 * 60 * MIN).toISOString();
+  const today = now.toISOString().slice(0, 10);
 
-  /* Candidates: a reminder is set, and the event is either a series or a
-     one-off that has not ended long ago. */
-  const horizon = new Date(nowMs - 2 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabaseServer
-    .from("koleex_calendar_events")
+    .from(EVENTS)
     .select("id, tenant_id, account_id, title, start_at, end_at, all_day, reminder_minutes, reminded_at, recurrence, recurrence_until")
     .not("reminder_minutes", "is", null)
-    .or(`recurrence.not.is.null,start_at.gte.${horizon}`)
+    .or(`recurrence.not.is.null,and(start_at.gte.${horizon},start_at.lte.${ahead})`)
+    .or(`recurrence_until.is.null,recurrence_until.gte.${today}`)
+    .order("start_at", { ascending: true })
     .limit(500);
 
   if (error) {
     console.error("[cron/calendar-reminders]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load reminders" }, { status: 500 });
+  }
+
+  const rows = (data ?? []) as EvRow[];
+  /* One round trip for every organizer's zone: a series' next date is on
+     its organizer's clock. */
+  const tzByAccount = await accountTimezones(rows.map((r) => r.account_id));
+
+  const due: Array<{ ev: EvRow; occ: Date; tz: string }> = [];
+  const missed: Array<{ ev: EvRow; occ: Date }> = [];
+  for (const ev of rows) {
+    const tz = tzByAccount.get(ev.account_id) ?? "UTC";
+    const occ = nextOccurrenceStart(ev.start_at, ev.recurrence, ev.recurrence_until, now, tz);
+    if (!occ) continue;
+    const occMs = occ.getTime();
+    if (nowMs < occMs - (ev.reminder_minutes ?? 0) * MIN) continue; // not time yet
+    if (ev.reminded_at && Date.parse(ev.reminded_at) >= occMs) continue; // this occurrence is done
+    if (nowMs > occMs + 60 * MIN) missed.push({ ev, occ });
+    else due.push({ ev, occ, tz });
+  }
+
+  /* Missed window — stamp it so a stale one-off stops being evaluated. */
+  await Promise.all(missed.map(({ ev, occ }) => claim(ev.id, occ.toISOString())));
+
+  /* Guests of every due event in one read. */
+  const guestsByEvent = new Map<string, string[]>();
+  if (due.length) {
+    const { data: att } = await supabaseServer
+      .from("koleex_calendar_event_attendees")
+      .select("event_id, account_id")
+      .in("event_id", due.map((d) => d.ev.id))
+      .neq("status", "declined");
+    for (const a of (att ?? []) as Array<{ event_id: string; account_id: string }>) {
+      const list = guestsByEvent.get(a.event_id) ?? [];
+      list.push(a.account_id);
+      guestsByEvent.set(a.event_id, list);
+    }
   }
 
   let fired = 0;
-  const tzByAccount = new Map<string, string>();
-  for (const ev of (data ?? []) as EvRow[]) {
-    const mins = ev.reminder_minutes ?? 0;
-    const occ = nextOccurrenceStart(ev.start_at, ev.recurrence, ev.recurrence_until, now);
-    if (!occ) continue;
-    const occMs = occ.getTime();
-    if (nowMs < occMs - mins * 60_000) continue; // not time yet
-    if (ev.reminded_at && new Date(ev.reminded_at).getTime() >= occMs) continue; // this occurrence is done
-    if (nowMs > occMs + 60 * 60 * 1000) {
-      /* Missed window — stamp it so a stale one-off stops being evaluated. */
-      await supabaseServer.from("koleex_calendar_events").update({ reminded_at: occ.toISOString() }).eq("id", ev.id);
-      continue;
-    }
+  for (const { ev, occ, tz } of due) {
+    const occISO = occ.toISOString();
+    if (!(await claim(ev.id, occISO))) continue; // another run has it
 
-    const recipients = Array.from(new Set([ev.account_id, ...(await eventAttendeeIds(ev.id, { excludeDeclined: true }))]));
-
-    let tz = tzByAccount.get(ev.account_id);
-    if (!tz) { tz = await accountTimezone(ev.account_id); tzByAccount.set(ev.account_id, tz); }
+    const recipients = Array.from(new Set([ev.account_id, ...(guestsByEvent.get(ev.id) ?? [])]));
     const durationMs = Math.max(0, Date.parse(ev.end_at) - Date.parse(ev.start_at));
-    const when = formatWhen(occ.toISOString(), new Date(occMs + durationMs).toISOString(), ev.all_day, tz);
-    const soon = mins > 0 ? ` (in ${mins} min)` : "";
+    const when = formatWhen(occISO, new Date(occ.getTime() + durationMs).toISOString(), ev.all_day, tz);
+    const left = timeLeft(occ.getTime() - Date.now());
+    const lead = left === "now" ? "starting now" : left;
 
     const meta = { type: "calendar_reminder", event_id: ev.id };
-    await supersedeUnread({ recipients, meta });
-    await supabaseServer.from("inbox_messages").insert(
-      recipients.map((rid) => ({
-        recipient_account_id: rid,
-        sender_account_id: null,
-        tenant_id: ev.tenant_id,
-        category: "calendar",
-        subject: `Starting soon: ${ev.title}`,
-        body: `${when}${soon}.`,
-        link: eventLink(ev.id),
-        metadata: meta,
-      })),
-    );
-    await emitPings(recipients.map((id) => ({ topic: rtTopic.inbox(id) })));
-    await sendPushToAccounts(recipients, {
-      title: ev.title,
-      body: `Starts ${when}${soon}`,
-      url: eventLink(ev.id),
-      tag: `calendar-reminder-${ev.id}`,
-      kind: "calendar_reminder",
-    }).catch((e) => console.error("[cron/calendar-reminders] push:", e));
-
-    await supabaseServer.from("koleex_calendar_events").update({ reminded_at: occ.toISOString() }).eq("id", ev.id);
-    fired += 1;
+    try {
+      await supersedeUnread({ recipients, meta });
+      await supabaseServer.from("inbox_messages").insert(
+        recipients.map((rid) => ({
+          recipient_account_id: rid,
+          sender_account_id: null,
+          tenant_id: ev.tenant_id,
+          category: "calendar",
+          subject: `Starting soon: ${ev.title}`,
+          body: `${when} (${lead}).`,
+          link: eventLink(ev.id),
+          metadata: meta,
+        })),
+      );
+      await emitPings(recipients.map((id) => ({ topic: rtTopic.inbox(id) })));
+      await sendPushToAccounts(recipients, {
+        title: ev.title,
+        body: `${when} (${lead})`,
+        url: eventLink(ev.id),
+        tag: `calendar-reminder-${ev.id}`,
+        kind: "calendar_reminder",
+      }).catch((e) => console.error("[cron/calendar-reminders] push:", e));
+      fired += 1;
+    } catch (e) {
+      /* The claim stands: a half-sent reminder is not resent every two
+         minutes for the next hour. */
+      console.error("[cron/calendar-reminders] send:", e instanceof Error ? e.message : e);
+    }
   }
 
-  return NextResponse.json({ ok: true, fired });
+  return NextResponse.json({ ok: true, fired, missed: missed.length });
 }

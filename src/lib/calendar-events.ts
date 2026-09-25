@@ -2,8 +2,10 @@
    Calendar events — the browser's client for /api/calendar/events.
 
    THE BROWSER DOES NOT TOUCH THE DATABASE HERE. Every function calls the
-   API and returns the empty answer on failure. Scope, tenant and the
-   private-record rules are applied by the route from the session.
+   API. Reads that a screen must be able to tell apart from "nothing there"
+   (the window, the guest list) say whether they worked; the rest return the
+   empty answer on failure. Scope, tenant and the private-record rules are
+   applied by the route from the session.
    --------------------------------------------------------------------------- */
 
 import type {
@@ -11,26 +13,31 @@ import type {
   CalendarEventRow,
   CalendarEventInsert,
   CalendarEventUpdate,
-  CalendarViewEvent,
 } from "@/types/supabase";
+import type { CalendarFeedEvent } from "@/lib/calendar-types";
 
 export interface CalendarAttendee {
   account_id: string;
   status: CalendarAttendeeStatus;
-  name: string;
+  /** null when the account has no name — the screen words the fallback. */
+  name: string | null;
 }
+
+/** A single event as GET /api/calendar/events/[id] returns it. */
+export type CalendarEventDetail = CalendarEventRow & { invited?: boolean; start_date?: string; end_date?: string };
 
 function logUnlessDenied(what: string, status: number, quiet: number[] = [401, 403]) {
   if (!quiet.includes(status)) console.error(`[Calendar] ${what}:`, status);
 }
 
 /** Events for an account within [rangeStart, rangeEnd) — its own, the
- *  occurrences of its series, the events it is invited to, and the mirrors. */
+ *  occurrences of its series, the events it is invited to, and the mirrors.
+ *  `ok: false` is a failed load, never an empty month. */
 export async function fetchEventsInRange(
   accountId: string,
   rangeStart: Date,
   rangeEnd: Date,
-): Promise<CalendarViewEvent[]> {
+): Promise<{ ok: boolean; events: CalendarFeedEvent[] }> {
   const params = new URLSearchParams({
     accountId,
     from: rangeStart.toISOString(),
@@ -38,21 +45,21 @@ export async function fetchEventsInRange(
   });
   try {
     const res = await fetch("/api/calendar/events?" + params.toString(), { credentials: "include" });
-    if (!res.ok) { logUnlessDenied("fetchEventsInRange", res.status); return []; }
-    const json = (await res.json()) as { events: CalendarViewEvent[] };
-    return json.events;
+    if (!res.ok) { logUnlessDenied("fetchEventsInRange", res.status); return { ok: false, events: [] }; }
+    const json = (await res.json()) as { events?: CalendarFeedEvent[] };
+    return { ok: true, events: json.events ?? [] };
   } catch (e) {
     console.error("[Calendar] fetchEventsInRange failed:", e);
-    return [];
+    return { ok: false, events: [] };
   }
 }
 
 /** One real event by id; `invited` is set when the caller is a guest. */
-export async function fetchEventById(id: string): Promise<(CalendarEventRow & { invited?: boolean }) | null> {
+export async function fetchEventById(id: string): Promise<CalendarEventDetail | null> {
   try {
     const res = await fetch("/api/calendar/events/" + id, { credentials: "include" });
     if (!res.ok) { logUnlessDenied("fetchEventById", res.status, [401, 403, 404]); return null; }
-    const json = (await res.json()) as { event: (CalendarEventRow & { invited?: boolean }) | null };
+    const json = (await res.json()) as { event: CalendarEventDetail | null };
     return json.event;
   } catch (e) {
     console.error("[Calendar] fetchEventById failed:", e);
@@ -110,14 +117,16 @@ export async function deleteEvent(id: string): Promise<boolean> {
 
 /* ── Guests ── */
 
-export async function fetchAttendees(eventId: string): Promise<CalendarAttendee[]> {
+/** The guest list, or null when it could not be read — a caller must not
+ *  mistake a failed read for "no guests" and save that back. */
+export async function fetchAttendees(eventId: string): Promise<CalendarAttendee[] | null> {
   try {
     const res = await fetch(`/api/calendar/events/${eventId}/attendees`, { credentials: "include" });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const json = (await res.json()) as { attendees?: CalendarAttendee[] };
     return json.attendees ?? [];
   } catch {
-    return [];
+    return null;
   }
 }
 

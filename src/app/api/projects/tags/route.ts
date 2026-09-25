@@ -16,7 +16,10 @@ export async function GET() {
     .eq("tenant_id", auth.tenant_id)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/projects/tags]", error.message);
+    return NextResponse.json({ error: error.code === "23505" ? "A tag with this name already exists" : "Tag request failed" }, { status: error.code === "23505" ? 409 : 500 });
+  }
   return NextResponse.json({ tags: data ?? [] });
 }
 
@@ -45,6 +48,9 @@ export async function POST(req: Request) {
     })
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/projects/tags]", error.message);
+    return NextResponse.json({ error: error.code === "23505" ? "A tag with this name already exists" : "Tag request failed" }, { status: error.code === "23505" ? 409 : 500 });
+  }
   return NextResponse.json({ tag: data });
 }

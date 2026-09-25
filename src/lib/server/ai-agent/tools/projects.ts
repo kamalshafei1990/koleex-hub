@@ -16,6 +16,7 @@ import "server-only";
 
 import { supabaseServer } from "../../supabase-server";
 import { recomputeProjectProgress } from "../../project-progress";
+import { loadStages, reconcileStageStatus } from "../../project-task-rules";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 
@@ -33,6 +34,7 @@ interface TaskRow {
   description: string | null;
   priority: string | null;
   status: string | null;
+  stage_id: string | null;
   due_date: string | null;
   assignee_account_id: string | null;
   created_by_account_id: string | null;
@@ -44,7 +46,7 @@ async function loadVisibleTask(
 ): Promise<TaskRow | null> {
   const { data } = await supabaseServer
     .from("project_tasks")
-    .select("id, project_id, title, description, priority, status, due_date, assignee_account_id, created_by_account_id")
+    .select("id, project_id, title, description, priority, status, stage_id, due_date, assignee_account_id, created_by_account_id")
     .eq("id", id)
     .eq("tenant_id", ctx.auth.tenant_id)
     .maybeSingle();
@@ -307,6 +309,8 @@ const createProjectTask: ToolDef<
       console.error("[tool.createProjectTask]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the project task — please try again." };
     }
+    // A new open task changes the project's % — same recompute as the route.
+    await recomputeProjectProgress(ctx.auth.tenant_id, projectId);
     return {
       ok: true,
       permissionStatus: "allowed",
@@ -367,10 +371,15 @@ const completeProjectTask: ToolDef<
     }
 
     /* project_tasks_status_check allows open|done|cancelled — reopen
-       means "open" (there is no todo/in_progress at the DB level). */
-    const patch: Record<string, unknown> = done
-      ? { status: "done", closed_at: new Date().toISOString(), progress_pct: 100 }
-      : { status: "open", closed_at: null };
+       means "open" (there is no todo/in_progress at the DB level). The
+       stage follows the status exactly as in the PATCH route: done moves
+       the card into the first closed stage, reopening moves it out. */
+    const stages = t.project_id ? await loadStages(ctx.auth.tenant_id, t.project_id) : [];
+    const patch = reconcileStageStatus(
+      { status: t.status ?? "open", stage_id: t.stage_id ?? null },
+      { status: done ? "done" : "open" },
+      stages,
+    );
     const { error } = await supabaseServer
       .from("project_tasks")
       .update(patch)
@@ -380,7 +389,7 @@ const completeProjectTask: ToolDef<
       console.error("[tool.completeProjectTask]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
-    void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
+    await recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
     return {
       ok: true,
       permissionStatus: "allowed",
@@ -516,7 +525,7 @@ const deleteProjectTask: ToolDef<
       console.error("[tool.deleteProjectTask]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
-    void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
+    await recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
     return {
       ok: true,
       permissionStatus: "allowed",

@@ -2,8 +2,10 @@
 
 /* ---------------------------------------------------------------------------
    FoldersSidebar — left pane. Lists smart folders at the top (All,
-   Pinned, Unfiled, Trash), then user folders with multi-level nesting.
-   Right-click or tap the ··· menu to rename / delete / add subfolder.
+   Pinned, Unfiled, Shared with me), then user folders with multi-level
+   nesting, then Trash. Each folder row has add-subfolder / rename / delete
+   actions (shown on hover, keyboard focus, and always on touch screens).
+   Counts come from the server (live notes per folder), not the visible list.
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
@@ -42,7 +44,7 @@ export default function FoldersSidebar({
   onAskCreateFolder: (parentId: string | null) => void;
   onAskRenameFolder: (folder: NotesFolderRow) => void;
   onAskDeleteFolder: (id: string) => void;
-  notesCountByFolder: Map<string, number>;
+  notesCountByFolder: Record<string, number>;
 }) {
   const { t } = useTranslation(notesT);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -91,7 +93,7 @@ export default function FoldersSidebar({
         <SmartItem
           label={t("smart.pinned")}
           Icon={PinIcon}
-          tint="text-[#0066FF]"
+          tint="text-[#567FB2] dark:text-[#7FA9D6]"
           active={selection.kind === "smart" && selection.key === "pinned"}
           onClick={() => onSelect({ kind: "smart", key: "pinned" })}
         />
@@ -105,7 +107,7 @@ export default function FoldersSidebar({
         <SmartItem
           label={t("smart.shared")}
           Icon={UsersIcon}
-          tint="text-[#0066FF]"
+          tint="text-[#567FB2] dark:text-[#7FA9D6]"
           active={selection.kind === "smart" && selection.key === "shared"}
           onClick={() => onSelect({ kind: "smart", key: "shared" })}
         />
@@ -117,8 +119,10 @@ export default function FoldersSidebar({
           {t("folders")}
         </span>
         <button
+          type="button"
           onClick={handleCreateRoot}
           title={t("newFolder")}
+          aria-label={t("newFolder")}
           className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all"
         >
           <PlusIcon className="h-3.5 w-3.5" />
@@ -138,6 +142,7 @@ export default function FoldersSidebar({
           onRename={handleRename}
           onDelete={onAskDeleteFolder}
           notesCountByFolder={notesCountByFolder}
+          t={t}
         />
       </div>
 
@@ -170,7 +175,9 @@ function SmartItem({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-current={active ? "true" : undefined}
       className={`w-full h-8 px-2.5 rounded-lg flex items-center gap-2.5 transition-all text-[13px] ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold"
@@ -195,6 +202,7 @@ function FolderTree({
   onRename,
   onDelete,
   notesCountByFolder,
+  t,
 }: {
   parent: string | null;
   tree: Map<string | null, NotesFolderRow[]>;
@@ -206,7 +214,8 @@ function FolderTree({
   onCreateChild: (parentId: string) => void;
   onRename: (f: NotesFolderRow) => void;
   onDelete: (id: string) => void;
-  notesCountByFolder: Map<string, number>;
+  notesCountByFolder: Record<string, number>;
+  t: (k: string) => string;
 }) {
   const children = tree.get(parent) ?? [];
   if (children.length === 0) return null;
@@ -218,12 +227,12 @@ function FolderTree({
         const hasChildren = grand.length > 0;
         const isOpen = expanded.has(f.id);
         const isActive = selection.kind === "folder" && selection.id === f.id;
-        const count = notesCountByFolder.get(f.id) ?? 0;
+        const count = notesCountByFolder[f.id] ?? 0;
 
         return (
           <div key={f.id}>
             <div
-              className={`group flex items-center gap-1 rounded-lg pr-1 transition-all ${
+              className={`group flex items-center gap-1 rounded-lg pe-1 transition-all ${
                 isActive
                   ? "bg-[var(--bg-surface-active)]"
                   : "hover:bg-[var(--bg-surface)]"
@@ -231,7 +240,12 @@ function FolderTree({
               style={{ paddingInlineStart: 4 + depth * 14 }}
             >
               <button
+                type="button"
                 onClick={() => hasChildren && toggle(f.id)}
+                tabIndex={hasChildren ? 0 : -1}
+                aria-hidden={hasChildren ? undefined : true}
+                aria-expanded={hasChildren ? isOpen : undefined}
+                aria-label={hasChildren ? `${isOpen ? t("folder.collapse") : t("folder.expand")} ${f.name}` : undefined}
                 className={`w-4 h-4 flex items-center justify-center shrink-0 text-[var(--text-faint)] ${
                   hasChildren ? "hover:text-[var(--text-primary)]" : "invisible"
                 }`}
@@ -239,12 +253,14 @@ function FolderTree({
                 {isOpen ? (
                   <AngleDownIcon className="h-3 w-3" />
                 ) : (
-                  <AngleRightIcon className="h-3 w-3" />
+                  <AngleRightIcon className="h-3 w-3 rtl:-scale-x-100" />
                 )}
               </button>
 
               <button
+                type="button"
                 onClick={() => onSelect({ kind: "folder", id: f.id })}
+                aria-current={isActive ? "true" : undefined}
                 className={`flex-1 min-w-0 h-8 flex items-center gap-2 text-[13px] text-start ${
                   isActive
                     ? "text-[var(--text-primary)] font-semibold"
@@ -253,7 +269,7 @@ function FolderTree({
               >
                 <FolderIcon
                   className={`h-3.5 w-3.5 shrink-0 ${
-                    isActive ? "text-[#0066FF]" : "text-[var(--text-faint)]"
+                    isActive ? "text-[#567FB2] dark:text-[#7FA9D6]" : "text-[var(--text-faint)]"
                   }`}
                 />
                 <span className="truncate flex-1">{f.name}</span>
@@ -264,26 +280,32 @@ function FolderTree({
                 )}
               </button>
 
-              {/* Row actions — visible on hover */}
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+              {/* Row actions — hover, keyboard focus, and always on touch */}
+              <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex items-center gap-0.5">
                 <button
+                  type="button"
                   onClick={() => onCreateChild(f.id)}
-                  title="New subfolder"
+                  title={t("newSubfolder")}
+                  aria-label={`${t("newSubfolder")} — ${f.name}`}
                   className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                 >
                   <PlusIcon className="h-3 w-3" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => onRename(f)}
-                  title="Rename"
+                  title={t("rename")}
+                  aria-label={`${t("rename")} — ${f.name}`}
                   className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                 >
                   <PencilIcon className="h-3 w-3" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => onDelete(f.id)}
-                  title="Delete"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface-subtle)]"
+                  title={t("delete")}
+                  aria-label={`${t("delete")} — ${f.name}`}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--bg-surface-subtle)]"
                 >
                   <TrashIcon className="h-3 w-3" />
                 </button>
@@ -303,6 +325,7 @@ function FolderTree({
                 onRename={onRename}
                 onDelete={onDelete}
                 notesCountByFolder={notesCountByFolder}
+                t={t}
               />
             )}
           </div>

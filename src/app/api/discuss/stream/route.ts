@@ -27,7 +27,10 @@ import "server-only";
        serialization: reactions/reply enrichment reconciles via the existing
        30s dirty pass)
      · membership set refreshes every ~30s; heartbeat comment keeps proxies open
-     · the stream self-terminates before maxDuration; EventSource reconnects.
+     · the stream self-terminates before maxDuration; EventSource reconnects
+       with ?since=<newest seen> so the gap is replayed (bounded, deduped)
+     · every ~3s an `chg` event names channels touched by an edit / delete /
+       reaction / pin, so those reach open clients without a broadcast ping
 
    Delivery latency: poll cadence /2 (~0.5s median) + SSE push ≈ WeChat-feel,
    independent of Supabase websocket reachability. The Supabase broadcast path
@@ -35,34 +38,20 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
-import { serializeDiscussMessageForClient } from "@/lib/server/discuss-serialize";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import {
+  serializeDiscussMessageForClient,
+  flattenDiscussAuthor as flattenAuthor,
+  DISCUSS_AUTHOR_SELECT as AUTHOR_SELECT,
+  type DiscussAuthorJoin as AuthorJoin,
+} from "@/lib/server/discuss-serialize";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const MEMBERS = "discuss_members";
 const MESSAGES = "discuss_messages";
-
-/* Keep in lockstep with /api/discuss/read AUTHOR_SELECT. */
-const AUTHOR_SELECT = `
-  *,
-  author:accounts!discuss_messages_author_account_id_fkey (
-    id, username, avatar_url, person:people ( full_name, name_alt )
-  )
-`;
-
-type AuthorJoin =
-  | { id: string; username: string; avatar_url: string | null; person: { full_name: string } | Array<{ full_name: string }> | null }
-  | Array<{ id: string; username: string; avatar_url: string | null; person: { full_name: string } | Array<{ full_name: string }> | null }>
-  | null;
-
-function flattenAuthor(raw: AuthorJoin) {
-  const acc = Array.isArray(raw) ? raw[0] ?? null : raw;
-  if (!acc) return null;
-  const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-  return { id: acc.id, username: acc.username, avatar_url: acc.avatar_url, full_name: person?.full_name ?? null, name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null };
-}
+const CHANNELS = "discuss_channels";
 
 async function myChannelIds(me: string): Promise<string[]> {
   const { data } = await supabaseServer
@@ -77,12 +66,34 @@ const POLL_MS = 900;          // hot cursor-poll cadence (median delivery ≈ 45
 const IDLE_POLL_MS = 2500;    // relaxed cadence after 60s without a delivered row
 const HEARTBEAT_EVERY = 22;   // ≈20s — keep proxies/CDN from timing the stream out
 const MEMBERSHIP_EVERY = 33;  // ≈30s — pick up newly joined/left channels
+const CHANGE_EVERY = 3;       // ≈3s  — edits / deletes / reactions / pins
 const LIFETIME_MS = 280_000;  // self-terminate under maxDuration; client reconnects
+/* Rows commit with created_at = the INSERT's now(), but become visible only
+   at COMMIT — a slow transaction can surface a row older than the cursor we
+   already advanced past, and it was silently skipped forever. Re-read a small
+   window behind the cursor on every tick and drop what was already sent. */
+const OVERLAP_MS = 2_000;
+/* How far back a reconnecting client may ask us to replay (?since=). Bounded
+   so a stale tab cannot turn one reconnect into a history dump. */
+const MAX_REPLAY_MS = 5 * 60_000;
+/* An update counts as an edit-type change (not the insert trigger's own
+   touch) when updated_at is this far past last_message_at. */
+const CHANGE_SLACK_MS = 1_000;
 
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof Response) return auth;
+  const denied = await requireModuleAccess(auth, "Discuss");
+  if (denied) return denied;
   const me = auth.account_id;
+
+  /* Reconnect catch-up: the client sends the newest created_at it has seen;
+     start there (bounded) instead of "now", so a network gap on the China
+     link does not lose the messages sent while it was down. */
+  const sinceRaw = new URL(req.url).searchParams.get("since");
+  const sinceMs = sinceRaw ? Date.parse(sinceRaw) : NaN;
+  const nowMs = Date.now();
+  const startMs = Number.isFinite(sinceMs) ? Math.max(sinceMs, nowMs - MAX_REPLAY_MS) : nowMs;
 
   const encoder = new TextEncoder();
 
@@ -105,19 +116,17 @@ export async function GET(req: Request) {
       send(`event: hello\ndata: ${JSON.stringify({ t: Date.now() })}\n\n`);
 
       let channelIds = await myChannelIds(me);
-      /* Cursor starts NOW — history is the read endpoint's job; the stream
-         only carries what happens while it is open. Client dedupes by id. */
-      let cursor = new Date().toISOString();
+      let cursor = new Date(Math.min(startMs, nowMs)).toISOString();
+      /* Ids already delivered on this connection (overlap dedupe). Bounded:
+         only ids inside the overlap window can ever be re-read. */
+      const sent = new Map<string, number>();
+      let changeCursor = new Date(nowMs - 5_000).toISOString();
       const started = Date.now();
       let iter = 0;
 
       /* Adaptive cadence: poll fast while the conversation is live, back
-         off when quiet. A delivered row (or fresh stream) counts as
-         activity; after 60s without one the cursor poll relaxes to
-         IDLE_POLL_MS. First row after a quiet spell arrives ≤2.5s late —
-         imperceptible for a dormant chat — and immediately snaps the
-         cadence back to hot. Cuts steady-state DB polling ~65% per
-         connected user, which is what made 10 concurrent users heavy. */
+         off when quiet. Cuts steady-state DB polling ~65% per connected
+         user. */
       let lastActivity = Date.now();
       while (!closed && Date.now() - started < LIFETIME_MS) {
         const quiet = Date.now() - lastActivity > 60_000;
@@ -132,17 +141,22 @@ export async function GET(req: Request) {
         if (channelIds.length === 0) continue;
 
         try {
+          const from = new Date(Date.parse(cursor) - OVERLAP_MS).toISOString();
           const { data } = await supabaseServer
             .from(MESSAGES)
             .select(AUTHOR_SELECT)
             .in("channel_id", channelIds)
-            .gt("created_at", cursor)
+            .gt("created_at", from)
             .order("created_at", { ascending: true })
-            .limit(60);
+            .limit(100);
           const rows = (data ?? []) as Array<
             Record<string, unknown> & { id: string; created_at: string; author: AuthorJoin }
           >;
+          let delivered = 0;
           for (const row of rows) {
+            if (row.created_at > cursor) cursor = row.created_at;
+            if (sent.has(row.id)) continue;
+            sent.set(row.id, Date.parse(row.created_at));
             const serialized = serializeDiscussMessageForClient({
               ...row,
               author: flattenAuthor(row.author),
@@ -151,10 +165,39 @@ export async function GET(req: Request) {
               thread: null,
             });
             send(`event: msg\ndata: ${JSON.stringify(serialized)}\n\n`);
-            if (row.created_at > cursor) cursor = row.created_at;
+            delivered += 1;
           }
-          if (rows.length > 0) lastActivity = Date.now();
+          if (delivered > 0) lastActivity = Date.now();
+          /* Forget ids that fell out of the overlap window. */
+          const floor = Date.parse(cursor) - OVERLAP_MS * 2;
+          for (const [id, at] of sent) if (at < floor) sent.delete(id);
         } catch { /* transient query failure — next tick retries */ }
+
+        /* Edits, deletions, reactions and pins do not create rows, so the
+           cursor above cannot see them. Every such write touches the
+           channel (discuss_channels.updated_at via its BEFORE UPDATE
+           trigger); report touched channels so open clients reconcile. The
+           insert trigger also touches the channel, so rows whose updated_at
+           merely matches last_message_at (a new message) are skipped. */
+        if (iter % CHANGE_EVERY === 0) {
+          try {
+            const { data: touched } = await supabaseServer
+              .from(CHANNELS)
+              .select("id, updated_at, last_message_at")
+              .in("id", channelIds)
+              .gt("updated_at", changeCursor)
+              .limit(100);
+            for (const ch of (touched ?? []) as Array<{ id: string; updated_at: string; last_message_at: string | null }>) {
+              if (ch.updated_at > changeCursor) changeCursor = ch.updated_at;
+              const upd = Date.parse(ch.updated_at);
+              const last = ch.last_message_at ? Date.parse(ch.last_message_at) : 0;
+              if (upd - last > CHANGE_SLACK_MS) {
+                send(`event: chg\ndata: ${JSON.stringify({ channelId: ch.id, at: ch.updated_at })}\n\n`);
+                lastActivity = Date.now();
+              }
+            }
+          } catch { /* next tick retries */ }
+        }
       }
 
       send(`event: bye\ndata: {}\n\n`);

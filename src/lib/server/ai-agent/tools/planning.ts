@@ -15,6 +15,11 @@ import "server-only";
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
+import {
+  callerResourceIds,
+  loadPlanningItemForCaller,
+  planningReadScopeOr,
+} from "../../planning-access";
 
 const PLANNING_MODULE = "Planning";
 
@@ -55,13 +60,14 @@ const listMyPlanning: ToolDef<
     const limit = Math.min(Math.max(Number(args.limit ?? 30) || 30, 1), 60);
     const { from, to } = windowISO(days);
 
-    // Resource ids belonging to the caller.
-    const { data: mineRes } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("account_id", accountId);
-    const rids = (mineRes ?? []).map((r) => (r as { id: string }).id);
+    // Resource ids belonging to the caller (shared helper — same rule as the app).
+    let rids: string[];
+    try {
+      rids = await callerResourceIds({ account_id: accountId, tenant_id: tenantId });
+    } catch (e) {
+      console.error("[tool.listMyPlanning] resources", e);
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your planning right now." };
+    }
 
     let q = supabaseServer
       .from("planning_items")
@@ -76,12 +82,7 @@ const listMyPlanning: ToolDef<
       if (rids.length > 0) q = q.in("resource_id", rids);
       else return { ok: true, permissionStatus: "allowed", data: [], message: "You have no assigned resource, so no personal planning items." };
     } else if (!ctx.isSuperAdmin) {
-      const orParts = [
-        `created_by_account_id.eq.${accountId}`,
-        `resource_id.is.null`,
-      ];
-      if (rids.length > 0) orParts.push(`resource_id.in.(${rids.join(",")})`);
-      q = q.or(orParts.join(","));
+      q = q.or(planningReadScopeOr(accountId, rids));
     }
 
     const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
@@ -140,11 +141,14 @@ const createPlanningItem: ToolDef<
     if (!startAt || !endAt) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
     {
       const s = Date.parse(startAt), e = Date.parse(endAt);
-      if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) {
+      if (Number.isNaN(s) || Number.isNaN(e)) {
+        return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read those times — give me a start and end as full dates with times." };
+      }
+      if (e <= s) {
         return { ok: false, permissionStatus: "allowed", data: null, message: "The end time must be after the start time." };
       }
     }
-    const title = args.title ? String(args.title) : "";
+    const title = args.title ? String(args.title).slice(0, 200) : "";
     /* planning_items_type_check allows shift|meeting|production|delivery|
        maintenance|project_task|room_booking|other — anything else from the
        model (it used to offer "task"/"time_off") collapses to "shift" so
@@ -156,7 +160,8 @@ const createPlanningItem: ToolDef<
     // Attach to the caller's own resource so it's their planned time (not an
     // open shift). If they have none, it's created unassigned.
     const { data: mineRes } = await supabaseServer
-      .from("planning_resources").select("id").eq("tenant_id", ctx.auth.tenant_id).eq("account_id", ctx.auth.account_id).limit(1);
+      .from("planning_resources").select("id").eq("tenant_id", ctx.auth.tenant_id).eq("account_id", ctx.auth.account_id)
+      .eq("is_active", true).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(1);
     const resourceId = (mineRes ?? [])[0] ? (mineRes as { id: string }[])[0].id : null;
 
     const normalized = { title, start_at: startAt, end_at: endAt, type, notes: args.notes ? String(args.notes) : null };
@@ -211,10 +216,10 @@ const createPlanningItem: ToolDef<
 };
 
 /* ── Shared loader for mutations ──
-   The app's PATCH/DELETE gate on module action + tenant; the agent holds
-   itself to the caller's OWN slice of the schedule: an item is mutable
-   via AI only if the caller created it or it sits on their own resource
-   (SA skips). Open shifts and other people's shifts stay app-only. */
+   The ownership rule now lives in lib/server/planning-access.ts and is the
+   SAME one the app's PATCH/DELETE routes enforce: an item is mutable only
+   if the caller created it or it sits on their own resource (SA skips).
+   Open shifts and other people's shifts are refused. */
 interface PlanningRow {
   id: string;
   type: string | null;
@@ -231,27 +236,13 @@ async function loadOwnPlanningItem(
   ctx: { auth: { account_id: string; tenant_id: string }; isSuperAdmin: boolean },
   id: string,
 ): Promise<PlanningRow | null> {
-  const { data } = await supabaseServer
-    .from("planning_items")
-    .select("id, type, title, notes, resource_id, start_at, end_at, status, created_by_account_id")
-    .eq("id", id)
-    .eq("tenant_id", ctx.auth.tenant_id)
-    .maybeSingle();
-  const item = (data as PlanningRow | null) ?? null;
-  if (!item) return null;
-  if (ctx.isSuperAdmin) return item;
-  if (item.created_by_account_id === ctx.auth.account_id) return item;
-  if (item.resource_id) {
-    const { data: res } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("id", item.resource_id)
-      .eq("tenant_id", ctx.auth.tenant_id)
-      .eq("account_id", ctx.auth.account_id)
-      .maybeSingle();
-    if (res) return item;
-  }
-  return null;
+  const r = await loadPlanningItemForCaller<PlanningRow>(
+    { account_id: ctx.auth.account_id, tenant_id: ctx.auth.tenant_id, is_super_admin: ctx.isSuperAdmin },
+    id,
+    "write",
+    "id, type, title, notes, resource_id, start_at, end_at, status, created_by_account_id",
+  );
+  return r.ok ? r.item : null;
 }
 
 /* ── Edit / cancel a planning item (with confirm) ──
@@ -303,6 +294,11 @@ const updatePlanningItem: ToolDef<
     if (typeof args.notes === "string") changes.notes = args.notes;
     if (typeof args.start_at === "string" && args.start_at.trim()) changes.start_at = args.start_at.trim();
     if (typeof args.end_at === "string" && args.end_at.trim()) changes.end_at = args.end_at.trim();
+    for (const k of ["start_at", "end_at"] as const) {
+      if (typeof changes[k] === "string" && Number.isNaN(Date.parse(changes[k] as string))) {
+        return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that time — give it as a full date with a time." };
+      }
+    }
     if (args.status === "cancelled") {
       changes.status = "cancelled";
       changes.cancelled_at = new Date().toISOString();

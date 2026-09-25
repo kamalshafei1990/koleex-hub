@@ -8,8 +8,9 @@ import "server-only";
    calendar-access, calendar-notify): the owner or a super admin changes an
    event, a reschedule re-arms the reminder and tells the guests, a delete
    tells them it was cancelled and closes every notification about it. The
-   list returns the user's real events in a window; the recurring-series
-   expansion and the module mirrors the app overlays are left to the app.
+   list reads the SAME feed as the Calendar screen (lib/server/calendar-feed):
+   own events with every occurrence of a series, invitations, and the
+   Planning / To-do / Projects / leave / report-deadline mirrors.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
@@ -17,18 +18,33 @@ import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { eventAttendeeIds, isEventOwner, loadCalendarEvent, sanitizeEventInput } from "../../calendar-access";
 import { clearEventNotifications, notifyEventChanged } from "../../calendar-notify";
+import { feedWindow, loadCalendarFeed } from "../../calendar-feed";
+import { deleteLinkedTodos, syncLinkedTodo } from "../../calendar-todo-bridge";
 import { CALENDAR_EVENT_TYPES } from "@/lib/calendar-enums";
+import type { CalendarFeedEvent } from "@/lib/calendar-types";
 
 const CALENDAR_MODULE = "Calendar";
 
-const EVENT_COLS = `id, title, description, location, event_type, start_at, end_at, all_day,
-  is_private, recurrence, recurrence_until, reminder_minutes, color, created_at`;
-
-/** Default window: now → +N days. */
-function windowISO(days: number): { from: string; to: string } {
-  const now = new Date();
-  const to = new Date(now); to.setDate(to.getDate() + days); to.setHours(23, 59, 59, 999);
-  return { from: now.toISOString(), to: to.toISOString() };
+/** One feed item as the agent sees it. `event_id` is what update/delete
+ *  take — present only for the user's own editable events (an occurrence of
+ *  a series answers with its series; editing it edits the whole series). */
+function agentRow(e: CalendarFeedEvent): Record<string, unknown> {
+  const own = !e.source && !e.invited;
+  const title = e.title
+    || (e.source === "leave" ? "Leave" : e.source === "planning" ? `Planning (${e.planning_type ?? "shift"})` : "Untitled");
+  return {
+    ...(own ? { event_id: e.series_base_id ?? e.id } : {}),
+    title,
+    kind: e.source ?? (e.invited ? "invitation" : "event"),
+    event_type: e.event_type,
+    ...(e.all_day ? { all_day: true, start_date: e.start_date, end_date: e.end_date } : { start_at: e.start_at, end_at: e.end_at }),
+    ...(e.location ? { location: e.location } : {}),
+    ...(e.description && own ? { description: e.description } : {}),
+    ...(e.series_base_id ? { recurring: e.recurrence ?? true } : {}),
+    ...(e.invited ? { my_answer: e.invite_status ?? "invited" } : {}),
+    ...(e.source_kind && e.source ? { status: e.source_kind } : {}),
+    ...(e.is_private ? { private: true } : {}),
+  };
 }
 
 const listMyCalendar: ToolDef<
@@ -37,7 +53,7 @@ const listMyCalendar: ToolDef<
 > = {
   name: "listMyCalendar",
   description:
-    "List the current user's own calendar events in an upcoming window (default next 7 days). Use for 'what's on my calendar', 'my meetings this week', 'am I free tomorrow'. When resolving a SPECIFIC event by name (to reschedule or delete it), pass q with words from its title and raise days if it might be further out. Only ever returns the current user's own calendar.",
+    "List what is on the current user's own calendar in an upcoming window (default next 7 days): their events (every occurrence of a recurring one), invitations, approved leave, to-dos and project tasks due, planning shifts and report deadlines. Use for 'what's on my calendar', 'my meetings this week', 'am I free tomorrow'. Only rows with an event_id are the user's own events and can be updated or deleted (an occurrence of a recurring event carries its series' id — changing it changes the whole series). When resolving a SPECIFIC event by name, pass q with words from its title and raise days if it might be further out.",
   parameters: {
     type: "object",
     properties: {
@@ -50,38 +66,32 @@ const listMyCalendar: ToolDef<
   requiredModule: CALENDAR_MODULE,
   requiredAction: "view",
   handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
-    const accountId = ctx.auth.account_id;
-    const tenantId = ctx.auth.tenant_id;
     const days = Math.min(Math.max(Number(args.days ?? 7) || 7, 1), 60);
     const limit = Math.min(Math.max(Number(args.limit ?? 30) || 30, 1), 60);
-    const { from, to } = windowISO(days);
+    const from = new Date();
+    const to = new Date(from.getTime() + days * 86_400_000);
 
-    // Always the caller's own calendar — matches the route's own-calendar rule.
-    let q = supabaseServer
-      .from("koleex_calendar_events")
-      .select(EVENT_COLS)
-      .eq("account_id", accountId)
-      .eq("tenant_id", tenantId)
-      .lt("start_at", to)
-      .gte("end_at", from);
-
-    const titleQuery = typeof args.q === "string" ? args.q.trim() : "";
-    if (titleQuery) {
-      q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
-    }
-
-    const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
-    if (error) {
-      console.error("[tool.listMyCalendar]", error);
+    let feed: CalendarFeedEvent[];
+    try {
+      // Always the caller's own calendar — matches the route's own-calendar rule.
+      feed = await loadCalendarFeed(ctx.auth, ctx.auth.account_id, feedWindow(from, to));
+    } catch (e) {
+      console.error("[tool.listMyCalendar]", e instanceof Error ? e.message : e);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your calendar right now." };
     }
-    const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+    const titleQuery = typeof args.q === "string" ? args.q.trim().toLowerCase() : "";
+    const rows = feed
+      .filter((e) => !titleQuery || (e.title ?? "").toLowerCase().includes(titleQuery))
+      .sort((a, b) => Date.parse(a.start_at) - Date.parse(b.start_at))
+      .slice(0, limit)
+      .map(agentRow);
     return {
       ok: true,
       permissionStatus: "allowed",
       data: rows,
-      message: rows.length ? `Found ${rows.length} event(s) in the next ${days} day(s).` : `No calendar events in the next ${days} day(s).`,
-      sources: [`koleex_calendar_events(account=me,tenant=${tenantId.slice(0, 8)}…)`],
+      message: rows.length ? `Found ${rows.length} item(s) in the next ${days} day(s).` : `Nothing on the calendar in the next ${days} day(s).`,
+      sources: [`calendar-feed(account=me,tenant=${(ctx.auth.tenant_id ?? "").slice(0, 8)}…)`],
     };
   },
 };
@@ -287,10 +297,12 @@ const updateCalendarEvent: ToolDef<
       console.error("[tool.updateCalendarEvent]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the event — please try again." };
     }
-    if (input.timeChanged) {
+    const updated = { ...ev, ...(data ?? {}), ...changes } as typeof ev;
+    if (input.timeChanged || input.locationChanged) {
       const guests = await eventAttendeeIds(id, { excludeDeclined: true });
-      await notifyEventChanged({ ...ev, ...(data ?? {}) }, guests, ctx.auth.account_id, "rescheduled");
+      await notifyEventChanged(updated, guests, ctx.auth.account_id, input.timeChanged ? "rescheduled" : "moved");
     }
+    if (input.timeChanged || "title" in changes || "description" in changes) await syncLinkedTodo(updated);
     return {
       ok: true,
       permissionStatus: "allowed",
@@ -350,6 +362,7 @@ const deleteCalendarEvent: ToolDef<
     }
     await clearEventNotifications(id);
     await notifyEventChanged(ev, guests, ctx.auth.account_id, "cancelled");
+    await deleteLinkedTodos(id, ev.tenant_id);
     return {
       ok: true,
       permissionStatus: "allowed",

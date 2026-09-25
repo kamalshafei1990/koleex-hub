@@ -1,21 +1,44 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyTaskAssigned } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { assertProjectAccess, likeTerm, UUID_RE } from "@/lib/server/project-access";
+import { loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* GET  /api/projects/tasks — list tasks across one or all projects.
      Query:
        project_id=<uuid>        scope to a single project
+       parent_task_id=<uuid>    only the subtasks of one task
        mine=1                   only tasks assigned to the caller
        status=open|done|cancelled|all   default: open
        priority=low|normal|high|urgent
        search=<text>            ilike over title
        linked_entity_type + linked_entity_id    attached to a Hub entity
        stage_id=<uuid>          single kanban column
+       limit=<n>                default 500, max 2000
    POST /api/projects/tasks — create a new task. */
+
+/* Card + form columns only — no tenant_id / followers / start_date /
+   updated_at, which no list screen reads. */
+const LIST_COLS = `id, project_id, stage_id, parent_task_id,
+  title, description, priority, assignee_account_id,
+  tag_ids, blocked_by_task_ids, due_date, estimated_hours, logged_hours,
+  progress_pct, status,
+  linked_planning_item_id, linked_entity_type, linked_entity_id, linked_entity_label,
+  sort_order, closed_at, created_at,
+  project:project_id ( id, name, color ),
+  stage:stage_id ( id, name, color, is_closed, is_default_new, sort_order ),
+  assignee:assignee_account_id ( id, username )`;
+
+const CREATABLE = [
+  "title", "description", "stage_id", "priority", "status",
+  "assignee_account_id", "blocked_by_task_ids", "followers_account_ids", "tag_ids",
+  "due_date", "start_date", "estimated_hours", "parent_task_id",
+  "linked_planning_item_id", "linked_entity_type", "linked_entity_id", "linked_entity_label",
+] as const;
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -25,6 +48,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const projectId = url.searchParams.get("project_id");
+  const parentId = url.searchParams.get("parent_task_id");
   const mine = url.searchParams.get("mine") === "1";
   const status = url.searchParams.get("status") ?? "open";
   const priority = url.searchParams.get("priority");
@@ -32,23 +56,16 @@ export async function GET(req: Request) {
   const stageId = url.searchParams.get("stage_id");
   const linkedType = url.searchParams.get("linked_entity_type");
   const linkedId = url.searchParams.get("linked_entity_id");
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 500, 1), 2000);
 
-  let q = supabaseServer
-    .from("project_tasks")
-    .select(
-      `id, tenant_id, project_id, stage_id, parent_task_id,
-       title, description, priority, assignee_account_id, followers_account_ids,
-       tag_ids, blocked_by_task_ids, due_date, start_date, estimated_hours, logged_hours,
-       progress_pct, status,
-       linked_planning_item_id, linked_entity_type, linked_entity_id, linked_entity_label,
-       sort_order, closed_at, created_at, updated_at,
-       project:project_id ( id, name, color ),
-       stage:stage_id ( id, name, color, is_closed, is_default_new, sort_order ),
-       assignee:assignee_account_id ( id, username )`,
-    )
-    .eq("tenant_id", auth.tenant_id);
+  for (const v of [projectId, parentId, stageId, linkedId]) {
+    if (v && !UUID_RE.test(v)) return NextResponse.json({ tasks: [] });
+  }
+
+  let q = supabaseServer.from("project_tasks").select(LIST_COLS).eq("tenant_id", auth.tenant_id);
 
   if (projectId) q = q.eq("project_id", projectId);
+  if (parentId) q = q.eq("parent_task_id", parentId);
   if (mine) q = q.eq("assignee_account_id", auth.account_id);
 
   // Type C scope: non-SA callers see tasks they're involved in (assignee or
@@ -72,18 +89,18 @@ export async function GET(req: Request) {
   if (stageId) q = q.eq("stage_id", stageId);
   if (linkedType) q = q.eq("linked_entity_type", linkedType);
   if (linkedId) q = q.eq("linked_entity_id", linkedId);
-  if (search) q = q.ilike("title", `%${search}%`);
+  if (search) q = q.ilike("title", likeTerm(search));
 
-  q = q.order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+  q = q.order("sort_order", { ascending: true }).order("created_at", { ascending: false }).limit(limit);
 
   const { data, error } = await q;
   if (error) {
     console.error("[api/projects/tasks GET]", error.message);
     return NextResponse.json({ error: "Failed to load tasks" }, { status: 500 });
   }
-  return NextResponse.json({ tasks: data ?? [] }, {
-    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
-  });
+  /* No max-age: the client always reads this with cache:"no-store", so a
+     cacheable header only invited a stale board after a write. */
+  return NextResponse.json({ tasks: data ?? [] });
 }
 
 export async function POST(req: Request) {
@@ -92,78 +109,56 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Projects", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as {
-    project_id: string;
-    title: string;
-    description?: string | null;
-    stage_id?: string | null;
-    priority?: "low" | "normal" | "high" | "urgent";
-    assignee_account_id?: string | null;
-    blocked_by_task_ids?: string[];
-    followers_account_ids?: string[];
-    tag_ids?: string[];
-    due_date?: string | null;
-    start_date?: string | null;
-    estimated_hours?: number | null;
-    parent_task_id?: string | null;
-    linked_planning_item_id?: string | null;
-    linked_entity_type?: string | null;
-    linked_entity_id?: string | null;
-    linked_entity_label?: string | null;
-  };
-  if (!body.project_id || !body.title?.trim()) {
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const projectId = typeof body?.project_id === "string" ? body.project_id : "";
+  if (!body || !projectId || typeof body.title !== "string" || !body.title.trim()) {
     return NextResponse.json({ error: "project_id and title required" }, { status: 400 });
   }
+  const gate = await assertProjectAccess(auth, projectId);
+  if (gate instanceof NextResponse) return gate;
+
+  const stages = await loadStages(auth.tenant_id, projectId);
+  const checked = await validateTaskWrite({
+    tenantId: auth.tenant_id,
+    projectId,
+    taskId: null,
+    body,
+    allowed: CREATABLE,
+    stages,
+  });
+  if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
+  const fields = checked.patch;
 
   // Default the stage to the project's is_default_new column.
-  let stageId = body.stage_id ?? null;
-  if (!stageId) {
-    const { data: def } = await supabaseServer
-      .from("project_stages")
-      .select("id")
-      .eq("tenant_id", auth.tenant_id)
-      .eq("project_id", body.project_id)
-      .eq("is_default_new", true)
-      .maybeSingle();
-    stageId = def?.id ?? null;
+  if (!fields.stage_id) {
+    fields.stage_id = stages.find((s) => s.is_default_new)?.id ?? null;
   }
+  const row = reconcileStageStatus(null, { ...fields, stage_id: fields.stage_id }, stages);
 
   const { data, error } = await supabaseServer
     .from("project_tasks")
     .insert({
+      priority: "normal",
+      followers_account_ids: [],
+      tag_ids: [],
+      blocked_by_task_ids: [],
+      ...row,
       tenant_id: auth.tenant_id,
-      project_id: body.project_id,
-      stage_id: stageId,
-      parent_task_id: body.parent_task_id ?? null,
-      title: body.title.trim(),
-      description: body.description ?? null,
-      priority: body.priority ?? "normal",
-      assignee_account_id: body.assignee_account_id ?? null,
-      followers_account_ids: body.followers_account_ids ?? [],
-      tag_ids: body.tag_ids ?? [],
-      blocked_by_task_ids: body.blocked_by_task_ids ?? [],
-      due_date: body.due_date ?? null,
-      start_date: body.start_date ?? null,
-      estimated_hours: body.estimated_hours ?? null,
-      linked_planning_item_id: body.linked_planning_item_id ?? null,
-      linked_entity_type: body.linked_entity_type ?? null,
-      linked_entity_id: body.linked_entity_id ?? null,
-      linked_entity_label: body.linked_entity_label ?? null,
+      project_id: projectId,
       created_by_account_id: auth.account_id,
     })
     .select("*")
     .single();
   if (error) {
     console.error("[api/projects/tasks POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
   }
 
-  // Fire-and-forget: notify the assignee (inbox + web-push) and keep the
-  // project's progress % in sync with its task counts.
-  if (data) {
-    void notifyTaskAssigned(auth, data);
-    void recomputeProjectProgress(auth.tenant_id, data.project_id);
-  }
+  // After the response: notify the assignee and keep project % in sync.
+  after(async () => {
+    await notifyTaskAssigned(auth, data);
+    await recomputeProjectProgress(auth.tenant_id, projectId);
+  });
 
   return NextResponse.json({ task: data });
 }
