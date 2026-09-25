@@ -117,7 +117,11 @@ export default function PlaceNamesReview() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-24">
-      <PageHeader title={t("names.open")} subtitle={t("names.subtitle")} icon={<LanguagesIcon size={16} />} showTabs={false} />
+      {/* titleNode: the system bar already says "Shipping" (M-1 hides a title
+          that repeats it), but this page's own name is not the app's — it
+          stays on screen. The back chip names where it goes. */}
+      <PageHeader title={t("names.open")} titleNode={t("names.open")} subtitle={t("names.subtitle")}
+        icon={<LanguagesIcon size={16} />} backLabel={t("app.title")} showTabs={false} />
 
       <div className="mt-5 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
