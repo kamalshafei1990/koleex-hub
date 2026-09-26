@@ -18,7 +18,7 @@
    Memoised with stable handlers: ticking one task re-renders one row.
    --------------------------------------------------------------------------- */
 
-import { memo } from "react";
+import { memo, type MouseEvent } from "react";
 import Link from "next/link";
 import type { TodoMetadata, TodoWithRelations } from "@/types/supabase";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
@@ -99,10 +99,20 @@ function TaskRow({
 
   const toggleLabel = task.completed ? t("row.markUndone") : pending ? t("row.withdraw") : t("row.markDone");
 
+  // The whole card opens the task (or toggles it in select mode). Clicks on
+  // the card's own controls and links keep their job, and a drag that
+  // selects text never counts as a click.
+  const onRowClick = (e: MouseEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    if (el.closest("button, a, input, textarea, select, label, [role=button]")) return;
+    if (window.getSelection()?.toString()) return;
+    if (selectMode) onSelect(task.id); else onOpen(task.id);
+  };
+
   return (
-    <div data-task-id={task.id}
+    <div data-task-id={task.id} onClick={onRowClick}
       className={`[content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all ${task.completed ? "opacity-50" : ""} ${highlight ? "bg-[#567FB2]/10" : ""} ${temp ? "opacity-70" : ""}`}>
-      <div className={`group flex items-start gap-3 px-4 py-3.5 transition-all ${selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+      <div className={`group flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-all ${selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
         {selectMode && (
           <button type="button" onClick={() => onSelect(task.id)} className="mt-0.5 shrink-0"
             aria-pressed={selected} aria-label={t("row.selectTask")}>
