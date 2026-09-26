@@ -63,7 +63,6 @@ export const INPUT = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border 
 export const CHOICE = "rounded-lg text-[11px] font-semibold transition-colors border flex items-center justify-center gap-1.5";
 export const CHOICE_ON = "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]";
 export const CHOICE_OFF = "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]";
-export const SELECT_TRIGGER = "h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start";
 
 /** Status as a pill — the row and the sheet say the situation in words. */
 export const STATUS_PILL: Record<TodoStatus, string> = {

@@ -33,14 +33,14 @@
 
    `resolveAssignees` went with them; /api/todos/assignees does that job.
 
-   Realtime (`subscribeToTodos`) still needs the Supabase client for the
-   socket — but it listens for the server's BROADCAST ping on the tenant's
+   Realtime (`subscribeToTodos`, now in ./todo-realtime so this module —
+   and every screen that imports it — no longer carries supabase-js) still
+   needs the Supabase client for the socket — but it listens for the server's BROADCAST ping on the tenant's
    `todos` topic and refetches through the gated route. It used to subscribe
    to anon postgres_changes on koleex_todos, a table locked to the service
    role, so it never received a single row and the screen only refreshed on
    its own writes. */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type {
   TodoRow,
   TodoUpdate,
@@ -50,7 +50,7 @@ import type {
   TodoAssigneeInfo,
   TodoMetadata,
 } from "@/types/supabase";
-import { todoListUrl, todoOpenListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
+import { todoListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
 
 /* ── Fetch todos ──
    The server scopes the list to the session (lib/server/todo-scope.ts):
@@ -84,19 +84,6 @@ async function getTodoList(url: string): Promise<{ todos: TodoWithRelations[]; n
   return { todos: Array.isArray(json.todos) ? json.todos : [], next_before: json.next_before, truncated: json.truncated };
 }
 
-/** The whole visible list (the To-do screen's classic load). Throws on failure. */
-export async function fetchTodos(): Promise<TodoWithRelations[]> {
-  /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
-     a toggle repaints the cached, pre-toggle list. */
-  return (await getTodoList(todoListUrl())).todos;
-}
-
-/** Open tasks plus those completed in the last 24 hours (the lazy-completed
- *  screen's first load). Throws on failure. */
-export async function fetchOpenTodos(): Promise<TodoWithRelations[]> {
-  return (await getTodoList(todoOpenListUrl())).todos;
-}
-
 /** One page of completed tasks, newest completion first. Pass the previous
  *  page's `nextBefore` to continue; null means there is no more. Throws on
  *  failure. */
@@ -112,7 +99,8 @@ export async function fetchCompletedTodos(opts: { limit?: number; before?: strin
 
 /* ── Create todo ── */
 
-export async function createTodo(input: {
+/** What POST /api/todos accepts (createTodoResult below). */
+export type TodoCreateInput = {
   title: string;
   description?: string | null;
   priority?: "high" | "medium" | "low";
@@ -131,54 +119,15 @@ export async function createTodo(input: {
   assigned_department?: string | null;
   assign_to_all?: boolean;
   metadata?: TodoMetadata;
-}): Promise<TodoRow | null> {
-  // API-first — server enforces creator/tenant and handles fan-out.
-  try {
-    const res = await fetch("/api/todos", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: input.title,
-        description: input.description,
-        priority: input.priority,
-        label: input.label,
-        due_date: input.due_date,
-        start_date: input.start_date,
-        remind_at: input.remind_at,
-        status: input.status,
-        recurrence: input.recurrence,
-        recurrence_until: input.recurrence_until,
-        source: input.source,
-        source_id: input.source_id,
-        assignee_account_ids: input.assignee_account_ids,
-        assigned_department: input.assigned_department,
-        assign_to_all: input.assign_to_all,
-        metadata: input.metadata,
-      }),
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { todo: TodoRow | null };
-      /* ⚠️ THE ONE WRITE THAT NEVER ANNOUNCED ITSELF. update / toggle / delete
-         all call announceTodoChange() — which bumps the ?v= write version that
-         busts the list's 30-second HTTP cache — and CREATE did not. So the
-         refetch right after adding a task asked the same ?v= URL, the browser
-         answered from cache with the pre-create list, and the task the user
-         just added simply was not there: reproduced live 2026-08-28 (row in
-         the database, list and Active counter unmoved). announceTodoChange
-         also fires the force-recount event, so the old bare setTimeout event
-         is folded into it. */
-      if (json.todo) await announceTodoChange();
-      return json.todo;
-    }
-    if (res.status !== 401 && res.status !== 403) {
-      console.error("[Todos] createTodo:", res.status);
-    }
-    return null;
-  } catch (e) {
-    console.error("[Todos] createTodo failed:", e);
-    return null;
-  }
+};
+
+/** Create a task and return the row, or null when it was refused — for the
+ *  apps that file a task on the side (Calendar, CRM). The To-do screen uses
+ *  createTodoResult, which also says why. */
+export async function createTodo(input: TodoCreateInput): Promise<TodoRow | null> {
+  const r = await createTodoResult(input);
+  if (!r.ok && r.status !== 401 && r.status !== 403) console.error("[Todos] createTodo:", r.status);
+  return r.ok ? r.data : null;
 }
 
 /* ── Update todo ── */
@@ -232,48 +181,6 @@ async function announceTodoChange(): Promise<void> {
     invalidateCachedGet("/api/inbox/feed");   // bell + tile unread counts
   } catch { /* the event below still refreshes it */ }
   window.dispatchEvent(new CustomEvent("inbox:force-recount"));
-}
-
-export async function updateTodo(
-  id: string,
-  updates: TodoUpdate,
-  newAssigneeIds?: string[],
-): Promise<boolean> {
-  try {
-    const res = await fetch("/api/todos/" + id, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ updates, newAssigneeIds }),
-    });
-    if (res.ok) { await announceTodoChange(); return true; }
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Todos] updateTodo:", res.status);
-    }
-    return false;
-  } catch (e) {
-    console.error("[Todos] updateTodo failed:", e);
-    return false;
-  }
-}
-
-/* ── Toggle complete ── */
-
-export async function toggleTodo(id: string): Promise<boolean> {
-  try {
-    const res = await fetch("/api/todos/" + id + "/toggle", {
-      method: "POST",
-      credentials: "include",
-    });
-    if (res.ok) { await announceTodoChange(); return true; }
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Todos] toggleTodo:", res.status);
-    }
-    return false;
-  } catch (e) {
-    console.error("[Todos] toggleTodo failed:", e);
-    return false;
-  }
 }
 
 /* ── Delete todo ── */
@@ -352,7 +259,7 @@ export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
   try {
     /* Coalesced (SYS-2): two components mount together on /todo and each
        asked for labels; one shared request + 60s reuse covers both.
-       createTodoLabel() below invalidates after a write. */
+       createTodoLabelResult() below invalidates after a write. */
     const { cachedGet } = await import("@/lib/client-cache");
     const json = await cachedGet<{ labels: TodoLabelRow[] }>("/api/todo-labels", 60_000);
     return json.labels;
@@ -361,34 +268,6 @@ export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
     if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) return [];
     console.error("[Todos] fetchTodoLabels failed:", e);
     return [];
-  }
-}
-
-export async function createTodoLabel(
-  name: string,
-  color?: string | null,
-): Promise<TodoLabelRow | null> {
-  try {
-    const res = await fetch("/api/todo-labels", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, color }),
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { label: TodoLabelRow | null };
-      /* Drop the coalesced list so the next fetch shows the new label. */
-      const { invalidateCachedGet } = await import("@/lib/client-cache");
-      invalidateCachedGet("/api/todo-labels");
-      return json.label;
-    }
-    if (res.status !== 401 && res.status !== 403) {
-      console.error("[Todos] createTodoLabel:", res.status);
-    }
-    return null;
-  } catch (e) {
-    console.error("[Todos] createTodoLabel failed:", e);
-    return null;
   }
 }
 
@@ -433,34 +312,6 @@ export async function fetchDepartments(): Promise<string[]> {
    world-subscribable topic leaks only "something changed". The screen then
    refetches through the gated route, which enforces the scope. Pings that
    land within `debounceMs` collapse into one refetch. */
-export function subscribeToTodos(
-  tenantId: string,
-  onChanged: () => void,
-  debounceMs = 400,
-): () => void {
-  let timer: number | null = null;
-  /* Live updates are an extra, never a requirement: if the realtime client
-     can't be built (missing env, blocked socket) the list still works on its
-     own refreshes, so a failure here must not take the page down with it. */
-  let channel: ReturnType<typeof supabase.channel>;
-  try {
-    channel = supabase
-      .channel(`todos:tenant:${tenantId}`)
-      .on("broadcast", { event: "changed" }, () => {
-        if (timer !== null) return;
-        timer = window.setTimeout(() => { timer = null; onChanged(); }, debounceMs);
-      })
-      .subscribe();
-  } catch (e) {
-    console.error("[Todos] realtime unavailable:", e);
-    return () => {};
-  }
-  return () => {
-    if (timer !== null) window.clearTimeout(timer);
-    void supabase.removeChannel(channel);
-  };
-}
-
 /* ── Writes that REPORT WHY they failed ─────────────────────────────────────
    The helpers above answer a bare true/false (or null), so a screen can only
    say "something went wrong" — for a lost race (409), a refused "assign to
@@ -495,7 +346,7 @@ async function sendTodoWrite<T>(
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 /** POST /api/todos — the created row. */
-export function createTodoResult(body: Parameters<typeof createTodo>[0]): Promise<TodoWriteResult<TodoRow | null>> {
+export function createTodoResult(body: TodoCreateInput): Promise<TodoWriteResult<TodoRow | null>> {
   return sendTodoWrite("/api/todos", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) },
     (j) => (j.todo ?? null) as TodoRow | null);
 }

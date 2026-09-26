@@ -69,7 +69,6 @@ export const todoT: Translations = {
   "pill.assignedToMe": { en: "Assigned to me",             zh: "分配给我",               ar: "مُسندة إليّ" },
   "src.all":           { en: "All",                        zh: "全部",                   ar: "الكل" },
   "src.mine":          { en: "My tasks",                   zh: "我的任务",               ar: "مهامي" },
-  "row.assignedBy":    { en: "assigned by",                zh: "分配自",                 ar: "أسندها" },
   "row.onTime":        { en: "On time",                    zh: "按时",                   ar: "في الوقت" },
   "row.late":          { en: "Late",                       zh: "逾期完成",               ar: "متأخر" },
   "pill.all":          { en: "All",                        zh: "全部",                   ar: "الكل" },
@@ -227,14 +226,6 @@ export const todoT: Translations = {
   "shortcuts.hint":    { en: "Shortcuts: N add a task · / search · ⌘/Ctrl+Enter save the form · Esc close", zh: "快捷键：N 添加任务 · / 搜索 · ⌘/Ctrl+Enter 保存表单 · Esc 关闭", ar: "اختصارات: N إضافة مهمة · / بحث · ⌘/Ctrl+Enter حفظ النموذج · Esc إغلاق" },
 
   /* Filters */
-  "filters.source":    { en: "Whose tasks",                 zh: "任务来源",               ar: "مصدر المهام" },
-  "filters.assignee":  { en: "Assignee",                    zh: "受托人",                 ar: "المكلَّف" },
-  "filters.department":{ en: "Department",                  zh: "部门",                   ar: "القسم" },
-  "filters.range":     { en: "Date range",                  zh: "日期范围",               ar: "نطاق التاريخ" },
-  "filters.rangeHint": { en: "Matches the due date or the date the task was created.", zh: "匹配截止日期或任务创建日期。", ar: "يطابق تاريخ الاستحقاق أو تاريخ إنشاء المهمة." },
-  "filters.show":      { en: "Show tasks",                  zh: "显示任务",               ar: "عرض المهام" },
-  "sa.audience":       { en: "Whose list",                  zh: "查看谁的列表",           ar: "قائمة من" },
-  "sa.viewing":        { en: "Viewing:",                    zh: "正在查看：",             ar: "عرض:" },
 
   /* Row / panel */
   "row.markDone":      { en: "Mark as done",                zh: "标记为完成",             ar: "تحديد كمنجزة" },
@@ -302,8 +293,6 @@ export const todoT: Translations = {
   "common.retry":      { en: "Retry",                       zh: "重试",                   ar: "إعادة المحاولة" },
   /* Task clarity — the row answers what / who / when / what next */
   "row.byAgo":         { en: "Assigned by {name} · {ago}", zh: "{name} 分配 · {ago}",   ar: "أسندها {name} · {ago}" },
-  "row.forNames":      { en: "For {names}",                zh: "分配给 {names}",         ar: "لـ {names}" },
-  "row.createdAgo":    { en: "Created {ago}",              zh: "创建于 {ago}",           ar: "أُنشئت {ago}" },
   "row.next":          { en: "Next:",                      zh: "下一步：",               ar: "التالي:" },
   "row.open":          { en: "Open task",                  zh: "打开任务",               ar: "فتح المهمة" },
   "due.today":         { en: "Due today",                  zh: "今天到期",               ar: "مستحقة اليوم" },
@@ -322,7 +311,6 @@ export const todoT: Translations = {
   "sheet.assignedBy":  { en: "Assigned by",                zh: "分配人",                 ar: "أسندها" },
   "sheet.assignees":   { en: "Assigned to",                zh: "执行人",                 ar: "مُسندة إلى" },
   "sheet.created":     { en: "Created",                    zh: "创建时间",               ar: "أُنشئت" },
-  "sheet.source":      { en: "Source",                     zh: "来源",                   ar: "المصدر" },
   "sheet.you":         { en: "You",                        zh: "你",                     ar: "أنت" },
   "sheet.start":       { en: "Start",                      zh: "开始",                   ar: "ابدأ" },
   "sheet.submit":      { en: "Submit for approval",        zh: "提交审批",               ar: "إرسال للموافقة" },

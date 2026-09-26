@@ -32,7 +32,7 @@ import type {
   TodoAssigneeInfo, TodoLabelRow, TodoMetadata, TodoPriority, TodoRecurrence, TodoRow, TodoStatus, TodoWithRelations,
 } from "@/types/supabase";
 import {
-  addTodoNote, createTodoResult, deleteTodo, deleteTodoNote, subscribeToTodos, toggleTodoResult, updateTodoResult,
+  addTodoNote, createTodoResult, deleteTodo, deleteTodoNote, toggleTodoResult, updateTodoResult,
   type TodoWriteResult,
 } from "@/lib/todo-admin";
 import { loadCompletedPage, loadTodoSnap, mergeTodos, saveTodoWarm, type TodoSnap } from "./todo-data";
@@ -173,9 +173,16 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
     return () => engine.dispose();
   }, [engine]);
 
+  /* Live updates load after the list: the socket's client is ~190 KB of
+     script the first paint does not need (lib/todo-realtime). */
   useEffect(() => {
     if (!tenantId) return;
-    return subscribeToTodos(tenantId, () => engine.schedule(0));
+    let off: (() => void) | null = null;
+    let gone = false;
+    void import("@/lib/todo-realtime")
+      .then(({ subscribeToTodos }) => { if (!gone) off = subscribeToTodos(tenantId, () => engine.schedule(0)); })
+      .catch(() => { /* no live updates — the list still refreshes itself */ });
+    return () => { gone = true; off?.(); };
   }, [tenantId, engine]);
 
   /* An installed PWA resumes instead of reloading; catch up when it does. */
