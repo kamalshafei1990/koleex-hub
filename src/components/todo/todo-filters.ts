@@ -1,12 +1,11 @@
 /* ---------------------------------------------------------------------------
-   To-do filters — the state, the predicate, and the chip list, in one place
-   so the sheet, the chips row and the list can never disagree about what a
-   filter means.
+   To-do filters — the state and the predicate in one place, so the pills,
+   the filter panel and the list can never disagree about what a filter
+   means.
    --------------------------------------------------------------------------- */
 
-import type { TodoAssigneeInfo, TodoPriority, TodoStatus, TodoWithRelations } from "@/types/supabase";
-import { dayKey, fmtDay, horizonRange, isOverdueDate } from "./todo-dates";
-import type { TFn } from "./todo-ui";
+import type { TodoPriority, TodoStatus, TodoWithRelations } from "@/types/supabase";
+import { dayKey, horizonRange, isOverdueDate } from "./todo-dates";
 
 export type DueFilter = "" | "overdue" | "today" | "week" | "month" | "none";
 export type SourceFilter = "all" | "mine" | "assigned";
@@ -29,12 +28,6 @@ export interface TodoFilters {
 export const NO_FILTERS: TodoFilters = {
   due: "", source: "all", priority: "", status: "", dept: "", assignee: "", label: "", from: "", to: "", saView: "own",
 };
-
-/** Filters other than the super-admin lens that narrow the list. */
-export function activeFilterCount(f: TodoFilters): number {
-  return (["due", "priority", "status", "dept", "assignee", "label", "from", "to"] as const)
-    .filter((k) => f[k] !== "").length + (f.source !== "all" ? 1 : 0) + (f.saView !== "own" ? 1 : 0);
-}
 
 export function matchesFilters(task: TodoWithRelations, f: TodoFilters, meId: string | null): boolean {
   if (f.source !== "all") {
@@ -66,26 +59,4 @@ export function matchesFilters(task: TodoWithRelations, f: TodoFilters, meId: st
     if (!inRange(due) && !inRange(dayKey(task.created_at))) return false;
   }
   return true;
-}
-
-export interface FilterChip { key: keyof TodoFilters | "range"; label: string }
-
-export function filterChips(f: TodoFilters, t: TFn, lang: string, people: TodoAssigneeInfo[]): FilterChip[] {
-  const out: FilterChip[] = [];
-  const name = (id: string) => {
-    const p = people.find((e) => e.account_id === id);
-    return p ? p.full_name || p.username : id.slice(0, 8);
-  };
-  if (f.saView !== "own") out.push({ key: "saView", label: f.saView === "all" ? t("sa.viewAll") : `${t("sa.viewing")} ${name(f.saView)}` });
-  if (f.due) out.push({ key: "due", label: t("due." + f.due) });
-  if (f.source !== "all") out.push({ key: "source", label: f.source === "mine" ? t("src.mine") : t("pill.assignedToMe") });
-  if (f.priority) out.push({ key: "priority", label: t("p." + f.priority) });
-  if (f.status) out.push({ key: "status", label: t("st." + f.status) });
-  if (f.dept) out.push({ key: "dept", label: f.dept });
-  if (f.assignee) out.push({ key: "assignee", label: name(f.assignee) });
-  if (f.label) out.push({ key: "label", label: f.label });
-  if (f.from || f.to) {
-    out.push({ key: "range", label: `${f.from ? fmtDay(f.from, lang) : "…"} – ${f.to ? fmtDay(f.to, lang) : "…"}` });
-  }
-  return out;
 }

@@ -75,6 +75,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, data: { open } });
   }
 
+  /* ── ?resource=stats → the To-do list's KPI cards ─────────────────────────
+     The list now loads only the OPEN set, so finished-work numbers come from
+     here: counts under the SAME scope rule as the list, never rows. */
+  if (params.get("resource") === "stats") return todoStats(auth, params);
+
   const statusParam = params.get("status");
   if (statusParam !== null && statusParam !== "open" && statusParam !== "completed") {
     return NextResponse.json({ error: "status must be open or completed" }, { status: 400 });
@@ -428,4 +433,96 @@ async function resolveAssigneeInfos(accountIds: string[]): Promise<Map<string, A
     });
   });
   return out;
+}
+
+
+/* ── GET /api/todos?resource=stats ────────────────────────────────────────
+   { completed, completedSince, performers[] } for the list's KPI cards.
+
+   · Same scope as the list (sharedTodoIds + applyTodoScope, privacy
+     included), bounded by tenant. Open-side numbers (active, overdue, high
+     priority) are NOT here: the screen holds the whole open set already and
+     counts it with the recurring-series rule applied, which a count query
+     cannot do.
+   · ?since=<ISO> — "done this week" starts at the READER's Monday, so the
+     client sends its own local midnight; default: the last 7 days.
+   · ?view= (super admin only) — the list's audience lens: "own" (tasks I
+     created, assigned, am assigned or that go to everyone), "all", or an
+     account id. Anyone else is already limited by the scope.
+   · performers: the three assignees with the most completed tasks, counted
+     over the newest 5000 completed tasks in scope (ids only, then the
+     assignee table in chunks) — observers are never assignees. */
+type StatsAuth = Exclude<Awaited<ReturnType<typeof requireAuth>>, NextResponse>;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function todoStats(auth: StatsAuth, params: URLSearchParams) {
+  const viewer: TodoViewer = {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id,
+    department: auth.department,
+    isSuperAdmin: auth.is_super_admin,
+    canViewPrivate: auth.can_view_private,
+  };
+  const sinceParam = params.get("since");
+  const since = sinceParam && Number.isFinite(Date.parse(sinceParam))
+    ? new Date(sinceParam).toISOString()
+    : new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+  /* Super admin lens → an extra OR clause (ANDed with the rest). */
+  let lens: string | null = null;
+  const view = params.get("view") ?? "own";
+  if (auth.is_super_admin && view !== "all") {
+    const target = view === "own" ? auth.account_id : UUID.test(view) ? view : null;
+    if (!target) return NextResponse.json({ error: "Invalid view" }, { status: 400 });
+    const { data: mine } = await supabaseServer.from("koleex_todo_assignees").select("todo_id").eq("account_id", target);
+    const ids = Array.from(new Set((mine ?? []).map((r) => (r as { todo_id: string }).todo_id)));
+    const parts = [`created_by_account_id.eq.${target}`, `assigned_by_account_id.eq.${target}`];
+    if (view === "own") parts.push("assign_to_all.eq.true");
+    if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
+    lens = parts.join(",");
+  }
+
+  const sharedIds = await sharedTodoIds(viewer);
+  /* Loosely typed on purpose: the PostgREST builder's generics blow up
+     TypeScript ("excessively deep") when threaded through a helper. */
+  type Filterable = { or(f: string): Filterable; eq(c: string, v: unknown): Filterable };
+  const scoped = <Q,>(query: Q): Q => {
+    let out = (query as unknown as Filterable).eq("completed", true);
+    if (auth.tenant_id) out = out.eq("tenant_id", auth.tenant_id);
+    out = applyTodoScope(out, viewer, sharedIds);
+    return (lens ? out.or(lens) : out) as unknown as Q;
+  };
+
+  const [allRes, sinceRes, idsRes] = await Promise.all([
+    scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })),
+    scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })).gte("completed_at", since),
+    scoped(supabaseServer.from("koleex_todos").select("id")).order("completed_at", { ascending: false }).limit(5000),
+  ]);
+  if (allRes.error || sinceRes.error || idsRes.error) {
+    console.error("[api/todos stats]", allRes.error?.message ?? sinceRes.error?.message ?? idsRes.error?.message);
+    return NextResponse.json({ error: "Failed to load stats" }, { status: 500 });
+  }
+
+  const doneIds = ((idsRes.data ?? []) as Array<{ id: string }>).map((r) => r.id);
+  const perAccount = new Map<string, number>();
+  for (let i = 0; i < doneIds.length; i += 300) {
+    const { data } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("account_id")
+      .in("todo_id", doneIds.slice(i, i + 300));
+    ((data ?? []) as Array<{ account_id: string }>).forEach((a) => perAccount.set(a.account_id, (perAccount.get(a.account_id) ?? 0) + 1));
+  }
+  const top = [...perAccount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const infos = await resolveAssigneeInfos(top.map(([id]) => id));
+  const performers = top
+    .map(([id, count]) => {
+      const i = infos.get(id);
+      return i ? { account_id: id, username: i.username, full_name: i.full_name, name_alt: i.name_alt, avatar_url: i.avatar_url, department: i.department, position: i.position, count } : null;
+    })
+    .filter((p) => p !== null);
+
+  return NextResponse.json(
+    { completed: allRes.count ?? 0, completedSince: sinceRes.count ?? 0, performers },
+    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+  );
 }

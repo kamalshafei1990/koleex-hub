@@ -170,7 +170,6 @@ export const todoT: Translations = {
   "extras.mention":    { en: "Mention people",             zh: "提及成员",               ar: "الإشارة إلى أشخاص" },
   "extras.mentionSearch": { en: "Search to mention…",      zh: "搜索以提及…",            ar: "ابحث للإشارة…" },
   "extras.noMatches":  { en: "No matches",                 zh: "无匹配结果",             ar: "لا توجد نتائج" },
-  "f.label.choose":    { en: "Choose a label…",            zh: "选择标签…",              ar: "اختر تصنيفًا…" },
   "f.label.search":    { en: "Search labels…",             zh: "搜索标签…",              ar: "ابحث في التصنيفات…" },
   "extras.observers":  { en: "Observers",                  zh: "关注人",                 ar: "المراقبون" },
   "extras.observerSearch": { en: "Add an observer…",       zh: "添加关注人…",            ar: "أضف مراقبًا…" },
@@ -226,15 +225,7 @@ export const todoT: Translations = {
   "quick.keepText":    { en: "Keep as text",                zh: "保留为文字",             ar: "إبقاؤها كنص" },
   "shortcuts.hint":    { en: "Shortcuts: N add a task · / search · ⌘/Ctrl+Enter save the form · Esc close", zh: "快捷键：N 添加任务 · / 搜索 · ⌘/Ctrl+Enter 保存表单 · Esc 关闭", ar: "اختصارات: N إضافة مهمة · / بحث · ⌘/Ctrl+Enter حفظ النموذج · Esc إغلاق" },
 
-  /* Due horizon filter */
-  "due.any":           { en: "Any time",                    zh: "任何时间",               ar: "أي وقت" },
-  "due.overdue":       { en: "Overdue",                     zh: "逾期",                   ar: "متأخرة" },
-  "due.today":         { en: "Due today",                   zh: "今天到期",               ar: "مستحقة اليوم" },
-  "due.week":          { en: "This week",                   zh: "本周",                   ar: "هذا الأسبوع" },
-  "due.month":         { en: "This month",                  zh: "本月",                   ar: "هذا الشهر" },
-  "due.none":          { en: "No due date",                 zh: "无截止日期",             ar: "بدون تاريخ" },
-
-  /* Filter sheet */
+  /* Filters */
   "filters.source":    { en: "Whose tasks",                 zh: "任务来源",               ar: "مصدر المهام" },
   "filters.assignee":  { en: "Assignee",                    zh: "受托人",                 ar: "المكلَّف" },
   "filters.department":{ en: "Department",                  zh: "部门",                   ar: "القسم" },
@@ -250,8 +241,6 @@ export const todoT: Translations = {
   "row.withdraw":      { en: "Withdraw the submission",     zh: "撤回提交",               ar: "سحب الإرسال" },
   "notes.send":        { en: "Send note",                   zh: "发送笔记",               ar: "إرسال الملاحظة" },
   "notes.delete":      { en: "Delete note",                 zh: "删除笔记",               ar: "حذف الملاحظة" },
-  "f.completedAt":     { en: "Completed",                   zh: "完成于",                 ar: "أُنجزت في" },
-  "f.reminderTime":    { en: "Reminder time",               zh: "提醒时间",               ar: "وقت التذكير" },
   "f.label.new":       { en: "New label",                   zh: "新建标签",               ar: "وسم جديد" },
   "assign.onlyMe":     { en: "Only me",                     zh: "仅我自己",               ar: "أنا فقط" },
   "modal.saveHint":    { en: "⌘/Ctrl+Enter to save",        zh: "⌘/Ctrl+Enter 保存",      ar: "⌘/Ctrl+Enter للحفظ" },
@@ -295,5 +284,19 @@ export const todoT: Translations = {
   "done.loadFailed":   { en: "Couldn't load completed tasks.", zh: "无法加载已完成的任务。", ar: "تعذّر تحميل المهام المنجزة." },
   "done.searchHint":   { en: "Older completed tasks are searched once they are loaded — open Completed and load more to include them.", zh: "更早的已完成任务需先加载才会被搜索——打开“已完成”并加载更多。", ar: "يُبحث في المهام المنجزة الأقدم بعد تحميلها — افتح «المكتملة» وحمّل المزيد لتضمينها." },
   "report.partial":    { en: "Very long history — the oldest completed tasks are not included. Pick a shorter period for exact numbers.", zh: "历史记录过长——最早的已完成任务未包含在内。请选择较短的周期以获得准确数字。", ar: "السجل طويل جدًا — لم تُضمَّن أقدم المهام المنجزة. اختر فترة أقصر للحصول على أرقام دقيقة." },
+  /* Restored with the original list design */
+  "kpi.active":        { en: "Active",                    zh: "活跃",                   ar: "نشِطة" },
+  "app.subtitle":      { en: "Task management",            zh: "任务管理",               ar: "إدارة المهام" },
+  "cadence.all":       { en: "All",                        zh: "全部",                   ar: "الكل" },
+  "cadence.day":       { en: "Today",                      zh: "今天",                   ar: "اليوم" },
+  "cadence.week":      { en: "This week",                  zh: "本周",                   ar: "هذا الأسبوع" },
+  "cadence.month":     { en: "This month",                 zh: "本月",                   ar: "هذا الشهر" },
+  "approval.awaitingYou": { en: "Marked done — approve it?", zh: "已标记完成——是否批准？", ar: "تم وضع علامة كمنجز — هل توافق؟" },
+  "kpi.totalTasks":    { en: "Total Tasks",                zh: "任务总数",               ar: "إجمالي المهام" },
+  "kpi.highPriority":  { en: "High Priority",              zh: "高优先级",               ar: "أولوية عالية" },
+  "kpi.doneThisWeek":  { en: "Done This Week",             zh: "本周完成",               ar: "أُنجزت هذا الأسبوع" },
+  "kpi.completion":    { en: "Completion",                 zh: "完成率",                 ar: "نسبة الإنجاز" },
+  "filters.allStatuses": { en: "All Statuses",             zh: "所有状态",               ar: "كل الحالات" },
+  "report.back":       { en: "Back to To-do",               zh: "返回待办",               ar: "العودة إلى المهام" },
   "common.retry":      { en: "Retry",                       zh: "重试",                   ar: "إعادة المحاولة" },
 };

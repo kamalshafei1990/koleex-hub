@@ -21,15 +21,13 @@ import { useCurrentAccountId } from "@/lib/identity";
 import { useWarm } from "@/lib/warm-cache";
 import type { TodoAssigneeInfo, TodoStatus, TodoWithRelations } from "@/types/supabase";
 import KdsSelect from "@/components/kds/Select";
-import PageHeader from "@/components/ui/PageHeader";
+import Link from "next/link";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import DatePicker from "@/components/ui/DatePicker";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
-import AwardIcon from "@/components/icons/ui/AwardIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
-import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import MiniAvatar from "@/components/todo/MiniAvatar";
 import { loadCompletedSince, loadOpenTodos, mergeTodos, todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
 import { dayKey, fmtDay, horizonRange, isOverdueDate } from "@/components/todo/todo-dates";
 import { statusOf } from "@/components/todo/todo-ui";
@@ -125,21 +123,6 @@ export default function TodoReportPage() {
     };
   }, [rows]);
 
-  /* Who finished the most of what I assigned, in this period. Credit is the
-     ASSIGNEE's only — observers follow a task, the work is not theirs. */
-  const performers = useMemo(() => {
-    const map = new Map<string, { info: TodoAssigneeInfo; count: number }>();
-    rows.filter(isDone).forEach((r) => {
-      const observers = new Set(((r.metadata?.observers ?? []) as { account_id?: string }[]).map((o) => o.account_id));
-      r.assignees.forEach((a) => {
-        if (observers.has(a.account_id)) return;
-        const e = map.get(a.account_id);
-        if (e) e.count++; else map.set(a.account_id, { info: a, count: 1 });
-      });
-    });
-    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 3);
-  }, [rows]);
-
   const exportCsv = () => {
     /* Headers in the reader's language; a BOM so Excel reads 中文 / العربية
        as UTF-8; dates as YYYY-MM-DD, which no spreadsheet misreads. */
@@ -180,10 +163,18 @@ export default function TodoReportPage() {
       <div className="relative z-[1] flex flex-col min-h-0 flex-1">
         <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
           <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
-            <div className="pt-5 pb-3">
-              <PageHeader title={t("report.title")} subtitle={t("report.subtitle")} backHref="/todo"
-                icon={<BarChart3Icon size={16} />} showTabs={false} />
+            {/* The original report header: back chip · icon chip · title. */}
+            <div className="flex items-center gap-3 pt-5 pb-1">
+              <Link href="/todo" aria-label={t("report.back")}
+                className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                <ArrowLeftIcon className="h-4 w-4 rtl:-scale-x-100" />
+              </Link>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <BarChart3Icon size={16} />
+              </div>
+              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate min-w-0">{t("report.title")}</h1>
             </div>
+            <p className="text-[12px] text-[var(--text-dim)] mb-3 ms-0 md:ms-11">{t("report.subtitle")}</p>
 
             <div className="flex flex-wrap items-center gap-2 pb-4">
               <div className="flex items-center gap-1.5 w-full sm:w-auto sm:min-w-[220px]">
@@ -196,7 +187,7 @@ export default function TodoReportPage() {
                 {(["today", "week", "month", "custom"] as Period[]).map((p) => (
                   <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p}
                     className={`h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors whitespace-nowrap ${
-                      period === p ? "kx-seg-on border-transparent text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                      period === p ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                     }`}>
                     {t("report." + p)}
                   </button>
@@ -209,8 +200,8 @@ export default function TodoReportPage() {
                 </div>
               )}
               <button type="button" onClick={exportCsv} disabled={rows.length === 0}
-                className="ms-auto h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-opacity shadow-lg disabled:opacity-40 flex items-center gap-1.5">
-                <DownloadIcon size={13} /> {t("report.export")}
+                className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
+                {t("report.export")}
               </button>
             </div>
           </div>
@@ -246,27 +237,6 @@ export default function TodoReportPage() {
                     </div>
                   ))}
                 </div>
-
-                {performers.length > 0 && (
-                  <div className="kx-glass bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AwardIcon size={14} className="text-yellow-400" />
-                      <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("kpi.topPerformers")}</span>
-                    </div>
-                    <ol className="flex items-center gap-5 flex-wrap min-w-0">
-                      {performers.map((p, i) => (
-                        <li key={p.info.account_id} className="flex items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-bold text-[var(--text-ghost)] tabular-nums w-3">{i + 1}</span>
-                          <MiniAvatar info={p.info} size={28} />
-                          <span className="min-w-0">
-                            <span className="block text-[12px] font-medium text-[var(--text-primary)] truncate">{p.info.full_name || p.info.username}</span>
-                            <span className="block text-[10px] text-[var(--text-dim)]">{p.count} {t("kpi.completedWord")}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
 
                 {rows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 gap-2 text-center px-6">

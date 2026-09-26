@@ -3,15 +3,19 @@
 /* ---------------------------------------------------------------------------
    To-do — capture, organise, finish, review.
 
-   The screen is composed, not written here: rows, the task form, the board,
-   the filter sheet and the data store each live in components/todo, and the
-   rare ones (form, board, filters, send-back dialog) load on first use so the
-   list paints on the smallest possible bundle.
+   THE ORIGINAL LAYOUT on the new plumbing (owner: "return the old shape as
+   UI design but with the same performance and codes as now"). The header,
+   the pill groups, the inline filter panel, the KPI cards + Top Performers
+   and the rich rows look as they did; underneath, rows, the form, the board,
+   the filters and the data store live in components/todo, and the rare ones
+   load on first use.
 
    Flow, top to bottom:
-     · header — search, filters, reports, the full "Add task" form
-     · tabs — All / Active / Done / Waiting my approval, with view + sort
+     · header — search, filters, reports, Add task; My Work (desktop);
+       status / priority / audience / source / horizon pills; view · sort ·
+       select; bulk bar; the advanced filter panel
      · quick add — one line, natural dates ("tomorrow !high"), Enter
+     · KPI cards + Top Performers
      · the list — Overdue → Today → Upcoming → No date, Completed folded
    Keys: N adds, / searches, Esc leaves search or selection.
    --------------------------------------------------------------------------- */
@@ -20,7 +24,6 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import KdsSelect from "@/components/kds/Select";
-import FilterChip from "@/components/kds/FilterChip";
 import { useToast } from "@/components/kds/useToast";
 import PageHeader from "@/components/ui/PageHeader";
 import AppIcon from "@/components/common/AppIcon";
@@ -30,6 +33,9 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
+import FlagIcon from "@/components/icons/ui/FlagIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -51,14 +57,15 @@ import QuickAdd, { type QuickAddValue } from "@/components/todo/QuickAdd";
 import TaskRow from "@/components/todo/TaskRow";
 import { todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
 import { dayKey, fmtDay, isDueTodayDate, isOverdueDate, todoLocale } from "@/components/todo/todo-dates";
-import { NO_FILTERS, activeFilterCount, filterChips, matchesFilters, type TodoFilters } from "@/components/todo/todo-filters";
-import { PILL, PILL_OFF, PILL_ON, PRIORITY_RANK, STATUSES, involves } from "@/components/todo/todo-ui";
+import { NO_FILTERS, matchesFilters, type DueFilter, type SourceFilter, type TodoFilters } from "@/components/todo/todo-filters";
+import KpiDashboard, { useTodoStats } from "@/components/todo/KpiDashboard";
+import { PILL, PILL_OFF, PILL_ON, PRIORITIES, PRIORITY_ON, PRIORITY_RANK, STATUSES, involves } from "@/components/todo/todo-ui";
 import { useTodoStore, type DoneState, type TaskFields } from "@/components/todo/use-todo-store";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Loaded on first use — none of these is needed to paint the list. */
 const TaskModal = dynamic(() => import("@/components/todo/TaskModal"), { ssr: false });
-const FiltersSheet = dynamic(() => import("@/components/todo/FiltersSheet"), { ssr: false });
+const FiltersPanel = dynamic(() => import("@/components/todo/FiltersPanel"), { ssr: false });
 const RejectDialog = dynamic(() => import("@/components/todo/RejectDialog"), { ssr: false });
 const TodoBoard = dynamic(() => import("@/components/todo/TodoBoard"), { ssr: false, loading: () => <ListSkeleton /> });
 /* Aurora ground — only under the skin; Core never pays for the canvas. */
@@ -180,6 +187,21 @@ export default function TodoPage() {
     return { all: base.length, active: base.length - done, done, approvals, overdue };
   }, [base, accountId]);
 
+  /* KPI + tab numbers: open-side counts from the scoped open set (series
+     collapsed), finished-work counts from the stats endpoint — both under
+     the audience lens only, as the original cards were. */
+  const open = useMemo(() => {
+    let active = 0, overdue = 0, high = 0;
+    for (const x of scoped) {
+      if (x.completed) continue;
+      active++;
+      if (isOverdueDate(x.due_date)) overdue++;
+      if (x.priority === "high") high++;
+    }
+    return { active, overdue, high };
+  }, [scoped]);
+  const stats = useTodoStats(accountId, isSA ? filters.saView : "own", todos);
+
   const shown = useMemo(() => {
     if (tab === "active") return base.filter((x) => !x.completed);
     if (tab === "completed") return base.filter((x) => x.completed);
@@ -219,8 +241,11 @@ export default function TodoPage() {
     return [...names].sort();
   }, [todos, labels]);
 
-  const chips = filterChips(filters, t, lang, employees);
-  const filterCount = activeFilterCount(filters);
+  /* The inline panel's filters (the pills carry their own state). */
+  const panelActive = !!(filters.status || filters.dept || filters.assignee || filters.label || filters.from || filters.to);
+  const filterCount = [filters.status, filters.dept, filters.assignee, filters.label, filters.from, filters.to, filters.due, filters.priority]
+    .filter(Boolean).length + (filters.source !== "all" ? 1 : 0) + (filters.saView !== "own" ? 1 : 0);
+  const setF = (patch: Partial<TodoFilters>) => setFilters((f) => ({ ...f, ...patch }));
   const modalEntry = modal?.id ? todos.find((x) => x.id === modal.id) ?? null : null;
 
   /* Finished history is fetched the first time someone looks at it — the
@@ -287,7 +312,7 @@ export default function TodoPage() {
   }, [todos, synced]);
 
   /* ── keyboard: N = add, / = search, Esc = leave selection ── */
-  const modalOpen = !!modal || !!rejectId || filtersOpen;
+  const modalOpen = !!modal || !!rejectId;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (modalOpen || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -325,7 +350,8 @@ export default function TodoPage() {
   );
 
   const pill = (on: boolean) => `${PILL} ${on ? PILL_ON : PILL_OFF}`;
-  const toolBtn = "h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-colors shrink-0";
+  /* The quiet selected state the original source / horizon pills used. */
+  const SOFT_ON = "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]";
   const smallSelect = "h-8 ps-2.5 pe-7 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-muted)] outline-none cursor-pointer text-start";
 
   return (
@@ -347,107 +373,152 @@ export default function TodoPage() {
             <div className="pt-5 pb-3">
               <PageHeader
                 title={t("app.title")}
-                subtitle={`${counts.active} ${t("pill.active").toLowerCase()}${counts.overdue ? ` · ${counts.overdue} ${t("kpi.overdue").toLowerCase()}` : ""}`}
+                subtitle={`${t("app.subtitle")} · ${stats ? open.active + stats.completed : open.active}`}
                 icon={<AppIcon appId="todo" className="h-4 w-4" size={16} />}
                 showTabs={false}
               />
             </div>
 
-            {/* Search + tools. The search is a LIVE filter (PageHeader's is a
+            {/* Search + Add. The search is a LIVE filter (PageHeader's is a
                 route search), which is why it is not passed to PageHeader. */}
-            <div className="flex items-center gap-2 pb-2.5 min-w-0">
-              <div className="kx-glass flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 gap-2 focus-within:border-[var(--border-focus)] transition-colors">
+            <div className="flex items-center gap-2 pb-2 min-w-0">
+              <div className="kx-glass flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
                 <SearchIcon size={16} className="text-[var(--text-dim)] shrink-0" />
                 <input ref={searchRef} type="search" value={search} onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Escape") { setSearch(""); (e.target as HTMLInputElement).blur(); } }}
                   placeholder={t("search")} aria-label={t("search")}
                   className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10 [&::-webkit-search-cancel-button]:hidden" />
                 {search ? (
-                  <button type="button" onClick={() => setSearch("")} aria-label={t("common.clear")} className="h-7 w-7 inline-flex items-center justify-center rounded-md">
+                  <button type="button" onClick={() => setSearch("")} aria-label={t("common.clear")} className="p-0.5">
                     <CrossIcon size={14} className="text-[var(--text-dim)]" />
                   </button>
                 ) : (
                   <kbd className="hidden md:inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded border border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-ghost)]">/</kbd>
                 )}
               </div>
-              <button type="button" onClick={() => setFiltersOpen(true)} aria-label={t("filters")}
-                className={`${toolBtn} ${filterCount ? "bg-[#567FB2]/10 border-[#567FB2]/40 text-[#7FA9D6]" : "kx-glass bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+              <button type="button" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen} aria-label={t("filters")}
+                className={`h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-all shrink-0 ${
+                  filtersOpen || panelActive
+                    ? "bg-[#567FB2]/10 border-[#567FB2]/30 text-[#7FA9D6]"
+                    : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}>
                 <FilterIcon size={14} />
                 <span className="hidden md:inline">{t("filters")}</span>
-                {filterCount > 0 && <span className="min-w-4 h-4 px-1 rounded-full bg-[#567FB2] text-white text-[10px] font-bold inline-flex items-center justify-center">{filterCount}</span>}
+                {panelActive && <span className="w-1.5 h-1.5 rounded-full bg-[#7FA9D6]" />}
               </button>
               <Link href="/todo/report" title={t("report.link")} aria-label={t("report.link")}
-                className={`kx-glass ${toolBtn} bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]`}>
+                className="kx-glass h-10 px-3 rounded-xl border text-[13px] font-medium flex items-center gap-1.5 transition-all shrink-0 bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
                 <BarChart3Icon size={14} />
                 <span className="hidden md:inline">{t("report.link")}</span>
               </Link>
               <button type="button" onClick={() => setModal({ id: null, key: Date.now() })} aria-label={t("add")}
-                className="h-10 px-3 md:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shrink-0">
+                className="h-10 px-3 md:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
                 <PlusIcon size={16} />
                 <span className="hidden md:inline">{t("add")}</span>
               </button>
             </div>
 
-            {/* Tabs + view controls */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 scrollbar-none">
-              <div role="tablist" aria-label={t("app.title")} className="flex items-center gap-1.5 shrink-0">
-              {([
-                ["all", t("pill.all"), moreDone ? "" : String(counts.all)],
-                ["active", t("pill.active"), String(counts.active)],
-                ["completed", t("pill.done"), doneCount(counts.done)],
-              ] as const).map(([k, label, n]) => (
-                <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={pill(tab === k)}>
-                  {label} {n && <span className="tabular-nums opacity-70">{n}</span>}
-                </button>
-              ))}
-              {/* Waiting for MY sign-off — amber so a manager cannot miss it. */}
-              {(counts.approvals > 0 || tab === "approvals") && (
-                <button type="button" role="tab" aria-selected={tab === "approvals"} onClick={() => setTab(tab === "approvals" ? "all" : "approvals")}
-                  className={`${PILL} ${tab === "approvals" ? "bg-amber-500/25 border-amber-500/50 text-amber-300" : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"}`}>
-                  {t("pill.approvals")} <span className="tabular-nums">{counts.approvals}</span>
-                </button>
-              )}
-              </div>
-              <div className="ms-auto flex items-center gap-1.5 shrink-0 ps-2">
-                <div className="inline-flex rounded-lg border border-[var(--border-color)] p-0.5 gap-0.5" role="group" aria-label={t("view.label")}>
-                  {(["list", "board"] as const).map((v) => (
-                    /* rounded-md is not decoration: kx-seg-on paints an INSET
-                       RING, and a ring follows the element's own radius. */
-                    <button key={v} type="button" onClick={() => setView(v)} aria-pressed={view === v} aria-label={t("view." + v)}
-                      className={`h-7 px-2 md:px-2.5 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${view === v ? "kx-seg-on text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
-                      <ViewLabel view={v} label={t("view." + v)} />
-                    </button>
-                  ))}
-                </div>
-                {view === "list" && (
-                  <KdsSelect value={sort} onChange={(v) => setSort(v as Sort)}
-                    options={[{ value: "smart", label: t("sort.smart") }, { value: "due", label: t("sort.due") },
-                      { value: "priority", label: t("sort.priority") }, { value: "created", label: t("sort.created") }]}
-                    triggerClassName={smallSelect} />
-                )}
-                <button type="button" onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} aria-pressed={selectMode}
-                  className={`h-8 px-3 rounded-lg border text-[11px] font-semibold transition-colors ${selectMode ? "bg-[#567FB2]/10 border-[#567FB2]/40 text-[#7FA9D6]" : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
-                  {selectMode ? t("bulk.cancel") : t("bulk.select")}
-                </button>
-              </div>
+            {/* Cross-app: my project tasks + upcoming shifts (renders only when
+                non-empty). In the header on a desktop as before; on a phone it
+                moves into the scrolling list so the tasks are not pushed off. */}
+            <div className="hidden md:block">
+              <MyWorkStrip />
             </div>
 
-            {/* What is applied — visible and removable without opening the sheet. */}
-            {chips.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pb-2.5">
-                {chips.map((c) => (
-                  <FilterChip key={c.key} label={c.label}
-                    onRemove={() => setFilters((f) => (c.key === "range" ? { ...f, from: "", to: "" } : { ...f, [c.key]: NO_FILTERS[c.key as keyof TodoFilters] }))} />
+            {/* Filter pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none">
+              <div role="tablist" aria-label={t("app.title")} className="flex items-center gap-1.5 shrink-0">
+                {([
+                  ["all", t("pill.all"), stats ? String(open.active + stats.completed) : moreDone ? "" : String(counts.all)],
+                  ["active", t("pill.active"), String(open.active)],
+                  ["completed", t("pill.done"), stats ? String(stats.completed) : doneCount(counts.done)],
+                ] as const).map(([k, label, n]) => (
+                  <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={pill(tab === k)}>
+                    {label}{n ? ` (${n})` : ""}
+                  </button>
                 ))}
-                <button type="button" onClick={() => setFilters({ ...NO_FILTERS })}
-                  className="h-7 px-2.5 rounded-full text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-                  {t("filters.clearBtn")}
-                </button>
+                {/* Waiting for MY sign-off — amber so a manager cannot miss it. */}
+                {(counts.approvals > 0 || tab === "approvals") && (
+                  <button type="button" role="tab" aria-selected={tab === "approvals"} onClick={() => setTab(tab === "approvals" ? "all" : "approvals")}
+                    className={`h-7 px-3 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap ${tab === "approvals" ? "bg-amber-500/25 border-amber-500/50 text-amber-300" : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"}`}>
+                    {t("pill.approvals")} ({counts.approvals})
+                  </button>
+                )}
               </div>
-            )}
+              <div className="w-px h-4 bg-[var(--border-subtle)] mx-1 shrink-0" />
+              {PRIORITIES.map((p) => (
+                <button key={p} type="button" aria-pressed={filters.priority === p} onClick={() => setF({ priority: filters.priority === p ? "" : p })}
+                  className={`h-7 px-2.5 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1 whitespace-nowrap shrink-0 ${filters.priority === p ? PRIORITY_ON[p] : PILL_OFF}`}>
+                  <FlagIcon size={10} /> {t("p." + p)}
+                </button>
+              ))}
+              {isSA && (
+                <>
+                  <div className="w-px h-4 bg-[var(--border-subtle)] mx-1 shrink-0" />
+                  {/* Super-admin audience lens — whose tasks am I looking at? */}
+                  <KdsSelect value={filters.saView} onChange={(v) => setF({ saView: v || "own" })}
+                    options={[
+                      { value: "own", label: t("sa.viewOwn") },
+                      { value: "all", label: t("sa.viewAll") },
+                      ...employees.filter((e) => e.account_id !== accountId).map((e) => ({
+                        value: e.account_id,
+                        label: (e.full_name || e.username) + (e.name_alt ? ` · ${e.name_alt}` : ""),
+                      })),
+                    ]}
+                    panelWidthClassName="min-w-[12rem]" wrapperClassName="shrink-0"
+                    triggerClassName={`h-7 ps-2.5 pe-7 rounded-full text-[11px] font-semibold border outline-none cursor-pointer text-start ${
+                      filters.saView === "own"
+                        ? "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)]"
+                        : "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]"
+                    }`} />
+                </>
+              )}
+              <div className="w-px h-4 bg-[var(--border-subtle)] mx-1 shrink-0" />
+              {/* Source: my own to-dos vs. tasks someone else gave me */}
+              {([
+                { v: "all", key: "src.all", icon: null },
+                { v: "mine", key: "src.mine", icon: <UserIcon size={11} /> },
+                { v: "assigned", key: "pill.assignedToMe", icon: <UserCheckIcon size={11} /> },
+              ] as const).map((o) => (
+                <button key={o.v} type="button" aria-pressed={filters.source === o.v} onClick={() => setF({ source: o.v as SourceFilter })}
+                  className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 whitespace-nowrap shrink-0 ${filters.source === o.v ? SOFT_ON : PILL_OFF}`}>
+                  {o.icon} {t(o.key)}
+                </button>
+              ))}
+              <div className="w-px h-4 bg-[var(--border-subtle)] mx-1 shrink-0" />
+              {/* Horizon — daily / weekly / monthly to-do */}
+              {([["", "cadence.all"], ["today", "cadence.day"], ["week", "cadence.week"], ["month", "cadence.month"]] as const).map(([v, key]) => (
+                <button key={key} type="button" aria-pressed={filters.due === v} onClick={() => setF({ due: v as DueFilter })}
+                  className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border whitespace-nowrap shrink-0 ${filters.due === v ? SOFT_ON : PILL_OFF}`}>
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+
+            {/* View · Sort · Select */}
+            <div className="flex items-center gap-2 pb-3 flex-wrap">
+              <div className="inline-flex rounded-lg border border-[var(--border-color)] overflow-hidden" role="group" aria-label={t("view.label")}>
+                {(["list", "board"] as const).map((v) => (
+                  /* rounded-md is not decoration: kx-seg-on paints an INSET
+                     RING, and a ring follows the element's own radius. */
+                  <button key={v} type="button" onClick={() => setView(v)} aria-pressed={view === v}
+                    className={`h-8 px-3 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1.5 ${view === v ? "kx-seg-on text-[var(--text-primary)]" : "bg-[var(--bg-secondary)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+                    <ViewLabel view={v} label={t("view." + v)} />
+                  </button>
+                ))}
+              </div>
+              <KdsSelect value={sort} onChange={(v) => setSort(v as Sort)}
+                options={[{ value: "smart", label: t("sort.smart") }, { value: "due", label: t("sort.due") },
+                  { value: "priority", label: t("sort.priority") }, { value: "created", label: t("sort.created") }]}
+                triggerClassName={smallSelect} />
+              <button type="button" onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} aria-pressed={selectMode}
+                className={`h-8 px-3 rounded-lg border text-[11px] font-semibold transition-colors ${selectMode ? "bg-[#567FB2]/10 border-[#567FB2]/30 text-[#7FA9D6]" : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+                {selectMode ? t("bulk.cancel") : t("bulk.select")}
+              </button>
+            </div>
 
             {selectMode && (
-              <div className="flex items-center gap-2 pb-2.5 flex-wrap">
+              <div className="flex items-center gap-2 pb-3 flex-wrap">
                 <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">{selected.size} {t("bulk.selected")}</span>
                 <button type="button" onClick={() => setSelected(new Set(view === "board" ? shown.map((x) => x.id) : flat.map((x) => x.id)))}
                   className="h-8 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]">
@@ -462,7 +533,7 @@ export default function TodoPage() {
                     </button>
                     {/* Action menus: fire on pick and snap back to their prompt. */}
                     <KdsSelect value="" onChange={(v) => { if (v) { void actions.bulkStatus(selectedIds, v as TodoStatus); exitSelect(); } }}
-                      options={STATUSES.map((s) => ({ value: s, label: t("st." + s) }))}
+                      options={STATUSES.map((st) => ({ value: st, label: t("st." + st) }))}
                       placeholder={t("bulk.setStatus")} triggerClassName={smallSelect} />
                     {employees.length > 0 && (
                       <KdsSelect value="" onChange={(v) => {
@@ -470,7 +541,7 @@ export default function TodoPage() {
                         if (emp) { void actions.bulkReassign(selectedIds, emp); exitSelect(); }
                       }}
                         options={employees.map((emp) => ({ value: emp.account_id, label: emp.full_name || emp.username }))}
-                        placeholder={t("bulk.reassign")} triggerClassName={`${smallSelect} max-w-[170px]`} />
+                        placeholder={t("bulk.reassign")} triggerClassName={`${smallSelect} max-w-[160px]`} />
                     )}
                     <button type="button" onClick={() => { actions.remove(selectedIds); exitSelect(); }}
                       className="h-8 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-semibold flex items-center gap-1.5">
@@ -480,12 +551,19 @@ export default function TodoPage() {
                 )}
               </div>
             )}
+
+            {/* Advanced filters panel */}
+            {filtersOpen && (
+              <FiltersPanel value={filters} onChange={setF} t={t} lang={lang}
+                onClear={() => setF({ status: "", dept: "", assignee: "", label: "", from: "", to: "" })}
+                departments={departments} assignees={assigneesInUse} labels={labelsInUse} />
+            )}
           </div>
         </div>
 
         {/* ── Scrolling content ── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 w-full min-w-0 space-y-3">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full min-w-0 space-y-3">
             <QuickAdd t={t} lang={lang} labels={labelsInUse} inputRef={quickRef} onCreate={quickCreate} />
 
             {error != null && data && (
@@ -500,7 +578,13 @@ export default function TodoPage() {
               <p className="text-[11.5px] text-[var(--text-dim)] px-1">{t("err.truncated")}</p>
             )}
 
-            <MyWorkStrip />
+            <div className="md:hidden">
+              <MyWorkStrip />
+            </div>
+
+            {!loading && data && scoped.length + (stats?.completed ?? 0) > 0 && (
+              <KpiDashboard active={open.active} overdue={open.overdue} high={open.high} stats={stats} t={t} />
+            )}
 
             {loading ? (
               <ListSkeleton />
@@ -559,11 +643,6 @@ export default function TodoPage() {
         <TaskModal key={modal.key} entry={modalEntry} employees={employees} departments={departments} labels={labels} canAssignAll={canAssignAll}
           onClose={() => setModal(null)} onSubmit={submitModal} onLabelCreated={actions.addLabel} />
       )}
-      {filtersOpen && (
-        <FiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} value={filters}
-          onChange={(p) => setFilters((f) => ({ ...f, ...p }))} t={t} lang={lang} isSA={isSA} meId={accountId}
-          employees={employees} departments={departments} assignees={assigneesInUse} labels={labelsInUse} resultCount={base.length} />
-      )}
       {rejectId && (
         <RejectDialog t={t} onCancel={() => setRejectId(null)}
           onSend={(reason) => { const id = rejectId; setRejectId(null); void actions.reject(id, reason); }} />
@@ -588,12 +667,12 @@ function Section({ title, count, countLabel, keep, tone, children, open: control
   return (
     <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <button type="button" onClick={() => (onToggle ? onToggle() : setOwn((v) => !v))} aria-expanded={open}
-        className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--bg-surface-subtle)] transition-colors rounded-2xl" data-kx-keep-hover>
+        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors rounded-2xl" data-kx-keep-hover>
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
         <h2 className={`text-[12px] font-bold uppercase tracking-wider ${tone}`}>{title}</h2>
         {badge && <span className="text-[10px] font-semibold text-[var(--text-ghost)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-full tabular-nums">{badge}</span>}
       </button>
-      {open && <div className="border-t border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">{children}</div>}
+      {open && <div className="border-t border-[var(--border-subtle)]">{children}</div>}
     </section>
   );
 }
@@ -602,7 +681,7 @@ function ViewLabel({ view, label }: { view: "list" | "board"; label: string }) {
   return (
     <>
       {view === "list" ? <LayoutListIcon size={13} /> : <LayoutGridIcon size={13} />}
-      <span className="hidden md:inline">{label}</span>
+      <span>{label}</span>
     </>
   );
 }

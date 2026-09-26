@@ -39,7 +39,7 @@ export default function TodoBoard({ tasks, t, lang, actions, onOpen }: {
             onDragOver={(e) => { e.preventDefault(); setOverCol(col); }}
             onDragLeave={() => setOverCol((c) => (c === col ? null : c))}
             onDrop={() => { if (dragId) move(dragId, col); setDragId(null); setOverCol(null); }}
-            className={`kx-glass rounded-2xl border bg-[var(--bg-secondary)] p-2 min-h-[120px] transition-colors ${
+            className={`rounded-2xl border bg-[var(--bg-secondary)] p-2 min-h-[120px] transition-colors ${
               overCol === col ? "border-[var(--border-focus)] bg-[var(--bg-surface-active)]" : "border-[var(--border-color)]"
             }`}>
             <header className="flex items-center gap-1.5 px-2 py-1.5 mb-1">
@@ -96,7 +96,7 @@ export default function TodoBoard({ tasks, t, lang, actions, onOpen }: {
                   </div>
                 );
               })}
-              {colTasks.length === 0 && <div className="text-center text-[11px] text-[var(--text-ghost)] py-4">{t("board.empty")}</div>}
+              {colTasks.length === 0 && <div className="text-center text-[11px] text-[var(--text-ghost)] py-4" aria-label={t("board.empty")}>—</div>}
             </div>
           </section>
         );

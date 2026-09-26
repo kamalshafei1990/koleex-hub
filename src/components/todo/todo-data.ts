@@ -11,7 +11,7 @@
 
 import type { TodoAssigneeInfo, TodoLabelRow, TodoWithRelations } from "@/types/supabase";
 import { fetchAssignableEmployees, fetchCompletedTodos, fetchDepartments, fetchTodoLabels } from "@/lib/todo-admin";
-import { todoListUrl, todoOpenListUrl } from "@/lib/todo-list-url";
+import { todoOpenListUrl } from "@/lib/todo-list-url";
 import { writeWarm } from "@/lib/warm-cache";
 
 export interface TodoSnap {
@@ -32,11 +32,6 @@ export const todoWarmKey = (accountId: string | null) => (accountId ? `todo:list
    finished in the last 24 h (so a tick you just made does not vanish).
    Finished history is paged separately, newest first, and only when someone
    opens it — it is usually most of the rows and none of the day's work. */
-function listUrl(query: string): string {
-  const base = todoListUrl(); // "/api/todos?v=<write version>"
-  return `${base}${base.includes("?") ? "&" : "?"}${query}`;
-}
-
 /* Not todo-admin's fetchOpenTodos: a refresh triggered by someone else's
    write (the realtime ping) must bypass the HTTP cache, which our ?v= write
    version does not move, and the screen wants `truncated`. */

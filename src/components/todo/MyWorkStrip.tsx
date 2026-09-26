@@ -7,8 +7,9 @@
    Warm-started (shared warm cache), so on every visit after the first it is
    on the first frame instead of arriving late and shoving the list down. It
    renders nothing while cold-loading or when both lists are empty, and it
-   sits in the scrolling area — not the fixed header, where it used to eat a
-   phone's screen before the first task.
+   sits in the header on a desktop (the original place) and in the scrolling
+   list on a phone, where in the fixed header it ate the screen before the
+   first task.
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
@@ -49,7 +50,7 @@ async function loadWork(): Promise<Work> {
   };
 }
 
-const card = "kx-glass rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 min-w-0";
+const card = "rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 min-w-0";
 const head = "flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-primary)] rounded-md";
 const row = "flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[var(--bg-surface)] transition-colors min-w-0";
 
@@ -69,7 +70,7 @@ export default function MyWorkStrip() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 [&>*]:min-w-0">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3 [&>*]:min-w-0">
       {data.tasks.length > 0 && (
         <div className={card}>
           <Link href="/projects" className={head}>
@@ -77,8 +78,8 @@ export default function MyWorkStrip() {
             {t("mywork.tasks")}
             <span className="ms-auto font-semibold normal-case tracking-normal tabular-nums">{data.tasksCount}</span>
           </Link>
-          <div className="space-y-0.5">
-            {data.tasks.slice(0, 4).map((tk) => (
+          <div className="space-y-1">
+            {data.tasks.map((tk) => (
               <Link key={tk.id} href="/projects" className={row}>
                 <span className="w-1 h-4 rounded-full shrink-0" style={{ background: tk.project?.color ?? "#94a3b8" }} />
                 <span className="text-[12px] text-[var(--text-primary)] truncate flex-1"><AutoTranslatedText text={tk.title} plain /></span>
@@ -99,8 +100,8 @@ export default function MyWorkStrip() {
             {t("mywork.schedule")}
             <span className="ms-auto font-semibold normal-case tracking-normal tabular-nums">{data.planningCount}</span>
           </Link>
-          <div className="space-y-0.5">
-            {data.planning.slice(0, 4).map((sh) => (
+          <div className="space-y-1">
+            {data.planning.map((sh) => (
               <Link key={sh.id} href="/planning" className={row}>
                 <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{sh.title ? <AutoTranslatedText text={sh.title} plain /> : sh.type}</span>
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] shrink-0 tabular-nums">
