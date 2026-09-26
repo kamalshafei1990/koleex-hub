@@ -565,7 +565,7 @@ check("a row's quick actions sit in their own slot on the second line, the time 
   [...listSrc.matchAll(/<RowActions\b/g)].length === 1 && /<RowActions\b/.test(slot)
   && /min-w-\[42px\]/.test(slot) && /\bh-4\b/.test(slot)
   && [...listSrc.matchAll(/<ActionSlot\b/g)].length === 2
-  && /grid h-4 w-5/.test(listSrc) && !/absolute end-3 top-2/.test(listSrc)
+  && /"h-4 w-5 place-items-center/.test(listSrc) && !/absolute end-3 top-2/.test(listSrc)
   && !/group-hover\/row:invisible/.test(listSrc));
 const bellSrc = fileSrc("src/components/layout/NotificationBell.tsx");
 check("the bell asks for slim rows", /fetchInboxMessagesOrNull\(\{[^}]*slim:\s*true/.test(bellSrc));
@@ -934,6 +934,11 @@ check("on the row (⋯) and on the card (the clock), the card holding its time w
   && /aria-label=\{tUi\("later\.title"\)\}/.test(cardsW)
   && /<CardLater onPick=\{\(until, word\) => \{ onLater\(until\); setLaterOpen\(false\); ctl\.done\(word\); \}\} \/>/.test(cardsW)
   && /onSnooze=\{actions\.onSnooze \? \(until\) => actions\.onSnooze!\(\[row\], until\) : undefined\}/.test(listU));
+/* Owner, 26/09, testing Mute from the phone: the ⋯ showed on mouse hover
+   only, so on a touch screen Later and Mute could not be reached from the
+   bell at all — the click the owner made never left the phone. */
+check("on a touch screen the ⋯ stays in view, with a tap area larger than its glyph",
+  /\[@media\(hover:none\)\]:grid/.test(listU) && /after:absolute after:-inset-2 after:content-\[''\]/.test(listU));
 check("the center has a Later view: when each comes back, and \"Bring back now\"",
   /type View = "all" \| "action" \| "security" \| "unread" \| "later" \| "archive";/.test(centerU)
   && /fetchSnoozedOrNull\(\)\.then/.test(centerU) && /onUnsnooze: unsnoozeRows,/.test(centerU) && /later=\{view === "later"\}/.test(centerU)

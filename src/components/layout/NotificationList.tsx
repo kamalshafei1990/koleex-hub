@@ -267,7 +267,10 @@ function RowTime({ row, tUi, time, waiting, later = false }: { row: ListRow; tUi
    focus; the words never move and are never covered, and the time on the
    first line stays in view (owner, 26/09). They used to float over the
    row's corner — 54×28px — and cut the end off a long title; then they took
-   the time's place, and the owner wanted the time kept. */
+   the time's place, and the owner wanted the time kept.
+   On a touch screen there is no hover: the ⋯ (Later, Mute) stays in view
+   there, with a tap area larger than its glyph so a near miss does not open
+   the notification (owner, 26/09: "from the phone"). */
 function ActionSlot<R extends ListRow>({
   rows, unread, tUi, actions, more,
 }: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R>; more?: { open: boolean; toggle: () => void } }) {
@@ -282,35 +285,37 @@ function ActionSlot<R extends ListRow>({
 function RowActions<R extends ListRow>({
   rows, unread, tUi, actions, more,
 }: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R>; more?: { open: boolean; toggle: () => void } }) {
-  const btn =
-    "grid h-4 w-5 place-items-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-surface-strong)] hover:text-[var(--text-primary)]";
+  const look = "h-4 w-5 place-items-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-surface-strong)] hover:text-[var(--text-primary)]";
+  const btn = `grid ${look}`;
   return (
-    <span className="hidden items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex">
-      <button
-        type="button"
-        data-kx-keep-hover
-        className={btn}
-        aria-label={unread ? tUi("markRead") : tUi("markUnread")}
-        title={unread ? tUi("markRead") : tUi("markUnread")}
-        onClick={(e) => { e.stopPropagation(); actions.onSetRead(rows, unread); }}
-      >
-        {unread ? <MailOpenIcon size={12} /> : <EnvelopeIcon size={12} />}
-      </button>
-      <button
-        type="button"
-        data-kx-keep-hover
-        className={btn}
-        aria-label={tUi("archive")}
-        title={tUi("archive")}
-        onClick={(e) => { e.stopPropagation(); actions.onArchive(rows); }}
-      >
-        <ArchiveIcon size={12} />
-      </button>
-      {more && (
+    <span className="flex items-center gap-0.5">
+      <span className="hidden items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex">
         <button
           type="button"
           data-kx-keep-hover
           className={btn}
+          aria-label={unread ? tUi("markRead") : tUi("markUnread")}
+          title={unread ? tUi("markRead") : tUi("markUnread")}
+          onClick={(e) => { e.stopPropagation(); actions.onSetRead(rows, unread); }}
+        >
+          {unread ? <MailOpenIcon size={12} /> : <EnvelopeIcon size={12} />}
+        </button>
+        <button
+          type="button"
+          data-kx-keep-hover
+          className={btn}
+          aria-label={tUi("archive")}
+          title={tUi("archive")}
+          onClick={(e) => { e.stopPropagation(); actions.onArchive(rows); }}
+        >
+          <ArchiveIcon size={12} />
+        </button>
+      </span>
+      {more && (
+        <button
+          type="button"
+          data-kx-keep-hover
+          className={`relative ${look} after:absolute after:-inset-2 after:content-[''] ${more.open ? "grid" : "hidden group-hover/row:grid group-focus-within/row:grid [@media(hover:none)]:grid"}`}
           aria-label={tUi("more")}
           aria-expanded={more.open}
           title={tUi("more")}
