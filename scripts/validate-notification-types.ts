@@ -534,7 +534,7 @@ console.log("\nL. the bell stays light");
    through import(): the list, its words, the templates and the decisions
    load the first time the bell is wanted, never with the page. (Measured on
    the build output by validate:budgets §J.) */
-const HEAVY = /NotificationBell(?!Gate)\b|NotificationList|NotificationText|notif-ui|notif-templates|notification-templates|notification-decisions|notification-view/;
+const HEAVY = /NotificationBell(?!Gate)\b|NotificationList|NotificationText|notif-ui|notif-templates|notification-templates|notification-decisions|notification-view|PushNudge|push-nudge/;
 const eager = new Set<string>();
 const leaks: string[] = [];
 const visit = (f: string, via: string[]) => {
@@ -646,6 +646,42 @@ const registrar = fileSrc("src/components/pwa/ServiceWorkerRegistrar.tsx");
 const card = fileSrc("src/components/settings/tabs/NotificationsTab.tsx");
 check("every signed-in open, and the settings card, re-save the device for whoever is signed in",
   /resyncPushSubscription\(accountId\)/.test(registrar) && /useCurrentAccountId\(\)/.test(registrar) && /resyncPushSubscription\(getCurrentAccountIdSync\(\)\)/.test(card));
+
+/* ── P: the bell offers push on a device that doesn't have it ─────────── */
+console.log("\nP. the bell offers push on a device that doesn't have it");
+/* 26/09/2026: one device in the company received push (the owner's iPhone);
+   the only switch sat in Settings. The bell now offers it — decided before
+   the panel opens, never a prompt the reader didn't ask for, never for
+   someone else or where it cannot work. */
+const nudgeLib = fileSrc("src/lib/push-nudge.ts");
+const nudgeCard = fileSrc("src/components/layout/PushNudge.tsx");
+const bellP = fileSrc("src/components/layout/NotificationBell.tsx");
+const transition = bellP.slice(bellP.indexOf("const [seen, setSeen] = useState({ accountId, open });"), bellP.indexOf("const discussChannelsRef"));
+const nudgeSets = [...bellP.matchAll(/\bsetNudge\(/g)].length;
+check("the offer is taken as the panel opens and fixed for that open — never set from an effect",
+  /useState<Nudge>\(\(\) => \(defaultOpen \? peekPushNudge\(accountId\) : null\)\)/.test(bellP)
+  && /if \(opened \|\| accountChanged\) setNudge\(open \? peekPushNudge\(accountId\) : null\);/.test(transition)
+  && /onClose=\{\(\) => setNudge\(null\)\}/.test(bellP) && nudgeSets === 2, `setNudge calls: ${nudgeSets}`);
+check("the Gate works it out ahead, through import() only",
+  /import\("@\/lib\/push-nudge"\)\.then\(\(m\) => m\.preparePushNudge\(getCurrentAccountIdSync\(\)\)\)/.test(gateSrc));
+const turnOn = nudgeCard.slice(nudgeCard.indexOf("async function turnOn"), nudgeCard.indexOf("function dismiss"));
+check("the browser asks only after a press of Turn on",
+  !/requestPermission\(|subscribeToPush\(|pushManager\.subscribe\(/.test(nudgeLib)
+  && [...nudgeCard.matchAll(/subscribeToPush\(/g)].length === 1 && /subscribeToPush\(/.test(turnOn)
+  && [...nudgeCard.matchAll(/\bturnOn\(/g)].length === 2 /* its definition + the one press */ && /onClick=\{\(\) => void turnOn\(\)\}/.test(nudgeCard)
+  && !/useEffect/.test(nudgeCard));
+const decideBody = nudgeLib.slice(nudgeLib.indexOf("async function decide"));
+check("never during view-as, in the desktop app, once push is on here, or when the browser blocks it",
+  /if \(!scope\.endsWith\(":self"\)\) return null;/.test(decideBody) && /koleex\?\.isDesktop\) return null;/.test(decideBody)
+  && /permission === "denied"[^\n]*return null;/.test(decideBody) && /getSubscription\(\)\) return null;/.test(decideBody)
+  && /if \(!isPushConfigured\(\)\) return null;/.test(decideBody));
+check("✕ closes it for good for this person on this device; turning push on does not",
+  /closePushNudge\(accountId, true\)/.test(nudgeCard.slice(nudgeCard.indexOf("function dismiss")))
+  && /closePushNudge\(accountId, false\)/.test(turnOn) && /localStorage\.getItem\(KEY \+ accountId\)/.test(decideBody));
+const uiWords = fileSrc("src/lib/translations/notif-ui.ts");
+const nudgeKeys = [...new Set([...nudgeCard.matchAll(/tUi\("(push\.[a-zA-Z]+)"\)/g)].map((m) => m[1]))];
+const missingWords = nudgeKeys.filter((k) => !new RegExp(`"${k.replace(".", "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(uiWords));
+check(`its words read in English, Chinese and Arabic (${nudgeKeys.length} keys)`, nudgeKeys.length >= 8 && missingWords.length === 0, missingWords.join(", "));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

@@ -67,4 +67,15 @@ export const notifUiT: Translations = {
   "dec.approved":   { en: "Approved",       zh: "已批准",     ar: "تمت الموافقة" },
   "dec.rejected":   { en: "Rejected",       zh: "已拒绝",     ar: "تم الرفض" },
   "dec.returned":   { en: "Sent back",      zh: "已退回",     ar: "تمت الإعادة" },
+
+  /* The offer to turn push on for this device (components/layout/PushNudge). */
+  "push.title":     { en: "Get notifications on this device", zh: "在此设备上接收通知", ar: "استلم الإشعارات على هذا الجهاز" },
+  "push.why":       { en: "Alerts reach you even when Koleex Hub is closed.", zh: "即使 Koleex Hub 未打开，也能收到提醒。", ar: "تصلك التنبيهات حتى عندما يكون Koleex Hub مغلقًا." },
+  "push.install":   { en: "First add Koleex Hub to your Home Screen: tap Share, then Add to Home Screen. Open it from the new icon and turn notifications on there.", zh: "请先将 Koleex Hub 添加到主屏幕：点按“共享”，再点“添加到主屏幕”。然后从新图标打开，并在那里开启通知。", ar: "أضف Koleex Hub أولًا إلى الشاشة الرئيسية: اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية». افتحه من الأيقونة الجديدة وفعّل الإشعارات من هناك." },
+  "push.turnOn":    { en: "Turn on",        zh: "开启",       ar: "تفعيل" },
+  "push.turningOn": { en: "Turning on…",    zh: "正在开启…",   ar: "جارٍ التفعيل…" },
+  "push.on":        { en: "Notifications are on for this device.", zh: "此设备已开启通知。", ar: "تم تفعيل الإشعارات على هذا الجهاز." },
+  "push.denied":    { en: "The browser blocked notifications. Allow them in its site settings, then try again from Settings → Notifications.", zh: "浏览器已阻止通知。请在网站设置中允许，然后在 设置 → 通知 中重试。", ar: "المتصفح منع الإشعارات. اسمح بها من إعدادات الموقع، ثم أعد المحاولة من الإعدادات، قسم الإشعارات." },
+  "push.failed":    { en: "Couldn't turn them on. Try again, or use Settings → Notifications.", zh: "无法开启。请重试，或前往 设置 → 通知。", ar: "تعذّر التفعيل. حاول مرة أخرى، أو من الإعدادات، قسم الإشعارات." },
+  "push.dismiss":   { en: "Don't show again", zh: "不再显示",  ar: "عدم الإظهار مرة أخرى" },
 };

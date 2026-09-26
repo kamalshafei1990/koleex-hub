@@ -21,6 +21,11 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return out;
 }
 
+/** False when the server's push key never reached this build. */
+export function isPushConfigured(): boolean {
+  return !!VAPID_PUBLIC;
+}
+
 /** True if this browser can do Web Push. On iOS this also requires the app to
  *  be installed to the Home Screen (standalone). */
 export function isPushSupported(): boolean {

@@ -115,6 +115,9 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
     const warm = () => {
       if (cancelled || document.visibilityState !== "visible") return;
       void import("./NotificationBell");
+      /* Whether the panel will offer push on this device — decided now, so
+         the first open shows it (or not) on its first frame. */
+      void import("@/lib/push-nudge").then((m) => m.preparePushNudge(getCurrentAccountIdSync()));
       /* ...and the LIST it will open on. The chunk alone made the first
          press fast to mount but still left it waiting 0.5–1.2 s for rows
          (measured on prod, 26/09). One slim request, skipped when a fresh

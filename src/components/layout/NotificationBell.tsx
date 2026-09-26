@@ -62,6 +62,8 @@ import { notifUiT } from "@/lib/translations/notif-ui";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import { setIconBadge } from "@/lib/app-icon-badge";
 import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
+import PushNudge from "@/components/layout/PushNudge";
+import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
@@ -170,6 +172,10 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
        · panel closed → the tab resets to All so a tab left behind cannot
          hide fresh notifications on the next open.
      The async fetches themselves stay in the effects below. */
+  /* The offer to turn push on here (lib/push-nudge): taken as the panel
+     opens and fixed for that open, so it is there on the first frame or not
+     at all — never pushed in above the rows a moment later. */
+  const [nudge, setNudge] = useState<Nudge>(() => (defaultOpen ? peekPushNudge(accountId) : null));
   const [seen, setSeen] = useState({ accountId, open });
   if (seen.accountId !== accountId || seen.open !== open) {
     const accountChanged = seen.accountId !== accountId;
@@ -182,10 +188,16 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       setMessages([]);
     }
     if (closed) setTab("all");
+    if (opened || accountChanged) setNudge(open ? peekPushNudge(accountId) : null);
     /* A spinner only over an empty panel — rows painted from the last
        answer stay put while the refresh runs. */
     if (open && accountId && (opened || accountChanged)) setLoadingInbox(messages.length === 0);
   }
+  /* Worked out again while the panel is shut, for the next open: permission
+     or a subscription may have changed meanwhile (Settings, another tab). */
+  useEffect(() => {
+    if (!open) void preparePushNudge(accountId);
+  }, [open, accountId]);
   /* Latest list for the realtime handler (per-channel mute check). */
   const discussChannelsRef = useRef<DiscussChannelWithState[]>([]);
   useEffect(() => {
@@ -741,6 +753,10 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               </button>
             </span>
           </div>
+
+          {nudge && accountId && (
+            <PushNudge nudge={nudge} accountId={accountId} tUi={tUi} onClose={() => setNudge(null)} />
+          )}
 
           {/* Tabs: All (the work) · Needs you · Security (Super Admins). */}
           <div role="tablist" aria-label={t("notif.title")} className="mx-3 mb-1 flex gap-1 rounded-lg bg-[var(--bg-surface-subtle)] p-0.5">
