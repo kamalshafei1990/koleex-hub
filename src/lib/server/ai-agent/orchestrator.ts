@@ -38,6 +38,7 @@ import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
 import type { TurnInput } from "@/lib/server/ai/core/types";
 export type { TurnInput } from "@/lib/server/ai/core/types";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
+import { wantsList } from "@/lib/server/ai/analyze-intent";
 import { logToolRun } from "@/lib/server/ai/observability/turn-trace";
 import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
 import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
@@ -106,6 +107,14 @@ const IDENTITY_HISTORY_TURNS = 6;
 const IDENTITY_HISTORY_CHARS = 400;
 
 const MAX_ITERATIONS = 4;
+/* THE ANSWER CEILING (owner, 2026-09-26: "what is the top 100 famous brands"
+   on Koleex Deep came back as the text "Running search_web(…)…"). A model
+   that reasons before it writes spends its reasoning from the same budget,
+   and 2048 tokens could not hold a hundred rows after it. A list asked for
+   by name, or any turn on Deep — the model chosen for depth — gets the long
+   ceiling, as the general lane does (#474). */
+const LOOP_MAX_TOKENS = 2048;
+const LOOP_LONG_MAX_TOKENS = 4000;
 /* Hard ceiling on total tool executions per user turn. Prevents small
    models from loop-calling the same tool 50 times and blowing past
    Groq's 413 request-size limit. Unique (tool,args) pairs are cached
@@ -156,6 +165,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   /* The user's chosen Koleex model: its provider goes first, the rest stay
      behind it as failover (provider/registry preferFirst). */
   const prefer = adapterForModel(model);
+  const longAnswer = model === "deep" || wantsList(userMessage);
   /* The previews this turn made. A confirm of one of them in the same turn is
      the model agreeing for the user, and dispatchTool refuses it. */
   const turnPreviews = new Set<string>();
@@ -460,8 +470,12 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     /* Trade-terms lookup on the first request — see wantsTradeTerms. */
     const forceTradeNow = wantsTradeTerms && !forcedTrade && totalToolRuns === 0;
     if (forceTradeNow) forcedTrade = true;
+    /* THE LAST ROUND ANSWERS. A turn whose rounds were all spent on lookups
+       used to end with no answer at all; the last round now carries no tool,
+       so the model writes one from what it gathered. */
+    const lastRound = iter === MAX_ITERATIONS - 1 && totalToolRuns > 0;
     const toolChoice: OpenAiToolChoice =
-      totalToolRuns >= MAX_TOOLS_PER_TURN
+      totalToolRuns >= MAX_TOOLS_PER_TURN || lastRound
         ? "none"
         : forceAskNow
           ? { type: "function", function: { name: "askUser" } }
@@ -507,7 +521,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           messages: fromOpenAiMessages(messages),
           tools: fromOpenAiTools(tools as unknown as OpenAiTool[]),
           toolChoice: fromOpenAiToolChoice(toolChoice),
-          maxTokens: 2048,
+          maxTokens: longAnswer ? LOOP_LONG_MAX_TOKENS : LOOP_MAX_TOKENS,
           temperature: 0.3,
           /* The tool loop is the multi-step, evidence-gathering path — the one
              turn where a slower, stronger model is worth its latency. */
@@ -859,8 +873,11 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   // output ("(cached)", "productId required.", "Please provide …") so
   // we don't promote engineering-speak into a user-facing reply.
   if (!finalReply) {
+    /* Never a progress line: a tool-call step's text is "Running search_web(…)…",
+       narration for the screen, not an answer (2026-09-26). */
     const candidate = [...steps]
       .reverse()
+      .filter((s) => s.kind !== "tool-call")
       .map((s) => cleanAssistantText(s.text ?? ""))
       .find((t) => t && !looksLikeDebug(t)) ?? "";
     finalReply = normaliseBrandName(candidate) ||
