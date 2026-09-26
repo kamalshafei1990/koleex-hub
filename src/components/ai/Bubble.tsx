@@ -160,7 +160,12 @@ function BubbleImpl({
   const actionsAlwaysOn = !!isLast || revealed;
   const revealCls = actionsAlwaysOn
     ? ""
-    : "opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity";
+    /* HIDDEN MEANS UNTAPPABLE. opacity-0 alone left the buttons live: on a
+       phone a tap in the blank under an older reply copied it, read it
+       aloud or sent a thumbs-down, and under a message of yours opened
+       Edit (review, 2026-09-26). Now the tap falls through to the row,
+       which reveals them; hover and keyboard focus bring them back too. */
+    : "opacity-0 pointer-events-none group-hover/msg:opacity-100 group-hover/msg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto transition-opacity";
 
 
   /* Phase 13: edit-and-retry state. Only user messages can be
@@ -171,7 +176,11 @@ function BubbleImpl({
   const showEditButton = isUser && !!onEdit && canEdit !== false;
   const submitEdit = useCallback(() => {
     const next = editValue.trim();
-    if (!next || next === msg.content) {
+    /* THE SAME WORDS RESEND. The button says "Save and retry", and after a
+       failed reply retrying unchanged is exactly what is wanted — it used
+       to just close the editor (review, 2026-09-26). Only an empty box
+       cancels. */
+    if (!next) {
       setEditing(false);
       setEditValue(msg.content);
       return;
@@ -295,7 +304,7 @@ function BubbleImpl({
             dir={bubbleDir}
             lang={bubbleLang}
             className={`leading-relaxed ${
-              isUser ? "rounded-2xl whitespace-pre-wrap px-4 py-2.5" : "kx-ai-reply max-w-full"
+              isUser ? "rounded-2xl whitespace-pre-wrap [overflow-wrap:anywhere] px-4 py-2.5" : "kx-ai-reply max-w-full"
             } ${
               bubbleScript === "ar" || bubbleScript === "zh" ? "text-[16px]" : "text-[14px]"
             } ${
@@ -351,8 +360,13 @@ function BubbleImpl({
                       cancelEdit();
                     }
                   }}
-                  rows={1}
-                  className="w-full bg-transparent outline-none resize-none text-inherit leading-relaxed min-w-[180px]"
+                  /* AS TALL AS THE MESSAGE. rows={1} showed one line of a
+                     long message and scrolled the rest inside the box
+                     (review, 2026-09-26); field-sizing grows it with the
+                     text, the rows count is the floor where it is not
+                     supported, and the cap keeps it on screen. */
+                  rows={Math.min(8, Math.max(1, editValue.split("\n").length))}
+                  className="kx-edit-box w-full bg-transparent outline-none resize-none text-inherit leading-relaxed min-w-[180px] max-h-[40vh] overflow-y-auto"
                   style={{ fontFamily: "inherit" }}
                 />
               ) : (
@@ -419,7 +433,7 @@ function BubbleImpl({
               const options = q?.options ?? [];
               if (options.length === 0) {
                 return (
-                  <Suspense fallback={<div className="whitespace-pre-wrap" dir={bubbleDir}>{msg.content}</div>}>
+                  <Suspense fallback={<div className="whitespace-pre-wrap [overflow-wrap:anywhere]" dir={bubbleDir}>{msg.content}</div>}>
                     <MessageMarkdown content={msg.content} lang={lang} dir={bubbleDir} />
                   </Suspense>
                 );

@@ -146,7 +146,7 @@ console.log("\n── 6. Chat: no duplicate sends, no stuck spinners, Stop reall
   check("a task card keeps its outcome when its reply's id becomes the saved row's",
     (app.match(/carryTaskCard\(placeholderId, (?:persisted\.id|finalMessage\.id)\);\s*setMessages/g) ?? []).length === 2);
   check("deleting a chat on a dead link says so, and a deleted open chat stops loading and leaves the address",
-    /\} catch \{\s*setError\(humanizeError\("NetworkError"\)\);\s*return;\s*\}/.test(app) && /syncUrl\(\{ c: null, view: null \}, "replace"\);\s*\}\s*\}, \[pendingDeleteId, syncUrl\]\);/.test(app));
+    /\} catch \{\s*setError\(chatError\("NetworkError"\)\);\s*return;\s*\}/.test(app) && /syncUrl\(\{ c: null, view: null \}, "replace"\);\s*\}\s*\}, \[pendingDeleteId, syncUrl\]\);/.test(app));
   const md = read("src/components/ai/MessageMarkdown.tsx");
   check("a code fence with no language is drawn as a code block (newlines kept, copy button), not inline code",
     /pre: \(\{ children \}\) => \{[\s\S]{0,400}return <CodeBlock labels=\{labels\}>\{text\}<\/CodeBlock>;/.test(md));
@@ -182,7 +182,7 @@ console.log("\n── 7. Speed ──");
   const bubble = read("src/components/ai/Bubble.tsx");
   check("the markdown renderer is loaded when a reply needs it, with the plain text in its place until then — and warmed after the app is up",
     /const MessageMarkdown = lazy\(\(\) => import\("@\/components\/ai\/MessageMarkdown"\)\);/.test(bubble) &&
-      !/^import MessageMarkdown from/m.test(bubble) && /<Suspense fallback=\{<div className="whitespace-pre-wrap"/.test(bubble) &&
+      !/^import MessageMarkdown from/m.test(bubble) && /<Suspense fallback=\{<div className="whitespace-pre-wrap \[overflow-wrap:anywhere\]"/.test(bubble) &&
       /void import\("@\/components\/ai\/MessageMarkdown"\);/.test(app));
   check("the accounts admin client is loaded for the one save that needs it, not with the app",
     !/^import \{ updateAccountPreferences \} from "@\/lib\/accounts-admin";/m.test(app) && /import\("@\/lib\/accounts-admin"\)/.test(app));
@@ -237,7 +237,7 @@ console.log("\n── 9. Design, part 2: the thread ──");
   const bubble = read("src/components/ai/Bubble.tsx");
   const css = read("src/app/globals.css");
   check("a reply is plain text in Core and keeps the glass card only under Aurora",
-    /isUser \? "rounded-2xl whitespace-pre-wrap px-4 py-2\.5" : "kx-ai-reply max-w-full"/.test(bubble) &&
+    /isUser \? "rounded-2xl whitespace-pre-wrap \[overflow-wrap:anywhere\] px-4 py-2\.5" : "kx-ai-reply max-w-full"/.test(bubble) &&
       /\.kx-ai-reply \{ padding: 2px 0; \}/.test(css) && /\[data-kx-skin="aurora"\] \.kx-ai-reply \{\s*padding: 14px 20px;/.test(css) &&
       !/"kx-glass relative bg-\[var\(--bg-secondary\)\] border/.test(bubble));
   check("a tap on an older message reveals its actions, but never steals a tap from a button or link inside it",

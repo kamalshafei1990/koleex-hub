@@ -59,7 +59,7 @@ import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
 import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
-import { humanizeError } from "@/lib/ui/humanize-error";
+import { chatError } from "@/components/ai/chat-error";
 import { isNetworkError } from "@/lib/ai/network-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ProjectGlyph from "@/components/ai/ProjectGlyph";
@@ -1211,7 +1211,7 @@ export default function KoleexAiApp() {
           const raw = e instanceof Error ? e.message : "unknown error";
           const isNetwork = isNetworkError(e);
           failure = isNetwork
-            ? humanizeError("NetworkError")
+            ? chatError("NetworkError")
             : `${copy.attachError}: ${raw}`;
         }
         setAttachStatus(null);
@@ -1345,7 +1345,7 @@ export default function KoleexAiApp() {
           }
           /* JSON with no usable reply — fall through to the error path. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-          setError(json?.error ? humanizeError(json.error) : copy.noReply);
+          setError(json?.error ? chatError(json.error) : copy.noReply);
           return;
         }
 
@@ -1365,8 +1365,8 @@ export default function KoleexAiApp() {
               : res.status === 413
                 ? copy.messageTooLong
               : said
-                ? humanizeError(said)
-                : humanizeError(`HTTP ${res.status}`);
+                ? chatError(said)
+                : chatError(`HTTP ${res.status}`);
           setError(msg);
           /* Drop the placeholder so the UI doesn't show an empty bubble. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
@@ -1502,7 +1502,7 @@ export default function KoleexAiApp() {
                   convUpdateId = json.conversation.id;
                   convUpdateTitle = json.conversation.title;
                 } else if (json.type === "error") {
-                  setError(json.message ? humanizeError(json.message) : copy.aiUnavailable);
+                  setError(json.message ? chatError(json.message) : copy.aiUnavailable);
                 }
               } catch {
                 /* Malformed frame — skip, keep streaming. */
@@ -1590,7 +1590,7 @@ export default function KoleexAiApp() {
           /* A dropped send puts its words back in the composer (below), so
              its bubble goes too — kept, the resend showed the message twice. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId && !(isNetwork && m.id === optimistic.id)));
-          setError(humanizeError(isNetwork ? "NetworkError" : raw));
+          setError(chatError(isNetwork ? "NetworkError" : raw));
           /* Owner report: "I write a message and can't send it" — a dropped
              stream lost the text as well as the answer, so the only recovery
              was retyping. On this link a drop is routine, so put the message
@@ -1823,6 +1823,11 @@ export default function KoleexAiApp() {
     primeSounds(CHAT_CUES);
   }, []);
 
+  /* The thread ends on the caller's own words with no reply after them:
+     a failed turn, which the error banner offers to send again. */
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const canRetryLast = !sending && lastMessage?.role === "user" && !!lastMessage.content;
+
   /** Regenerate the last assistant reply. Finds the most recent
    *  user message, removes any trailing assistant messages, and
    *  re-runs send() with that same text. Server treats it as a
@@ -1873,11 +1878,11 @@ export default function KoleexAiApp() {
         credentials: "include",
       });
     } catch {
-      setError(humanizeError("NetworkError"));
+      setError(chatError("NetworkError"));
       return;
     }
     if (!res.ok) {
-      setError(humanizeError(`HTTP ${res.status}`));
+      setError(chatError(`HTTP ${res.status}`));
       return;
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
@@ -1912,7 +1917,7 @@ export default function KoleexAiApp() {
           body: JSON.stringify({ title: next.trim() }),
         });
         if (!res.ok) {
-          setError(humanizeError(`HTTP ${res.status}`));
+          setError(chatError(`HTTP ${res.status}`));
           return;
         }
         setConversations((prev) =>
@@ -1920,7 +1925,7 @@ export default function KoleexAiApp() {
         );
       } catch {
         /* A rename that did not reach the server is said, not swallowed. */
-        setError(humanizeError("NetworkError"));
+        setError(chatError("NetworkError"));
       }
     },
     [],
@@ -1966,13 +1971,13 @@ export default function KoleexAiApp() {
         });
         if (!res.ok) {
           rollback();
-          setError(humanizeError(`HTTP ${res.status}`));
+          setError(chatError(`HTTP ${res.status}`));
         }
       } catch {
         /* A network drop is not a server "no", but the pin never landed
            either: the sidebar must not keep showing it (audit, 2026-09-11). */
         rollback();
-        setError(humanizeError("NetworkError"));
+        setError(chatError("NetworkError"));
       }
     },
     [],
@@ -2022,7 +2027,7 @@ export default function KoleexAiApp() {
         },
       );
       if (!res.ok) {
-        setError(humanizeError(`HTTP ${res.status}`));
+        setError(chatError(`HTTP ${res.status}`));
         return;
       }
       const { project } = (await res.json()) as { project: AiProject };
@@ -2039,7 +2044,7 @@ export default function KoleexAiApp() {
       }
       setProjectDraft(null);
     } catch {
-      setError(humanizeError("NetworkError"));
+      setError(chatError("NetworkError"));
     } finally {
       setProjectSaving(false);
     }
@@ -2058,11 +2063,11 @@ export default function KoleexAiApp() {
         credentials: "include",
       });
     } catch {
-      setError(humanizeError("NetworkError"));
+      setError(chatError("NetworkError"));
       return;
     }
     if (!res.ok) {
-      setError(humanizeError(`HTTP ${res.status}`));
+      setError(chatError(`HTTP ${res.status}`));
       return;
     }
     setProjects((prev) => prev.filter((p) => p.id !== id));
@@ -2250,6 +2255,29 @@ export default function KoleexAiApp() {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages, sending]);
+
+  /* THE THREAD GROWS WITHOUT A NEW MESSAGE, TOO. A product photo that
+     loads, the reply's last deferred render, the Thinking panel folding —
+     none of them changes `messages`, so the snap above never ran for them
+     and a finished reply could end with its picture or last lines below
+     the fold, the jump chip not showing either (review, 2026-09-26). The
+     content column is watched: following, it stays at the end; not
+     following, the chip is told. */
+  const threadContentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const content = threadContentRef.current;
+    /* The same column shows the Library and Calls panels: those are lists
+       read from the top, never pulled to their end. */
+    if (!content || libraryOpen || callsOpen || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      if (userFollowingRef.current) el.scrollTop = el.scrollHeight;
+      else setShowJumpToBottom(el.scrollHeight - el.clientHeight - el.scrollTop > 120);
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [libraryOpen, callsOpen]);
 
   /* AN ERROR IS SHOWN WHERE THE EYE IS. The banner sits at the bottom of the
      scroller and nothing scrolled to it, so an attachment failure — which
@@ -2872,7 +2900,7 @@ export default function KoleexAiApp() {
           className="kx-ai-thread relative flex-1 overflow-y-auto"
         >
 
-          <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
+          <div ref={threadContentRef} className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
             {libraryOpen ? (
               <LibraryPanel copy={copy} onOpenConversation={(id) => void openConversation(id)} />
             ) : callsOpen ? (
@@ -2981,8 +3009,26 @@ export default function KoleexAiApp() {
               </div>
             )}
             {error && (
-              <div role="alert" className="rounded-xl border border-[var(--kx-ai-danger-line)] bg-[var(--kx-ai-danger-soft)] text-[var(--kx-ai-danger-text)] px-3 py-2 text-[12px]">
-                {error}
+              <div role="alert" className="rounded-xl border border-[var(--kx-ai-danger-line)] bg-[var(--kx-ai-danger-soft)] text-[var(--kx-ai-danger-text)] px-3 py-2 text-[12px] flex flex-wrap items-center gap-2">
+                <span className="flex-1 min-w-[12rem]">{error}</span>
+                {/* ONE TAP TO ASK AGAIN. A reply that failed (a refusal, a
+                    server error, an empty stream) took its bubble with it,
+                    and Regenerate lives on reply bubbles — so the thread
+                    ended on the question with a red line and nothing to
+                    press (review, 2026-09-26). While the thread ends on
+                    the caller's own message, this resends it. A dropped
+                    link is not offered it: that message went back into
+                    the box, and Send is the retry. */}
+                {canRetryLast && (
+                  <button
+                    type="button"
+                    onClick={() => { setError(null); handleRegenerate(); }}
+                    data-retry-last
+                    className="-my-1 min-h-[36px] rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] px-3.5 text-[12px] font-semibold active:scale-95 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"
+                  >
+                    {copy.retry}
+                  </button>
+                )}
               </div>
             )}
             {/* Floating "jump to latest" — STICKY, not absolute: an
@@ -3195,7 +3241,7 @@ export default function KoleexAiApp() {
                   rows={1}
                   /* Measured like the bubbles: one Arabic word inside an
                      English sentence no longer flips the whole box. */
-                  dir={textDirection(input)}
+                  dir={textDirection(input, lang === "ar" ? "rtl" : "ltr")}
                   lang={textLang(input)}
                   enterKeyHint="send"
                   inputMode="text"
