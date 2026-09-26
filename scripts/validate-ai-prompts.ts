@@ -325,10 +325,13 @@ console.log("\n── Roadmap D4: a photo the user sent ──");
   const built = buildSmartPrompt("ok make a list for top 100 countries", { expectedFormat: "list", intentType: "chat" })[0].content;
   check("  …and the built prompt asks for every item, a table when items have fields, and never a link alone",
     /RESPONSE SHAPE: the whole list the user asked for, every item/.test(built) && /a Markdown table/.test(built) &&
-    /Never answer a request for a list with only a link\./.test(built) && !/1–2 sentences/.test(built));
+    /Never answer a request for a list with only a link\./.test(built) && !/1–2 sentences/.test(built) &&
+    /When the user named a number \(top 100, 20 items\), give that many rows — mark any that may be out of date rather than leaving them out\./.test(built));
   const note = GENERAL_SEARCH_NOTE;
   check("the search note completes a partial result from general knowledge, said so, and never answers with only a link",
-    /complete the rest from what you know, saying in one line which part comes from general knowledge/.test(note) && /Never answer with only a link\./.test(note));
+    /complete the rest from what you know, saying in one line which part comes from general knowledge/.test(note) && /Never answer with only a link\./.test(note) &&
+    /give that many: in a table, add a Source column/.test(note) && /general knowledge — may be out of date/.test(note) &&
+    /never a reason to stop short/.test(note));
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   check("the general lane's ceiling is the long one for a list asked for by name or for Deep, and 1400 otherwise",
     /const GENERAL_LONG_MAX_TOKENS = 4000;/.test(route) &&
