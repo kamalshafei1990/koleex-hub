@@ -60,6 +60,7 @@ import { useSkin } from "@/lib/appearance";
 import { hubT } from "@/lib/translations/hub";
 import { notifUiT } from "@/lib/translations/notif-ui";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
+import { setIconBadge } from "@/lib/app-icon-badge";
 import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
@@ -241,6 +242,15 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     publishInboxUnread(accountId ?? null, inboxUnread);
   }, [accountId, inboxUnread]);
 
+  /* The installed app's icon carries the number this bell shows. Only once
+     both halves have been read: both start at 0 here, and a mount must not
+     wipe the number the Gate already put on the icon. */
+  const [iconKnown, setIconKnown] = useState({ inbox: false, discuss: false });
+  useEffect(() => {
+    if (!accountId || !iconKnown.inbox || !iconKnown.discuss) return;
+    setIconBadge(inboxUnread, discussUnread);
+  }, [accountId, iconKnown, inboxUnread, discussUnread]);
+
   /* ── Discuss: seed channel list ──────────────────────────────────── */
   const recountDiscuss = useCallback(async () => {
     const aid = accountIdRef.current;
@@ -249,6 +259,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     try {
       const rows = await fetchMyChannels(aid);
       setDiscussChannels(rows);
+      setIconKnown((k) => (k.discuss ? k : { ...k, discuss: true }));
     } catch {
       /* Leave prior list in place. */
     }
@@ -455,6 +466,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       } else {
         setInboxUnread(n);
       }
+      setIconKnown((k) => (k.inbox ? k : { ...k, inbox: true }));
     }
     void tick();
     const t = window.setInterval(() => {

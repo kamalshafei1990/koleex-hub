@@ -26,6 +26,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { cachedGet } from "@/lib/client-cache";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
+import { setIconBadge } from "@/lib/app-icon-badge";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 
 /* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
@@ -196,6 +197,9 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
            click — so on every ordinary page load the pill said 0. At rest,
            this is the publisher. */
         if (inbox) publishInboxUnread(accountId, unreadInbox, inbox.data?.byApp ?? {});
+        /* The installed app's icon says the same number — once both halves
+           are known (a failed half would show a number that is too low). */
+        if (inbox && channels) setIconBadge(unreadInbox, discussUnreadOf(channels));
       } catch { /* a missing badge is not worth an error state */ }
     };
     void read();

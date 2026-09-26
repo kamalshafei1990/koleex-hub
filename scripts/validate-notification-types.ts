@@ -35,6 +35,9 @@
         the registry (security left out), published by the Gate with the
         count it already reads; Discuss, To-do, Projects and Planning keep
         their own numbers; Home asks again only when the count moved alone
+     N  the installed app's icon carries the bell's number: set by the Gate and
+        the bell (never during view-as), cleared at sign-out, carried by every
+        push as the recipient's own count and painted by the service worker
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -574,6 +577,29 @@ check("Discuss, To-do, Projects and Planning keep their own numbers — and only
 const homeReads = [...homeSrc.matchAll(/fetchUnreadByApp\(\)/g)].length;
 check("Home never asks for them on its own load — only when the count moved without them",
   homeReads === 1 && /const needsRead = badgesReady && tileCounts\.published && !tileCounts\.fresh;/.test(homeSrc) && /if \(!needsRead\) return;/.test(homeSrc));
+
+/* ── N: the installed app's icon carries the bell's number ────────────── */
+console.log("\nN. the installed app's icon carries the bell's number");
+/* Owner, 26/09: a number on the app's icon — iPhone / iPad Home Screen,
+   installed Chrome / Edge, the Mac desktop app (Electron maps the same
+   Badging API call to the dock). The page sets it while the Hub is open;
+   the service worker keeps it moving while it is closed. */
+const iconSrc = fileSrc("src/lib/app-icon-badge.ts");
+check("the icon never shows another person's number (view-as) and sums the bell's two halves",
+  /if \(!currentScopeKey\(\)\.endsWith\(":self"\)\) return;/.test(iconSrc) && /paint\(i \+ d\)/.test(iconSrc));
+const bellSrcN = fileSrc("src/components/layout/NotificationBell.tsx");
+check("the Gate and the bell set it from the number they show, once both halves are known",
+  /if \(inbox && channels\) setIconBadge\(unreadInbox, discussUnreadOf\(channels\)\)/.test(gateSrc)
+  && /if \(!accountId \|\| !iconKnown\.inbox \|\| !iconKnown\.discuss\) return;\s*setIconBadge\(inboxUnread, discussUnread\)/.test(bellSrcN));
+check("sign-out clears it", /clearIconBadge\(\)/.test(fileSrc("src/lib/session-caches.ts")));
+const pushSrc = fileSrc("src/lib/server/web-push.ts");
+check("each push carries its recipient's own unread count",
+  /unread: unreadOf\.get\(s\.account_id\)/.test(pushSrc) && /\.is\("read_at", null\)[\s\S]{0,60}\.is\("archived_at", null\)/.test(pushSrc.slice(pushSrc.indexOf("unreadOf"))));
+const sw = fs.readFileSync(R("public/sw.js"), "utf8");
+check("the service worker paints it on every push, and keeps the halves the open Hub tells it",
+  /event\.waitUntil\(Promise\.all\(\[showPush\(payload\), badgeFromPush\(payload\)\]\)\)/.test(sw)
+  && /if \(typeof payload\.unread === "number"\) parts\.inbox = payload\.unread;/.test(sw)
+  && /d\.type !== "kx-icon-badge"/.test(sw));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

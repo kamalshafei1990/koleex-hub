@@ -126,7 +126,57 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data ? event.data.text() : "" };
   }
 
-  event.waitUntil(showPush(payload));
+  event.waitUntil(Promise.all([showPush(payload), badgeFromPush(payload)]));
+});
+
+/* THE ICON'S NUMBER while the Hub is closed (lib/app-icon-badge sets it
+   while it is open). The icon shows what the bell shows: unread
+   notifications + unread Discuss messages. Each push brings the recipient's
+   own unread-notification count (`unread`, from the server, exact); a
+   Discuss message adds one to the Discuss part the open Hub last told us.
+   The two parts live in the Cache API, which survives the worker being
+   stopped between pushes. Where setAppBadge is missing, nothing happens. */
+const BADGE_CACHE = "kx-icon-badge-v1";
+const BADGE_KEY = "/__kx/icon-badge";
+
+async function readBadgeParts() {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    const hit = await cache.match(BADGE_KEY);
+    const p = hit ? await hit.json() : null;
+    return { inbox: (p && p.inbox) | 0, discuss: (p && p.discuss) | 0 };
+  } catch {
+    return { inbox: 0, discuss: 0 };
+  }
+}
+
+async function writeBadgeParts(parts) {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    await cache.put(BADGE_KEY, new Response(JSON.stringify(parts), { headers: { "Content-Type": "application/json" } }));
+  } catch { /* no Cache API — the open Hub still sets the icon */ }
+}
+
+async function paintBadge(parts) {
+  const n = Math.max(0, parts.inbox | 0) + Math.max(0, parts.discuss | 0);
+  try {
+    if (n > 0 && self.navigator.setAppBadge) await self.navigator.setAppBadge(n);
+    else if (n === 0 && self.navigator.clearAppBadge) await self.navigator.clearAppBadge();
+  } catch { /* not allowed on this device */ }
+}
+
+async function badgeFromPush(payload) {
+  const parts = await readBadgeParts();
+  if (typeof payload.unread === "number") parts.inbox = payload.unread;
+  if (payload.kind === "discuss_message") parts.discuss = (parts.discuss | 0) + 1;
+  await writeBadgeParts(parts);
+  await paintBadge(parts);
+}
+
+self.addEventListener("message", (event) => {
+  const d = event.data;
+  if (!d || d.type !== "kx-icon-badge") return;
+  event.waitUntil(writeBadgeParts({ inbox: Math.max(0, d.inbox | 0), discuss: Math.max(0, d.discuss | 0) }));
 });
 
 /* FOLDING. A push that carries `group` (security alerts per person per day,

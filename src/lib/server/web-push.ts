@@ -174,8 +174,33 @@ export async function sendPushToAccounts(
      dictionary is imported only when someone needs another language: this
      module sits on the cold-start graph of sign-in, the heartbeat and every
      audited route (see the note at the top). */
+  /* The icon's number while the Hub is closed: each recipient's own unread
+     notifications, read once for everyone this push reaches (after the row
+     it announces was written). The service worker adds the Discuss part it
+     was last told by the open Hub (lib/app-icon-badge). A failed read sends
+     no number, and the icon keeps the one it had. */
+  const unreadOf = new Map<string, number>();
+  {
+    const who = [...new Set(subs.map((s) => s.account_id))];
+    let readOk = true;
+    for (let i = 0; i < who.length && readOk; i += 100) {
+      const { data: un, error } = await supabaseServer
+        .from("inbox_messages")
+        .select("recipient_account_id")
+        .in("recipient_account_id", who.slice(i, i + 100))
+        .is("read_at", null)
+        .is("archived_at", null)
+        .limit(5000);
+      if (error) { readOk = false; unreadOf.clear(); break; }
+      for (const r of (un ?? []) as Array<{ recipient_account_id: string }>) {
+        unreadOf.set(r.recipient_account_id, (unreadOf.get(r.recipient_account_id) ?? 0) + 1);
+      }
+    }
+    if (readOk) for (const id of who) if (!unreadOf.has(id)) unreadOf.set(id, 0);
+  }
+
   const langs = new Set<Lang>(subs.map((s) => langOf.get(s.account_id) ?? "en"));
-  const bodies = new Map<Lang, string>();
+  const bodies = new Map<Lang, Record<string, unknown>>();
   const tr = (payload.tpl && [...langs].some((l) => l !== "en")) || (payload.group && payload.tag)
     ? await import("@/lib/notification-templates")
     : null;
@@ -184,13 +209,14 @@ export async function sendPushToAccounts(
     const groupTitle = tr && payload.group && payload.tag
       ? tr.fillTemplate(`${payload.group.tpl.k}.s`, lang, payload.group.tpl.p ?? {})
       : null;
-    bodies.set(lang, JSON.stringify({
+    bodies.set(lang, {
       title: r ? tr!.partsText(r.subject) : payload.title,
       body: r?.body ? tr!.partsText(r.body) : payload.body ?? "",
       url: payload.url ?? "/",
       tag: payload.tag,
+      kind: payload.kind,
       ...(groupTitle ? { group: { title: groupTitle } } : {}),
-    }));
+    });
   }
 
   const deadIds: string[] = [];
@@ -205,7 +231,10 @@ export async function sendPushToAccounts(
         await Promise.race([
           webpush.sendNotification(
             { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            bodies.get(langOf.get(s.account_id) ?? "en")!,
+            JSON.stringify({
+              ...bodies.get(langOf.get(s.account_id) ?? "en")!,
+              ...(unreadOf.has(s.account_id) ? { unread: unreadOf.get(s.account_id) } : {}),
+            }),
             { TTL: 60 * 60 * 24, urgency: "high", timeout: 8000 },
           ),
           new Promise((_, reject) =>
