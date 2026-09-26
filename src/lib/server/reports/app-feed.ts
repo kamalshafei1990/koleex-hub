@@ -115,7 +115,10 @@ const todos: Loader = async (c) => {
   const real = (r: TodoRow) => !(r.recurrence && !r.recurrence_parent_id) && !!(r.title ?? "").trim();
   return [
     ...rows<TodoRow>(done, "todos done").filter(real).map((r) => ({ source: "todos" as const, id: r.id, state: "done" as const, at: r.completed_at!, title: r.title!.trim() })),
-    ...rows<TodoRow>(open, "todos open").filter(real).map((r) => ({ source: "todos" as const, id: r.id, state: "open" as const, at: r.due_date!, title: r.title!.trim() })),
+    /* A to-do's due date is a DAY stored as midnight UTC (timestamptz): read
+       as a day — as a moment it showed "08:00" in Shanghai, and a day early
+       west of Greenwich. */
+    ...rows<TodoRow>(open, "todos open").filter(real).map((r) => ({ source: "todos" as const, id: r.id, state: "open" as const, at: r.due_date!.slice(0, 10), title: r.title!.trim() })),
   ];
 };
 

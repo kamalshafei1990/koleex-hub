@@ -148,7 +148,7 @@ import { dayLanes } from "../src/lib/calendar-utils";
 import {
   EVENT_TEMPLATE, eventDue, prefillSections, requestIdOf, requestIsOwed, requestNudges, requestState, requestSubject, type RequestFacts, type RequestRow,
 } from "../src/lib/reports/events";
-import { AI_LIMITS, AI_WRITE_SECTIONS, canWrite, checkAiRequest, toSection, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
+import { AI_LIMITS, AI_WRITE_SECTIONS, WRITE_APPS_ONLY, canWrite, checkAiRequest, toSection, writeGroups, writeGuide, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
 } from "../src/lib/reports/attachments";
@@ -814,11 +814,28 @@ console.log("\n§11 Koleex AI and dictation");
     for (const id of ids) {
       const sec = tpl?.sections.find((x) => x.id === id);
       if (!sec) bad.push(`${key}.${id}: no such section`);
-      else if (sec.kind !== "text") bad.push(`${key}.${id}: "write" is for text sections`);
+      else if (sec.kind === "list" ? !writeGuide(tpl, id) : sec.kind !== "text") bad.push(`${key}.${id}: "write" is for a text section, or a list told what belongs in it`);
     }
   }
-  expect(bad.length === 0, "Koleex AI writes only real text sections", bad.join("; "));
-  expect(canWrite(reportTemplate("weekly"), "summary") && canWrite(reportTemplate("monthly"), "summary") && !canWrite(reportTemplate("daily"), "done") && !canWrite(reportTemplate("free"), "body"), "it writes the weekly and monthly summaries — everything else it only tidies");
+  expect(bad.length === 0, "Koleex AI writes only real text sections — or lists, each with its own guide", bad.join("; "));
+  const D = reportTemplate("daily"), WP = reportTemplate("weekly_plan");
+  expect(canWrite(reportTemplate("weekly"), "summary") && canWrite(reportTemplate("monthly"), "summary")
+    && ["meetings", "done", "pending", "tomorrow"].every((x) => canWrite(D, x)) && ["goals", "meetings", "deadlines"].every((x) => canWrite(WP, x))
+    && !canWrite(D, "blockers") && !canWrite(WP, "support") && !canWrite(reportTemplate("free"), "body"),
+    "it writes the weekly and monthly summaries and (27/09, owner) the daily's and the weekly plan's lists — never the problems or the help needed: only the writer knows those");
+  /* Each list from its own suggestions: "done" never reads a plan as done. */
+  const grp = (from: string, section: string, to: string[], app = false) => ({ from, section, to, app, sources: [], items: [{ text: `${from}.${section}`, paragraph: false, date: null }] });
+  const pool = [grp("daily", "tomorrow", ["done", "pending"]), grp("daily", "pending", ["done", "pending"]), grp("apps", "done", ["done"], true), grp("apps", "open", ["pending"], true), grp("apps", "tomorrow", ["tomorrow"], true), grp("apps", "meetings", ["meetings"], true)];
+  eq(writeGroups(D!, "done", pool).map((g) => g.items[0].text), ["apps.done"], "the daily's \"done\" is written from the apps' records only — yesterday's plan is not proof it was done");
+  eq(writeGroups(D!, "pending", pool).map((g) => g.items[0].text), ["daily.tomorrow", "daily.pending", "apps.open"], "\"pending\" reads what may still be open — earlier plans and open tasks");
+  eq(writeGroups(reportTemplate("weekly")!, "summary", pool).length, pool.length, "a summary (a text section) reads every list, as before");
+  expect(WRITE_APPS_ONLY.includes("daily.done") && writeGuide({ ...D!, key: "c-copyofdaily", custom: true, base: "daily" }, "done") === writeGuide(D, "done"),
+    "a builder copy of the daily writes its lists by the daily's guides");
+  /* A day is never guessed: a task's tag carries it, and the material keeps the tag. */
+  const enFmt: FeedFormatter = { t: (k) => reportsT[k]?.en ?? k, time: (iso) => iso.slice(11, 16), day: (ymd) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`, tzOffsetMin: 0 };
+  eq(formatAppRecord({ id: "t1", source: "todos", state: "open", at: "2026-10-15", title: "Send samples" }, enFmt).tag, "To-do · 15/10", "an open to-do's tag carries its due day");
+  eq(writeMaterial([{ heading: "Due this week", group: { from: "apps", section: "due", to: ["deadlines"], app: true, sources: [], items: [{ text: "Send samples", paragraph: false, date: null, tag: "To-do · 15/10" }] } }], []),
+    "## Due this week\n- Send samples (To-do · 15/10)", "…and Koleex AI reads that day with it");
 
   /* The language the author writes in, not the screen's. */
   eq(writingLang(["اليوم خلصنا عرض السعر وبعتناه للعميل"], "en"), "ar", "Arabic writing → an Arabic answer, even on an English screen");
@@ -844,7 +861,7 @@ console.log("\n§11 Koleex AI and dictation");
   /* Refused before any model is asked. */
   eq(checkAiRequest(reportTemplate("weekly"), { action: "write", section: "summary", lang: "en", material: "## x\n- y" }), null, "a weekly summary with material goes");
   eq(checkAiRequest(reportTemplate("weekly"), { action: "write", section: "summary", lang: "en", material: "   " }), "no_material", "nothing to write from → refused");
-  eq(checkAiRequest(reportTemplate("daily"), { action: "write", section: "done", lang: "en", material: "x" }), "not_writable", "\"write\" on a section it does not serve → refused");
+  eq(checkAiRequest(reportTemplate("daily"), { action: "write", section: "blockers", lang: "en", material: "x" }), "not_writable", "\"write\" on a section it does not serve → refused");
   eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "ar", text: "النت فصل ساعتين والعميل ما ردش" }), null, "tidying a written section goes");
   eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "blockers", lang: "ar", text: "ok" }), "too_short", "tidying almost nothing → refused");
   eq(checkAiRequest(reportTemplate("daily"), { action: "tidy", section: "nope", lang: "en", text: "x".repeat(40) }), "bad_section", "an unknown section → refused");
@@ -862,9 +879,20 @@ console.log("\n§11 Koleex AI and dictation");
   rule("every prompt carries the provenance rule (Koleex AI, never the model or its maker)", AI,
     (c) => (/const SYSTEM =[\s\S]*?AI_PROVENANCE_RULE;/.test(c) && /\{ role: "system", content: SYSTEM \}/.test(c) ? [] : ["the system prompt lacks AI_PROVENANCE_RULE"]),
     (src) => src.replace('  " If the material is thin, say less; never pad." +\n  AI_PROVENANCE_RULE;', '  " If the material is thin, say less; never pad.";'));
-  rule("other people's words go in fenced — data, never instructions", AI,
-    (c) => ((c.match(/fenceUntrusted\(/g) ?? []).length >= 2 ? [] : ["material or text is not fenced"]),
+  rule("other people's words go in fenced — data, never instructions (the list's and the summary's material, the text to tidy)", AI,
+    (c) => ((c.match(/fenceUntrusted\(ask\.material \?\? "", "document"/g) ?? []).length === 2 && c.includes('fenceUntrusted(ask.text ?? "", "document"') ? [] : ["material or text is not fenced"]),
     (src) => src.replace('fenceUntrusted(ask.material ?? "", "document", "The employee\'s report material: their earlier reports and their records in Koleex Hub", fence)', "(ask.material ?? \"\")"));
+  rule("a list is told what belongs in it, and \"nothing does\" comes back as no_facts — never pasted as an item", AI,
+    (c) => (c.includes('const guide = ask.action === "write" && kind === "list" ? writeGuide(tpl, ask.section) : null;') && c.includes('if (guide && /^none\\.?$/i.test(answer)) {')
+      && c.includes('return NextResponse.json({ error: "no_facts" }, { status: 400 });') ? [] : ["a list gets the summary's instruction, or \"NONE\" becomes an item"]),
+    (src) => src.replace('if (guide && /^none\\.?$/i.test(answer)) {', "if (false) {"));
+  rule("a list never gets a day the material does not give (27/09: the weekly plan's deadlines came back with made-up weekdays)", AI,
+    (c) => (c.includes('" Never add a day, date or time the material does not give; write a day exactly as the material writes it (e.g. 15/01), never as a weekday name." +')
+      && c.includes("never copy the brackets or the app's name.") ? [] : ["the model is free to date a deadline itself, or pastes the source tag"]),
+    (src) => src.replace('      " Never add a day, date or time the material does not give; write a day exactly as the material writes it (e.g. 15/01), never as a weekday name." +\n', ""));
+  rule("the page sends a list only its own suggestions — and says \"nothing fits here\" without asking", "src/components/reports/app/ReportView.tsx",
+    (c) => (c.includes("const groups = writeGroups(tpl, sid, [...carry.groups, ...feedGroups]);") && c.includes('if (kindOf(sid) === "list" && !groups.some((g) => g.items.length)) { ai.fail(sid, t("ai.noFacts")); return; }') ? [] : ["a list is written from every suggestion on the page"]),
+    (src) => src.replace("const groups = writeGroups(tpl, sid, [...carry.groups, ...feedGroups]);", "const groups = [...carry.groups, ...feedGroups];"));
   rule("nothing of the model or its provider reaches the browser", AI,
     (c) => (/servedBy|out\.model|bodyText|getLastAiError/.test(c) ? ["the route touches provider details"] : []),
     (src) => src.replace('return NextResponse.json({ text }, {', 'return NextResponse.json({ text, by: out.servedBy }, {'));

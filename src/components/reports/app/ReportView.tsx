@@ -44,7 +44,7 @@ import {
 } from "@/lib/reports/templates";
 import { carryRulesFor, type CarryGroup } from "@/lib/reports/carry";
 import { appRulesFor, buildFeedGroups, type AppRecord } from "@/lib/reports/app-feed";
-import { serverMaterial, toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
+import { serverMaterial, toSection, writeGroups, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
 import {
   commentOnReport, decideReport, deleteDraft, dmyDate, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
   type ReportDetail, type ReportRecipient,
@@ -344,8 +344,12 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
        sends none of it back. */
     if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }
     const heading = (g: CarryGroup) => (g.app ? t(`feed.g.${g.section}`) : `${t(`tpl.${g.from}.s.${g.section}`)} (${tplName(t, g.from)})`);
+    /* A list (the daily's, the weekly plan's) is written from its own
+       suggestions only; with none, it says so without asking. */
+    const groups = writeGroups(tpl, sid, [...carry.groups, ...feedGroups]);
+    if (kindOf(sid) === "list" && !groups.some((g) => g.items.length)) { ai.fail(sid, t("ai.noFacts")); return; }
     const material = writeMaterial(
-      [...carry.groups, ...feedGroups].map((g) => ({ heading: heading(g), group: g })),
+      groups.map((g) => ({ heading: heading(g), group: g })),
       tpl.sections.filter((x) => x.id !== sid && !isBlock(x.kind)).map((x) => ({ name: sectionName(x.id), text: d.texts[x.id] ?? "" })),
     );
     const own = [...Object.values(d.texts), ...carry.groups.flatMap((g) => g.items.map((i) => i.text))];

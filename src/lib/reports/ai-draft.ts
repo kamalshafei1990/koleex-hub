@@ -8,7 +8,8 @@
      · write  — the summary of a weekly or monthly report, from the material
                 the composer already holds (the carry-over from the author's
                 earlier reports, their own work in the apps, and what the
-                report already says).
+                report already says). 27/09/2026: also the daily report's and
+                the weekly plan's lists, each from ITS OWN suggestions only.
      · tidy   — any section the author has written (often dictated): the same
                 facts, said clearly, in the same language; nothing added.
 
@@ -28,12 +29,53 @@ export type WritingLang = "en" | "zh" | "ar";
 export const AI_WRITE_SECTIONS: Record<string, string[]> = {
   weekly: ["summary"],
   monthly: ["summary"],
+  /* 27/09/2026 (owner: «أيوه خلي اكتبهولي يشتغل في اليومي وخطة الأسبوع»):
+     their lists, each from its own suggestions (writeGroups) with its own
+     guide (WRITE_GUIDE). Never the problems or the help needed — only the
+     writer knows those. */
+  daily: ["meetings", "done", "pending", "tomorrow"],
+  weekly_plan: ["goals", "meetings", "deadlines"],
   /* 5A: from what the team sent in the report's days — read by the server. */
   team_summary: ["summary"],
   /* 5D: from what the whole company sent — read by the server. */
   exec_weekly: ["summary"],
   exec_monthly_review: ["summary"],
 };
+
+/** What "write" is told a LIST section holds — the facts that belong in it,
+ *  and nothing else (by the built-in's key and the section's id). */
+export const WRITE_GUIDE: Record<string, string> = {
+  "daily.meetings": "the meetings held that day, from the calendar and the customer activities: with whom, and about what, as the records say.",
+  "daily.done": "the work FINISHED that day: only what the records show as done or issued (finished tasks, quotations, invoices, orders, customer activities).",
+  "daily.pending": "what is still open: open tasks, and earlier plans or pending items that no record shows finished and that this report does not already list as done.",
+  "daily.tomorrow": "what comes next: tomorrow's meetings, and the open tasks due next — a time or a day only where the material gives one.",
+  "weekly_plan.goals": "this week's goals: what last week's report planned for this week, and the tasks and plans due this week. Write them as goals: merge related tasks into one goal; do not copy every task.",
+  "weekly_plan.meetings": "the meetings planned this week, each with its day where the material gives one.",
+  "weekly_plan.deadlines": "this week's deadlines: the tasks and plans due this week, each with its day where the material gives one.",
+};
+
+/** A list section written from the APPS' records only: an earlier plan
+ *  ("tomorrow", "pending") is not proof the work was done. */
+export const WRITE_APPS_ONLY: readonly string[] = ["daily.done"];
+
+/** The most items "write" puts in a list. */
+export const WRITE_LIST_MAX = 10;
+
+/** A list section's guide (a builder copy follows its built-in). */
+export function writeGuide(tpl: ReportTemplateDef | null | undefined, sectionId: string): string | null {
+  if (!tpl) return null;
+  return WRITE_GUIDE[`${tpl.key}.${sectionId}`] ?? WRITE_GUIDE[`${behaviourKey(tpl)}.${sectionId}`] ?? null;
+}
+
+/** The suggestion lists a section is written from. A text section (a
+ *  summary) reads them all; a list section only those that may go in it —
+ *  and the daily's "done" only the apps' records. */
+export function writeGroups<G extends { to: string[]; app?: boolean }>(tpl: ReportTemplateDef, sectionId: string, groups: G[]): G[] {
+  const kind = tpl.sections.find((s) => s.id === sectionId)?.kind;
+  if (kind !== "list") return groups;
+  const appsOnly = WRITE_APPS_ONLY.includes(`${behaviourKey(tpl)}.${sectionId}`);
+  return groups.filter((g) => g.to.includes(sectionId) && (!appsOnly || !!g.app));
+}
 
 /** 5D: the types written from what the whole COMPANY sent (the executive
  *  summary and the monthly review — «Management Reports»). */
@@ -96,7 +138,9 @@ export function writeMaterial(
   const parts: string[] = [];
   for (const { heading, group } of groups) {
     if (!group.items.length) continue;
-    parts.push(`## ${heading}\n${group.items.map((i) => (i.paragraph ? i.text : `- ${i.text}`)).join("\n")}`);
+    /* An app suggestion keeps its tag ("To-do · 15/01") — the only place
+       its day is written, so the model never has to guess one. */
+    parts.push(`## ${heading}\n${group.items.map((i) => (i.paragraph ? i.text : `- ${i.text}${i.tag ? ` (${i.tag})` : ""}`)).join("\n")}`);
   }
   const written = sections.filter((s) => s.text.trim());
   if (written.length) parts.push(`## Already in this report\n${written.map((s) => `### ${s.name}\n${s.text.trim()}`).join("\n")}`);

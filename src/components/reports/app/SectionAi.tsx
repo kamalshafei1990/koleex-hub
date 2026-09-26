@@ -39,11 +39,13 @@ export function useSectionAi(reportId: string, t: T) {
     const res = await askReportAi(reportId, req);
     if (res.ok && res.data.text.trim()) setSlots((m) => ({ ...m, [req.section]: { action: req.action, text: res.data.text } }));
     else {
-      const error = !res.ok && res.status === 429 ? t("ai.busy") : !res.ok && res.error === "no_material" ? t("ai.noMaterial") : !res.ok && res.error === "too_short" ? t("ai.tooShort") : t("ai.failed");
+      const error = !res.ok && res.status === 429 ? t("ai.busy") : !res.ok && res.error === "no_material" ? t("ai.noMaterial")
+        : !res.ok && res.error === "no_facts" ? t("ai.noFacts") : !res.ok && res.error === "too_short" ? t("ai.tooShort") : t("ai.failed");
       setSlots((m) => ({ ...m, [req.section]: { error } }));
     }
   }, [reportId, t]);
-  return { slots, run, clear: (sid: string) => set(sid, null) };
+  /* `fail`: said without asking (a list with nothing of its own to write from). */
+  return { slots, run, fail: (sid: string, error: string) => set(sid, { error }), clear: (sid: string) => set(sid, null) };
 }
 
 const AI_BTN =

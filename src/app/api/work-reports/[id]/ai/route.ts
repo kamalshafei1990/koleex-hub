@@ -5,7 +5,9 @@ import "server-only";
    (Phase 2D). Body: AiDraftRequest (src/lib/reports/ai-draft.ts).
      write  the weekly / monthly summary, from the material the composer
             already shows the author (their earlier reports, their own work
-            in the apps, what the report says)
+            in the apps, what the report says) — and (27/09/2026) the daily's
+            and the weekly plan's lists, each told what belongs in it
+            (WRITE_GUIDE); "NONE" from the model = nothing belongs → no_facts
      tidy   the author's own words, said clearly, in their language
    Answers { text } — a PROPOSAL. Nothing is written anywhere: the composer
    shows it and the author chooses (fill, never save).
@@ -32,7 +34,7 @@ import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_LIMITS, checkAiRequest, companyMaterial, serverMaterial, toSection, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
+import { AI_LIMITS, WRITE_LIST_MAX, checkAiRequest, companyMaterial, serverMaterial, toSection, writeGuide, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
 import { rangeLabel, teamFactsText, teamRange } from "@/lib/reports/team";
 import { EXEC_SYSTEM, TEAM_SYSTEM, execInstruction, loadTeamMaterial, teamInstruction } from "@/lib/server/reports/team";
 import { MGMT_MODULE } from "@/lib/reports/report-data";
@@ -126,7 +128,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     : "Answer as plain paragraphs.";
   let instruction: string;
   let maxTokens: number;
-  if (ask.action === "write") {
+  /* A list the daily or the weekly plan holds: told what belongs in it. */
+  const guide = ask.action === "write" && kind === "list" ? writeGuide(tpl, ask.section) : null;
+  if (guide) {
+    instruction =
+      `Write the "${section}" section of the employee's ${type}${period ? `, covering ${period}` : ""}: ${guide}` +
+      ` Language: ${LANG_NAME[ask.lang]}. At most ${WRITE_LIST_MAX} items.` +
+      " Each item is one short line in the employee's own voice, as they would write it to their manager; items that are the same thing become one." +
+      " What the report's other sections already say is context: do not repeat their items here." +
+      " Never add a day, date or time the material does not give; write a day exactly as the material writes it (e.g. 15/01), never as a weekday name." +
+      " The brackets after an item say where it came from and when: use that day or time where the item needs one, but never copy the brackets or the app's name." +
+      " Leave out anything that does not clearly belong in this section. If nothing does, answer with exactly: NONE" +
+      ` ${shape} Answer with the section text only.` +
+      fenceUntrusted(ask.material ?? "", "document", "The employee's report material: their earlier reports and their records in Koleex Hub", fence);
+    maxTokens = 600;
+  } else if (ask.action === "write") {
     const length = behaviourKey(tpl) === "monthly" ? "6 to 12 sentences (at most about 300 words)" : "4 to 8 sentences (at most about 180 words)";
     instruction =
       `Write the "${section}" section of the employee's ${type}${period ? `, covering ${period}` : ""}.` +
@@ -173,6 +189,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!out.ok || !answer || cut) {
     console.error(`[reports.ai] action=${ask.action} section=${ask.section} outcome=${!out.ok ? `status_${out.status}` : cut ? "length" : "empty"} ms=${ms}`);
     return NextResponse.json({ error: "failed" }, { status: 502 });
+  }
+  /* Nothing in the material belongs in this list — said, not pasted. */
+  if (guide && /^none\.?$/i.test(answer)) {
+    console.warn(`[reports.ai] action=write section=${ask.section} outcome=none ms=${ms}`);
+    return NextResponse.json({ error: "no_facts" }, { status: 400 });
   }
   const text = toSection(answer, kind);
   console.warn(`[reports.ai] action=${ask.action} section=${ask.section} lang=${ask.lang} in=${(ask.material ?? ask.text ?? "").length} out=${text.length} ms=${ms}`);

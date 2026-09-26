@@ -72,6 +72,7 @@ export const reportPageT: Translations = {
   "ai.addBelow":   { en: "Add below", zh: "添加到下方", ar: "ضيفه تحت" },
   "ai.discard":    { en: "Discard", zh: "放弃", ar: "سيبه" },
   "ai.noMaterial": { en: "Nothing to write from yet. Write your dailies first, or add items above.", zh: "还没有可用的素材。请先写日报，或添加上面的内容。", ar: "لسه مفيش حاجة يكتب منها. اكتب يومياتك الأول، أو ضيف بنود من فوق." },
+  "ai.noFacts":    { en: "Nothing from your work in the Hub or your earlier reports fits here yet.", zh: "你在系统中的工作和之前的报告里，暂时没有适合这里的内容。", ar: "لسه مفيش حاجة من شغلك على الهب أو تقاريرك اللي فاتت تنفع هنا." },
   "ai.tooShort":   { en: "Write a little first, then tidy it up.", zh: "请先写一些内容，再进行润色。", ar: "اكتب شوية الأول، وبعدين رتّبه." },
   "ai.failed":     { en: "Koleex AI could not write this just now. Try again.", zh: "Koleex AI 暂时无法撰写，请重试。", ar: "Koleex AI ما قدرش يكتبه دلوقتي. جرب تاني." },
   "ai.busy":       { en: "Koleex AI has written a lot this hour. Try again in a little while.", zh: "Koleex AI 本小时已撰写很多内容，请稍后再试。", ar: "Koleex AI كتب كتير الساعة دي. جرب كمان شوية." },

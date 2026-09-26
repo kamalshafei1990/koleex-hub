@@ -172,10 +172,12 @@ export function formatAppRecord(r: AppRecord, f: FeedFormatter): { text: string;
       const text = who ? fill("feed.fmt.crm", { kind, who, title: r.title }) : `${kind}: ${r.title}`;
       return { text: text.replace(/:\s*$/, ""), tag: `${f.t("feed.src.crm")} · ${when}` };
     }
+    /* A task's tag carries its day (due, or finished) like a meeting's —
+       the card shows it, and Koleex AI reads it instead of guessing one. */
     case "tasks":
-      return { text: who ? `${who}: ${r.title}` : r.title, tag: f.t("feed.src.tasks") };
+      return { text: who ? `${who}: ${r.title}` : r.title, tag: `${f.t("feed.src.tasks")} · ${when}` };
     case "todos":
-      return { text: r.title, tag: f.t("feed.src.todos") };
+      return { text: r.title, tag: `${f.t("feed.src.todos")} · ${when}` };
     case "planning":
       return { text: r.title, tag: `${f.t("feed.src.planning")} · ${when}` };
     case "quotations":
