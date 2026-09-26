@@ -194,8 +194,11 @@ console.log("\n── 7. Speed ──");
       /const headerBudget = Math\.min\(\s*timeoutMs\(process\.env\.AI_HTTP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS\),\s*timeoutMs\(process\.env\.AI_HTTP_HEADER_TIMEOUT_MS, DEFAULT_STREAM_HEADER_MS\),\s*\);/.test(transport));
   const route = read("src/app/api/ai/agent/route.ts");
   check("the rate-limit round trip runs beside the ownership read, and a refused turn still returns before any write",
-    /const \[refused, \{ data: conv \}, storedLang\] = await Promise\.all\(\[\s*budgetGate\(\),/.test(route) &&
-      route.indexOf("if (refused) return refused;") > 0 && route.indexOf("if (refused) return refused;") < route.indexOf('.from("ai_messages")'));
+    /const \[refused, \{ data: found \}, storedLang\] = await Promise\.all\(\[\s*budgetGate\(\),/.test(route) &&
+      route.indexOf("if (refused) return refused;") > 0 && route.indexOf("if (refused) return refused;") < route.indexOf('.from("ai_messages")') &&
+      /* …and before a first turn makes its chat (2026-09-26): a refused
+         turn writes nothing at all. */
+      route.indexOf("if (refused) return refused;") < route.indexOf("insertConversation(auth"));
 }
 
 console.log("\n── 8. Design, part 1: a quieter screen ──");

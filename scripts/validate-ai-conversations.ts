@@ -171,20 +171,35 @@ console.log("\n── 4. The route and the client, read ──");
    start a new chat" six times while six rows were made) ── */
 {
   const route = readFileSync("src/app/api/ai/conversations/route.ts", "utf8");
+  const helper = readFileSync("src/lib/server/ai/new-conversation.ts", "utf8");
+  const agent = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
   console.log("\n── A new chat survives a lost answer ──");
-  check("the route takes the client's id only when it is a UUID, and inserts with it",
-    /const UUID_RE = \/\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$\/i;/.test(route) &&
-    /const clientId = typeof body\.id === "string" && UUID_RE\.test\(body\.id\) \? body\.id\.toLowerCase\(\) : null;/.test(route) &&
-    /\.\.\.\(clientId \? \{ id: clientId \} : \{\}\),\s*tenant_id: auth\.tenant_id,\s*account_id: auth\.account_id,/.test(route));
+  check("a client's id is taken only when it is a UUID, and the row is inserted with it",
+    /export const CONVERSATION_ID_RE = \/\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$\/i;/.test(helper) &&
+    /return typeof value === "string" && CONVERSATION_ID_RE\.test\(value\) \? value\.toLowerCase\(\) : null;/.test(helper) &&
+    /\.\.\.\(opts\.id \? \{ id: opts\.id \} : \{\}\),\s*tenant_id: auth\.tenant_id,\s*account_id: auth\.account_id,/.test(helper) &&
+    /id: clientConversationId\(body\.id\),/.test(route));
   check("the same id again hands back the caller's own row, and only theirs — anyone else's id is a 409",
-    /if \(clientId && error\.code === "23505"\) \{[\s\S]{0,200}\.eq\("id", clientId\)\s*\.eq\("tenant_id", auth\.tenant_id\)\s*\.eq\("account_id", auth\.account_id\)\s*\.maybeSingle\(\);\s*if \(mine\) return NextResponse\.json\(\{ conversation: mine \}\);\s*return NextResponse\.json\(\{ error: "conflict" \}, \{ status: 409 \}\);/.test(route));
+    /if \(opts\.id && error\?\.code === "23505"\) \{[\s\S]{0,200}\.eq\("id", opts\.id\)\s*\.eq\("tenant_id", auth\.tenant_id\)\s*\.eq\("account_id", auth\.account_id\)\s*\.maybeSingle\(\);\s*if \(mine\) return \{ ok: true, row: mine \};\s*return \{ ok: false, conflict: true \};/.test(helper) &&
+    /if \(made\.conflict\) return NextResponse\.json\(\{ error: "conflict" \}, \{ status: 409 \}\);/.test(route));
   check("the app names the row before the first ask and asks up to three times with the same body; without an id, once",
     /const CREATE_CHAT_TRIES = 3;/.test(app) &&
-    /const id = typeof crypto !== "undefined" && typeof crypto\.randomUUID === "function" \? crypto\.randomUUID\(\) : null;/.test(app) &&
+    /return typeof crypto !== "undefined" && typeof crypto\.randomUUID === "function" \? crypto\.randomUUID\(\) : null;/.test(app) &&
+    /const id = opts\.id \?\? newConversationId\(\);/.test(app) &&
     /const tries = id \? CREATE_CHAT_TRIES : 1;/.test(app) &&
     /for \(let attempt = 1; attempt <= tries && !conversation; attempt\+\+\)/.test(app) &&
     /body: payload,/.test(app));
+  check("a new chat's first message makes its chat: the app names it, lists it at once and sends no separate create",
+    /const named = conversationId \? null : newConversationId\(\);\s*if \(named\) \{\s*pendingNewChatsRef\.current\.add\(named\);/.test(app) &&
+    /setConversations\(\(prev\) => \[row, \.\.\.prev\.filter\(\(c\) => c\.id !== named\)\]\);\s*setActiveId\(named\);\s*conversationId = named;\s*turnConversationId = named;/.test(app) &&
+    /\.\.\.\(pendingNewChatsRef\.current\.has\(conversationId!\)\s*\? \{ newConversation: true,/.test(app) &&
+    /pendingNewChatsRef\.current\.delete\(turnConversationId \?\? ""\);/.test(app));
+  check("…a call in a chat not yet confirmed asks for it by the same id first",
+    /if \(open && pendingNewChatsRef\.current\.has\(open\)\) return createConversation\(\{ id: open \}\);/.test(app));
+  check("…and the server makes it only when asked, with a UUID, by the shared rules — anything else not found is still a 404",
+    /if \(!conv && body\.newConversation === true\) \{\s*const newId = clientConversationId\(conversationId\);\s*if \(newId\) \{\s*const made = await insertConversation\(auth, \{ id: newId, projectId: body\.project_id \}\);/.test(agent) &&
+    /if \(!conv\) \{\s*return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);/.test(agent));
   check("a refusal (4xx) is final; a lost answer, an unreadable one or a 5xx is asked again",
     /if \(!res\.ok\) \{\s*why = `status:\$\{res\.status\}`;\s*if \(res\.status < 500\) break;\s*continue;\s*\}/.test(app));
   check("every way it fails is counted by how, and the row is listed once",

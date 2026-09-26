@@ -144,6 +144,11 @@ const SIDEBAR_W = 248;
  *  not be made, and the wait before the second ask (doubled for the third). */
 const CREATE_CHAT_TRIES = 3;
 const CREATE_CHAT_BACKOFF_MS = 1200;
+/** A new chat's id, chosen here so asking twice makes one chat; null where
+ *  the browser cannot make one (the old two-step path is used then). */
+function newConversationId(): string | null {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : null;
+}
 /** The shortest gap between two re-reads of the sidebar list on return. */
 const LIST_REFRESH_MIN_MS = 60_000;
 
@@ -909,7 +914,10 @@ export default function KoleexAiApp() {
      call that begins on an empty screen needs it too, the moment its first
      settled turn wants somewhere to go. The restore-race note inside applies
      to both callers equally, which is why this is one function and not two. */
-  const createConversation = useCallback(async (opts: { activate?: boolean } = {}): Promise<string | null> => {
+  /* Chats this app named whose first reply has not come back: the server
+     may not have them yet, so a turn or a call in one says "make it". */
+  const pendingNewChatsRef = useRef<Set<string>>(new Set());
+  const createConversation = useCallback(async (opts: { activate?: boolean; id?: string } = {}): Promise<string | null> => {
     /* EVERY FAILURE LEAVES BY THE `null` DOOR (owner, 2026-09-18: "fix any
        issue in this app"). This returned null for a refusal and THREW for a
        dropped link — and the one caller that matters, send(), awaits it at a
@@ -933,7 +941,7 @@ export default function KoleexAiApp() {
        idempotent on it). A server's refusal (4xx) is final; a lost answer,
        an unreadable one or a 5xx is asked again. Each failure is counted,
        by how, so the next report says why without a screenshot. */
-    const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : null;
+    const id = opts.id ?? newConversationId();
     const payload = JSON.stringify({ ...(activeProjectId ? { project_id: activeProjectId } : {}), ...(id ? { id } : {}) });
     let conversation: ConversationRow | undefined;
     let why = "";
@@ -976,6 +984,7 @@ export default function KoleexAiApp() {
       return null;   /* the caller says so and unlocks */
     }
     const made = conversation;
+    pendingNewChatsRef.current.delete(made.id);
     /* A retry after a lost answer returns the row the first ask made: it is
        listed once. */
     setConversations((prev) => [made, ...prev.filter((c) => c.id !== made.id)]);
@@ -988,10 +997,13 @@ export default function KoleexAiApp() {
   /* A call writes into the OPEN conversation, or makes one. Read through the
      ref: the persister calls this from a network callback long after the
      render that created it. */
-  const ensureVoiceConversation = useCallback(
-    () => (activeIdRef.current ? Promise.resolve(activeIdRef.current) : createConversation()),
-    [createConversation],
-  );
+  const ensureVoiceConversation = useCallback(() => {
+    const open = activeIdRef.current;
+    /* A chat the app named whose first message has not come back yet may not
+       exist: asked for by the same id, it is made or found. */
+    if (open && pendingNewChatsRef.current.has(open)) return createConversation({ id: open });
+    return open ? Promise.resolve(open) : createConversation();
+  }, [createConversation]);
 
   /* THE ROWS THE SERVER WROTE FOR A CALL, appended to the thread as they land
      — so when the call screen closes, the exchange is already there, the way
@@ -1119,6 +1131,27 @@ export default function KoleexAiApp() {
          Stop did nothing while a 60 MB file was going up (audit, 2026-09-07). */
       const aborter = new AbortController();
       abortRef.current = aborter;
+      /* THE FIRST MESSAGE MAKES ITS CHAT (owner, 2026-09-26, from the phone
+         in the mainland: "it answered but it takes too long"). A separate
+         "make a chat" request came first, and on that link its answer was
+         lost twice — ten seconds each — before the question could leave. The
+         app now names the chat and the question carries the name; the server
+         makes the row with the turn (same rules, the caller's own, a second
+         ask finds the first). The row shows in the list at once. Without
+         randomUUID the old two-step path stays. */
+      const named = conversationId ? null : newConversationId();
+      if (named) {
+        pendingNewChatsRef.current.add(named);
+        const at = new Date().toISOString();
+        const row: ConversationRow = {
+          id: named, title: "New chat", last_preview: null, message_count: 0,
+          created_at: at, updated_at: at, pinned: false, project_id: activeProjectId ?? null,
+        };
+        setConversations((prev) => [row, ...prev.filter((c) => c.id !== named)]);
+        setActiveId(named);
+        conversationId = named;
+        turnConversationId = named;
+      }
       if (!conversationId) {
         const created = await createConversation({ activate: false });
         /* THE USER MOVED ON WHILE THE CHAT WAS BEING MADE (deep check,
@@ -1371,6 +1404,11 @@ export default function KoleexAiApp() {
                or switched-off model is Auto — and answers with the model
                that actually served. */
             model: modelChoice,
+            /* A chat this app named and the server has not confirmed: the
+               turn makes it (in the folder the screen stands in). */
+            ...(pendingNewChatsRef.current.has(conversationId!)
+              ? { newConversation: true, ...(activeProjectId ? { project_id: activeProjectId } : {}) }
+              : {}),
           }),
           signal: aborter.signal,
         });
@@ -1613,6 +1651,8 @@ export default function KoleexAiApp() {
            final steps (id/created_at now come from Supabase, not the
            temporary placeholder). */
         if (finalMessage) {
+          /* The reply is saved, so the chat is: no longer pending. */
+          pendingNewChatsRef.current.delete(turnConversationId ?? "");
           if (thinkMs === undefined && (lookupsSeen > 0 || thinkNotes.length > 0)) thinkMs = Date.now() - thinkStartedAt;
           carryTaskCard(placeholderId, finalMessage.id);
           setMessages((prev) => {
@@ -1706,7 +1746,7 @@ export default function KoleexAiApp() {
         setTurnsDone((n) => n + 1);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation, carryTaskCard],
+    [input, activeId, activeProjectId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation, carryTaskCard],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */

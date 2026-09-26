@@ -27,6 +27,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { clientConversationId, insertConversation } from "@/lib/server/ai/new-conversation";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
@@ -220,6 +221,11 @@ export async function POST(req: Request) {
     /** The Koleex AI model the user picked (lib/ai/koleex-models). A REQUEST:
      *  resolveRequestedModel() decides what is honoured. */
     model?: unknown;
+    /** The app named this chat and it may not exist yet: make it (the
+     *  caller's own) instead of answering 404. */
+    newConversation?: boolean;
+    /** The folder a new chat starts in — verified as the caller's. */
+    project_id?: unknown;
   };
 
   const content = body.content?.trim();
@@ -292,7 +298,7 @@ export async function POST(req: Request) {
      should be side-effect-free. The reply-language READ beside it needs
      nothing from it and used to wait a full round trip for it (audit,
      2026-09-07); a read on a 404 costs nothing. */
-  const [refused, { data: conv }, storedLang] = await Promise.all([
+  const [refused, { data: found }, storedLang] = await Promise.all([
     budgetGate(),
     supabaseServer
       .from("ai_conversations")
@@ -305,6 +311,21 @@ export async function POST(req: Request) {
   ]);
   const tConv = Date.now();
   if (refused) return refused;
+  /* THE FIRST MESSAGE MAKES ITS CHAT (owner, 2026-09-26, from the phone in
+     the mainland: the answer to a separate "make a chat" request was lost on
+     the link twice before the question could even leave — twenty seconds).
+     The app names a new chat's id and says so; the row is made here, by the
+     same rules as POST /api/ai/conversations (the caller's own, a UUID, a
+     second ask finds the first). Anything else that is not found is still a
+     side-effect-free 404. */
+  let conv = found;
+  if (!conv && body.newConversation === true) {
+    const newId = clientConversationId(conversationId);
+    if (newId) {
+      const made = await insertConversation(auth, { id: newId, projectId: body.project_id });
+      if (made.ok) conv = { id: made.row.id, title: String(made.row.title ?? "New chat"), message_count: Number(made.row.message_count ?? 0) };
+    }
+  }
   if (!conv) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
