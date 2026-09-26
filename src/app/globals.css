@@ -5126,3 +5126,19 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   border-color: rgba(62, 103, 150, 0.30);
   color: #16324F;
 }
+
+/* ── To-do on a light theme ──
+   The To-do tones (status, priority, due, KPI numbers) are the dark-theme
+   -300/-400 shades; on white they read washed out — "Due today" yellow on a
+   pale yellow chip, the KPI "46" in pale blue. Scoped to .kx-todo (the page,
+   its task window, its sheet and its floating pickers), the same hues one
+   step darker so they pass contrast on a light ground. */
+[data-theme="light"] .kx-todo :is(.text-yellow-400) { color: #a16207; }
+[data-theme="light"] .kx-todo :is(.text-amber-300, .text-amber-400) { color: #b45309; }
+[data-theme="light"] .kx-todo :is(.text-orange-400) { color: #c2410c; }
+[data-theme="light"] .kx-todo :is(.text-red-300, .text-red-400) { color: #dc2626; }
+[data-theme="light"] .kx-todo :is(.text-green-300, .text-green-400) { color: #15803d; }
+[data-theme="light"] .kx-todo :is(.text-emerald-400) { color: #047857; }
+[data-theme="light"] .kx-todo :is(.text-cyan-400) { color: #0e7490; }
+[data-theme="light"] .kx-todo :is(.text-violet-300, .text-violet-400) { color: #6d28d9; }
+[data-theme="light"] .kx-todo :is(.text-\[\#7FA9D6\]) { color: #3a6699; }

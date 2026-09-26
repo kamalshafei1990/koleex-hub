@@ -209,7 +209,7 @@ export default function TaskModal({ entry, initialDue, draft, employees, departm
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-16 md:pt-16 pb-6 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="todo-modal-title"
-        className="kx-app kx-glass-pop kx-pop-in w-full max-w-[880px] rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[92dvh] flex flex-col">
+        className="kx-app kx-todo kx-glass-pop kx-pop-in w-full max-w-[880px] rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[92dvh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <span className="h-8 w-8 rounded-lg bg-[#567FB2]/15 text-[#7FA9D6] inline-flex items-center justify-center"><ListTodoIcon size={16} /></span>
@@ -614,7 +614,7 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
         {value ? (
           <span className="flex items-center gap-2 min-w-0 text-[var(--text-primary)]">
             <LabelIcon name={value} color={selected?.color} size={15} />
-            <span className="truncate"><AutoTranslatedText text={value} plain /></span>
+            <span className="truncate"><AutoTranslatedText dir="auto" text={value} plain /></span>
           </span>
         ) : (
           <>
@@ -649,7 +649,7 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
                     <span className="w-6 h-6 rounded-md shrink-0 inline-flex items-center justify-center" style={{ backgroundColor: `color-mix(in srgb, ${l.color ?? "#94a3b8"} 14%, transparent)` }}>
                       <LabelIcon name={l.name} color={l.color ?? "#94a3b8"} size={13} />
                     </span>
-                    <span className="truncate"><AutoTranslatedText text={l.name} plain /></span>
+                    <span className="truncate"><AutoTranslatedText dir="auto" text={l.name} plain /></span>
                     {on && <CheckCircleIcon size={12} className="ms-auto shrink-0 text-[#7FA9D6]" />}
                   </button>
                 );

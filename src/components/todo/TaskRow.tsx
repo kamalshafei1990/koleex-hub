@@ -134,10 +134,10 @@ function TaskRow({
           <button type="button" onClick={() => onOpen(task.id)} data-kx-keep-hover
             className="w-full text-start rounded-md">
             <span className={`block text-[13px] font-medium leading-snug break-words ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
-              <AutoTranslatedText text={task.title} plain />
+              <AutoTranslatedText dir="auto" text={task.title} plain />
             </span>
             {task.description && (
-              <AutoTranslatedText text={task.description} plain block className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-2 whitespace-pre-line" />
+              <AutoTranslatedText dir="auto" text={task.description} plain block className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-2 whitespace-pre-line" />
             )}
           </button>
 
@@ -167,7 +167,7 @@ function TaskRow({
             )}
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
-                <LabelIcon name={task.label} size={10} className="text-current" /> <AutoTranslatedText text={task.label} plain />
+                <LabelIcon name={task.label} size={10} className="text-current" /> <AutoTranslatedText dir="auto" text={task.label} plain />
               </span>
             )}
             {task.series_cadence && (
@@ -232,7 +232,7 @@ function TaskRow({
               )}
               {nextItem && !task.completed && (
                 <span className="min-w-0 truncate text-[var(--text-dim)]">
-                  <span className="font-semibold text-[var(--text-muted)]">{t("row.next")}</span> <AutoTranslatedText text={nextItem.text} plain />
+                  <span className="font-semibold text-[var(--text-muted)]">{t("row.next")}</span> <AutoTranslatedText dir="auto" text={nextItem.text} plain />
                 </span>
               )}
               <span className="ms-auto inline-flex items-center gap-2 shrink-0 text-[var(--text-dim)]">
@@ -252,7 +252,7 @@ function TaskRow({
             <div className="mt-1.5 rounded-lg border border-red-500/25 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
               <span className="font-bold">{t("approval.returned")}</span>
               {rejection
-                ? <>: <AutoTranslatedText text={rejection} plain /></>
+                ? <>: <AutoTranslatedText dir="auto" text={rejection} plain /></>
                 : <span className="font-normal text-red-300/70"> — {t("approval.noReason")}</span>}
             </div>
           )}

@@ -82,7 +82,7 @@ export default function MyWorkStrip() {
             {data.tasks.map((tk) => (
               <Link key={tk.id} href="/projects" className={row}>
                 <span className="w-1 h-4 rounded-full shrink-0" style={{ background: tk.project?.color ?? "#94a3b8" }} />
-                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1"><AutoTranslatedText text={tk.title} plain /></span>
+                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1"><AutoTranslatedText dir="auto" text={tk.title} plain /></span>
                 {tk.due_date && (
                   <span className={`text-[10px] font-semibold shrink-0 ${isOverdueDate(tk.due_date) ? "text-red-400" : "text-[var(--text-dim)]"}`}>
                     {fmtDay(tk.due_date, lang)}
@@ -103,7 +103,7 @@ export default function MyWorkStrip() {
           <div className="space-y-1">
             {data.planning.map((sh) => (
               <Link key={sh.id} href="/planning" className={row}>
-                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{sh.title ? <AutoTranslatedText text={sh.title} plain /> : sh.type}</span>
+                <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">{sh.title ? <AutoTranslatedText dir="auto" text={sh.title} plain /> : sh.type}</span>
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] shrink-0 tabular-nums">
                   {weekday(sh.start_at)} {fmtDay(isoDay(new Date(sh.start_at)), lang)} · {time(sh.start_at)}–{time(sh.end_at)}
                 </span>

@@ -48,7 +48,7 @@ export default function FloatLayer({ anchor, inset, width, layerRef, children }:
   return createPortal(
     /* zIndex 120: above ScrollLockOverlay's 110, so a picker opened from the
        task window sits on top of it too. */
-    <div ref={layerRef} className="kx-app fixed overflow-y-auto" style={{ zIndex: 120, top: box.top, bottom: box.bottom, left: box.left, right: box.right, width: box.w, maxHeight: box.maxH }}>
+    <div ref={layerRef} className="kx-app kx-todo fixed overflow-y-auto" style={{ zIndex: 120, top: box.top, bottom: box.bottom, left: box.left, right: box.right, width: box.w, maxHeight: box.maxH }}>
       {children}
     </div>,
     document.body,

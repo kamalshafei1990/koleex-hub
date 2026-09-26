@@ -125,7 +125,7 @@ export default function TaskSheet({
     if (awaitsMe) next = { tone: "amber", text: t("approval.awaitingYou") };
     else if (pending) next = { tone: "amber", text: t("approval.submitted") };
     else if (task.approval_state === "rejected") {
-      next = { tone: "red", text: <><b>{t("approval.returned")}</b>{rejection ? <>: <AutoTranslatedText text={rejection} plain /></> : ` — ${t("approval.noReason")}`}</> };
+      next = { tone: "red", text: <><b>{t("approval.returned")}</b>{rejection ? <>: <AutoTranslatedText dir="auto" text={rejection} plain /></> : ` — ${t("approval.noReason")}`}</> };
     } else if (mine && !isOwner) {
       next = {
         tone: "blue",
@@ -186,7 +186,7 @@ export default function TaskSheet({
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside role="dialog" aria-modal="true" aria-labelledby="todo-sheet-title"
-        className="kx-app kx-glass-pop kx-pop-in relative flex w-full h-full sm:h-auto sm:max-h-[88dvh] sm:max-w-2xl flex-col overflow-hidden sm:rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl">
+        className="kx-app kx-todo kx-glass-pop kx-pop-in relative flex w-full h-full sm:h-auto sm:max-h-[88dvh] sm:max-w-2xl flex-col overflow-hidden sm:rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl">
 
         {/* ── Header ── */}
         <header className="shrink-0 border-b border-[var(--border-subtle)] px-4 sm:px-5 pt-3 pb-3.5" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
@@ -212,7 +212,7 @@ export default function TaskSheet({
             </div>
           </div>
           <h2 id="todo-sheet-title" className={`mt-1.5 text-[18px] font-semibold leading-snug break-words ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
-            <AutoTranslatedText text={task.title} plain />
+            <AutoTranslatedText dir="auto" text={task.title} plain />
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className={`${BADGE} ${STATUS_PILL[status]}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[status]}`} /> {t("st." + status)}</span>
@@ -252,7 +252,7 @@ export default function TaskSheet({
 
           <Section icon={<ListTodoIcon size={13} />} title={t("sheet.whatToDo")}>
             {task.description ? (
-              <AutoTranslatedText text={task.description} block className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words" />
+              <AutoTranslatedText dir="auto" text={task.description} block className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words" />
             ) : (
               <p className="text-[12.5px] text-[var(--text-dim)]">{t("sheet.noDescription")}</p>
             )}
@@ -274,7 +274,7 @@ export default function TaskSheet({
                         className="w-full flex items-start gap-2 py-1 px-1 text-[12.5px] text-start rounded-md enabled:hover:bg-[var(--bg-surface-hover)] disabled:cursor-default">
                         {c.done ? <CheckCircleIcon size={15} className="mt-px text-green-400 shrink-0" /> : <CircleIcon size={15} className="mt-px text-[var(--text-ghost)] shrink-0" />}
                         <span className={`min-w-0 break-words ${c.done ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
-                          <AutoTranslatedText text={c.text} plain />
+                          <AutoTranslatedText dir="auto" text={c.text} plain />
                         </span>
                       </button>
                     </li>
@@ -342,7 +342,7 @@ export default function TaskSheet({
               )}
               <div className="flex flex-wrap gap-1.5">
                 {proj && <LinkChip icon={<BriefcaseIcon size={12} />} text={proj.name} />}
-                {task.label && <LinkChip icon={<LabelIcon name={task.label} size={12} className="text-current" />} text={<AutoTranslatedText text={task.label} plain />} />}
+                {task.label && <LinkChip icon={<LabelIcon name={task.label} size={12} className="text-current" />} text={<AutoTranslatedText dir="auto" text={task.label} plain />} />}
                 {prods.map((p) => <LinkChip key={p.id} icon={<PackageIcon size={12} />} text={p.code ? `${p.code} · ${p.name}` : p.name} />)}
                 {mentions.map((m) => <LinkChip key={m.account_id} icon={<AtSignIcon size={12} />} text={m.full_name || m.username} />)}
                 {task.source === "report" && task.source_id && (
@@ -458,7 +458,7 @@ function Notes({ task, t, lang, meId, actions, temp }: {
                   </button>
                 )}
               </div>
-              <AutoTranslatedText text={n.body} block className="text-[var(--text-primary)] mt-0.5 break-words whitespace-pre-wrap" />
+              <AutoTranslatedText dir="auto" text={n.body} block className="text-[var(--text-primary)] mt-0.5 break-words whitespace-pre-wrap" />
             </div>
           </div>
         ))}

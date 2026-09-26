@@ -60,7 +60,7 @@ export default function TodoBoard({ tasks, t, lang, actions, onOpen }: {
                     className={`group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5 cursor-grab active:cursor-grabbing hover:border-[var(--border-color)] transition-colors ${dragId === task.id ? "opacity-50" : ""}`}>
                     <button type="button" onClick={() => onOpen(task.id)} data-kx-keep-hover
                       className={`w-full text-start text-[12.5px] font-medium leading-snug break-words rounded-md ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
-                      <AutoTranslatedText text={task.title} plain />
+                      <AutoTranslatedText dir="auto" text={task.title} plain />
                     </button>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${PRIORITY_TEXT[task.priority]}`}>

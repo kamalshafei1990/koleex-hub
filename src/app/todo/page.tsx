@@ -385,7 +385,7 @@ export default function TodoPage() {
     /* `kx-app` is the whole Aurora conversion: globals remaps this app's own
        tokens under that scope, so every panel, row and field turns
        translucent at once and Core keeps its solid values. */
-    <div className="kx-app kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
+    <div className="kx-app kx-todo kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}>
       {aurora && (
         <div className="fixed inset-0 z-0 pointer-events-none">
@@ -453,7 +453,7 @@ export default function TodoPage() {
             </div>
 
             {/* Filter pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none [mask-image:linear-gradient(90deg,transparent,#000_24px,#000_calc(100%-24px),transparent)]">
               <div role="tablist" aria-label={t("app.title")} className="flex items-center gap-1.5 shrink-0">
                 {([
                   ["all", t("pill.all"), stats ? String(open.active + stats.completed) : moreDone ? "" : String(counts.all)],

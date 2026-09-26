@@ -86,9 +86,11 @@ export default function KpiDashboard({ active, overdue, high, stats, t }: {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 min-w-0 [&>*]:min-w-0">
+      {/* Phones: one row that scrolls sideways — seven stacked cards pushed
+          the first task below the fold. */}
+      <div className="flex sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-2 min-w-0 overflow-x-auto sm:overflow-visible scrollbar-none snap-x snap-mandatory sm:snap-none [&>*]:min-w-0">
         {cards.map((c) => (
-          <div key={c.label} className={`rounded-xl border px-3 py-3 overflow-hidden ${c.bg}`}>
+          <div key={c.label} className={`w-[124px] shrink-0 sm:w-auto snap-start rounded-xl border px-3 py-3 overflow-hidden ${c.bg}`}>
             <div className="flex items-center gap-1.5 mb-1 min-w-0">
               <c.icon size={12} className={`${c.color} shrink-0`} />
               <span className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</span>
