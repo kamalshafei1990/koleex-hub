@@ -98,14 +98,18 @@ export default function NotificationCards({
   onMoreGone: () => void;
 }) {
   /* FLIP: when a card arrives or goes, the others glide to their new place
-     instead of jumping. Measured after every commit. */
+     instead of jumping. Measured after every commit, by LAYOUT position
+     (offsetTop), never the painted box: a card still springing in, or
+     already gliding, would otherwise be measured mid-flight and the stack
+     would chase a wrong offset — seen on the first run, a card sitting over
+     the one above it. */
   const els = useRef(new Map<string, HTMLDivElement>());
   const tops = useRef(new Map<string, number>());
   useLayoutEffect(() => {
     const next = new Map<string, number>();
     for (const [k, el] of els.current) {
       if (!el.isConnected) { els.current.delete(k); continue; }
-      next.set(k, el.getBoundingClientRect().top);
+      next.set(k, el.offsetTop);
     }
     if (!lessMotion()) {
       for (const [k, top] of next) {
@@ -144,7 +148,9 @@ export default function NotificationCards({
             now={tHub("notif.justNow")} chip={null}
             face={initialsOf(c.author || c.title)}
             head={<><span className="font-medium">{c.author || c.title}</span>{c.author && <span className="text-[var(--text-muted)]"> · {c.title}</span>}</>}
-            body={<p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-[var(--text-primary)]">{c.body}</p>}
+            /* A person's words keep their own direction: an English message
+               in the Arabic Hub must not throw its "?" to the start. */
+            body={<p dir="auto" className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-[var(--text-primary)]">{c.body}</p>}
             actions={<ReplyBox tUi={tUi} onSend={(text) => onReply(c, text)} onOpenChat={() => onOpenChat(c.channelId)} />}
           />
         ),
@@ -395,6 +401,7 @@ function ReplyBox({ tUi, onSend, onOpenChat }: {
           value={text}
           onChange={(e) => { setText(e.target.value); ctl.setBusy(e.target.value.trim().length > 0); if (failed) setFailed(false); }}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          dir="auto"
           placeholder={tUi("card.replyPh")}
           aria-label={tUi("card.replyPh")}
           className="h-[30px] min-w-0 flex-1 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)] focus:border-[var(--border-focus)]"
