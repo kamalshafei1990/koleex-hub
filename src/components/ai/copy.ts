@@ -69,6 +69,15 @@ export const COPY: Record<Lang, {
   /* The priority words on a task card — the tool's own values are English. */
   priorityHigh: string;
   priorityLow: string;
+  /** The update card's lines in words — the tool's field names ("due_date",
+   *  "remind_at") and values ("weekly", "medium") were printed raw. */
+  priorityMedium: string;
+  taskField: Record<"title" | "description" | "priority" | "due_date" | "remind_at" | "start_date" | "label" | "recurrence" | "recurrence_until" | "is_private", string>;
+  recurrenceWord: Record<"daily" | "weekly" | "monthly", string>;
+  /** A task given to the whole company, in the card's "For" line. */
+  everyone: string;
+  yes: string;
+  no: string;
   remind: string;
   forPeople: string;
   observers: string;
@@ -196,6 +205,12 @@ export const COPY: Record<Lang, {
   attachNothingRead: string;
   noReply: string;
   aiUnavailable: string;
+  /** A chat turn's failures in the chat's own words (chat-error.ts): the
+   *  link dropped, the answer failed, anything else. Egyptian, not the
+   *  Hub's formal Arabic, and never the server's English sentence. */
+  networkDropped: string;
+  answerFailed: string;
+  somethingWrong: string;
   couldNotStartChat: string;
   editShort: string;
   draftNeedsApproval: string;
@@ -219,6 +234,12 @@ export const COPY: Record<Lang, {
     due: "Due",
     priorityHigh: "High priority",
     priorityLow: "Low priority",
+    priorityMedium: "Medium priority",
+    taskField: { title: "Title", description: "Notes", priority: "Priority", due_date: "Due", remind_at: "Reminder", start_date: "Starts", label: "Label", recurrence: "Repeats", recurrence_until: "Repeats until", is_private: "Private" },
+    recurrenceWord: { daily: "Every day", weekly: "Every week", monthly: "Every month" },
+    everyone: "Everyone",
+    yes: "Yes",
+    no: "No",
     remind: "Reminder",
     forPeople: "For",
     observers: "Following",
@@ -347,6 +368,9 @@ export const COPY: Record<Lang, {
     attachNothingRead: "Couldn't read the attachment(s).",
     noReply: "No reply was received.",
     aiUnavailable: "Koleex AI is unavailable right now.",
+    networkDropped: "The connection dropped — check your internet and try again.",
+    answerFailed: "Koleex AI couldn't finish this answer. Try again.",
+    somethingWrong: "Something went wrong. Try again.",
     couldNotStartChat: "Couldn't start a new chat.",
     editShort: "Edit",
     draftNeedsApproval: "Draft · needs approval",
@@ -374,6 +398,12 @@ export const COPY: Record<Lang, {
     due: "截止",
     priorityHigh: "高优先级",
     priorityLow: "低优先级",
+    priorityMedium: "中优先级",
+    taskField: { title: "标题", description: "备注", priority: "优先级", due_date: "截止", remind_at: "提醒", start_date: "开始", label: "标签", recurrence: "重复", recurrence_until: "重复至", is_private: "私密" },
+    recurrenceWord: { daily: "每天", weekly: "每周", monthly: "每月" },
+    everyone: "所有人",
+    yes: "是",
+    no: "否",
     remind: "提醒",
     forPeople: "给",
     observers: "关注",
@@ -501,6 +531,9 @@ export const COPY: Record<Lang, {
     attachNothingRead: "读不了这个附件。",
     noReply: "没有收到回复。",
     aiUnavailable: "Koleex AI 现在暂时不可用。",
+    networkDropped: "网络断了——请检查网络后再试一次。",
+    answerFailed: "Koleex AI 没能完成这次回答，请再试一次。",
+    somethingWrong: "出了点问题，请再试一次。",
     couldNotStartChat: "无法开始新对话。",
     editShort: "编辑",
     draftNeedsApproval: "草稿 · 待审批",
@@ -528,6 +561,12 @@ export const COPY: Record<Lang, {
     due: "موعدها",
     priorityHigh: "أولوية عالية",
     priorityLow: "أولوية قليلة",
+    priorityMedium: "أولوية متوسطة",
+    taskField: { title: "العنوان", description: "الملاحظات", priority: "الأولوية", due_date: "موعدها", remind_at: "التذكير", start_date: "بتبدأ", label: "التصنيف", recurrence: "بتتكرر", recurrence_until: "بتتكرر لحد", is_private: "خاصة" },
+    recurrenceWord: { daily: "كل يوم", weekly: "كل أسبوع", monthly: "كل شهر" },
+    everyone: "الكل",
+    yes: "أيوه",
+    no: "لأ",
     remind: "تذكير",
     forPeople: "لـ",
     observers: "يتابع",
@@ -656,6 +695,9 @@ export const COPY: Record<Lang, {
     attachNothingRead: "مقدرناش نقرا المرفق.",
     noReply: "مفيش رد وصل.",
     aiUnavailable: "Koleex AI مش متاح دلوقتي.",
+    networkDropped: "النت فصل — اتأكد من الاتصال وجرّب تاني.",
+    answerFailed: "Koleex AI ماقدرش يكمّل الرد ده. جرّب تاني.",
+    somethingWrong: "حصلت مشكلة. جرّب تاني.",
     couldNotStartChat: "مقدرناش نبدأ محادثة جديدة.",
     editShort: "تعديل",
     draftNeedsApproval: "مسودة · محتاجة اعتماد",

@@ -33,6 +33,27 @@ export type TaskCardState =
 
 type Person = { name?: unknown };
 
+/** "weekly" → "Every week" / "كل أسبوع"; a value this card does not know is
+ *  shown as it came, rather than dropped (it is what will be saved). */
+export function recurrenceWords(v: string, copy: (typeof COPY)[Lang]): string {
+  return v === "daily" || v === "weekly" || v === "monthly" ? copy.recurrenceWord[v] : v;
+}
+
+/** One line of an update card, in the screen's language: the field by name,
+ *  the value in words — priorities, repeats and yes/no translated, a cleared
+ *  field as "—". The tool's own field names ("due_date") and values
+ *  ("medium") were printed raw on every screen (review, 2026-09-26). */
+export function taskChangeLine(key: string, value: unknown, copy: (typeof COPY)[Lang]): string {
+  const field = (copy.taskField as Record<string, string>)[key] ?? key.replace(/_/g, " ");
+  let said: string;
+  if (value === null || value === undefined || value === "") said = "—";
+  else if (key === "priority") said = value === "high" ? copy.priorityHigh : value === "low" ? copy.priorityLow : value === "medium" ? copy.priorityMedium : String(value);
+  else if (key === "recurrence") said = recurrenceWords(String(value), copy);
+  else if (typeof value === "boolean") said = value ? copy.yes : copy.no;
+  else said = String(value);
+  return key === "priority" && said !== "—" && said !== String(value) ? said : `${field}: ${said}`;
+}
+
 /** The lines under the title, from the tool's preview — names, times in
  *  words, the zone's day — with the raw arguments as the fallback. Pure. */
 export function taskCardDetails(
@@ -45,7 +66,7 @@ export function taskCardDetails(
   const names = (v: unknown) => (Array.isArray(v) ? (v as Person[]).map((p) => String(p?.name ?? "")).filter(Boolean) : []);
   if (tool === "updateTodo") {
     const changes = pv.changes && typeof pv.changes === "object" ? (pv.changes as Record<string, unknown>) : {};
-    const lines = Object.entries(changes).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v === null ? "—" : String(v)}`);
+    const lines = Object.entries(changes).map(([k, v]) => taskChangeLine(k, v, copy));
     const obs = names(pv.observers);
     if (obs.length) lines.push(`${copy.observers} ${obs.join(", ")}`);
     return lines;
@@ -56,7 +77,7 @@ export function taskCardDetails(
   const start = typeof when.start === "string" && when.start ? when.start : "";
   const people = names(pv.assignees)
     .concat(typeof pv.department === "string" && pv.department ? [pv.department] : [])
-    .concat(pv.assign_to_all === true ? ["*"] : []);
+    .concat(pv.assign_to_all === true ? [copy.everyone] : []);
   const priority = typeof args.priority === "string" ? args.priority : "";
   const label = typeof args.label === "string" ? args.label : "";
   const recurrence = typeof args.recurrence === "string" && args.recurrence ? args.recurrence : "";
@@ -71,7 +92,7 @@ export function taskCardDetails(
     people.length ? `${copy.forPeople} ${people.join(", ")}` : "",
     observers.length ? `${copy.observers} ${observers.join(", ")}` : "",
     mentions.length ? `${copy.mentions} ${mentions.join(", ")}` : "",
-    recurrence ? `${copy.repeats} ${recurrence}` : "",
+    recurrence ? `${copy.repeats} ${recurrenceWords(recurrence, copy)}` : "",
     args.is_private === true ? copy.privateTask : "",
   ].filter(Boolean);
 }

@@ -40,7 +40,8 @@ import PhotoLightbox from "../src/components/ai/PhotoLightbox";
 import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
 import { textLang, textScript, textDirection, blockDirection } from "../src/lib/text-direction";
-import TaskCard from "../src/components/ai/TaskCard";
+import TaskCard, { taskChangeLine, taskCardDetails } from "../src/components/ai/TaskCard";
+import { chatError, SERVER_ANSWER_FAILED } from "../src/components/ai/chat-error";
 import { stripComments } from "./lib/strip-comments";
 
 let pass = 0;
@@ -191,7 +192,11 @@ console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
   const latestActs = html(<Bubble {...({ msg, isLast: true, lang: "en", onCopy: () => true } as any)} />);
   check("the latest reply shows its actions; an older one hides them until hover, focus or a tap",
     /role="toolbar"/.test(latestActs) && !/opacity-0 group-hover\/msg:opacity-100/.test(latestActs) &&
-      /<div class="opacity-0 group-hover\/msg:opacity-100 focus-within:opacity-100 transition-opacity"><div role="toolbar"/.test(older));
+      /<div class="opacity-0 pointer-events-none group-hover\/msg:opacity-100 group-hover\/msg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto transition-opacity"><div role="toolbar"/.test(older));
+  /* HIDDEN MEANS UNTAPPABLE (review, 2026-09-26): an invisible button under an
+     older reply fired on a tap in the blank space. */
+  check("  …and while hidden they cannot be tapped — the tap reaches the row, which reveals them",
+    /opacity-0 pointer-events-none/.test(older) && !/opacity-0 pointer-events-none/.test(latestActs));
 
   const withQuestion: any = { msg: { ...msg, steps: [
     { kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [
@@ -1282,7 +1287,9 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
     check("  …cancelled: 'Not saved', no buttons", /data-task-state="cancelled"/.test(cancelled) && text(cancelled).includes("Not saved") && !/data-task-save/.test(cancelled));
     const update = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ kind: "tool-result", tool: "updateTodo", permissionStatus: "approval_required", payload: { preview: { title: "Send the revised quotation", changes: { priority: "high", due_date: "2026-09-19T13:00:00.000Z" }, observers: [{ name: "Sara" }] } }, pending: { tool: "updateTodo", args: { task_id: "x", priority: "high", confirm: true } } }] } } as any)} />);
     check("an update preview is a 'Task change' card listing the changes and the observers",
-      text(update).includes("Task change") && text(update).includes("priority: high") && text(update).includes("due date: 2026-09-19T13:00:00.000Z") && text(update).includes("Following Sara"));
+      text(update).includes("Task change") && text(update).includes("High priority") && text(update).includes("Due: 2026-09-19T13:00:00.000Z") && text(update).includes("Following Sara") &&
+      /* In words, not the tool's field names (review, 2026-09-26). */
+      !text(update).includes("priority: high") && !text(update).includes("due date:"));
     const noPending = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ ...step, pending: undefined }] } } as any)} />);
     const allowed = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ ...step, permissionStatus: "allowed" }] } } as any)} />);
     check("no card without the confirm arguments, and none for a step that is not awaiting approval", !/data-task-card/.test(noPending) && !/data-task-card/.test(allowed));
@@ -1505,7 +1512,7 @@ console.log("\n── Arabic and Chinese at their own size; the sidebar title ke
   check("the root carries the screen's language; both bar titles and the composer carry their content's",
     /lang=\{lang\}\s+className="kx-ai-root /.test(app) &&
     (app.match(/kx-ai-bar-title[^>]*dir="auto" lang=\{active\?\.title \? textLang\(active\.title\) : undefined\}/g) ?? []).length === 2 &&
-    /dir=\{textDirection\(input\)\}\s+lang=\{textLang\(input\)\}/.test(app) && /className="kx-ai-composer-text block w-full/.test(app));
+    /dir=\{textDirection\(input, lang === "ar" \? "rtl" : "ltr"\)\}\s+lang=\{textLang\(input\)\}/.test(app) && /className="kx-ai-composer-text block w-full/.test(app));
   check("the stylesheet pins the title to the screen's side and sizes ar/zh content one step up on every marked surface",
     /\.kx-ai-root \.kx-ai-row-title,\s*\.kx-ai-root \.kx-ai-bar-title \{\s*text-align: left;/.test(css) &&
     /html\[dir="rtl"\] \.kx-ai-root \.kx-ai-row-title,\s*html\[dir="rtl"\] \.kx-ai-root \.kx-ai-bar-title \{\s*text-align: right;/.test(css) &&
@@ -1749,6 +1756,70 @@ console.log("\n── An Arabic opening before an English code block reads right
     /whenNetworkQuiet\(\{ quietMs: 700, maxWaitMs: 6000 \}\)\.then\(\(\) => \{\s*if \(!alive\) return;[\s\S]{0,400}arrivalFromMarker\(/.test(watcher) &&
     /timer = window\.setTimeout\(\(\) => setArrived\(null\), ARRIVAL_SHOW_MS\);/.test(watcher) &&
     /"u\.updated":/.test(watcher));
+}
+
+/* ── CHAT SCREEN REVIEW (owner, 2026-09-26: "صلّح من ١ لـ ٩") ─────────── */
+{
+  console.log("\n── Chat screen review: retry, direction, long words, errors in words, task-card words, hidden taps, following, light theme, edit box ──");
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const bub = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+
+  /* 1 */
+  check("a failed turn offers one tap to ask again: the banner's Retry resends the caller's last message while the thread ends on it",
+    /const canRetryLast = !sending && lastMessage\?\.role === "user" && !!lastMessage\.content;/.test(app) &&
+    /\{canRetryLast && \(\s*<button\s*type="button"\s*onClick=\{\(\) => \{ setError\(null\); handleRegenerate\(\); \}\}\s*data-retry-last/.test(app) &&
+    /\{copy\.retry\}/.test(app.slice(app.indexOf("data-retry-last"), app.indexOf("data-retry-last") + 800)));
+  check("  …and Save and retry with the words unchanged sends them again; only an empty box cancels",
+    /const next = editValue\.trim\(\);[\s\S]{0,400}?if \(!next\) \{\s*setEditing\(false\);/.test(bub) && !/next === msg\.content/.test(bub));
+
+  /* 2 */
+  check("an empty message box on an Arabic screen runs right to left from the first paint",
+    textDirection("", "rtl") === "rtl" && textDirection("", "ltr") === "ltr" &&
+    /dir=\{textDirection\(input, lang === "ar" \? "rtl" : "ltr"\)\}/.test(app));
+
+  /* 3 */
+  const longUser = renderToStaticMarkup(<Bubble {...({ msg: { id: "u1", role: "user", content: "https://example.com/" + "a".repeat(300) }, copy: COPY.en, lang: "en" } as any)} /> as ReactElement);
+  check("a long unbroken string wraps: the caller's bubble, the fallback and the reply's prose, links and inline code break anywhere",
+    /whitespace-pre-wrap \[overflow-wrap:anywhere\]/.test(longUser) &&
+    /\.koleex-md p,\s*\.koleex-md li,\s*\.koleex-md h1,\s*\.koleex-md h2,\s*\.koleex-md h3,\s*\.koleex-md h4,\s*\.koleex-md blockquote,\s*\.koleex-md a,\s*\.koleex-md \.koleex-md-inline-code \{\s*overflow-wrap: anywhere;\s*\}/.test(css) &&
+    !/\.koleex-md (pre|td|th)[^{]*\{[^}]*overflow-wrap/.test(css));
+
+  /* 4 */
+  check("a failed turn is said in the chat's words: a dropped link, a failed answer, a bare status — Egyptian, never the server's English",
+    chatError("NetworkError", "ar") === COPY.ar.networkDropped && chatError(new TypeError("Failed to fetch"), "zh") === COPY.zh.networkDropped &&
+    chatError(SERVER_ANSWER_FAILED, "ar") === COPY.ar.answerFailed && chatError(SERVER_ANSWER_FAILED, "zh") === COPY.zh.answerFailed &&
+    chatError("HTTP 502", "ar") === COPY.ar.answerFailed && chatError("HTTP 404", "ar") === COPY.ar.somethingWrong &&
+    !/تحقق|أعد المحاولة|يرجى/.test(COPY.ar.networkDropped + COPY.ar.answerFailed + COPY.ar.somethingWrong) &&
+    !/humanizeError/.test(app) && (app.match(/chatError\(/g) ?? []).length >= 10);
+
+  /* 5 */
+  check("the task change card says each field and value in the screen's words",
+    taskChangeLine("due_date", "Fri 19 Sep, 13:00", COPY.ar) === "موعدها: Fri 19 Sep, 13:00" &&
+    taskChangeLine("priority", "medium", COPY.ar) === "أولوية متوسطة" && taskChangeLine("priority", "high", COPY.zh) === "高优先级" &&
+    taskChangeLine("recurrence", "weekly", COPY.ar) === "بتتكرر: كل أسبوع" && taskChangeLine("is_private", true, COPY.en) === "Private: Yes" &&
+    taskChangeLine("label", null, COPY.en) === "Label: —" && taskChangeLine("mystery_field", "x", COPY.en) === "mystery field: x");
+  check("  …and the create card reads repeats in words and a company-wide task as Everyone",
+    taskCardDetails("createTodo", { assign_to_all: true }, { recurrence: "monthly" }, COPY.ar).join("|") === `${COPY.ar.forPeople} الكل|${COPY.ar.repeats} كل شهر`);
+
+  /* 7 */
+  check("the thread follows content that grows without a new message (a photo loading, the last render, the Thinking panel) — or shows the chip — but never pulls the Library or Calls lists",
+    /<div ref=\{threadContentRef\} className="relative z-\[1\] max-w-\[820px\]/.test(app) &&
+    /if \(!content \|\| libraryOpen \|\| callsOpen \|\| typeof ResizeObserver === "undefined"\) return;/.test(app) &&
+    /if \(userFollowingRef\.current\) el\.scrollTop = el\.scrollHeight;\s*else setShowJumpToBottom\(el\.scrollHeight - el\.clientHeight - el\.scrollTop > 120\);/.test(app) &&
+    /\}, \[libraryOpen, callsOpen\]\);/.test(app));
+
+  /* 8 */
+  check("the light theme reads: links in the Hub blue (source chips keep their own), inline code and table headers on a dark wash",
+    /\[data-theme="light"\] \.koleex-md a:not\(\.koleex-md-source\) \{\s*color: var\(--kx-ai-accent, #0066FF\);/.test(css) &&
+    /\[data-theme="light"\] \.koleex-md \.koleex-md-inline-code \{\s*background: rgba\(0, 0, 0, 0\.06\);/.test(css) &&
+    /\[data-theme="light"\] \.koleex-md th \{\s*background: rgba\(0, 0, 0, 0\.04\);/.test(css));
+
+  /* 9 */
+  check("the edit box is as tall as the message: rows follow its lines (up to 8), field-sizing grows it, a cap keeps it on screen",
+    /rows=\{Math\.min\(8, Math\.max\(1, editValue\.split\("\\n"\)\.length\)\)\}/.test(bub) &&
+    /className="kx-edit-box w-full[^"]*max-h-\[40vh\] overflow-y-auto"/.test(bub) &&
+    /\.kx-edit-box \{\s*field-sizing: content;\s*\}/.test(css));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

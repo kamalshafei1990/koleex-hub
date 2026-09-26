@@ -4690,6 +4690,26 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
 .koleex-md p {
   margin: 0 0 14px;
 }
+/* The edit box under a message of yours grows with its text (Bubble.tsx). */
+.kx-edit-box {
+  field-sizing: content;
+}
+/* A LONG UNBROKEN STRING WRAPS. A pasted link, a SKU list, a file path or a
+   long code word had no break point, so at 390px it pushed the whole thread
+   sideways (review, 2026-09-26). Prose, list items, headings, quotes, links
+   and inline code break anywhere when they must; code blocks keep their own
+   scroll (white-space: pre never wraps) and tables their scrolling wrap. */
+.koleex-md p,
+.koleex-md li,
+.koleex-md h1,
+.koleex-md h2,
+.koleex-md h3,
+.koleex-md h4,
+.koleex-md blockquote,
+.koleex-md a,
+.koleex-md .koleex-md-inline-code {
+  overflow-wrap: anywhere;
+}
 .koleex-md p:last-child {
   margin-bottom: 0;
 }
@@ -4819,6 +4839,20 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   background: rgba(255, 255, 255, 0.04);
   font-weight: 650;
   white-space: nowrap;
+}
+/* THE LIGHT THEME (review, 2026-09-26). Links were a fixed #6aa7ff — no
+   token by that name exists — about 2.5:1 on white; inline code and table
+   headers were washes of white, invisible on white. The Hub blue for links
+   (the dark theme keeps its lighter blue, which reads on #0D0D0D), and
+   washes of black for the rest. */
+[data-theme="light"] .koleex-md a:not(.koleex-md-source) {
+  color: var(--kx-ai-accent, #0066FF);
+}
+[data-theme="light"] .koleex-md .koleex-md-inline-code {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .koleex-md th {
+  background: rgba(0, 0, 0, 0.04);
 }
 /* Product photos inside an answer: bounded, rounded, a hairline edge, and
    room around them so a picture sits between sentences rather than on one. */
