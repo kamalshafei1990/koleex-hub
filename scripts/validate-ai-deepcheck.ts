@@ -269,5 +269,22 @@ console.log("\n── 10. Design, part 3: the call screen ──");
     /\{copy\.settingsShort\}/.test(scr) && !/selectedVoiceLabel/.test(scr));
 }
 
+console.log("\n── The tool loop always ends in an answer (owner, 2026-09-26) ──");
+{
+  /* "what is the top 100 famous brands" on Deep came back as the text
+     "Running search_web(…)…": the rounds were spent on lookups, and the
+     give-up path promoted the last step's progress line to the answer. */
+  const orch = read("src/lib/server/ai-agent/orchestrator.ts");
+  check("the last round carries no tool once tools have run, so the model writes the answer from what it gathered",
+    /const lastRound = iter === MAX_ITERATIONS - 1 && totalToolRuns > 0;/.test(orch) &&
+      /totalToolRuns >= MAX_TOOLS_PER_TURN \|\| lastRound\s*\? "none"/.test(orch));
+  check("  …and the give-up path never promotes a progress line (a tool-call step) to the reply",
+    /\.reverse\(\)\s*\.filter\(\(s\) => s\.kind !== "tool-call"\)\s*\.map\(\(s\) => cleanAssistantText\(s\.text \?\? ""\)\)/.test(orch));
+  check("a list asked for by name, or any turn on Deep, gets the long ceiling in the loop too",
+    /const LOOP_MAX_TOKENS = 2048;/.test(orch) && /const LOOP_LONG_MAX_TOKENS = 4000;/.test(orch) &&
+      /const longAnswer = model === "deep" \|\| wantsList\(userMessage\);/.test(orch) &&
+      /maxTokens: longAnswer \? LOOP_LONG_MAX_TOKENS : LOOP_MAX_TOKENS,/.test(orch) && !/maxTokens: 2048,/.test(orch));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
