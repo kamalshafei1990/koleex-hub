@@ -198,6 +198,8 @@ export const settingsT: Translations = {
   "ai.models.deepHint":   { en: "Off also closes the international call line.", zh: "关闭后也会关闭国际通话线路。", ar: "لو اتقفل، خط المكالمات الدولية بيتقفل معاه." },
   "ai.models.failed":     { en: "Could not load the models.", zh: "无法加载模型。", ar: "مقدرناش نحمّل الموديلات." },
   "ai.models.saveFailed": { en: "Could not save. Try again.", zh: "无法保存，请重试。", ar: "مقدرناش نحفظ. جرّب تاني." },
+  "ai.models.readPage":   { en: "Read web pages", zh: "阅读网页", ar: "قراءة صفحات الويب" },
+  "ai.models.readPageHint": { en: "After a search, Koleex AI may open a result — or a link you sent — and read the whole page. Off: search snippets only.", zh: "搜索后，Koleex AI 可以打开搜索结果或你发送的链接并阅读整页。关闭后只用搜索摘要。", ar: "بعد البحث، Koleex AI يقدر يفتح نتيجة أو لينك إنت بعته ويقرا الصفحة كلها. لو اتقفل، بيستخدم ملخصات البحث بس." },
   /* Roadmap D3 — usage, for the owner. Counts only; no content, no cost. */
   "ai.usage.title":       { en: "Usage (last 14 days)", zh: "使用情况（最近 14 天）", ar: "الاستخدام (آخر 14 يوم)" },
   "ai.usage.desc":        { en: "How much Koleex AI is used across the company. Counts only — no message content. Cost is not shown: token usage is logged per turn but not stored, so a figure here would be a guess.", zh: "全公司使用 Koleex AI 的情况。仅统计数量，不含消息内容。不显示费用：每轮的 token 用量只记录在日志中，未保存，这里的数字只会是猜测。", ar: "قد إيه الشركة بتستخدم Koleex AI. أرقام بس من غير محتوى الرسائل. التكلفة مش معروضة: استهلاك كل رسالة بيتسجل في اللوج بس مابيتحفظش، فأي رقم هنا هيبقى تخمين." },

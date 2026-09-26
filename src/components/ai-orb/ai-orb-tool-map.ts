@@ -68,6 +68,8 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
      rather than a generic "Searching": the owner asked for the title to
      say what is happening, and where a lookup goes is the useful part. */
   search_web: "browsing",
+  /* Koleex AI opening a result page (core/read-page.ts): "Reading the details". */
+  read_page: "reading",
   search_knowledge: "searching",
   searchMachineKnowledge: "searching",
   searchTradeTerms: "searching",

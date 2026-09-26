@@ -111,6 +111,20 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_SEARCHES_PER_MIN, 20),
   }),
+  /* Koleex AI's page reader (core/read-page.ts): our server fetches a public
+     page for the model. Two a turn at most; ten a minute is far above a
+     person and a floor under a model that asks for more. The tenant's day
+     is the outbound-fetch bill. */
+  readPagePerAccount: (): Budget => ({
+    bucket: "read_page",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_PAGE_READS_PER_MIN, 10),
+  }),
+  readPagePerTenantDay: (): Budget => ({
+    bucket: "read_page:tenant:day",
+    windowSec: 24 * 60 * 60,
+    max: num(process.env.AI_LIMIT_TENANT_PAGE_READS_PER_DAY, 1000),
+  }),
   searchPerTenantDay: (): Budget => ({
     bucket: "search:tenant:day",
     windowSec: 24 * 60 * 60,

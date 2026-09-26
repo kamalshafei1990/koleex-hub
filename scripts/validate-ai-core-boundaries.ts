@@ -275,10 +275,16 @@ check("world facts: the route treats one as live information", /isWorldFactQuery
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   const body = stripComments(route, { line: "keep" });
   check("general lane: the tool list is asked for ONLY on the general lane", /const generalTools = fastLane === "general" \? generalLaneTools\(ctx\) : null;/.test(body));
-  check("general lane: the tools ride the first call only when offered, with toolChoice auto", /\.\.\.\(generalTools \? \{ tools: generalTools, toolChoice: "auto" as const \} : \{\}\)/.test(body));
-  check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && generalTools && out\.response\.toolCalls\.length > 0\)/.test(body));
+  check("general lane: the tools ride the first call only when offered, with toolChoice auto (the page reader joins only with a user's link)", /\.\.\.\(laneTools \? \{ tools: laneTools, toolChoice: "auto" as const \} : \{\}\)/.test(body) &&
+    /const laneTools = generalTools && readOn && allowedLinks\.size > 0 \? \[\.\.\.generalTools, READ_PAGE_TOOL_DEF\] : generalTools;/.test(body));
+  check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && laneTools && out\.response\.toolCalls\.length > 0\)/.test(body));
   check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) (?:controller\.enqueue|emit)\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
-  check("general lane: the second call carries NO tools — a hop, never a loop", /out = await chatWithTools\(\s*\{ messages: hop\.messages, maxTokens, temperature: 0\.3, modelClass: "GENERAL" as const, stream: true \},/.test(body));
+  /* The page reader (2026-09-26) adds ONE bounded hop: the second call may
+     carry read_page alone, and the call after a read carries nothing. */
+  check("general lane: the second call carries no tool but read_page, and only while reads are left — the call after it carries NO tools; a hop, never a loop",
+    /messages: hop\.messages, maxTokens, temperature: 0\.3, modelClass: "GENERAL" as const, stream: true,\s*\.\.\.\(canRead \? \{ tools: \[READ_PAGE_TOOL_DEF\], toolChoice: "auto" as const \} : \{\}\),/.test(body) &&
+    /const canRead = !!readPage && allowedLinks\.size > 0 && hop\.reads < READ_PAGE_MAX_PER_ANSWER;/.test(body) &&
+    /out = await chatWithTools\(\s*\{ messages: readHop\.messages, maxTokens, temperature: 0\.3, modelClass: "GENERAL" as const, stream: true \},/.test(body));
   check("general lane: the lookup's steps are on the answer's record and the pricing seal sees them", /sealPricingSafety\(fastReply, fastSteps\)/.test(body) && /\.\.\.fastSteps,\s*\{ kind: "answer"/.test(body));
   check("general lane: the provider label says when a lookup was made", /fast-\$\{fastLane\}\$\{fastSteps\.length > 0 \? "\+search" : ""\}/.test(body));
   check("general lane: the log line counts lookups", /fast_search=\$\{fastSteps\.filter/.test(body));

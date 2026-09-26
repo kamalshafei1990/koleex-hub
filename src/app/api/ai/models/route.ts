@@ -23,7 +23,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { modelAvailability, modelConfigured, parseDisabledModels } from "@/lib/server/ai/provider/koleex-model-slots";
-import { switchedOffInTable, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
+import { featureOffInTable, switchedOffInTable, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
 import { DEFAULT_KOLEEX_MODEL, KOLEEX_SERVING_MODELS } from "@/lib/ai/koleex-models";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +45,13 @@ export async function GET() {
       off: tableOff.has(id),
       env_off: envOff.has(id),
     }));
+    /* The page reader's switch (core/read-page.ts), drawn beside the models. */
+    body.admin_features = {
+      read_page: {
+        off: await featureOffInTable("read_page"),
+        env_off: (process.env.AI_READ_PAGE ?? "").trim().toLowerCase() === "off",
+      },
+    };
   }
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }

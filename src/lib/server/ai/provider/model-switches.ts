@@ -36,8 +36,17 @@ export const MODEL_SWITCH_KEYS: Readonly<Record<KoleexServingModel, string>> = {
   deep: "ai_model_off_deep",
 };
 
+/* THE OWNER'S OTHER RUNTIME SWITCH: Koleex AI's page reader (2026-09-26,
+   core/read-page.ts). Same table, same rules, same cache as the models: an
+   explicit `true` turns it off, absent means on. */
+export const FEATURE_SWITCH_KEYS = { read_page: "ai_read_page_off" } as const;
+export type FeatureSwitch = keyof typeof FEATURE_SWITCH_KEYS;
+
+/** A key the owner may flip from Settings → Koleex AI: a model's switch or
+ *  a feature's. Booleans only, super admin only (platform-settings route). */
 export function isModelSwitchKey(key: unknown): boolean {
-  return typeof key === "string" && (Object.values(MODEL_SWITCH_KEYS) as string[]).includes(key);
+  return typeof key === "string" &&
+    ([...Object.values(MODEL_SWITCH_KEYS), ...Object.values(FEATURE_SWITCH_KEYS)] as string[]).includes(key);
 }
 
 /** Which models the stored rows switch off. Pure; only an explicit `true`
@@ -51,7 +60,17 @@ export function parseSwitchRows(rows: ReadonlyArray<{ key: unknown; value: unkno
   return out;
 }
 
-let cache: { at: number; off: ReadonlySet<KoleexServingModel> } | null = null;
+/** Which features the stored rows switch off. Same rule: only an explicit `true`. */
+export function parseFeatureRows(rows: ReadonlyArray<{ key: unknown; value: unknown }>): Set<FeatureSwitch> {
+  const out = new Set<FeatureSwitch>();
+  for (const f of Object.keys(FEATURE_SWITCH_KEYS) as FeatureSwitch[]) {
+    const row = rows.find((r) => r.key === FEATURE_SWITCH_KEYS[f]);
+    if (row && row.value === true) out.add(f);
+  }
+  return out;
+}
+
+let cache: { at: number; off: ReadonlySet<KoleexServingModel>; features: ReadonlySet<FeatureSwitch> } | null = null;
 let inflight: Promise<ReadonlySet<KoleexServingModel>> | null = null;
 
 async function readTable(): Promise<ReadonlySet<KoleexServingModel>> {
@@ -62,17 +81,17 @@ async function readTable(): Promise<ReadonlySet<KoleexServingModel>> {
     const { data, error } = await supabaseServer
       .from("platform_settings")
       .select("key, value")
-      .in("key", Object.values(MODEL_SWITCH_KEYS));
+      .in("key", [...Object.values(MODEL_SWITCH_KEYS), ...Object.values(FEATURE_SWITCH_KEYS)]);
     if (error) throw new Error(error.message);
     const off = parseSwitchRows(data ?? []);
-    cache = { at: Date.now(), off };
+    cache = { at: Date.now(), off, features: parseFeatureRows(data ?? []) };
     return off;
   } catch (e) {
     console.warn(`[ai.models] switch read failed — keeping the last known state: ${e instanceof Error ? e.message.slice(0, 120) : "unknown"}`);
     const kept = cache?.off ?? new Set<KoleexServingModel>();
     /* Hold the kept answer for a full window: a failing table must not be
        asked again on every turn. */
-    cache = { at: Date.now(), off: kept };
+    cache = { at: Date.now(), off: kept, features: cache?.features ?? new Set<FeatureSwitch>() };
     return kept;
   }
 }
@@ -89,6 +108,20 @@ export async function switchedOffModels(): Promise<ReadonlySet<KoleexServingMode
   const env = parseDisabledModels(process.env.AI_MODELS_DISABLED);
   const table = await switchedOffInTable();
   return new Set<KoleexServingModel>([...env, ...table]);
+}
+
+/** Is a feature off right now — the deploy-time env (AI_READ_PAGE=off) or
+ *  the owner's switch? Same cache as the models. */
+export async function featureSwitchedOff(feature: FeatureSwitch): Promise<boolean> {
+  if (feature === "read_page" && (process.env.AI_READ_PAGE ?? "").trim().toLowerCase() === "off") return true;
+  await switchedOffInTable();
+  return cache?.features.has(feature) ?? false;
+}
+
+/** The owner's switch alone (the table), for the Settings screen. */
+export async function featureOffInTable(feature: FeatureSwitch): Promise<boolean> {
+  await switchedOffInTable();
+  return cache?.features.has(feature) ?? false;
 }
 
 /** A switch was just saved on this instance: read it again on the next ask. */
