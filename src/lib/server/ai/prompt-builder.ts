@@ -78,7 +78,7 @@ function formatHint(ctx: AiContext): string {
   /* A list asked for by name (analyze-intent wantsList): every item, never
      a link in place of the list. */
   if (format === "list") {
-    return ` RESPONSE SHAPE: the whole list the user asked for, every item they asked for — a Markdown table (header row, separator row, one row per line) when each item has more than one field (rank, name, figure), otherwise a numbered list. At most one short line before it. Never answer a request for a list with only a link.`;
+    return ` RESPONSE SHAPE: the whole list the user asked for, every item they asked for — a Markdown table (header row, separator row, one row per line) when each item has more than one field (rank, name, figure), otherwise a numbered list. At most one short line before it. When the user named a number (top 100, 20 items), give that many rows — mark any that may be out of date rather than leaving them out. Never answer a request for a list with only a link.`;
   }
 
   /* Each branch names the format + gives concrete constraints so

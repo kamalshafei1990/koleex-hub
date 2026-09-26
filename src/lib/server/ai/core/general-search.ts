@@ -48,7 +48,9 @@ export const GENERAL_SEARCH_NOTE =
   "You get at most one lookup per answer, so make the query count. " +
   "If the result covers only part of what was asked (a list, a table, a ranking), still give the whole answer: " +
   "use the result for what it covers and complete the rest from what you know, saying in one line which part comes from general knowledge. " +
-  "Never answer with only a link.";
+  "When the user asked for a number of items (top 100, 20 companies), give that many: in a table, add a Source column that says \"search\" " +
+  "for rows from the result and \"general knowledge — may be out of date\" for the rest. A ranking that changes over time is a reason to say " +
+  "it may be dated, never a reason to stop short. Never answer with only a link.";
 
 export type GeneralInvoke = (
   ctx: UserContext,
