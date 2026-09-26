@@ -4905,14 +4905,31 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    and the two sizes want different things from it. These rules apply ONLY
    inside .kx-call-orb, so the five other places the orb is drawn are
    untouched. See lib/voice/level.ts for the glitch this replaces. */
+/* THE CAPTION UNDER THE ORB SHOWS THE NEWEST WORDS. A column that ends at
+   its bottom edge: three lines tall, and anything longer overflows from the
+   TOP, where it is clipped — so a long answer's caption keeps up with the
+   voice instead of freezing on its first three lines (review, 2026-09-26). */
+.kx-call-caption-tail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: calc(3 * 1.625em);
+  overflow: hidden;
+}
+.kx-call-caption-tail.is-long {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em);
+}
+
 .kx-call-orb { --kx-call-level: 0; }
 .kx-call-ring {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 200px;
-  height: 200px;
-  margin: -100px 0 0 -100px;
+  /* The orb's measured size (VoiceCallScreen fitOrb), 200px by default. */
+  width: var(--kx-orb-size, 200px);
+  height: var(--kx-orb-size, 200px);
+  margin: calc(var(--kx-orb-size, 200px) / -2) 0 0 calc(var(--kx-orb-size, 200px) / -2);
   border-radius: 9999px;
   border: 1.5px solid rgba(255, 255, 255, 0.22);
   opacity: 0;

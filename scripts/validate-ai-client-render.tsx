@@ -490,14 +490,43 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     text(searchingScreen).includes("Looking it up"));
   check("and it outranks Listening, which is not what is happening",
     !/\bListening\b/.test(text(searchingScreen)));
-  /* But it must NOT outrank the two states that are about whether the call
-     works at all. A muted call that is also looking something up has a bigger
-     problem to report. */
+  /* WHAT KOLEEX AI IS DOING OUTRANKS THE CALLER'S CLOSED MICROPHONE (review,
+     2026-09-26). This used to say the opposite — "a muted call that is also
+     looking something up has a bigger problem to report" — and in hold mode,
+     where the microphone is closed between holds by design, it meant the
+     caption said "Hold to talk" through every lookup, thought and answer.
+     The Mic control still shows the microphone is off; the caption says what
+     the far side is doing, and falls back to "Microphone off" only when the
+     far side is doing nothing, so a muted caller is still never told
+     "Listening". */
   const searchingMuted = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
       onEnd={() => {}} searching muted onToggleMute={() => {}} /> as ReactElement,
   );
-  check("muted still wins over a lookup", text(searchingMuted).includes("Microphone off"));
+  check("a lookup is shown even while the caller is muted", text(searchingMuted).includes("Looking it up") && !text(searchingMuted).includes("Microphone off"));
+  const idleMuted = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} muted onToggleMute={() => {}} /> as ReactElement,
+  );
+  check("  …and with the far side idle, muted still wins over Listening", text(idleMuted).includes("Microphone off") && !/\bListening\b/.test(text(idleMuted)));
+  const holdThinking = renderToStaticMarkup(
+    <VoiceCallScreen live phase="thinking" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} muted talkMode="hold" onHold={() => {}} /> as ReactElement,
+  );
+  const holdSpeaking = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} muted talkMode="hold" onHold={() => {}} /> as ReactElement,
+  );
+  const holdIdle = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} muted talkMode="hold" onHold={() => {}} /> as ReactElement,
+  );
+  check("  …in hold mode, between holds, the caller sees Thinking and Speaking — and Hold to talk once the far side is done",
+    text(holdThinking).includes("Thinking") && text(holdSpeaking).includes("Speaking") &&
+    /class="kx-call-orb[^"]*is-thinking/.test(holdThinking) && /class="kx-call-orb[^"]*is-live/.test(holdSpeaking) && !/class="kx-call-orb[^"]*is-live/.test(holdIdle) &&
+    /* The button always reads Hold to talk; the status adds it only once
+       the far side is done. */
+    (text(holdIdle).match(/Hold to talk/g) ?? []).length > (text(holdThinking).match(/Hold to talk/g) ?? []).length);
   const searchingWobble = renderToStaticMarkup(
     <VoiceCallScreen live reconnecting phase="listening" audioLevel={0.2} lines={lines} lang="en"
       onEnd={() => {}} searching /> as ReactElement,
@@ -1478,7 +1507,7 @@ console.log("\n── Arabic and Chinese at their own size; the sidebar title ke
   const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the call's transcript lines and caption carry their lang and the classes the call rules size",
     /lang=\{textLang\(stripImageMarkdown\(line\.text\) \|\| line\.text\)\}/.test(tr) && /kx-call-line text-\[18px\]/.test(tr) &&
-    /lang=\{textLang\(stripImageMarkdown\(lastLine\.text\) \|\| lastLine\.text\)\}/.test(scr) && /kx-call-caption max-w-\[820px\]/.test(scr));
+    /lang=\{textLang\(stripImageMarkdown\(lastLine\.text\) \|\| lastLine\.text\)\}/.test(scr) && /kx-call-caption kx-call-caption-tail max-w-\[820px\]/.test(scr));
 }
 
 console.log("\n── An Arabic opening before an English code block reads right-to-left; each block may differ from the bubble (owner, 2026-09-15) ──");

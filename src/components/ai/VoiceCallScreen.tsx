@@ -345,6 +345,26 @@ const COPY: Record<Lang, {
   },
 };
 
+/** Past this many characters the caption may run over its three lines, so
+ *  its top edge fades — earlier words leaving, not a cut. */
+const CAPTION_FADE_AFTER = 110;
+
+/** The orb's size on the call screen: its full 200px where there is room,
+ *  down to 112px on a short screen. */
+export const ORB_MAX = 200;
+export const ORB_MIN = 112;
+/** Room kept around the orb for its rings to swell into. */
+const ORB_ROOM = 40;
+
+/** The largest orb that fits a box of this size, rings included. A box not
+ *  laid out yet (0×0) keeps the full size rather than collapsing to the
+ *  minimum for one frame. */
+export function fitOrb(width: number, height: number): number {
+  if (!(width > 0) || !(height > 0)) return ORB_MAX;
+  const room = Math.floor(Math.min(width, height) - ORB_ROOM);
+  return Math.max(ORB_MIN, Math.min(ORB_MAX, room));
+}
+
 export type VoiceCallScreenProps = {
   /** False while connecting — the orb wakes rather than pretending to listen. */
   live: boolean;
@@ -621,6 +641,23 @@ export default function VoiceCallScreen({
   const cornerRef = useRef<HTMLDivElement | null>(null);
   const belowRef = useRef<HTMLDivElement | null>(null);
   const [travel, setTravel] = useState<string>("none");
+  /* THE ORB FITS THE ROOM IT HAS. A fixed 200px ran into the wordmark and
+     the caption on a short screen, or with the type-in line open (review,
+     2026-09-26). The box between them is measured and the orb takes what
+     fits, between ORB_MIN and ORB_MAX; the rings follow through
+     --kx-orb-size and the flight's scale is measured from the real size. */
+  const orbBoxRef = useRef<HTMLDivElement | null>(null);
+  const [orbSize, setOrbSize] = useState(ORB_MAX);
+  useLayoutEffect(() => {
+    const box = orbBoxRef.current;
+    if (!box) return;
+    const fit = () => setOrbSize(fitOrb(box.clientWidth, box.clientHeight));
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, []);
   useLayoutEffect(() => {
     const measure = () => {
       if (view !== "chat") {
@@ -640,7 +677,7 @@ export default function VoiceCallScreen({
     if (stageRef.current) ro.observe(stageRef.current);
     if (belowRef.current) ro.observe(belowRef.current);
     return () => ro.disconnect();
-  }, [view]);
+  }, [view, orbSize]);
 
   /* THE LATEST PICTURES, under the orb: the ones on the newest turn that
      showed any. Older ones stay in the conversation. */
@@ -721,7 +758,12 @@ export default function VoiceCallScreen({
      while the call is up; a connecting or reconnecting call has no voice to
      show. */
   const orbWrapRef = useRef<HTMLDivElement>(null);
-  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted);
+  /* THE FAR SIDE'S VOICE MOVES THE RINGS EVEN WHILE THE CALLER IS MUTED.
+     `audioLevel` is the far side's level while it speaks (VoiceCallButton),
+     so a closed microphone has nothing to do with it; only the caller's own
+     level stays still while their audio goes nowhere. */
+  const ringsLive = live && ready && !reconnecting && (!muted || phase === "speaking");
+  useCallLevel(orbWrapRef, audioLevel, ringsLive);
 
   const orbState: AIOrbState = !live || reconnecting || !ready
     ? "awakening"
@@ -732,7 +774,13 @@ export default function VoiceCallScreen({
     /* AND THE GAP BETWEEN TURNS. The caller has stopped and the far side is
        composing — the pause ChatGPT fills with motion and this screen used
        to fill with nothing. Same state as a lookup: it is the same wait. */
-    : (searching || phase === "thinking") && !muted
+    /* NOT GATED ON MUTE (owner, 2026-09-26: "anything need to fix in the
+       interface?"). In hold mode the microphone is closed between holds —
+       which is exactly when the far side thinks and answers — so gating
+       this on `muted` left a caller who had just let go looking at a still
+       orb until the voice arrived. What Koleex AI is doing outranks the
+       caller's closed microphone; the Mic control still shows it. */
+    : searching || phase === "thinking"
       ? "thinking"
     : phase === "speaking"
       ? "speaking"
@@ -747,32 +795,61 @@ export default function VoiceCallScreen({
   /* The CAPTION keeps the three-way distinction the orb does not need: the orb
      shows that it is live and reacting, while the words can still say whether
      anyone has spoken yet. */
-  const status = searching && live && !reconnecting && !muted
-    /* Above listening, below muted and reconnecting: those two are about
-       whether the call works at all, and this one is only about why it is
-       quiet right now. */
+  const status = reconnecting
+    ? copy.reconnecting
+    : !live || !ready
+    ? (connectingSlow ? copy.connectingSlow : copy.connecting)
+    /* WHAT KOLEEX AI IS DOING COMES FIRST — looking up, thinking, speaking —
+       and then the caller's closed microphone. Hold mode made the old order
+       wrong: between holds the caption said "Hold to talk" all the way
+       through the answer, so a caller could not tell a thinking call from a
+       stuck one (review, 2026-09-26). */
+    : searching
     ? copy.searching
-    : muted && live && !reconnecting
-    /* OUTRANKS listening/speaking. A user who forgot they muted, told
+    : phase === "thinking"
+      ? copy.thinking
+      : phase === "speaking"
+      ? copy.speaking
+    /* OUTRANKS listening and "go ahead". A user who forgot they muted, told
        "Listening", concludes the product is broken — and they are right to,
        because the screen said it was hearing them and it was not. In hold
        mode the closed microphone is the resting state, so the caption
        says what to do rather than what is off. */
-    ? (talkMode === "hold" ? copy.holdToTalk : copy.muted)
-    : reconnecting
-    ? copy.reconnecting
-    : !live || !ready
-    ? (connectingSlow ? copy.connectingSlow : copy.connecting)
-    : phase === "speaking"
-      ? copy.speaking
-      : phase === "thinking"
-      ? copy.thinking
+      : muted
+      ? (talkMode === "hold" ? copy.holdToTalk : copy.muted)
       : phase === "listening"
         ? copy.listening
         : copy.ready;
 
+  /* The two buttons that get a stuck call moving again (see the strip). */
+  const showRetry = connectingSlow && (!live || !ready) && !!onRetry;
+  const showSoundUnlock = soundBlocked && !!onEnableSound;
+
   /* Pending, as opposed to settled: the caption gets motion only here. */
-  const working = !live || !ready || reconnecting || (searching && !muted) || (phase === "thinking" && !muted);
+  const working = !live || !ready || reconnecting || searching || phase === "thinking";
+
+  /* THE STATUS LINE, drawn once and placed twice: under the orb in the orb
+     view, and in the strip above the controls in the conversation view —
+     where it used to be hidden with the rest of the orb layer, so a caller
+     reading the words could not see "Thinking", "Reconnecting" or "Still
+     connecting" (review, 2026-09-26). */
+  const statusLine = (
+    <p className={`max-w-[340px] px-2 text-center text-[12px] uppercase ${lang === "ar" ? "" : "tracking-[0.14em]"} font-semibold leading-relaxed text-[#AAAAAA]`}>
+      {live && ready && !working && (
+        <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full me-2 align-middle ${phase === "speaking" ? "bg-[#0066FF]" : "bg-white"}`} />
+      )}
+      {working ? (
+        <>
+          <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
+          {" "}
+          <span className="kx-activity-dots align-baseline" aria-hidden><i /><i /><i /></span>
+          {connectingSlow && (!live || !ready) && connectingFor > 0 && (
+            <span aria-hidden className="ms-2 normal-case tracking-normal font-normal">{connectingFor}s</span>
+          )}
+        </>
+      ) : status}
+    </p>
+  );
 
   /* THE ORB, ONCE. Rings and face; the wrapper the rings read their level
      from; the travelling element the flight is applied to. */
@@ -791,13 +868,13 @@ export default function VoiceCallScreen({
           className={[
             "kx-call-orb relative shrink-0 flex items-center justify-center",
             phase === "speaking" ? "is-far" : "is-near",
-            live && ready && !reconnecting && !muted ? "is-live" : "",
+            ringsLive ? "is-live" : "",
             /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
                the orb until the answer comes. The orb itself is in
                `thinking` — the shared component's own considering state. */
-            (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
+            (searching || phase === "thinking") && live ? "is-thinking" : "",
           ].join(" ")}
-          style={{ width: 200, height: 200 }}
+          style={{ width: orbSize, height: orbSize, ["--kx-orb-size" as string]: `${orbSize}px` }}
         >
           {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
               opacity only: nothing here forces a repaint of the blurred
@@ -807,9 +884,9 @@ export default function VoiceCallScreen({
           <span aria-hidden className="kx-call-ring kx-call-ring-3" />
           <ChosenOrb
             state={orbState}
-            activity={searching && live && !muted ? "searching" : "none"}
+            activity={searching && live ? "searching" : "none"}
             audioLevel={audioLevel}
-            size={200}
+            size={orbSize}
             interactive
             /* The call screen is dark in both themes; the dotted orb must
                draw light dots here even when the Hub is in light mode. */
@@ -848,7 +925,7 @@ export default function VoiceCallScreen({
       <div className={`kx-call-fade shrink-0 pt-6 ${view === "orb" ? "is-in" : ""}`} aria-hidden={view !== "orb"}>
         <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
       </div>
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+      <div ref={orbBoxRef} className="flex-1 min-h-0 w-full flex items-center justify-center">
         {orb}
       </div>
       {/* A FIXED FLOOR, so the orb's home does not move with every caption:
@@ -876,21 +953,7 @@ export default function VoiceCallScreen({
         {/* NO LETTER-SPACING ON ARABIC (UI review, 2026-09-12): a cursive
             script pulled apart renders as disconnected glyphs. The other two
             keep the small-caps tracking. */}
-        <p className={`max-w-[340px] px-2 text-center text-[12px] uppercase ${lang === "ar" ? "" : "tracking-[0.14em]"} font-semibold leading-relaxed text-[#AAAAAA]`}>
-          {live && ready && !working && (
-            <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full me-2 align-middle ${phase === "speaking" ? "bg-[#0066FF]" : "bg-white"}`} />
-          )}
-          {working ? (
-            <>
-              <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
-              {" "}
-              <span className="kx-activity-dots align-baseline" aria-hidden><i /><i /><i /></span>
-              {connectingSlow && (!live || !ready) && connectingFor > 0 && (
-                <span aria-hidden className="ms-2 normal-case tracking-normal font-normal">{connectingFor}s</span>
-              )}
-            </>
-          ) : status}
-        </p>
+        {statusLine}
         {/* AT MOST ONE HELPER LINE (UI/UX pass, 2026-09-24): the line note
             first, then the text-only note, then the how-to hint below — never
             two stacked under the orb. */}
@@ -900,32 +963,17 @@ export default function VoiceCallScreen({
         {model === "mind" && laneNote !== "international-unreachable" && (
           <p className="mt-2 max-w-[28rem] text-[12px] text-[#AAAAAA]" role="status">{copy.mindCallNote}</p>
         )}
-        {/* A SLOW HANDSHAKE OFFERS A WAY OUT THAT IS NOT "END": one tap
-            rebuilds the call — on the other lane when this one never came
-            up — with the words kept. */}
-        {connectingSlow && (!live || !ready) && onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-white/[0.06] px-5 text-sm font-semibold text-white hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] active:scale-95 transition-[background-color,transform]"
-          >
-            {copy.tryAgain}
-          </button>
-        )}
-        {soundBlocked && onEnableSound && (
-          <button
-            type="button"
-            onClick={onEnableSound}
-            className="inline-flex h-10 items-center justify-center rounded-full bg-[#0066FF] px-5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 transition-transform"
-          >
-            {copy.enableSound}
-          </button>
-        )}
         {lastLine && (
           <p
             dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}
             lang={textLang(stripImageMarkdown(lastLine.text) || lastLine.text)}
-            className={`kx-call-caption max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
+            /* THE LATEST THREE LINES, NOT THE FIRST THREE. line-clamp kept
+               the opening of a long answer and cut the rest, so the caption
+               froze while the voice went on (review, 2026-09-26). The box
+               now holds three lines and lets the text overflow from the top
+               (globals.css .kx-call-caption-tail), with a fade where the
+               earlier words leave. */
+            className={`kx-call-caption kx-call-caption-tail max-w-[820px] px-2 text-center text-base leading-relaxed ${stripImageMarkdown(lastLine.text).length > CAPTION_FADE_AFTER ? "is-long" : ""} ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
           >
             {stripImageMarkdown(lastLine.text)}
           </p>
@@ -1020,6 +1068,38 @@ export default function VoiceCallScreen({
         {wordsLayer}
         {orbLayer}
       </div>
+
+      {/* ── THE STRIP ABOVE THE CONTROLS, in both views. The ways out of a
+          stuck call — Try again, Turn on sound — lived under the orb and
+          vanished with it when the conversation was open; here they are
+          always in reach. In the conversation view the status line comes
+          too, since the one under the orb is hidden there. ── */}
+      {(view === "chat" || showRetry || showSoundUnlock) && (
+        <div className="shrink-0 flex flex-col items-center gap-2 px-4 pt-2" data-call-strip>
+          {view === "chat" && statusLine}
+          {/* A SLOW HANDSHAKE OFFERS A WAY OUT THAT IS NOT "END": one tap
+              rebuilds the call — on the other lane when this one never came
+              up — with the words kept. */}
+          {showRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-white/[0.06] px-5 text-sm font-semibold text-white hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] active:scale-95 transition-[background-color,transform]"
+            >
+              {copy.tryAgain}
+            </button>
+          )}
+          {showSoundUnlock && (
+            <button
+              type="button"
+              onClick={onEnableSound}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[#0066FF] px-5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 transition-transform"
+            >
+              {copy.enableSound}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── A TASK WAITING FOR A TAP (roadmap D1) ──────────────────────────
           Above the bar, in both views: what will be saved, in the caller's
@@ -1180,7 +1260,11 @@ export default function VoiceCallScreen({
         {/* Room under the controls: on the desktop app "Mic / End" sat on the
             window's edge and on a phone on the home-indicator strip (the
             safe-area inset is added by the root, on top of this). */}
-        <div className="flex items-end justify-center gap-6 sm:gap-10 pb-6">
+        {/* TIGHTER ON A PHONE. With Hold to talk in Mute's place the row was
+            wider than a 390px iPhone and ran off both edges (review,
+            2026-09-26): 12px between the controls under 400px, the old 24px
+            above it. */}
+        <div className="flex items-end justify-center gap-3 min-[400px]:gap-6 sm:gap-10 pb-6">
           {talkMode === "hold" && onHold ? (
             /* HOLD TO TALK (roadmap B2), in Mute's place: the one control a
                caller in a loud room uses, so it is the widest thing on the
@@ -1204,21 +1288,25 @@ export default function VoiceCallScreen({
                 onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); hold(false); } }}
                 onContextMenu={(e) => e.preventDefault()}
                 style={{ touchAction: "none", WebkitTouchCallout: "none", userSelect: "none", WebkitUserSelect: "none" }}
-                className={`h-14 min-w-[160px] px-6 rounded-full inline-flex items-center justify-center gap-2 border text-[14px] font-semibold select-none transition-[background-color,color,border-color,transform] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                /* ONE WIDTH AND ONE LABEL. The label used to change to "Let
+                   go when done" under the finger, which widened the button
+                   and shifted the whole row mid-press; the hint now sits in
+                   the small line under it, and the button keeps its size. */
+                className={`h-14 w-[clamp(124px,36vw,168px)] px-3 rounded-full inline-flex items-center justify-center gap-1.5 border text-[13px] sm:text-[14px] font-semibold whitespace-nowrap select-none transition-[background-color,color,border-color,transform] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
                   holding
                     ? "bg-[#0066FF] text-white border-[#0066FF] scale-[1.03]"
                     : "text-white border-white/25 bg-white/[0.06] hover:bg-white/[0.1]"
                 }`}
               >
-                <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden className="shrink-0" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="9" y="2" width="6" height="12" rx="3" />
                   <path d="M5 10.5V12a7 7 0 0 0 14 0v-1.5" />
                   <line x1="12" y1="19" x2="12" y2="22" />
                 </svg>
-                {holding ? copy.holdRelease : copy.holdToTalk}
+                <span className="min-w-0 truncate">{copy.holdToTalk}</span>
               </button>
               <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} transition-colors ${holding ? "text-white" : "text-[#AAAAAA]"}`}>
-                {copy.micShort}
+                {holding ? copy.holdRelease : copy.micShort}
               </span>
             </div>
           ) : onToggleMute && (

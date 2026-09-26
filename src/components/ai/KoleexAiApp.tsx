@@ -481,7 +481,7 @@ export default function KoleexAiApp() {
   /* THE CALL THE PAGE DIED UNDER, offered back (plan B5): the button found
      the pulse on this load and handed over a way to continue; the card
      below the thread carries it until the caller taps or dismisses. */
-  const [interruptedCall, setInterruptedCall] = useState<{ resume: () => void; conversation: string | null } | null>(null);
+  const [interruptedCall, setInterruptedCall] = useState<{ resume: () => void; conversation: string | null; cause: "page" | "network" } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   /* WHICH SIDEBAR IS THIS. On a phone the aside is a drawer that slides off
      screen; on a desktop it collapses to zero width. Both used to stay in the
@@ -960,8 +960,8 @@ export default function KoleexAiApp() {
     });
   }, []);
 
-  const onVoiceInterrupted = useCallback((resume: () => void, conversation: string | null) => {
-    setInterruptedCall({ resume, conversation });
+  const onVoiceInterrupted = useCallback((resume: () => void, conversation: string | null, cause: "page" | "network" = "page") => {
+    setInterruptedCall({ resume, conversation, cause });
     playSound("call-interrupted");
   }, []);
   const continueInterruptedCall = useCallback(async () => {
@@ -2969,7 +2969,7 @@ export default function KoleexAiApp() {
             )}
             {interruptedCall && !callLive && (
               <div role="status" className="rounded-xl border border-[var(--kx-ai-warning-line)] bg-[var(--kx-ai-warning-soft)] text-[var(--kx-ai-warning-text)] px-3 py-2 text-[12px] flex flex-wrap items-center gap-2">
-                <span className="flex-1 min-w-[12rem]">{copy.callCutOff}</span>
+                <span className="flex-1 min-w-[12rem]">{interruptedCall.cause === "network" ? copy.callDropped : copy.callCutOff}</span>
                 <button
                   type="button"
                   onClick={() => void continueInterruptedCall()}
