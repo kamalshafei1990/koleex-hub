@@ -23,7 +23,7 @@ export type IntentType =
 
 export type Complexity = "simple" | "medium" | "deep";
 
-export type ExpectedFormat = "short" | "structured" | "detailed";
+export type ExpectedFormat = "short" | "structured" | "detailed" | "list";
 
 export interface IntentAnalysis {
   type: IntentType;
@@ -111,13 +111,26 @@ function detectFormat(type: IntentType, complexity: Complexity): ExpectedFormat 
   return "structured";
 }
 
+/* ─── A list or a table, asked for by name ──────────────────────
+   Owner, 2026-09-26: "ok make a list for top 100 countries from the
+   biggest to the smallest" read as chat (it opens with "ok") → "short"
+   → "1–2 sentences", and the reply was two sentences and a link. A
+   request that names a list, a table, a ranking or a "top N" wants the
+   whole list, whatever the rest of the message looks like. */
+const RE_LIST =
+  /\b(?:list|table|ranking|ranked|top\s+\d+)\b|قائمة|قايمة|ليستة|جدول|ترتيب|(?:أكبر|أعلى|أول|أحسن|أفضل)\s+\d+|列表|清单|表格|排名|前\s*\d+/i;
+
+export function wantsList(text: string): boolean {
+  return RE_LIST.test(text ?? "");
+}
+
 /* ─── Public API ─────────────────────────────────────────────── */
 
 export function analyzeIntent(query: string): IntentAnalysis {
   const q = (query ?? "").trim();
   const type = detectType(q);
   const complexity = detectComplexity(q, type);
-  const expectedFormat = detectFormat(type, complexity);
+  const expectedFormat = wantsList(q) ? "list" : detectFormat(type, complexity);
   return { type, complexity, expectedFormat };
 }
 

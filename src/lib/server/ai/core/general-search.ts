@@ -45,7 +45,10 @@ export const GENERAL_SEARCH_NOTE =
   "You have ONE tool on this turn: search_web. Use it for a fact about the world you would otherwise recall from training " +
   "(a person, a company, a place, a figure, a ranking, anything recent) — look it up, then answer from the result. " +
   "Do not use it for an explanation, a definition, a translation, a draft, or small talk: answer those directly. " +
-  "You get at most one lookup per answer, so make the query count.";
+  "You get at most one lookup per answer, so make the query count. " +
+  "If the result covers only part of what was asked (a list, a table, a ranking), still give the whole answer: " +
+  "use the result for what it covers and complete the rest from what you know, saying in one line which part comes from general knowledge. " +
+  "Never answer with only a link.";
 
 export type GeneralInvoke = (
   ctx: UserContext,
