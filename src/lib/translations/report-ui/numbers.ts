@@ -111,6 +111,7 @@ export const reportNumbersT: Translations = {
   "num.emptyNow":  { en: "Nothing recorded yet.", zh: "暂无记录。", ar: "لسه مفيش حاجة متسجّلة." },
   "num.locked.cost":    { en: "These figures include costs — they open with “Can see private data” in Roles.", zh: "这些数字包含成本——需要在“角色”中开启“可查看私密数据”。", ar: "الأرقام دي فيها تكاليف — بتتفتح بصلاحية «يرى البيانات الخاصة» في الأدوار." },
   "num.locked.finance": { en: "These numbers open with Finance access.", zh: "这些数字需要财务权限。", ar: "الأرقام دي محتاجة صلاحية المالية." },
+  "num.locked.bankProfit": { en: "Profit and cash open with «Bank & Profit» in Roles.", zh: "利润与现金需要在“角色”中拥有「Bank & Profit」。", ar: "الأرباح والنقدية بتتفتح بصلاحية «Bank & Profit» في الأدوار." },
   "num.currencies": { en: "Each amount stays in its own currency: a document Finance converted shows in the company's currency ({c}), any other in its own. Two currencies are never added together.", zh: "每个金额保留其自身货币：财务已换算的单据以公司货币（{c}）显示，其余以单据自身货币显示。不同货币从不相加。", ar: "كل مبلغ بعملته: المستند اللي المالية حوّلته بيظهر بعملة الشركة ({c})، والباقي بعملته هو. وعمر عملتين ما بيتجمعوا على بعض." },
   "num.totalOf":    { en: "Total · {n}", zh: "合计 · {n}", ar: "الإجمالي · {n}" },
   "num.total":      { en: "Total", zh: "合计", ar: "الإجمالي" },

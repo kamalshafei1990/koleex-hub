@@ -53,11 +53,14 @@ export default function FinanceCashFlow() {
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/accounting/cash-flow?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
     const j = await res.json();
+    /* No «Bank & Profit» (src/lib/experience): a line, not a failure. */
+    if (res.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
     if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
     return j.statement as CashFlowStatement;
   }, [from, to]);
   const { data, loading, error: loadError } = useWarmData<CashFlowStatement>(`fin:cf:${from}:${to}`, fetchData);
-  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
+  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  const error = loadError && !locked ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -79,6 +82,7 @@ export default function FinanceCashFlow() {
           </div>
         </div>
 
+        {locked && <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("cf.locked", "The cash flow opens with «Bank & Profit» in Roles & Permissions.")}</div>}
         {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
 
         {data && (

@@ -18,7 +18,7 @@ async function build(q: URLSearchParams, t: (key: string) => string): Promise<Pa
   const range = isYmd(f) && isYmd(to) && f <= to ? { from: f, to } : year;
   const asOf = isYmd(a) ? a : today;
   const res = await fetchStatement(tab, { ...range, asOf, cmp: q.get("cmp") === "1" });
-  if (res.state === "locked") return { failed: "num.locked.finance" };
+  if (res.state === "locked") return { failed: res.code === "needs_bank_profit" ? "num.locked.bankProfit" : "num.locked.finance" };
   if (res.state === "error") return { failed: "num.error" };
   return { paper: statementPaper(t, res.data, { ...range, asOf }) };
 }

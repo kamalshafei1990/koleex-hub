@@ -44,12 +44,16 @@ export type StatementData =
   | { tab: "cf"; cf: CashFlow }
   | { tab: "ar" | "ap"; aging: Aging };
 
-export type Fetched<D> = { state: "ok"; data: D } | { state: "locked" } | { state: "error" };
+/** `code`: which door refused — "needs_bank_profit" names «Bank & Profit». */
+export type Fetched<D> = { state: "ok"; data: D } | { state: "locked"; code?: string } | { state: "error" };
 
 async function getJson<D>(url: string, pick: (j: Record<string, unknown>) => D | null): Promise<Fetched<D>> {
   try {
     const res = await fetch(url, { credentials: "include", cache: "no-store" });
-    if (res.status === 403) return { state: "locked" };
+    if (res.status === 403) {
+      const code = await res.json().then((j: { code?: unknown }) => (typeof j.code === "string" ? j.code : undefined), () => undefined);
+      return { state: "locked", code };
+    }
     if (!res.ok) return { state: "error" };
     const data = pick((await res.json()) as Record<string, unknown>);
     return data ? { state: "ok", data } : { state: "error" };

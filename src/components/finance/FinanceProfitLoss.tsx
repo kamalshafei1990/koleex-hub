@@ -62,11 +62,14 @@ export default function FinanceProfitLoss() {
     if (compare) qs.set("compare_prior", "1");
     const res = await fetch(`/api/accounting/profit-loss?${qs.toString()}`, { cache: "no-store", credentials: "include" });
     const j = await res.json();
+    /* No «Bank & Profit» (src/lib/experience): a line, not a failure. */
+    if (res.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
     if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
     return j.statement as ProfitLoss;
   }, [from, to, compare]);
   const { data, loading, error: loadError } = useWarmData<ProfitLoss>(`fin:pl:${from}:${to}:${compare ? 1 : 0}`, fetchData);
-  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
+  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  const error = loadError && !locked ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   /* Variance helper for the comparison column. */
   const variance = (cur: number, prev: number): { amount: number; pct: number } => ({
@@ -101,6 +104,9 @@ export default function FinanceProfitLoss() {
           </div>
         </div>
 
+        {locked && (
+          <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("pl.locked", "The profit and loss opens with «Bank & Profit» in Roles & Permissions.")}</div>
+        )}
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
         )}

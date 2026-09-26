@@ -4,6 +4,9 @@ import type { Translations } from "@/lib/i18n";
    See the header of ../finance.ts for why. */
 
 export const FIN_STATEMENTS: Translations = {
+  "statements.locked":          { en: "Profit and cash open with «Bank & Profit» in Roles & Permissions.",
+                                  zh: "利润与现金需要在角色与权限中拥有「Bank & Profit」才能查看。",
+                                  ar: "الأرباح والنقدية تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
   "statements.subtitle.long":{ en: "Executive financial picture — P&L, Balance Sheet, Cash Flow, aging, valuation, gross profit.",
                               zh: "高管财务全景 — 损益、资产负债、现金流、账龄、估值、毛利。",
                               ar: "صورة مالية تنفيذية — الدخل، الميزانية، التدفقات، الأعمار، التقييم، الربح الإجمالي." },

@@ -5,6 +5,9 @@ import type { Translations } from "@/lib/i18n";
 
 export const FIN_PL: Translations = {
   /* ── Profit & Loss (FinanceProfitLoss.tsx) ───────────────────────── */
+  "pl.locked":               { en: "The profit and loss opens with «Bank & Profit» in Roles & Permissions.",
+                               zh: "损益表需要在角色与权限中拥有「Bank & Profit」才能查看。",
+                               ar: "الأرباح والخسائر تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
   "pl.compare":              { en: "Compare to prior period", zh: "与上期对比", ar: "قارن بالفترة السابقة" },
   "pl.from":                 { en: "From",            zh: "起始",        ar: "من" },
   "pl.to":                   { en: "To",              zh: "截止",        ar: "إلى" },

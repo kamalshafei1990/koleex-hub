@@ -744,6 +744,22 @@ rule("the financial statements open only with «Bank & Profit»", VS_API, bankPr
       "      compareEnd,\n    });\n  const denied = await requireBankAndProfit(auth, \"The financial statements\");\n  if (denied) return denied;\n") },
 ]);
 
+/* Profit and cash in the accounting API (owner, 26/09/2026: «أيوه اقفلهم»):
+   the P&L, the cash-flow statement and the cash-flow summary were Finance
+   only — the same numbers the visual statements keep to «Bank & Profit». */
+for (const [file, what, data] of [
+  ["src/app/api/accounting/profit-loss/route.ts", "The profit and loss", /\bbuildProfitLoss\(/],
+  ["src/app/api/accounting/cash-flow/route.ts", "The cash flow", /\bbuildCashFlow\(/],
+  ["src/app/api/accounting/statements/cash-flow-summary/route.ts", "The cash flow", /\bbuildCashFlowSummary\(/],
+] as const) {
+  rule(`${file.split("/api/accounting/")[1].replace("/route.ts", "")} opens only with «Bank & Profit»`, file, bankProfitDoorProblems(data), [
+    { label: `${file}: the door removed`, caught: /does not ask «Bank & Profit»/,
+      mutate: (s) => once(s, `  const denied = await requireBankAndProfit(auth, "${what}");\n`, "") },
+    { label: `${file}: the answer ignored`, caught: /ignores the «Bank & Profit» answer/,
+      mutate: (s) => once(s, `  const denied = await requireBankAndProfit(auth, "${what}");\n  if (denied) return denied;\n`, `  const denied = await requireBankAndProfit(auth, "${what}");\n  void denied;\n`) },
+  ]);
+}
+
 rule("the treasury feed keeps the balances to «Bank & Profit»", TRE, (c) => {
   const get = bodyOf(c, "GET");
   const p: string[] = [];

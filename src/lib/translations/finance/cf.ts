@@ -4,6 +4,9 @@ import type { Translations } from "@/lib/i18n";
    See the header of ../finance.ts for why. */
 
 export const FIN_CF: Translations = {
+  "cf.locked":               { en: "The cash flow opens with «Bank & Profit» in Roles & Permissions.",
+                               zh: "现金流量表需要在角色与权限中拥有「Bank & Profit」才能查看。",
+                               ar: "التدفقات النقدية تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
   /* ── Cash Flow (FinanceCashFlow.tsx) ─────────────────────────────── */
   "cf.from":                 { en: "From",            zh: "起始",        ar: "من" },
   "cf.to":                   { en: "To",              zh: "截止",        ar: "إلى" },

@@ -3158,13 +3158,18 @@ console.log("\n§32 the number reports — same doors, one currency per figure, 
     (c) => (c.includes('(j) => (j.statement ? { tab: "pl", pl: j.statement as ProfitLoss } : null)') && c.includes("j.balance_sheet ? { tab: \"bs\", bs: j.balance_sheet as BalanceSummary")
       && c.includes('(j) => (j.statement ? { tab: "cf", cf: j.statement as CashFlow } : null)') && c.includes("(j) => (j.report ? { tab, aging: j.report as Aging } : null)") ? [] : ["a tab reads a field the API never sends"]),
     (src) => src.replace('(j) => (j.statement ? { tab: "pl", pl: j.statement as ProfitLoss } : null)', '(j) => (j.pl ? { tab: "pl", pl: j.pl as ProfitLoss } : null)'));
-  rule("a 403 is a lock, said as such — never an error or a guess", DATA,
-    (c) => (c.includes('if (res.status === 403) return { state: "locked" };') ? [] : ["a refused report reads as broken"]),
-    (src) => src.replace('    if (res.status === 403) return { state: "locked" };\n', ""));
+  rule("a 403 is a lock, said as such — never an error or a guess — with the door that refused", DATA,
+    (c) => (/if \(res\.status === 403\) \{[\s\S]{0,240}?return \{ state: "locked", code \};/.test(c) ? [] : ["a refused report reads as broken"]),
+    (src) => src.replace("    if (res.status === 403) {", "    if (res.status === 999) {"));
   rule("Finance's \"tap for aging\" (?tab=ar|ap) opens that aging", "src/components/reports/numbers/StatementNumbers.tsx",
     (c) => (c.includes("if (isStatementTab(tb)) setTab(tb);") ? [] : ["the aging link lands on the profit and loss"]),
     (src) => src.replace("      if (isStatementTab(tb)) setTab(tb);\n", ""));
   expect(["ar", "ap"].every((x) => code(read("src/components/finance/FinanceDashboard.tsx")).includes(`href="/reports/statements?tab=${x}"`)), "…and those are the links Finance's dashboard carries");
+  /* Profit and cash moved behind «Bank & Profit» (owner, 26/09/2026): the
+     lock names that permission, not Finance. */
+  expect(code(read("src/components/reports/numbers/StatementNumbers.tsx")).includes('t(result.code === "needs_bank_profit" ? "num.locked.bankProfit" : "num.locked.finance")')
+    && code(read("src/components/reports/numbers/data.ts")).includes('return { state: "locked", code };'),
+    "a statement refused for «Bank & Profit» says so — the lock names the permission that opens it");
 
   /* The look, the words, the paper. */
   const KIT = code(read("src/components/reports/numbers/NumbersKit.tsx"));

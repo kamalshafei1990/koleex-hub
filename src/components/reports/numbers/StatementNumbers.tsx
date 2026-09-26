@@ -105,7 +105,7 @@ export default function StatementNumbers() {
       </section>
 
       {result?.state === "locked" ? (
-        <StateCard t={t} kind="locked" text={t("num.locked.finance")} />
+        <StateCard t={t} kind="locked" text={t(result.code === "needs_bank_profit" ? "num.locked.bankProfit" : "num.locked.finance")} />
       ) : result?.state === "error" ? (
         <StateCard t={t} kind="error" onRetry={() => void load(tab, true)} />
       ) : !data ? (

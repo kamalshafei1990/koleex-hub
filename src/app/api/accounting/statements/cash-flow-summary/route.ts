@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireBankAndProfit } from "@/lib/experience";
 import { buildCashFlowSummary } from "@/lib/accounting/aging";
 
 export async function GET(req: Request) {
@@ -9,6 +10,11 @@ export async function GET(req: Request) {
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
+  /* Profit and cash are «Bank & Profit» (owner, 26/09/2026: «أيوه اقفلهم»
+     — the rule the Finance dashboard and visual statements already keep).
+     Guarded by validate:finance-perf §G. */
+  const denied = await requireBankAndProfit(auth, "The cash flow");
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const today = new Date();

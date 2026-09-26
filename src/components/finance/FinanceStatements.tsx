@@ -134,6 +134,8 @@ function useJson<T>(url: string | null) {
     if (!url) throw new Error("no url");
     const r = await fetch(url, { credentials: "include", cache: "no-store" });
     const j = await r.json();
+    /* No «Bank & Profit» (the P&L and the cash flow): a line, not a failure. */
+    if (r.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
     if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
     return j as T;
   }, [url]);
@@ -143,8 +145,9 @@ function useJson<T>(url: string | null) {
      the exact question being asked — the "include the filter in the key"
      half of the cache's contract, rather than the opt-out half. */
   const { data, loading, error: loadError } = useWarmData<T>(url ? `fin:stmt:${url}` : "", load);
-  const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
-  return { data, loading, error };
+  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  const error = loadError && !locked ? String(loadError instanceof Error ? loadError.message : loadError) : null;
+  return { data, loading, error, locked };
 }
 
 function Panel({ children, title }: { children: React.ReactNode; title: string }) {
@@ -176,10 +179,11 @@ interface PLStatement {
 
 function ProfitLossPanel({ from, to }: { from: string; to: string }) {
   const { t } = useTranslation(FIN_STATEMENTS);
-  const { data, loading, error } = useJson<{ statement: PLStatement }>(
+  const { data, loading, error, locked } = useJson<{ statement: PLStatement }>(
     `/api/accounting/profit-loss?from=${from}&to=${to}`,
   );
   const s = data?.statement;
+  if (locked) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("statements.locked", "Profit and cash open with «Bank & Profit» in Roles & Permissions.")}</div></Panel>;
   if (loading && !s) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
   if (error) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!s) return null;
@@ -298,10 +302,11 @@ function BalanceSheetPanel({ asOf }: { asOf: string }) {
 interface CFSummary { from: string; to: string; cash_in: number; cash_out: number; net_change: number; counts: { in: number; out: number } }
 function CashFlowPanel({ from, to }: { from: string; to: string }) {
   const { t } = useTranslation(FIN_STATEMENTS);
-  const { data, loading, error } = useJson<{ report: CFSummary }>(
+  const { data, loading, error, locked } = useJson<{ report: CFSummary }>(
     `/api/accounting/statements/cash-flow-summary?from=${from}&to=${to}`,
   );
   const r = data?.report;
+  if (locked) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("statements.locked", "Profit and cash open with «Bank & Profit» in Roles & Permissions.")}</div></Panel>;
   if (loading && !r) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
   if (error) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
