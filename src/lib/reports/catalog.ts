@@ -397,6 +397,17 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
       b("reports", "data", { source: "team_reports" }), b("work", "data", { source: "team_workload" }), b("attendance", "data", { source: "team_attendance" }),
       t("next", "list"),
     ] },
+  /* 6E (owner's picks 26/09/2026): the team's week, prepared every Monday
+     at 07:00 in the manager's own time — Koleex AI writes "the week" from
+     what the team sent (the Team tab's reading shape) beside the team's
+     numbers; each manager switches it on for themself in «فريقي». It is
+     read, not sent: no default readers, nothing is sent by itself. */
+  { key: "team_weekly", family: "team", icon: "users", cadence: "weekly", teamOnly: true, recipients: "none", reviewRequired: false, confidential: false,
+    sections: [
+      t("summary", "text", true),
+      b("reports", "data", { source: "team_reports" }), b("work", "data", { source: "team_workload" }), b("attendance", "data", { source: "team_attendance" }),
+      t("notes", "text"),
+    ] },
   { key: "one_on_one", family: "team", icon: "handshake", cadence: null, teamOnly: true, recipients: "none", reviewRequired: false, confidential: true,
     sections: [
       t("discussed", "text", true), t("wins", "list"), t("challenges", "list"),

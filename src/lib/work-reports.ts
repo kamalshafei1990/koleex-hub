@@ -267,6 +267,11 @@ export interface TeamSummaryResult {
 }
 export const fetchTeamSummary = (from: string, to: string, lang: string) =>
   call<TeamSummaryResult>("/api/work-reports/team-summary", { method: "POST", body: JSON.stringify({ from, to, lang }) });
+/** 6E: the manager's own weekly team summary — every Monday at 07:00, the
+ *  week that ended, written by Koleex AI into a draft. */
+export interface TeamWeekly { available: boolean; on: boolean }
+export const fetchTeamWeekly = () => call<TeamWeekly>("/api/work-reports/team-summary/weekly");
+export const saveTeamWeekly = (on: boolean) => call<TeamWeekly>("/api/work-reports/team-summary/weekly", { method: "PUT", body: JSON.stringify({ on }) });
 
 /* ── The template builder (4E) ── */
 export interface TemplateRights { view: boolean; create: boolean; edit: boolean; delete: boolean }

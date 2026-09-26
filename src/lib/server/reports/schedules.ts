@@ -19,8 +19,15 @@ import "server-only";
          new is made and nothing is said
        · the writer is told once (report_scheduled), and the notice goes
          away when the report is sent or deleted
+       · 6E: a type written from what the TEAM (or the company) sent — the
+         weekly team summary, the executive summary, the monthly review —
+         starts with Koleex AI's summary in the writer's language, written
+         before the draft is made and only with time left in the run (else
+         the next run prepares it); days in which nothing was sent say so.
+         The weekly team summary starts with the first counted week.
 
-   Nothing is ever sent by itself. `dryRun` reads and plans only.
+   Nothing is ever sent by itself. `dryRun` reads and plans only — it never
+   asks a model.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -30,13 +37,35 @@ import { reportTemplate } from "@/lib/reports/catalog";
 import { isCustomKey, snapshotOf, type TemplateSnapshot } from "@/lib/reports/custom-templates";
 import { customAsTemplate, loadCustomTemplate, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 import { insertDraft, periodReport } from "@/lib/server/reports/drafts";
+import { loadTrackingFrom } from "@/lib/server/reports/obligations";
+import { writeScheduledSummary } from "@/lib/server/reports/summary-writer";
+import { companyMaterial, serverMaterial } from "@/lib/reports/ai-draft";
 import { loadPolicyRows, pickPolicy, resolveEmployeeCountries } from "@/lib/server/work-calendar";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { localDayOf } from "@/lib/reports/obligations";
-import { periodFor, type ReportTemplateDef } from "@/lib/reports/templates";
+import { behaviourKey, periodFor, type ReportTemplateDef } from "@/lib/reports/templates";
 import { rangeLabel } from "@/lib/reports/team";
-import { SCHEDULE_LIMITS, localMinutesOf, periodToPrepare, schedulable, type ScheduleRow } from "@/lib/reports/schedules";
+import { SCHEDULE_LIMITS, SCHEDULE_SUMMARY, localMinutesOf, periodToPrepare, schedulable, type ScheduleRow } from "@/lib/reports/schedules";
+import { templateWords } from "@/lib/reports/custom-templates";
 import { reportsT } from "@/lib/translations/reports";
+import { REPORT_SECTION_WORDS } from "@/lib/translations/report-sections/all";
+
+type Lang = "en" | "zh" | "ar";
+
+/** 6E: the language the writer READS in (accounts.preferences.language —
+ *  the one their push notifications are written in); English when unset. */
+async function languageOf(accountId: string): Promise<Lang> {
+  const { data } = await supabaseServer.from("accounts").select("preferences").eq("id", accountId).maybeSingle();
+  const lang = ((data as { preferences?: { language?: unknown } | null } | null)?.preferences?.language);
+  return lang === "zh" || lang === "ar" ? lang : "en";
+}
+
+/** The summary section's names in every language (a builder copy's own). */
+function summaryNames(tpl: ReportTemplateDef, snapshot: TemplateSnapshot | null): string[] {
+  const key = `tpl.${tpl.key}.s.summary`;
+  const own = snapshot ? templateWords(tpl.key, snapshot.words) : null;
+  return Object.values((own?.[key] ?? reportsT[key] ?? REPORT_SECTION_WORDS[key]) ?? {}).filter((v): v is string => typeof v === "string");
+}
 
 type Sched = { id: string; tenant_id: string | null; account_id: string; template_key: string; active: boolean; last_period: string | null; last_report_id: string | null };
 
@@ -89,8 +118,9 @@ export interface ScheduleRun { checked: number; prepared: Array<{ accountId: str
 
 /** `deadline` (epoch ms): no new row is started after it — the rest stay
  *  due and the next run prepares them; one cut off halfway would keep its
- *  claim with no draft. */
-export async function runReportSchedules(opts: { now?: Date; dryRun?: boolean; tenantId?: string | null; deadline?: number } = {}): Promise<ScheduleRun> {
+ *  claim with no draft. `summaryBy` (epoch ms): when a summary Koleex AI
+ *  writes into a draft (6E) must be done — the job's own end. */
+export async function runReportSchedules(opts: { now?: Date; dryRun?: boolean; tenantId?: string | null; deadline?: number; summaryBy?: number } = {}): Promise<ScheduleRun> {
   const nowIso = (opts.now ?? new Date()).toISOString();
   let q = supabaseServer.from("work_report_schedules").select("id, tenant_id, account_id, template_key, active, last_period, last_report_id").eq("active", true).limit(SCHEDULE_LIMITS.perTenant * 4);
   if (opts.tenantId) q = q.eq("tenant_id", opts.tenantId);
@@ -117,6 +147,12 @@ export async function runReportSchedules(opts: { now?: Date; dryRun?: boolean; t
       const auth = await authForAccount(r.account_id);
       if (!auth || !(await canStartTemplate(tpl, auth))) { out.skipped++; continue; }
       if (opts.dryRun) { out.prepared.push({ accountId: r.account_id, key: tpl.key, period: period.key, reportId: null }); continue; }
+      /* 6E: a summary Koleex AI writes needs time left in this run — asked
+         BEFORE the claim, so a row without room is simply prepared by the
+         next run. */
+      const writes = serverMaterial(tpl);
+      const room = writes ? (opts.summaryBy ?? Date.now() + SCHEDULE_SUMMARY.maxMs) - Date.now() : 0;
+      if (writes && room < SCHEDULE_SUMMARY.minMs) { out.waiting++; continue; }
 
       /* Claim the period first: only the run that moves last_period prepares it. */
       let claim = supabaseServer.from("work_report_schedules").update({ last_period: period.key, updated_at: nowIso }).eq("id", r.id);
@@ -131,7 +167,27 @@ export async function runReportSchedules(opts: { now?: Date; dryRun?: boolean; t
         await supabaseServer.from("work_report_schedules").update({ last_report_id: existing.id }).eq("id", r.id);
         continue;
       }
-      const id = await insertDraft(auth, tpl, { start: period.start, end: period.end, key: period.key }, "", [], snapshot);
+      /* 6E: the weekly team summary starts with the first week reports are
+         counted — before it, the team owed nothing and there is nothing to
+         read. The week stays claimed: it is done, not retried. */
+      if (behaviourKey(tpl) === "team_weekly") {
+        const from = await loadTrackingFrom(auth.tenant_id);
+        if (!from || period.end < from) continue;
+      }
+      /* 6E: written from what the team (or the company) sent — BEFORE the
+         draft is made, so it starts with the summary; said in the writer's
+         language when nothing was sent; left for "Write it" when the answer
+         did not come in time. */
+      let sections: Array<{ id: string; text: string }> = [];
+      if (writes) {
+        const lang = await languageOf(r.account_id);
+        const got = await writeScheduledSummary(auth, tpl, { start: period.start, end: period.end }, lang, Math.min(room - 2_000, SCHEDULE_SUMMARY.maxMs), summaryNames(tpl, snapshot))
+          .catch((e: unknown) => { console.error("[reports] schedule summary:", r.id, e instanceof Error ? e.message : e); return { text: null, reports: -1 }; });
+        const none = got.reports === 0 ? (reportsT[companyMaterial(tpl) ? "sched.none.company" : "sched.none.team"]?.[lang] as string | undefined) : undefined;
+        const text = got.text ?? none;
+        if (text) sections = [{ id: "summary", text }];
+      }
+      const id = await insertDraft(auth, tpl, { start: period.start, end: period.end, key: period.key }, "", sections, snapshot);
       if (!id) {
         /* Not written: give the period back, so the next run tries again. */
         await supabaseServer.from("work_report_schedules").update({ last_period: r.last_period }).eq("id", r.id).eq("last_period", period.key);

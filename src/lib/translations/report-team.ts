@@ -11,6 +11,10 @@ export const reportTeamT: Translations = {
   "team.p.this_week": { en: "This week", zh: "本周", ar: "الأسبوع ده" },
   "team.p.last_week": { en: "Last week", zh: "上周", ar: "الأسبوع اللي فات" },
   "team.p.this_month": { en: "This month", zh: "本月", ar: "الشهر ده" },
+  /* 6E: the weekly summary, switched on by the manager for themself. */
+  "team.weekly": { en: "Weekly summary", zh: "每周总结", ar: "ملخص أسبوعي" },
+  "team.weekly.hint": { en: "Every Monday at 07:00 your time, Koleex AI writes last week's summary of your team into My reports and tells you — from the first week reports are counted. Nothing is sent.", zh: "每周一你当地时间 07:00，Koleex AI 会把团队上周的总结写入「我的报告」并通知你——从开始统计报告的第一周起。不会发送给任何人。", ar: "كل اتنين الساعة 7 الصبح بتوقيتك، Koleex AI بيكتب ملخص الأسبوع اللي فات لفريقك في «تقاريري» ويبلّغك — من أول أسبوع التقارير بتتحسب فيه. مفيش حاجة بتتبعت." },
+  "team.weekly.failed": { en: "Could not save — try again.", zh: "无法保存——请重试。", ar: "ما اتحفظش — جرّب تاني." },
   "team.go": { en: "Summarize", zh: "生成总结", ar: "لخّص" },
   "team.again": { en: "Summarize again", zh: "重新总结", ar: "لخّص تاني" },
   "team.busy": { en: "Reading your team's reports…", zh: "正在阅读团队报告…", ar: "بيقرا تقارير فريقك…" },

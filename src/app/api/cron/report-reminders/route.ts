@@ -17,7 +17,9 @@ import "server-only";
    Phase 5D runs last: the drafts the system prepares on schedule — the
    week or month that just ended, at 07:00 in the writer's own time, once
    per period, each claimed before it is written; the writer is told,
-   nothing is ever sent (src/lib/server/reports/schedules.ts).
+   nothing is ever sent (src/lib/server/reports/schedules.ts). 6E: a
+   summary Koleex AI writes into one must be done 55 s in, before the
+   job's 60 s end.
 
    The answer carries counts only — never a name.
 
@@ -56,6 +58,6 @@ export async function GET(req: Request) {
   /* A failed schedule run never costs the reminders above; it stops
      starting new drafts 45 s in, so the job's 60 s never cuts one off
      halfway — the rest are prepared 15 minutes later. */
-  const scheduled = await runReportSchedules({ deadline: started + 45_000 }).catch((e: unknown) => { console.error("[cron report-reminders] schedules:", e instanceof Error ? e.message : e); return null; });
+  const scheduled = await runReportSchedules({ deadline: started + 45_000, summaryBy: started + 55_000 }).catch((e: unknown) => { console.error("[cron report-reminders] schedules:", e instanceof Error ? e.message : e); return null; });
   return NextResponse.json({ ok: true, tenants: run.tenants, reminders: run.reminders, escalations: run.escalations, asked: events.created, cancelled: events.cancelled, prepared: scheduled?.prepared.length ?? 0 }, { headers: { "Cache-Control": "no-store" } });
 }

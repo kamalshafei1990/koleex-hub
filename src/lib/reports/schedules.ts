@@ -18,6 +18,10 @@ import { OBLIGATION_KEYS, mondayOf } from "./obligations";
 
 /** The hour, in the writer's own time, a new period's draft is prepared. */
 export const SCHEDULE_HOUR = 7;
+/** 6E: the time a summary Koleex AI writes into a prepared draft may take
+ *  inside the report job — started only with `minMs` left, cut at `maxMs`
+ *  (the job itself stops at 60 s; one that cannot start waits 15 minutes). */
+export const SCHEDULE_SUMMARY = { minMs: 20_000, maxMs: 40_000 } as const;
 export const SCHEDULE_LIMITS = { perTenant: 500 } as const;
 
 const DAY = 86_400_000;

@@ -65,6 +65,7 @@ export const REPORT_HEADS: readonly ReportTemplateHead[] = [
   { key: "price_comparison", family: "suppliers", icon: "balance-scale-left", cadence: null },
   { key: "installation", family: "service", icon: "hammer", cadence: null },
   { key: "team_summary", family: "team", icon: "users", cadence: null },
+  { key: "team_weekly", family: "team", icon: "users", cadence: "weekly" },
   { key: "one_on_one", family: "team", icon: "handshake", cadence: null },
   { key: "promotion_recommendation", family: "team", icon: "award", cadence: null },
   { key: "morning_brief", family: "office", icon: "mug-hot", cadence: null },

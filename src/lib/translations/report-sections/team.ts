@@ -1,7 +1,7 @@
 import type { Translations } from "@/lib/i18n";
 
 /* Reports — the section words of the manager's team templates (Phase 5A):
-   the team summary, the 1-on-1 minutes and the promotion or bonus
+   the team summary (and 6E's weekly one), the 1-on-1 minutes and the promotion or bonus
    recommendation (`tpl.<key>.s.*`: sections, hints, criteria, columns,
    answers). Loaded with a report of this family (./index.ts), never on the
    other Reports pages; the names and descriptions stay in ../reports.ts. */
@@ -16,6 +16,14 @@ const words: Translations = {
   "tpl.team_summary.s.work": { en: "The team's work", zh: "团队工作", ar: "شغل الفريق" },
   "tpl.team_summary.s.attendance": { en: "The team's attendance", zh: "团队考勤", ar: "حضور الفريق" },
   "tpl.team_summary.s.next": { en: "Next steps", zh: "下一步", ar: "الخطوات الجاية" },
+  /* 6E: the weekly team summary. */
+  "tpl.team_weekly.s.summary": { en: "The week", zh: "本周", ar: "الأسبوع" },
+  "tpl.team_weekly.s.summary.hint": { en: "Written by Koleex AI from what your team sent this week — read it, correct it, add what it missed.", zh: "由 Koleex AI 根据团队本周提交的报告撰写——请阅读、修改，并补充遗漏的内容。", ar: "كتبه Koleex AI من اللي فريقك بعته الأسبوع ده — اقراه وصحّحه وزوّد اللي فاته." },
+  "tpl.team_weekly.s.reports": { en: "The team's reports", zh: "团队报告", ar: "تقارير الفريق" },
+  "tpl.team_weekly.s.work": { en: "The team's work", zh: "团队工作", ar: "شغل الفريق" },
+  "tpl.team_weekly.s.attendance": { en: "The team's attendance", zh: "团队考勤", ar: "حضور الفريق" },
+  "tpl.team_weekly.s.notes": { en: "Your notes", zh: "你的备注", ar: "ملاحظاتك" },
+  "tpl.team_weekly.s.notes.hint": { en: "What you will do about it — for yourself, or for whoever you send it to.", zh: "你打算怎么处理——写给自己，或写给你要发送的人。", ar: "هتعمل إيه في ده — ليك انت، أو للي هتبعتهوله." },
   "tpl.one_on_one.s.discussed": { en: "What we talked about", zh: "谈话内容", ar: "اتكلمنا في إيه" },
   "tpl.one_on_one.s.discussed.hint": { en: "Put the person you met in \"To\" — they receive the minutes.", zh: "请把面谈对象加入“收件人”——对方会收到纪要。", ar: "حط الشخص اللي قعدت معاه في «إلى» — هو اللي هيستلم المحضر." },
   "tpl.one_on_one.s.wins": { en: "Wins", zh: "成绩", ar: "النجاحات" },

@@ -42,6 +42,8 @@ export const AI_WRITE_SECTIONS: Record<string, string[]> = {
   weekly_plan: ["goals", "meetings", "deadlines"],
   /* 5A: from what the team sent in the report's days — read by the server. */
   team_summary: ["summary"],
+  /* 6E: the team's week — the same material, in the Team tab's shape. */
+  team_weekly: ["summary"],
   /* 5D: from what the whole company sent — read by the server. */
   exec_weekly: ["summary"],
   exec_monthly_review: ["summary"],
@@ -88,11 +90,17 @@ export const COMPANY_MATERIAL = ["exec_weekly", "exec_monthly_review"] as const;
 export const companyMaterial = (tpl: ReportTemplateDef | null | undefined): boolean =>
   !!tpl && (COMPANY_MATERIAL as readonly string[]).includes(behaviourKey(tpl));
 
+/** 5A / 6E: the types written from what the manager's TEAM sent. The weekly
+ *  one reads in the Team tab's shape (the whole team, what needs attention,
+ *  each person, the decisions asked for) — it is read, not sent up. */
+export const TEAM_MATERIAL = ["team_summary", "team_weekly"] as const;
+export const teamReadShape = (tpl: ReportTemplateDef | null | undefined): boolean => !!tpl && behaviourKey(tpl) === "team_weekly";
+
 /** A type whose "write" material the SERVER gathers (5A: the team's reports;
  *  5D: the company's — the author's page never carries other people's
  *  reports to send back). */
 export const serverMaterial = (tpl: ReportTemplateDef | null | undefined): boolean => {
-  return !!tpl && (behaviourKey(tpl) === "team_summary" || companyMaterial(tpl));
+  return !!tpl && ((TEAM_MATERIAL as readonly string[]).includes(behaviourKey(tpl)) || companyMaterial(tpl));
 };
 
 export const AI_LIMITS = {

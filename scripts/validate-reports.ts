@@ -97,6 +97,11 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §36 Phase 6E — the weekly team summary: every Monday at 07:00 in the
+ *      manager's own time, the week that ended, written by Koleex AI into a
+ *      draft before it is made (the same prompt as "Write it"), only with
+ *      time left in the run, from the first counted week; each manager
+ *      switches their OWN on in «فريقي»; nothing is sent.
  *   §35 the Reports home — both columns open with the same heading row so
  *      their cards start on one line; every icon a type or the builder
  *      offers is drawn on the 24 grid it is shown in (no blank tiles).
@@ -141,8 +146,8 @@ import {
 import {
   NO_DEPT_KEY, accessRows, addMonths, attendanceByDept, contractDateRows, deptKpiRows, moneyRows, presentRate, reportsByDept, salesRows, stockRows, usageRows,
 } from "../src/lib/reports/numbers-5d";
-import { COMPANY_MATERIAL, companyMaterial } from "../src/lib/reports/ai-draft";
-import { SCHEDULE_HOUR, localMinutesOf, periodToPrepare, schedulable } from "../src/lib/reports/schedules";
+import { COMPANY_MATERIAL, TEAM_MATERIAL, companyMaterial, teamReadShape } from "../src/lib/reports/ai-draft";
+import { SCHEDULE_HOUR, SCHEDULE_SUMMARY, localMinutesOf, periodToPrepare, schedulable } from "../src/lib/reports/schedules";
 import { FOLLOW_UP_LIMITS, forwardNote, forwardTargets, mayForward, reportLine, taskDue, taskPeopleAllowed, taskTitle } from "../src/lib/reports/follow-up";
 import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
 import { FAMILY_GROUPS as HEAD_GROUPS, REPORT_HEADS, reportHead } from "../src/lib/reports/catalog-heads";
@@ -296,7 +301,7 @@ console.log("\n§3 templates and their words");
   const quality = ["pre_shipment", "incoming", "defect_report", "corrective_action", "supplier_return"];
   const suppliers4c = ["supplier_approval", "sample_evaluation", "negotiation", "production_followup", "supplier_performance", "supplier_risk", "supplier_stop", "purchasing_weekly", "purchasing_monthly", "late_pos", "payables"];
   const d4 = ["container_loading", "shipment_update", "damage_claim", "customs_clearance", "service_visit", "warranty_claim", "customer_training", "spare_parts_request", "trip_report", "delegation_visit", "meeting_minutes", "decision_log"];
-  const team5a = ["team_summary", "one_on_one", "promotion_recommendation"];
+  const team5a = ["team_summary", "team_weekly", "one_on_one", "promotion_recommendation"];
   const office5b = ["morning_brief", "decisions_waiting", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary",
     "office_readiness", "admin_affairs", "office_expenses", "assets_custody", "renewals", "visitors_log", "gov_bank", "company_documents", "stamp_log", "correspondence", "gift_register", "occasions"];
   /* 6D: the quarter, the half-year and the year, right after the monthly. */
@@ -311,7 +316,7 @@ console.log("\n§3 templates and their words");
   const invFin5c = ["inv_count", "inv_writeoff", "inv_movement", "inv_low_stock", "fin_expenses", "fin_petty_cash", "fin_budget", "fin_cash_flow", "fin_statements", "fin_month_close"];
   const execCmp5d = ["exec_weekly", "exec_dept_kpis", "exec_monthly_review", "cmp_conflict", "cmp_equipment", "cmp_security", "cmp_access_review", "cmp_usage", "cmp_car_log", "cmp_contracts"];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, ...hr5c, ...prj5c, ...invFin5c, ...execCmp5d, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types (with 6D's quarterly, half-year and annual after the monthly), the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), the ten Executive and Compliance types (5D), and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types (with 6D's quarterly, half-year and annual after the monthly), the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the manager's team (5A's three, 6E's weekly summary after the team summary), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), the ten Executive and Compliance types (5D), and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr" && !t.payrollOnly).every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(REPORT_TEMPLATES.filter((t) => t.payrollOnly).every((t) => t.recipients === "manager" && t.confidential), "a salary type (5C) goes to the writer's manager only, and is confidential");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
@@ -375,7 +380,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 22, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, the launch preview, about, links search, the builder's list and one type, the team summary, the schedules, forward, tasks)`);
+  expect(files.length === 23, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, the launch preview, about, links search, the builder's list and one type, the team summary, its weekly switch, the schedules, forward, tasks)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -2053,8 +2058,8 @@ console.log("\n§21 the manager and the team");
   const API = "src/app/api/work-reports";
   /* The types */
   const team = REPORT_TEMPLATES.filter((t) => t.family === "team");
-  eq(team.map((t) => t.key), ["team_summary", "one_on_one", "promotion_recommendation"], "the Manager & team family holds the team summary, the 1-on-1 and the recommendation");
-  expect(team.every((t) => t.teamOnly) && REPORT_TEMPLATES.filter((t) => t.teamOnly).length === 3, "only someone with a team starts them — and nothing else is team-only");
+  eq(team.map((t) => t.key), ["team_summary", "team_weekly", "one_on_one", "promotion_recommendation"], "the Manager & team family holds the team summary (and 6E's weekly one), the 1-on-1 and the recommendation");
+  expect(team.every((t) => t.teamOnly) && REPORT_TEMPLATES.filter((t) => t.teamOnly).length === 4, "only someone with a team starts them — and nothing else is team-only");
   const ts = reportTemplate("team_summary")!, one = reportTemplate("one_on_one")!, promo = reportTemplate("promotion_recommendation")!;
   eq(ts.sections.filter((x) => x.kind === "data").map((x) => x.source), ["team_reports", "team_workload", "team_attendance"], "the team summary carries the team's reports, work and attendance");
   expect(!!ts.range && ts.cadence === null && ts.recipients === "manager" && !ts.confidential, "a team summary spans the days its manager picks and goes up to their manager");
@@ -2172,9 +2177,11 @@ console.log("\n§21 the manager and the team");
   rule("with nothing sent, no model is asked", TS,
     (c) => { const a = c.indexOf("if (!team.included) return NextResponse.json({ text: \"\", ...base }"); const b = c.indexOf("chatWithTools({"); return a > 0 && b > a ? [] : ["the model is asked about nothing"]; },
     (src) => src.replace('  if (!team.included) return NextResponse.json({ text: "", ...base }, { headers: { "Cache-Control": "private, no-store" } });\n', ""));
-  rule("a team summary's Write it reads the team on the server", `${API}/[id]/ai/route.ts`,
-    (c) => (c.includes("if (ask.action === \"write\" && serverMaterial(tpl)) {") && c.includes("team = await loadTeamMaterial(auth, range.from, range.to, company);") ? [] : ["the team summary is written from what the page sends"]),
-    (src) => src.replace("team = await loadTeamMaterial(auth, range.from, range.to, company);", "team = { included: 0 } as never;"));
+  rule("a team summary's Write it reads the team on the server — through the one prompt the scheduled drafts use too", `${API}/[id]/ai/route.ts`,
+    (c) => (c.includes("if (ask.action === \"write\" && serverMaterial(tpl)) {") && c.includes("try { teamPrompt = await serverSummaryPrompt(auth, tpl, range.from, range.to, ask.lang, fence); }")
+      && c.includes('if (!teamPrompt) return NextResponse.json({ error: "no_material" }, { status: 400 });')
+      && code(read("src/lib/server/reports/summary-writer.ts")).includes("const team = await loadTeamMaterial(auth, from, to, company);") ? [] : ["the team summary is written from what the page sends"]),
+    (src) => src.replace("try { teamPrompt = await serverSummaryPrompt(auth, tpl, range.from, range.to, ask.lang, fence); }", "try { teamPrompt = null; }"));
   rule("the page never sends the team's reports back", "src/components/reports/app/ReportView.tsx",
     (c) => (c.includes('if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }') ? [] : ["the page gathers material for a team summary"]),
     (src) => src.replace('    if (serverMaterial(tpl)) { void ai.run({ action: "write", section: sid, lang: writingLang(Object.values(d.texts), screenLang as WritingLang) }); return; }\n', ""));
@@ -2951,8 +2958,8 @@ console.log("\n§29 the drafts the system prepares on schedule");
     (c) => (c.includes('after(() => clearUnreadByMeta({ type: "report_scheduled", report_id: loaded.row.id }));') ? [] : ["a deleted draft still says 'ready to write'"]),
     (src) => src.replace('  after(() => clearUnreadByMeta({ type: "report_scheduled", report_id: loaded.row.id }));\n', ""));
   rule("the report job prepares them after the reminders, and a failure never costs the reminders", "src/app/api/cron/report-reminders/route.ts",
-    (c) => { const n = c.indexOf("const run = await runReportNudges();"); const s2 = c.indexOf("const scheduled = await runReportSchedules({ deadline: started + 45_000 }).catch("); return n > 0 && s2 > n && c.includes("runReportSchedules({ dryRun: true, tenantId: auth.tenant_id }),") ? [] : ["the schedules run before or instead of the reminders"]; },
-    (src) => src.replace("const scheduled = await runReportSchedules({ deadline: started + 45_000 }).catch(", "const scheduled = await runReportSchedules({ deadline: started + 45_000 }).then((x) => x, "));
+    (c) => { const n = c.indexOf("const run = await runReportNudges();"); const s2 = c.indexOf("const scheduled = await runReportSchedules({ deadline: started + 45_000, summaryBy: started + 55_000 }).catch("); return n > 0 && s2 > n && c.includes("runReportSchedules({ dryRun: true, tenantId: auth.tenant_id }),") ? [] : ["the schedules run before or instead of the reminders"]; },
+    (src) => src.replace("const scheduled = await runReportSchedules({ deadline: started + 45_000, summaryBy: started + 55_000 }).catch(", "const scheduled = await runReportSchedules({ deadline: started + 45_000, summaryBy: started + 55_000 }).then((x) => x, "));
   rule("the job stops starting new drafts before its time runs out — none is cut off halfway with its period claimed", SC,
     (c) => (c.includes("if (opts.deadline && Date.now() > opts.deadline) { out.waiting += rows.length - i; break; }") && c.indexOf("if (opts.deadline && Date.now() > opts.deadline)") < c.indexOf('let claim = supabaseServer.from("work_report_schedules").update({ last_period: period.key') ? [] : ["a slow run is killed between the claim and the draft, and that period is lost"]),
     (src) => src.replace("if (opts.deadline && Date.now() > opts.deadline) { out.waiting += rows.length - i; break; }", ""));
@@ -3419,6 +3426,75 @@ console.log("\n§35 the Reports home — both columns on one line, every icon wh
     (c) => { const bad = offGrid(c).filter((n) => offered.has(n)); return bad.length ? [`drawn on a bigger grid: ${bad.join(", ")}`] : []; },
     (src) => src.replace('<path transform="scale(0.046875)" d="M470.549', '<path d="M470.549'));
   expect(offered.has("graduation-cap") && offGrid(code(read("src/components/ui/RrIcon.tsx"))).length === 0, "…and no icon in the set is off its grid today");
+}
+
+/* ── §36 the weekly team summary (6E, 26 Sep 2026) ──────────────────────── */
+console.log("\n§36 the weekly team summary — every Monday, written before you open it");
+{
+  /* The owner's picks: Monday 07:00 in the manager's own time, the week that
+     ended; a switch in «فريقي» each manager turns on for themself. */
+  const tw = reportTemplate("team_weekly")!;
+  expect(!!tw && tw.family === "team" && tw.cadence === "weekly" && !!tw.teamOnly && tw.recipients === "none" && !tw.confidential && !tw.range,
+    "a weekly type of the team family, for someone with a team — read, not sent: no default readers");
+  eq(tw.sections.filter((x) => x.kind === "data").map((x) => x.source), ["team_reports", "team_workload", "team_attendance"], "…beside the team's reports, work and attendance, like the team summary");
+  expect(schedulable(tw) && serverMaterial(tw) && !companyMaterial(tw) && teamReadShape(tw) && !teamReadShape(reportTemplate("team_summary")) && AI_WRITE_SECTIONS.team_weekly?.join() === "summary"
+    && [...TEAM_MATERIAL].join() === "team_summary,team_weekly",
+    "the system may prepare it; Koleex AI writes its summary from what the TEAM sent, read by the server, in the Team tab's shape (the team summary keeps its paragraphs)");
+  eq([periodToPrepare(tw.cadence, "2026-10-19", 6 * 60 + 59), periodToPrepare(tw.cadence, "2026-10-19", 7 * 60)], [null, "2026-10-12"],
+    "the first counted week (12–18 October) is prepared on Monday 19 October at 07:00, not a minute before");
+
+  /* One prompt for both ways it is written. */
+  const SW = "src/lib/server/reports/summary-writer.ts";
+  rule("the summary writer only reads — the callers decide what the text becomes", SW,
+    (c) => (!/\.(insert|update|upsert|delete)\(|notifyLite|notifyReport/.test(c) ? [] : ["the writer stores or notifies"]),
+    (src) => src.replace("  if (!prompt) return { text: null, reports: 0 };", '  if (!prompt) return { text: null, reports: 0 };\n  await supabaseServer.from("work_reports").update({});'));
+  rule("nothing sent → no model is asked; a cut, empty or late answer is never kept", SW,
+    (c) => (c.indexOf("if (!team.included) return null;") > 0 && c.indexOf("if (!prompt) return { text: null, reports: 0 };") < c.indexOf("chatWithTools({")
+      && c.includes('const cut = out.ok && out.response.finishReason === "length";') && c.includes("if (!out.ok || !answer || cut) {")
+      && c.includes('.replace(/<think>[\\s\\S]*?<\\/think>/gi, "")') && c.includes("setTimeout(() => resolve(null), Math.max(0, budgetMs))") ? [] : ["a summary of nothing, or half a summary, can reach a draft"]),
+    (src) => src.replace("if (!out.ok || !answer || cut) {", "if (!out.ok || !answer) {"));
+  rule("every summary prompt carries the provenance rule and fences the team's words", SW,
+    (c) => ((c.match(/SYSTEM \+ AI_PROVENANCE_RULE/g) ?? []).length === 2 && c.includes("teamInstruction({ kind: read ? \"read\" : \"section\"") && c.includes("execInstruction({") ? [] : ["a summary prompt without the provenance rule"]),
+    (src) => src.replace("system: TEAM_SYSTEM + AI_PROVENANCE_RULE,", "system: TEAM_SYSTEM,"));
+
+  /* The schedule engine writes it. */
+  const SE = "src/lib/server/reports/schedules.ts";
+  rule("a preview never asks a model; the time is checked BEFORE the claim; the summary is written BEFORE the draft is made", SE,
+    (c) => {
+      const dry = c.indexOf("if (opts.dryRun) { out.prepared.push(");
+      const room = c.indexOf("if (writes && room < SCHEDULE_SUMMARY.minMs) { out.waiting++; continue; }");
+      const claim = c.indexOf('let claim = supabaseServer.from("work_report_schedules").update({ last_period: period.key');
+      const write = c.indexOf("await writeScheduledSummary(auth, tpl,");
+      const draft = c.indexOf('const id = await insertDraft(auth, tpl, { start: period.start, end: period.end, key: period.key }, "", sections, snapshot);');
+      return dry > 0 && room > dry && claim > room && write > claim && draft > write ? [] : ["the model can run in a preview, a row can be claimed with no time to write it, or the draft is made before its summary"];
+    },
+    (src) => src.replace('const id = await insertDraft(auth, tpl, { start: period.start, end: period.end, key: period.key }, "", sections, snapshot);', 'const id = await insertDraft(auth, tpl, { start: period.start, end: period.end, key: period.key }, "", [], snapshot);'));
+  rule("the weekly team summary starts with the first counted week — earlier weeks stay claimed, never retried", SE,
+    (c) => (c.includes('if (behaviourKey(tpl) === "team_weekly") {') && c.includes("if (!from || period.end < from) continue;")
+      && c.indexOf("if (!from || period.end < from) continue;") > c.indexOf("let claim = supabaseServer") ? [] : ["weeks before counting starts are prepared (three empty summaries before the start)"]),
+    (src) => src.replace("        if (!from || period.end < from) continue;\n", ""));
+  rule("it is written in the language the writer reads in (their push language), English when unset", SE,
+    (c) => (c.includes('supabaseServer.from("accounts").select("preferences").eq("id", accountId).maybeSingle()') && c.includes('return lang === "zh" || lang === "ar" ? lang : "en";')
+      && c.includes("const lang = await languageOf(r.account_id);") ? [] : ["the summary is always English"]),
+    (src) => src.replace("const lang = await languageOf(r.account_id);", 'const lang = "en" as Lang;'));
+  expect(SCHEDULE_SUMMARY.minMs >= 15_000 && SCHEDULE_SUMMARY.maxMs <= 45_000 && SCHEDULE_SUMMARY.minMs < SCHEDULE_SUMMARY.maxMs,
+    "a summary starts only with 20 s left and is cut at 40 s — inside the job's 55 s summary line and its 60 s end");
+
+  /* The switch: each manager, their own. */
+  const WR = "src/app/api/work-reports/team-summary/weekly/route.ts";
+  rule("the weekly switch sets only the caller's own schedule, and only for someone who may start the type", WR,
+    (c) => (c.includes("const res = await saveSchedule(auth, { accountId: auth.account_id, templateKey: KEY, active: body.on });")
+      && c.indexOf('if (!(await available(auth))) return NextResponse.json({ error: "forbidden" }, { status: 403 });') > 0
+      && c.indexOf('if (!(await available(auth))) return NextResponse.json({ error: "forbidden" }, { status: 403 });') < c.indexOf("await saveSchedule(")
+      && c.includes("return !hidden.includes(KEY) && (await canStartTemplate(tpl, auth));") ? [] : ["one manager can switch another's, or someone with no team gets it"]),
+    (src) => src.replace("const res = await saveSchedule(auth, { accountId: auth.account_id, templateKey: KEY, active: body.on });", "const res = await saveSchedule(auth, { accountId: String((body as { accountId?: unknown }).accountId), templateKey: KEY, active: body.on });"));
+  rule("the switch is in «فريقي», there from the first paint, and says what it does", "src/components/reports/app/TeamSummary.tsx",
+    (c) => (c.includes("<WeeklySwitch t={t} />") && c.includes('role="switch" aria-checked={on} aria-label={t("team.weekly")}') && c.includes("const res = await saveTeamWeekly(!on);")
+      && c.includes('{t("team.weekly.hint")}') && !/\{state && <div/.test(c) ? [] : ["no switch, or one that pops in after load"]),
+    (src) => src.replace("      <WeeklySwitch t={t} />\n", ""));
+  const lack6e = ["team.weekly", "team.weekly.hint", "team.weekly.failed"].filter((k) => !(reportTeamT[k]?.en && reportTeamT[k]?.zh && reportTeamT[k]?.ar))
+    .concat(["sched.none.team", "sched.none.company", "tpl.team_weekly.name", "tpl.team_weekly.desc", "tpl.team_weekly.s.summary", "tpl.team_weekly.s.notes"].filter((k) => !(reportsT[k]?.en && reportsT[k]?.zh && reportsT[k]?.ar)));
+  expect(lack6e.length === 0, "its words speak en / zh / ar — the switch, the type, its sections and the line for days with nothing sent", lack6e.join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

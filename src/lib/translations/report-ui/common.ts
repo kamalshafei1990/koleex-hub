@@ -104,6 +104,7 @@ export const reportCommonT: Translations = {
 
   /* ── Phase 5A: the manager and the team (the Team tab's own words: ./report-team.ts) ── */
   "tpl.team_summary.name": { en: "Team summary", zh: "团队总结", ar: "ملخّص الفريق" },
+  "tpl.team_weekly.name": { en: "Weekly team summary", zh: "团队周总结", ar: "ملخّص الفريق الأسبوعي" },
   "tpl.one_on_one.name": { en: "1-on-1 meeting", zh: "一对一面谈", ar: "جلسة فردية" },
   "tpl.promotion_recommendation.name": { en: "Promotion or bonus recommendation", zh: "晋升或奖金推荐", ar: "ترشيح لترقية أو مكافأة" },
 

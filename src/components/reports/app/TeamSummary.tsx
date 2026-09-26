@@ -13,9 +13,13 @@
    kept for this session, so coming back shows it at once. "Make it a
    report" opens a Team summary report for those days with the summary in
    it — the manager edits it and sends it up.
+
+   6E: the weekly summary switch — every Monday at 07:00 the week that
+   ended, written by Koleex AI into a draft in My reports; each manager
+   switches it on for themself (their own schedule row, nobody else's).
    --------------------------------------------------------------------------- */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -23,7 +27,7 @@ import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import type { Lang } from "@/lib/i18n";
 import { reportTeamT } from "@/lib/translations/report-team";
 import { TEAM_PERIODS, rangeLabel, teamPeriod, type TeamPeriodKey, type TeamPersonFacts } from "@/lib/reports/team";
-import { createReport, fetchTeamSummary, localToday, saveDraft, type TeamSummaryResult } from "@/lib/work-reports";
+import { createReport, fetchTeamSummary, fetchTeamWeekly, localToday, saveDraft, saveTeamWeekly, type TeamSummaryResult, type TeamWeekly } from "@/lib/work-reports";
 import { CARD, type T } from "./shared";
 
 const SEL = "kx-seg-on border-[#567FB2]/50 bg-[#567FB2]/12 text-[var(--text-primary)]";
@@ -36,6 +40,36 @@ type Kept = TeamSummaryResult & { at: string };
 const readKept = (key: string): Kept | null => {
   try { const raw = sessionStorage.getItem(CACHE + key); return raw ? (JSON.parse(raw) as Kept) : null; } catch { return null; }
 };
+
+/** 6E: "Weekly summary" — the manager's own; the row is there from the first
+ *  paint (the switch waits, disabled, for its state), so nothing moves. */
+function WeeklySwitch({ t }: { t: T }) {
+  const [state, setState] = useState<TeamWeekly | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { void Promise.resolve().then(async () => { const res = await fetchTeamWeekly(); if (res.ok) setState(res.data); }); }, []);
+  const on = !!state?.on;
+  const flip = async () => {
+    if (!state?.available) return;
+    setBusy(true); setFailed(false);
+    const res = await saveTeamWeekly(!on);
+    setBusy(false);
+    if (res.ok) setState(res.data); else setFailed(true);
+  };
+  return (
+    <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+      <div className="min-w-0">
+        <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("team.weekly")}</p>
+        <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-dim)]">{t("team.weekly.hint")}</p>
+        {failed && <p role="alert" className="mt-1 text-[11.5px] text-red-500">{t("team.weekly.failed")}</p>}
+      </div>
+      <button type="button" role="switch" aria-checked={on} aria-label={t("team.weekly")} disabled={!state?.available || busy} onClick={() => void flip()}
+        className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors duration-200 disabled:opacity-60 ${on ? "bg-emerald-500" : "bg-[var(--bg-surface)] ring-1 ring-inset ring-[var(--border-subtle)]"}`}>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${on ? "start-[22px]" : "start-0.5"}`} />
+      </button>
+    </div>
+  );
+}
 
 export default function TeamSummary({ t: shared, lang }: { t: T; lang: string }) {
   const l = ((["en", "zh", "ar"] as const).find((x) => x === lang) ?? "en") as Lang;
@@ -99,6 +133,8 @@ export default function TeamSummary({ t: shared, lang }: { t: T; lang: string })
           {busy === "sum" ? <SpinnerIcon size={11} /> : <RrIcon name="bulb" size={11} />}{result ? t("team.again") : t("team.go")}
         </button>
       </div>
+
+      <WeeklySwitch t={t} />
 
       <div className="mt-3 flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("team.title")}>
         {TEAM_PERIODS.map((p) => (
