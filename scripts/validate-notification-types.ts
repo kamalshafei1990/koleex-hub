@@ -552,6 +552,17 @@ const feed = fileSrc("src/app/api/inbox/feed/route.ts");
 const slimProj = feed.match(/const projection: string = slim\s*\?\s*`([^`]*)`/)?.[1] ?? "";
 check("the bell's rows are the slim projection — no avatar, no *", !!slimProj && !/avatar_url|\*/.test(slimProj), slimProj ? "" : "slim projection not found");
 check("the feed never answers more than 300 rows", /Math\.min\(Number\(url\.searchParams\.get\("limit"\)\)\s*\|\|\s*\d+,\s*300\)/.test(feed));
+/* A row's quick actions (read / archive) sit at the end of its second line
+   in a slot kept for them, and the time stays in view: the owner saw them
+   cut off a long title, then asked for the time to stay. */
+const listSrc = fileSrc("src/components/layout/NotificationList.tsx");
+const slot = listSrc.slice(listSrc.indexOf("function ActionSlot"), listSrc.indexOf("function RowActions"));
+check("a row's quick actions sit in their own slot on the second line, the time always in view",
+  [...listSrc.matchAll(/<RowActions\b/g)].length === 1 && /<RowActions\b/.test(slot)
+  && /min-w-\[42px\]/.test(slot) && /\bh-4\b/.test(slot)
+  && [...listSrc.matchAll(/<ActionSlot\b/g)].length === 2
+  && /grid h-4 w-5/.test(listSrc) && !/absolute end-3 top-2/.test(listSrc)
+  && !/group-hover\/row:invisible/.test(listSrc));
 const bellSrc = fileSrc("src/components/layout/NotificationBell.tsx");
 check("the bell asks for slim rows", /fetchInboxMessagesOrNull\(\{[^}]*slim:\s*true/.test(bellSrc));
 

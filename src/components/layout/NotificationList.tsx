@@ -186,13 +186,30 @@ function UnreadDot({ on }: { on: boolean }) {
   );
 }
 
+/* A row's two quick actions (read / archive) live at the END OF ITS SECOND
+   LINE, in a slot kept for them at rest (42px: two 20px buttons and their
+   gap; 16px tall, inside the line's height). They show on hover or keyboard
+   focus; the words never move and are never covered, and the time on the
+   first line stays in view (owner, 26/09). They used to float over the
+   row's corner — 54×28px — and cut the end off a long title; then they took
+   the time's place, and the owner wanted the time kept. */
+function ActionSlot<R extends ListRow>({
+  rows, unread, tUi, actions,
+}: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R> }) {
+  return (
+    <span className="ms-auto flex h-4 min-w-[42px] shrink-0 items-center justify-end">
+      <RowActions rows={rows} unread={unread} tUi={tUi} actions={actions} />
+    </span>
+  );
+}
+
 function RowActions<R extends ListRow>({
   rows, unread, tUi, actions,
 }: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R> }) {
   const btn =
-    "grid h-6 w-6 place-items-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]";
+    "grid h-4 w-5 place-items-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-surface-strong)] hover:text-[var(--text-primary)]";
   return (
-    <span className="absolute end-3 top-2 hidden items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] p-0.5 shadow-sm group-hover/row:flex group-focus-within/row:flex">
+    <span className="hidden items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex">
       <button
         type="button"
         data-kx-keep-hover
@@ -201,7 +218,7 @@ function RowActions<R extends ListRow>({
         title={unread ? tUi("markRead") : tUi("markUnread")}
         onClick={(e) => { e.stopPropagation(); actions.onSetRead(rows, unread); }}
       >
-        {unread ? <MailOpenIcon size={13} /> : <EnvelopeIcon size={13} />}
+        {unread ? <MailOpenIcon size={12} /> : <EnvelopeIcon size={12} />}
       </button>
       <button
         type="button"
@@ -211,7 +228,7 @@ function RowActions<R extends ListRow>({
         title={tUi("archive")}
         onClick={(e) => { e.stopPropagation(); actions.onArchive(rows); }}
       >
-        <ArchiveIcon size={13} />
+        <ArchiveIcon size={12} />
       </button>
     </span>
   );
@@ -242,18 +259,20 @@ function Row<R extends ListRow>({
             <span className={`min-w-0 flex-1 truncate text-[12.5px] ${unread ? "font-semibold text-[var(--text-primary)]" : "font-medium text-[var(--text-secondary)]"}`}>
               <NotificationSubject meta={row.metadata} subject={row.subject} lang={lang} plain />
             </span>
-            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)] group-hover/row:invisible group-focus-within/row:invisible">{time(row.created_at)}</span>
+            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{time(row.created_at)}</span>
           </div>
-          {hasBody ? (
-            <NotificationBody meta={row.metadata} body={row.body} lang={lang} plain className="mt-0.5 line-clamp-1 text-[11.5px] text-[var(--text-dim)]" />
-          ) : who ? (
-            <p className="mt-0.5 truncate text-[11.5px] text-[var(--text-dim)]">{who}</p>
-          ) : null}
+          <div className="mt-0.5 flex items-center gap-2">
+            {hasBody ? (
+              <NotificationBody meta={row.metadata} body={row.body} lang={lang} plain className="min-w-0 flex-1 line-clamp-1 text-[11.5px] text-[var(--text-dim)]" />
+            ) : who ? (
+              <p className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--text-dim)]">{who}</p>
+            ) : null}
+            <ActionSlot rows={[row]} unread={unread} tUi={tUi} actions={actions} />
+          </div>
           {actions.onDecided && !row.archived_at && (
             <DecisionBar meta={row.metadata} tUi={tUi} onDecided={(v) => actions.onDecided!(row, v)} />
           )}
         </div>
-        <RowActions rows={[row]} unread={unread} tUi={tUi} actions={actions} />
       </div>
     </li>
   );
@@ -285,11 +304,11 @@ function Group<R extends ListRow>({
               {digestTitle ?? <NotificationSubject meta={latest.metadata} subject={latest.subject} lang={lang} plain />}
             </span>
             {!digestTitle && (
-              <span className="shrink-0 rounded-full bg-[var(--bg-surface-strong)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--text-secondary)] group-hover/row:invisible group-focus-within/row:invisible">
+              <span className="shrink-0 rounded-full bg-[var(--bg-surface-strong)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">
                 ×{rows.length}
               </span>
             )}
-            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)] group-hover/row:invisible group-focus-within/row:invisible">{time(latest.created_at)}</span>
+            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{time(latest.created_at)}</span>
           </div>
           <div className="mt-0.5 flex items-center gap-1 text-[11.5px] text-[var(--text-dim)]">
             {who && <span className="min-w-0 truncate">{who}</span>}
@@ -298,9 +317,9 @@ function Group<R extends ListRow>({
               {open ? tUi("group.hide") : tUi("group.show").replace("{n}", String(rows.length))}
               <ChevronDownIcon size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
             </span>
+            <ActionSlot rows={rows} unread={unread} tUi={tUi} actions={actions} />
           </div>
         </div>
-        <RowActions rows={rows} unread={unread} tUi={tUi} actions={actions} />
       </div>
       {open && (
         <ul className="border-s border-[var(--border-faint)] ms-[34px] mb-1">
