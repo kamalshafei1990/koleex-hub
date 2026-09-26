@@ -208,6 +208,16 @@ console.log("\n── 4. The route and the client, read ──");
     /setConversations\(\(prev\) => \[made, \.\.\.prev\.filter\(\(c\) => c\.id !== made\.id\)\]\);/.test(app));
 }
 
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("each turn is timed on the phone — headers, first words, end, or failure — tagged with whether it made its chat",
+    /turnMark\.t0 = performance\.now\(\);\s*turnMark\.first = pendingNewChatsRef\.current\.has\(conversationId!\);\s*const res = await fetch\(`\/api\/ai\/agent`/.test(app) &&
+    /perfRecord\("ai\.turn_headers_ms", performance\.now\(\) - turnMark\.t0, \{ first: turnMark\.first, status: res\.status \}\);\s*const reader = res\.body\.getReader\(\);/.test(app) &&
+    /if \(!turnMark\.firstToken\) \{\s*turnMark\.firstToken = true;\s*perfRecord\("ai\.turn_first_token_ms"/.test(app) &&
+    /if \(finalMessage\) \{\s*perfRecord\("ai\.turn_total_ms"/.test(app) &&
+    /if \(turnMark\.t0\) perfRecord\("ai\.turn_fail_ms", performance\.now\(\) - turnMark\.t0, \{ first: turnMark\.first, why: isNetwork \? "network" : "other" \}\);/.test(app));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
