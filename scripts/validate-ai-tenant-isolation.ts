@@ -57,6 +57,10 @@ const TENANT_SCOPED = new Set([
   "ai_sources",
   "ai_knowledge_units",
   "ai_tool_calls",
+  /* Notes (security review 2026-09-26): account-owned, shared only inside the
+     tenant, service-role only — and every AI read ALSO names the tenant. */
+  "notes",
+  "note_shares",
 ]);
 
 /* Tables that are SHARED by design (no tenant_id column), or are keyed by a
@@ -223,6 +227,22 @@ check(
   /service.role/i.test(supa) && /Row-Level Security/i.test(supa),
   "supabase-server.ts changed — re-validate this guard's premise",
 );
+
+/* readNote reads through lib/notes-server (outside this scan), which keys on
+   the note and the account. The tool itself must also refuse another
+   tenant's note, with the same "not found" as any other refusal. */
+{
+  const notesTool = readFileSync(`${AI_DIR}/tools/notes.ts`, "utf8");
+  check("readNote refuses a note from another tenant, answered as not found",
+    /if \(!access\.note \|\| !canRead\(access\.role\) \|\| access\.tenantId !== ctx\.auth\.tenant_id\) \{\s*return \{ ok: false, permissionStatus: "allowed", data: null, message: "I couldn't find that note\." \};/.test(notesTool));
+  /* Named explicitly: the scanner's look-ahead window would let the next
+     statement's filter cover this one. */
+  check("searchNotes reads the caller's shares inside their own tenant",
+    /from\("note_shares"\)\.select\("note_id"\)\.eq\("tenant_id", tenant\)\.eq\("shared_with_account_id", me\)/.test(notesTool) &&
+    /const tenant = ctx\.auth\.tenant_id;/.test(notesTool));
+  check("createNote writes the caller's own tenant and account, never an argument's",
+    /tenant_id: ctx\.auth\.tenant_id,\s*account_id: ctx\.auth\.account_id,/.test(notesTool));
+}
 
 console.log(`\n${pass} passed, ${fail} failed, ${preVerified} pre-verified by-PK mutation(s)`);
 if (unknownTables > 0) {

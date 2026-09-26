@@ -35,7 +35,8 @@ export type ResourceKind =
   | "todo"
   | "project"
   | "planning_item"
-  | "calendar_event";
+  | "calendar_event"
+  | "note";
 
 export interface ResourceRef {
   kind: ResourceKind;

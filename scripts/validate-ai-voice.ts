@@ -297,9 +297,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
-    check("  …and the cron jobs sharing this file survived the edit (twelve since notes joined the reports, attendance, finance, tasks, calendar, project and HR ones)",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 12 &&
-      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance", "/api/cron/report-reminders", "/api/cron/notes-trash-purge"]
+    check("  …and the cron jobs sharing this file survived the edit (fourteen since sales reminders and the Discuss sweep joined the notes, reports, attendance, finance, tasks, calendar, project and HR ones)",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 14 &&
+      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance", "/api/cron/report-reminders", "/api/cron/notes-trash-purge", "/api/cron/sales-reminders", "/api/cron/discuss-pending-sweep"]
         .every((p) => (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === p)));
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
