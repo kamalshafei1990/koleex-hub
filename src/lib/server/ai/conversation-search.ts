@@ -1,4 +1,5 @@
 import "server-only";
+import { FOLDABLE, foldForSearch, foldLettersOnly } from "@/lib/text-fold";
 
 /* ---------------------------------------------------------------------------
    ai/conversation-search — find the chat where something was said.
@@ -51,6 +52,18 @@ export function likePattern(query: string): string {
   return `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
+/** The same pattern, loose on the Arabic letters people spell more than one
+ *  way (lib/text-fold): each of them is a one-character wildcard, so
+ *  "اسعار" reaches "الأسعار" and "مدرسه" reaches "مدرسة". The rows it
+ *  returns are filtered with the folded comparison in collectHits, so the
+ *  wildcard only widens what is read, never what is shown. */
+export function foldedLikePattern(query: string): string {
+  const escaped = Array.from(query)
+    .map((c) => (FOLDABLE.test(c) ? "_" : /[\\%_]/.test(c) ? `\\${c}` : c))
+    .join("");
+  return `%${escaped}%`;
+}
+
 /** The text around the first match, cut to one line with ellipses where it
  *  was cut. Case-insensitive, like the search itself. A content without the
  *  query (a row matched on something the pattern saw differently) falls
@@ -58,7 +71,10 @@ export function likePattern(query: string): string {
 export function snippetAround(content: string, query: string, width: number = SNIPPET_CHARS): string {
   const flat = content.replace(/\s+/g, " ").trim();
   if (flat.length <= width) return flat;
-  const at = flat.toLowerCase().indexOf(query.toLowerCase());
+  /* Found as typed, or with its letters folded (same length, so the index
+     still points into the original). */
+  const direct = flat.toLowerCase().indexOf(query.toLowerCase());
+  const at = direct !== -1 ? direct : foldLettersOnly(flat).indexOf(foldLettersOnly(query));
   if (at === -1) return `${flat.slice(0, width - 1).trimEnd()}…`;
   const half = Math.floor((width - query.length) / 2);
   let start = Math.max(0, at - half);
@@ -89,6 +105,9 @@ export function collectHits(rows: readonly SearchRow[], query: string, max: numb
     if (out.length >= max) break;
     if (!row.conversation_id || seen.has(row.conversation_id)) continue;
     if (typeof row.content !== "string" || !row.content.trim()) continue;
+    /* The folded pattern reads a little wider than a match; only a real
+       match, compared folded, is a hit. */
+    if (!foldForSearch(row.content).includes(foldForSearch(query))) continue;
     seen.add(row.conversation_id);
     out.push({ conversation_id: row.conversation_id, snippet: snippetAround(row.content, query) });
   }

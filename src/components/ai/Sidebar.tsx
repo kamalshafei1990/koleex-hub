@@ -314,17 +314,34 @@ export function RowMenu({
 
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); closeMenu(); } };
     /* Any scroll or resize invalidates a fixed position, and re-placing a
-       menu mid-scroll looks broken — closing is the honest response. */
+       menu mid-scroll looks broken — closing is the honest response.
+       EXCEPT THE MENU'S OWN SCROLL. The listener is on capture, so it also
+       heard the menu scrolling itself: on a phone with a few projects the
+       menu is taller than its cap, and a swipe down to Delete or Export —
+       or arrowing to them — closed it, so they could not be reached
+       (review, 2026-09-26). */
+    const close = (e: Event) => {
+      if (e.target instanceof Node && menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
+    /* ESCAPE CLOSES THE MENU AND NOTHING ELSE. On capture and stopped
+       outright, and marked handled, so the drawer under it does not close
+       on the same key press. */
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeMenu();
+    };
     window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [open, closeMenu]);
 
@@ -433,8 +450,10 @@ export function RowMenu({
 export function groupByDate(
   rows: ConversationRow[],
   copy: typeof COPY["en"],
+  /** The day the groups are counted from — the caller passes it, so the
+   *  groups are recomputed when the day turns (default: now). */
+  now: Date = new Date(),
 ): Array<{ label: string; rows: ConversationRow[] }> {
-  const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const oneDay = 86_400_000;
   const bucket = {
