@@ -71,13 +71,13 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     const fullName = account.person?.full_name || account.username;
 
     const subtitle = [
-      account.user_type,
+      account.user_type ? tHub(`um.type.${account.user_type}`, account.user_type) : null,
       account.role?.name,
     ]
       .filter(Boolean)
       .join(" · ");
     return { avatar, fullName, subtitle };
-  }, [account]);
+  }, [account, tHub]);
 
   /* Load the signed-in flag + keep it in sync. */
   useEffect(() => {
@@ -174,8 +174,8 @@ export default function UserMenu({ dk }: { dk: boolean }) {
   }, [queryClient]);
 
   const avatarLabel = "KS";
-  const displayName = profile?.fullName ?? (signedIn ? "Koleex Admin" : "Not signed in");
-  const subLine = profile?.subtitle ?? (signedIn ? "Legacy session" : "Password gate");
+  const displayName = profile?.fullName ?? (signedIn ? tHub("um.fallback.admin", "Koleex Admin") : tHub("um.fallback.out", "Not signed in"));
+  const subLine = profile?.subtitle ?? (signedIn ? tHub("um.fallback.legacy", "Legacy session") : tHub("um.fallback.gate", "Password gate"));
   const avatarUrl = profile?.avatar ?? null;
 
   return (
@@ -183,7 +183,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Account menu"
+        aria-label={tHub("um.menu", "Account menu")}
         aria-haspopup="menu"
         aria-expanded={open}
         /* A pill chip, like its neighbours. Every other control on this bar
@@ -289,7 +289,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             <div className="mt-2.5 flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                 <ShieldIcon className="h-2.5 w-2.5" />
-                Legacy
+                {tHub("um.badge.legacy", "Legacy")}
               </span>
               {signedIn && (
                 <span
@@ -299,7 +299,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                       : "bg-black/[0.04] text-black/60 border border-black/[0.08]"
                   }`}
                 >
-                  Active
+                  {tHub("um.badge.active", "Active")}
                 </span>
               )}
             </div>
@@ -318,7 +318,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                 }`}
               >
                 <SignInIcon className="h-4 w-4" />
-                Sign in
+                {tHub("um.signIn", "Sign in")}
               </button>
             ) : (
               <>
@@ -341,12 +341,12 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                   title={
                     account
-                      ? "Open your account profile"
-                      : "Profile unavailable — no linked account"
+                      ? tHub("um.profile.open", "Open your account profile")
+                      : tHub("um.profile.none", "Profile unavailable — no linked account")
                   }
                 >
                   <UserIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Profile</span>
+                  <span className="flex-1 text-start">{tHub("um.profile", "Profile")}</span>
                 </button>
                 <button
                   type="button"
@@ -388,7 +388,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <Settings2Icon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Account Settings</span>
+                  <span className="flex-1 text-start">{tHub("um.settings", "Account Settings")}</span>
                 </button>
                 {isSuperAdmin && (
                   <button
@@ -404,7 +404,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     }`}
                   >
                     <ActivityIcon className="h-4 w-4" />
-                    <span className="flex-1 text-start">Activity Monitor</span>
+                    <span className="flex-1 text-start">{tHub("app.activity-monitor", "Activity Monitor")}</span>
                   </button>
                 )}
                 {isSuperAdmin && (
@@ -421,7 +421,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     }`}
                   >
                     <BellRawIcon className="h-4 w-4" />
-                    <span className="flex-1 text-start">Mobile Notifications</span>
+                    <span className="flex-1 text-start">{tHub("um.mobileNotif", "Mobile Notifications")}</span>
                   </button>
                 )}
                 <div className={`my-1 border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`} />
@@ -435,7 +435,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <SignOutIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Sign out</span>
+                  <span className="flex-1 text-start">{tHub("um.signOut", "Sign out")}</span>
                 </button>
               </>
             )}

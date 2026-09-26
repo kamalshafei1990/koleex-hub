@@ -135,4 +135,25 @@ export const hubT: Translations = {
   "notif.filter.all":   { en: "All",              zh: "全部",              ar: "الكل" },
   "notif.filter.other": { en: "Other",            zh: "其他",              ar: "أخرى" },
   "notif.noneOfType":   { en: "No notifications of this type", zh: "没有此类型的通知", ar: "لا توجد إشعارات من هذا النوع" },
+  /* The account menu (layout/UserMenu) — the avatar button on every page.
+     Its "Notifications" and "Activity Monitor" rows reuse app.inbox and
+     app.activity-monitor. */
+  "um.menu":            { en: "Account menu",     zh: "账户菜单",           ar: "قائمة الحساب" },
+  "um.profile":         { en: "Profile",          zh: "个人资料",           ar: "الملف الشخصي" },
+  "um.profile.open":    { en: "Open your account profile", zh: "打开你的账户资料", ar: "افتح ملفك الشخصي" },
+  "um.profile.none":    { en: "Profile unavailable — no linked account", zh: "无法打开资料 — 没有关联的账户", ar: "الملف الشخصي غير متاح — لا يوجد حساب مرتبط" },
+  "um.settings":        { en: "Account Settings", zh: "账户设置",           ar: "إعدادات الحساب" },
+  "um.mobileNotif":     { en: "Mobile Notifications", zh: "手机通知",       ar: "إشعارات الهاتف" },
+  "um.signIn":          { en: "Sign in",          zh: "登录",              ar: "تسجيل الدخول" },
+  "um.signOut":         { en: "Sign out",         zh: "退出登录",           ar: "تسجيل الخروج" },
+  "um.badge.legacy":    { en: "Legacy",           zh: "旧版",              ar: "قديم" },
+  "um.badge.active":    { en: "Active",           zh: "活跃",              ar: "نشط" },
+  "um.fallback.admin":  { en: "Koleex Admin",     zh: "Koleex 管理员",      ar: "مسؤول Koleex" },
+  "um.fallback.out":    { en: "Not signed in",    zh: "未登录",             ar: "غير مسجّل الدخول" },
+  "um.fallback.legacy": { en: "Legacy session",   zh: "旧版会话",           ar: "جلسة قديمة" },
+  "um.fallback.gate":   { en: "Password gate",    zh: "密码登录",           ar: "الدخول بكلمة المرور" },
+  /* accounts.user_type, as the menu's subtitle shows it. The role name beside
+     it is the roles table's own text (English is its source). */
+  "um.type.internal":   { en: "Internal",         zh: "内部",              ar: "داخلي" },
+  "um.type.customer":   { en: "Customer",         zh: "客户",              ar: "عميل" },
 };
