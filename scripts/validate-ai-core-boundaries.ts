@@ -311,7 +311,21 @@ check(
   !isWorldFactQuery("what is FOB") && !isWorldFactQuery("explain the difference between CIF and FOB") && !isWorldFactQuery("how do I write a cover letter") &&
     !isWorldFactQuery("translate this to Chinese") && !isWorldFactQuery("إيه معنى الكلمة دي") && !isWorldFactQuery("ok") && !isWorldFactQuery("thanks a lot") && !isWorldFactQuery("解释一下什么是信用证"),
 );
-check("world facts: the route treats one as live information", /isWorldFactQuery\(normalizedContent\) \|\|/.test(readFileSync("src/app/api/ai/agent/route.ts", "utf8")));
+/* A world fact is still always LOOKED UP (plan A4). Owner, 2026-09-26: "top
+   100 brands" took 3.5 minutes in the tool loop, so a world fact now takes the
+   general lane — whose first call is forced to be the lookup — whenever that
+   lane can search for the caller, and the tool loop otherwise. */
+{
+  const route = stripComments(readFileSync("src/app/api/ai/agent/route.ts", "utf8"), { line: "keep" });
+  check("world facts: on the general lane only when it can look them up for this caller, and never a live-info or web-search turn",
+    /const worldFactOnGeneral =\s*isWorldFactQuery\(normalizedContent\) &&\s*!isLiveInfoQuery\(normalizedContent\) &&\s*body\.web_search !== true &&\s*generalLaneTools\(ctx\) !== null;/.test(route));
+  check("world facts: otherwise the route still treats one as live information (the tool loop)",
+    /\(isWorldFactQuery\(normalizedContent\) && !worldFactOnGeneral\) \|\|/.test(route));
+  check("world facts: the general lane is the one they take, never the tool-less brand or small-talk prompt",
+    /fastLane = worldFactOnGeneral \? "general" : isBrand \? "brand" : isSmall \? "small" : "general";/.test(route));
+  check("world facts: the general lane's first call is forced to be the lookup — looked up, not recalled",
+    /toolChoice: worldFactOnGeneral \? \{ forceTool: GENERAL_LANE_TOOL \} : \("auto" as const\)/.test(route));
+}
 /* Dependability plan A4, second slice: the general lane itself may look one
    thing up. Source pins on the route — the behaviour is unit-tested in
    validate:ai-hub-connector §6, where the connector can be imported. */
@@ -319,7 +333,7 @@ check("world facts: the route treats one as live information", /isWorldFactQuery
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   const body = stripComments(route, { line: "keep" });
   check("general lane: the tool list is asked for ONLY on the general lane", /const generalTools = fastLane === "general" \? generalLaneTools\(ctx\) : null;/.test(body));
-  check("general lane: the tools ride the first call only when offered, with toolChoice auto (the page reader joins only with a user's link)", /\.\.\.\(laneTools \? \{ tools: laneTools, toolChoice: "auto" as const \} : \{\}\)/.test(body) &&
+  check("general lane: the tools ride the first call only when offered, with toolChoice auto unless a world fact forces the lookup (the page reader joins only with a user's link)", /\.\.\.\(laneTools\s*\? \{ tools: laneTools, toolChoice: worldFactOnGeneral \? \{ forceTool: GENERAL_LANE_TOOL \} : \("auto" as const\) \}\s*: \{\}\)/.test(body) &&
     /const laneTools = generalTools && readOn && allowedLinks\.size > 0 \? \[\.\.\.generalTools, READ_PAGE_TOOL_DEF\] : generalTools;/.test(body));
   check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && laneTools && out\.response\.toolCalls\.length > 0\)/.test(body));
   check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) (?:controller\.enqueue|emit)\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
