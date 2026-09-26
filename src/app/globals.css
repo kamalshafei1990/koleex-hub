@@ -2138,17 +2138,6 @@ body:has([data-kx-call-active='1']) .kx-update-offer { display: none; }
   [data-kx-skin="aurora"] .kx-glass-pop { background: rgba(14, 17, 23, 0.98); }
   [data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop { background: rgba(252, 253, 255, 0.99); }
 }
-/* ── kx-pop-solid — a pop surface that stays opaque in Aurora too. For long
-   pick lists read at a glance (the To-do label list): owner, 26/09, "make
-   the label dropdown dark not transparent". Same fill as the low-power arm. */
-[data-kx-skin="aurora"] .kx-glass-pop.kx-pop-solid {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: rgba(14, 17, 23, 0.98);
-}
-[data-kx-skin="aurora"][data-theme="light"] .kx-glass-pop.kx-pop-solid {
-  background: rgba(252, 253, 255, 0.99);
-}
 
 /* ── A MENU IS DENSER GLASS THAN A MODAL (owner, 2026-08-12) ──
    "too transparent… you can totally see clearly the item under it. keep it

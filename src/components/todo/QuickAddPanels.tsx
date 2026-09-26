@@ -76,7 +76,7 @@ export default function QuickAddPanel(props: {
 }) {
   const { kind, t } = props;
   return (
-    <div className={kind === "label" ? `${CARD} kx-pop-solid` : CARD} role="dialog" aria-label={kind === "assign" ? t("quick.assign") : kind === "due" ? t("quick.due") : kind === "priority" ? t("f.priority") : t("f.label")}
+    <div className={CARD} role="dialog" aria-label={kind === "assign" ? t("quick.assign") : kind === "due" ? t("quick.due") : kind === "priority" ? t("f.priority") : t("f.label")}
       onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); props.onClose(); } }}>
       {kind === "assign" && <AssignPicker {...props} />}
       {kind === "due" && <DuePicker {...props} />}
