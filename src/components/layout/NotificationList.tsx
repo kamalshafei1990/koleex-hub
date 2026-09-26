@@ -165,7 +165,7 @@ const SECTION_KEY: Record<DaySection, string> = {
 
 const senderName = (r: ListRow) => r.sender?.full_name || r.sender?.username || null;
 
-function AppGlyph({ meta, tHub }: { meta: unknown; tHub: TFn }) {
+export function AppGlyph({ meta, tHub }: { meta: unknown; tHub: TFn }) {
   const appId = defOf(meta)?.app;
   const app = appId ? APP_REGISTRY.find((a) => a.id === appId) : undefined;
   const Icon = app?.icon;

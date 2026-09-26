@@ -510,6 +510,10 @@ export const settingsT: Translations = {
   "push.nothingSent":     { en: "Nothing sent yet.", zh: "尚未发送任何通知。", ar: "لم يُرسل شيء بعد." },
 
   /* ── Quiet hours + muted conversations (Notifications tab) ── */
+  "notif.cards":               { en: "Pop-up cards", zh: "弹出卡片", ar: "بطاقات الإشعارات" },
+  "notif.cards.sub":           { en: "A card for each new notification while you're in Koleex Hub. What you don't open stays in the bell.", zh: "在 Koleex Hub 中时，每条新通知都会弹出一张卡片。未打开的会保留在通知铃中。", ar: "بطاقة لكل إشعار جديد أثناء وجودك في Koleex Hub. ما لا تفتحه يبقى في الجرس." },
+  "notif.cards.enable":        { en: "Show pop-up cards", zh: "显示弹出卡片", ar: "إظهار بطاقات الإشعارات" },
+  "notif.cards.enable.hint":   { en: "They appear under the bell for a few seconds. During quiet hours they appear without sound.", zh: "卡片会在通知铃下方显示几秒钟。免打扰时段内静音显示。", ar: "تظهر أسفل الجرس لبضع ثوانٍ. وفي ساعات الهدوء تظهر بلا صوت." },
   "notif.quiet":               { en: "Quiet hours",  zh: "免打扰时段", ar: "ساعات الهدوء" },
   "notif.quiet.sub":           { en: "Silence push and sounds on a daily schedule. Badges still update.", zh: "在每日固定时段静音推送和提示音，角标仍会更新。", ar: "كتم الإشعارات والأصوات في فترة يومية محددة — الشارات تستمر بالتحديث." },
   "notif.quiet.enable":        { en: "Enable quiet hours", zh: "启用免打扰时段", ar: "تفعيل ساعات الهدوء" },

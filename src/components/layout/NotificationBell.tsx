@@ -64,7 +64,8 @@ import { setIconBadge } from "@/lib/app-icon-badge";
 import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
 import PushNudge from "@/components/layout/PushNudge";
 import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
-import { desktopToast, inboxToastText, type Toast } from "@/lib/desktop-toast";
+import { desktopToast, inboxToastText, outOfView, type Toast } from "@/lib/desktop-toast";
+import NotificationCards, { CARD_MAX, type NoticeCard } from "@/components/layout/NotificationCards";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
@@ -87,6 +88,9 @@ const POLL_INTERVAL_MS = 60_000;
 const FEED_LIMIT = 300;
 
 type TFn = (key: string, fallback?: string) => string;
+
+/* No pop-up cards on screen (components/layout/NotificationCards). */
+const NO_CARDS: { cards: NoticeCard[]; more: number } = { cards: [], more: 0 };
 
 /** Resolve the best label for a Discuss channel row, mirroring the
  *  same fallback chain the sidebar uses: explicit name → DM partner's
@@ -177,6 +181,9 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
      opens and fixed for that open, so it is there on the first frame or not
      at all — never pushed in above the rows a moment later. */
   const [nudge, setNudge] = useState<Nudge>(() => (defaultOpen ? peekPushNudge(accountId) : null));
+  /* Pop-up cards on screen, and how many more folded behind them. Opening
+     the panel clears them: the rows are all there. */
+  const [cardStack, setCardStack] = useState(NO_CARDS);
   const [seen, setSeen] = useState({ accountId, open });
   if (seen.accountId !== accountId || seen.open !== open) {
     const accountChanged = seen.accountId !== accountId;
@@ -190,6 +197,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     }
     if (closed) setTab("all");
     if (opened || accountChanged) setNudge(open ? peekPushNudge(accountId) : null);
+    if (opened || accountChanged) setCardStack(NO_CARDS);
     /* A spinner only over an empty panel — rows painted from the last
        answer stay put while the refresh runs. */
     if (open && accountId && (opened || accountChanged)) setLoadingInbox(messages.length === 0);
@@ -212,6 +220,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   const toastRef = useRef<{
     lang: typeof lang; t: TFn; many: (n: number) => Toast;
     openRow: (m: InboxMessageWithSender) => void; openChannel: (id: string) => void;
+    card: (c: NoticeCard) => void;
   } | null>(null);
 
   /** Grace-period tracking: after a realtime bump, protect the optimistic
@@ -320,7 +329,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           c.muted || c.notification_pref === "none" || (c.notification_pref === "mentions" && !mentionsYou);
         const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
         const silenced = !!ch && quietFor(ch);
-        const heard = !silenced && !window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours);
+        const onDiscuss = window.location.pathname.startsWith("/discuss");
+        const heard = !silenced && !onDiscuss && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours);
         if (heard) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
@@ -338,22 +348,22 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           ),
         );
         void recountDiscuss().then((rows) => {
-          /* The desktop app with its window not in front: a system
-             notification too (lib/desktop-toast), under the chime's rules —
-             read again on the fresh list, which knows a conversation that
-             was new to the bell. */
+          /* The conversation's own setting, read again on the fresh list
+             (which knows a conversation that was new to the bell). */
           const c = rows?.find((x) => x.id === msg.channel_id);
-          if (!heard || !c || quietFor(c)) return;
           const r = toastRef.current;
-          if (!r) return;
+          if (!c || !r || quietFor(c)) return;
           const preview = c.last_message?.body?.trim() || r.t("notif.newMessage");
           const author = c.last_message?.author_username;
-          desktopToast({
-            key: `discuss:${c.id}`,
-            title: channelLabel(c, r.t),
-            body: author ? `${author}: ${preview}` : preview,
-            open: () => r.openChannel(c.id),
-          }, r.many);
+          const title = channelLabel(c, r.t);
+          const body = author ? `${author}: ${preview}` : preview;
+          /* In front of the reader: a pop-up card. Quiet hours only silence
+             the chime. Never on Discuss itself, where the message is on screen. */
+          if (!onDiscuss) r.card({ key: `discuss:${c.id}`, kind: "discuss", channelId: c.id, title, body });
+          /* The desktop app with its window not in front: a system
+             notification (lib/desktop-toast), under the chime's rules. */
+          if (!heard || !c || quietFor(c)) return;
+          desktopToast({ key: `discuss:${c.id}`, title, body, open: () => r.openChannel(c.id) }, r.many);
         });
       },
       onChannelChange: () => {
@@ -558,6 +568,12 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         const r = toastRef.current;
         if (r) desktopToast({ key: `inbox:${msg.id}`, ...inboxToastText(msg, r.lang), open: () => r.openRow(msg as unknown as InboxMessageWithSender) }, r.many);
       }
+      /* In front of the reader: a pop-up card (NotificationCards). The same
+         switch decides; quiet hours only silence the chime, not the card. */
+      if (activityAllowed(notifPrefsRef.current, activity)) {
+        const row = { ...msg, sender: null } as InboxMessageWithSender;
+        toastRef.current?.card({ key: `inbox:${msg.id}`, kind: "inbox", row, action: inTab(row, "action") });
+      }
       setInboxUnread((n) => n + 1);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
@@ -686,6 +702,16 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       many: (n) => ({ key: "inbox:many", title: t("notif.title"), body: tUi("toast.many").replace("{n}", String(n)), open: () => setOpen(true) }),
       openRow: (m) => void handleInboxRowClick(m),
       openChannel: (id) => handleDiscussRowClick(id),
+      /* Only while the window is in front (out of view, the system
+         notification or the push speaks), with cards on, and the panel
+         shut — open, the row lands in the list in front of the reader. */
+      card: (c) => {
+        if (open || outOfView() || notifPrefs?.popup_cards === false) return;
+        setCardStack((s) => {
+          const next = [c, ...s.cards.filter((x) => x.key !== c.key)];
+          return { cards: next.slice(0, CARD_MAX), more: s.more + Math.max(0, next.length - CARD_MAX) };
+        });
+      },
     };
   });
 
@@ -909,6 +935,20 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             )}
           </div>
       </PopoverPanel>
+
+      {(cardStack.cards.length > 0 || cardStack.more > 0) && (
+        <NotificationCards
+          cards={cardStack.cards}
+          more={cardStack.more}
+          lang={lang}
+          tHub={t}
+          tUi={tUi}
+          onOpen={(c) => (c.kind === "inbox" ? void handleInboxRowClick(c.row) : handleDiscussRowClick(c.channelId))}
+          onDismiss={(key) => setCardStack((s) => ({ ...s, cards: s.cards.filter((x) => x.key !== key) }))}
+          onMore={() => { setCardStack(NO_CARDS); setOpen(true); }}
+          onMoreDismiss={() => setCardStack((s) => ({ ...s, more: 0 }))}
+        />
+      )}
     </div>
   );
 }

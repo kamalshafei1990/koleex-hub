@@ -711,9 +711,9 @@ check("clicking it brings the Hub forward and opens that notification or convers
   /n\.onclick = \(ev\) => \{[\s\S]{0,200}window\.focus\(\)[\s\S]{0,120}t\.open\(\)/.test(toastLib)
   && /openRow: \(m\) => void handleInboxRowClick\(m\)/.test(bellQ) && /openChannel: \(id\) => handleDiscussRowClick\(id\)/.test(bellQ));
 const warmQ = gateQ.slice(gateQ.indexOf("const warm = () => {"), gateQ.indexOf("const t = window.setTimeout(", gateQ.indexOf("const warm = () => {")));
-check("the desktop app mounts the real bell early, closed — browsers keep the lazy one",
-  /if \(isDesktopApp\(\)\) \{[\s\S]*?setOpenOnMount\(false\);\s*setBell\([\s\S]*?return;\s*\}/.test(warmQ)
-  && /<Bell dk=\{dk\} defaultOpen=\{openOnMount\} \/>/.test(gateQ));
+check("the real bell mounts early, closed, once the list is stored — on every device",
+  /await prewarmBellFeed\(getCurrentAccountIdSync\(\)\);\s*const mod = await import\("\.\/NotificationBell"\);\s*if \(cancelled\) return;\s*setOpenOnMount\(false\);\s*setBell\(/.test(warmQ)
+  && /<Bell dk=\{dk\} defaultOpen=\{openOnMount\} \/>/.test(gateQ) && !/isDesktopApp/.test(gateQ));
 check("a burst's words read in English, Chinese and Arabic",
   /"toast\.many":\s*\{\s*en: "[^"]*\{n\}[^"]*",\s*zh: "[^"]*\{n\}[^"]*",\s*ar: "[^"]*\{n\}[^"]*"/.test(fileSrc("src/lib/translations/notif-ui.ts")));
 
@@ -737,6 +737,48 @@ check("the chime and the desktop pop-up both keep quiet in \"Mentions only\" unl
   /const quietFor = \(c: DiscussChannelWithState\) =>\s*c\.muted \|\| c\.notification_pref === "none" \|\| \(c\.notification_pref === "mentions" && !mentionsYou\);/.test(discussBlock)
   && /const silenced = !!ch && quietFor\(ch\);/.test(discussBlock)
   && /const mentionsYou = !!\(msg\.metadata as \{ mentions_you\?: boolean \} \| null\)\?\.mentions_you;/.test(discussBlock));
+
+/* ── T: pop-up cards while the Hub is in front ──────────────────────── */
+console.log("\nT. pop-up cards while the Hub is in front");
+/* Owner, 26/09: a card for each new notification that appears for a while,
+   then goes — and if it wasn't opened, it is still in the bell. Mockup
+   approved; "take care we have two styles aurora and core". */
+const cardsSrc = fileSrc("src/components/layout/NotificationCards.tsx");
+const bellT = fileSrc("src/components/layout/NotificationBell.tsx");
+const cardFn = bellT.slice(bellT.indexOf("card: (c) => {"), bellT.indexOf("});", bellT.indexOf("card: (c) => {")));
+check("a card shows only while the window is in front, with cards switched on, and the panel shut",
+  /if \(open \|\| outOfView\(\) \|\| notifPrefs\?\.popup_cards === false\) return;/.test(cardFn));
+const inboxCardAt = bellT.indexOf("if (activityAllowed(notifPrefsRef.current, activity)) {");
+const inboxCard = inboxCardAt < 0 ? "" : bellT.slice(inboxCardAt, bellT.indexOf("\n      }\n", inboxCardAt));
+check("a work notification's card follows its per-activity switch — quiet hours only silence the chime",
+  /toastRef\.current\?\.card\(\{ key: `inbox:\$\{msg\.id\}`, kind: "inbox", row, action: inTab\(row, "action"\) \}\)/.test(inboxCard) && !/inQuietHours/.test(inboxCard));
+const dBlock = bellT.slice(bellT.indexOf("onMessageInsert: (msg) => {"), bellT.indexOf("onChannelChange:", bellT.indexOf("onMessageInsert: (msg) => {")));
+const dGuard = dBlock.indexOf("if (!c || !r || quietFor(c)) return;");
+check("a Discuss card follows the conversation's setting, and never shows on Discuss itself",
+  dGuard > 0 && dGuard < dBlock.indexOf("r.card(") && /if \(!onDiscuss\) r\.card\(\{ key: `discuss:\$\{c\.id\}`/.test(dBlock));
+check("at most three cards; the rest fold into \"+N more\", which opens the bell",
+  /export const CARD_MAX = 3;/.test(cardsSrc) && /cards: next\.slice\(0, CARD_MAX\), more: s\.more \+ Math\.max\(0, next\.length - CARD_MAX\)/.test(cardFn)
+  && /onMore=\{\(\) => \{ setCardStack\(NO_CARDS\); setOpen\(true\); \}\}/.test(bellT));
+check("clicking opens it (marked read); ✕ or time running out only takes it off the screen",
+  /onOpen=\{\(c\) => \(c\.kind === "inbox" \? void handleInboxRowClick\(c\.row\) : handleDiscussRowClick\(c\.channelId\)\)\}/.test(bellT)
+  && /onDismiss=\{\(key\) => setCardStack\(\(s\) => \(\{ \.\.\.s, cards: s\.cards\.filter\(\(x\) => x\.key !== key\) \}\)\)\}/.test(bellT)
+  && /onClick=\{\(\) => leave\(onOpen\)\}/.test(cardsSrc) && /onClick=\{\(e\) => \{ e\.stopPropagation\(\); leave\(\); \}\}/.test(cardsSrc));
+check("the card keeps its own time (reduce motion collapses animations) and holds while pointed at or focused",
+  !/onAnimationEnd/.test(cardsSrc) && /window\.setTimeout\([\s\S]{0,120}left\.current\)/.test(cardsSrc)
+  && /onPointerEnter=\{\(\) => setHeld\(true\)\}/.test(cardsSrc) && /onFocus=\{\(\) => setHeld\(true\)\}/.test(cardsSrc)
+  && /CARD_MS = \{ action: 12_000, other: 6_000/.test(cardsSrc) && /@keyframes kx-card-time/.test(fs.readFileSync(R("src/app/globals.css"), "utf8")));
+check("both skins: the bell panel's own material, portalled with its own kx-app scope",
+  /className=\{`kx-app kx-glass-pop kx-pop-panel kx-pop-clear /.test(cardsSrc) && /createPortal\(/.test(cardsSrc) && /document\.body,/.test(cardsSrc));
+check("opening the panel, or another account, clears them",
+  /if \(opened \|\| accountChanged\) setCardStack\(NO_CARDS\);/.test(bellT));
+const tabSrc = fileSrc("src/components/settings/tabs/NotificationsTab.tsx");
+const acSrc = fileSrc("src/lib/access-control.ts");
+const setWords = fileSrc("src/lib/translations/settings.ts");
+const missingCardWords = ["card.more", "card.moreSub", "card.close"].filter((k) => !new RegExp(`"${k.replace(".", "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(fileSrc("src/lib/translations/notif-ui.ts")))
+  .concat(["notif.cards", "notif.cards.sub", "notif.cards.enable", "notif.cards.enable.hint"].filter((k) => !new RegExp(`"${k.replace(/\./g, "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(setWords)));
+check("a switch in Settings → Notifications, on by default, in English, Chinese and Arabic",
+  /checked=\{n\.popup_cards !== false\}/.test(tabSrc) && /patch\(\{ popup_cards: v \}\)/.test(tabSrc)
+  && /popup_cards: true,/.test(acSrc) && /popup_cards\?: boolean;/.test(acSrc) && missingCardWords.length === 0, missingCardWords.join(", "));
 
 /* ── S: a notification that failed to write leaves a trace ──────────── */
 console.log("\nS. a notification that failed to write leaves a trace");

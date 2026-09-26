@@ -24,7 +24,7 @@ import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours">;
+type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours" | "popup_cards">;
 
 /* SEVENTEEN SWITCHES IN THREE GROUPS, NOT ONE FLAT RUN.
    This was a single undifferentiated list — the same "not organised enough"
@@ -290,6 +290,16 @@ export default function NotificationsTab({ account, onChanged }: {
   return (
     <div className="space-y-4">
       <PushEnableCard />
+      {/* Pop-up cards while the Hub is in front (layout/NotificationCards). */}
+      <SettingsCard title={t("notif.cards")} subtitle={t("notif.cards.sub")}>
+        <SwitchRow
+          label={t("notif.cards.enable")}
+          hint={t("notif.cards.enable.hint")}
+          checked={n.popup_cards !== false}
+          onChange={(v) => patch({ popup_cards: v })}
+          last
+        />
+      </SettingsCard>
       {/* No "Channels" card. It offered Email (there is no email channel) and
           In-app (read by nothing) — two switches that changed no behaviour.
           Push is the card above; the chime is Settings → Sounds; the in-app

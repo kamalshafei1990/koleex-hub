@@ -79,6 +79,11 @@ export const notifUiT: Translations = {
   "push.failed":    { en: "Couldn't turn them on. Try again, or use Settings → Notifications.", zh: "无法开启。请重试，或前往 设置 → 通知。", ar: "تعذّر التفعيل. حاول مرة أخرى، أو من الإعدادات، قسم الإشعارات." },
   "push.dismiss":   { en: "Don't show again", zh: "不再显示",  ar: "عدم الإظهار مرة أخرى" },
 
+  /* Pop-up cards while the Hub is in front (components/layout/NotificationCards). */
+  "card.more":      { en: "+{n} more notifications", zh: "另有 {n} 条新通知", ar: "+{n} إشعارات أخرى" },
+  "card.moreSub":   { en: "Open notifications", zh: "打开通知", ar: "افتح الإشعارات" },
+  "card.close":     { en: "Close",          zh: "关闭",       ar: "إغلاق" },
+
   /* The desktop app's system notification for a burst (lib/desktop-toast). */
   "toast.many":     { en: "{n} new notifications", zh: "{n} 条新通知", ar: "إشعارات جديدة: {n}" },
 };

@@ -28,7 +28,6 @@ import { cachedGet } from "@/lib/client-cache";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import { setIconBadge } from "@/lib/app-icon-badge";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
-import { isDesktopApp } from "@/lib/desktop-app";
 
 /* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
    and even with the module ALREADY imported and awaited, that wrapper renders
@@ -118,21 +117,6 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
     let cancelled = false;
     const warm = () => {
       if (cancelled || document.visibilityState !== "visible") return;
-      /* THE DESKTOP APP MOUNTS THE REAL BELL NOW, CLOSED. It has no push,
-         so the bell's live feed is its only way to hear of a notification:
-         with the bell mounted, a new one chimes, moves the icon's number and
-         pops a Windows / Mac notification (lib/desktop-toast) while the
-         window is minimized or behind another program. Left to the first
-         press, a desktop session that never opened the bell heard nothing.
-         Browsers keep the lazy bell — push covers them. */
-      if (isDesktopApp()) {
-        void import("./NotificationBell").then((mod) => {
-          if (cancelled) return;
-          setOpenOnMount(false);
-          setBell(() => mod.default as BellComponent);
-        });
-        return;
-      }
       void import("./NotificationBell");
       /* Whether the panel will offer push on this device — decided now, so
          the first open shows it (or not) on its first frame. */
@@ -147,6 +131,19 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
         if (cancelled) return;
         const { prewarmBellFeed } = await import("@/lib/inbox-warm");
         await prewarmBellFeed(getCurrentAccountIdSync());
+        /* THEN THE REAL BELL MOUNTS, CLOSED — on every device. Until it does
+           nothing hears a new notification live: the resting count moves
+           once a minute, and there is no chime, no pop-up card and no desktop
+           notification. A session that never opened the bell used to hear
+           nothing at all. The desktop app needed it first (26/09, no push
+           there); the pop-up cards need it everywhere (owner, same day).
+           After the list is stored, so the panel still opens on fresh rows;
+           after the screen's own requests, so no page waits on it. The
+           Gate's own polling stands down, and the bell's replaces it. */
+        const mod = await import("./NotificationBell");
+        if (cancelled) return;
+        setOpenOnMount(false);
+        setBell(() => mod.default as BellComponent);
       })();
     };
     const t = window.setTimeout(() => {

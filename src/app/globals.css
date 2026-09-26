@@ -4061,6 +4061,17 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   .kx-pop-arrive, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
 }
 
+/* ── Notification card time line (components/layout/NotificationCards) ──
+   The thin Hub-Blue line under a pop-up card: how long it stays. DISPLAY
+   ONLY — the card's own timer (JS) decides when it goes, because
+   .kx-reduce-motion collapses every animation to 0.001ms: a card timed by
+   animationend would vanish the instant it arrived. Under reduced motion
+   the line is simply gone; the card still waits its full time. */
+@keyframes kx-card-time {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
 /* Low-power tier: the DECORATIVE infinite loops pause (they were running
    forever on weak devices while every glass arm was already dropped).
    Loading indicators — the orb, the comet bar, the loadbar — keep moving:

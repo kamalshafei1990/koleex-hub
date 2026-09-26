@@ -270,6 +270,10 @@ export interface NotificationPrefs {
      the SERVER can evaluate the window without guessing the user's zone.
      Enforced in sendPushToAccounts and the NotificationBell chime. */
   quiet_hours?: QuietHoursPref;
+  /* Pop-up cards (components/layout/NotificationCards): a card for each new
+     notification while the Hub is in front. Default on; quiet hours only
+     silence them. Carried by withDefaults' notifications spread. */
+  popup_cards?: boolean;
 }
 
 export interface QuietHoursPref {
@@ -422,6 +426,7 @@ export const DEFAULT_PREFERENCES: Required<
     security_alerts: true,
     comments_activity: true,
     reports_activity: true,
+    popup_cards: true,
   },
   display: {
     text_size: "default",
