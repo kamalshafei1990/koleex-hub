@@ -23,8 +23,12 @@ import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+/* Fetch only: nothing the bell's chunk holds may be imported here — a shared
+   module splits the bell into several files (validate:budgets §L). The
+   server names each topic in the reader's language. */
+import { fetchMutes, unmuteTopic, type NotificationMute } from "@/lib/notification-mute-client";
 
-type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours" | "popup_cards">;
+type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours" | "popup_cards" | "pause_until">;
 
 /* SEVENTEEN SWITCHES IN THREE GROUPS, NOT ONE FLAT RUN.
    This was a single undifferentiated list — the same "not organised enough"
@@ -253,6 +257,51 @@ function MutedConversationsCard() {
   );
 }
 
+/* ── Muted topics ────────────────────────────────────────────────────────
+   One task, issue or quotation the user stopped hearing about from a
+   notification's ⋯ (lib/notification-mute) — listed here to undo. */
+function MutedTopicsCard() {
+  const { t, lang } = useTranslation(settingsT);
+  const [mutes, setMutes] = useState<NotificationMute[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMutes(lang).then((rows) => { if (!cancelled) setMutes(rows ?? []); });
+    return () => { cancelled = true; };
+  }, [lang]);
+
+  async function unmute(id: string) {
+    setBusyId(id);
+    const ok = await unmuteTopic(id);
+    if (ok) setMutes((prev) => (prev ?? []).filter((m) => m.id !== id));
+    setBusyId(null);
+  }
+
+  return (
+    <SettingsCard title={t("notif.topics")} subtitle={t("notif.topics.sub")}>
+      {mutes === null ? (
+        <div className="flex justify-center py-4"><SpinnerIcon size={14} className="text-[var(--text-dim)]" /></div>
+      ) : mutes.length === 0 ? (
+        <p className="py-2 text-[12px] text-[var(--text-faint)]">{t("notif.topics.none")}</p>
+      ) : mutes.map((m, i) => (
+        <div key={m.id} className={`flex items-center justify-between gap-3 py-2.5 ${i === mutes.length - 1 ? "" : "border-b border-[var(--border-faint)]"}`}>
+          {m.app && <BoundIcon semanticKey={`app.${m.app}`} className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" fallback={null} />}
+          <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">{m.name}</span>
+          <button
+            type="button"
+            disabled={busyId === m.id}
+            onClick={() => void unmute(m.id)}
+            className="kx-hover-glow shrink-0 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+          >
+            {busyId === m.id ? "…" : t("notif.muted.unmute")}
+          </button>
+        </div>
+      ))}
+    </SettingsCard>
+  );
+}
+
 export default function NotificationsTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
@@ -336,6 +385,7 @@ export default function NotificationsTab({ account, onChanged }: {
       />
 
       <MutedConversationsCard />
+      <MutedTopicsCard />
 
       {/* Device management page is Super-Admin-only — don't link regular
           users into a lock screen. */}

@@ -498,7 +498,7 @@ async function mailWidget(auth: ServerAuthContext): Promise<Widget> {
   const { count, error } = await supabaseServer.from("inbox_messages")
     .select("*", { count: "exact", head: true })
     .eq("recipient_account_id", auth.account_id)
-    .is("read_at", null).is("archived_at", null);
+    .is("read_at", null).is("archived_at", null).is("snoozed_until", null);
   if (error) return { error: error.message };
   return { unread: count ?? 0 };
 }

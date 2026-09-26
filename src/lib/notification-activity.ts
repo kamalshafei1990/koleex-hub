@@ -166,3 +166,26 @@ export function inQuietHours(
     ? cur >= start && cur < end
     : cur >= start || cur < end; // crosses midnight
 }
+
+/* ── Pause ─────────────────────────────────────────────────────────────────
+   A pause the reader takes from the bell (an hour, until the morning, while
+   a meeting runs): until `pause_until` (ISO, in preferences.notifications)
+   no sound, no pop-up card, no desktop notification and no push — the bell
+   still collects everything, and its number still counts. Unlike quiet
+   hours it ends by itself, once, and silences the cards too. Evaluated
+   where quiet hours are: sendPushToAccounts and the bell. */
+export const PAUSE_MAX_MS = 7 * 24 * 3_600_000;
+
+/** The moment a pause ends, or null when none is running. */
+export function pausedUntil(prefs: unknown, now: Date = new Date()): Date | null {
+  const raw = (prefs as { pause_until?: unknown } | null | undefined)?.pause_until;
+  if (typeof raw !== "string") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) && ms > now.getTime() ? new Date(ms) : null;
+}
+
+/** Quiet hours or a pause: no sound and no push right now. */
+export function hushedNow(prefs: unknown, now: Date = new Date()): boolean {
+  return inQuietHours((prefs as { quiet_hours?: QuietHoursLike } | null | undefined)?.quiet_hours, now)
+    || pausedUntil(prefs, now) !== null;
+}

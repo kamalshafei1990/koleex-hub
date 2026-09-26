@@ -156,7 +156,10 @@ export function subscribeToInboxMessages(
 ): () => void {
   let closed = false;
   let primed = false;
-  const seen = new Set<string>();
+  /* id → the created_at it was seen with. A row brought back to the top —
+     a snooze waking, a request reminded (lib/server/inbox-resurface) — keeps
+     its id and gets a newer created_at: that is new again (a card, a chime). */
+  const seen = new Map<string, string>();
   const refresh = async () => {
     if (closed) return;
     /* Slim projection: this refetch runs on EVERY broadcast ping for EVERY
@@ -178,8 +181,9 @@ export function subscribeToInboxMessages(
     })();
     if (closed || !msgs) return;
     for (const m of [...msgs].reverse()) {
-      if (seen.has(m.id)) continue;
-      seen.add(m.id);
+      const was = seen.get(m.id);
+      if (was !== undefined && Date.parse(m.created_at) <= Date.parse(was)) continue;
+      seen.set(m.id, m.created_at);
       if (primed) onInsert(m as unknown as InboxMessageRow);
     }
     primed = true;
@@ -249,6 +253,31 @@ export async function archiveMessages(ids: string[]): Promise<boolean> {
   const r = await inboxMutate({ action: "archive", ids });
   if (!r.ok) console.error("[Inbox] Archive:", r.error);
   return r.ok;
+}
+
+/** Later: hidden until `until` (ISO), then back on top as new, with its push
+ *  (lib/server/inbox-snooze). */
+export async function snoozeMessages(ids: string[], until: string): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const r = await inboxMutate({ action: "snooze", ids, until });
+  if (!r.ok) console.error("[Inbox] Snooze:", r.error);
+  return r.ok;
+}
+
+/** Back now, where it was (the center's "Later" view). */
+export async function unsnoozeMessages(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const r = await inboxMutate({ action: "unsnooze", ids });
+  if (!r.ok) console.error("[Inbox] Unsnooze:", r.error);
+  return r.ok;
+}
+
+/** What the reader put off, the soonest back first — null when the read failed. */
+export async function fetchSnoozedOrNull(): Promise<InboxMessageWithSender[] | null> {
+  const data = await inboxFeed<InboxMessageWithSender[]>("messages", { snoozed: "1", limit: "200" });
+  if (!data) return null;
+  const at = (m: InboxMessageWithSender) => Date.parse(m.snoozed_until ?? "") || 0;
+  return [...data].sort((a, b) => at(a) - at(b));
 }
 
 /** Structured attachment record stored in `inbox_messages.metadata.attachments`.

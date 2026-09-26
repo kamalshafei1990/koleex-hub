@@ -10,7 +10,8 @@
      changes…) — separated from the work they used to drown: on the owner's
      feed they were 96% of all rows. "Needs you" is every unread row whose
      type waits on the reader (severity "action": approvals, assignments,
-     requests). "All" is the work — everything that is not Security.
+     requests), read oldest-first with how long each has waited. "All" is
+     the work — everything that is not Security.
    · Sections. Today / Yesterday / This week / Older, on the reader's clock.
    · Groups. Rows of the same type from the same sender on the same day that
      say the same thing fold into one: identical subjects ("kamal signed in
@@ -49,6 +50,60 @@ export function inTab(row: ViewRow, tab: BellTab): boolean {
   if (isSecurity(row.metadata)) return false;
   if (tab === "action") return !row.read_at && defOf(row.metadata)?.severity === "action";
   return true;
+}
+
+/* ── How long a request has waited on the reader ─────────────────────────
+   A reminder brings the request back to the top of the list — its
+   created_at moves to "now" — so the moment the reader was FIRST asked is
+   kept in metadata.first_at (lib/server/inbox-resurface). The "Needs you"
+   list is read oldest-first by it: what has waited longest leads. */
+export function waitingSince(row: ViewRow): string {
+  const f = (row.metadata as { first_at?: unknown } | null | undefined)?.first_at;
+  return typeof f === "string" && f && !Number.isNaN(Date.parse(f)) ? f : row.created_at;
+}
+
+/** Oldest waiting first. */
+export function byWaiting<R extends ViewRow>(rows: R[]): R[] {
+  return [...rows].sort((a, b) => Date.parse(waitingSince(a)) - Date.parse(waitingSince(b)));
+}
+
+/** A request still on the reader: unread, and of a type that waits on them. */
+export const isWaiting = (row: ViewRow): boolean => !row.read_at && defOf(row.metadata)?.severity === "action";
+
+export type WaitLevel = "fresh" | "day" | "long";
+/** Hours waited, and how loud to say it: a day turns it amber, three red —
+ *  the day the approval reminders tell the Super Admins (lib/server/
+ *  approval-reminders ESCALATE_AFTER_H). */
+export function waitOf(row: ViewRow, now: number = Date.now()): { hours: number; level: WaitLevel } {
+  const hours = Math.max(0, Math.floor((now - Date.parse(waitingSince(row))) / 3_600_000));
+  return { hours, level: hours >= 72 ? "long" : hours >= 24 ? "day" : "fresh" };
+}
+
+/* ── Back after an absence ────────────────────────────────────────────────
+   Owner (item 4 of the second round): after a few hours away, or first thing
+   in the morning, ONE card that sums up what came in — not a wall of them. */
+const HOUR_MS = 3_600_000;
+export const AWAY_MS = 3 * HOUR_MS;
+
+/** Away long enough for a summary: three hours, or a new day (an hour at least). */
+export function isAway(last: number, now: number): boolean {
+  if (!last || now - last < HOUR_MS) return false;
+  if (now - last >= AWAY_MS) return true;
+  return dayStart(new Date(last)) !== dayStart(new Date(now));
+}
+
+/** What came in since `since`, still unread (security alerts have their own
+ *  tab): how many wait on the reader, how many are updates, and the apps they
+ *  came from, the busiest first. */
+export function awaySummary(rows: ViewRow[], since: number): { needs: number; updates: number; apps: string[] } {
+  const fresh = rows.filter((r) => !r.read_at && !isSecurity(r.metadata) && Date.parse(r.created_at) > since);
+  const needs = fresh.filter((r) => defOf(r.metadata)?.severity === "action").length;
+  const byApp = new Map<string, number>();
+  for (const r of fresh) {
+    const a = defOf(r.metadata)?.app;
+    if (a) byApp.set(a, (byApp.get(a) ?? 0) + 1);
+  }
+  return { needs, updates: fresh.length - needs, apps: [...byApp].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a) };
 }
 
 function dayStart(d: Date): number {

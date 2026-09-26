@@ -1188,6 +1188,9 @@ export interface InboxMessageRow {
   read_at: string | null;
   archived_at: string | null;
   created_at: string;
+  /** Put off until then ("Later"; 20260927_inbox_snooze.sql). The slim bell
+   *  projection leaves it out — only the center's Later view reads it. */
+  snoozed_until?: string | null;
 
   /* ── External-email fields (all NULL for internal Koleex messages) ── */
   mail_connection_id: string | null;

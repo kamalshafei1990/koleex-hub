@@ -58,13 +58,17 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import {
   archiveMessages,
   fetchInboxMessagesOrNull,
+  fetchSnoozedOrNull,
   markMessageRead,
   markMessagesRead,
   markMessagesUnread,
+  snoozeMessages,
   subscribeToInboxMessages,
+  unsnoozeMessages,
   type InboxAttachment,
   type InboxProductRef,
 } from "@/lib/inbox";
+import { muteTopic } from "@/lib/notification-mute-client";
 import { useCurrentAccount, useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
 import { readWarmMailFeed, writeWarmMailFeed } from "@/lib/inbox-warm";
 import { cleanInboxBody, cleanInboxSubject } from "@/lib/inbox-display";
@@ -81,10 +85,13 @@ import type { InboxMessageWithSender } from "@/types/supabase";
    Aurora is the ONE JavaScript branch the skin system allows itself. */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
-type View = "all" | "action" | "security" | "unread" | "archive";
+/* "later" holds what the reader put off (lib/server/inbox-snooze): read on
+   its own, as those rows are out of the feed until they wake. */
+type View = "all" | "action" | "security" | "unread" | "later" | "archive";
 type Msg = InboxMessageWithSender;
 
 function inView(m: Msg, view: View): boolean {
+  if (view === "later") return false;
   if (view === "archive") return !!m.archived_at;
   if (m.archived_at) return false;
   if (view === "unread") return !m.read_at;
@@ -96,6 +103,7 @@ const VIEW_LABEL: Record<View, string> = {
   action: "tab.action",
   security: "tab.security",
   unread: "view.unread",
+  later: "view.later",
   archive: "view.archive",
 };
 
@@ -189,14 +197,24 @@ export default function NotificationCenterPage() {
     });
   }, [accountId, loadMessages]);
 
+  /* What was put off for later — read when that view opens (and again on
+     each open: something may have woken meanwhile). */
+  const [snoozed, setSnoozed] = useState<Msg[] | null>(null);
+  useEffect(() => {
+    if (view !== "later" || !feedAccountId) return;
+    let alive = true;
+    fetchSnoozedOrNull().then((rows) => { if (alive && rows) setSnoozed(rows); });
+    return () => { alive = false; };
+  }, [view, feedAccountId]);
+
   /* ── Shaping ─────────────────────────────────────────────────────────── */
   const hasSecurity = useMemo(() => messages.some((m) => isSecurity(m.metadata)), [messages]);
-  const views: View[] = hasSecurity ? ["all", "action", "security", "unread", "archive"] : ["all", "action", "unread", "archive"];
+  const views: View[] = hasSecurity ? ["all", "action", "security", "unread", "later", "archive"] : ["all", "action", "unread", "later", "archive"];
 
   /* A count is things needing attention (unread) — except Archive, which
      shows how much is there. */
   const counts = useMemo(() => {
-    const c: Record<View, number> = { all: 0, action: 0, security: 0, unread: 0, archive: 0 };
+    const c: Record<View, number> = { all: 0, action: 0, security: 0, unread: 0, later: snoozed?.length ?? 0, archive: 0 };
     for (const m of messages) {
       for (const v of ["all", "action", "security", "unread", "archive"] as View[]) {
         if (!inView(m, v)) continue;
@@ -204,9 +222,12 @@ export default function NotificationCenterPage() {
       }
     }
     return c;
-  }, [messages]);
+  }, [messages, snoozed]);
 
-  const inCurrentView = useMemo(() => messages.filter((m) => inView(m, view)), [messages, view]);
+  const inCurrentView = useMemo(
+    () => (view === "later" ? snoozed ?? [] : messages.filter((m) => inView(m, view))),
+    [messages, snoozed, view],
+  );
 
   /* The apps this view holds, with how much each has — the rail's second
      list and the narrow screens' app picker. */
@@ -249,7 +270,10 @@ export default function NotificationCenterPage() {
   const appFilterLive = appFilter && apps.some((a) => a.app.id === appFilter) ? appFilter : "";
   if (appFilterLive !== appFilter) setAppFilter(appFilterLive);
 
-  const selected = useMemo(() => messages.find((m) => m.id === selectedId) ?? null, [messages, selectedId]);
+  const selected = useMemo(
+    () => messages.find((m) => m.id === selectedId) ?? snoozed?.find((m) => m.id === selectedId) ?? null,
+    [messages, snoozed, selectedId],
+  );
 
   /* ── Actions (optimistic; one request for the lot) ────────────────────── */
   function setRowsRead(rows: Msg[], read: boolean) {
@@ -311,20 +335,49 @@ export default function NotificationCenterPage() {
     );
   }
 
+  /* Later: out of the feed until it wakes — or, in the Later view, a new
+     time. Bring back now: into the feed where it was. */
+  function snoozeRows(rows: Msg[], until: string) {
+    const ids = new Set(rows.map((m) => m.id));
+    if (ids.size === 0) return;
+    if (view === "later") {
+      setSnoozed((prev) => (prev ?? []).map((m) => (ids.has(m.id) ? { ...m, snoozed_until: until } : m))
+        .sort((a, b) => Date.parse(a.snoozed_until ?? "") - Date.parse(b.snoozed_until ?? "")));
+    } else {
+      setMessages((prev) => prev.filter((m) => !ids.has(m.id)));
+      setSnoozed((prev) => (prev ? [...prev, ...rows.map((m) => ({ ...m, snoozed_until: until }))] : prev));
+    }
+    if (selectedId && ids.has(selectedId) && view !== "later") { setSelectedId(null); setMobileView("list"); }
+    void snoozeMessages([...ids], until);
+  }
+  function unsnoozeRows(rows: Msg[]) {
+    const ids = new Set(rows.map((m) => m.id));
+    if (ids.size === 0) return;
+    setSnoozed((prev) => (prev ?? []).filter((m) => !ids.has(m.id)));
+    void unsnoozeMessages([...ids]).then(() => loadMessages());
+  }
+
   const listActions: ListActions<Msg> = {
     onOpen: openRow,
     onSetRead: setRowsRead,
     onArchive: archiveRows,
     onDecided: decided,
+    onSnooze: snoozeRows,
+    onUnsnooze: unsnoozeRows,
+    onMute: async (m) => {
+      const ok = await muteTopic(m.id);
+      if (ok) void loadMessages();
+      return ok;
+    },
   };
 
   /* Mark read — what the reader is looking at (this view, this app, this
      search): its unread rows, in one request. */
   function markViewRead() {
-    if (view === "archive") return;
+    if (view === "archive" || view === "later") return;
     setRowsRead(filtered.filter((m) => !m.read_at), true);
   }
-  const viewUnread = view === "archive" ? 0 : filtered.filter((m) => !m.read_at).length;
+  const viewUnread = view === "archive" || view === "later" ? 0 : filtered.filter((m) => !m.read_at).length;
 
   /* ── Render ─────────────────────────────────────────────────────────── */
   if (accountLoading && !feedAccountId) return <DirectoryListSkeleton label={tHub("notif.title")} />;
@@ -348,6 +401,7 @@ export default function NotificationCenterPage() {
     : view === "security" ? tUi("empty.security")
     : view === "unread" ? tUi("empty.unread")
     : view === "archive" ? tUi("empty.archive")
+    : view === "later" ? tUi("empty.later")
     : tHub("notif.caughtUp");
 
   const viewButton = (v: View, compact: boolean) => {
@@ -519,6 +573,8 @@ export default function NotificationCenterPage() {
                 time={(iso) => notifTimeAgo(iso, tHub)}
                 actions={listActions}
                 selectedId={selectedId}
+                waiting={view === "action"}
+                later={view === "later"}
               />
             )}
             {loading && messages.length === 0 && <NotificationSkeleton rows={6} />}

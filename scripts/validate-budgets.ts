@@ -1008,23 +1008,48 @@ console.log("\nJ. Koleex AI app chunk");
    and /inbox's); the ceiling is that plus ~12%. The static side — the Gate
    imports none of it — is validate:notification-types §L. */
 console.log("\nL. Notification bell chunk");
+/* 27/09/2026 (second notification round): measured as the bell's WHOLE own
+   download, no longer one file. The file this used to find — the one holding
+   both dictionaries — was never all of it: the bell's import() fetches its
+   own code, the list with the words, and its libraries (Discuss, inbox, push
+   helpers), each a file only the bell asks for. When the pause menu and the
+   row's ⋯ moved to a chunk of their own (NotificationMore), the bundler moved
+   notif-ui in with the libraries and the two-dictionary file stopped existing
+   — the old check reported "not found" while the bell had grown 4.6%.
+   Every import() compiles to a list of files; the bell's is the one naming
+   the file with the notification dictionary. Its OWN files are the ones no
+   other list names (supabase-js, shared by a dozen features, is not the
+   bell's weight). Measured: 216 KB on main before the round (42 code + 86
+   list & words + 88 libraries), 226 KB after it (six features, +10 KB).
+   Ceiling: the first measure plus ~12%, the rule the one-file ceiling used. */
 {
   const dir = path.join(NEXT, "static", "chunks");
   const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".js")) : [];
+  const read = (f: string) => fs.readFileSync(path.join(dir, f), "utf8");
   const longest = (keys: string[]) => keys.reduce((a, b) => (b.length > a.length ? b : a), "");
-  const markers = [longest(Object.keys(notifTemplatesT)), longest(Object.keys(notifUiT))].map((k) => JSON.stringify(k));
-  const bell = files.filter((f) => {
-    const src = fs.readFileSync(path.join(dir, f), "utf8");
-    return markers.every((m) => src.includes(m));
-  });
-  if (bell.length === 0) {
-    bad("notification bell chunk", `not found by ${markers.join(" + ")} — did the dictionaries or the build move?`);
+  const marker = JSON.stringify(longest(Object.keys(notifTemplatesT)));
+  const dictFiles = new Set(files.filter((f) => read(f).includes(marker)));
+  const lists: string[][] = [];
+  const seenList = new Set<string>();
+  for (const f of files) {
+    for (const m of read(f).matchAll(/Promise\.all\(\[([^\]]*)\]\.map/g)) {
+      const l = [...m[1].matchAll(/static\/chunks\/([^"]+)/g)].map((x) => x[1]);
+      const key = l.join("|");
+      if (l.length && !seenList.has(key)) { seenList.add(key); lists.push(l); }
+    }
+  }
+  const bellLists = lists.filter((l) => l.some((c) => dictFiles.has(c)));
+  if (bellLists.length !== 1) {
+    bad("notification bell chunk", `${bellLists.length} import() lists name the dictionary ${marker} (want exactly the bell's) — did the dictionaries or the build move?`);
   } else {
-    const MAX_KB = 91;
-    const heavy = bell.filter((f) => kb(fs.statSync(path.join(dir, f)).size) > MAX_KB);
-    heavy.length === 0
-      ? ok(`bell words + list: ${bell.length} chunk(s), largest ${Math.max(...bell.map((f) => kb(fs.statSync(path.join(dir, f)).size)))} KB`, `budget ${MAX_KB} KB each`)
-      : bad("bell chunk over budget", heavy.map((f) => `${f} ${kb(fs.statSync(path.join(dir, f)).size)} KB`).join(", ") + ` > ${MAX_KB} KB`);
+    const MAX_KB = 240;
+    const own = bellLists[0].filter((c) => lists.filter((l) => l.includes(c)).length === 1);
+    const total = own.reduce((n, f) => n + kb(fs.statSync(path.join(dir, f)).size), 0);
+    const detail = own.map((f) => `${f} ${kb(fs.statSync(path.join(dir, f)).size)} KB`).join(" + ");
+    total <= MAX_KB
+      ? ok(`the open bell's own files: ${own.length}, ${total} KB`, `budget ${MAX_KB} KB — ${detail}`)
+      : bad("the open bell over budget", `${detail} = ${total} KB > ${MAX_KB} KB`);
+    const bell = own;
     const bm = JSON.parse(fs.readFileSync(path.join(NEXT, "build-manifest.json"), "utf8")) as { rootMainFiles?: string[] };
     const inFloor = bell.filter((f) => (bm.rootMainFiles ?? []).some((r) => r.endsWith(f)));
     inFloor.length === 0

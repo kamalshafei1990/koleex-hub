@@ -527,6 +527,9 @@ export const settingsT: Translations = {
   "notif.muted.none":          { en: "No muted conversations.", zh: "没有已静音的会话。", ar: "لا توجد محادثات مكتومة." },
   "notif.muted.unmute":        { en: "Unmute", zh: "取消静音", ar: "إلغاء الكتم" },
   "notif.muted.dm":            { en: "Direct message", zh: "私信", ar: "رسالة مباشرة" },
+  "notif.topics":              { en: "Muted topics", zh: "已静音的事项", ar: "المواضيع المكتومة" },
+  "notif.topics.sub":          { en: "Tasks, issues and quotations you stopped notifications about. A request that needs you still reaches you.", zh: "您停止接收通知的任务、问题和报价。需要您处理的请求仍会通知您。", ar: "المهام والمشكلات وعروض الأسعار التي أوقفت إشعاراتها. الطلبات التي تحتاجك تصلك دائمًا." },
+  "notif.topics.none":         { en: "Nothing muted. Use ⋯ on a notification to stop hearing about one topic.", zh: "没有已静音的事项。在通知的 ⋯ 中可停止接收某个事项的通知。", ar: "لا شيء مكتوم. استخدم ⋯ على أي إشعار لإيقاف إشعارات موضوع واحد." },
 
   /* ── Wallpaper ──
      Wallpaper NAMES are translated, unlike tone names above, and the

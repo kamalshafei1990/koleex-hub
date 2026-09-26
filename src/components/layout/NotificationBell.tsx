@@ -30,10 +30,11 @@
        regardless of which page the user is on.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useRouter } from "next/navigation";
 import BellIcon from "@/components/icons/ui/BellIcon";
+import MoonIcon from "@/components/icons/ui/MoonIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import {
@@ -43,8 +44,11 @@ import {
   markMessageRead,
   markMessagesRead,
   markMessagesUnread,
+  snoozeMessages,
   subscribeToInboxMessages,
 } from "@/lib/inbox";
+import { muteTopic } from "@/lib/notification-mute-client";
+import { invalidateCachedGet } from "@/lib/client-cache";
 import {
   fetchMyChannels,
   isAccountStreamHealthy,
@@ -55,7 +59,8 @@ import {
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import { readWarmBellFeed, writeWarmBellFeed } from "@/lib/inbox-warm";
-import { activityAllowed, inQuietHours } from "@/lib/notification-activity";
+import { activityAllowed, hushedNow, pausedUntil } from "@/lib/notification-activity";
+import { clockText, requestPause, type PauseChoice } from "@/lib/notification-pause";
 import { useTranslation } from "@/lib/i18n";
 import { useSkin } from "@/lib/appearance";
 import { hubT } from "@/lib/translations/hub";
@@ -67,7 +72,7 @@ import PushNudge from "@/components/layout/PushNudge";
 import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
 import { desktopToast, inboxToastText, outOfView, type Toast } from "@/lib/desktop-toast";
 import NotificationCards, { CARD_MAX, lessMotion, type NoticeCard } from "@/components/layout/NotificationCards";
-import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
+import { awaySummary, inTab, isAway, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
   playAppSound,
@@ -92,6 +97,16 @@ type TFn = (key: string, fallback?: string) => string;
 
 /* No pop-up cards on screen (components/layout/NotificationCards). */
 const NO_CARDS: { cards: NoticeCard[]; more: number } = { cards: [], more: 0 };
+
+/** Quiet hours, or the pause taken here (whose newest answer the bell knows
+ *  before the account is re-read): no sound, no desktop notification. */
+const hushed = (prefs: Record<string, unknown> | undefined, pause: string | null) =>
+  hushedNow({ ...(prefs ?? {}), pause_until: pause });
+
+/* The pause menu loads when first opened (NotificationMore — prefetched as
+   the panel opens), off the bell's own chunk. */
+const PauseMenu = lazy(() => import("./NotificationMore").then((m) => ({ default: m.PauseMenu })));
+const prefetchMore = () => { void import("./NotificationMore").catch(() => undefined); };
 
 /** Resolve the best label for a Discuss channel row, mirroring the
  *  same fallback chain the sidebar uses: explicit name → DM partner's
@@ -156,6 +171,12 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   useEffect(() => {
     if (loadedRef.current) writeWarmBellFeed(accountId, messages);
   }, [messages, accountId]);
+  /* The list as the realtime handler last saw it: a row brought back to the
+     top (a snooze waking, a reminder) may already be here — unread or not. */
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   /* All (the work) · Needs you · Security (lib/notification-view). */
   const [tab, setTab] = useState<BellTab>("all");
   const { t: tUi } = useTranslation(notifUiT);
@@ -185,6 +206,30 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   /* Pop-up cards on screen, and how many more folded behind them. Opening
      the panel clears them: the rows are all there. */
   const [cardStack, setCardStack] = useState(NO_CARDS);
+  /* A pause taken from the bell (lib/notification-pause): shown from the
+     account's preferences, and a choice made here shows at once — `from`
+     is the stored value it was last aligned with, so a fresh read of the
+     account (this tab, Settings, another device) always wins. */
+  const prefsPause = (notifPrefs as { pause_until?: string | null } | undefined)?.pause_until ?? null;
+  const [pause, setPause] = useState({ from: prefsPause, until: prefsPause });
+  if (pause.from !== prefsPause) setPause({ from: prefsPause, until: prefsPause });
+  const [pauseMenu, setPauseMenu] = useState(false);
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [pauseNote, setPauseNote] = useState<"failed" | "noMeeting" | null>(null);
+  const pauseRef = useRef<string | null>(pause.until);
+  useEffect(() => {
+    pauseRef.current = pause.until;
+  }, [pause.until]);
+  /* Re-render when the pause runs out, so the bell and its banner end with it. */
+  const [, setPauseTick] = useState(0);
+  useEffect(() => {
+    const ms = pause.until ? Date.parse(pause.until) - Date.now() : NaN;
+    if (!(ms > 0)) return;
+    const id = window.setTimeout(() => setPauseTick((n) => n + 1), Math.min(ms + 500, 2_147_000_000));
+    return () => window.clearTimeout(id);
+  }, [pause.until]);
+  const pauseEnd = pausedUntil({ pause_until: pause.until });
+  const twelveHour = (account?.preferences as { display?: { time_format?: string } } | null | undefined)?.display?.time_format === "12h";
   const [seen, setSeen] = useState({ accountId, open });
   if (seen.accountId !== accountId || seen.open !== open) {
     const accountChanged = seen.accountId !== accountId;
@@ -196,7 +241,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       setDiscussChannels([]);
       setMessages([]);
     }
-    if (closed) setTab("all");
+    if (closed) { setTab("all"); setPauseMenu(false); setPauseNote(null); }
     if (opened || accountChanged) setNudge(open ? peekPushNudge(accountId) : null);
     if (opened || accountChanged) setCardStack(NO_CARDS);
     /* A spinner only over an empty panel — rows painted from the last
@@ -275,7 +320,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
          arrives (it knows WHICH activity it is). Only chime here when the
          rise came from a poll — realtime missed it, activity unknown. */
       if (Date.now() - lastRealtimeChimeRef.current > 3000
-          && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
+          && !hushed(notifPrefsRef.current, pauseRef.current)) {
         playAppSound("notification");
       }
     }
@@ -347,7 +392,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
         const silenced = !!ch && quietFor(ch);
         const onDiscuss = window.location.pathname.startsWith("/discuss");
-        const heard = !silenced && !onDiscuss && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours);
+        const heard = !silenced && !onDiscuss && !hushed(notifPrefsRef.current, pauseRef.current);
         if (heard) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
@@ -508,7 +553,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           const hadBaseline = discussBaselineRef.current;
           discussBaselineRef.current = true;
           if (hadBaseline && newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")
-              && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
+              && !hushed(notifPrefsRef.current, pauseRef.current)) {
             playAppSound("message");
           }
           return rows;
@@ -578,8 +623,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
          chose quiet, not blind. Same shared classifier gates the server-side
          push, so one switch controls both channels. */
       const activity = classifyInboxActivity((msg as { metadata?: unknown }).metadata);
-      const qh = (notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours;
-      if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {
+      if (activityAllowed(notifPrefsRef.current, activity) && !hushed(notifPrefsRef.current, pauseRef.current)) {
         playAppSound("notification", activity);
         /* The desktop app with its window not in front: a system
            notification too (lib/desktop-toast) — the same switches decide. */
@@ -592,12 +636,15 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         const row = { ...msg, sender: null } as InboxMessageWithSender;
         toastRef.current?.card({ key: `inbox:${msg.id}`, kind: "inbox", row, action: inTab(row, "action") });
       }
-      setInboxUnread((n) => n + 1);
+      /* A row brought back to the top (lib/server/inbox-resurface) that was
+         already unread here adds nothing to the count. */
+      const known = messagesRef.current.find((m) => m.id === msg.id);
+      if (!known || known.read_at) setInboxUnread((n) => n + 1);
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        /* Prepend with an empty sender object — the next loadInbox()
-           round-trip will hydrate the avatar / username. */
-        return [{ ...msg, sender: null } as InboxMessageWithSender, ...prev];
+        const old = prev.find((m) => m.id === msg.id);
+        /* On top — new, or back (its newer created_at). An empty sender
+           until the next loadInbox() round-trip hydrates it. */
+        return [{ ...msg, sender: old?.sender ?? null } as InboxMessageWithSender, ...prev.filter((m) => m.id !== msg.id)];
       });
       /* NO chime here. setInboxUnread above raises the count, and the
          count-watcher effect ("inboxUnread > prev") already chimes for
@@ -615,6 +662,60 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         }, 2000);
       }
     });
+  }, [accountId]);
+
+  /* ── Back after an absence ────────────────────────────────────────────
+     One card summing up what came in meanwhile (lib/notification-view),
+     after three hours away or first thing in a new day. When the reader was
+     last here is kept per account on this device: it moves each minute the
+     Hub is in front, and when it leaves the front. The one read it costs —
+     the list — is the one the bell makes on opening anyway, and it lands in
+     the list. */
+  useEffect(() => {
+    if (!accountId) return;
+    const key = `kx-last-seen:${accountId}`;
+    const lastSeen = () => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
+    const stamp = () => { try { localStorage.setItem(key, String(Date.now())); } catch { /* storage off */ } };
+    let alive = true;
+    let pending: number | null = null;
+    const check = () => {
+      if (outOfView()) return;
+      const last = lastSeen();
+      stamp();
+      if (!isAway(last, Date.now())) return;
+      /* A moment for the conversations' own recount to land, then one read. */
+      if (pending !== null) window.clearTimeout(pending);
+      pending = window.setTimeout(async () => {
+        pending = null;
+        const rows = await fetchInboxMessagesOrNull({ limit: FEED_LIMIT, slim: true });
+        if (!alive || !rows) return;
+        loadedRef.current = true;
+        setMessages(rows);
+        const s = awaySummary(rows, last);
+        const chats = discussChannelsRef.current
+          .filter((c) => !c.muted && c.notification_pref !== "none" && !!c.last_message_at && Date.parse(c.last_message_at) > last)
+          .reduce((n, c) => n + (c.unread_count ?? 0), 0);
+        if (s.needs + s.updates + chats < 2) return;
+        toastRef.current?.card({ key: "away", kind: "away", needs: s.needs, updates: s.updates, messages: chats, apps: s.apps });
+      }, 1500);
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") check(); else stamp(); };
+    const first = window.setTimeout(check, 1000);
+    const tick = window.setInterval(() => { if (!outOfView()) stamp(); }, 60_000);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", check);
+    window.addEventListener("blur", stamp);
+    window.addEventListener("pagehide", stamp);
+    return () => {
+      alive = false;
+      window.clearTimeout(first);
+      if (pending !== null) window.clearTimeout(pending);
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("blur", stamp);
+      window.removeEventListener("pagehide", stamp);
+    };
   }, [accountId]);
 
   const loadInbox = useCallback(() => {
@@ -647,6 +748,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     if (!open) return;
     void loadInbox();
     void recountDiscuss();
+    /* The pause menu and the rows' ⋯ are a click away now. */
+    prefetchMore();
   }, [open, loadInbox, recountDiscuss]);
 
 
@@ -704,12 +807,43 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     void archiveMessages([...ids]);
   }
 
+  /** Later: out of the list (and the count) until they wake, on top again. */
+  function snoozeRows(rows: InboxMessageWithSender[], until: string) {
+    if (rows.length === 0) return;
+    const ids = new Set(rows.map((m) => m.id));
+    const unread = rows.filter((m) => !m.read_at).length;
+    setMessages((prev) => prev.filter((m) => !ids.has(m.id)));
+    if (unread) setInboxUnread((n) => Math.max(0, n - unread));
+    void snoozeMessages([...ids], until);
+  }
+
+  /** Pause (or resume) from the header. The cards on screen go with it. */
+  async function choosePause(choice: PauseChoice | null) {
+    setPauseBusy(true);
+    setPauseNote(null);
+    const r = await requestPause(choice);
+    setPauseBusy(false);
+    if (!r) { setPauseNote("failed"); return; }
+    setPause((p) => ({ ...p, until: r.until }));
+    setPauseMenu(false);
+    if (choice === "meeting" && !r.meeting) setPauseNote("noMeeting");
+    if (r.until) setCardStack(NO_CARDS);
+  }
+
   const listActions: ListActions<InboxMessageWithSender> = {
     onOpen: (m) => void handleInboxRowClick(m),
     onSetRead: setRowsRead,
     onArchive: archiveRows,
     /* Decided on the row: its work is done — it leaves the list. */
     onDecided: (m) => archiveRows([m]),
+    onSnooze: snoozeRows,
+    /* Muted: what was unread about it is read now (server-side) — the list
+       is read again to show it. */
+    onMute: async (m) => {
+      const ok = await muteTopic(m.id);
+      if (ok) { invalidateCachedGet("/api/inbox/feed"); void loadInbox(); }
+      return ok;
+    },
   };
 
   /* A card's actions, on the page the reader is on (NotificationCards). */
@@ -746,7 +880,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
          notification or the push speaks), with cards on, and the panel
          shut — open, the row lands in the list in front of the reader. */
       card: (c) => {
-        if (open || outOfView() || notifPrefs?.popup_cards === false) return;
+        if (open || outOfView() || notifPrefs?.popup_cards === false || pausedUntil({ pause_until: pauseRef.current })) return;
         setCardStack((s) => {
           const next = [c, ...s.cards.filter((x) => x.key !== c.key)];
           return { cards: next.slice(0, CARD_MAX), more: s.more + Math.max(0, next.length - CARD_MAX) };
@@ -829,7 +963,9 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         } ${open ? (dk ? "text-white bg-white/[0.06]" : "text-black bg-black/[0.06]") : ""}`}
       >
         <span ref={bellIconRef} className="grid place-items-center" style={{ transformOrigin: "50% 15%" }}>
-          <BellIcon size={15} className="md:w-4 md:h-4" />
+          {/* Paused (lib/notification-pause): the bell says so before it is
+              opened — the moon, as the pause button and banner wear it. */}
+          {pauseEnd ? <MoonIcon size={14} className="md:w-[15px] md:h-[15px]" /> : <BellIcon size={15} className="md:w-4 md:h-4" />}
         </span>
         {totalUnread > 0 && (
           <span
@@ -853,6 +989,19 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           <div className="flex items-center gap-2 px-4 pt-3 pb-2">
             <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("notif.title")}</span>
             <span className="ms-auto flex items-center gap-1">
+              {!pauseEnd && (
+                <button
+                  type="button"
+                  data-kx-keep-hover
+                  onClick={() => { setPauseMenu((v) => !v); setPauseNote(null); }}
+                  aria-expanded={pauseMenu}
+                  aria-label={tUi("pause.button")}
+                  title={tUi("pause.button")}
+                  className={`grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] ${pauseMenu ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}
+                >
+                  <MoonIcon size={13} />
+                </button>
+              )}
               <button
                 type="button"
                 data-kx-keep-hover
@@ -873,6 +1022,40 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               </button>
             </span>
           </div>
+
+          {/* Paused: until when, and the way back. */}
+          {pauseEnd && (
+            <div className="mx-3 mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+              <div className="flex items-center gap-2">
+                <MoonIcon size={13} className="shrink-0 text-[var(--text-secondary)]" />
+                <span className="min-w-0 flex-1 text-[11.5px] font-medium text-[var(--text-primary)]">
+                  {tUi("pause.on").replace("{time}", clockText(pauseEnd, twelveHour, tUi("pause.tomorrow")))}
+                </span>
+                <button
+                  type="button"
+                  data-kx-keep-hover
+                  onClick={() => void choosePause(null)}
+                  disabled={pauseBusy}
+                  className="h-6 shrink-0 rounded-md px-2 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
+                >
+                  {tUi("pause.resume")}
+                </button>
+              </div>
+              {pauseNote && (
+                <p role="status" className={`mt-1 ps-[21px] text-[11px] ${pauseNote === "failed" ? "font-medium text-red-500" : "text-[var(--text-dim)]"}`}>
+                  {tUi(pauseNote === "failed" ? "pause.failed" : "pause.noMeeting")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* The pause menu: sounds, pop-ups and phone alerts stop; the bell
+              keeps collecting. */}
+          {!pauseEnd && pauseMenu && (
+            <Suspense fallback={null}>
+              <PauseMenu twelveHour={twelveHour} busy={pauseBusy} failed={pauseNote === "failed"} onPick={(c) => void choosePause(c)} />
+            </Suspense>
+          )}
 
           {nudge && accountId && (
             <PushNudge nudge={nudge} accountId={accountId} tUi={tUi} onClose={() => setNudge(null)} />
@@ -963,6 +1146,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
                 tUi={tUi}
                 time={(iso) => notifTimeAgo(iso, t)}
                 actions={listActions}
+                waiting={tab === "action"}
               />
             )}
 
@@ -994,6 +1178,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           onOpenChat={openChatInPlace}
           onReply={replyInPlace}
           onDecided={(c, v) => listActions.onDecided?.(c.row, v)}
+          onLater={(c, until) => snoozeRows([c.row], until)}
+          onAway={(c) => { setCardStack(NO_CARDS); setTab(c.needs > 0 ? "action" : "all"); setOpen(true); }}
           onGone={(key) => setCardStack((s) => ({ ...s, cards: s.cards.filter((x) => x.key !== key) }))}
           onReturned={nudgeBell}
           onMore={() => { setCardStack(NO_CARDS); setOpen(true); }}

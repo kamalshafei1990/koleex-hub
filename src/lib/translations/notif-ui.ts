@@ -20,6 +20,34 @@ export const notifUiT: Translations = {
   "group.show":     { en: "Show all {n}",   zh: "显示全部 {n} 条", ar: "عرض الكل ({n})" },
   "group.hide":     { en: "Show less",      zh: "收起",       ar: "عرض أقل" },
 
+  /* Later — one notification put off (lib/notification-pause LATER_CHOICES). */
+  "more":           { en: "More",           zh: "更多",       ar: "المزيد" },
+  "later.title":    { en: "Remind me later", zh: "稍后提醒我", ar: "ذكّرني لاحقًا" },
+  "later.back":     { en: "Back {time}",    zh: "{time} 回来", ar: "يعود {time}" },
+  "view.later":     { en: "Later",          zh: "稍后",       ar: "لاحقًا" },
+  "empty.later":    { en: "Nothing put off for later", zh: "没有稍后提醒的通知", ar: "لا شيء مؤجّل" },
+
+  /* Pause from the bell (lib/notification-pause). */
+  "pause.button":   { en: "Pause notifications", zh: "暂停通知", ar: "إيقاف الإشعارات مؤقتًا" },
+  "pause.on":       { en: "Paused until {time}", zh: "已暂停，至 {time}", ar: "متوقفة حتى {time}" },
+  "pause.tomorrow": { en: "tomorrow",       zh: "明天",       ar: "غدًا" },
+  "pause.resume":   { en: "Resume",         zh: "恢复",       ar: "استئناف" },
+  "pause.failed":   { en: "Couldn't change it. Try again.", zh: "操作失败，请重试。", ar: "تعذّر التغيير. حاول مرة أخرى." },
+  "pause.noMeeting": { en: "No meeting in your calendar right now — paused for 1 hour.", zh: "日历中现在没有会议——已暂停 1 小时。", ar: "لا يوجد اجتماع في تقويمك الآن — تم الإيقاف لمدة ساعة." },
+
+  /* Back after an absence: one card for what came in meanwhile. */
+  "away.title":     { en: "While you were away", zh: "你离开期间", ar: "أثناء غيابك" },
+  "away.needs":     { en: "Needs you {n}",  zh: "待你处理 {n}", ar: "بانتظارك {n}" },
+  "away.messages":  { en: "Messages {n}",   zh: "消息 {n}",   ar: "رسائل {n}" },
+  "away.updates":   { en: "Updates {n}",    zh: "更新 {n}",   ar: "تحديثات {n}" },
+  "away.show":      { en: "Show me",        zh: "查看",       ar: "اعرض" },
+
+  /* How long a request has waited on the reader (the "Needs you" list). */
+  "wait.hours":     { en: "Waiting {n}h",   zh: "已等待 {n} 小时", ar: "ينتظر منذ {n} ساعة" },
+  "wait.day":       { en: "Waiting 1 day",  zh: "已等待 1 天",  ar: "ينتظر منذ يوم" },
+  "wait.days":      { en: "Waiting {n} days", zh: "已等待 {n} 天", ar: "ينتظر منذ {n} أيام" },
+  "wait.on":        { en: "Waiting on {who}", zh: "等待 {who} 处理", ar: "بانتظار {who}" },
+
   "empty.action":   { en: "Nothing is waiting on you", zh: "没有待你处理的事项", ar: "لا شيء بانتظارك" },
   "empty.security": { en: "No security alerts",        zh: "没有安全提醒",       ar: "لا توجد تنبيهات أمنية" },
   "empty.unread":   { en: "No unread notifications",   zh: "没有未读通知",       ar: "لا توجد إشعارات غير مقروءة" },

@@ -274,6 +274,10 @@ export interface NotificationPrefs {
      notification while the Hub is in front. Default on; quiet hours only
      silence them. Carried by withDefaults' notifications spread. */
   popup_cards?: boolean;
+  /* A pause taken from the bell (lib/notification-activity pausedUntil):
+     ISO end, or null when none. No sound, card or push until then. Set only
+     by /api/notifications/pause; carried by the same spread. */
+  pause_until?: string | null;
 }
 
 export interface QuietHoursPref {

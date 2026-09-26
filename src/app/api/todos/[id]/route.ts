@@ -15,6 +15,7 @@ import { readIdList, readTodoFields } from "@/lib/server/todo-input";
 import { attachmentPathsOf, releaseTodoAttachments, removedAttachmentPaths } from "@/lib/server/todo-attachments";
 import { ESCALATION_MARK } from "@/lib/server/todo-escalation";
 import {
+  clearApprovalRequest,
   clearTodoNotifications,
   notifyApprovalDecision,
   notifySubmittedForApproval,
@@ -249,6 +250,8 @@ export async function PATCH(
   /* A FINISHED TASK MUST NOT LEAVE ITS NOTIFICATIONS UNREAD. Awaited: the
      client refetches the bell right after this response. */
   if (updates.status === "done" && !existing.completed) await clearTodoNotifications(id);
+  /* Sent back: the request for approval is answered, the task goes on. */
+  if (approvalDecision === "rejected") await clearApprovalRequest(id);
 
   /* Reassignment — the diff, not a wipe-and-rewrite: removed people lose
      their row, new people gain one, everyone else keeps theirs (and its

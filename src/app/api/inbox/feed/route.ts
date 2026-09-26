@@ -8,6 +8,7 @@ import "server-only";
    session account — never a client-supplied id:
 
      · messages[&archived=1][&limit=]  → the caller's inbox (+ sender join)
+     · messages&snoozed=1              → what the caller put off until later
      · badges                          → { unread, unreadTasks } in one trip
 
    Freshness is driven by server Broadcast pings on inbox:account:<id> (see
@@ -169,6 +170,12 @@ export async function GET(req: Request) {
           .order("created_at", { ascending: false })
           .limit(limit);
         if (!includeArchived) q = q.is("archived_at", null);
+        /* Snoozed rows (lib/server/inbox-snooze) are out of every list until
+           they wake — except the "Later" view, which lists only them, the
+           soonest back first. */
+        q = url.searchParams.get("snoozed") === "1"
+          ? q.not("snoozed_until", "is", null).is("archived_at", null)
+          : q.is("snoozed_until", null);
         const { data, error } = await q;
         if (error) throw new Error(error.message);
         const rows = ((data ?? []) as unknown as Array<Record<string, unknown> & { sender: SenderJoin }>).map((row) => {
@@ -188,12 +195,20 @@ export async function GET(req: Request) {
             /* …and `tpl`: the template the bell renders in the reader's
                language (lib/notification-templates) — a key and a few short
                values, never a payload. */
-            const meta = base.metadata as { type?: unknown; kind?: unknown; tpl?: unknown } | null;
+            /* …and `first_at`: when a request was first sent, once a reminder
+               has brought it back to the top (lib/server/inbox-resurface) —
+               the bell's "Needs you" says how long it has waited from it. */
+            /* …and `escalated_for`: on a Super Admin's copy of a request
+               that waited three days (lib/server/approval-reminders), whom
+               it waits on — a few names. */
+            const meta = base.metadata as { type?: unknown; kind?: unknown; tpl?: unknown; first_at?: unknown; escalated_for?: unknown } | null;
             if (meta && typeof meta === "object") {
               const trimmed: Record<string, unknown> = {};
               if (meta.type != null) trimmed.type = meta.type;
               if (meta.kind != null) trimmed.kind = meta.kind;
               if (meta.tpl != null) trimmed.tpl = meta.tpl;
+              if (typeof meta.first_at === "string") trimmed.first_at = meta.first_at;
+              if (typeof meta.escalated_for === "string") trimmed.escalated_for = meta.escalated_for;
               base.metadata = trimmed;
             } else {
               base.metadata = {};
@@ -219,7 +234,9 @@ export async function GET(req: Request) {
           .select("*", { count: "exact", head: true })
           .eq("recipient_account_id", me)
           .is("read_at", null)
-          .is("archived_at", null);
+          .is("archived_at", null)
+          /* A snoozed row is unread but put off: it counts once it wakes. */
+          .is("snoozed_until", null);
         const [unreadRes, tasksRes, typesRes] = await Promise.all([
           base(),
           /* All task categories — the type filter here undercounted for the
@@ -234,6 +251,7 @@ export async function GET(req: Request) {
             .eq("recipient_account_id", me)
             .is("read_at", null)
             .is("archived_at", null)
+            .is("snoozed_until", null)
             .limit(1000),
         ]);
         if (unreadRes.error) throw new Error(unreadRes.error.message);

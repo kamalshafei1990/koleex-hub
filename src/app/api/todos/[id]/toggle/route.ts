@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { loadTodoOwnership, todoParticipation } from "@/lib/server/todo-access";
 import {
+  clearApprovalRequest,
   clearTodoNotifications,
   notifyApprovalDecision,
   notifySubmittedForApproval,
@@ -69,6 +70,8 @@ export async function POST(
     if (!data || data.length === 0) return conflict();
     after(async () => {
       if (!withdrawing) await notifySubmittedForApproval(t, auth.account_id);
+      /* Withdrawn: nothing is waiting on the assigner any more. */
+      else await clearApprovalRequest(id);
       await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
     });
     return NextResponse.json({ ok: true, approval: withdrawing ? null : "pending" });

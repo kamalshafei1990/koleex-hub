@@ -697,9 +697,12 @@ check("only in the desktop app, only while its window isn't in front, and silent
   && [...toastLib.matchAll(/if \(!outOfView\(\)\) return;/g)].length === 2 && /silent: true/.test(toastLib)
   && /koleex\?\.isDesktop/.test(fileSrc("src/lib/desktop-app.ts")));
 check("a burst shows as one", /batch\.length > 2 \? \[many\(batch\.length\)\] : batch/.test(toastLib));
-const allowedAt = bellQ.indexOf("if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {");
-const allowedBlock = allowedAt < 0 ? "" : bellQ.slice(allowedAt, bellQ.indexOf("setInboxUnread((n) => n + 1);", allowedAt));
-check("a work notification pops under the chime's own switches and quiet hours",
+/* Quiet hours or a pause taken from the bell (section V): hushed(). */
+const allowedAt = bellQ.indexOf("if (activityAllowed(notifPrefsRef.current, activity) && !hushed(notifPrefsRef.current, pauseRef.current)) {");
+/* The if-block alone (it closes at its own indent): a toast moved just past
+   it — out from under the switches — must not still count as inside. */
+const allowedBlock = allowedAt < 0 ? "" : bellQ.slice(allowedAt, bellQ.indexOf("\n      }\n", allowedAt));
+check("a work notification pops under the chime's own switches, quiet hours and a pause",
   /playAppSound\("notification", activity\)/.test(allowedBlock) && /desktopToast\(\{ key: `inbox:\$\{msg\.id\}`/.test(allowedBlock)
   && [...bellQ.matchAll(/\bdesktopToast\(/g)].length === 2);
 const discussAt = bellQ.indexOf("onMessageInsert: (msg) => {");
@@ -747,7 +750,7 @@ const cardsSrc = fileSrc("src/components/layout/NotificationCards.tsx");
 const bellT = fileSrc("src/components/layout/NotificationBell.tsx");
 const cardFn = bellT.slice(bellT.indexOf("card: (c) => {"), bellT.indexOf("});", bellT.indexOf("card: (c) => {")));
 check("a card shows only while the window is in front, with cards switched on, and the panel shut",
-  /if \(open \|\| outOfView\(\) \|\| notifPrefs\?\.popup_cards === false\) return;/.test(cardFn));
+  /if \(open \|\| outOfView\(\) \|\| notifPrefs\?\.popup_cards === false\b/.test(cardFn));
 const inboxCardAt = bellT.indexOf("if (activityAllowed(notifPrefsRef.current, activity)) {");
 const inboxCard = inboxCardAt < 0 ? "" : bellT.slice(inboxCardAt, bellT.indexOf("\n      }\n", inboxCardAt));
 check("a work notification's card follows its per-activity switch — quiet hours only silence the chime",
@@ -780,7 +783,7 @@ check("✕, Escape or time running out send it home into the bell, still unread;
   && /onGone=\{\(key\) => setCardStack\(\(s\) => \(\{ \.\.\.s, cards: s\.cards\.filter\(\(x\) => x\.key !== key\) \}\)\)\}/.test(bellT)
   && /done: \(word\) => \{ setDoneWord\(word\); window\.setTimeout\(slideAway, 1100\); \}/.test(cardsSrc));
 check("the card keeps its own time and holds while pointed at, focused, or mid reply or decision",
-  !/onAnimationEnd/.test(cardsSrc) && /const running = !held && !busy && doneWord === null;/.test(cardsSrc)
+  !/onAnimationEnd/.test(cardsSrc) && /const running = !held && !busy && !laterOpen && doneWord === null;/.test(cardsSrc)
   && /onPointerEnter=\{\(\) => setHeld\(true\)\}/.test(cardsSrc) && /onFocus=\{\(\) => setHeld\(true\)\}/.test(cardsSrc)
   && /ctl\.setBusy\(e\.target\.value\.trim\(\)\.length > 0\)/.test(cardsSrc)
   && /CARD_MS = \{ action: 12_000, other: 6_000/.test(cardsSrc));
@@ -821,6 +824,242 @@ check("a failed insert is logged, and no ping or push goes out for it",
   /const \{ error: insertError \} = await supabaseServer\.from\("inbox_messages"\)\.insert\(/.test(liteFn)
   && throwAt > 0 && throwAt < liteFn.indexOf("await emitPings(") && throwAt < liteFn.indexOf("await sendPushToAccounts(")
   && /console\.error\("\[notify-lite\]"/.test(liteFn));
+
+/* ── U: "Needs you" says how long each request has waited ──────────── */
+console.log("\nU. \"Needs you\" says how long each request has waited");
+/* Owner, 26/09 (item 6 of the second round): the wait next to each request,
+   the oldest first. A reminder brings a request back to the top, so the wait
+   is counted from metadata.first_at — never from created_at alone. */
+const viewU = fileSrc("src/lib/notification-view.ts");
+const listU = fileSrc("src/components/layout/NotificationList.tsx");
+const bellU = fileSrc("src/components/layout/NotificationBell.tsx");
+const centerU = fileSrc("src/app/inbox/page.tsx");
+const feedU = fileSrc("src/app/api/inbox/feed/route.ts");
+const uiWordsU = fileSrc("src/lib/translations/notif-ui.ts");
+const has3in = (src: string, keys: string[]) => keys.filter((k) => !new RegExp(`"${k.replace(/\./g, "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(src));
+const has3 = (keys: string[]) => has3in(uiWordsU, keys);
+/* The rarely opened parts' words load with them (translations/notif-more). */
+const moreWords = fileSrc("src/lib/translations/notif-more.ts");
+check("the wait counts from when the reader was first asked (first_at), and the slim feed keeps it",
+  /const f = \(row\.metadata as \{ first_at\?: unknown \} \| null \| undefined\)\?\.first_at;/.test(viewU)
+  && /return typeof f === "string" && f && !Number\.isNaN\(Date\.parse\(f\)\) \? f : row\.created_at;/.test(viewU)
+  && /if \(typeof meta\.first_at === "string"\) trimmed\.first_at = meta\.first_at;/.test(feedU));
+check("oldest first, one list — no day sections, no folding — in the bell and in the center",
+  /return \[\.\.\.rows\]\.sort\(\(a, b\) => Date\.parse\(waitingSince\(a\)\) - Date\.parse\(waitingSince\(b\)\)\);/.test(viewU)
+  && /if \(waiting \|\| later\) \{/.test(listU) && /\(later \? rows : byWaiting\(rows\)\)\.map/.test(listU)
+  && /waiting=\{tab === "action"\}/.test(bellU) && /waiting=\{view === "action"\}/.test(centerU));
+check("amber from a day, red from three — the day the Super Admins are told",
+  /level: hours >= 72 \? "long" : hours >= 24 \? "day" : "fresh"/.test(viewU)
+  && /export const ESCALATE_AFTER_H = 72;/.test(fileSrc("src/lib/server/approval-reminders.ts"))
+  && /bg-red-500\/12/.test(listU) && /text-amber-600 dark:text-amber-400/.test(listU));
+check("the wait stands in the time's place on the first line (the time is never dropped for anything else)",
+  /if \(hours >= 1 && \(waiting \|\| level !== "fresh"\)\) return <WaitChip row=\{row\} tUi=\{tUi\} \/>;/.test(listU)
+  && /<RowTime row=\{row\} tUi=\{tUi\} time=\{time\} waiting=\{waiting\} later=\{later\} \/>/.test(listU)
+  && /export const isWaiting = \(row: ViewRow\): boolean => !row\.read_at && defOf\(row\.metadata\)\?\.severity === "action";/.test(viewU));
+const missingU = has3(["wait.hours", "wait.day", "wait.days", "wait.on"]);
+check("its words in English, Chinese and Arabic", missingU.length === 0, missingU.join(", "));
+
+/* ── V: a pause from the bell ──────────────────────────────────────── */
+console.log("\nV. a pause from the bell");
+/* Owner (item 2): "إيقاف ساعة، لحد بكرة الصبح، أنا في اجتماع" — sounds,
+   cards and push stop; the bell still collects. */
+const actV = fileSrc("src/lib/notification-activity.ts");
+const pushV = fileSrc("src/lib/server/web-push.ts");
+const pauseSrv = fileSrc("src/lib/server/notification-pause.ts");
+const pauseRoute = fileSrc("src/app/api/inbox/pause/route.ts");
+const pauseCli = fileSrc("src/lib/notification-pause.ts");
+check("a pause silences what quiet hours silence — the push on the server included",
+  /return inQuietHours\([\s\S]{0,120}\)\s*\|\| pausedUntil\(prefs, now\) !== null;/.test(actV)
+  && /\.filter\(\(r\) => hushedNow\(r\.preferences\?\.notifications, now\)\)/.test(pushV) && !/inQuietHours/.test(pushV));
+check("the bell's sound and desktop notifications all ask hushed() — none reads quiet hours alone",
+  [...bellU.matchAll(/!hushed\(notifPrefsRef\.current, pauseRef\.current\)/g)].length === 4 && !/inQuietHours/.test(bellU));
+check("…and the cards stop too (quiet hours leave them on; a pause does not)",
+  /pausedUntil\(\{ pause_until: pauseRef\.current \}\)\) return;/.test(bellU));
+check("only your own, not while viewing as someone, between a minute and seven days",
+  /const auth = await requireAuth\(req\);/.test(pauseRoute) && /setPause\(auth\.account_id,/.test(pauseRoute)
+  && /ms <= nowMs \+ 60_000 \|\| ms > nowMs \+ PAUSE_MAX_MS/.test(pauseSrv) && /export const PAUSE_MAX_MS = 7 \* 24 \* 3_600_000;/.test(actV));
+check("\"in a meeting\" reads the Calendar — invited and not declined, timed, a series' occurrence with its exceptions — capped at 12h; no meeting: an hour",
+  /\.neq\("status", "declined"\)/.test(pauseSrv) && /\.or\("all_day\.is\.null,all_day\.eq\.false"\)/.test(pauseSrv)
+  && /expandWithExceptions\(/.test(pauseSrv) && /const MEETING_MAX_MS = 12 \* HOUR;/.test(pauseSrv)
+  && /until = end \?\? new Date\(nowMs \+ HOUR\);/.test(pauseSrv));
+check("it is saved with the account (so every device and Settings see it) and survives withDefaults",
+  /mergeAccountPrefs\(accountId, \{ notifications: \{ \.\.\.stored, pause_until: iso \} \}\)/.test(pauseSrv)
+  && /pause_until\?: string \| null;/.test(fileSrc("src/lib/access-control.ts"))
+  && /\.\.\.\(p\.notifications \?\? \{\}\),/.test(fileSrc("src/lib/access-control.ts"))
+  && /"quiet_hours" \| "popup_cards" \| "pause_until"/.test(fileSrc("src/components/settings/tabs/NotificationsTab.tsx"))
+  && /notifyIdentityChanged\(\);/.test(pauseCli));
+check("the bell says so before it is opened, and the panel says until when, with Resume",
+  /\{pauseEnd \? <MoonIcon size=\{14\}/.test(bellU) && /tUi\("pause\.on"\)\.replace\("\{time\}", clockText\(pauseEnd, twelveHour, tUi\("pause\.tomorrow"\)\)\)/.test(bellU)
+  && /onClick=\{\(\) => void choosePause\(null\)\}/.test(bellU));
+const missingV = has3(["pause.button", "pause.on", "pause.tomorrow", "pause.resume", "pause.failed", "pause.noMeeting"])
+  .concat(has3in(moreWords, ["pause.hint", "pause.hour", "pause.morning", "pause.meeting", "pause.meetingNote"]));
+check("its words in English, Chinese and Arabic", missingV.length === 0, missingV.join(", "));
+
+/* ── W: Later — one notification put off ────────────────────────────── */
+console.log("\nW. Later — one notification put off");
+/* Owner (item 3): "بعد ساعة" or "بكرة ٩ الصبح", on the row and on the card;
+   it leaves and comes back unread at that time. */
+const snoozeSql = fs.readFileSync(R("supabase/migrations/20260927_inbox_snooze.sql"), "utf8");
+const mutateW = fileSrc("src/app/api/inbox/mutate/route.ts");
+const snoozeW = fileSrc("src/lib/server/inbox-snooze.ts");
+const resurfW = fileSrc("src/lib/server/inbox-resurface.ts");
+const inboxLibW = fileSrc("src/lib/inbox.ts");
+const cardsW = fileSrc("src/components/layout/NotificationCards.tsx");
+const vercelW = fs.readFileSync(R("vercel.json"), "utf8");
+check("the column is additive, and only snoozed rows are indexed",
+  /ADD COLUMN IF NOT EXISTS snoozed_until timestamptz/.test(snoozeSql) && /WHERE snoozed_until IS NOT NULL/.test(snoozeSql));
+check("a snoozed row is out of every list and every count until it wakes (the bell, Home, the icon, the dashboard)",
+  /: q\.is\("snoozed_until", null\);/.test(feedU)
+  && [...feedU.matchAll(/\.is\("snoozed_until", null\)/g)].length === 3
+  && /\.is\("read_at", null\)\s*\.is\("archived_at", null\)\s*\.is\("snoozed_until", null\)/.test(pushV)
+  && /\.is\("read_at", null\)\.is\("archived_at", null\)\.is\("snoozed_until", null\);/.test(fileSrc("src/app/api/dashboard/route.ts")));
+check("it stays UNREAD while snoozed, so a settled cause still archives it and it never comes back",
+  /: body\.action === "snooze" \? \{ snoozed_until: until \}/.test(mutateW) && !/snooze[^\n]*read_at/.test(mutateW)
+  && /const live = rows\.filter\(\(r\) => !r\.archived_at && !r\.read_at\);/.test(snoozeW)
+  && /update\(\{ snoozed_until: null \}\)\.in\("id", settled\)/.test(snoozeW));
+check("between a minute and 30 days; archiving ends a snooze",
+  /ms <= Date\.now\(\) \+ 60_000 \|\| ms > Date\.now\(\) \+ SNOOZE_MAX_MS/.test(mutateW) && /export const SNOOZE_MAX_MS = 30 \* 86_400_000;/.test(snoozeW)
+  && /\{ archived_at: new Date\(\)\.toISOString\(\), snoozed_until: null \}/.test(mutateW));
+check("woken every 5 minutes: back on top as new, once (compare-and-set), with its push",
+  /"path": "\/api\/cron\/inbox-wake",\s*"schedule": "\*\/5 \* \* \* \*"/.test(vercelW)
+  && /created_at: now,\s*read_at: null,\s*snoozed_until: null,/.test(resurfW)
+  && /q = opts\.snoozed \? q\.not\("snoozed_until", "is", null\)\.lte\("snoozed_until", now\) : q\.eq\("created_at", row\.created_at\);/.test(resurfW)
+  && /first_at: firstAt\(row\)/.test(resurfW) && /\.is\("archived_at", null\);/.test(resurfW)
+  && resurfW.indexOf("await emitPings(") < resurfW.indexOf("sendPushToAccounts("));
+check("a row brought back is new to the bell (a card) — without counting an already-unread one twice",
+  /const was = seen\.get\(m\.id\);\s*if \(was !== undefined && Date\.parse\(m\.created_at\) <= Date\.parse\(was\)\) continue;/.test(inboxLibW)
+  && /if \(!known \|\| known\.read_at\) setInboxUnread\(\(n\) => n \+ 1\);/.test(bellU));
+check("on the row (⋯) and on the card (the clock), the card holding its time while you choose",
+  /onSnooze: snoozeRows,/.test(bellU) && /onLater=\{\(c, until\) => snoozeRows\(\[c\.row\], until\)\}/.test(bellU)
+  && /aria-label=\{tUi\("later\.title"\)\}/.test(cardsW)
+  && /<CardLater onPick=\{\(until, word\) => \{ onLater\(until\); setLaterOpen\(false\); ctl\.done\(word\); \}\} \/>/.test(cardsW)
+  && /onSnooze=\{actions\.onSnooze \? \(until\) => actions\.onSnooze!\(\[row\], until\) : undefined\}/.test(listU));
+check("the center has a Later view: when each comes back, and \"Bring back now\"",
+  /type View = "all" \| "action" \| "security" \| "unread" \| "later" \| "archive";/.test(centerU)
+  && /fetchSnoozedOrNull\(\)\.then/.test(centerU) && /onUnsnooze: unsnoozeRows,/.test(centerU) && /later=\{view === "later"\}/.test(centerU)
+  && /tUi\("later\.back"\)/.test(listU));
+const missingW = has3(["more", "later.title", "later.back", "view.later", "empty.later"])
+  .concat(has3in(moreWords, ["later.again", "later.1h", "later.3h", "later.tomorrow", "later.done", "later.now"]));
+check("its words in English, Chinese and Arabic", missingW.length === 0, missingW.join(", "));
+
+/* ── X: a request that waits is reminded, then escalated ────────────── */
+console.log("\nX. a request that waits is reminded, then escalated");
+/* Owner (item 1): reminded once a day after 24h; the Super Admins told at
+   three days. */
+const remX = fileSrc("src/lib/server/approval-reminders.ts");
+const remTypes = [...remX.matchAll(/^  ([a-z_]+): \{\s*\n\s*table: "/gm)].map((m) => m[1]);
+check("hourly", /"path": "\/api\/cron\/approval-reminders",\s*"schedule": "20 \* \* \* \*"/.test(vercelW));
+check("the request types it covers are registered requests (severity action)",
+  remTypes.length === 6 && remTypes.every((t) => entries.has(t) && new RegExp(`^\\s+${t}:\\s*\\{[^\\n]*severity: "action"`, "m").test(regSrc)), remTypes.join(", "));
+check("\"still waiting\" is asked of the request itself (its own table), never of the notification's state",
+  /await supabaseServer\.from\(check\.table\)\.select\(check\.cols\)\.in\("id", ids\.slice\(i, i \+ 100\)\)/.test(remX)
+  && /const waiting = rows\.filter\(\(r\) => verdict\(r\) === true\);/.test(remX)
+  && /if \(failed\) continue;/.test(remX));
+check("a decided request's UNREAD row is archived (a missing clearer, healed); a read one is left alone",
+  /const settle = rows\.filter\(\(r\) => verdict\(r\) === false && !r\.read_at\)/.test(remX)
+  && /update\(\{ read_at: at, archived_at: at \}\)\.in\("id", settle\.slice\(i, i \+ 100\)\)\.is\("read_at", null\)/.test(remX));
+check("reminded after a day since it last reached the approver, in their working hours; snoozed rows are theirs",
+  /export const REMIND_AFTER_H = 23;/.test(remX) && /nowMs - Date\.parse\(r\.created_at\) >= REMIND_AFTER_H \* HOUR/.test(remX)
+  && /return h >= WORK_FROM && h < WORK_TO;/.test(remX) && /\.is\("snoozed_until", null\)/.test(remX)
+  && /await resurface\(inHours,/.test(remX));
+check("escalated once at three days: marked before anyone is told; copies skip the approvers, keep the type, say whom it waits on",
+  /g\.some\(\(r\) => ageH\(r, nowMs\) >= ESCALATE_AFTER_H\) && !g\.some\(\(r\) => r\.metadata\?\.escalated_at\)/.test(remX)
+  && remX.indexOf("escalated_at: at };") < remX.indexOf('from("inbox_messages").insert(')
+  && /\.filter\(\(id\) => !approvers\.has\(id\)\)/.test(remX)
+  && /metadata: \{ \.\.\.keep, first_at: since, escalated: true, escalated_for: who, escalated_at: at \}/.test(remX)
+  && /if \(r\.metadata\?\.escalated\) continue;/.test(remX) && /!r\.metadata\?\.escalated &&/.test(remX));
+check("escalation runs before the reminders (both write the row's metadata)",
+  remX.indexOf("const ripe = ") > 0 && remX.indexOf("const ripe = ") < remX.indexOf("await resurface(inHours,"));
+check("the push says it is still waiting, and carries the request in the reader's language",
+  /kind: "approval_reminder",\s*tpl: \{ k: "approval_reminder", p: \{ since \} \},\s*bodyTpl: readTpl\(r\.metadata\),/.test(remX)
+  && /const about = tr && lang !== "en" && payload\.bodyTpl \? tr\.renderNotification\(\{ tpl: payload\.bodyTpl \}, lang\) : null;/.test(pushV)
+  && entries.get("approval_reminder")?.activity === "approvals");
+const todoRoute = fileSrc("src/app/api/todos/[id]/route.ts");
+const toggleRoute = fileSrc("src/app/api/todos/[id]/toggle/route.ts");
+check("a task's approval request clears when it is sent back or withdrawn (it lingered until the task was done)",
+  /if \(approvalDecision === "rejected"\) await clearApprovalRequest\(id\);/.test(todoRoute)
+  && /else await clearApprovalRequest\(id\);/.test(toggleRoute)
+  && /clearUnreadByMeta\(\{ type: "todo_approval_request", todo_id: todoId \}\)/.test(fileSrc("src/lib/server/todo-notify.ts")));
+
+/* ── Y: back after an absence, one card ─────────────────────────────── */
+console.log("\nY. back after an absence, one card");
+/* Owner (item 4): after a few hours away, or first thing in the morning,
+   one card that sums up what came in. */
+check("away means three hours, or a new day after an hour at least",
+  /if \(!last \|\| now - last < HOUR_MS\) return false;/.test(viewU) && /if \(now - last >= AWAY_MS\) return true;/.test(viewU)
+  && /export const AWAY_MS = 3 \* HOUR_MS;/.test(viewU) && /return dayStart\(new Date\(last\)\) !== dayStart\(new Date\(now\)\);/.test(viewU));
+check("it sums what came in since, still unread and not a security alert — and the chats with news, unless muted",
+  /!r\.read_at && !isSecurity\(r\.metadata\) && Date\.parse\(r\.created_at\) > since/.test(viewU)
+  && /\.filter\(\(c\) => !c\.muted && c\.notification_pref !== "none" && !!c\.last_message_at && Date\.parse\(c\.last_message_at\) > last\)/.test(bellU));
+const awayAt = bellU.indexOf("const check = () => {");
+const awayFn = awayAt < 0 ? "" : bellU.slice(awayAt, bellU.indexOf("const onVisibility", awayAt));
+check("only in front of the reader, the moment kept per account, and at least two things — through the card's own gate (switch, pause, panel)",
+  awayFn.indexOf("if (outOfView()) return;") > 0 && awayFn.indexOf("if (outOfView()) return;") < awayFn.indexOf("stamp();")
+  && /const key = `kx-last-seen:\$\{accountId\}`;/.test(bellU)
+  && /if \(s\.needs \+ s\.updates \+ chats < 2\) return;/.test(awayFn)
+  && /toastRef\.current\?\.card\(\{ key: "away", kind: "away"/.test(awayFn)
+  && /window\.addEventListener\("blur", stamp\);/.test(bellU) && /window\.addEventListener\("pagehide", stamp\);/.test(bellU));
+check("\"Show me\" opens the bell on what needs the reader",
+  /onAway=\{\(c\) => \{ setCardStack\(NO_CARDS\); setTab\(c\.needs > 0 \? "action" : "all"\); setOpen\(true\); \}\}/.test(bellU)
+  && /actions=\{<OpenAction label=\{tUi\("away\.show"\)\} onOpen=\{\(\) => onAway\(c\)\} \/>\}/.test(cardsW));
+const missingY = has3(["away.title", "away.needs", "away.messages", "away.updates", "away.show"]);
+check("its words in English, Chinese and Arabic", missingY.length === 0, missingY.join(", "));
+
+/* ── Z: stop notifications about one topic ──────────────────────────── */
+console.log("\nZ. stop notifications about one topic");
+/* Owner (item 5): "وقّف إشعارات عرض السعر ده" — one task, issue or
+   quotation; a request that waits on the reader always gets through. */
+const muteSql = fs.readFileSync(R("supabase/migrations/20260927_notification_mutes.sql"), "utf8");
+const muteLib = fileSrc("src/lib/notification-mute.ts");
+const mutesSrv = fileSrc("src/lib/server/notification-mutes.ts");
+const muteRoute = fileSrc("src/app/api/inbox/mute/route.ts");
+const moreSrc = fileSrc("src/components/layout/NotificationMore.tsx");
+check("the database applies a mute to every writer: a new row about it lands read, archived and marked muted",
+  /CREATE TABLE IF NOT EXISTS notification_mutes/.test(muteSql) && /ALTER TABLE notification_mutes ENABLE ROW LEVEL SECURITY;/.test(muteSql)
+  && /CREATE OR REPLACE TRIGGER inbox_apply_mutes\s+BEFORE INSERT ON inbox_messages/.test(muteSql)
+  && /\(NEW\.metadata ->> m\.field\) = m\.value\s+AND \(NEW\.metadata ->> 'type'\) = ANY \(m\.types\)/.test(muteSql)
+  && /NEW\.archived_at := now\(\);/.test(muteSql) && /jsonb_build_object\('muted', true\)/.test(muteSql)
+  && !/^\s*(DROP|DELETE|TRUNCATE)\b/im.test(muteSql.replace(/^--.*$/gm, "")));
+check("never a request that waits on the reader, a security alert, a type with no switch, or a key that is not one thing",
+  /if \(!def \|\| def\.severity === "action" \|\| def\.activity === null \|\| def\.app === "activity-monitor"\) return null;/.test(muteLib)
+  && /key !== "subject" && key !== "type"/.test(muteLib) && /d\.app === app && muteKeyOf\(d\) === key/.test(muteLib));
+check("the push is held back too — by the push's own tag or link naming the topic",
+  /const topicMuted = await mutedRecipients\(allowedIds, payload\);/.test(pushV)
+  && /allowedIds = allowedIds\.filter\(\(id\) => !topicMuted\.has\(id\)\);/.test(pushV)
+  && /\.contains\("types", \[payload\.kind\]\)/.test(mutesSrv) && /if \(m\.value && about\.includes\(m\.value\)\) out\.add\(m\.account_id\);/.test(mutesSrv));
+check("the push sender's cold start stays light: no template dictionary through the mute code",
+  !/notification-view|notification-templates/.test(muteLib) && !/notification-templates/.test(mutesSrv));
+check("only your own notifications and mutes, never while viewing as someone",
+  [...muteRoute.matchAll(/const auth = await requireAuth\(req\);/g)].length === 2
+  && /\.eq\("id", inboxId\)\.eq\("recipient_account_id", accountId\)/.test(mutesSrv)
+  && /\.delete\(\)\.eq\("id", muteId\)\.eq\("account_id", accountId\)/.test(mutesSrv));
+check("muting quietens what is already unread about it",
+  /\.eq\(`metadata->>\$\{key\}`, value\)\.in\("metadata->>type", types\)/.test(mutesSrv));
+check("offered on a row only when its topic can be muted; undone in Settings → Notifications",
+  /onMute=\{actions\.onMute && canMute\(row\.metadata\) \? \(\) => actions\.onMute!\(row\) : undefined\}/.test(listU)
+  && /t\("mute\.this"\)/.test(moreSrc) && /<MutedTopicsCard \/>/.test(fileSrc("src/components/settings/tabs/NotificationsTab.tsx")));
+const missingZ = has3in(moreWords, ["mute.this", "mute.done", "mute.failed"])
+  .concat(has3in(fileSrc("src/lib/translations/settings.ts"), ["notif.topics", "notif.topics.sub", "notif.topics.none"]));
+check("its words in English, Chinese and Arabic", missingZ.length === 0, missingZ.join(", "));
+
+/* ── the rarely opened parts load when opened ───────────────────────── */
+console.log("\nL2. the pause menu, the ⋯ panel and the card's Later stay off the bell's chunk");
+const lazyUsers = ["src/components/layout/NotificationBell.tsx", "src/components/layout/NotificationList.tsx", "src/components/layout/NotificationCards.tsx"].map(fileSrc);
+check("NotificationMore is only ever import()ed, and its words only by it",
+  lazyUsers.every((src) => !/from "\.\/NotificationMore"|from "@\/components\/layout\/NotificationMore"/.test(src))
+  && lazyUsers.every((src) => /import\("\.\/NotificationMore"\)/.test(src))
+  && files.filter((f) => /from "@\/lib\/translations\/notif-more"/.test(fs.readFileSync(f, "utf8"))).map((f) => path.relative(ROOT, f)).join() === "src/components/layout/NotificationMore.tsx");
+/* 26/09: a Settings card that lazily imported the text renderer (and the
+   inbox helpers) split the bell into three files — the dictionary moved to
+   a chunk of its own. Settings reads its mutes through a fetch-only module,
+   named by the server. */
+const muteClient = fileSrc("src/lib/notification-mute-client.ts");
+const notifTab = fileSrc("src/components/settings/tabs/NotificationsTab.tsx");
+check("Settings shares nothing with the bell's chunk: a fetch-only client, names rendered by the server",
+  !/^import (?!type )/m.test(muteClient)
+  && !/["']@\/lib\/inbox["']|NotificationText|notification-templates/.test(notifTab)
+  && /from "@\/lib\/notification-mute-client"/.test(notifTab)
+  && /renderNotification\(\{ tpl: m\.tpl \}, lang\)/.test(fileSrc("src/app/api/inbox/mute/route.ts")));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

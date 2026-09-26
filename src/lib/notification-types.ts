@@ -74,7 +74,7 @@ export const NOTIFICATION_TYPES = {
   todo_assignment:          { app: "todo", activity: "assignments", severity: "action", lifecycle: todoClear },
   todo_mention:             { app: "todo", activity: "mentions", severity: "info", lifecycle: todoClear },
   todo_observer:            { app: "todo", activity: "assignments", severity: "info", lifecycle: todoClear },
-  todo_approval_request:    { app: "todo", activity: "approvals", severity: "action", lifecycle: todoClear },
+  todo_approval_request:    { app: "todo", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "todo_id", when: "the task is done or deleted, or the submission is sent back or withdrawn (plus the feed reconcile)" } },
   todo_approval_decision:   { app: "todo", activity: "approvals", severity: "info", lifecycle: todoClear },
   todo_reminder:            { app: "todo", activity: "tasks_due", severity: "info", lifecycle: { kind: "supersede", key: "todo_id" } },
   todo_overdue:             { app: "todo", activity: "tasks_due", severity: "warning", lifecycle: todoClear },
@@ -160,6 +160,9 @@ export const NOTIFICATION_TYPES = {
   support_request:          { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "clear", key: "support_request_id", when: "an admin marks the request handled — the notification's own button (api/support/requests/[id]/resolve)" } },
   ai_brief:                 { app: "ai", activity: null, activityNote: "OPEN: no Settings switch for the daily brief yet — lands under Other.", severity: "info", lifecycle: { kind: "supersede", key: "type" } },
   discuss_message:          { app: "discuss", activity: "discuss_messages", severity: "info", lifecycle: { kind: "push-only" } },
+  /* The push that brings a waiting request back (lib/server/approval-
+     reminders): the request itself is the row, brought back to the top. */
+  approval_reminder:        { app: "settings", activity: "approvals", severity: "info", lifecycle: { kind: "push-only" } },
   test:                     { app: "settings", activity: null, activityNote: "The user's own test push (Settings → Notifications) — muting it would defeat the test.", severity: "info", lifecycle: { kind: "push-only" } },
 
   /* ── Super-Admin security (notifySuperAdmins → metadata.kind) ──────── */

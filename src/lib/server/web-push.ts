@@ -22,9 +22,10 @@ import "server-only";
    callers can gate cheaply without loading the package. */
 import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { activityAllowed, classifyNotificationActivity, inQuietHours } from "@/lib/notification-activity";
+import { activityAllowed, classifyNotificationActivity, hushedNow } from "@/lib/notification-activity";
 import type { NotifTpl } from "@/lib/notification-templates";
 import type { Lang } from "@/lib/i18n";
+import { mutedRecipients } from "@/lib/server/notification-mutes";
 
 /** Are the VAPID keys present? Pure env check — does NOT load `web-push`. */
 export function isPushConfigured(): boolean {
@@ -69,6 +70,10 @@ export interface PushPayload {
    *  this `tag` are on the screen. Its template keeps `{n}` for the device
    *  to fill (public/sw.js counts them). */
   group?: { tpl: NotifTpl } | null;
+  /** A push ABOUT another notification (a reminder, an escalation): that
+   *  notification's template, whose subject becomes this push's body in the
+   *  reader's language. `body` stays its English. */
+  bodyTpl?: NotifTpl | null;
 }
 
 interface SubRow {
@@ -127,15 +132,13 @@ export async function sendPushToAccounts(
     const activityMuted = new Set(
       rows.filter((r) => !activityAllowed(r.preferences?.notifications, activity)).map((r) => r.id),
     );
-    /* Quiet hours — evaluated on the RECIPIENT's saved local window/zone.
-       Independent of the activity gate: it silences every push kind. */
+    /* Quiet hours — evaluated on the RECIPIENT's saved local window/zone —
+       and a pause taken from the bell (pause_until). Independent of the
+       activity gate: both silence every push kind. */
     const quiet = new Set(
       rows
         .filter((r) => !activityMuted.has(r.id))
-        .filter((r) => inQuietHours(
-          (r.preferences?.notifications as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours,
-          now,
-        ))
+        .filter((r) => hushedNow(r.preferences?.notifications, now))
         .map((r) => r.id),
     );
     if (activityMuted.size) {
@@ -149,11 +152,23 @@ export async function sendPushToAccounts(
       result.skipped += quiet.size;
       await logPush(
         [...quiet][0], opts?.actorAccountId, payload, "skipped",
-        `quiet_hours (${quiet.size})`, null,
+        `quiet_hours_or_paused (${quiet.size})`, null,
       ).catch(() => undefined);
     }
     if (activityMuted.size || quiet.size) {
       allowedIds = ids.filter((id) => !activityMuted.has(id) && !quiet.has(id));
+    }
+    /* A topic the reader muted ("Stop notifications about this"): its row
+       went straight to their Archive (the inbox_apply_mutes trigger), and
+       its push stays unsent. */
+    const topicMuted = await mutedRecipients(allowedIds, payload);
+    if (topicMuted.size) {
+      result.skipped += topicMuted.size;
+      await logPush(
+        [...topicMuted][0], opts?.actorAccountId, payload, "skipped",
+        `muted_topic (${topicMuted.size})`, null,
+      ).catch(() => undefined);
+      allowedIds = allowedIds.filter((id) => !topicMuted.has(id));
     }
     if (allowedIds.length === 0) return result;
   }
@@ -190,6 +205,7 @@ export async function sendPushToAccounts(
         .in("recipient_account_id", who.slice(i, i + 100))
         .is("read_at", null)
         .is("archived_at", null)
+        .is("snoozed_until", null)
         .limit(5000);
       if (error) { readOk = false; unreadOf.clear(); break; }
       for (const r of (un ?? []) as Array<{ recipient_account_id: string }>) {
@@ -201,17 +217,18 @@ export async function sendPushToAccounts(
 
   const langs = new Set<Lang>(subs.map((s) => langOf.get(s.account_id) ?? "en"));
   const bodies = new Map<Lang, Record<string, unknown>>();
-  const tr = (payload.tpl && [...langs].some((l) => l !== "en")) || (payload.group && payload.tag)
+  const tr = ((payload.tpl || payload.bodyTpl) && [...langs].some((l) => l !== "en")) || (payload.group && payload.tag)
     ? await import("@/lib/notification-templates")
     : null;
   for (const lang of langs) {
     const r = tr && lang !== "en" && payload.tpl ? tr.renderNotification({ tpl: payload.tpl }, lang) : null;
+    const about = tr && lang !== "en" && payload.bodyTpl ? tr.renderNotification({ tpl: payload.bodyTpl }, lang) : null;
     const groupTitle = tr && payload.group && payload.tag
       ? tr.fillTemplate(`${payload.group.tpl.k}.s`, lang, payload.group.tpl.p ?? {})
       : null;
     bodies.set(lang, {
       title: r ? tr!.partsText(r.subject) : payload.title,
-      body: r?.body ? tr!.partsText(r.body) : payload.body ?? "",
+      body: about ? tr!.partsText(about.subject) : r?.body ? tr!.partsText(r.body) : payload.body ?? "",
       url: payload.url ?? "/",
       tag: payload.tag,
       kind: payload.kind,

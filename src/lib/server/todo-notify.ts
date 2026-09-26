@@ -230,3 +230,11 @@ export async function notifyApprovalDecision(
 export async function clearTodoNotifications(todoId: string): Promise<void> {
   await clearUnreadByMeta({ todo_id: todoId });
 }
+
+/** The submission is no longer waiting — sent back, or withdrawn by the one
+ *  who submitted it: the assigner's "awaiting your approval" is finished
+ *  business, while the task itself goes on. (It used to stay in the
+ *  assigner's "Needs you" until the task was finally done.) */
+export async function clearApprovalRequest(todoId: string): Promise<void> {
+  await clearUnreadByMeta({ type: "todo_approval_request", todo_id: todoId });
+}

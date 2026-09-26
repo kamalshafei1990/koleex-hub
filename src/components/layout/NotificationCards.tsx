@@ -19,6 +19,9 @@
          Approvals → the bell row's own decision (DecisionBar, card look):
                      approve, or refuse with its reason, both confirmed.
          Others    → "Open" goes to its page — the one action that leaves.
+         Later     → the clock on the app line: an hour, three hours or
+                     tomorrow 09:00; the notification leaves the bell until
+                     then and comes back on top (lib/server/inbox-snooze).
      · It stays 12 s for "Needs you" and 6 s for anything else. It holds
        while pointed at, focused, or while a reply or a decision is under
        way.
@@ -38,15 +41,19 @@
    the chime) and owns what the actions do. This file shows them.
    --------------------------------------------------------------------------- */
 
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { createContext, lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 import BoundIcon from "@/components/common/BoundIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { DecisionBar } from "@/components/layout/NotificationList";
+
+/* Later's choices load when the clock is first pressed (NotificationMore). */
+const CardLater = lazy(() => import("./NotificationMore").then((m) => ({ default: m.CardLater })));
 import { NotificationBody, NotificationSubject } from "@/components/layout/NotificationText";
 import { defOf } from "@/lib/notification-view";
 import { readTpl } from "@/lib/notification-templates";
@@ -57,7 +64,10 @@ import type { InboxMessageWithSender } from "@/types/supabase";
 
 export type NoticeCard =
   | { key: string; kind: "inbox"; action: boolean; row: InboxMessageWithSender }
-  | { key: string; kind: "discuss"; channelId: string; title: string; body: string; author: string | null };
+  | { key: string; kind: "discuss"; channelId: string; title: string; body: string; author: string | null }
+  /* Back after an absence (lib/notification-view awaySummary): one card for
+     what came in meanwhile. */
+  | { key: string; kind: "away"; needs: number; messages: number; updates: number; apps: string[] };
 
 type TFn = (key: string, fallback?: string) => string;
 
@@ -78,7 +88,7 @@ const RING = 2 * Math.PI * 18;
 
 export default function NotificationCards({
   cards, more, lang, tHub, tUi, aurora, bellRef,
-  onOpen, onOpenChat, onReply, onDecided, onGone, onReturned, onMore, onMoreGone,
+  onOpen, onOpenChat, onReply, onDecided, onLater, onAway, onGone, onReturned, onMore, onMoreGone,
 }: {
   cards: NoticeCard[];
   more: number;
@@ -92,6 +102,10 @@ export default function NotificationCards({
   onOpenChat: (channelId: string) => void;
   onReply: (card: Extract<NoticeCard, { kind: "discuss" }>, text: string) => Promise<boolean>;
   onDecided: (card: Extract<NoticeCard, { kind: "inbox" }>, verdict: Verdict) => void;
+  /** Later: put the notification off until `until`. */
+  onLater: (card: Extract<NoticeCard, { kind: "inbox" }>, until: string) => void;
+  /** The away summary's "Show me": the bell, on what needs the reader. */
+  onAway: (card: Extract<NoticeCard, { kind: "away" }>) => void;
   onGone: (key: string) => void;
   onReturned: () => void;
   onMore: () => void;
@@ -140,7 +154,31 @@ export default function NotificationCards({
         c.kind === "inbox" ? (
           <InboxCard key={c.key} card={c} lang={lang} tHub={tHub} tUi={tUi} aurora={aurora} bellRef={bellRef}
             register={register(c.key)} onOpen={() => onOpen(c)} onDecided={(v) => onDecided(c, v)}
-            onGone={() => onGone(c.key)} onReturned={onReturned} />
+            onLater={(until) => onLater(c, until)} onGone={() => onGone(c.key)} onReturned={onReturned} />
+        ) : c.kind === "away" ? (
+          <Card key={c.key} ms={CARD_MS.action} aurora={aurora} tUi={tUi} bellRef={bellRef} register={register(c.key)}
+            onGone={() => onGone(c.key)} onReturned={onReturned}
+            app={{ name: tHub("notif.title"), icon: <BellIcon size={12} /> }} now={null} chip={null}
+            face={<BellIcon size={14} />}
+            head={<span className="font-medium">{tUi("away.title")}</span>}
+            body={
+              <>
+                <p className="mt-0.5 text-[12.5px] font-medium tabular-nums leading-snug text-[var(--text-primary)]">
+                  {[
+                    c.needs ? tUi("away.needs").replace("{n}", String(c.needs)) : null,
+                    c.messages ? tUi("away.messages").replace("{n}", String(c.messages)) : null,
+                    c.updates ? tUi("away.updates").replace("{n}", String(c.updates)) : null,
+                  ].filter(Boolean).join(" · ")}
+                </p>
+                {c.apps.length > 0 && (
+                  <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
+                    {c.apps.map((id) => { const a = APP_REGISTRY.find((x) => x.id === id); return a ? tHub(a.tKey, a.name) : id; }).join(" · ")}
+                  </p>
+                )}
+              </>
+            }
+            actions={<OpenAction label={tUi("away.show")} onOpen={() => onAway(c)} />}
+          />
         ) : (
           <Card key={c.key} ms={CARD_MS.other} aurora={aurora} tUi={tUi} bellRef={bellRef} register={register(c.key)}
             onGone={() => onGone(c.key)} onReturned={onReturned}
@@ -172,12 +210,12 @@ export default function NotificationCards({
 
 /* A work notification: its words through the bell's own renderer, its
    decision through the bell's own DecisionBar. */
-function InboxCard({ card, lang, tHub, tUi, aurora, bellRef, register, onOpen, onDecided, onGone, onReturned }: {
+function InboxCard({ card, lang, tHub, tUi, aurora, bellRef, register, onOpen, onDecided, onLater, onGone, onReturned }: {
   card: Extract<NoticeCard, { kind: "inbox" }>;
   lang: Lang; tHub: TFn; tUi: TFn; aurora: boolean;
   bellRef: RefObject<HTMLElement | null>;
   register: (el: HTMLDivElement | null) => void;
-  onOpen: () => void; onDecided: (v: Verdict) => void; onGone: () => void; onReturned: () => void;
+  onOpen: () => void; onDecided: (v: Verdict) => void; onLater: (until: string) => void; onGone: () => void; onReturned: () => void;
 }) {
   const meta = card.row.metadata;
   const appId = defOf(meta)?.app;
@@ -187,7 +225,7 @@ function InboxCard({ card, lang, tHub, tUi, aurora, bellRef, register, onOpen, o
   const spec = decisionOf(meta);
   return (
     <Card ms={card.action ? CARD_MS.action : CARD_MS.other} aurora={aurora} tUi={tUi} bellRef={bellRef} register={register}
-      onGone={onGone} onReturned={onReturned}
+      onGone={onGone} onReturned={onReturned} onLater={onLater}
       app={{ name: app ? tHub(app.tKey, app.name) : tHub("notif.title"), icon: appId ? <AppIcon appId={appId} /> : <BellIcon size={12} /> }}
       now={tHub("notif.justNow")}
       chip={card.action ? tUi("tab.action") : null}
@@ -237,8 +275,10 @@ type Ctl = {
   leave: () => void;
 };
 
-function Card({ ms, aurora, tUi, bellRef, register, onGone, onReturned, app, now, chip, face, head, body, actions }: {
+function Card({ ms, aurora, tUi, bellRef, register, onGone, onReturned, onLater, app, now, chip, face, head, body, actions }: {
   ms: number; aurora: boolean; tUi: TFn;
+  /** Offers "Later" (the clock on the app line). */
+  onLater?: (until: string) => void;
   bellRef: RefObject<HTMLElement | null>;
   register: (el: HTMLDivElement | null) => void;
   onGone: () => void; onReturned: () => void;
@@ -252,11 +292,12 @@ function Card({ ms, aurora, tUi, bellRef, register, onGone, onReturned, app, now
   const [held, setHeld] = useState(false);
   const [busy, setBusy] = useState(false);
   const [doneWord, setDoneWord] = useState<string | null>(null);
+  const [laterOpen, setLaterOpen] = useState(false);
   const gone = useRef(false);
   /* Time left, spent only while nothing holds the card; the cleanup books
      what ran, so a hover pauses exactly where the ring stopped. */
   const left = useRef(ms);
-  const running = !held && !busy && doneWord === null;
+  const running = !held && !busy && !laterOpen && doneWord === null;
 
   const cb = useRef({ onGone, onReturned });
   useEffect(() => { cb.current = { onGone, onReturned }; });
@@ -337,6 +378,19 @@ function Card({ ms, aurora, tUi, bellRef, register, onGone, onReturned, app, now
           </span>
         )}
         <span className="flex-1" />
+        {onLater && doneWord === null && (
+          <button
+            type="button"
+            data-kx-keep-hover
+            aria-label={tUi("later.title")}
+            aria-expanded={laterOpen}
+            title={tUi("later.title")}
+            onClick={() => setLaterOpen((v) => !v)}
+            className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] ${laterOpen ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-faint)]"}`}
+          >
+            <ClockIcon size={11} />
+          </button>
+        )}
         <button
           type="button"
           data-kx-keep-hover
@@ -368,6 +422,11 @@ function Card({ ms, aurora, tUi, bellRef, register, onGone, onReturned, app, now
                 <CheckCircleIcon className={`h-3.5 w-3.5 ${aurora ? "text-[#567FB2]" : "text-[var(--text-primary)]"}`} />
                 {doneWord}
               </p>
+            ) : laterOpen && onLater ? (
+              /* Later: the choices stand in for the card's actions. */
+              <Suspense fallback={null}>
+                <CardLater onPick={(until, word) => { onLater(until); setLaterOpen(false); ctl.done(word); }} />
+              </Suspense>
             ) : <CtlCtx.Provider value={ctl}>{actions}</CtlCtx.Provider>}
           </div>
         </div>

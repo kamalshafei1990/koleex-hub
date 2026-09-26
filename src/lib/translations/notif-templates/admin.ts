@@ -113,4 +113,11 @@ export const adminTpl: Translations = {
      `{n}` is filled ON THE DEVICE (the server passes it through as "{n}"). */
   "push_group.alerts.s": { en: "{actor} — {n} alerts", zh: "{actor} — {n} 条提醒", ar: "{actor} — تنبيهات: {n}" },
   "push_group.messages.s": { en: "{actor} · {n} new messages", zh: "{actor} · {n} 条新消息", ar: "{actor} · رسائل جديدة: {n}" },
+
+  /* A request still waiting on its approver (lib/server/approval-reminders):
+     the push's title; its body is the request itself, in the reader's
+     language (PushPayload.bodyTpl). {since}: the day it was first sent, day
+     first. {who}: the approvers it waits on (people's names, as written). */
+  "approval_reminder.s": { en: "Still waiting for your decision · since {since}", zh: "仍在等待你的决定 · 自 {since}", ar: "ما زال بانتظار قرارك · منذ {since}" },
+  "approval_reminder.escalated.s": { en: "Waiting for a decision since {since} · {who}", zh: "自 {since} 起等待决定 · {who}", ar: "بانتظار قرار منذ {since} · {who}" },
 };

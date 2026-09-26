@@ -59,6 +59,14 @@
     {
       "path": "/api/cron/discuss-pending-sweep",
       "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/inbox-wake",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/approval-reminders",
+      "schedule": "20 * * * *"
     }
   ],
   "functions": {

@@ -17,16 +17,22 @@
    themes read it the same way.
    --------------------------------------------------------------------------- */
 
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import ChevronDownIcon from "@/components/icons/ui/ChevronDownIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import { clockText } from "@/lib/notification-pause";
+import { canMute } from "@/lib/notification-mute";
+
+/* The ⋯ panel (Later, Mute) loads when first opened (NotificationMore). */
+const MorePanel = lazy(() => import("./NotificationMore").then((m) => ({ default: m.MorePanel })));
 import { APP_REGISTRY } from "@/lib/navigation";
 import { NotificationBody, NotificationSubject, useRenderedNotification } from "@/components/layout/NotificationText";
-import { defOf, sectionize, type DaySection, type ViewRow } from "@/lib/notification-view";
+import { byWaiting, defOf, isWaiting, sectionize, waitOf, type DaySection, type ViewRow } from "@/lib/notification-view";
 import { partsText, templateParts } from "@/lib/notification-templates";
 import { decide, decisionOf, type Verdict } from "@/lib/notification-decisions";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
@@ -38,6 +44,8 @@ export type ListRow = ViewRow & {
   body: string | null;
   link: string | null;
   archived_at?: string | null;
+  /** Put off until then (the center's "Later" view). */
+  snoozed_until?: string | null;
   sender?: { full_name?: string | null; username?: string | null } | null;
 };
 
@@ -65,6 +73,12 @@ export interface ListActions<R extends ListRow> {
   onArchive: (rows: R[]) => void;
   /** A decision was taken on the row (DecisionBar) — the row's work is done. */
   onDecided?: (row: R, verdict: Verdict) => void;
+  /** Later: put the rows off until `until` (lib/notification-pause). */
+  onSnooze?: (rows: R[], until: string) => void;
+  /** Back now, where it was (the "Later" view). */
+  onUnsnooze?: (rows: R[]) => void;
+  /** Stop notifications about the row's topic (lib/notification-mute). */
+  onMute?: (row: R) => Promise<boolean>;
 }
 
 /* ── Decide on the notification itself ──────────────────────────────────
@@ -210,6 +224,43 @@ function UnreadDot({ on }: { on: boolean }) {
   );
 }
 
+/* How long a request has waited on the reader (lib/notification-view): in
+   the time's place on the first line — it IS the row's time, counted from
+   when the reader was first asked (a reminder moves created_at, never the
+   wait). Plain under a day, amber from a day, red from three. */
+function WaitChip({ row, tUi }: { row: ViewRow; tUi: TFn }) {
+  const { hours, level } = waitOf(row);
+  const days = Math.floor(hours / 24);
+  const text = hours < 24
+    ? tUi("wait.hours").replace("{n}", String(Math.max(1, hours)))
+    : days === 1 ? tUi("wait.day") : tUi("wait.days").replace("{n}", String(days));
+  const tone = level === "long"
+    ? "rounded-full bg-red-500/12 px-1.5 font-semibold text-red-500"
+    : level === "day"
+      ? "rounded-full bg-amber-500/15 px-1.5 font-semibold text-amber-600 dark:text-amber-400"
+      : "text-[var(--text-dim)]";
+  return <span className={`shrink-0 whitespace-nowrap text-[10.5px] tabular-nums ${tone}`}>{text}</span>;
+}
+
+/** The first line's time: how long it has waited for a request the reader
+ *  owes (always in the "Needs you" list; elsewhere once it has waited a
+ *  day), else how long ago it arrived. */
+function RowTime({ row, tUi, time, waiting, later = false }: { row: ListRow; tUi: TFn; time: (iso: string) => string; waiting: boolean; later?: boolean }) {
+  /* The "Later" view: when it comes back. */
+  if (later && row.snoozed_until) {
+    return (
+      <span className="shrink-0 whitespace-nowrap text-[10.5px] tabular-nums text-[var(--text-dim)]">
+        {tUi("later.back").replace("{time}", clockText(new Date(row.snoozed_until), false, tUi("pause.tomorrow")))}
+      </span>
+    );
+  }
+  if (isWaiting(row)) {
+    const { hours, level } = waitOf(row);
+    if (hours >= 1 && (waiting || level !== "fresh")) return <WaitChip row={row} tUi={tUi} />;
+  }
+  return <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{time(row.created_at)}</span>;
+}
+
 /* A row's two quick actions (read / archive) live at the END OF ITS SECOND
    LINE, in a slot kept for them at rest (42px: two 20px buttons and their
    gap; 16px tall, inside the line's height). They show on hover or keyboard
@@ -218,18 +269,19 @@ function UnreadDot({ on }: { on: boolean }) {
    row's corner — 54×28px — and cut the end off a long title; then they took
    the time's place, and the owner wanted the time kept. */
 function ActionSlot<R extends ListRow>({
-  rows, unread, tUi, actions,
-}: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R> }) {
+  rows, unread, tUi, actions, more,
+}: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R>; more?: { open: boolean; toggle: () => void } }) {
+  /* 42px for two buttons, 64px with the ⋯ (Later) — kept at rest either way. */
   return (
-    <span className="ms-auto flex h-4 min-w-[42px] shrink-0 items-center justify-end">
-      <RowActions rows={rows} unread={unread} tUi={tUi} actions={actions} />
+    <span className={`ms-auto flex h-4 shrink-0 items-center justify-end ${more ? "min-w-[64px]" : "min-w-[42px]"}`}>
+      <RowActions rows={rows} unread={unread} tUi={tUi} actions={actions} more={more} />
     </span>
   );
 }
 
 function RowActions<R extends ListRow>({
-  rows, unread, tUi, actions,
-}: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R> }) {
+  rows, unread, tUi, actions, more,
+}: { rows: R[]; unread: boolean; tUi: TFn; actions: ListActions<R>; more?: { open: boolean; toggle: () => void } }) {
   const btn =
     "grid h-4 w-5 place-items-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-surface-strong)] hover:text-[var(--text-primary)]";
   return (
@@ -254,18 +306,35 @@ function RowActions<R extends ListRow>({
       >
         <ArchiveIcon size={12} />
       </button>
+      {more && (
+        <button
+          type="button"
+          data-kx-keep-hover
+          className={btn}
+          aria-label={tUi("more")}
+          aria-expanded={more.open}
+          title={tUi("more")}
+          onClick={(e) => { e.stopPropagation(); more.toggle(); }}
+        >
+          <MoreHorizontalIcon size={12} />
+        </button>
+      )}
     </span>
   );
 }
 
 function Row<R extends ListRow>({
-  row, lang, tHub, tUi, time, actions, selected = false,
-}: { row: R; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selected?: boolean }) {
+  row, lang, tHub, tUi, time, actions, selected = false, waiting = false, later = false,
+}: { row: R; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selected?: boolean; waiting?: boolean; later?: boolean }) {
   const unread = !row.read_at;
+  const [moreOpen, setMoreOpen] = useState(false);
+  const more = actions.onSnooze && !row.archived_at ? { open: moreOpen, toggle: () => setMoreOpen((v) => !v) } : undefined;
   const who = senderName(row);
   /* Second line: the body — or, when there is none, who sent it. A name is
-     never sent through auto-translation. */
+     never sent through auto-translation. A Super Admin's copy of a request
+     that waited three days says whom it waits on instead. */
   const hasBody = !!useRenderedNotification(row.metadata, lang)?.body || !!row.body;
+  const waitsOn = (row.metadata as { escalated_for?: unknown } | null | undefined)?.escalated_for;
   return (
     <li className="relative">
       <div
@@ -283,17 +352,30 @@ function Row<R extends ListRow>({
             <span className={`min-w-0 flex-1 truncate text-[12.5px] ${unread ? "font-semibold text-[var(--text-primary)]" : "font-medium text-[var(--text-secondary)]"}`}>
               <NotificationSubject meta={row.metadata} subject={row.subject} lang={lang} plain />
             </span>
-            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{time(row.created_at)}</span>
+            <RowTime row={row} tUi={tUi} time={time} waiting={waiting} later={later} />
           </div>
           <div className="mt-0.5 flex items-center gap-2">
-            {hasBody ? (
+            {typeof waitsOn === "string" && waitsOn ? (
+              <p className="min-w-0 flex-1 truncate text-[11.5px] font-medium text-[var(--text-secondary)]">{tUi("wait.on").replace("{who}", waitsOn)}</p>
+            ) : hasBody ? (
               <NotificationBody meta={row.metadata} body={row.body} lang={lang} plain className="min-w-0 flex-1 line-clamp-1 text-[11.5px] text-[var(--text-dim)]" />
             ) : who ? (
               <p className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--text-dim)]">{who}</p>
             ) : null}
-            <ActionSlot rows={[row]} unread={unread} tUi={tUi} actions={actions} />
+            <ActionSlot rows={[row]} unread={unread} tUi={tUi} actions={actions} more={more} />
           </div>
-          {actions.onDecided && !row.archived_at && (
+          {more?.open && (
+            <Suspense fallback={null}>
+              <MorePanel
+                later={later}
+                onSnooze={actions.onSnooze ? (until) => actions.onSnooze!([row], until) : undefined}
+                onUnsnooze={later && actions.onUnsnooze ? () => actions.onUnsnooze!([row]) : undefined}
+                onMute={actions.onMute && canMute(row.metadata) ? () => actions.onMute!(row) : undefined}
+                onDone={() => setMoreOpen(false)}
+              />
+            </Suspense>
+          )}
+          {actions.onDecided && !row.archived_at && !later && (
             <DecisionBar meta={row.metadata} tUi={tUi} onDecided={(v) => actions.onDecided!(row, v)} />
           )}
         </div>
@@ -307,6 +389,8 @@ function Group<R extends ListRow>({
 }: { rows: R[]; digestTitle: string | null; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selectedId?: string | null }) {
   /* Opens by itself when the selected row is inside it (a deep link). */
   const [open, setOpen] = useState(() => !!selectedId && rows.some((r) => r.id === selectedId));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const more = actions.onSnooze ? { open: moreOpen, toggle: () => setMoreOpen((v) => !v) } : undefined;
   const latest = rows[0];
   const unread = rows.some((r) => !r.read_at);
   const who = senderName(latest);
@@ -341,8 +425,13 @@ function Group<R extends ListRow>({
               {open ? tUi("group.hide") : tUi("group.show").replace("{n}", String(rows.length))}
               <ChevronDownIcon size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
             </span>
-            <ActionSlot rows={rows} unread={unread} tUi={tUi} actions={actions} />
+            <ActionSlot rows={rows} unread={unread} tUi={tUi} actions={actions} more={more} />
           </div>
+          {more?.open && (
+            <Suspense fallback={null}>
+              <MorePanel later={false} onSnooze={(until) => actions.onSnooze?.(rows, until)} onDone={() => setMoreOpen(false)} />
+            </Suspense>
+          )}
         </div>
       </div>
       {open && (
@@ -357,8 +446,26 @@ function Group<R extends ListRow>({
 }
 
 export function NotificationSections<R extends ListRow>({
-  rows, lang, tHub, tUi, time, actions, selectedId = null,
-}: { rows: R[]; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selectedId?: string | null }) {
+  rows, lang, tHub, tUi, time, actions, selectedId = null, waiting = false, later = false,
+}: {
+  rows: R[]; lang: Lang; tHub: TFn; tUi: TFn; time: (iso: string) => string; actions: ListActions<R>; selectedId?: string | null;
+  /** The "Needs you" list: one list, what has waited longest first, each
+   *  row saying how long — no day sections (a request from last week is the
+   *  most urgent thing on it, not the last), no folding. */
+  waiting?: boolean;
+  /** The "Later" view: one list in the order given (the soonest back
+   *  first), each row saying when it comes back. */
+  later?: boolean;
+}) {
+  if (waiting || later) {
+    return (
+      <ul className="pt-1">
+        {(later ? rows : byWaiting(rows)).map((r) => (
+          <Row key={r.id} row={r} lang={lang} tHub={tHub} tUi={tUi} time={time} actions={actions} selected={r.id === selectedId} waiting={waiting} later={later} />
+        ))}
+      </ul>
+    );
+  }
   const sections = sectionize(rows);
   return (
     <>
