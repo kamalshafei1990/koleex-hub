@@ -5131,6 +5131,33 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     /const ended = wasInCallRef\.current && !inCall;\s*wasInCallRef\.current = inCall;\s*if \(!ended\) return;\s*const active = document\.activeElement;\s*if \(active && active !== document\.body && active\.isConnected\) return;\s*try \{ controlRef\.current\?\.focus\(\{ preventScroll: true \}\); \}/.test(btn) &&
     (btn.match(/ref=\{controlRef\}/g) ?? []).length === 2);
 }
+{
+  /* ── 62. THE KEYBOARD AND THE WAVEFORM (owner: "ابدأ بـ ٢ و٣") ── */
+  console.log("\n── 62. The call screen fits above the keyboard; the voice waveform is one library mark ──");
+  const fs62 = await import("node:fs");
+  const scr = fs62.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const scrMod = await import("../src/components/ai/VoiceCallScreen");
+  check("the keyboard box: the part of the screen still showing once a keyboard covers a real share of it — none for browser chrome or before layout",
+    scrMod.KEYBOARD_MIN_PX === 120 &&
+    scrMod.keyboardBox(844, 844, 0) === null && scrMod.keyboardBox(844, 780, 0) === null &&
+    JSON.stringify(scrMod.keyboardBox(844, 508.4, 0)) === JSON.stringify({ height: 508, top: 0 }) &&
+    JSON.stringify(scrMod.keyboardBox(844, 500, 120.6)) === JSON.stringify({ height: 500, top: 121 }) &&
+    JSON.stringify(scrMod.keyboardBox(844, 500, -3)) === JSON.stringify({ height: 500, top: 0 }) &&
+    scrMod.keyboardBox(0, 0, 0) === null && scrMod.keyboardBox(844, Number.NaN, 0) === null);
+  check("  …the screen reads the visual viewport through a subscription (resize and scroll), and fills that box while the keyboard is up",
+    /const viewport = useSyncExternalStore\(subscribeViewport, readViewport, \(\) => ""\);/.test(scr) &&
+    /v\.addEventListener\("resize", onChange\);\s*v\.addEventListener\("scroll", onChange\);/.test(scr) &&
+    /style=\{viewport \? \{[\s\S]{0,300}?top: kbTop,\s*bottom: "auto",\s*height: kbHeight,/.test(scr) &&
+    /: \{\s*paddingTop: "env\(safe-area-inset-top, 0px\)",\s*paddingBottom: "env\(safe-area-inset-bottom, 0px\)",\s*\}\}/.test(scr));
+  const drawn = ["src/components/ai/VoiceCallButton.tsx", "src/components/ai/Bubble.tsx", "src/components/ai/KoleexAiApp.tsx"].map((f) => fs62.readFileSync(f, "utf8"));
+  const wave = fs62.readFileSync("src/components/icons/ui/WaveformIcon.tsx", "utf8");
+  check("the voice waveform is ONE library mark — the Speak pill, its loading stand-in, the round call control and the voice mark all use it; none is drawn by hand",
+    drawn.every((src) => !/x1="4" y1="10" x2="4" y2="14"/.test(src) && /import WaveformIcon from "@\/components\/icons\/ui\/WaveformIcon";/.test(src)) &&
+    (drawn[0].match(/<WaveformIcon size=\{\d+\} aria-hidden \/>/g) ?? []).length === 2 &&
+    fs62.readFileSync("src/components/icons/ui/index.ts", "utf8").includes('export { default as WaveformIcon } from "./WaveformIcon";') &&
+    /viewBox="0 0 24 24"/.test(wave) && /fill="none"/.test(wave) && /strokeWidth=\{2\}/.test(wave) && /strokeLinecap="round"/.test(wave) &&
+    /forwardRef/.test(wave) && /WaveformIcon\.displayName = "WaveformIcon";/.test(wave));
+}
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

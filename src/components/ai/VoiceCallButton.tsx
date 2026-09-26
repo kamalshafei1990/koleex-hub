@@ -75,6 +75,7 @@ import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import { VOICE_SWITCH_GREETING } from "@/lib/voice/text-turn";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
+import WaveformIcon from "@/components/icons/ui/WaveformIcon";
 
 /* Every failure the session can report, in every language the app speaks.
    `Record<Lang, Record<VoiceFailure, string>>` makes a missing translation a
@@ -1915,13 +1916,7 @@ export default function VoiceCallButton({
             dictating ? "bg-[var(--kx-ai-danger)] text-white" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
           } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
         >
-          <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="10" x2="4" y2="14" />
-            <line x1="8" y1="7" x2="8" y2="17" />
-            <line x1="12" y1="4" x2="12" y2="20" />
-            <line x1="16" y1="7" x2="16" y2="17" />
-            <line x1="20" y1="10" x2="20" y2="14" />
-          </svg>
+          <WaveformIcon size={16} aria-hidden />
           {dictating ? recLabel : labels.speak}
         </button>
       ) : (
@@ -1957,13 +1952,7 @@ export default function VoiceCallButton({
           </svg>
         ) : (
           /* Waveform — a call you speak into, distinct from the mic beside it. */
-          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="10" x2="4" y2="14" />
-            <line x1="8" y1="7" x2="8" y2="17" />
-            <line x1="12" y1="4" x2="12" y2="20" />
-            <line x1="16" y1="7" x2="16" y2="17" />
-            <line x1="20" y1="10" x2="20" y2="14" />
-          </svg>
+          <WaveformIcon size={18} aria-hidden />
         )}
       </button>
       )}

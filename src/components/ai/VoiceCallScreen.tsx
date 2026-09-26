@@ -20,7 +20,7 @@
    functional danger colour and is used only on the control that ends the call.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import ChosenOrb from "@/components/ai-orb/ChosenOrb";
 import { useCallLevel } from "./useCallLevel";
 import { useFocusTrap } from "./useFocusTrap";
@@ -397,6 +397,42 @@ export function priorityWords(raw: unknown, words: { low: string; medium: string
   return raw === "low" || raw === "medium" || raw === "high" ? words[raw] : "";
 }
 
+/* THE KEYBOARD ON A PHONE. iOS does not shrink the page for its keyboard:
+   the call screen, fixed to the whole page, kept its full height and the
+   keyboard sat over its bottom half — the type-in line, the controls and
+   half the orb under it (review, 2026-09-26). The visual viewport is the
+   part still showing; while the keyboard covers a real share of the screen
+   the call screen is laid into that part instead, and the orb (fitOrb) and
+   everything above the controls resize with it. */
+/** Less than this many pixels covered is browser chrome, not a keyboard. */
+export const KEYBOARD_MIN_PX = 120;
+
+/** The box the call screen should fill, or null to fill the whole page. */
+export function keyboardBox(pageHeight: number, visibleHeight: number, visibleTop: number): { height: number; top: number } | null {
+  if (!(pageHeight > 0) || !(visibleHeight > 0)) return null;
+  if (pageHeight - visibleHeight < KEYBOARD_MIN_PX) return null;
+  return { height: Math.round(visibleHeight), top: Math.max(0, Math.round(visibleTop)) };
+}
+
+function subscribeViewport(onChange: () => void): () => void {
+  const v = typeof window === "undefined" ? undefined : window.visualViewport;
+  if (!v) return () => {};
+  v.addEventListener("resize", onChange);
+  v.addEventListener("scroll", onChange);
+  return () => {
+    v.removeEventListener("resize", onChange);
+    v.removeEventListener("scroll", onChange);
+  };
+}
+
+/** A string, so the snapshot is stable between renders ("" = no keyboard). */
+function readViewport(): string {
+  const v = typeof window === "undefined" ? undefined : window.visualViewport;
+  if (!v) return "";
+  const box = keyboardBox(window.innerHeight, v.height, v.offsetTop);
+  return box ? `${box.height}:${box.top}` : "";
+}
+
 export type VoiceCallScreenProps = {
   /** False while connecting — the orb wakes rather than pretending to listen. */
   live: boolean;
@@ -540,6 +576,8 @@ export default function VoiceCallScreen({
      it back on hang-up; the sheet does the same over the screen. */
   const rootRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(rootRef, true);
+  const viewport = useSyncExternalStore(subscribeViewport, readViewport, () => "");
+  const [kbHeight, kbTop] = viewport ? viewport.split(":").map(Number) : [0, 0];
   /* HOW LONG THE CONNECT HAS TAKEN, in seconds, shown beside the slow caption
      so a long wait is a number and not a feeling (audit, 2026-09-11). The
      timings themselves are unchanged: the mainland handshake has been slow
@@ -1094,10 +1132,18 @@ export default function VoiceCallScreen({
       /* Read by UpdateWatcher: a live call is never interrupted by a reload
          onto a new build — the stale bundle waits until the call ends. */
       data-kx-call-active="1"
-      style={{
+      style={viewport ? {
+        /* The keyboard is up: fill the part of the screen still showing.
+           The keyboard covers the home indicator, so no bottom inset. */
+        top: kbTop,
+        bottom: "auto",
+        height: kbHeight,
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      } : {
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
+      data-keyboard={viewport ? "up" : undefined}
     >
       {/* ONE LIVE REGION, outside both views. The visible status sits inside
           a layer that is aria-hidden in chat view, so nothing was announced
