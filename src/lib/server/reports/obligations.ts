@@ -67,6 +67,15 @@ export async function loadOwners(tree: OrgTree, only?: Set<string>): Promise<Own
   return out;
 }
 
+/** Who hears of a report still missing (Phase 3B): the author's manager, or
+ *  every super admin when HR names none — never the author themself. The
+ *  reminder job and the launch preview both ask here, so the preview names
+ *  exactly the people the job would tell. */
+export function escalationRecipients(tree: OrgTree, admins: string[], author: string): string[] {
+  const m = tree.chainOf(author)[0];
+  return (m ? [m] : admins).filter((x) => x !== author);
+}
+
 export interface ReportSettings { trackingFrom: string | null; reminders: boolean; escalations: boolean }
 
 /** The tenant's settings: when counting starts, and the two Phase 3B

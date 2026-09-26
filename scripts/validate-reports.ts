@@ -97,6 +97,10 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §34 the launch preview — before counting starts, the first week as the
+ *      reminder job would run it: the same calendar, the same rules and the
+ *      same people told; reads only; the banner offers tomorrow and warns
+ *      about a start today or earlier.
  *   §33 Phase 6D — the quarter, the half-year and the year: their periods,
  *      the shorter reports inside each that it starts from, Koleex AI's
  *      summary, the drafts prepared when one ends, the builder and the
@@ -151,7 +155,7 @@ import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
 import {
-  OBLIGATION_KEYS, boardRow, cellOf, dailyDue, dayKind, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, summarize, weeklyDue,
+  OBLIGATION_KEYS, boardRow, cellOf, dailyDue, dayKind, daysOffIn, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, planWindow, summarize, weeklyDue,
   type Clock, type PersonClock, type Sent,
 } from "../src/lib/reports/obligations";
 import { REPORT_DUE_WORDS, reportDueLine } from "../src/lib/home/report-due-line";
@@ -368,7 +372,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 21, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type, the team summary, the schedules, forward, tasks)`);
+  expect(files.length === 22, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, the launch preview, about, links search, the builder's list and one type, the team summary, the schedules, forward, tasks)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -1050,9 +1054,12 @@ console.log("\n§13 reminders and escalation");
   rule("nothing is sent before tracking starts, and either switch pauses its kind", NU,
     (c) => (/if \(!settings\.trackingFrom \|\| \(!settings\.reminders && !settings\.escalations\)\) return;/.test(c) && /n\.kind === "reminder" && !settings\.reminders/.test(c) && /n\.kind === "escalation" && !settings\.escalations/.test(c) ? [] : ["a paused kind can still be sent"]),
     (src) => src.replace('if (n.kind === "escalation" && !settings.escalations) continue;', ""));
-  rule("an escalation never goes to the author themself", NU,
-    (c) => (/const escalateTo = \(author: string\) => \{ const m = tree\.chainOf\(author\)\[0\]; return \(m \? \[m\] : admins\)\.filter\(\(x\) => x !== author\); \};/.test(c) && (c.match(/escalateTo\(/g) ?? []).length >= 2 ? [] : ["the author can be told about their own report as the manager"]),
-    (src) => src.replace(".filter((x) => x !== author)", ""));
+  rule("an escalation never goes to the author themself — one rule, in one place", "src/lib/server/reports/obligations.ts",
+    (c) => (/export function escalationRecipients\(tree: OrgTree, admins: string\[\], author: string\): string\[\] \{\s*const m = tree\.chainOf\(author\)\[0\];\s*return \(m \? \[m\] : admins\)\.filter\(\(x\) => x !== author\);\s*\}/.test(c) ? [] : ["the author can be told about their own report as the manager"]),
+    (src) => src.replace("return (m ? [m] : admins).filter((x) => x !== author);", "return m ? [m] : admins;"));
+  rule("the job tells exactly the people escalationRecipients names", NU,
+    (c) => (/const escalateTo = \(author: string\) => escalationRecipients\(tree, admins, author\);/.test(c) && (c.match(/escalateTo\(/g) ?? []).length >= 2 ? [] : ["the job picks its own recipients"]),
+    (src) => src.replace("const escalateTo = (author: string) => escalationRecipients(tree, admins, author);", "const escalateTo = (author: string) => admins.filter((x) => x !== author);"));
   const CR = "src/app/api/cron/report-reminders/route.ts";
   rule("the job's answer carries counts, never a name", CR,
     (c) => (/return NextResponse\.json\(\{ ok: true, tenants: run\.tenants, reminders: run\.reminders, escalations: run\.escalations, asked: events\.created, cancelled: events\.cancelled, prepared: scheduled\?\.prepared\.length \?\? 0 \}/.test(c) ? [] : ["the job can answer with names"]),
@@ -3312,6 +3319,71 @@ console.log("\n§33 the quarterly, half-year and annual reports");
     "the report's period field names the quarter, the half-year and the year");
   expect(/const qh = \/\^\(\\d\{4\}\)-\(\[QH\]\)\(\[1-4\]\)\$\/\.exec\(key\);/.test(code(read("src/components/reports/app/ComplianceTab.tsx"))), "the schedule list words a quarter or a half-year as its first to last day");
   expect(["quarterly", "halfyear", "yearly"].every((c) => !!reportsT[`compliance.sched.${c}`]?.ar), "…and says when each is prepared, in every language");
+}
+
+/* ── §34 the launch preview (26 Sep 2026) ──────────────────────────────── */
+console.log("\n§34 the launch preview — the first week, before anyone is asked for anything");
+{
+  /* The owner's pick «نشغّل التقارير فعلًا»: before counting starts, the
+     first week as the reminder job would run it. */
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8, "Africa/Cairo": 3 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  /* China with only 1 October marked — what the Hub's calendar held on 26/09/2026. */
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(["2026-10-01"]), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-10-01" };
+  const staff = { obliged: { daily: true, weekly: true, monthly: false }, clock: cn };
+  const plan = planWindow(staff, "2026-10-01", "2026-10-07", clock);
+  eq(plan.map((x) => `${x.key}:${x.periodKey}:${x.dueDay}`),
+    ["daily:2026-10-02:2026-10-02", "weekly:2026-W40:2026-10-02", "daily:2026-10-05:2026-10-05", "daily:2026-10-06:2026-10-06", "daily:2026-10-07:2026-10-07"],
+    "a week from Thursday 1 October in China: nothing on the holiday or the weekend, the weekly on Friday — and 2, 5, 6 and 7 October ask for reports while the calendar holds only the 1st");
+  eq([plan[0].dueAt, plan[0].remindAt, plan[0].escalateAt], ["2026-10-02T10:00:00.000Z", "2026-10-02T09:00:00.000Z", "2026-10-02T12:00:00.000Z"],
+    "the daily: due 18:00 there, the reminder at 17:00, the manager told at 20:00 — the job's own moments");
+  eq(plan[1].escalateAt, "2026-10-05T10:00:00.000Z", "the weekly reaches the manager at the end of the next working day — Monday, past the weekend");
+  const golden = { ...cn, holidays: new Set(["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07"]) };
+  eq(planWindow({ ...staff, clock: golden }, "2026-10-01", "2026-10-07", clock), [], "with the whole National Day week marked, that week asks for nothing — not even a weekly");
+  eq(planWindow({ ...staff, clock: { ...cn, from: "2026-10-06" } }, "2026-10-01", "2026-10-07", clock).map((x) => x.dueDay), ["2026-10-06", "2026-10-07"],
+    "nothing before the person's own start — someone hired on the 6th owes from the 6th");
+  const eg: PersonClock = { weekend: [5, 6], holidays: new Set(), leave: new Set(), tz: "Africa/Cairo", workEnd: "17:00", from: "2026-10-01" };
+  eq(planWindow({ obliged: { daily: false, weekly: true, monthly: true }, clock: eg }, "2026-10-01", "2026-10-07", clock).map((x) => `${x.key}:${x.periodKey}:${x.dueDay}`),
+    ["weekly:2026-W40:2026-10-01", "monthly:2026-09:2026-10-05"],
+    "an Egyptian manager: the weekly on Thursday before the Friday–Saturday weekend, September's monthly on the 3rd working day of October (Thursday 1, Sunday 4, Monday 5)");
+  eq(daysOffIn({ ...cn, leave: new Set(["2026-10-06"]) }, "2026-10-01", "2026-10-07"),
+    [{ day: "2026-10-01", why: "holiday" }, { day: "2026-10-03", why: "weekend" }, { day: "2026-10-04", why: "weekend" }, { day: "2026-10-06", why: "leave" }],
+    "the days off say why: the holiday the calendar holds, the weekend, leave");
+
+  /* The server: the job's facts and rules, reading only. */
+  const LA = "src/lib/server/reports/launch.ts";
+  rule("the preview reads only — nothing is claimed, stored or sent", LA,
+    (c) => (!/\.(insert|upsert|update|delete)\(|notifyLite|notifyReport|sendPush/.test(c) ? [] : ["the preview writes or notifies"]),
+    (src) => src.replace("const owners = await loadOwners(tree);", 'const owners = await loadOwners(tree);\n  await supabaseServer.from("work_report_nudges").upsert([]);'));
+  rule("the preview names exactly who the job would tell, on the job's own facts and rules", LA,
+    (c) => (c.includes("escalateTo: escalationRecipients(tree, admins, o.accountId).map(personOf),") && c.includes("items: planWindow({ obliged, clock }, first, last, obligationClock),")
+      && c.includes("const owners = await loadOwners(tree);") && /loadClocks\(auth\.tenant_id, owing\.map\(\(\{ o \}\) => o\)/.test(c) ? [] : ["the preview works out its own people or rules"]),
+    (src) => src.replace("escalateTo: escalationRecipients(tree, admins, o.accountId).map(personOf),", "escalateTo: admins.map(personOf),"));
+  rule("before counting starts the day asked about is the start being judged; after, the real start", LA,
+    (c) => (c.includes("const start = settings.trackingFrom ?? first;") ? [] : ["the preview ignores the start date in force"]),
+    (src) => src.replace("const start = settings.trackingFrom ?? first;", "const start = first;"));
+  rule("the preview has who-writes-what's door: a super admin or HR·edit", "src/app/api/work-reports/obligations/preview/route.ts",
+    (c) => (/const deny = requireReportsUser\(auth\);\s*if \(deny\) return deny;\s*if \(!\(await canSetUp\(auth\)\)\) return NextResponse\.json\(\{ error: "forbidden" \}, \{ status: 403 \}\);[\s\S]*loadLaunchPlan\(auth, from\)/.test(c) ? [] : ["the preview is open to anyone signed in"]),
+    (src) => src.replace('if (!(await canSetUp(auth))) return NextResponse.json({ error: "forbidden" }, { status: 403 });', ""));
+
+  /* The banner. */
+  const CT = "src/components/reports/app/ComplianceTab.tsx";
+  rule("the start banner offers TOMORROW and previews before it starts", CT,
+    (c) => (c.includes("const [date, setDate] = useState(() => addDays(localToday(), 1));") && c.includes("const res = await fetchLaunchPlan(date);") && c.includes("{plan && <LaunchPlanView t={t} lang={lang} plan={plan} />}") ? [] : ["the banner starts today, or without a preview"]),
+    (src) => src.replace("const [date, setDate] = useState(() => addDays(localToday(), 1));", "const [date, setDate] = useState(() => localToday());"));
+  rule("a start today or earlier says what it means", CT,
+    (c) => (c.includes("const past = date <= localToday();") && c.includes('{past && <p className="mt-2 text-[12px] text-amber-500">{t("launch.past")}</p>}') ? [] : ["no warning for a start in the past"]),
+    (src) => src.replace('{past && <p className="mt-2 text-[12px] text-amber-500">{t("launch.past")}</p>}', ""));
+  rule("a preview belongs to its day — another day clears it", CT,
+    (c) => (c.includes("onChange={(iso) => { if (iso) { setDate(iso); setPlan(null); } }}") ? [] : ["a stale preview can show for another day"]),
+    (src) => src.replace("onChange={(iso) => { if (iso) { setDate(iso); setPlan(null); } }}", "onChange={(iso) => { if (iso) setDate(iso); }}"));
+  const LW = ["preview", "previewHint", "title", "clock", "startsOn", "daysOff", "off.weekend", "off.holiday", "off.leave", "noDaysOff", "due", "remind", "remindOff",
+    "escalate", "escalateOff", "escalateNobody", "noManager", "nothingDue", "nobody", "exempt", "past", "events", "nothingSent"].map((k) => `launch.${k}`);
+  const used = [...new Set([...code(read(CT)).matchAll(/t\("(launch\.[a-zA-Z.]+)"\)/g)].map((m) => m[1]))];
+  expect(used.every((k) => LW.includes(k)) && used.length >= 18, `the preview reads ${used.length} launch words, every one listed here`, used.filter((k) => !LW.includes(k)).join(", "));
+  const blanks = (s?: string) => (s?.match(/\{[a-z]+\}/g) ?? []).sort().join();
+  const bad = LW.filter((k) => { const e = reportsT[k]; return !e?.en || !e.zh || !e.ar || blanks(e.en) !== blanks(e.zh) || blanks(e.en) !== blanks(e.ar); });
+  expect(bad.length === 0, "every launch word speaks en / zh / ar and fills the same blanks in each", bad.join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

@@ -13,7 +13,7 @@ import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
 import type { AiDraftRequest } from "@/lib/reports/ai-draft";
-import type { BoardRow, BoardSummary, DueItem, Obliged } from "@/lib/reports/obligations";
+import type { BoardRow, BoardSummary, DayOffWhy, DueItem, Obliged, PlanItem } from "@/lib/reports/obligations";
 import type { ReportTask, TaskPriority } from "@/lib/reports/follow-up";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
@@ -229,6 +229,21 @@ export const saveObligations = (body: { trackingFrom?: string | null; reminders?
  *  (nothing is sent). */
 export interface NudgePreview { planned?: Array<{ key: string; periodKey: string; kind: "reminder" | "escalation"; dueAt: string; authorName: string; recipients: string[] }> }
 export const previewNudges = () => call<NudgePreview>("/api/cron/report-reminders?dry=1");
+/** The launch preview (26/09/2026): a week from a start day as the reminder
+ *  job would run it, person by person — read only (a super admin or HR · edit). */
+export interface LaunchPlan {
+  first: string;
+  last: string;
+  trackingFrom: string | null;
+  reminders: boolean;
+  escalations: boolean;
+  exempt: number;
+  people: Array<{
+    person: ReportPerson; tz: string; workEnd: string; startsOn: string | null;
+    daysOff: Array<{ day: string; why: DayOffWhy }>; items: PlanItem[]; escalateTo: ReportPerson[]; noManager: boolean;
+  }>;
+}
+export const fetchLaunchPlan = (from: string) => call<LaunchPlan>(`/api/work-reports/obligations/preview?from=${encodeURIComponent(from)}`);
 /** 5D: the drafts the system prepares on schedule — set like «who must
  *  write what» (a super admin or HR · edit). */
 export interface ScheduleSetup {

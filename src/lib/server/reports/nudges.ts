@@ -28,7 +28,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { listPeople, loadOrgTree, superAdminIds } from "@/lib/server/reports/core";
-import { loadClocks, loadOwners, loadSent, loadSettings, obligationClock } from "@/lib/server/reports/obligations";
+import { escalationRecipients, loadClocks, loadOwners, loadSent, loadSettings, obligationClock } from "@/lib/server/reports/obligations";
 import { addDays, effectiveObliged, nudgesDue, type Nudge } from "@/lib/reports/obligations";
 import { REQUEST_COLS, requestNudges, type RequestRow } from "@/lib/reports/events";
 import { reportsT } from "@/lib/translations/reports";
@@ -82,7 +82,7 @@ async function runTenant(tenantId: string, now: string, opts: { dryRun?: boolean
   ]);
   const nameOf = new Map(people.map((p) => [p.id, p.name]));
   const isAdmin = new Set(owners.filter((o) => o.isSuperAdmin).map((o) => o.accountId));
-  const escalateTo = (author: string) => { const m = tree.chainOf(author)[0]; return (m ? [m] : admins).filter((x) => x !== author); };
+  const escalateTo = (author: string) => escalationRecipients(tree, admins, author);
 
   /* Everything due now, with who is told. */
   const planned: PlannedNudge[] = [];

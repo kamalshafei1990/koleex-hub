@@ -9,7 +9,8 @@
    and HR see everyone; a manager their own people. Cells say whether a
    report was sent, never its text; a sent one links to it unless it was
    confidential. Until tracking starts nobody is marked late or missing —
-   the setup (super admin / HR·edit) picks the day, and who writes what.
+   the setup (super admin / HR·edit) picks the day, and who writes what;
+   before starting, the launch preview shows that first week as it would run.
    Loaded only when the tab opens (next/dynamic in ReportsApp).
    --------------------------------------------------------------------------- */
 
@@ -18,11 +19,11 @@ import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DatePicker from "@/components/ui/DatePicker";
-import { addDays } from "@/lib/reports/obligations";
+import { addDays, localDayOf } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
 import {
-  dmyDate, dmyTime, fetchCompliance, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
-  type ComplianceBoard, type NudgePreview, type ObligationSetup, type ReportPerson, type ScheduleSetup as ScheduleData,
+  dmyDate, dmyTime, fetchCompliance, fetchLaunchPlan, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
+  type ComplianceBoard, type LaunchPlan, type NudgePreview, type ObligationSetup, type ReportPerson, type ScheduleSetup as ScheduleData,
 } from "@/lib/work-reports";
 import { reportHead } from "@/lib/reports/catalog-heads";
 import { periodFor } from "@/lib/reports/templates";
@@ -187,29 +188,111 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
   );
 }
 
+/* Before counting starts: pick the day, see that first week as it would run
+   (the launch preview — read only), then start. The day offered is TOMORROW:
+   started today, a report whose time has already passed would count as
+   missing at once and its manager could hear of it within hours. */
 function TrackingBanner({ t, lang, canSetUp, onStarted }: { t: T; lang: string; canSetUp: boolean; onStarted: () => void }) {
-  const [date, setDate] = useState(() => localToday());
-  const [busy, setBusy] = useState(false);
+  const [date, setDate] = useState(() => addDays(localToday(), 1));
+  const [busy, setBusy] = useState<"start" | "preview" | null>(null);
   const [problem, setProblem] = useState(false);
+  const [plan, setPlan] = useState<LaunchPlan | null>(null);
   const start = async () => {
-    setBusy(true); setProblem(false);
+    setBusy("start"); setProblem(false);
     const res = await saveObligations({ trackingFrom: date });
-    setBusy(false);
+    setBusy(null);
     if (res.ok) onStarted(); else setProblem(true);
   };
+  const preview = async () => {
+    setBusy("preview"); setProblem(false);
+    const res = await fetchLaunchPlan(date);
+    setBusy(null);
+    if (res.ok) setPlan(res.data); else setProblem(true);
+  };
+  const past = date <= localToday();
   return (
     <div className="mt-4 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-[12.5px] text-[var(--text-secondary)]">
       <p>{t("compliance.notStarted")}</p>
       {canSetUp && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-[var(--text-dim)]">{t("compliance.startOn")}</span>
-          <div className="w-[170px]"><DatePicker id="kx-rep-track-from" value={date} onChange={(iso) => { if (iso) setDate(iso); }} lang={lang} /></div>
-          <button type="button" onClick={() => void start()} disabled={busy} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--bg-inverted)] px-3 text-[12.5px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
-            {busy && <SpinnerIcon size={12} />}{t("compliance.start")}
-          </button>
-          {problem && <span role="alert" className="text-[12px] text-red-500">{t("err.generic")}</span>}
-        </div>
+        <>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-[12px] text-[var(--text-dim)]">{t("compliance.startOn")}</span>
+            {/* A preview belongs to its day: another day clears it. */}
+            <div className="w-[170px]"><DatePicker id="kx-rep-track-from" value={date} onChange={(iso) => { if (iso) { setDate(iso); setPlan(null); } }} lang={lang} /></div>
+            <button type="button" onClick={() => void preview()} disabled={!!busy} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-[12.5px] font-medium text-[var(--text-primary)] disabled:opacity-60">
+              {busy === "preview" ? <SpinnerIcon size={12} /> : <RrIcon name="eye" size={12} />}{t("launch.preview")}
+            </button>
+            <button type="button" onClick={() => void start()} disabled={!!busy} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--bg-inverted)] px-3 text-[12.5px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
+              {busy === "start" && <SpinnerIcon size={12} />}{t("compliance.start")}
+            </button>
+            {problem && <span role="alert" className="text-[12px] text-red-500">{t("err.generic")}</span>}
+          </div>
+          {past && <p className="mt-2 text-[12px] text-amber-500">{t("launch.past")}</p>}
+          {!plan && <p className="mt-1.5 text-[11.5px] text-[var(--text-dim)]">{t("launch.previewHint")}</p>}
+          {plan && <LaunchPlanView t={t} lang={lang} plan={plan} />}
+        </>
       )}
+    </div>
+  );
+}
+
+/** The launch preview, person by person: each report due on their own clock,
+ *  the reminder, who hears of a missing one and when, and the days their
+ *  calendar gives off — a holiday missing from it shows as a working day. */
+function LaunchPlanView({ t, lang, plan }: { t: T; lang: string; plan: LaunchPlan }) {
+  const loc = lang === "ar" ? "ar-EG" : lang === "zh" ? "zh-CN" : "en-GB";
+  const dayText = (ymd: string) => `${new Intl.DateTimeFormat(loc, { weekday: "short", timeZone: "UTC" }).format(new Date(`${ymd}T00:00:00Z`))} ${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`;
+  /* Times on the author's own clock, Latin digits like the rest of the Hub. */
+  const hm = (iso: string, tz: string) => {
+    try { return new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)); } catch { return iso.slice(11, 16); }
+  };
+  const zone = (tz: string) => {
+    try { return new Intl.DateTimeFormat(loc, { timeZone: tz, timeZoneName: "long" }).formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value ?? tz; } catch { return tz; }
+  };
+  /* Each name kept whole and isolated: a Latin name inside Arabic neither
+     breaks across lines nor reorders the words around it. */
+  const names = (list: ReportPerson[]) => list.map((x) => `\u2068${x.name.trim().replace(/\s+/g, "\u00a0")}\u2069`).join(lang === "ar" ? "، " : lang === "zh" ? "、" : ", ");
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("launch.title").replace("{from}", dmyDate(plan.first)).replace("{to}", dmyDate(plan.last))}</p>
+      {plan.people.length === 0 ? <p className="text-[12px] text-[var(--text-dim)]">{t("launch.nobody")}</p> : plan.people.map((p) => (
+        <div key={p.person.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2">
+              <Avatar person={p.person} size={24} />
+              <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{p.person.name}</span>
+            </span>
+            <span className="text-[11px] text-[var(--text-dim)]">{t("launch.clock").replace("{zone}", zone(p.tz)).replace("{time}", p.workEnd)}</span>
+          </div>
+          {p.startsOn && <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("launch.startsOn").replace("{day}", dayText(p.startsOn))}</p>}
+          <p className="mt-1.5 text-[11.5px] text-[var(--text-dim)]">
+            <span className="font-medium text-[var(--text-secondary)]">{t("launch.daysOff")}</span>{" "}
+            {p.daysOff.length ? p.daysOff.map((d) => `${dayText(d.day)} (${t(`launch.off.${d.why}`)})`).join(" · ") : t("launch.noDaysOff")}
+          </p>
+          {p.items.length === 0 ? <p className="mt-1.5 text-[12px] text-[var(--text-dim)]">{t("launch.nothingDue")}</p> : (
+            <ul className="mt-2 space-y-1.5">
+              {p.items.map((it) => (
+                <li key={`${it.key}|${it.periodKey}`} className="text-[12px] leading-snug">
+                  <span className="text-[var(--text-primary)]">{t("launch.due").replace("{report}", t(`tpl.${it.key}.name`)).replace("{day}", dayText(it.dueDay)).replace("{time}", hm(it.dueAt, p.tz))}</span>
+                  <span className="block text-[11.5px] text-[var(--text-dim)]">
+                    {plan.reminders ? t("launch.remind").replace("{time}", hm(it.remindAt, p.tz)) : t("launch.remindOff")}
+                    {" · "}
+                    {!plan.escalations ? t("launch.escalateOff")
+                      : !it.escalateAt || p.escalateTo.length === 0 ? t("launch.escalateNobody")
+                        : t("launch.escalate").replace("{people}", names(p.escalateTo)).replace("{day}", dayText(localDayOf(it.escalateAt, p.tz))).replace("{time}", hm(it.escalateAt, p.tz))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {p.noManager && plan.escalations && p.escalateTo.length > 0 && (
+            <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11.5px] text-amber-500">{t("launch.noManager").replace("{people}", names(p.escalateTo))}</p>
+          )}
+        </div>
+      ))}
+      {plan.exempt > 0 && <p className="text-[11.5px] text-[var(--text-dim)]">{t("launch.exempt").replace("{n}", String(plan.exempt))}</p>}
+      <p className="text-[11.5px] text-[var(--text-dim)]">{t("launch.events")}</p>
+      <p className="text-[11.5px] font-medium text-[var(--text-secondary)]">{t("launch.nothingSent")}</p>
     </div>
   );
 }

@@ -345,3 +345,50 @@ export function deadlinesIn(p: PersonFacts, fromIso: string, toIso: string, sent
   if (p.obliged.monthly) for (let mo = prevMonth(prevMonth(monthOf(first))); mo <= monthOf(last); mo = nextMonth(mo)) push("monthly", mo, `${mo}-01`, monthlyDue(c, mo, clock));
   return out.sort((a, b) => ms(a.dueAt) - ms(b.dueAt));
 }
+
+/* ── The launch preview (owner's pick 26/09/2026, «نشغّل التقارير فعلًا») ──
+   Before counting starts, whoever sets it up sees the first week as it would
+   run: every deadline, the moment its author is reminded and the moment their
+   manager would be told — the very rules nudgesDue() acts on, laid out ahead
+   of time, so a start day can be judged before anyone is asked for anything.
+   Nothing here decides what is sent; it only reads the same calendar. */
+export interface PlanItem {
+  key: ObligationKey;
+  periodKey: string;
+  dueDay: string;
+  dueAt: string;
+  /** An hour before the deadline (REMIND_BEFORE_MIN). */
+  remindAt: string;
+  /** When the manager hears of it if it is still missing (escalationAt). */
+  escalateAt: string | null;
+}
+
+/** Every deadline whose day falls in [firstDay, lastDay] on the person's own
+ *  calendar, earliest first — none before their start (clock.from). A week's
+ *  report is listed on the day it is due, a month's report in the month after
+ *  its own. */
+export function planWindow(p: PersonFacts, firstDay: string, lastDay: string, clock: Clock): PlanItem[] {
+  const c = p.clock;
+  const out: PlanItem[] = [];
+  const push = (key: ObligationKey, periodKey: string, due: Due | null) => {
+    if (!due || due.day < firstDay || due.day > lastDay || (c.from !== null && due.day < c.from)) return;
+    out.push({ key, periodKey, dueDay: due.day, dueAt: due.at, remindAt: new Date(ms(due.at) - REMIND_BEFORE_MIN * 60_000).toISOString(), escalateAt: escalationAt(c, key, due, clock) });
+  };
+  if (p.obliged.daily) for (let d = firstDay; d <= lastDay; d = addDays(d, 1)) push("daily", d, dailyDue(c, d, clock));
+  if (p.obliged.weekly) for (let m = mondayOf(firstDay); m <= lastDay; m = addDays(m, 7)) push("weekly", isoWeekKey(m), weeklyDue(c, m, clock));
+  if (p.obliged.monthly) for (let mo = prevMonth(prevMonth(monthOf(firstDay))); mo <= monthOf(lastDay); mo = nextMonth(mo)) push("monthly", mo, monthlyDue(c, mo, clock));
+  return out.sort((a, b) => ms(a.dueAt) - ms(b.dueAt));
+}
+
+export type DayOffWhy = "weekend" | "holiday" | "leave";
+
+/** The days in [firstDay, lastDay] the person does not work, and why — what
+ *  their calendar holds, so a holiday missing from it shows as a working day. */
+export function daysOffIn(c: PersonClock, firstDay: string, lastDay: string): Array<{ day: string; why: DayOffWhy }> {
+  const out: Array<{ day: string; why: DayOffWhy }> = [];
+  for (let d = firstDay; d <= lastDay; d = addDays(d, 1)) {
+    const why: DayOffWhy | null = c.weekend.includes(weekdayOf(d)) ? "weekend" : c.holidays.has(d) ? "holiday" : c.leave.has(d) ? "leave" : null;
+    if (why) out.push({ day: d, why });
+  }
+  return out;
+}
