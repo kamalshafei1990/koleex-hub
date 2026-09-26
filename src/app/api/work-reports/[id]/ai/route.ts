@@ -3,7 +3,7 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    POST /api/work-reports/[id]/ai — Koleex AI on one section of a DRAFT
    (Phase 2D). Body: AiDraftRequest (src/lib/reports/ai-draft.ts).
-     write  the weekly / monthly summary, from the material the composer
+     write  the weekly / monthly / quarterly / half-year / annual summary, from the material the composer
             already shows the author (their earlier reports, their own work
             in the apps, what the report says) — and (27/09/2026) the daily's
             and the weekly plan's lists, each told what belongs in it
@@ -34,7 +34,7 @@ import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_LIMITS, WRITE_LIST_MAX, checkAiRequest, companyMaterial, serverMaterial, toSection, writeGuide, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
+import { AI_LIMITS, WRITE_LIST_MAX, checkAiRequest, companyMaterial, dropEchoedTitle, serverMaterial, toSection, writeGuide, type AiDraftRequest, type WritingLang } from "@/lib/reports/ai-draft";
 import { rangeLabel, teamFactsText, teamRange } from "@/lib/reports/team";
 import { EXEC_SYSTEM, TEAM_SYSTEM, execInstruction, loadTeamMaterial, teamInstruction } from "@/lib/server/reports/team";
 import { MGMT_MODULE } from "@/lib/reports/report-data";
@@ -122,7 +122,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const section = en(`tpl.${tpl.key}.s.${ask.section}`);
   const type = en(`tpl.${tpl.key}.name`);
-  const period = row.period_start && row.period_end && row.period_start !== row.period_end ? `${row.period_start} to ${row.period_end}` : (row.period_start ?? "");
+  /* Day first (the Hub's D/M/Y rule): the model writes dates the way it is
+     told them — "2025-01-01 to 2025-03-31" came back in the first quarterly. */
+  const period = row.period_start ? rangeLabel(row.period_start, row.period_end ?? row.period_start) : "";
   const shape = kind === "list"
     ? "Answer as a list: one item per line, no bullets, no numbers."
     : "Answer as plain paragraphs.";
@@ -143,7 +145,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       fenceUntrusted(ask.material ?? "", "document", "The employee's report material: their earlier reports and their records in Koleex Hub", fence);
     maxTokens = 600;
   } else if (ask.action === "write") {
-    const length = behaviourKey(tpl) === "monthly" ? "6 to 12 sentences (at most about 300 words)" : "4 to 8 sentences (at most about 180 words)";
+    /* The longer the period, the longer its summary (6D). */
+    const length = ({
+      monthly: "6 to 12 sentences (at most about 300 words)",
+      quarterly: "8 to 14 sentences (at most about 380 words)",
+      halfyear: "10 to 16 sentences (at most about 450 words)",
+      annual: "10 to 18 sentences (at most about 500 words)",
+    } as Record<string, string>)[behaviourKey(tpl)] ?? "4 to 8 sentences (at most about 180 words)";
     instruction =
       `Write the "${section}" section of the employee's ${type}${period ? `, covering ${period}` : ""}.` +
       ` Language: ${LANG_NAME[ask.lang]}. Length: ${length}.` +
@@ -151,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       " Group related items; do not list every line." +
       ` ${shape} Answer with the section text only.` +
       fenceUntrusted(ask.material ?? "", "document", "The employee's report material: their earlier reports and their records in Koleex Hub", fence);
-    maxTokens = 900;
+    maxTokens = ["quarterly", "halfyear", "annual"].includes(behaviourKey(tpl)) ? 1400 : 900;
   } else {
     instruction =
       `Rewrite this "${section}" section of the employee's ${type} so it reads clearly.` +
@@ -195,7 +203,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     console.warn(`[reports.ai] action=write section=${ask.section} outcome=none ms=${ms}`);
     return NextResponse.json({ error: "no_facts" }, { status: 400 });
   }
-  const text = toSection(answer, kind);
+  /* The section's names in every language: an answer opening with one of
+     them as a heading loses that line. */
+  const ownWords = snap ? templateWords(tpl.key, snap.words) : null;
+  const nameKey = `tpl.${tpl.key}.s.${ask.section}`;
+  const names = Object.values((ownWords?.[nameKey] ?? reportsT[nameKey] ?? REPORT_SECTION_WORDS[nameKey]) ?? {}).filter((v): v is string => typeof v === "string");
+  const text = toSection(dropEchoedTitle(answer, names), kind);
   console.warn(`[reports.ai] action=${ask.action} section=${ask.section} lang=${ask.lang} in=${(ask.material ?? ask.text ?? "").length} out=${text.length} ms=${ms}`);
   return NextResponse.json({ text }, { headers: { "Cache-Control": "private, no-store" } });
 }

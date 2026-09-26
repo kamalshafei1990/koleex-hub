@@ -507,7 +507,8 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
           ) : (
             <div>
               <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
-                {tpl.cadence === "weekly" ? t("period.week") : tpl.cadence === "monthly" ? t("period.month") : tpl.cadence === "daily" ? t("period.day") : t("period.date")}
+                {tpl.cadence === "weekly" ? t("period.week") : tpl.cadence === "monthly" ? t("period.month") : tpl.cadence === "daily" ? t("period.day")
+                  : tpl.cadence === "quarterly" ? t("period.quarter") : tpl.cadence === "halfyear" ? t("period.half") : tpl.cadence === "yearly" ? t("period.year") : t("period.date")}
               </p>
               <DatePicker id="kx-rep-date" value={draft.date} onChange={(iso) => {
                 if (!iso) return;

@@ -13,7 +13,7 @@
    screen and validate:reports share it.
    --------------------------------------------------------------------------- */
 
-import { behaviourKey, type ReportCadence, type ReportTemplateDef } from "./templates";
+import { behaviourKey, periodFor, type ReportCadence, type ReportTemplateDef } from "./templates";
 import { OBLIGATION_KEYS, mondayOf } from "./obligations";
 
 /** The hour, in the writer's own time, a new period's draft is prepared. */
@@ -23,11 +23,18 @@ export const SCHEDULE_LIMITS = { perTenant: 500 } as const;
 const DAY = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 
-/** A type the system may prepare: one that covers a week or a month. The
- *  daily, weekly and monthly work reports are owed and reminded already
- *  (their own obligations); a type only an event asks for waits for it. */
-export function schedulable(tpl: Pick<ReportTemplateDef, "key" | "cadence" | "requestOnly" | "base"> | null | undefined): tpl is Pick<ReportTemplateDef, "key" | "cadence" | "requestOnly" | "base"> & { cadence: "weekly" | "monthly" } {
-  return !!tpl && (tpl.cadence === "weekly" || tpl.cadence === "monthly") && !tpl.requestOnly
+/** The periods a draft can be prepared for (6D: the quarter, the half-year
+ *  and the year too). */
+export const SCHEDULE_CADENCES = ["weekly", "monthly", "quarterly", "halfyear", "yearly"] as const;
+export type ScheduleCadence = (typeof SCHEDULE_CADENCES)[number];
+export const isScheduleCadence = (c: unknown): c is ScheduleCadence => typeof c === "string" && (SCHEDULE_CADENCES as readonly string[]).includes(c);
+
+/** A type the system may prepare: one that covers a week, a month, a
+ *  quarter, a half-year or a year. The daily, weekly and monthly work
+ *  reports are owed and reminded already (their own obligations); a type
+ *  only an event asks for waits for it. */
+export function schedulable(tpl: Pick<ReportTemplateDef, "key" | "cadence" | "requestOnly" | "base"> | null | undefined): tpl is Pick<ReportTemplateDef, "key" | "cadence" | "requestOnly" | "base"> & { cadence: ScheduleCadence } {
+  return !!tpl && isScheduleCadence(tpl.cadence) && !tpl.requestOnly
     && !(OBLIGATION_KEYS as readonly string[]).includes(behaviourKey(tpl));
 }
 
@@ -42,6 +49,12 @@ export function periodToPrepare(cadence: ReportCadence, localDay: string, localM
   }
   if (cadence === "monthly") {
     const first = `${localDay.slice(0, 8)}01`;
+    return localDay === first && early ? null : addDays(first, -1);
+  }
+  /* 6D: the quarter / half-year / year that just ended — from 07:00 on the
+     new one's first day. */
+  if (cadence === "quarterly" || cadence === "halfyear" || cadence === "yearly") {
+    const first = periodFor(cadence, localDay).start;
     return localDay === first && early ? null : addDays(first, -1);
   }
   return null;

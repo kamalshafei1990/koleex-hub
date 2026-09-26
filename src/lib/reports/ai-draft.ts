@@ -29,6 +29,11 @@ export type WritingLang = "en" | "zh" | "ar";
 export const AI_WRITE_SECTIONS: Record<string, string[]> = {
   weekly: ["summary"],
   monthly: ["summary"],
+  /* 6D: from the shorter reports inside the period (and the quarter's
+     finished records). */
+  quarterly: ["summary"],
+  halfyear: ["summary"],
+  annual: ["summary"],
   /* 27/09/2026 (owner: «أيوه خلي اكتبهولي يشتغل في اليومي وخطة الأسبوع»):
      their lists, each from its own suggestions (writeGroups) with its own
      guide (WRITE_GUIDE). Never the problems or the help needed — only the
@@ -167,6 +172,20 @@ export function toSection(answer: string, kind: ReportSectionKind): string {
       .join("\n");
   }
   return plain.replace(/\n{3,}/g, "\n\n").slice(0, REPORT_LIMITS.text);
+}
+
+/** A model asked for a section's text sometimes opens with the section's
+ *  own name as a heading ("Quarter summary" — seen live on the first
+ *  quarterly, 26/09/2026), which "Use it" would paste into the report. A
+ *  first line that is one of the section's names — in any language, with
+ *  or without a heading mark or a colon — is dropped; nothing else is. */
+export function dropEchoedTitle(answer: string, names: string[]): string {
+  const norm = (s: string) => s.replace(/^[\s#*_>]+|[\s:：*_.]+$/g, "").trim().toLowerCase();
+  const wanted = new Set(names.map(norm).filter(Boolean));
+  const lines = answer.replace(/\r/g, "").split("\n");
+  const first = lines.findIndex((l) => l.trim());
+  if (first < 0 || !wanted.has(norm(lines[first]))) return answer;
+  return lines.slice(first + 1).join("\n").trim();
 }
 
 /** What the route accepts — the one shape both sides agree on. */

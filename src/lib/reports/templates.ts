@@ -85,7 +85,11 @@
 import type { RrIconName } from "@/components/ui/RrIcon";
 
 export type ReportFamily = "work" | "team" | "office" | "executive" | "visits" | "sales" | "marketing" | "suppliers" | "quality" | "logistics" | "service" | "travel" | "memos" | "hr" | "projects" | "inventory" | "finance" | "compliance";
-export type ReportCadence = "daily" | "weekly" | "monthly" | null;
+/** 6D (owner, 26/09/2026): a quarter ("2026-Q3"), a half-year ("2026-H2")
+ *  and a year ("2026") join the day, the week and the month. */
+export type ReportCadence = "daily" | "weekly" | "monthly" | "quarterly" | "halfyear" | "yearly" | null;
+export const CADENCES = ["daily", "weekly", "monthly", "quarterly", "halfyear", "yearly"] as const;
+export const isCadence = (v: unknown): v is Exclude<ReportCadence, null> => typeof v === "string" && (CADENCES as readonly string[]).includes(v);
 /** "text" = one free text block · "list" = bullet items, one per line ·
  *  the Phase 4A blocks: "checklist", "score", "table", "links", "signature" ·
  *  4B: "choice" (one fixed answer) and "data" (numbers from the apps). */
@@ -622,6 +626,17 @@ export function periodFor(cadence: ReportCadence, ymd: string): ReportPeriod {
     const [y, m] = ymd.split("-").map(Number);
     const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
     return { start: `${y}-${pad(m)}-01`, end: `${y}-${pad(m)}-${pad(last)}`, key: `${y}-${pad(m)}` };
+  }
+  /* 6D: a run of whole months — a quarter (3), a half-year (6), a year (12). */
+  if (cadence === "quarterly" || cadence === "halfyear" || cadence === "yearly") {
+    const [y, m] = ymd.split("-").map(Number);
+    const span = cadence === "quarterly" ? 3 : cadence === "halfyear" ? 6 : 12;
+    const n = Math.floor((m - 1) / span);
+    const first = n * span + 1;
+    const lastMonth = first + span - 1;
+    const lastDay = new Date(Date.UTC(y, lastMonth, 0)).getUTCDate();
+    const key = cadence === "quarterly" ? `${y}-Q${n + 1}` : cadence === "halfyear" ? `${y}-H${n + 1}` : `${y}`;
+    return { start: `${y}-${pad(first)}-01`, end: `${y}-${pad(lastMonth)}-${pad(lastDay)}`, key };
   }
   return { start: ymd, end: ymd, key: ymd };
 }

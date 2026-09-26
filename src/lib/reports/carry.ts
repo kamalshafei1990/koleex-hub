@@ -6,6 +6,9 @@
      · Monday's plan      ← last week's "next week"
      · Friday's weekly    ← Monday's goals + the week's dailies
      · the monthly        ← the month's weekly reports
+     · the quarterly      ← the quarter's monthly reports (6D)
+     · the half-year      ← its quarterly reports, then its months
+     · the annual         ← its half-years and quarters, then its months
    They come back as SUGGESTIONS. The author taps where each one belongs;
    nothing is ever written into a report by itself.
 
@@ -58,6 +61,33 @@ export const CARRY_RULES: Record<string, CarryRule[]> = {
     { from: "weekly", window: "period", section: "summary", to: ["summary"] },
     { from: "weekly", window: "period", section: "projects", to: ["projects"] },
     { from: "weekly", window: "period", section: "decisions", to: ["summary", "improvements"] },
+  ],
+  /* 6D. The quarter: its three monthly reports. */
+  quarterly: [
+    { from: "monthly", window: "period", section: "summary", to: ["summary"] },
+    { from: "monthly", window: "period", section: "projects", to: ["projects", "achievements"] },
+    { from: "monthly", window: "period", section: "improvements", to: ["next_quarter", "challenges"] },
+  ],
+  /* The half-year: its quarterly reports first, then the months (a half
+     written before any quarterly report still has its months). */
+  halfyear: [
+    { from: "quarterly", window: "period", section: "summary", to: ["summary"] },
+    { from: "quarterly", window: "period", section: "achievements", to: ["achievements", "goals"] },
+    { from: "quarterly", window: "period", section: "challenges", to: ["challenges"] },
+    { from: "quarterly", window: "period", section: "next_quarter", to: ["next_half"], latestOnly: true },
+    { from: "monthly", window: "period", section: "summary", to: ["summary"] },
+  ],
+  /* The year: its half-year and quarterly reports, then the months — the
+     most condensed first, so what fits in Koleex AI's material is the best. */
+  annual: [
+    { from: "halfyear", window: "period", section: "summary", to: ["summary"] },
+    { from: "halfyear", window: "period", section: "achievements", to: ["achievements"] },
+    { from: "halfyear", window: "period", section: "next_half", to: ["next_year"], latestOnly: true },
+    { from: "quarterly", window: "period", section: "summary", to: ["summary"] },
+    { from: "quarterly", window: "period", section: "achievements", to: ["achievements"] },
+    { from: "quarterly", window: "period", section: "projects", to: ["projects"] },
+    { from: "quarterly", window: "period", section: "challenges", to: ["lessons"] },
+    { from: "monthly", window: "period", section: "summary", to: ["summary"] },
   ],
 };
 

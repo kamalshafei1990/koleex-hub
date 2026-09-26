@@ -78,6 +78,11 @@ export const APP_RULES: Record<string, AppRule[]> = {
   monthly: [
     { group: "done", sources: ["tasks", "quotations", "invoices", "orders"], state: ["done"], when: "period", to: ["summary", "projects"] },
   ],
+  /* 6D: what the quarter finished. The half-year and the year read their
+     shorter reports only — a year of records is no list of suggestions. */
+  quarterly: [
+    { group: "done", sources: ["tasks", "quotations", "invoices", "orders"], state: ["done"], when: "period", to: ["achievements", "summary", "projects"] },
+  ],
 };
 
 /** A type's rules: its own — or, for a builder copy (4E), its built-in's

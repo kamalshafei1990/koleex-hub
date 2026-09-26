@@ -10,6 +10,9 @@ export const reportPageT: Translations = {
   "period.day":   { en: "Day", zh: "日期", ar: "اليوم" },
   "period.week":  { en: "Week", zh: "周", ar: "الأسبوع" },
   "period.month": { en: "Month", zh: "月份", ar: "الشهر" },
+  "period.quarter": { en: "Quarter", zh: "季度", ar: "الربع" },
+  "period.half":  { en: "Half-year", zh: "半年", ar: "النص سنة" },
+  "period.year":  { en: "Year", zh: "年份", ar: "السنة" },
   "period.date":  { en: "Date", zh: "日期", ar: "التاريخ" },
 
   /* Phase 2A — carry-over and roll-ups: the author's earlier reports offered

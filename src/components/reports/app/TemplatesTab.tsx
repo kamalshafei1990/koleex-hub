@@ -494,7 +494,7 @@ function Editor({ t, lang, doc, onClose }: { t: T; lang: Lang; doc: TemplateDoc;
             <div>
               <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{t("tb.period")}</p>
               <Seg value={period} label={t("tb.period")} onChange={(v) => patch({ cadence: v === "none" || v === "range" ? null : v, range: v === "range" })}
-                options={(["none", "daily", "weekly", "monthly", "range"] as const).map((v) => ({ value: v, label: t(`tb.period.${v}`) }))} />
+                options={(["none", "daily", "weekly", "monthly", "quarterly", "halfyear", "yearly", "range"] as const).map((v) => ({ value: v, label: t(`tb.period.${v}`) }))} />
               {def.cadence && <p className="mt-1.5 text-[11px] text-[var(--text-dim)]">{t("tb.periodHint")}</p>}
             </div>
             <div>

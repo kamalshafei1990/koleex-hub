@@ -25,6 +25,8 @@ import {
   type ComplianceBoard, type NudgePreview, type ObligationSetup, type ReportPerson, type ScheduleSetup as ScheduleData,
 } from "@/lib/work-reports";
 import { reportHead } from "@/lib/reports/catalog-heads";
+import { periodFor } from "@/lib/reports/templates";
+import { isScheduleCadence } from "@/lib/reports/schedules";
 import { Avatar, CARD, FIELD, type T } from "./shared";
 import type { Lang } from "@/lib/i18n";
 import { reportComplianceT } from "@/lib/translations/report-ui/compliance";
@@ -345,6 +347,14 @@ function Setup({ t, lang, onChanged }: { t: T; lang: string; onChanged: () => vo
 function periodText(key: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(key);
   if (m) return `${m[2]}/${m[1]}`;
+  /* 6D: a quarter or a half-year its first to last day; a year itself. */
+  const qh = /^(\d{4})-([QH])([1-4])$/.exec(key);
+  if (qh) {
+    const span = qh[2] === "Q" ? 3 : 6;
+    const p = periodFor(qh[2] === "Q" ? "quarterly" : "halfyear", `${qh[1]}-${String((Number(qh[3]) - 1) * span + 1).padStart(2, "0")}-01`);
+    return `${dmyDate(p.start)} – ${dmyDate(p.end)}`;
+  }
+  if (/^\d{4}$/.test(key)) return key;
   const w = /^(\d{4})-W(\d{2})$/.exec(key);
   if (!w) return key;
   const DAY = 86_400_000;
@@ -387,7 +397,7 @@ function ScheduleSetup({ t, people }: { t: T; people: ReportPerson[] }) {
               {data.schedules.map((x) => {
                 const tag = `${x.accountId}|${x.templateKey}`;
                 const cadence = reportHead(x.templateKey)?.cadence;
-                const when = cadence === "weekly" || cadence === "monthly" ? t(`compliance.sched.${cadence}`) : "";
+                const when = isScheduleCadence(cadence) ? t(`compliance.sched.${cadence}`) : "";
                 /* Only a draft that was really prepared — a new schedule's
                    starting period is not one. */
                 const last = x.lastPeriod && x.lastReportId ? t("compliance.sched.last").replace("{period}", periodText(x.lastPeriod)) : "";

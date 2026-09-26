@@ -23,7 +23,7 @@ import { canSetUp, ownerIds } from "@/lib/server/reports/obligations";
 import { loadSchedules, saveSchedule } from "@/lib/server/reports/schedules";
 import { loadCustomHeads } from "@/lib/server/reports/custom-templates";
 import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
-import { schedulable } from "@/lib/reports/schedules";
+import { isScheduleCadence, schedulable } from "@/lib/reports/schedules";
 
 export const dynamic = "force-dynamic";
 const forbidden = () => NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -35,7 +35,7 @@ async function answer(auth: ServerAuthContext) {
   ]);
   const types = [
     ...REPORT_TEMPLATES.filter((t) => schedulable(t)).map((t) => t.key),
-    ...custom.filter((c) => c.cadence === "weekly" || c.cadence === "monthly").map((c) => c.key),
+    ...custom.filter((c) => isScheduleCadence(c.cadence)).map((c) => c.key),
   ];
   return NextResponse.json({ schedules, types }, { headers: { "Cache-Control": "private, no-store" } });
 }

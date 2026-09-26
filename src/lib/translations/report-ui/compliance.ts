@@ -52,7 +52,7 @@ export const reportComplianceT: Translations = {
   "nudge.kind.escalation": { en: "Manager told", zh: "通知主管", ar: "تبليغ المدير" },
   /* 5D: the drafts the system prepares on schedule. */
   "compliance.sched.title": { en: "Drafts prepared on schedule", zh: "按计划准备的草稿", ar: "مسودات بتتجهز لوحدها" },
-  "compliance.sched.hint": { en: "When the week or month a type covers has ended, Koleex prepares that period's draft at 07:00 in the person's own time and tells them — the first one when the current week or month ends. Nothing is ever sent by itself, and a schedule gives nobody a right they don't have.", zh: "当某类报告对应的一周或一个月结束后，Koleex 会在此人当地时间 07:00 准备好该期草稿并通知对方——第一份在本周或本月结束时准备。不会自动发送任何报告，排程也不会授予任何人原本没有的权限。", ar: "لما الأسبوع أو الشهر اللي النوع بيغطيه يخلص، Koleex بيجهّز مسودة الفترة دي الساعة 7 الصبح بتوقيت الشخص، ويبعتله إشعار — وأول واحدة لما الأسبوع أو الشهر الحالي يخلص. مفيش حاجة بتتبعت لوحدها، والجدولة مش بتدي حد صلاحية مش معاه." },
+  "compliance.sched.hint": { en: "When the period a type covers has ended — a week, a month, a quarter, a half-year or a year — Koleex prepares that period's draft at 07:00 in the person's own time and tells them; the first one when the current period ends. Nothing is ever sent by itself, and a schedule gives nobody a right they don't have.", zh: "当某类报告对应的周期（一周、一个月、一个季度、半年或一年）结束后，Koleex 会在此人当地时间 07:00 准备好该期草稿并通知对方——第一份在当前周期结束时准备。不会自动发送任何报告，排程也不会授予任何人原本没有的权限。", ar: "لما الفترة اللي النوع بيغطيها تخلص — أسبوع أو شهر أو ربع أو نص سنة أو سنة — Koleex بيجهّز مسودة الفترة دي الساعة 7 الصبح بتوقيت الشخص، ويبعتله إشعار — وأول واحدة لما الفترة الحالية تخلص. مفيش حاجة بتتبعت لوحدها، والجدولة مش بتدي حد صلاحية مش معاه." },
   "compliance.sched.person": { en: "Person", zh: "人员", ar: "الشخص" },
   "compliance.sched.type": { en: "Report type", zh: "报告类型", ar: "نوع التقرير" },
   "compliance.sched.add": { en: "Add", zh: "添加", ar: "ضيف" },
@@ -62,4 +62,7 @@ export const reportComplianceT: Translations = {
   "compliance.open": { en: "Open it", zh: "打开", ar: "افتحها" },
   "compliance.sched.weekly": { en: "every Monday, the week that ended", zh: "每周一，准备上周的", ar: "كل اتنين، للأسبوع اللي خلص" },
   "compliance.sched.monthly": { en: "on the 1st, the month that ended", zh: "每月1日，准备上个月的", ar: "أول كل شهر، للشهر اللي خلص" },
+  "compliance.sched.quarterly": { en: "on the 1st day of each quarter, the quarter that ended", zh: "每季度第一天，准备上季度的", ar: "أول يوم في كل ربع، للربع اللي خلص" },
+  "compliance.sched.halfyear": { en: "on 1 January and 1 July, the six months that ended", zh: "每年1月1日和7月1日，准备上半年的", ar: "أول يناير وأول يوليو، للست شهور اللي خلصوا" },
+  "compliance.sched.yearly": { en: "on 1 January, the year that ended", zh: "每年1月1日，准备上一年的", ar: "أول يناير، للسنة اللي خلصت" },
 };

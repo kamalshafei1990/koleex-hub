@@ -97,6 +97,10 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §33 Phase 6D — the quarter, the half-year and the year: their periods,
+ *      the shorter reports inside each that it starts from, Koleex AI's
+ *      summary, the drafts prepared when one ends, the builder and the
+ *      screens that name them.
  *   §32 Phase 6C — the number reports in the app's look: the same doors,
  *      every amount in its own currency (never two added), the statements
  *      reading the shapes the APIs send, the two agings Finance links to,
@@ -157,7 +161,7 @@ import { dayLanes } from "../src/lib/calendar-utils";
 import {
   EVENT_TEMPLATE, eventDue, prefillSections, requestIdOf, requestIsOwed, requestNudges, requestState, requestSubject, type RequestFacts, type RequestRow,
 } from "../src/lib/reports/events";
-import { AI_LIMITS, AI_WRITE_SECTIONS, WRITE_APPS_ONLY, canWrite, checkAiRequest, toSection, writeGroups, writeGuide, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
+import { AI_LIMITS, AI_WRITE_SECTIONS, WRITE_APPS_ONLY, canWrite, checkAiRequest, dropEchoedTitle, toSection, writeGroups, writeGuide, writeMaterial, writingLang } from "../src/lib/reports/ai-draft";
 import {
   REPORT_ATTACHMENT_LIMITS, REPORT_ATTACHMENT_MIME, REPORT_FILE_ACCEPT, checkReportAttachment, cleanFileName, extensionFor, reportFileUrl, sniffMatches,
 } from "../src/lib/reports/attachments";
@@ -288,7 +292,9 @@ console.log("\n§3 templates and their words");
   const team5a = ["team_summary", "one_on_one", "promotion_recommendation"];
   const office5b = ["morning_brief", "decisions_waiting", "followups_open", "promises_log", "calls_log", "next_week", "trip_folder", "bookings_log", "time_split", "meetings_summary",
     "office_readiness", "admin_affairs", "office_expenses", "assets_custody", "renewals", "visitors_log", "gov_bank", "company_documents", "stamp_log", "correspondence", "gift_register", "occasions"];
-  const withBlocks = [...phase1.slice(0, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...team5a, ...office5b, ...phase1.slice(6)];
+  /* 6D: the quarter, the half-year and the year, right after the monthly. */
+  const periodic6d = ["quarterly", "halfyear", "annual"];
+  const withBlocks = [...phase1.slice(0, 4), ...periodic6d, ...phase1.slice(4, 6), ...sales, ...quality, ...suppliers4c, ...d4, "factory_audit", "price_comparison", "installation", ...team5a, ...office5b, ...phase1.slice(6)];
   /* 5C (owner's picks 26 Sep 2026): HR's 31, Projects' 20, Inventory's 4 and Finance's 6, after the Phase 1 HR types. */
   const hr5c = ["hr_hiring_plan", "hr_pipeline", "hr_interview", "hr_reference_check", "hr_offer", "hr_onboarding", "hr_new_hire", "hr_attendance", "hr_lateness", "hr_leave", "hr_overtime",
     "hr_payroll", "hr_staff_cost", "hr_insurance", "hr_salary_review", "hr_appraisal", "hr_appraisal_results", "hr_training", "hr_skills", "hr_behavior", "hr_investigation", "hr_grievance_summary",
@@ -298,7 +304,7 @@ console.log("\n§3 templates and their words");
   const invFin5c = ["inv_count", "inv_writeoff", "inv_movement", "inv_low_stock", "fin_expenses", "fin_petty_cash", "fin_budget", "fin_cash_flow", "fin_statements", "fin_month_close"];
   const execCmp5d = ["exec_weekly", "exec_dept_kpis", "exec_monthly_review", "cmp_conflict", "cmp_equipment", "cmp_security", "cmp_access_review", "cmp_usage", "cmp_car_log", "cmp_contracts"];
   eq(REPORT_TEMPLATES.map((t) => t.key), [...withBlocks, ...hr5c, ...prj5c, ...invFin5c, ...execCmp5d, "return_plan", "attendance_note", "probation_review"],
-    "Phase 1's ten + four HR types, the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), the ten Executive and Compliance types (5D), and the three that events ask for (Phase 3D), in that order");
+    "Phase 1's ten + four HR types (with 6D's quarterly, half-year and annual after the monthly), the twelve Sales & customers types (4B), the sixteen Quality / Purchasing types (4C) and the twelve Logistics / After-sales / Travel types (4D) after the visits, then the three of Phase 4A, the three of the manager's team (5A), the twenty-two of the CEO office (5B), the sixty-one of HR, Projects, Inventory and Finance (5C), the ten Executive and Compliance types (5D), and the three that events ask for (Phase 3D), in that order");
   expect(REPORT_TEMPLATES.filter((t) => t.family === "hr" && !t.payrollOnly).every((t) => t.recipients !== "manager"), "every HR type reaches HR, not only the manager");
   expect(REPORT_TEMPLATES.filter((t) => t.payrollOnly).every((t) => t.recipients === "manager" && t.confidential), "a salary type (5C) goes to the writer's manager only, and is confidential");
   expect(["hr_grievance", "hr_warning", "hr_exit_interview"].every((k) => reportTemplate(k)?.confidential), "grievance, warning and exit interview are confidential by type");
@@ -511,7 +517,7 @@ console.log("\n§8 carry-over and roll-ups");
     }
   }
   expect(bad.length === 0, `${Object.keys(CARRY_RULES).length} report types carry items; every rule points at real sections, and a paragraph never lands in a list`, bad.join("; "));
-  eq(Object.keys(CARRY_RULES).sort(), ["daily", "monthly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly and monthly carry items; memos and visits start blank");
+  eq(Object.keys(CARRY_RULES).sort(), ["annual", "daily", "halfyear", "monthly", "quarterly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly, monthly and (6D) the quarterly, half-year and annual carry items; memos and visits start blank");
   const need = ["carry.title", "carry.hint", "carry.addAllTo", "carry.added", "carry.showAll", "carry.more", "carry.less", "carry.hide", "carry.show", "carry.waiting", "carry.allAdded", "carry.full"];
   expect(need.every((k) => !!reportsT[k]), "the card's words exist (their three languages are checked in §3)", need.filter((k) => !reportsT[k]).join(", "));
 
@@ -737,7 +743,7 @@ console.log("\n§10 fill from the apps");
   }
   for (const src of APP_SOURCES) if (!reportsT[`feed.src.${src}`]) bad.push(`feed.src.${src}: no words`);
   expect(bad.length === 0, `${Object.keys(APP_RULES).length} report types fill from the apps; every rule points at real sections and has its words`, bad.join("; "));
-  eq(Object.keys(APP_RULES).sort(), ["daily", "monthly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly and monthly fill from the apps; memos and visits start blank");
+  eq(Object.keys(APP_RULES).sort(), ["daily", "monthly", "quarterly", "weekly", "weekly_plan"], "the daily, weekly plan, weekly, monthly and (6D) quarterly fill from the apps; the half-year and the year read their shorter reports; memos and visits start blank");
   eq(feedSources(reportTemplate("free")!), [], "a free report reads no app");
   eq(feedSources(reportTemplate("monthly")!), ["tasks", "quotations", "invoices", "orders"], "the monthly reads only what it can use");
 
@@ -3227,6 +3233,85 @@ console.log("\n§32 the number reports — same doors, one currency per figure, 
     });
   }
   expect(bad.length === 0, `the paper deals ${cases.length} made-up reports: never over a sheet, every row once and in order, continued parts marked, the total with its last rows, a head never alone`, bad.join("; "));
+}
+
+/* ── §33 the quarter, the half-year and the year (6D, 26 Sep 2026) ────────── */
+console.log("\n§33 the quarterly, half-year and annual reports");
+{
+  /* Their periods: whole months, keys that sort and never collide. */
+  eq([periodFor("quarterly", "2026-02-15"), periodFor("quarterly", "2026-09-26"), periodFor("quarterly", "2026-12-31"), periodFor("quarterly", "2028-03-10")],
+    [{ start: "2026-01-01", end: "2026-03-31", key: "2026-Q1" }, { start: "2026-07-01", end: "2026-09-30", key: "2026-Q3" }, { start: "2026-10-01", end: "2026-12-31", key: "2026-Q4" }, { start: "2028-01-01", end: "2028-03-31", key: "2028-Q1" }],
+    "a quarter is its three whole months, keyed 2026-Q3");
+  eq([periodFor("halfyear", "2026-06-30"), periodFor("halfyear", "2026-07-01"), periodFor("yearly", "2026-05-05"), periodFor("yearly", "2024-02-29")],
+    [{ start: "2026-01-01", end: "2026-06-30", key: "2026-H1" }, { start: "2026-07-01", end: "2026-12-31", key: "2026-H2" }, { start: "2026-01-01", end: "2026-12-31", key: "2026" }, { start: "2024-01-01", end: "2024-12-31", key: "2024" }],
+    "a half-year is January–June or July–December (2026-H2); a year is itself");
+  eq([nextPeriod("quarterly", periodFor("quarterly", "2026-11-11")).key, nextPeriod("halfyear", periodFor("halfyear", "2026-08-01")).key, nextPeriod("yearly", periodFor("yearly", "2026-01-01")).key],
+    ["2027-Q1", "2027-H1", "2027"], "…and the one after each crosses into the next year");
+  const T6 = ["quarterly", "halfyear", "annual"].map((k) => reportTemplate(k));
+  eq(T6.map((t) => t ? `${t.family}:${t.cadence}:${t.sections[0].id}:${t.sections[0].kind}:${!!t.sections[0].required}` : "missing"),
+    ["work:quarterly:summary:text:true", "work:halfyear:summary:text:true", "work:yearly:summary:text:true"], "three Work types, each opening with its summary");
+  expect(T6.every((t) => !!t && canWrite(t, "summary") && t.sections.filter((x) => canWrite(t, x.id)).length === 1), "Koleex AI writes their summary — and nothing else in them");
+
+  /* What each starts from: only the shorter reports inside its period. */
+  const rep6 = (id: string, key: string, start: string, end: string, pk: string, sections: unknown): CarrySource =>
+    ({ id, template_key: key, period_start: start, period_end: end, period_key: pk, sections, version: 1, superseded: false });
+  const month = (id: string, m: string, summary: string) => rep6(id, "monthly", `2026-${m}-01`, `2026-${m}-28`, `2026-${m}`, [{ id: "summary", text: summary }, { id: "projects", items: [`Project ${m}`] }]);
+  const q3 = periodFor("quarterly", "2026-08-15");
+  const qg = buildCarry(reportTemplate("quarterly")!, q3, [month("m6", "06", "June"), month("m7", "07", "July"), month("m8", "08", "August"), month("m9", "09", "September"), month("m10", "10", "October")], { id: "self", periodKey: q3.key }, reportTemplate);
+  eq(qg.filter((g) => g.section === "summary").flatMap((g) => g.items.map((i) => i.text)), ["July", "August", "September"], "a quarterly starts from its three months' summaries — never June's or October's");
+  eq(qg.find((g) => g.section === "projects")?.to, ["projects", "achievements"], "…and their projects go to its projects or its achievements");
+  const quarter = (id: string, q: 1 | 2 | 3 | 4, summary: string, next: string) => { const p = periodFor("quarterly", `2026-${String((q - 1) * 3 + 1).padStart(2, "0")}-01`); return rep6(id, "quarterly", p.start, p.end, p.key, [{ id: "summary", text: summary }, { id: "achievements", items: [`Q${q} win`] }, { id: "next_quarter", items: [next] }]); };
+  const h2 = periodFor("halfyear", "2026-10-01");
+  const hg = buildCarry(reportTemplate("halfyear")!, h2, [quarter("q2", 2, "Q2", "plan after Q2"), quarter("q3", 3, "Q3", "plan after Q3"), quarter("q4", 4, "Q4", "plan after Q4")], { id: "self", periodKey: h2.key }, reportTemplate);
+  eq(hg.filter((g) => g.from === "quarterly" && g.section === "summary").flatMap((g) => g.items.map((i) => i.text)), ["Q3", "Q4"], "a half-year starts from its two quarters");
+  eq(hg.find((g) => g.section === "next_quarter")?.items.map((i) => i.text), ["plan after Q4"], "…and only the latest quarter's plan goes to the next six months");
+  const year = periodFor("yearly", "2026-06-01");
+  const yg = buildCarry(reportTemplate("annual")!, year, [quarter("q1", 1, "Q1", "x"), rep6("h1", "halfyear", "2026-01-01", "2026-06-30", "2026-H1", [{ id: "summary", text: "H1" }]), rep6("old", "halfyear", "2025-07-01", "2025-12-31", "2025-H2", [{ id: "summary", text: "last year" }])], { id: "self", periodKey: year.key }, reportTemplate);
+  eq(yg.filter((g) => g.section === "summary").map((g) => `${g.from}:${g.items.map((i) => i.text).join("|")}`), ["halfyear:H1", "quarterly:Q1"], "an annual starts from its half-years, then its quarters (then its months) — never last year's");
+  expect(CARRY_RULES.annual.findIndex((r) => r.from === "monthly") > CARRY_RULES.annual.findIndex((r) => r.from === "quarterly")
+    && CARRY_RULES.annual.findIndex((r) => r.from === "quarterly") > CARRY_RULES.annual.findIndex((r) => r.from === "halfyear"),
+    "…the most condensed first, so what fits in Koleex AI's material is the best of it");
+  eq([appRulesFor(reportTemplate("quarterly")).map((r) => `${r.group}:${r.when}`), appRulesFor(reportTemplate("halfyear")), appRulesFor(reportTemplate("annual"))], [["done:period"], [], []],
+    "the quarter also offers what it finished in the apps; a half-year or a year of records is no list of suggestions");
+
+  /* Koleex AI's summary: longer for a longer period. */
+  rule("each longer period's summary is asked for at its own length", "src/app/api/work-reports/[id]/ai/route.ts",
+    (c) => (c.includes('quarterly: "8 to 14 sentences (at most about 380 words)",') && c.includes('halfyear: "10 to 16 sentences (at most about 450 words)",') && c.includes('annual: "10 to 18 sentences (at most about 500 words)",')
+      && c.includes('maxTokens = ["quarterly", "halfyear", "annual"].includes(behaviourKey(tpl)) ? 1400 : 900;') ? [] : ["a year's summary is squeezed into a week's length"]),
+    (src) => src.replace('      annual: "10 to 18 sentences (at most about 500 words)",\n', ""));
+
+  /* Seen live on the first quarterly: the answer opened with "Quarter summary". */
+  eq([dropEchoedTitle("Quarter summary\n\nThe first quarter was good.", ["Quarter summary", "季度总结", "ملخص الربع"]),
+    dropEchoedTitle("## ملخص الربع:\nالربع كان كويس.", ["Quarter summary", "ملخص الربع"]),
+    dropEchoedTitle("Quarter summary shows growth.", ["Quarter summary"]),
+    dropEchoedTitle("The quarter.\nQuarter summary", ["Quarter summary"])],
+    ["The first quarter was good.", "الربع كان كويس.", "Quarter summary shows growth.", "The quarter.\nQuarter summary"],
+    "an answer that opens with the section's own name as a heading loses that line — in any language, with a mark or a colon — and nothing else");
+  rule("the route drops an echoed section title before the text reaches the composer", "src/app/api/work-reports/[id]/ai/route.ts",
+    (c) => (c.includes("const text = toSection(dropEchoedTitle(answer, names), kind);") ? [] : ["\"Quarter summary\" is pasted into the report"]),
+    (src) => src.replace("const text = toSection(dropEchoedTitle(answer, names), kind);", "const text = toSection(answer, kind);"));
+
+  rule("the model is told the period day first — it writes dates the way it is told them", "src/app/api/work-reports/[id]/ai/route.ts",
+    (c) => (c.includes('const period = row.period_start ? rangeLabel(row.period_start, row.period_end ?? row.period_start) : "";') && !/`\$\{row\.period_start\} to \$\{row\.period_end\}`/.test(c) ? [] : ["a summary says 2025-01-01 to 2025-03-31"]),
+    (src) => src.replace('const period = row.period_start ? rangeLabel(row.period_start, row.period_end ?? row.period_start) : "";', 'const period = row.period_start && row.period_end ? `${row.period_start} to ${row.period_end}` : "";'));
+
+  /* The drafts prepared when one ends — from 07:00 on the next one's first day. */
+  eq([periodToPrepare("quarterly", "2026-10-01", 6 * 60 + 59), periodToPrepare("quarterly", "2026-10-01", 7 * 60), periodToPrepare("quarterly", "2026-11-15", 600),
+    periodToPrepare("halfyear", "2026-07-01", 7 * 60), periodToPrepare("yearly", "2027-01-01", 7 * 60), periodToPrepare("yearly", "2027-01-01", 60)],
+    [null, "2026-09-30", "2026-09-30", "2026-06-30", "2026-12-31", null],
+    "the quarter's draft at 07:00 on its next quarter's first day (a missed run catches up), the half-year's and the year's the same way");
+  eq(["quarterly", "halfyear", "annual", "daily", "weekly", "monthly"].map((k) => schedulable(reportTemplate(k))), [true, true, true, false, false, false],
+    "the three can be prepared on schedule; the daily, weekly and monthly stay owed and reminded instead");
+  expect(code(read("src/app/api/work-reports/schedules/route.ts")).includes("...custom.filter((c) => isScheduleCadence(c.cadence)).map((c) => c.key),"), "…and so can a builder type that covers one of those periods");
+
+  /* The builder, and the screens that name the periods. */
+  eq(["quarterly", "halfyear", "yearly", "fortnightly"].map((c) => checkTemplate({ cadence: c, sections: [{ id: "a", kind: "text" }] }, { name: { en: "x" }, "s.a": { en: "a" } }).def.cadence),
+    ["quarterly", "halfyear", "yearly", null], "a builder type may cover a quarter, a half-year or a year — and nothing made up");
+  expect(code(read("src/components/reports/app/TemplatesTab.tsx")).includes('(["none", "daily", "weekly", "monthly", "quarterly", "halfyear", "yearly", "range"] as const)'), "…the builder offers them");
+  expect(code(read("src/components/reports/app/ReportView.tsx")).includes('tpl.cadence === "quarterly" ? t("period.quarter") : tpl.cadence === "halfyear" ? t("period.half") : tpl.cadence === "yearly" ? t("period.year")'),
+    "the report's period field names the quarter, the half-year and the year");
+  expect(/const qh = \/\^\(\\d\{4\}\)-\(\[QH\]\)\(\[1-4\]\)\$\/\.exec\(key\);/.test(code(read("src/components/reports/app/ComplianceTab.tsx"))), "the schedule list words a quarter or a half-year as its first to last day");
+  expect(["quarterly", "halfyear", "yearly"].every((c) => !!reportsT[`compliance.sched.${c}`]?.ar), "…and says when each is prepared, in every language");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

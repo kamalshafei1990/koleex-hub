@@ -71,6 +71,15 @@ export const REPORT_TEMPLATES: ReportTemplateDef[] = [
     sections: [t("summary", "text", true), t("meetings", "list"), t("projects", "list"), t("decisions", "list"), t("next_week", "list")] },
   { key: "monthly", family: "work", icon: "newspaper", cadence: "monthly", recipients: "manager", reviewRequired: false, confidential: false,
     sections: [t("summary", "text", true), t("projects", "list"), t("travel", "list"), t("social", "text"), t("improvements", "list")] },
+  /* 6D (owner, 26/09/2026: «الربع سنوي والنص سنوي والسنوي»): the longer
+     periods, each built from the shorter reports inside it (carry.ts) and
+     summarised by Koleex AI on request (ai-draft.ts). */
+  { key: "quarterly", family: "work", icon: "flag-checkered", cadence: "quarterly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [t("summary", "text", true), t("achievements", "list"), t("projects", "list"), t("challenges", "list"), t("next_quarter", "list"), t("support", "text")] },
+  { key: "halfyear", family: "work", icon: "list-check", cadence: "halfyear", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [t("summary", "text", true), t("goals", "list"), t("achievements", "list"), t("challenges", "list"), t("next_half", "list")] },
+  { key: "annual", family: "work", icon: "award", cadence: "yearly", recipients: "manager", reviewRequired: false, confidential: false,
+    sections: [t("summary", "text", true), t("achievements", "list"), t("projects", "list"), t("lessons", "list"), t("next_year", "list"), t("support", "text")] },
   /* ── Visits ── */
   { key: "customer_visit", family: "visits", icon: "handshake", cadence: null, recipients: "manager", reviewRequired: false, confidential: false,
     sections: [b("link", "links", { linkTypes: ["customer", "product", "order"] }), t("who", "text", true), t("purpose", "text"), t("discussion", "text", true), t("opportunities", "list"), t("next_steps", "list")] },

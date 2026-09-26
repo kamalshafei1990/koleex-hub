@@ -21,7 +21,7 @@ import { requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import {
   asReportTemplate, readSnapshot, type CustomDef, type CustomTemplateHead, type TemplateWords, type Word,
 } from "@/lib/reports/custom-templates";
-import { REPORT_APPS, type ReportApp, type ReportCadence, type ReportFamily, type ReportTemplateDef } from "@/lib/reports/templates";
+import { REPORT_APPS, isCadence, type ReportApp, type ReportCadence, type ReportFamily, type ReportTemplateDef } from "@/lib/reports/templates";
 import type { RrIconName } from "@/components/ui/RrIcon";
 
 export const TEMPLATES_MODULE = "Report Templates";
@@ -65,7 +65,7 @@ export async function loadCustomHeads(tenantId: string | null, opts: { activeOnl
     key: r.key,
     family: (r.family ?? "work") as ReportFamily,
     icon: (r.icon ?? "document") as RrIconName,
-    cadence: (r.cadence === "daily" || r.cadence === "weekly" || r.cadence === "monthly" ? r.cadence : null) as ReportCadence,
+    cadence: (isCadence(r.cadence) ? r.cadence : null) as ReportCadence,
     hrOnly: r.hr_only === true || r.hr_only === "true",
     teamOnly: r.team_only === true || r.team_only === "true",
     officeOnly: r.office_only === true || r.office_only === "true",

@@ -29,7 +29,7 @@ import type { Lang, Translations } from "@/lib/i18n";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { isCustomKey, isWritten, type TemplateHead, type TemplateWords, type Word } from "./template-words";
 import {
-  REPORT_APPS, REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES,
+  REPORT_APPS, REPORT_DATA_SOURCES, REPORT_FAMILIES, REPORT_LINK_TYPES, isCadence,
   type DataInputDef, type ReportApp, type ReportCadence, type ReportColumnType, type ReportDataSource, type ReportDefaultRecipients, type ReportFamily,
   type ReportLinkType, type ReportSectionDef, type ReportSectionKind, type ReportTemplateDef,
 } from "./templates";
@@ -224,7 +224,7 @@ export function checkTemplate(rawDef: unknown, rawWords: unknown): { def: Custom
     if (s && !sections.some((x) => x.id === s.id)) sections.push(s);
     if (sections.length >= BUILDER_LIMITS.sections) break;
   }
-  const cadence: ReportCadence = d.cadence === "daily" || d.cadence === "weekly" || d.cadence === "monthly" ? d.cadence : null;
+  const cadence: ReportCadence = isCadence(d.cadence) ? d.cadence : null;
   const def: CustomDef = {
     family: REPORT_FAMILIES.includes(d.family as ReportFamily) ? (d.family as ReportFamily) : "work",
     icon: ICON_CHOICES.includes(d.icon as RrIconName) ? (d.icon as RrIconName) : "document",
@@ -312,7 +312,7 @@ export function readSnapshot(raw: unknown): TemplateSnapshot | null {
   const clean: CustomDef = {
     family: def.family as ReportFamily,
     icon: typeof def.icon === "string" ? (def.icon as RrIconName) : "document",
-    cadence: def.cadence === "daily" || def.cadence === "weekly" || def.cadence === "monthly" ? def.cadence : null,
+    cadence: isCadence(def.cadence) ? def.cadence : null,
     range: def.range === true, recipients: RECIPIENTS.includes(def.recipients as ReportDefaultRecipients) ? (def.recipients as ReportDefaultRecipients) : "manager",
     reviewRequired: def.reviewRequired === true, confidential: def.confidential === true, urgent: def.urgent === true,
     customTitle: def.customTitle === true, hrOnly: def.hrOnly === true, teamOnly: def.teamOnly === true, officeOnly: def.officeOnly === true,
