@@ -32,6 +32,7 @@ import {
   stripProcessNarration,
   PRICING_GUARD_MESSAGE,
 } from "../src/lib/server/ai/seals";
+import { PRICING_GUARD_WEB_MESSAGE, isPublicWebFigure } from "../src/lib/server/ai/seals/pricing";
 
 let pass = 0;
 const failures: string[] = [];
@@ -106,6 +107,42 @@ check(
   sealPricingSafety("The machine is available in three widths.", [answer("x")]) ===
     "The machine is available in three widths.",
 );
+
+console.log("\n── 1b. A figure about the world, found on the web, is not a Koleex price (owner, 2026-09-26) ──");
+{
+  /* "What are the top 10 poorest countries?" — looked up, answered with GDP
+     per person in dollars, and replaced whole by the guard. */
+  const WORLD = "| # | Country | GDP per capita |\n|---|---|---|\n| 1 | South Sudan | $455 |\n| 2 | Burundi | $916 |";
+  const search = (): AgentStep => ({ kind: "tool-call", tool: "search_web", payload: { query: "poorest countries 2026" } });
+  const found = (): AgentStep => ({ kind: "tool-result", tool: "search_web", permissionStatus: "allowed", payload: { results: [] } });
+  const read = (): AgentStep => ({ kind: "tool-result", tool: "read_page", permissionStatus: "allowed", payload: {} });
+  check("a web-only turn's public dollar figures pass",
+    sealPricingSafety(WORLD, [search(), found(), read(), answer(WORLD)]) === WORLD);
+  check("  …but not with no lookup at all (the model recalling figures is still guarded)",
+    sealPricingSafety(WORLD, [answer(WORLD)]) === PRICING_GUARD_MESSAGE);
+  check("  …nor when the lookup was refused (nothing came back)",
+    sealPricingSafety(WORLD, [search(), { kind: "tool-result", tool: "search_web", permissionStatus: "denied" }, answer(WORLD)]) !== WORLD);
+  check("  …nor when any Koleex data tool ran in the same turn",
+    sealPricingSafety(WORLD, [search(), found(), { kind: "tool-result", tool: "searchProducts", permissionStatus: "allowed", payload: {} }, answer(WORLD)]) === PRICING_GUARD_MESSAGE);
+  for (const [label, text] of [
+    ["the word Koleex", "Koleex overlock machines cost about $1,200 abroad."],
+    ["a model code", "The XSL-8000A4 sells for $2,100 in Egypt."],
+    ["trade terms", "Typical prices are $950 FOB Ningbo."],
+    ["a unit price", "A unit price of $300 is common."],
+    ["a quotation", "Our quotation would be around $5,000."],
+    ["a discount", "With a 10% discount it is $900."],
+    ["Arabic price words", "سعر الوحدة حوالي $400."],
+  ] as const) {
+    check(`  …and never when the answer names Koleex price context: ${label}`,
+      !isPublicWebFigure(text, [search(), found(), answer(text)]) &&
+      sealPricingSafety(text, [search(), found(), answer(text)]) === PRICING_GUARD_WEB_MESSAGE);
+  }
+  check("a lower-case \"covid-19\" or \"top-10\" is not mistaken for a model code",
+    isPublicWebFigure("Covid-19 cost the top-10 economies $2 trillion.", [search(), found()]));
+  check("a guarded web-only turn says words that fit it; every other turn keeps the spec's wording",
+    (PRICING_GUARD_WEB_MESSAGE as string) !== PRICING_GUARD_MESSAGE && !/found the customer and product/.test(PRICING_GUARD_WEB_MESSAGE) &&
+    sealPricingSafety(PRICED, [draftEvidence(), answer(PRICED)]) === PRICING_GUARD_MESSAGE);
+}
 
 console.log("\n── 2. Execution seal v1: claiming a lookup happened ──");
 const FAKE_EXEC = "I found the customer in our database and pulled the record.";

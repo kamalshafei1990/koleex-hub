@@ -160,6 +160,42 @@ export function hasValidPricingEvidence(steps: AgentStep[]): boolean {
 export const PRICING_GUARD_MESSAGE =
   "I found the customer and product, but I cannot provide pricing until the pricing calculation completes successfully.";
 
+/* ── A FIGURE ABOUT THE WORLD IS NOT A KOLEEX PRICE (owner, 2026-09-26) ──
+   "What are the top 10 poorest countries?" was looked up, answered with
+   GDP per person in dollars, and the whole table was replaced by the
+   guard above — the patterns see "$1,200" and cannot tell a country's
+   income from a machine's price. The owner chose a narrow exception.
+   A currency figure passes only when ALL of these hold:
+     · every tool this turn ran was a web lookup (search / page read) and
+       at least one returned — no Koleex data tool ran, so nothing here
+       came from the Hub;
+     · the answer names no Koleex price context: not Koleex, a quotation,
+       trade terms (FOB, EXW…), a unit price, MOQ, a price list, "our
+       price", a discount/margin/markup, or a model code like XSL-8000A4.
+   Anything else is guarded exactly as before. */
+const WEB_LOOKUP_TOOLS = new Set(["search_web", "read_page"]);
+const KOLEEX_PRICE_CONTEXT =
+  /koleex|كوليكس|quotation|\bquotes?\b|عرض\s*سعر|报价|\b(?:FOB|EXW|CIF|CFR|CPT|CIP|DAP|DPU|DDP|FCA|FAS)\b|unit\s+price|per\s+unit|سعر\s*الوحدة|单价|\bMOQ\b|price\s*list|قائمة\s*الأسعار|价目|our\s+prices?|أسعارنا|سعرنا|我们的价格|discount|margin|markup|خصم|هامش\s*الربح|折扣|利润率/i;
+/* Case-sensitive on purpose: a model code is upper-case letters, a dash,
+   digits ("XSL-8000A4"); with /i "covid-19" or "top-10" would match. */
+const MODEL_CODE = /\b[A-Z]{2,5}-\d{2,}[A-Z0-9]*\b/;
+
+/** Is this reply a public figure found by a web lookup, with no Koleex
+ *  price anywhere near it? */
+export function isPublicWebFigure(reply: string, steps: AgentStep[]): boolean {
+  const toolSteps = steps.filter((s) => s.kind === "tool-call" || s.kind === "tool-result");
+  if (!toolSteps.every((s) => !!s.tool && WEB_LOOKUP_TOOLS.has(s.tool))) return false;
+  const looked = toolSteps.some((s) => s.kind === "tool-result" && s.permissionStatus !== "denied");
+  if (!looked) return false;
+  return !KOLEEX_PRICE_CONTEXT.test(reply) && !MODEL_CODE.test(reply);
+}
+
+/** What the guard says on a turn that only looked things up on the web —
+ *  "I found the customer and product" is the quotation flow's wording and
+ *  means nothing here. */
+export const PRICING_GUARD_WEB_MESSAGE =
+  "I can't state a Koleex price here: Koleex prices come only from the pricing calculation. Ask me for a quotation and I'll calculate it.";
+
 /** Single gate every orchestrate-return path calls. Returns the
  *  cleaned finalReply and mutates the last "answer" step's text in
  *  place so the UI matches. No-op when either (a) the reply has no
@@ -189,12 +225,19 @@ export function sealPricingSafety(rawFinalReply: string, steps: AgentStep[]): st
   const finalReply = stripProcessNarration(rawFinalReply);
   if (!containsPricingOutput(finalReply)) return finalReply;
   if (hasValidPricingEvidence(steps)) return finalReply;
+  if (isPublicWebFigure(finalReply, steps)) return finalReply;
+
+  /* A web-only turn gets words that fit it; every other turn keeps the
+     spec's wording. */
+  const webOnly = steps.some((s) => s.kind === "tool-call" || s.kind === "tool-result") &&
+    steps.every((s) => (s.kind !== "tool-call" && s.kind !== "tool-result") || (!!s.tool && WEB_LOOKUP_TOOLS.has(s.tool)));
+  const guard = webOnly ? PRICING_GUARD_WEB_MESSAGE : PRICING_GUARD_MESSAGE;
 
   for (let i = steps.length - 1; i >= 0; i--) {
     if (steps[i].kind === "answer") {
       steps[i] = {
         ...steps[i],
-        text: PRICING_GUARD_MESSAGE,
+        text: guard,
         permissionStatus: "allowed",
       };
       break;
@@ -203,6 +246,6 @@ export function sealPricingSafety(rawFinalReply: string, steps: AgentStep[]): st
   console.warn(
     "[ai.agent.pricing-guard] replaced hallucinated pricing; no pricing-tool evidence this turn.",
   );
-  return PRICING_GUARD_MESSAGE;
+  return guard;
 }
 

@@ -40,13 +40,20 @@ export function sourceChipLabel(href: string | undefined, text: string): string 
   return t.length <= CHIP_TEXT_MAX ? t : null;
 }
 
-/** A bare address the model wrapped in brackets — "(https://…)" — loses the
- *  brackets, so the chip does not sit inside a pair of stray parentheses.
- *  A markdown link's "](url)" is left alone, and so is code. */
+/** A web source the model wrapped in brackets — "(https://…)" or
+ *  "([Rencol](https://…))" — loses the brackets, so the chip does not sit
+ *  inside a pair of stray parentheses (owner's screenshot, 2026-09-26). A
+ *  markdown link's own "](url)" is left alone, and so is code. */
 export function tidyBareLinks(markdown: string): string {
-  if (!markdown || !/\(https?:\/\//i.test(markdown)) return markdown;
+  if (!markdown || !/https?:\/\//i.test(markdown)) return markdown;
   return markdown
     .split(/(```[\s\S]*?```|`[^`\n]*`)/g)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(/(^|[^\]])\((https?:\/\/[^\s()]+)\)/g, "$1 $2")))
+    .map((part, i) =>
+      i % 2 === 1
+        ? part
+        : part
+            .replace(/\(\s*(\[[^\]\n]+\]\(https?:\/\/[^\s()]+\))\s*\)/g, " $1")
+            .replace(/(^|[^\]])\((https?:\/\/[^\s()]+)\)/g, "$1 $2"),
+    )
     .join("");
 }
