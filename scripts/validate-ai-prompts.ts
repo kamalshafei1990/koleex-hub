@@ -22,6 +22,9 @@
 
 import { readFileSync } from "node:fs";
 import { buildNowLine } from "../src/lib/server/ai/prompts/blocks";
+import { analyzeIntent, wantsList } from "../src/lib/server/ai/analyze-intent";
+import { buildSmartPrompt } from "../src/lib/server/ai/prompt-builder";
+import { GENERAL_SEARCH_NOTE } from "../src/lib/server/ai/core/general-search";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 import {
   buildSystemPrompt,
@@ -303,6 +306,33 @@ console.log("\n── Roadmap D4: a photo the user sent ──");
   check("  …and the rule rides with the product-photo rule in every written lane",
     (readFileSync("src/lib/server/ai/prompt-builder.ts", "utf8").match(/PRODUCT_PHOTO_RULE \+\s*PHOTO_QUESTION_RULE \+/g) ?? []).length === 4 &&
     /\$\{PRODUCT_PHOTO_RULE\}\$\{PHOTO_QUESTION_RULE\}/.test(readFileSync("src/lib/server/ai/prompts/index.ts", "utf8")));
+}
+
+/* ── A LIST ASKED FOR BY NAME (owner, 2026-09-26: "ok make a list for top 100
+   countries…" → two sentences and a link) ── */
+{
+  check("a list, a table, a ranking or a top-N is recognised in English, Arabic and Chinese",
+    wantsList("ok make a list for top 100 countries from the biggest to the smallest") &&
+    wantsList("give me a table of prices") && wantsList("top 20 companies") &&
+    wantsList("عايز قائمة بأكبر الدول") && wantsList("اعملي جدول") && wantsList("أكبر 10 شركات") &&
+    wantsList("给我一个列表") && wantsList("前10名") && wantsList("按面积排名"));
+  check("  …and ordinary messages are not",
+    !wantsList("hello") && !wantsList("how are you") && !wantsList("explain margin") && !wantsList("ازيك") &&
+    !wantsList("I will stop by later") && !wantsList("the listing agent called"));
+  check("the list shape wins over the opening word: an \"ok …\" request for a list is a list, not a two-sentence chat",
+    analyzeIntent("ok make a list for top 100 countries from the biggest to the smallest").expectedFormat === "list" &&
+    analyzeIntent("hello").expectedFormat === "short");
+  const built = buildSmartPrompt("ok make a list for top 100 countries", { expectedFormat: "list", intentType: "chat" })[0].content;
+  check("  …and the built prompt asks for every item, a table when items have fields, and never a link alone",
+    /RESPONSE SHAPE: the whole list the user asked for, every item/.test(built) && /a Markdown table/.test(built) &&
+    /Never answer a request for a list with only a link\./.test(built) && !/1–2 sentences/.test(built));
+  const note = GENERAL_SEARCH_NOTE;
+  check("the search note completes a partial result from general knowledge, said so, and never answers with only a link",
+    /complete the rest from what you know, saying in one line which part comes from general knowledge/.test(note) && /Never answer with only a link\./.test(note));
+  const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+  check("the general lane's ceiling is the long one for a list asked for by name or for Deep, and 1400 otherwise",
+    /const GENERAL_LONG_MAX_TOKENS = 4000;/.test(route) &&
+    /: fastLane === "small" \? 200\s*: analysis\.expectedFormat === "list" \|\| chosenModel === "deep" \? GENERAL_LONG_MAX_TOKENS\s*: 1400;/.test(route));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

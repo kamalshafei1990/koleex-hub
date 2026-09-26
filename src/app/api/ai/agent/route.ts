@@ -96,6 +96,10 @@ export const maxDuration = 120;
 const HISTORY_LIMIT = 60;
 /** Characters allowed in one typed turn; longer text goes as a file. */
 const MAX_CONTENT_CHARS = 24_000;
+/* The general lane's ceiling for a list asked for by name, or for Deep: a
+   hundred-row table fits, with room for a model that thinks first. At the
+   dearest serving model's output price this is a couple of cents. */
+const GENERAL_LONG_MAX_TOKENS = 4000;
 const HISTORY_CHAR_BUDGET = 48000;
 
 /** Newest-first char-budget trim, applied AFTER the chronological flip:
@@ -745,9 +749,15 @@ export async function POST(req: Request) {
             /* Token budget per lane. General gets a bigger ceiling
                than small-talk so explanations can breathe but still
                bounded so we don't run away on open-ended prompts. */
+            /* LONG ANSWERS WHERE THEY ARE ASKED FOR (owner, 2026-09-26: a
+               100-row table cannot fit 1400 tokens, and Deep thinks before
+               it writes, on the same budget). A list asked for by name, or
+               any general answer from Deep — the model chosen for depth —
+               gets the long ceiling. */
             const maxTokens =
               fastLane === "brand" ? 1200
               : fastLane === "small" ? 200
+              : analysis.expectedFormat === "list" || chosenModel === "deep" ? GENERAL_LONG_MAX_TOKENS
               : 1400;
             let accumulated = "";
             let gotFirst = false;
