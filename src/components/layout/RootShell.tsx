@@ -17,6 +17,7 @@ import AppLaunchSplash from "./AppLaunchSplash";
 import AppLaunchZoom from "./AppLaunchZoom";
 import ViewTransitions from "./ViewTransitions";
 import Sidebar from "./Sidebar";
+import DockClearance from "./DockClearance";
 import ViewAsBanner from "./ViewAsBanner";
 import dynamic from "next/dynamic";
 /* QA reporter is post-paint tooling — keep it (and everything it pulls)
@@ -377,6 +378,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           post-paint tooling, not needed for first interaction) off every route's
           critical path on weak clients. */}
       {panelReady && <FloatingPanel />}
+      {/* Bottom room in each app's scroller so its last row can scroll clear
+          of the dock above (and the report button over it). */}
+      {panelReady && <DockClearance />}
       {/* Global QA issue reporter (floating button + modal). */}
       {panelReady && <ReportIssueButton />}
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the

@@ -589,11 +589,10 @@ export default function TodoPage() {
         </div>
 
         {/* ── Scrolling content ── */}
-        {/* pb-32: room under the last task for the floating AI · Discuss dock
-            and the report button above it (bottom 5.75rem + 36px = 128px), so
-            the last row and its buttons can always be scrolled clear of them. */}
+        {/* Room under the last task for the floating dock comes from the
+            shell's DockClearance, as in every other app. */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-5 pb-32 w-full min-w-0 space-y-3">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full min-w-0 space-y-3">
             <QuickAdd t={t} lang={lang} labels={labelsInUse} employees={employees} inputRef={quickRef} onCreate={quickCreate}
               onOpenForm={(draft) => setModal({ id: null, key: Date.now(), draft })} />
 

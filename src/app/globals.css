@@ -5195,3 +5195,20 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
 [data-theme="light"] .kx-todo :is(.text-cyan-400) { color: #0e7490; }
 [data-theme="light"] .kx-todo :is(.text-violet-300, .text-violet-400) { color: #6d28d9; }
 [data-theme="light"] .kx-todo :is(.text-\[\#7FA9D6\]) { color: #3a6699; }
+
+/* ── Room for the floating dock (DockClearance marks the scrollers) ──
+   The AI · Discuss pill sits at bottom 1.5rem and the report button above it
+   ends at 5.75rem + 36px = 128px; 8rem at the end of the page's scroller lets
+   its last row scroll clear of both. !important: it has to win over the
+   page's own padding utilities, and it is only ever on a real scroller. */
+.kx-dock-pad {
+  padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+/* When the shell's own scroller is the one that scrolls, a page root that is
+   min-h-screen gets squeezed to the viewport by the flex column and its
+   content overflows the box — past the padding above (Home: the last row of
+   tiles stayed under the dock). Let the page be as tall as its content. Only
+   ever on a page that already overflows, so no full-height app is touched. */
+#main-scroll-container.kx-dock-pad > * {
+  flex-shrink: 0;
+}
