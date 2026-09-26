@@ -20,12 +20,12 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait",
     background_color: "#0A0A0A",
     theme_color: "#0A0A0A",
-    /* ?v=4 matches layout.tsx's icon cache-buster — installed-PWA icon
+    /* ?v=5 matches layout.tsx's icon cache-buster — installed-PWA icon
        managers re-fetch when the manifest icon URLs change. */
     icons: [
-      { src: "/icon-192.png?v=4", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon-512-maskable.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon-192.png?v=5", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png?v=5", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-512-maskable.png?v=5", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

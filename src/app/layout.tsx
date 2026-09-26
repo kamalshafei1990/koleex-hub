@@ -32,18 +32,22 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   icons: {
-    /* ?v=4 busts browser/OS favicon caches after the hub-lockup icon
+    /* ?v=5 busts browser/OS favicon caches after the hub-lockup icon
        refresh — without it Safari/Chrome kept serving the pre-logo-v2
        icons for tabs, Add-to-Home-Screen and Add-to-Dock. Bump the
        version whenever the icon artwork changes. v4 = 2026-09-23 icon
-       (stacked lockup, "hub" in Birdman Regular). */
+       (stacked lockup, "hub" in Birdman Regular). v5 = 2026-09-26, the
+       owner's pick: the stacked lockup at 72% of the tile, the whole group
+       centred and set 3% low so KOLEEX's weight sits in the optical middle.
+       The 32px icon.png / favicon.ico stay "hub" alone — the lockup is not
+       legible at tab size. */
     icon: [
-      { url: "/favicon.ico?v=4", sizes: "any" },
-      { url: "/icon.png?v=4", type: "image/png", sizes: "32x32" },
-      { url: "/icon-192.png?v=4", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png?v=4", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico?v=5", sizes: "any" },
+      { url: "/icon.png?v=5", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png?v=5", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png?v=5", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/apple-icon.png?v=4",
+    apple: "/apple-icon.png?v=5",
   },
 };
 
