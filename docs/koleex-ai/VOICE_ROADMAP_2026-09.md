@@ -2642,3 +2642,39 @@ Two separate faults:
   - `validate:voice-client` has 804 checks (+4).
   - Each rule was confirmed by breaking the code on purpose, and all 7 breaks were caught.
 - **Still open:** why the VPN path loses whole responses from our origin for a few seconds. It is outside our code, and the canary is what shows it.
+
+## Koleex AI reads a web page (2026-09-26)
+
+Owner: "tell me the top 100 richest person in the world" returned a table of three rows. A search returns snippets, and the list lives on the page. The owner approved a plan in which links can come only from search results or from the user's own message.
+
+**What it does.** In the general lane, after its lookup, the model may open up to two pages with `read_page` and answer from them.
+- **Which links:** a page from this turn's search results, or a link the user wrote in their message.
+- **The flow is bounded:**
+  - the first call carries `search_web` (plus `read_page` only when the user wrote a link);
+  - the second call carries `read_page` alone, and only while reads are left;
+  - the call after a read carries no tools.
+
+**The rules** (`core/read-page.ts`):
+1. **Provenance.** A normalized link must be in the turn's set: links from search results, added as each search runs, and links from the user's message. A link the model composes is refused and never fetched.
+2. **Egress.** The link, decoded, passes `scanEgress` exactly as a search query does.
+3. **Server-side fetch** under the Translator's SSRF rules (`fetch-page.ts`):
+   - http(s) only;
+   - every address and every redirect hop re-checked against private ranges;
+   - 2 MB, 12 s and 4 hops at most.
+
+   Because the server fetches, not the phone, it works from the mainland without a VPN.
+4. **Untrusted.** The page text is wrapped in the untrusted fence (`web`), exactly as search snippets are. The general lane has no write tool at all.
+5. **Bounded.** At most `READ_PAGE_MAX_PER_ANSWER` = 2 pages per answer and `READ_PAGE_TEXT_CAP` = 60 000 characters per page. Budgets: 10 reads a minute per account, 1000 a day per tenant.
+6. **Logs.** Only host, character count and outcome; never the link, never the page.
+7. **Switch.** `AI_READ_PAGE=off` turns it off at deploy time. At runtime, the owner's switch (`ai_read_page_off` in `platform_settings`) is shown in Settings → Koleex AI next to the model switches.
+
+**Tables.** `extractReadableText(html, { tableRows: true })` keeps each table row as one line, with cells joined by " | ". The Translator's default output is unchanged.
+
+**Known limits.**
+- A page built entirely by scripts, such as a live leaderboard, reads as empty. The model says so and uses the search results or another source.
+- Voice calls do not read pages yet.
+- The SSRF check resolves and the platform's fetch resolves again. This is the residual already accepted in `safe-url.ts`.
+
+**Tests.**
+- `validate:ai-read-page` has 24 checks. Nine targeted mutations are all caught: provenance, egress, fence, cap, the read limit, a search on the reading hop, links fed by the search, the scheme, and a throw.
+- The route pins in `ai-core-boundaries` and `ai-models` now describe the bounded reading hop.

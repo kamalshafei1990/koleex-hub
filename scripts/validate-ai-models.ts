@@ -161,8 +161,8 @@ async function main() {
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   check("the route resolves the request on the server and derives the preference from it",
     /const chosenModel = resolveRequestedModel\(body\.model, await switchedOffModels\(\)\);\s*const prefer = adapterForModel\(chosenModel\);/.test(route));
-  check("both fast-lane calls carry the preference",
-    (route.match(/\{ onDelta, prefer \}/g) ?? []).length === 2 && !/\{ onDelta \},/.test(route));
+  check("every fast-lane call carries the preference (the first, the one after a lookup, the one after a page read)",
+    (route.match(/\{ onDelta, prefer \}/g) ?? []).length === 3 && !/\{ onDelta \},/.test(route));
   check("both orchestrator calls carry the chosen model",
     (route.match(/orchestrate\(\{\s*model: chosenModel,/g) ?? []).length === 2);
   check("every response names the Koleex model that answered, next to the public provider label",
@@ -283,7 +283,7 @@ async function main() {
       SWITCH_TTL_MS === 30_000 && /if \(cache && now - cache\.at < SWITCH_TTL_MS\) return cache\.off;/.test(sw) &&
         /const kept = cache\?\.off \?\? new Set<KoleexServingModel>\(\);/.test(sw) &&
         /return new Set<KoleexServingModel>\(\[\.\.\.env, \.\.\.table\]\);/.test(sw) &&
-        /\.from\("platform_settings"\)\s*\.select\("key, value"\)\s*\.in\("key", Object\.values\(MODEL_SWITCH_KEYS\)\)/.test(sw));
+        /\.from\("platform_settings"\)\s*\.select\("key, value"\)\s*\.in\("key", \[\.\.\.Object\.values\(MODEL_SWITCH_KEYS\), \.\.\.Object\.values\(FEATURE_SWITCH_KEYS\)\]\)/.test(sw));
     const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
     check("every turn path goes through the one door that reads the switches",
       /export async function chatWithTools\([\s\S]{0,300}?const off = await switchedOffModels\(\);[\s\S]{0,300}?return chatWithToolsVia\(REGISTRY, req, \{ \.\.\.opts, exclude, auto: autoStats \}\);/.test(reg) &&

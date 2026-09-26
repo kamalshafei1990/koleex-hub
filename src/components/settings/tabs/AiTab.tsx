@@ -304,17 +304,23 @@ export default function AiTab({ account, onChanged }: {
    is shown but cannot be flipped from here. */
 type ModelAdminRow = { id: KoleexServingModel; configured: boolean; off: boolean; env_off: boolean };
 
+type FeatureAdminRow = { off: boolean; env_off: boolean };
+
 function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lang }) {
   const [rows, setRows] = useState<ModelAdminRow[] | null | "failed">(null);
-  const [saving, setSaving] = useState<KoleexServingModel | null>(null);
+  /* The page reader (core/read-page.ts) — the owner's other Koleex AI switch. */
+  const [readPage, setReadPage] = useState<FeatureAdminRow | null>(null);
+  const [saving, setSaving] = useState<KoleexServingModel | "read_page" | null>(null);
   const [failed, setFailed] = useState(false);
   const l = lang === "zh" || lang === "ar" ? lang : "en";
   useEffect(() => {
     const ctl = new AbortController();
     fetch("/api/ai/models", { credentials: "include", signal: ctl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((body: { admin?: ModelAdminRow[] }) => {
-        if (!ctl.signal.aborted) setRows(Array.isArray(body.admin) ? body.admin : "failed");
+      .then((body: { admin?: ModelAdminRow[]; admin_features?: { read_page?: FeatureAdminRow } }) => {
+        if (ctl.signal.aborted) return;
+        setRows(Array.isArray(body.admin) ? body.admin : "failed");
+        setReadPage(body.admin_features?.read_page ?? null);
       })
       .catch(() => { if (!ctl.signal.aborted) setRows("failed"); });
     return () => ctl.abort();
@@ -333,6 +339,26 @@ function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lan
       });
       if (!res.ok) throw new Error(String(res.status));
       setRows((cur) => (Array.isArray(cur) ? cur.map((r) => (r.id === id ? { ...r, off: !on } : r)) : cur));
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function flipReadPage(on: boolean) {
+    if (saving || !readPage) return;
+    setSaving("read_page");
+    setFailed(false);
+    try {
+      const res = await fetch("/api/platform-settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "ai_read_page_off", value: !on }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setReadPage((cur) => (cur ? { ...cur, off: !on } : cur));
     } catch {
       setFailed(true);
     } finally {
@@ -363,10 +389,20 @@ function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lan
                 checked={r.configured && !r.env_off && !r.off}
                 disabled={!r.configured || r.env_off || saving !== null}
                 onChange={(on) => void flip(r.id, on)}
-                last={i === rows.length - 1 && !failed}
+                last={i === rows.length - 1 && !readPage && !failed}
               />
             );
           })}
+          {readPage && (
+            <SwitchRow
+              label={t("ai.models.readPage")}
+              hint={[readPage.env_off ? t("ai.models.envOff") : null, t("ai.models.readPageHint")].filter(Boolean).join(" · ")}
+              checked={!readPage.env_off && !readPage.off}
+              disabled={readPage.env_off || saving !== null}
+              onChange={(on) => void flipReadPage(on)}
+              last={!failed}
+            />
+          )}
           {failed && <p className="py-2 text-[12px] text-[#FF3333]" role="status">{t("ai.models.saveFailed")}</p>}
         </div>
       )}

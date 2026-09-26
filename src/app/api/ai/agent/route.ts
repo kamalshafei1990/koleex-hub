@@ -58,8 +58,9 @@ import {
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib/server/ai/provider/koleex-model-slots";
-import { switchedOffModels } from "@/lib/server/ai/provider/model-switches";
-import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE } from "@/lib/server/ai/core/general-search";
+import { featureSwitchedOff, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
+import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
+import { READ_PAGE_TOOL_DEF, READ_PAGE_MAX_PER_ANSWER, linksInText, readPageForModel } from "@/lib/server/ai/core/read-page";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
@@ -735,9 +736,18 @@ export async function POST(req: Request) {
                this caller; the second call carries no tools, so this is a
                hop, never a loop. core/general-search.ts has the rules. */
             const generalTools = fastLane === "general" ? generalLaneTools(ctx) : null;
+            /* THE PAGE READER (core/read-page.ts, owner 2026-09-26): after the
+               lookup, one more hop may open up to two pages — a search
+               result's, or a link the user wrote; nothing else. Only where the
+               lookup is offered, and only while its switch is on. */
+            const readOn = generalTools !== null && !(await featureSwitchedOff("read_page"));
+            const allowedLinks = new Set<string>(readOn ? linksInText(normalizedContent) : []);
+            const readPage = readOn ? (url: unknown) => readPageForModel(ctx, url, allowedLinks) : undefined;
+            const laneTools = generalTools && readOn && allowedLinks.size > 0 ? [...generalTools, READ_PAGE_TOOL_DEF] : generalTools;
             const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge +
               (fastLane === "general" ? `\n\n${buildNowLine(ctx.timezone)}` : "") +
-              (generalTools ? `\n\n${GENERAL_SEARCH_NOTE}` : "");
+              (generalTools ? `\n\n${GENERAL_SEARCH_NOTE}` : "") +
+              (readOn ? `\n\n${READ_PAGE_NOTE}` : "");
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */
@@ -795,7 +805,7 @@ export async function POST(req: Request) {
                      make the one lookup; brand and small talk stay tool-less. */
                   modelClass: fastLane === "small" ? ("FAST" as const) : ("GENERAL" as const),
                   stream: true,
-                  ...(generalTools ? { tools: generalTools, toolChoice: "auto" as const } : {}),
+                  ...(laneTools ? { tools: laneTools, toolChoice: "auto" as const } : {}),
                 },
                 { onDelta, prefer },
               );
@@ -807,7 +817,7 @@ export async function POST(req: Request) {
                  fails before its first delta leaves fastReply null below, so
                  the turn falls through to the orchestrator as any other fast
                  lane failure does. */
-              if (out.ok && generalTools && out.response.toolCalls.length > 0) {
+              if (out.ok && laneTools && out.response.toolCalls.length > 0) {
                 if (accumulated) emit(send({ type: "retract" }));
                 const hop = await runGeneralSearchHop({
                   ctx,
@@ -817,15 +827,49 @@ export async function POST(req: Request) {
                   messages: irMessages,
                   onStep: (steps) => emit(send({ type: "steps", steps })),
                   traceId: trace,
+                  readPage,
+                  allowedLinks,
                 });
                 fastSteps = hop.steps;
                 emit(send({ type: "steps", steps: hop.steps }));
                 accumulated = "";
                 gotFirst = false;
+                /* THE READING HOP, bounded: offered only when the lookup found
+                   pages (or the user sent one) and reads are left; it carries
+                   read_page alone, and the call after it carries nothing. */
+                const canRead = !!readPage && allowedLinks.size > 0 && hop.reads < READ_PAGE_MAX_PER_ANSWER;
                 out = await chatWithTools(
-                  { messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
+                  {
+                    messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true,
+                    ...(canRead ? { tools: [READ_PAGE_TOOL_DEF], toolChoice: "auto" as const } : {}),
+                  },
                   { onDelta, prefer },
                 );
+                if (canRead && out.ok && out.response.toolCalls.length > 0) {
+                  meter(out, "fast-general+search");
+                  if (accumulated) emit(send({ type: "retract" }));
+                  const readHop = await runGeneralSearchHop({
+                    ctx,
+                    conversationId: conversationId!,
+                    calls: out.response.toolCalls,
+                    priorContent: accumulated,
+                    messages: hop.messages,
+                    onStep: (steps) => emit(send({ type: "steps", steps: [...hop.steps, ...steps] })),
+                    traceId: trace,
+                    readPage,
+                    readsBefore: hop.reads,
+                    allowedLinks,
+                    allowSearch: false,
+                  });
+                  fastSteps = [...hop.steps, ...readHop.steps];
+                  emit(send({ type: "steps", steps: fastSteps }));
+                  accumulated = "";
+                  gotFirst = false;
+                  out = await chatWithTools(
+                    { messages: readHop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
+                    { onDelta, prefer },
+                  );
+                }
                 meter(out, "fast-general+search");
               }
               /* Lane-truthful label. The registry reports the bare model id

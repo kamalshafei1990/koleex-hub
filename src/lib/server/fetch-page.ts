@@ -46,8 +46,19 @@ export interface FetchedPage {
   truncated: boolean;
 }
 
+/** How a caller wants the page read. The Translator keeps every cell a block
+ *  of its own (it translates block by block); Koleex AI's page reader wants a
+ *  table's row kept together, cells joined by " | ", so a ranking reads as a
+ *  ranking. */
+export interface FetchPageOptions {
+  tableRows?: boolean;
+  userAgent?: string;
+  /** Blocks kept; the Translator's PAGE_MAX_BLOCKS unless the caller caps by size itself. */
+  maxBlocks?: number;
+}
+
 /** Fetch a page and return its readable text blocks in document order. */
-export async function fetchPageText(input: string): Promise<FetchedPage> {
+export async function fetchPageText(input: string, opts: FetchPageOptions = {}): Promise<FetchedPage> {
   let current = await assertSafeUrl(input.trim());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
@@ -60,7 +71,7 @@ export async function fetchPageText(input: string): Promise<FetchedPage> {
         signal: controller.signal,
         headers: {
           // Identify honestly and ask for HTML; some sites 403 an empty UA.
-          "User-Agent": "KoleexHub-Translator/1.0 (+https://hub.koleexgroup.com)",
+          "User-Agent": opts.userAgent ?? "KoleexHub-Translator/1.0 (+https://hub.koleexgroup.com)",
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "en,zh,ar;q=0.8",
         },
@@ -87,14 +98,14 @@ export async function fetchPageText(input: string): Promise<FetchedPage> {
     }
 
     const html = await readCapped(res, PAGE_MAX_BYTES);
-    const { title, blocks } = extractReadableText(html);
+    const { title, blocks } = extractReadableText(html, { tableRows: opts.tableRows });
     if (!blocks.length) throw new Error("empty_page" satisfies FetchPageError);
 
     return {
       url: current.toString(),
       title,
-      blocks: blocks.slice(0, PAGE_MAX_BLOCKS),
-      truncated: blocks.length > PAGE_MAX_BLOCKS,
+      blocks: blocks.slice(0, opts.maxBlocks ?? PAGE_MAX_BLOCKS),
+      truncated: blocks.length > (opts.maxBlocks ?? PAGE_MAX_BLOCKS),
     };
   } finally {
     clearTimeout(timer);
@@ -146,7 +157,7 @@ function safeCodePoint(n: number): string {
  * dropped, and the result is split on those breaks. Good enough to translate
  * a supplier page or a product spec; it is not trying to rebuild the layout.
  */
-export function extractReadableText(html: string): { title: string | null; blocks: string[] } {
+export function extractReadableText(html: string, opts: { tableRows?: boolean } = {}): { title: string | null; blocks: string[] } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1]).trim().slice(0, 300) : null;
 
@@ -156,6 +167,12 @@ export function extractReadableText(html: string): { title: string | null; block
   s = s.replace(/<(script|style|noscript|svg|canvas|template|iframe)[\s\S]*?<\/\1>/gi, " ");
   s = s.replace(/<(nav|header|footer|aside|form|select)[\s\S]*?<\/\1>/gi, " ");
 
+  /* A table's row stays one block when asked: cells joined by " | ", the row
+     ended by a break. Before the generic rule below, which would split them. */
+  if (opts.tableRows) {
+    s = s.replace(/<\/(td|th)>/gi, " | ");
+    s = s.replace(/<\/tr>/gi, "\n\n");
+  }
   // Block-level boundaries become explicit breaks so paragraphs stay separate.
   s = s.replace(/<\/(p|div|section|article|li|tr|h[1-6]|blockquote|td|th|dd|dt)>/gi, "\n\n");
   s = s.replace(/<br\s*\/?>/gi, "\n");

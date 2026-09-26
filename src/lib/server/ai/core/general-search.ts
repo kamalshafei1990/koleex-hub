@@ -27,6 +27,7 @@ import type { IrMessage, IrTool, IrToolCall } from "@/lib/server/ai/provider/tur
 import { koleexHub } from "@/lib/server/ai/connectors/koleex-hub";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
 import { logToolRun } from "@/lib/server/ai/observability/turn-trace";
+import { READ_PAGE_TOOL, READ_PAGE_MAX_PER_ANSWER, linksFromSearchResult } from "@/lib/server/ai/core/read-page";
 
 /** The only tool the general lane may see. */
 export const GENERAL_LANE_TOOL = "search_web";
@@ -70,13 +71,21 @@ export function generalLaneTools(ctx: UserContext): IrTool[] | null {
   return tools.length > 0 ? tools : null;
 }
 
+/** Appended beside GENERAL_SEARCH_NOTE when the page reader is on
+ *  (core/read-page.ts). */
+export const READ_PAGE_NOTE =
+  "After a lookup you may open up to two of its result pages with read_page — or a link the user wrote — when the snippets are not enough " +
+  "(a full list, a table, a ranking, an article's details), and answer from the page. Only those links can be opened.";
+
 export interface GeneralSearchHop {
   /** Steps for the screen: a tool-call and a tool-result per call run. */
   steps: AgentStep[];
-  /** The conversation to send on the second, tool-less call. */
+  /** The conversation to send on the next call. */
   messages: IrMessage[];
   /** How many calls were actually run (the rest were refused). */
   ran: number;
+  /** How many of those were page reads. */
+  reads: number;
 }
 
 function parseArgs(raw: string): Record<string, unknown> {
@@ -92,7 +101,7 @@ const NOT_RUN: ToolResult = {
   ok: false,
   permissionStatus: "denied",
   data: null,
-  message: `Not run: at most ${GENERAL_SEARCH_MAX_CALLS} lookups per answer on this lane. Answer from the lookups that ran.`,
+  message: `Not run: at most ${GENERAL_SEARCH_MAX_CALLS} lookups and ${READ_PAGE_MAX_PER_ANSWER} page reads per answer on this lane. Answer from what already ran.`,
 };
 
 /** Run the model's search calls and build the messages for the answer call.
@@ -111,16 +120,28 @@ export async function runGeneralSearchHop(input: {
   onStep?: (steps: AgentStep[]) => void;
   /** The turn's trace id for the [ai.tool] line; the conversation id stands in. */
   traceId?: string | null;
+  /** THE PAGE READER, when it is on for this turn (core/read-page.ts): the
+   *  reader itself, the reads this answer has already made, and the turn's
+   *  provenance set — every search result run here adds its links to it. */
+  readPage?: (url: unknown) => Promise<ToolResult>;
+  readsBefore?: number;
+  allowedLinks?: Set<string>;
+  /** False on the reading hop: a second round of searching is not offered. */
+  allowSearch?: boolean;
 }): Promise<GeneralSearchHop> {
   const invoke = input.invoke ?? ((ctx, name, args, opts) => koleexHub.invoke(ctx, name, args, opts));
   const steps: AgentStep[] = [];
   const replies: IrMessage[] = [];
   let ran = 0;
+  let searches = 0;
+  let reads = 0;
   for (const call of input.calls) {
     const args = parseArgs(call.argumentsJson);
-    /* Only the one tool, only so many times. Anything else the model asks
+    /* Only the lane's tools, only so many times. Anything else the model asks
        for is answered with a refusal the model can read — never run. */
-    const allowed = call.name === GENERAL_LANE_TOOL && ran < GENERAL_SEARCH_MAX_CALLS;
+    const isSearch = call.name === GENERAL_LANE_TOOL && input.allowSearch !== false && searches < GENERAL_SEARCH_MAX_CALLS;
+    const isRead = call.name === READ_PAGE_TOOL && !!input.readPage && (input.readsBefore ?? 0) + reads < READ_PAGE_MAX_PER_ANSWER;
+    const allowed = isSearch || isRead;
     let result: ToolResult = NOT_RUN;
     if (allowed) {
       steps.push({ kind: "tool-call", tool: call.name, text: humaniseCall(call.name, args), payload: args });
@@ -132,8 +153,14 @@ export async function runGeneralSearchHop(input: {
         /* A listener must not take the turn down. */
       }
       ran++;
+      if (isSearch) searches++;
+      else reads++;
       const tTool = Date.now();
-      result = await invoke(input.ctx, call.name, args, { conversationId: input.conversationId });
+      result = isRead
+        ? await input.readPage!(args.url)
+        : await invoke(input.ctx, call.name, args, { conversationId: input.conversationId });
+      /* A search's result pages join the links this turn may open. */
+      if (isSearch && input.allowedLinks) for (const u of linksFromSearchResult(result)) input.allowedLinks.add(u);
       /* Plan G1: the same [ai.tool] line the orchestrator writes. */
       logToolRun({ tool: call.name, ms: Date.now() - tTool, ok: result.ok, status: result.permissionStatus, trace: input.traceId ?? input.conversationId });
       steps.push({
@@ -156,5 +183,6 @@ export async function runGeneralSearchHop(input: {
       ...replies,
     ],
     ran,
+    reads,
   };
 }
