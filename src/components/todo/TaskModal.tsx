@@ -633,7 +633,7 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
 
       {open && (
         <FloatLayer anchor={triggerRef} inset={0} width={380} layerRef={layerRef}>
-          <div className="kx-glass-pop kx-pop-panel kx-pop-in p-1.5">
+          <div className="kx-glass-pop kx-pop-solid kx-pop-panel kx-pop-in p-1.5">
             <div className="relative mb-1">
               <SearchIcon size={13} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("f.label.search")} aria-label={t("f.label.search")}
