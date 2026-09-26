@@ -62,6 +62,7 @@ import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clip
 import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { chatError } from "@/components/ai/chat-error";
+import { foldForSearch } from "@/lib/text-fold";
 import { isNetworkError } from "@/lib/ai/network-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ProjectGlyph from "@/components/ai/ProjectGlyph";
@@ -138,6 +139,8 @@ const VoiceCallButton = dynamic(() => import("@/components/ai/VoiceCallButton"),
 });
 
 const SIDEBAR_W = 248;
+/** The shortest gap between two re-reads of the sidebar list on return. */
+const LIST_REFRESH_MIN_MS = 60_000;
 
 /* How many project rows show before "See more". */
 const PROJECTS_COLLAPSED = 4;
@@ -541,11 +544,36 @@ export default function KoleexAiApp() {
   useEffect(() => {
     if (!sidebarOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSidebarOpen(false);
+      /* A menu or dialog on top of the drawer handles its own Escape and
+         marks it; one press closes one layer (review, 2026-09-26). */
+      if (e.key === "Escape" && !e.defaultPrevented) setSidebarOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
+
+  /* THE PHONE DRAWER HOLDS THE KEYBOARD AND THE SCREEN READER while it is
+     open (review, 2026-09-26). VoiceOver stayed on the burger and swiped on
+     into the chat behind the scrim, and closing the drawer dropped focus to
+     the page. Now the chat and the composer behind it are inert while it is
+     open (the bar stays live: its button closes the drawer), the drawer's
+     first control takes focus, and closing gives focus back to the burger. */
+  const asideRef = useRef<HTMLElement | null>(null);
+  const burgerRef = useRef<HTMLButtonElement | null>(null);
+  const drawerModal = isNarrow && sidebarOpen;
+  useEffect(() => {
+    if (!drawerModal) return;
+    const aside = asideRef.current;
+    const burger = burgerRef.current;
+    const id = window.requestAnimationFrame(() => {
+      aside?.querySelector<HTMLElement>("button:not([disabled]), a[href], input")?.focus({ preventScroll: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(id);
+      const a = document.activeElement;
+      if (!a || a === document.body || aside?.contains(a)) burger?.focus({ preventScroll: true });
+    };
+  }, [drawerModal]);
 
   /* Show the "jump to latest" chip when the user has scrolled up more
      than 120 px from the bottom. Phase 13.1: also maintain a sticky
@@ -659,6 +687,33 @@ export default function KoleexAiApp() {
     }
     loadConversations();
   }, [loadConversations]);
+
+  /* THE LIST CATCHES UP WHEN THE APP COMES BACK (review, 2026-09-26). It
+     was read once per page load, and iOS keeps the PWA alive for days: a
+     chat started or renamed on the Mac never reached the phone, and
+     yesterday's chats stayed under "Today". Back to the front, or back
+     online, the list and the folders are read again — at most once a
+     minute — and the day is re-read so the date groups move on. */
+  const [dayKey, setDayKey] = useState(() => new Date().toDateString());
+  const lastListReadRef = useRef(0);
+  useEffect(() => {
+    const catchUp = () => {
+      if (document.visibilityState !== "visible") return;
+      setDayKey(new Date().toDateString());
+      const now = Date.now();
+      if (now - lastListReadRef.current < LIST_REFRESH_MIN_MS) return;
+      lastListReadRef.current = now;
+      void loadConversations();
+      void loadProjects();
+    };
+    lastListReadRef.current = Date.now();
+    document.addEventListener("visibilitychange", catchUp);
+    window.addEventListener("online", catchUp);
+    return () => {
+      document.removeEventListener("visibilitychange", catchUp);
+      window.removeEventListener("online", catchUp);
+    };
+  }, [loadConversations, loadProjects]);
 
   /* ── Load a conversation's messages ── */
   /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
@@ -1900,6 +1955,13 @@ export default function KoleexAiApp() {
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     playSound("deleted");
+    /* The deleted row took the focus with it: it lands on the sidebar's
+       first control instead of the page (review, 2026-09-26). */
+    window.requestAnimationFrame(() => {
+      const a = document.activeElement;
+      if (a && a !== document.body && a.isConnected) return;
+      asideRef.current?.querySelector<HTMLElement>("button:not([disabled]), a[href], input")?.focus({ preventScroll: true });
+    });
     if (activeIdRef.current === id) {
       /* A reply still streaming into a chat that no longer exists would
          leave the welcome screen stuck on "sending" (audit, 2026-09-07).
@@ -1945,7 +2007,15 @@ export default function KoleexAiApp() {
   );
   const renameConversation = useCallback(
     (id: string, currentTitle: string) => {
-      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
+      /* In the screen's words, Cancel included; a blank or all-space name
+         is refused here, not sent to be rejected by the server with an
+         error the thread shows (review, 2026-09-26). */
+      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v.trim()), {
+        initial: currentTitle,
+        confirmLabel: copy.rename ?? "Rename",
+        cancelLabel: copy.cancel,
+        validate: (v) => (v.trim() ? null : copy.nameRequired),
+      });
     },
     [askInput, copy, doRenameConversation],
   );
@@ -2146,13 +2216,13 @@ export default function KoleexAiApp() {
   }, [sidebarQuery]);
 
   const filteredConversations = useMemo(() => {
-    const q = sidebarQuery.trim().toLowerCase();
+    /* FOLDED, as a person types (lib/text-fold): "اسعار" finds
+       "الأسعار", "مدرسه" finds "مدرسة", harakat and tatweel are ignored. */
+    const q = foldForSearch(sidebarQuery);
     if (!q) return conversations;
-    return conversations.filter((c) => {
-      const title = (c.title || "").toLowerCase();
-      const preview = (c.last_preview || "").toLowerCase();
-      return title.includes(q) || preview.includes(q) || c.id in contentHits;
-    });
+    return conversations.filter((c) =>
+      foldForSearch(c.title || "").includes(q) || foldForSearch(c.last_preview || "").includes(q) || c.id in contentHits,
+    );
   }, [conversations, sidebarQuery, contentHits]);
 
   /* ── Sidebar sections ──
@@ -2200,8 +2270,10 @@ export default function KoleexAiApp() {
   const groups = useMemo(() => {
     if (searching) return [{ label: "", rows: filteredConversations }];
     const loose = filteredConversations.filter((c) => !c.pinned && !c.project_id);
-    return groupByDate(loose, copy);
-  }, [filteredConversations, searching, copy]);
+    /* Counted from the day the app last saw, so "Today" and "Yesterday"
+       move on when the day turns. */
+    return groupByDate(loose, copy, new Date(dayKey));
+  }, [filteredConversations, searching, copy, dayKey]);
 
   const visibleProjects = useMemo(
     () => (showAllProjects ? projects : projects.slice(0, PROJECTS_COLLAPSED)),
@@ -2513,6 +2585,7 @@ export default function KoleexAiApp() {
         }}
         aria-hidden={asideHidden}
         inert={asideHidden || undefined}
+        ref={asideRef}
       >
         {/* Content rides a FIXED-width inner column so the collapse CLIPS it
             instead of re-wrapping every text line on every frame — the
@@ -2572,7 +2645,10 @@ export default function KoleexAiApp() {
 
         {/* Phase 13: sidebar search. Only renders when there are
             enough conversations to make scanning hard. */}
-        {conversations.length > 3 && (
+        {/* WHILE A SEARCH IS ACTIVE THE BOX STAYS, whatever the count: it
+            used to vanish when deletes took the list to three, leaving the
+            filter on with no way to clear it (review, 2026-09-26). */}
+        {(conversations.length > 3 || sidebarQuery !== "") && (
           <div className="px-2 pb-1 pt-1">
             <input
               type="search"
@@ -2668,13 +2744,16 @@ export default function KoleexAiApp() {
 
               {openProjectRows.length === 0 ? (
                 <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
-                  {copy.emptyProject}
+                  {/* No match is not an empty folder (review, 2026-09-26). */}
+                  {searching ? copy.noSearchResults : copy.emptyProject}
                 </div>
               ) : (
                 openProjectRows.map((c) => (
                   <SidebarRow
                     key={c.id}
                     row={c}
+                    /* The matched words under a folder's row too. */
+                    hint={searching ? contentHits[c.id] : undefined}
                     active={c.id === activeId}
                     projects={projects}
                     copy={copy}
@@ -2838,10 +2917,12 @@ export default function KoleexAiApp() {
             scrolls beneath it, so it needs no blur of its own. */}
         <div className="kx-ai-bar md:hidden shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center gap-2 relative z-[2]">
           <button
+            ref={burgerRef}
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
             aria-label={sidebarOpen ? copy.closeSidebar : copy.openSidebar}
+            aria-expanded={sidebarOpen}
           >
             {sidebarOpen ? <CrossIcon size={14} /> : <MenuBurgerIcon size={14} />}
           </button>
@@ -2911,6 +2992,7 @@ export default function KoleexAiApp() {
           ref={scrollRef}
           onScroll={handleScroll}
           className="kx-ai-thread relative flex-1 overflow-y-auto"
+          inert={drawerModal || undefined}
         >
 
           <div ref={threadContentRef} className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
@@ -3096,6 +3178,7 @@ export default function KoleexAiApp() {
         <div
           className="shrink-0 bg-transparent"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+          inert={drawerModal || undefined}
         >
           <div className="max-w-[820px] mx-auto px-4 md:px-6 pt-2 pb-3">
             {!online && (
@@ -3384,6 +3467,9 @@ export default function KoleexAiApp() {
       <ConfirmDialog
         open={pendingDeleteId !== null}
         title={copy.confirmDelete}
+        /* Which chat — the dialog used to ask about "this conversation"
+           without naming it (review, 2026-09-26). */
+        description={conversations.find((c) => c.id === pendingDeleteId)?.title || undefined}
         variant="danger"
         confirmLabel={copy.delete}
         cancelLabel={copy.cancel}

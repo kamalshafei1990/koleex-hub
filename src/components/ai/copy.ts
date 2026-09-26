@@ -32,6 +32,8 @@ export const COPY: Record<Lang, {
   rename: string;
   confirmDelete: string;
   renamePrompt: string;
+  /** A rename left blank. */
+  nameRequired: string;
   stopped: string;
   /** The model picker beside the message box. */
   model: string;
@@ -267,6 +269,7 @@ export const COPY: Record<Lang, {
     rename: "Rename",
     confirmDelete: "Delete this conversation?",
     renamePrompt: "New title",
+    nameRequired: "Write a name first.",
     stopped: "Stopped",
     model: "Model",
     modelUnavailable: "Not available right now",
@@ -433,6 +436,7 @@ export const COPY: Record<Lang, {
     rename: "重命名",
     confirmDelete: "删除这个对话？",
     renamePrompt: "新标题",
+    nameRequired: "请先写一个名字。",
     stopped: "已停止",
     model: "模型",
     modelUnavailable: "暂时不可用",
@@ -598,6 +602,7 @@ export const COPY: Record<Lang, {
     rename: "غيّر الاسم",
     confirmDelete: "تمسح المحادثة دي؟",
     renamePrompt: "عنوان جديد",
+    nameRequired: "اكتب اسم الأول.",
     stopped: "اتوقف",
     model: "الموديل",
     modelUnavailable: "مش متاح دلوقتي",

@@ -22,6 +22,7 @@ import { notesT } from "@/lib/translations/notes";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useFocusTrap } from "@/components/ai/useFocusTrap";
 
 type ConfirmResult = boolean | void;
 
@@ -199,6 +200,13 @@ export function ConfirmDialog({
   const [busy, setBusy] = useState(false);
   const titleId = useId();
   const descId = useId();
+  /* THE KEYBOARD STAYS IN THE DIALOG (review, 2026-09-26). It took no focus,
+     so after choosing Delete by keyboard the focus sat on the menu button
+     behind the modal — Enter reopened the menu, Tab walked the page. Cancel
+     takes focus (the safe choice), Tab cycles inside, and focus goes back
+     to what opened it when that still exists. */
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(dialogRef, open, { initialFocus: "[data-confirm-cancel]" });
 
   useEscape(open, busy, onClose);
 
@@ -225,6 +233,7 @@ export function ConfirmDialog({
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[15vh] p-4">
       <div
+        ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -244,7 +253,7 @@ export function ConfirmDialog({
                 {title}
               </h2>
               {description && (
-                <p id={descId} className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">
+                <p id={descId} dir="auto" className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">
                   {description}
                 </p>
               )}
@@ -256,6 +265,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
+            data-confirm-cancel
             className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
           >
             {cancelLabel ?? t("dialog.cancel")}

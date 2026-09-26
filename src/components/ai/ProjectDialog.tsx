@@ -82,7 +82,13 @@ export default function ProjectDialog({
           value={draft.name}
           maxLength={PROJECT_NAME_MAX}
           onChange={(e) => onChange({ ...draft, name: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter" && canSave) onSave(); }}
+          onKeyDown={(e) => {
+            /* Picking a pinyin candidate is Enter too (keyCode 229 on older
+               engines): it saved the half-typed name (review, 2026-09-26). */
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (e.key === "Enter" && canSave) onSave();
+          }}
+          dir="auto"
           className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           placeholder={copy.newProject}
         />

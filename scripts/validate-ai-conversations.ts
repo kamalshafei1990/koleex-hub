@@ -19,6 +19,8 @@ import {
   snippetAround,
 } from "../src/lib/server/ai/conversation-search";
 import { BUDGETS } from "../src/lib/server/ai/security/rate-limit";
+import * as cs from "../src/lib/server/ai/conversation-search";
+import * as fold from "../src/lib/text-fold";
 
 let pass = 0;
 const failures: string[] = [];
@@ -78,7 +80,7 @@ console.log("\n── 4. The route and the client, read ──");
     /const auth = await requireAuth\(\);\s*if \(auth instanceof NextResponse\) return auth;[\s\S]{0,200}?requireInternalUser\(auth\)/.test(route));
   check("the id list is the caller's own tenant + account, and the message match runs INSIDE that list",
     /from\("ai_conversations"\)[\s\S]{0,200}?\.eq\("tenant_id", auth\.tenant_id\)\s*\.eq\("account_id", auth\.account_id\)/.test(route) &&
-    /from\("ai_messages"\)[\s\S]{0,200}?\.in\("conversation_id", ids\)[\s\S]{0,120}?\.ilike\("content", likePattern\(query\)\)/.test(route) &&
+    /from\("ai_messages"\)[\s\S]{0,200}?\.in\("conversation_id", ids\)[\s\S]{0,120}?\.ilike\("content", foldedLikePattern\(query\)\)/.test(route) &&
     /if \(ids\.length === 0\) return NextResponse\.json\(\{ hits: \[\] \}\);/.test(route));
   check("a query that is not worth asking is an empty answer, not an error, and the budget is consumed per account",
     /if \(!query\) return NextResponse\.json\(\{ hits: \[\] \}\);/.test(route) &&
@@ -91,8 +93,78 @@ console.log("\n── 4. The route and the client, read ──");
     /window\.setTimeout\(\(\) => \{\s*fetch\(`\/api\/ai\/conversations\/search\?q=\$\{encodeURIComponent\(q\)\}`, \{ credentials: "include", signal: ctl\.signal \}\)/.test(app) &&
     /if \(q\.length < 2\) \{\s*setContentHits\(\{\}\);\s*return;\s*\}/.test(app) &&
     /window\.clearTimeout\(timer\);\s*ctl\.abort\(\);/.test(app) &&
-    /title\.includes\(q\) \|\| preview\.includes\(q\) \|\| c\.id in contentHits/.test(app) &&
+    /foldForSearch\(c\.title \|\| ""\)\.includes\(q\) \|\| foldForSearch\(c\.last_preview \|\| ""\)\.includes\(q\) \|\| c\.id in contentHits/.test(app) &&
     /hint=\{searching \? contentHits\[c\.id\] : undefined\}/.test(app));
+}
+
+/* ── SIDEBAR REVIEW (owner, 2026-09-26: "ابدأ، صلّح من ١ لـ ٩") ─────────── */
+{
+  console.log("\n── Sidebar review: menu, Arabic search, rename, search box, catch-up, IME, focus, drawer, folder search ──");
+  const side = readFileSync("src/components/ai/Sidebar.tsx", "utf8");
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const inp = readFileSync("src/components/kds/useInput.tsx", "utf8");
+  const pd = readFileSync("src/components/ai/ProjectDialog.tsx", "utf8");
+  const nd = readFileSync("src/components/notes/NotesDialog.tsx", "utf8");
+  const copySrc = readFileSync("src/components/ai/copy.ts", "utf8");
+
+  /* 1 */
+  check("the row menu stays open while it scrolls itself; any other scroll or a resize still closes it; Escape closes only the menu",
+    /const close = \(e: Event\) => \{\s*if \(e\.target instanceof Node && menuRef\.current\?\.contains\(e\.target\)\) return;\s*setOpen\(false\);\s*\};/.test(side) &&
+    /window\.addEventListener\("scroll", close, true\);/.test(side) && /window\.addEventListener\("resize", onResize\);/.test(side) &&
+    /e\.preventDefault\(\);\s*e\.stopImmediatePropagation\(\);\s*closeMenu\(\);/.test(side) && /window\.addEventListener\("keydown", onKey, true\);/.test(side));
+
+  /* 2 */
+  check("Arabic is searched as it is typed: hamza forms, ta marbuta, alef maqsura and harakat fold on both sides",
+    fold.foldedIncludes("الأسعار الجديدة", "اسعار") && fold.foldedIncludes("مدرسة", "مدرسه") && fold.foldedIncludes("مستشفى", "مستشفي") &&
+    fold.foldedIncludes("مُحَمَّد", "محمد") && fold.foldedIncludes("مسـؤول", "مسوول") && fold.foldedIncludes("Price LIST", "price list") &&
+    !fold.foldedIncludes("سعر", "اسعار") && fold.foldLettersOnly("أسعار").length === "أسعار".length);
+  check("  …the server reads with a pattern loose only on those letters, and keeps a row only when it matches folded",
+    cs.foldedLikePattern("اسعار") === "%_سع_ر%" && cs.foldedLikePattern("100%") === "%100\\%%" && cs.foldedLikePattern("a_b") === "%a\\_b%" &&
+    cs.collectHits([{ conversation_id: "c1", content: "عرض الأسعار الجديد" }, { conversation_id: "c2", content: "إسعاف" }], "اسعار").map((h) => h.conversation_id).join() === "c1" &&
+    cs.snippetAround("x ".repeat(80) + "الأسعار هنا " + "y ".repeat(80), "اسعار").includes("الأسعار"));
+  check("  …and the sidebar's own filter folds too", /const q = foldForSearch\(sidebarQuery\);/.test(app) && /import \{ foldForSearch \} from "@\/lib\/text-fold";/.test(app));
+
+  /* 3 */
+  check("the rename dialog speaks the screen's language, lays a name out by its own script, and refuses a blank name before the server does",
+    /cancelLabel\?: string;/.test(inp) && /\{ask\.cancelLabel \?\? "Cancel"\}/.test(inp) && /dir="auto"\s*value=\{value\}/.test(inp) &&
+    /cancelLabel: copy\.cancel,\s*validate: \(v\) => \(v\.trim\(\) \? null : copy\.nameRequired\),/.test(app) &&
+    (copySrc.match(/\n\s*nameRequired: "/g) ?? []).length === 3);
+
+  /* 4 */
+  check("the search box stays while a search is on, whatever the count", /\{\(conversations\.length > 3 \|\| sidebarQuery !== ""\) && \(/.test(app));
+
+  /* 5 */
+  check("the list and folders are read again when the app comes back to the front or back online, at most once a minute, and the date groups follow the day",
+    /const LIST_REFRESH_MIN_MS = 60_000;/.test(app) &&
+    /document\.addEventListener\("visibilitychange", catchUp\);\s*window\.addEventListener\("online", catchUp\);/.test(app) &&
+    /if \(now - lastListReadRef\.current < LIST_REFRESH_MIN_MS\) return;[\s\S]{0,80}void loadConversations\(\);\s*void loadProjects\(\);/.test(app) &&
+    /return groupByDate\(loose, copy, new Date\(dayKey\)\);\s*\}, \[filteredConversations, searching, copy, dayKey\]\);/.test(app) &&
+    /now: Date = new Date\(\),/.test(side));
+
+  /* 6 */
+  check("picking a pinyin candidate in the folder name does not save it", /if \(e\.nativeEvent\.isComposing \|\| e\.keyCode === 229\) return;\s*if \(e\.key === "Enter" && canSave\) onSave\(\);/.test(pd));
+
+  /* 7 */
+  check("focus is kept around delete and rename: the confirm dialog traps it on Cancel and names the chat; rename gives it back; a deleted row hands it to the sidebar",
+    /useFocusTrap\(dialogRef, open, \{ initialFocus: "\[data-confirm-cancel\]" \}\);/.test(nd) && /ref=\{dialogRef\}\s*role="alertdialog"/.test(nd) &&
+    (nd.match(/data-confirm-cancel/g) ?? []).length === 2 &&
+    /description=\{conversations\.find\(\(c\) => c\.id === pendingDeleteId\)\?\.title \|\| undefined\}/.test(app) &&
+    /openerRef\.current = typeof document !== "undefined" && document\.activeElement instanceof HTMLElement \? document\.activeElement : null;/.test(inp) &&
+    /if \(el && el\.isConnected\) el\.focus\(\{ preventScroll: true \}\);/.test(inp) &&
+    /playSound\("deleted"\);\s*\/\*[\s\S]*?\*\/\s*window\.requestAnimationFrame\(\(\) => \{\s*const a = document\.activeElement;\s*if \(a && a !== document\.body && a\.isConnected\) return;\s*asideRef\.current\?\.querySelector/.test(app));
+
+  /* 8 */
+  check("the phone drawer holds focus: the chat and composer behind it are inert, its first control takes focus, closing returns it to the burger, one Escape closes one layer",
+    /const drawerModal = isNarrow && sidebarOpen;/.test(app) &&
+    (app.match(/inert=\{drawerModal \|\| undefined\}/g) ?? []).length === 2 &&
+    /if \(!a \|\| a === document\.body \|\| aside\?\.contains\(a\)\) burger\?\.focus\(\{ preventScroll: true \}\);/.test(app) &&
+    /ref=\{burgerRef\}/.test(app) && /aria-expanded=\{sidebarOpen\}/.test(app) &&
+    /if \(e\.key === "Escape" && !e\.defaultPrevented\) setSidebarOpen\(false\);/.test(app));
+
+  /* 9 */
+  check("a search inside a folder with no match says so, and its rows show the matched words",
+    /\{searching \? copy\.noSearchResults : copy\.emptyProject\}/.test(app) &&
+    (app.match(/hint=\{searching \? contentHits\[c\.id\] : undefined\}/g) ?? []).length === 2);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

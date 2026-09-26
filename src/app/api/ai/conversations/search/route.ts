@@ -24,7 +24,7 @@ import { dbError } from "@/lib/server/ai/http/api-error";
 import {
   SEARCH_SCAN_ROWS,
   collectHits,
-  likePattern,
+  foldedLikePattern,
   normalizeQuery,
   type SearchRow,
 } from "@/lib/server/ai/conversation-search";
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     .select("conversation_id, content")
     .in("conversation_id", ids)
     .in("role", ["user", "assistant"])
-    .ilike("content", likePattern(query))
+    .ilike("content", foldedLikePattern(query))
     .order("created_at", { ascending: false })
     .limit(SEARCH_SCAN_ROWS);
   if (error) return dbError("conversations/search", error);

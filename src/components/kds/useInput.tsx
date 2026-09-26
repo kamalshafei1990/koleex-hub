@@ -21,7 +21,7 @@
    flows that proceeded even on cancel.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 interface Ask {
   title: ReactNode;
@@ -29,6 +29,9 @@ interface Ask {
   initial?: string;
   placeholder?: string;
   confirmLabel?: string;
+  /** The Cancel button's words, for a screen in another language. The
+   *  default stays English for the callers that have not passed one. */
+  cancelLabel?: string;
   validate?: (value: string) => string | null;
 }
 
@@ -37,8 +40,23 @@ export function useInput() {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  /* FOCUS GOES BACK WHERE IT CAME FROM when the dialog closes — it fell to
+     the page after a rename (review, 2026-09-26). The opener is noted when
+     the dialog is asked for, before its own field takes focus. */
+  const openerRef = useRef<HTMLElement | null>(null);
+  const open = ask !== null;
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      const el = openerRef.current;
+      openerRef.current = null;
+      if (el && el.isConnected) el.focus({ preventScroll: true });
+    };
+  }, [open]);
+
   const askInput = useCallback(
     (title: ReactNode, onSubmit: (value: string) => void | Promise<void>, opts?: Omit<Ask, "title" | "onSubmit">) => {
+      openerRef.current = typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setValue(opts?.initial ?? "");
       setError(null);
       setAsk({ title, onSubmit, ...opts });
@@ -70,6 +88,8 @@ export function useInput() {
           <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{ask.title}</p>
           <input
             autoFocus
+            /* A name can be Arabic or English: each lays out its own way. */
+            dir="auto"
             value={value}
             onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
             onKeyDown={(e) => {
@@ -90,7 +110,7 @@ export function useInput() {
             onClick={() => setAsk(null)}
             className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.05] hover:text-[var(--text-primary)]"
           >
-            Cancel
+            {ask.cancelLabel ?? "Cancel"}
           </button>
           <button
             type="button"
