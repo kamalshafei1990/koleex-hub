@@ -52,7 +52,7 @@ const CHUNK_PRELOADERS: Record<string, () => Promise<unknown>> = {
   quotations: () => import("@/components/quotations/Quotations"),
 };
 
-import { isPreloadAllowed, readNetworkContext } from "./app-prefetch";
+import { isHeavyPreloadAllowed, readNetworkContext } from "./app-prefetch";
 
 const warmed = new Set<string>();
 
@@ -86,7 +86,7 @@ export function wasChunkWarmed(appId: string): boolean {
     has aimed at that app, so paying for its chunk is what they asked for. */
 export function preloadAppChunk(appId: string, opts?: { force?: boolean }): void {
   if (warmed.has(appId)) return;
-  if (!opts?.force && !isPreloadAllowed(readNetworkContext())) return;
+  if (!opts?.force && !isHeavyPreloadAllowed(readNetworkContext())) return;
   const fn = CHUNK_PRELOADERS[appId];
   if (!fn) return;
   warmed.add(appId);

@@ -34,7 +34,7 @@ import { useAppBadges } from "@/lib/app-badges";
 import { useInboxUnreadByApp } from "@/lib/inbox-unread-store";
 import { todoOpenListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
-import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
+import { idlePreloadApps, isPreloadAllowed, prefetchTier, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
 import { markHomeInteractive } from "@/lib/perf/client";
 import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
@@ -95,6 +95,7 @@ const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), {
    the component, its data route and its widgets are all untouched. */
 const HOME_DASHBOARD_ON = process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1";
 import { useSkin } from "@/lib/appearance";
+import { fetchRecent } from "@/lib/app-launcher";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
    ssr:false because it measures the element before it can paint. */
@@ -1244,6 +1245,18 @@ export default function HomePage() {
     if (apps.length === 0) return;
     const run = () => {
       if (!isPreloadAllowed(readNetworkContext())) return;
+      /* The user's own recent apps first — route/RSC only (a few KB each).
+         Home's visible tiles are prefetched by <Link> in screen order, and on
+         a slow link (a phone in China without a VPN: ~300 ms a round-trip)
+         that queue is still working through the grid when the user taps the
+         app they always open. */
+      void fetchRecent("", 6).then((ids) => {
+        for (const id of ids) {
+          if (!authorized.has(id) || prefetchTier(id) === "C") continue;
+          const r = getApp(id);
+          if (r?.active) { try { router.prefetch(r.route); } catch { /* ignore */ } }
+        }
+      }).catch(() => {});
       let chunksWarmed = 0;
       for (const id of apps) {
         const a = getApp(id);
