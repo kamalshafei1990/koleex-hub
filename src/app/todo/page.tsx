@@ -251,7 +251,9 @@ export default function TodoPage() {
   /* Finished history is fetched the first time someone looks at it — the
      Completed group opened, or the Done tab. Its count is only a number
      once known: "12+" while older pages remain, nothing before the first. */
-  const moreDone = !done.loaded || !!done.nextBefore;
+  /* Older finished tasks may still be on the server — unless the stats
+     already say there are none, in which case there is nothing to fold. */
+  const moreDone = stats?.completed === 0 ? false : !done.loaded || !!done.nextBefore;
   const wantDone = showCompleted || tab === "completed";
   useEffect(() => {
     if (wantDone && !done.loaded && !done.loading && !done.error) void actions.loadMoreDone();
@@ -582,7 +584,9 @@ export default function TodoPage() {
               <MyWorkStrip />
             </div>
 
-            {!loading && data && scoped.length + (stats?.completed ?? 0) > 0 && (
+            {/* The cards always show once the list has loaded — zeros included —
+                so the page keeps its dashboard even before the first task. */}
+            {!loading && data && (
               <KpiDashboard active={open.active} overdue={open.overdue} high={open.high} stats={stats} t={t} />
             )}
 
