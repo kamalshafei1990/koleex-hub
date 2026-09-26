@@ -38,7 +38,7 @@ import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
 import type { TurnInput } from "@/lib/server/ai/core/types";
 export type { TurnInput } from "@/lib/server/ai/core/types";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
-import { wantsList } from "@/lib/server/ai/analyze-intent";
+import { wantsList, speaksOfOwnRecords } from "@/lib/server/ai/analyze-intent";
 import { logToolRun } from "@/lib/server/ai/observability/turn-trace";
 import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
 import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
@@ -71,6 +71,7 @@ import {
   buildSystemPrompt,
   buildMinimalSystemPrompt,
   buildBrandSystemPrompt,
+  LIST_ANSWER_NOTE,
 } from "@/lib/server/ai/prompts";
 /* Phase 2B — the seal chain moved out. sealFinalReply is still THE one
    funnel; it simply no longer lives in the middle of the loop that calls it.
@@ -299,6 +300,14 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
              instruction only makes sense on the turn the user asked for it. */
           (webSearchRequested
             ? "\n\nThe user turned WEB SEARCH on for this message. Prefer calling search_web before answering, unless the question is purely about Koleex's own records or needs no lookup at all."
+            : "") +
+          /* A list of the world (brands, cities, companies) — never of the
+             Hub's own records, which are listed from tool results only. */
+          (wantsList(userMessage) &&
+          !isBusinessDataQuery(userMessage) &&
+          !isWorkDataQuery(userMessage) &&
+          !speaksOfOwnRecords(userMessage)
+            ? `\n\n${LIST_ANSWER_NOTE}`
             : "");
   /* The language lock applies to ALL THREE prompts, not just the full one.
      A brand answer or a one-line greeting in the wrong language is exactly

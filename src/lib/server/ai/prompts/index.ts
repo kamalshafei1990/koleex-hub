@@ -37,6 +37,22 @@ import { viewerBlockFor, buildNowBlock, buildNowLine } from "./blocks";
 
 export { viewerBlockFor, buildNowBlock, buildNowLine, isoDateIn } from "./blocks";
 
+/** Appended to the tool-loop prompt when the user asked for a list by name
+ *  (analyze-intent wantsList). The general lane carries the same rule in
+ *  GENERAL_SEARCH_NOTE; the loop had none, and a "top 100" question that
+ *  reached it came back as five rows per ranking and "the rest is not
+ *  published, so I won't invent it" (owner, 2026-09-26). Rows from general
+ *  knowledge are labelled as such, so completing the list is not inventing
+ *  it. */
+export const LIST_ANSWER_NOTE =
+  "The user asked for a list. Give the whole list, every item they asked for — a Markdown table when each item has more than one field " +
+  "(rank, name, figure), otherwise a numbered list. When they named a number (top 100, 20 companies), give that many rows. " +
+  "If your lookups cover only part of it, use them for what they cover and complete the rest from general knowledge: " +
+  "add a Source column that says \"search\" for rows from a result and \"general knowledge — may be out of date\" for the rest. " +
+  "A ranking that is not published in full, or that changes over time, is a reason to say it may be dated, never a reason to stop short. " +
+  "Never answer with only a link. This is for public knowledge about the world only: " +
+  "Koleex's own records (tasks, reports, customers, products, prices, quotations) are listed from tool results alone, never completed from general knowledge.";
+
 /** Minimal system prompt for small-talk that escaped the canned
  *  fast-reply table (e.g. "hey Koleex", "hi there Koleex AI"). Skips
  *  the tool-routing instructions + brand-knowledge block so the

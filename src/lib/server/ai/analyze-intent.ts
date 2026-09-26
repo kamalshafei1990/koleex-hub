@@ -124,6 +124,17 @@ export function wantsList(text: string): boolean {
   return RE_LIST.test(text ?? "");
 }
 
+/* The asker speaking of their own or their company's things: I / my / our,
+   بتاعي / بتاعنا / عندنا, 我 / 我们. Deliberately broad — it gates the one rule
+   that lets a list be completed from general knowledge, so a false hit only
+   withholds that rule, while a miss could let Hub records be filled in. */
+const RE_OWN =
+  /\b(?:i|i'm|i've|me|my|mine|we|we're|we've|us|our|ours)\b|بتاع(?:ي|تي|نا|تنا)|بتوع(?:ي|نا)|عند(?:ي|نا)|لينا|خاص(?:تي|تنا)|我|咱/i;
+
+export function speaksOfOwnRecords(text: string): boolean {
+  return RE_OWN.test(text ?? "");
+}
+
 /* ─── Public API ─────────────────────────────────────────────── */
 
 export function analyzeIntent(query: string): IntentAnalysis {
