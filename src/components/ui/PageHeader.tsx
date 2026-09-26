@@ -29,6 +29,7 @@ import { APP_REGISTRY } from "@/lib/navigation";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 import { BACK_CHROME } from "@/components/ui/back-chrome";
+import { measuredSlowLink } from "@/lib/app-prefetch";
 
 /* Sliding-pill geometry — change in one place. */
 const TAB_WIDTH_LG = 148;
@@ -546,6 +547,7 @@ function SlidingPillNav({
   useEffect(() => {
     const hrefs = tabHrefs.split("\n");
     const timers: number[] = [];
+    let gone = false;
     timers.push(window.setTimeout(() => {
       for (const i of [activeIndex - 1, activeIndex + 1]) {
         const href = hrefs[i];
@@ -562,11 +564,21 @@ function SlidingPillNav({
       for (const href of alsoHrefs ? alsoHrefs.split("\n") : []) {
         if (href.startsWith("/") && !seen.has(href)) { seen.add(href); rest.push(href); }
       }
-      rest.forEach((href, n) => {
-        timers.push(window.setTimeout(() => warmRoute(href), 250 * (n + 1)));
-      });
+      const walk = () => {
+        if (gone) return;
+        rest.forEach((href, n) => {
+          timers.push(window.setTimeout(() => warmRoute(href), 250 * (n + 1)));
+        });
+      };
+      /* On a link measured slow the rest of the strip still comes — the
+         owner wants every tab warm — but only once the screen that just
+         opened has its own data and code, not in the same second. */
+      if (!measuredSlowLink()) { walk(); return; }
+      void import("@/lib/net-idle")
+        .then(({ whenNetworkQuiet }) => whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }))
+        .then(walk, walk);
     }, 600));
-    return () => { for (const t of timers) window.clearTimeout(t); };
+    return () => { gone = true; for (const t of timers) window.clearTimeout(t); };
   }, [tabHrefs, alsoHrefs, activeIndex, warmRoute]);
 
   /* Written straight onto the node rather than held in state. Geometry read
