@@ -2469,16 +2469,18 @@ console.log("\n── 12. Mute ──");
   /* WHAT IT IS DOING, IN WORDS. */
   const bubble20 = fs20.readFileSync("src/components/ai/Bubble.tsx", "utf8");
   const line20 = fs20.readFileSync("src/components/ai/ActivityLine.tsx", "utf8");
-  check("the empty assistant bubble shows the activity line (Thinking / Searching the web / …) instead of anonymous dots, and again above a reply while a lookup runs",
+  check("the empty assistant bubble shows the activity line (Thinking / Checking the records / …) instead of anonymous dots, and again above a reply while a lookup runs",
     /orbState === "loading" \|\| orbState === "typing" \? \(\s*<ActivityLine activity=\{orbActivity\} lang=\{lang\}/.test(bubble20) &&
     /msg\.content && orbState === "typing" && orbActivity !== "none" && \(\s*<ActivityLine/.test(bubble20));
   check("  …the line is a status region with the shared sweep-and-dots classes, and no tool name ever reaches it",
     /role="status"/.test(line20) && /kx-activity-text/.test(line20) && /kx-activity-dots/.test(line20) && /activityLabel\(activity, lang\)/.test(line20));
   const ac = await import("../src/components/ai/activity-copy");
-  check("  …every activity has words in all three languages, and the web says where the lookup goes",
+  check("  …every activity has words in all three languages, and a web lookup reads as thinking (owner, 2026-09-26)",
     (["en", "zh", "ar"] as const).every((l) => Object.values(ac.ACTIVITY_COPY[l]).every((v) => typeof v === "string" && v.length > 0)) &&
-    ac.activityLabel("browsing", "en") === "Searching the web" && ac.activityLabel("none", "ar") === "بفكّر" && ac.activityLabel(undefined, "zh") === "思考中" &&
-    !Object.values(ac.ACTIVITY_COPY.en).some((v) => /_|[a-z][A-Z]/.test(v)));
+    ac.activityLabel("browsing", "en") === "Thinking" && ac.activityLabel("browsing", "zh") === "思考中" &&
+    ac.activityLabel("browsing", "ar") === "بفكّر" && ac.activityLabel("none", "ar") === "بفكّر" && ac.activityLabel(undefined, "zh") === "思考中" &&
+    !Object.values(ac.ACTIVITY_COPY.en).some((v) => /_|[a-z][A-Z]/.test(v)) &&
+    !(["en", "zh", "ar"] as const).some((l) => /web|网页|النت/i.test(Object.values(ac.ACTIVITY_COPY[l]).join(" "))));
   const map20 = fs20.readFileSync("src/components/ai-orb/ai-orb-tool-map.ts", "utf8");
   check("  …and the web search tool is mapped to browsing so the caption can say so", /search_web: "browsing",/.test(map20));
   /* THE VOICE SHEET. */

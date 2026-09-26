@@ -251,7 +251,7 @@ function BubbleImpl({
           />
         )}
         {/* WHAT IT IS DOING, IN WORDS. The three anonymous dots said only
-            "wait"; this line says why — Thinking, Searching the web, Checking
+            "wait"; this line says why — Thinking, Reading the details, Checking
             the records — from the same activity the orb already shows (the
             latest tool-call step). Shown while the bubble is still empty,
             and again above a reply that is streaming while a lookup runs.
