@@ -63,3 +63,59 @@ filled because `TrendingUpIcon` is.
 
 **Never `lucide-react`.** Enforced by rule 04 of `npm run validate:design-system`.
 <!-- KOLEEX HOUSE RULES END -->
+
+## Working with the owner
+
+**Language (standing rule, cannot be changed).** Speak and think in **Egyptian
+Arabic** in every reply to the owner. Code, comments, commit messages, PR text
+and docs stay in **English**.
+
+**Environments.**
+- Supabase production: `yxyizbnfjrwrnmwhkvme` ("Koleex Master Database").
+  Staging: `gmtjbshjsuexqayqumix`. DDL goes through the Supabase MCP
+  (`apply_migration`) on production, with a matching file in
+  `supabase/migrations/`.
+- Vercel: team `team_gNGHNQngWGL3tLYUzbBprkzg`, project
+  `prj_nGoO4NMiA2agGD5ysKmB27SOoemp` (koleex-hub). Live at
+  `hub.koleexgroup.com`. Every push to `main` deploys to production.
+- The owner works from mainland China, often on a phone and sometimes without
+  a VPN — treat slow, high-latency links as the normal case (see
+  `docs/performance/CHINA_*.md`, `src/lib/app-prefetch.ts`).
+
+**Before every push to `main`** (the owner has granted full permission to push):
+1. Stage explicit paths only — never `git add -A` / `git add .` (other sessions
+   work in this repo at the same time).
+2. `npx tsc --noEmit` and `npx eslint` on the touched files.
+3. The validators that cover the change, plus always
+   `npm run -s validate:design-system`, `npm run -s validate:budgets` and
+   `npm run -s validate:mobile-width`. Some validators already fail on `main`
+   (e.g. `validate:app-launch`, `validate:cold-start`) — compare with
+   `git stash` before blaming a change.
+4. A staging build:
+   `NEXT_PUBLIC_SUPABASE_URL=https://gmtjbshjsuexqayqumix.supabase.co npm run build`.
+   To run it locally, also set `NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy-local-test-key`
+   (the notifications code needs a value) and `next start -p 3100`; drive it
+   with Playwright (`/opt/pw-browsers/chromium`) against mocked `/api/**`.
+5. `git pull --rebase origin main`, `npx tsc --noEmit` again, push.
+6. Wait for the Vercel production deployment of that commit to be **READY**,
+   then give the owner a short recap in Egyptian Arabic: what changed, what
+   was verified and how, and anything not verified — said plainly.
+
+**Owner preferences.**
+- For any visual/UI change, show screenshots (desktop and phone; Arabic/RTL
+  when relevant) before or with the push.
+- Dates are D/M/Y. Icons only from the shared library (rule above).
+- When the owner says "undo", revert the commit (`git revert`), don't patch
+  around it.
+- A permission denial is final unless the owner explicitly approves the step.
+
+**Open items (update this list when you finish or add one).**
+- To-do demo data: 15 demo tasks + 5 labels in production for tenant
+  `490fbd4d-f3e8-44fa-83e6-ee26f961d5ca`, marked `metadata.demo = true`.
+  Delete them when the owner asks.
+- Storage: make the `todo-attachments` bucket private (owner asked to wait).
+- Speed from China: after the 26/09 slow-link change (commit `ca57b6a`),
+  compare `perf_samples` (`nav.warm_ms`, `home.interactive_ms`,
+  `nav.cold.*`) with the days before. The remaining gap is network distance
+  to the servers; the infrastructure plan waiting for the owner's approval is
+  `docs/performance/SUPABASE_CUSTOM_DOMAIN_EXPERIMENT.md`.
