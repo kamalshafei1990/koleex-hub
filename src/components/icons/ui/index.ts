@@ -223,6 +223,7 @@ export { default as UsersIcon } from "./UsersIcon";
 export { default as UserXIcon } from "./UserXIcon";
 export { default as Volume2Icon } from "./Volume2Icon";
 export { default as WalletIcon } from "./WalletIcon";
+export { default as WaveformIcon } from "./WaveformIcon";
 export { default as WarehouseIcon } from "./WarehouseIcon";
 export { default as WeightIcon } from "./WeightIcon";
 export { default as WorkflowIcon } from "./WorkflowIcon";
