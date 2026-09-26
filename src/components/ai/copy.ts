@@ -93,6 +93,8 @@ export const COPY: Record<Lang, {
   offline: string;
   /** The last call was cut by the page dying under it: one tap continues. */
   callCutOff: string;
+  /** A call whose line dropped and did not come back (the app was fine). */
+  callDropped: string;
   continueCall: string;
   dismiss: string;
   /* Projects + pinning */
@@ -271,6 +273,7 @@ export const COPY: Record<Lang, {
     messageTooLong: "That message is too long for one turn. Split it, or attach it as a file.",
     offline: "You're offline — your message will be sent when you're back.",
     callCutOff: "The last call was cut off — the app was interrupted.",
+    callDropped: "The call dropped — the connection didn't come back.",
     continueCall: "Continue the call",
     dismiss: "Dismiss",
     projects: "Projects",
@@ -425,6 +428,7 @@ export const COPY: Record<Lang, {
     messageTooLong: "这条消息太长了，请分成几条发送，或作为文件附上。",
     offline: "当前离线——恢复连接后会自动发送。",
     callCutOff: "上一次通话被打断了——应用被中断。",
+    callDropped: "通话断了——网络没有恢复。",
     continueCall: "继续通话",
     dismiss: "关闭",
     projects: "项目",
@@ -578,6 +582,7 @@ export const COPY: Record<Lang, {
     messageTooLong: "الرسالة دي طويلة أوي على مرة واحدة. قسّمها أو ارفعها كملف.",
     offline: "مفيش نت دلوقتي — رسالتك هتتبعت أول ما ترجع.",
     callCutOff: "المكالمة اللي فاتت اتقطعت — التطبيق اتقفل لوحده.",
+    callDropped: "المكالمة وقعت — النت ما رجعش.",
     continueCall: "كمّل المكالمة",
     dismiss: "تمام",
     projects: "المشاريع",

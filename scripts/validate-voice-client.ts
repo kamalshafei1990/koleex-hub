@@ -2069,10 +2069,10 @@ console.log("\n── 12. Mute ──");
   check("  …and so does unmount", /persisterRef\.current = null;\s*(?:\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;[\s\S]{0,260}?deepRedialRef\.current = null;\s*\}\s*)?tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
   check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
   const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
-  check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
+  check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /const showSoundUnlock = soundBlocked && !!onEnableSound;/.test(scr) && /\{showSoundUnlock && \(/.test(scr));
   check("  …and the orb stays awakening until then", /!live \|\| reconnecting \|\| !ready\s*\? "awakening"/.test(scr));
   check("  …ready defaults to true so other callers are unchanged", /ready = true,/.test(scr));
-  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
+  check("the rings are driven by the smoothed level, not by a per-render transform", /const ringsLive = live && ready && !reconnecting && \(!muted \|\| phase === "speaking"\);\s*useCallLevel\(orbWrapRef, audioLevel, ringsLive\);/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
   check("  …three rings, colour by who is speaking", (scr.match(/kx-call-ring-\d/g) ?? []).length === 3 && /phase === "speaking" \? "is-far" : "is-near"/.test(scr));
   const css = fs16.readFileSync("src/app/globals.css", "utf8");
   check("the rings read --kx-call-level with transform and opacity only", /\.kx-call-orb\.is-live \.kx-call-ring-3 \{\s*opacity: calc\(var\(--kx-call-level\)[^}]*transform: scale\(calc\(1\.16 \+ var\(--kx-call-level\)/.test(css));
@@ -2203,12 +2203,12 @@ console.log("\n── 12. Mute ──");
   check("  …the view is the caller's choice alone, derived, no effect writes it — a picture no longer switches it (section 21)",
     /useState<"orb" \| "chat" \| null>\(null\)/.test(scr) && !/useEffect\(\(\) => \{[^}]*setView/.test(scr) && !/hasPhotos/.test(scr));
   check("  …and the last thing said is a caption under the orb, so the orb view still shows the words",
-    /const lastLine = lines\.length > 0 \? lines\[lines\.length - 1\] : null;/.test(scr) && /\{stripImageMarkdown\(lastLine\.text\)\}/.test(scr) && /line-clamp-3/.test(scr));
+    /const lastLine = lines\.length > 0 \? lines\[lines\.length - 1\] : null;/.test(scr) && /\{stripImageMarkdown\(lastLine\.text\)\}/.test(scr) && /kx-call-caption kx-call-caption-tail/.test(scr));
   check("  …and the pinned photo strip is gone: no `photos` prop, pictures come with the lines", !/photos\?: readonly/.test(scr) && !/photos\.map\(/.test(scr));
   check("  …and a lookup is shown on the orb itself, as THINKING (not processing's rim arc) with the searching activity",
-    /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
+    /: searching \|\| phase === "thinking"\s*\? "thinking"/.test(scr) && /activity=\{searching && live \? "searching" : "none"\}/.test(scr));
   check("  …and on the rings: slow blue waves while a lookup runs, transform and opacity only",
-    /\(searching \|\| phase === "thinking"\) && live && !muted \? "is-thinking" : ""/.test(scr) &&
+    /\(searching \|\| phase === "thinking"\) && live \? "is-thinking" : ""/.test(scr) &&
     /\.kx-call-orb\.is-thinking \.kx-call-ring \{\s*border-color: rgba\(0, 102, 255[^}]*animation: kx-call-think/.test(css18) &&
     /@keyframes kx-call-think \{\s*0% \{ transform: scale\([\d.]+\); opacity: [\d.]+; \}\s*100% \{ transform: scale\([\d.]+\); opacity: 0; \}/.test(css18) &&
     /\.kx-call-orb\.is-thinking \.kx-call-ring-3 \{ animation-delay: 1\.6s; \}/.test(css18));
@@ -2296,7 +2296,7 @@ console.log("\n── 12. Mute ──");
     ev18.parseVoiceEvent(JSON.stringify({ type: "input_audio_buffer.speech_started" })).phase === "listening" &&
     ev18.parseVoiceEvent(JSON.stringify({ type: "response.done" })).phase === "listening");
   check("  …the screen shows thinking on the orb and the rings and in the caption",
-    /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /\(searching \|\| phase === "thinking"\) && live && !muted \? "is-thinking" : ""/.test(scr) && /phase === "thinking"\s*\? copy\.thinking/.test(scr));
+    /: searching \|\| phase === "thinking"\s*\? "thinking"/.test(scr) && /\(searching \|\| phase === "thinking"\) && live \? "is-thinking" : ""/.test(scr) && /phase === "thinking"\s*\? copy\.thinking/.test(scr));
 
   /* THE LOOKUP CEILING — sixty, after twelve was spent in four minutes. */
   check("a call may make sixty lookups, not twelve, and the server's constant agrees",
@@ -2313,7 +2313,7 @@ console.log("\n── 12. Mute ──");
     /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\)\);/.test(btn18) &&
     /if \(!opts\?\.resume\) \{\s*linesRef\.current = \[\];/.test(btn18));
   check("  …and only when it cannot come back does the caller hear the failure",
-    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*(\/\*[\s\S]*?\*\/\s*)?releaseCall\(\);\s*setLaneNote\(null\);\s*playSound\("call-failed"\);\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
+    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*(\/\*[\s\S]*?\*\/\s*)?releaseCall\(\);\s*setLaneNote\(null\);\s*const offer = onInterruptedRef\.current;[\s\S]{0,400}?else \{\s*playSound\("call-failed"\);\s*onErrorRef\.current\?\.\(failureMessage\(failure, langRef\.current\)\);\s*\}/.test(btn18));
   const tel = await import("../src/lib/voice/telemetry");
   const posted: Array<[string, string]> = [];
   tel.sendVoiceTelemetry({ reason: "connection-lost", elapsed_ms: 1234, ice: "failed", tool_calls: 3 }, (p, b) => posted.push([p, b]));
@@ -2498,7 +2498,7 @@ console.log("\n── 12. Mute ──");
     /GLYPH_PATTERNS\[index % GLYPH_PATTERNS\.length\]/.test(scr20) &&
     /fill=\{on \? "#0066FF" : "rgba\(255,255,255,0\.72\)"\}/.test(scr20) && /\.kx-voice-glyph\.is-on rect \{ animation: kx-voice-bar/.test(fs20.readFileSync("src/app/globals.css", "utf8")));
   check("  …the caption moves only while something is pending",
-    /const working = !live \|\| !ready \|\| reconnecting \|\| \(searching && !muted\) \|\| \(phase === "thinking" && !muted\);/.test(scr20) &&
+    /const working = !live \|\| !ready \|\| reconnecting \|\| searching \|\| phase === "thinking";/.test(scr20) &&
     /\{working \? \(\s*<>\s*<span className="kx-activity-text">\{status\.replace\(\/…\$\/, ""\)\}<\/span>/.test(scr20));
 }
 
@@ -2533,7 +2533,7 @@ console.log("\n── 12. Mute ──");
   /* The orb is drawn through ChosenOrb since the user can pick its style
      (2026-09-23) — still exactly one, whichever style it is. */
   check("one orb, drawn once: a single orb at call size, no small second orb",
-    (scr21.match(/<ChosenOrb\b/g) ?? []).length === 1 && !/<AIOrb\b/.test(scr21) && !/kx-mini-orb/.test(scr21) && /size=\{200\}/.test(scr21));
+    (scr21.match(/<ChosenOrb\b/g) ?? []).length === 1 && !/<AIOrb\b/.test(scr21) && !/kx-mini-orb/.test(scr21) && /size=\{orbSize\}/.test(scr21) && /export const ORB_MAX = 200;/.test(scr21));
   check("  …its flight is measured from its home to the corner slot (FLIP), so it lands exactly, in RTL too, and follows a resize",
     /const home = orbHomeRef\.current\?\.getBoundingClientRect\(\);\s*const corner = cornerRef\.current\?\.getBoundingClientRect\(\);/.test(scr21) &&
     /setTravel\(`translate\(\$\{dx\.toFixed\(1\)\}px, \$\{dy\.toFixed\(1\)\}px\) scale\(\$\{\(corner\.width \/ home\.width\)\.toFixed\(3\)\}\)`\);/.test(scr21) &&
@@ -2543,7 +2543,7 @@ console.log("\n── 12. Mute ──");
   check("  …the orb's home does not move with every caption: the block under it reserves a floor",
     /ref=\{belowRef\}[\s\S]{0,120}min-h-\[176px\]/.test(scr21));
   check("  …and the rings' level hook binds once — the ref never changes element now",
-    /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\);/.test(scr21));
+    /useCallLevel\(orbWrapRef, audioLevel, ringsLive\);/.test(scr21) && (scr21.match(/useCallLevel\(/g) ?? []).length === 1);
   check("the motion is transitions on transform and opacity, eased, and nothing animates under reduced motion",
     /\.kx-orb-travel \{ transform-origin: 50% 50%; will-change: transform; \}/.test(css21) &&
     /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-orb-travel \{ transition: transform 0\.6s cubic-bezier\(0\.32, 0\.72, 0, 1\); \}/.test(css21) &&
@@ -3069,7 +3069,7 @@ function describeErrorCheck(): boolean {
       /if \(!ok \|\| sessionRef\.current \|\| !laneFellBackRef\.current\) return;\s*laneFellBackRef\.current = false;\s*transportRef\.current = "ws";\s*saveLane\("ws", Date\.now\(\), "probe"\);/.test(btn) &&
       /setChosenLane\("ws"\);\s*setLaneNote\(null\);\s*\}\);\s*\}, \[\]\);/.test(btn) &&
       /const hangUp = useCallback\(\(\) => \{\s*\/\*[^*]*\*\/\s*recheckLaneAfterFallback\(\);/.test(btn) &&
-      /onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);\s*recheckLaneAfterFallback\(\);\s*\}/.test(btn) &&
+      /onErrorRef\.current\?\.\(failureMessage\(failure, langRef\.current\)\);\s*\}\s*recheckLaneAfterFallback\(\);\s*\}/.test(btn) &&
       /\}, \[releaseCall, beaconHangUp, recheckLaneAfterFallback\]\);/.test(btn));
     /* DEEP IS ASKED ONCE MORE BEFORE IT IS GIVEN UP (2026-09-24 15:28: both
        socket-lane answers lost in a three-second stall, the mainland POST
@@ -4013,8 +4013,8 @@ function describeErrorCheck(): boolean {
        the parent, which opens its conversation first; the sentence remains
        for a parent that offers nothing. */
     check("a found pulse is offered back as a resume when the parent takes one — the sentence otherwise",
-      /const offer = onInterruptedRef\.current;\s*if \(offer\) offer\(\(\) => void startCallRef\.current\?\.\(\), dead\.conversation\);\s*else onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&
-      /onInterrupted\?: \(resume: \(\) => void, conversationId: string \| null\) => void;/.test(btn) &&
+      /const offer = onInterruptedRef\.current;\s*if \(offer\) offer\(\(\) => void startCallRef\.current\?\.\(\), dead\.conversation, "page"\);\s*else onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&
+      /onInterrupted\?: \(resume: \(\) => void, conversationId: string \| null, cause\?: "page" \| "network"\) => void;/.test(btn) &&
       /onInterrupted=\{onVoiceInterrupted\}/.test(appSrc) && /if \(it\.conversation && it\.conversation !== activeIdRef\.current\) await openConversation\(it\.conversation\);\s*it\.resume\(\);/.test(appSrc) &&
       /\{interruptedCall && !callLive && \(/.test(appSrc) && /\{copy\.continueCall\}/.test(appSrc) && /aria-label=\{copy\.dismiss\}/.test(appSrc));
     const trSrc = fsQ.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
@@ -4647,7 +4647,7 @@ console.log("\n── 39. one voice control: a long press dictates through the s
   const scr = fsC.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
     /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
-    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-6 sm:gap-10 pb-6"/.test(scr));
+    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-3 min-\[400px\]:gap-6 sm:gap-10 pb-6"/.test(scr));
 }
 /* ── 40. THE CALLER'S LINE STANDS; THE SCREEN TELLS STATE FROM WORDS (audit, 2026-09-11) ── */
 console.log("\n── 40. lane verdicts carry their source; status line; memoised transcript ──");
@@ -4987,6 +4987,89 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     /import \{ SOUND_CATALOG, SOUND_MAX_SECONDS, soundLength \} from "\.\.\/src\/lib\/sounds\/catalog";/.test(gen) &&
     /const BASE_GAIN = \$\{TONE_GAIN\};/.test(gen) && /g\.gain\.linearRampToValueAtTime\(peak, start \+ RAMP\);/.test(gen) &&
     /"sounds:preview": "tsx scripts\/sounds-preview\.ts"/.test(fsF.readFileSync("package.json", "utf8")));
+}
+{
+  /* ── 60. THE CALL SCREEN REVIEW (owner, 2026-09-26: "in the voice chatting
+     with Koleex AI do you think anything need to fix in the interface?") ── */
+  console.log("\n── 60. Call screen review: states over mute, a bar that fits, words that keep up, a way back after a drop ──");
+  const fs60 = await import("node:fs");
+  const scr = fs60.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const btn = fs60.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  const tr = fs60.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  const app = fs60.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const copySrc = fs60.readFileSync("src/components/ai/copy.ts", "utf8");
+  const css = fs60.readFileSync("src/app/globals.css", "utf8");
+
+  /* 1. What Koleex AI is doing outranks the caller's closed microphone. */
+  check("the caption says looking up / thinking / speaking BEFORE it says the microphone is closed — hold mode no longer hides the answer",
+    /\(connectingSlow \? copy\.connectingSlow : copy\.connecting\)\s*(\/\*[\s\S]*?\*\/\s*)?: searching\s*\? copy\.searching\s*: phase === "thinking"\s*\? copy\.thinking\s*: phase === "speaking"\s*\? copy\.speaking[\s\S]{0,700}?: muted\s*\? \(talkMode === "hold" \? copy\.holdToTalk : copy\.muted\)\s*: phase === "listening"\s*\? copy\.listening\s*: copy\.ready;/.test(scr));
+  check("  …and a muted caller is still never told \"Listening\" — muted outranks listening and go-ahead",
+    scr.indexOf(': muted\n      ? (talkMode === "hold"') > 0 && scr.indexOf(': muted\n      ? (talkMode === "hold"') < scr.indexOf(': phase === "listening"\n        ? copy.listening'));
+  check("  …the orb thinks and the rings wave with the microphone closed; the far side's voice moves the rings while muted, the caller's own level does not",
+    !/!muted\s*\? "thinking"/.test(scr) && !/&& !muted \? "is-thinking"/.test(scr) && !/searching && !muted/.test(scr) &&
+    /const ringsLive = live && ready && !reconnecting && \(!muted \|\| phase === "speaking"\);/.test(scr) && /ringsLive \? "is-live" : ""/.test(scr) &&
+    /const audioLevel = phase === "speaking" \? farLevel : micLevel;/.test(btn));
+
+  /* 2. The hold bar fits a phone. */
+  check("the hold button keeps ONE width and ONE label; the release hint moves to the small line under it",
+    /w-\[clamp\(124px,36vw,168px\)\]/.test(scr) && !/min-w-\[160px\]/.test(scr) &&
+    /<span className="min-w-0 truncate">\{copy\.holdToTalk\}<\/span>/.test(scr) && !/\{holding \? copy\.holdRelease : copy\.holdToTalk\}/.test(scr) &&
+    /\{holding \? copy\.holdRelease : copy\.micShort\}/.test(scr));
+  check("  …the four controls fit a 360px phone: 12px apart under 400px, and the widest hold button plus three circles stays inside",
+    /gap-3 min-\[400px\]:gap-6 sm:gap-10/.test(scr) && (() => { const at = (vw: number) => Math.min(168, Math.max(124, vw * 0.36)) + 56 + 56 + 64 + 3 * (vw < 400 ? 12 : 24); return at(360) <= 360 && at(390) <= 390 && at(430) <= 430; })());
+
+  /* 3. The strip above the controls. */
+  check("Try again and Turn on sound live in a strip above the controls, in BOTH views; the conversation view shows the status line there too",
+    /\{\(view === "chat" \|\| showRetry \|\| showSoundUnlock\) && \(\s*<div className="shrink-0 flex flex-col items-center gap-2 px-4 pt-2" data-call-strip>\s*\{view === "chat" && statusLine\}/.test(scr) &&
+    /const showRetry = connectingSlow && \(!live \|\| !ready\) && !!onRetry;/.test(scr) &&
+    (scr.match(/\{copy\.tryAgain\}/g) ?? []).length === 1 && (scr.match(/\{copy\.enableSound\}/g) ?? []).length === 1 &&
+    scr.indexOf("data-call-strip") > scr.indexOf("{orbLayer}") && (scr.match(/\{statusLine\}/g) ?? []).length === 1);
+
+  /* 4. The caption keeps up. */
+  check("the caption under the orb shows the NEWEST three lines: a bottom-anchored box that clips from the top, faded when long",
+    !/line-clamp-3/.test(scr) && /const CAPTION_FADE_AFTER = \d+;/.test(scr) &&
+    /\.kx-call-caption-tail \{\s*display: flex;\s*flex-direction: column;\s*justify-content: flex-end;\s*max-height: calc\(3 \* 1\.625em\);\s*overflow: hidden;\s*\}/.test(css) &&
+    /\.kx-call-caption-tail\.is-long \{[^}]*mask-image: linear-gradient\(to bottom, transparent 0/.test(css));
+
+  /* 5. The transcript follows only a reader at the end. */
+  check("the transcript follows the newest words only while the reader is at the end; scrolled up, a Latest chip takes them back",
+    !/scrollIntoView/.test(tr) && /export const FOLLOW_SLACK_PX = 80;/.test(tr) &&
+    /const atEnd = el\.scrollHeight - el\.scrollTop - el\.clientHeight <= FOLLOW_SLACK_PX;\s*followRef\.current = atEnd;/.test(tr) &&
+    /if \(el && followRef\.current\) el\.scrollTop = el\.scrollHeight;/.test(tr) &&
+    /if \(followRef\.current\) el\.scrollTop = el\.scrollHeight;\s*else if \(el\.scrollHeight - el\.scrollTop - el\.clientHeight > FOLLOW_SLACK_PX\) setBehind\(true\);/.test(tr) &&
+    /onClick=\{jumpToLatest\}\s*data-transcript-latest/.test(tr) && /const jumpToLatest = useCallback\(\(\) => \{\s*const el = scrollerRef\.current;\s*followRef\.current = true;/.test(tr) &&
+    ["en", "zh", "ar"].every((l) => new RegExp(`${l}: \\{[^\\n]*latest: "`).test(tr)));
+
+  /* 6. The orb fits the room. */
+  const scrMod = await import("../src/components/ai/VoiceCallScreen");
+  check("the orb takes the room it has: full size with room, never under the minimum, and full size before layout",
+    scrMod.ORB_MAX === 200 && scrMod.ORB_MIN === 112 &&
+    scrMod.fitOrb(0, 0) === 200 && scrMod.fitOrb(400, 600) === 200 && scrMod.fitOrb(390, 180) === 140 &&
+    scrMod.fitOrb(390, 100) === 112 && scrMod.fitOrb(Number.NaN, 300) === 200);
+  check("  …measured from its box, the rings follow through --kx-orb-size, and the flight re-measures when it changes",
+    /<div ref=\{orbBoxRef\} className="flex-1 min-h-0 w-full flex items-center justify-center">/.test(scr) &&
+    /const fit = \(\) => setOrbSize\(fitOrb\(box\.clientWidth, box\.clientHeight\)\);/.test(scr) &&
+    /style=\{\{ width: orbSize, height: orbSize, \["--kx-orb-size" as string\]: `\$\{orbSize\}px` \}\}/.test(scr) &&
+    /\}, \[view, orbSize\]\);/.test(scr) &&
+    /width: var\(--kx-orb-size, 200px\);\s*height: var\(--kx-orb-size, 200px\);\s*margin: calc\(var\(--kx-orb-size, 200px\) \/ -2\) 0 0 calc\(var\(--kx-orb-size, 200px\) \/ -2\);/.test(css));
+
+  /* 7. A drop offers the way back. */
+  const btnMod = await import("../src/components/ai/VoiceCallButton");
+  check("a call that was up and dropped offers Continue — the page death's card — instead of a red line; a refusal keeps its sentence",
+    /const wasLive = liveSinceRef\.current !== null;/.test(btn) &&
+    /const offer = onInterruptedRef\.current;\s*if \(offer && wasLive && DROP_FAILURES\.has\(failure\)\) \{[\s\S]{0,300}?offer\(\(\) => void startCallRef\.current\?\.\(\), conversationIdRef\.current, "network"\);\s*\} else \{\s*playSound\("call-failed"\);/.test(btn) &&
+    ["connection-lost", "service-unreachable", "handshake-failed", "unavailable", "config-rejected"].every((f) => btnMod.DROP_FAILURES.has(f as never)) &&
+    ["no-microphone", "not-allowed", "too-many-calls", "signed-out", "service-refused"].every((f) => !btnMod.DROP_FAILURES.has(f as never)));
+  check("  …the card says the line dropped (not that the app was closed), in all three languages",
+    /interruptedCall\.cause === "network" \? copy\.callDropped : copy\.callCutOff/.test(app) &&
+    /cause: "page" \| "network" = "page"\) => \{\s*setInterruptedCall\(\{ resume, conversation, cause \}\);/.test(app) &&
+    (copySrc.match(/\n\s*callDropped: "/g) ?? []).length === 3);
+  check("a refused microphone on an iPhone or iPad says where the switch is; elsewhere the sentence is unchanged",
+    btnMod.failureMessage("no-microphone", "en", true).includes("Settings → Apps → Safari → Microphone") &&
+    btnMod.failureMessage("no-microphone", "ar", true).includes("الميكروفون ← اسمح") &&
+    btnMod.failureMessage("no-microphone", "zh", true).includes("麦克风 → 允许") &&
+    !btnMod.failureMessage("no-microphone", "en", false).includes("Settings") &&
+    !btnMod.failureMessage("connection-lost", "en", true).includes("Settings"));
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

@@ -138,6 +138,37 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
   },
 };
 
+/* A MICROPHONE REFUSED ON AN iPHONE OR iPAD is refused for the site, and
+   the switch is not where anyone looks: the sentence says where it is
+   (review, 2026-09-26). Added only on Apple touch devices. */
+const IOS_MIC_HINT: Record<Lang, string> = {
+  en: "On iPhone or iPad: Settings → Apps → Safari → Microphone → Allow, then try again.",
+  zh: "在 iPhone 或 iPad 上：设置 → App → Safari 浏览器 → 麦克风 → 允许，然后再试一次。",
+  ar: "على الآيفون أو الآيباد: الإعدادات ← التطبيقات ← Safari ← الميكروفون ← اسمح، وبعدين جرّب تاني.",
+};
+
+/** An iPhone, an iPad, or an iPad that says it is a Mac. */
+function isAppleTouch(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+/** The words for a call that failed, with the iPhone/iPad way to allow the
+ *  microphone when that is what failed. */
+export function failureMessage(failure: VoiceFailure, lang: Lang, appleTouch = isAppleTouch()): string {
+  const base = FAILURE_COPY[lang][failure];
+  return failure === "no-microphone" && appleTouch ? `${base} ${IOS_MIC_HINT[lang]}` : base;
+}
+
+/* A CALL THAT WAS UP AND THEN DROPPED — every automatic way back spent —
+   ends with one tap to start it again in the same conversation, the card
+   a page death already gets, instead of a red line and a hunt for the
+   button (review, 2026-09-26). These are the failures a line that was up
+   can end on; a refusal or a sign-out is not a drop and keeps its sentence. */
+export const DROP_FAILURES: ReadonlySet<VoiceFailure> = new Set<VoiceFailure>([
+  "connection-lost", "service-unreachable", "handshake-failed", "unavailable", "config-rejected",
+]);
+
 /* THE CALL THE PAGE DIED UNDER, told once when the page is back
    (lib/voice/call-memory.ts). Plain words; the tap to continue is the
    ordinary call button. */
@@ -239,7 +270,7 @@ export type VoiceCallButtonProps = {
    *  same conversation, which the parent opens first when it is not the
    *  open one. Without this the caller is told in a sentence and left to
    *  find the button. */
-  onInterrupted?: (resume: () => void, conversationId: string | null) => void;
+  onInterrupted?: (resume: () => void, conversationId: string | null, cause?: "page" | "network") => void;
   /** While the server is writing the call summary after a hang-up: true when
    *  the request goes out, false when its row has landed or nothing came.
    *  The parent shows a quiet "writing the summary" line in the thread so
@@ -1122,6 +1153,7 @@ export default function VoiceCallButton({
           const diag = sessionRef.current?.diagnostics();
           if (diag) regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
           const wasUp = liveSinceRef.current !== null && Date.now() - liveSinceRef.current >= RESUME_MIN_LIVE_MS;
+          const wasLive = liveSinceRef.current !== null;
           const canResume = failure === "connection-lost" && wasUp && resumesRef.current < MAX_RESUMES;
           /* THE OTHER LANE, ONCE: a WebSocket lane that never came up is
              retried on the mainland lane before the caller hears anything.
@@ -1200,8 +1232,15 @@ export default function VoiceCallButton({
              rest. */
           releaseCall();
           setLaneNote(null);
-          playSound("call-failed");
-          onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
+          const offer = onInterruptedRef.current;
+          if (offer && wasLive && DROP_FAILURES.has(failure)) {
+            /* The parent's card plays its own sound and says the line
+               dropped; the tap is the gesture a new call needs anyway. */
+            offer(() => void startCallRef.current?.(), conversationIdRef.current, "network");
+          } else {
+            playSound("call-failed");
+            onErrorRef.current?.(failureMessage(failure, langRef.current));
+          }
           recheckLaneAfterFallback();
         }
       },
@@ -1587,7 +1626,7 @@ export default function VoiceCallButton({
       /* One tap to continue where a parent offers it; the sentence where
          none does. The tap is the gesture the microphone needs anyway. */
       const offer = onInterruptedRef.current;
-      if (offer) offer(() => void startCallRef.current?.(), dead.conversation);
+      if (offer) offer(() => void startCallRef.current?.(), dead.conversation, "page");
       else onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
     }
     return () => window.removeEventListener("online", flush);

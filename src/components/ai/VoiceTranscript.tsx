@@ -26,18 +26,22 @@
    this file has no formatting layer at all.
    --------------------------------------------------------------------------- */
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { type TranscriptLine, type TranscriptPhoto } from "@/lib/voice/events";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 import { aiImage } from "@/lib/ai/image-url";
 import { type Lang } from "@/lib/i18n";
 import { textDirection, textLang } from "@/lib/text-direction";
+import ChevronDownIcon from "@/components/icons/ui/ChevronDownIcon";
 
-const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string; photos: string }> = {
-  en: { you: "You", assistant: "Koleex AI", live: "Live transcript", photos: "Photos" },
-  zh: { you: "你", assistant: "Koleex AI", live: "实时字幕", photos: "图片" },
-  ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر", photos: "الصور" },
+const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string; photos: string; latest: string }> = {
+  en: { you: "You", assistant: "Koleex AI", live: "Live transcript", photos: "Photos", latest: "Latest" },
+  zh: { you: "你", assistant: "Koleex AI", live: "实时字幕", photos: "图片", latest: "最新" },
+  ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر", photos: "الصور", latest: "آخر كلام" },
 };
+
+/** Within this many pixels of the end counts as "at the latest line". */
+export const FOLLOW_SLACK_PX = 80;
 
 /* Fewer, larger lines. Six 13px lines crammed into a rounded slab was the
    "too small and not organised well" that came back from a phone: on a call
@@ -110,14 +114,52 @@ export function PhotoTile({ photo, onOpen, label, size = 120, visible = true }: 
 }
 
 function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto, photosVisible = true }: VoiceTranscriptProps) {
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const copy = SPEAKER_COPY[lang];
 
-  /* Follow the newest line. Captions that stop scrolling are captions that
-     stop being read. */
+  /* FOLLOW THE NEWEST LINE — WHILE THE READER IS AT IT. Captions that stop
+     scrolling stop being read; but the words arrive a few at a time, and
+     scrolling to the end on every one pulled a caller who had gone up to
+     re-read something straight back down, again and again (review,
+     2026-09-26). Now it follows only while the reader is at the end; scrolled
+     up, the words keep arriving below and a "Latest" chip takes them back. */
+  const followRef = useRef(true);
+  const [behind, setBehind] = useState(false);
+  const onScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX;
+    followRef.current = atEnd;
+    if (atEnd) setBehind(false);
+  }, []);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  /* The list renders nothing until the first line, so the observer is
+     attached when there is something to observe. */
+  const hasLines = lines.length > 0;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
+    const el = scrollerRef.current;
+    if (el && followRef.current) el.scrollTop = el.scrollHeight;
   }, [lines]);
+  /* The words grow — a new line, a longer partial, a picture that loaded:
+     at the end, stay there; scrolled up, offer the way back. */
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      if (followRef.current) el.scrollTop = el.scrollHeight;
+      else if (el.scrollHeight - el.scrollTop - el.clientHeight > FOLLOW_SLACK_PX) setBehind(true);
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [hasLines]);
+  const jumpToLatest = useCallback(() => {
+    const el = scrollerRef.current;
+    followRef.current = true;
+    setBehind(false);
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
 
   if (lines.length === 0) return null;
   /* Filling the call screen: everything, scrolling. Beside a chat: the last
@@ -144,7 +186,8 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
       {/* NO SLAB. The rounded box was a container drawn around text that needed
           no container — it read as a widget sitting in the page rather than as
           words being spoken. Spacing separates the turns; nothing else has to. */}
-      <div className={`${fill ? "flex-1 min-h-0" : "max-h-[34vh]"} overflow-y-auto space-y-4`}>
+      <div ref={scrollerRef} onScroll={onScroll} className={`${fill ? "flex-1 min-h-0" : "max-h-[34vh]"} overflow-y-auto`}>
+        <div ref={contentRef} className="space-y-4">
         {shown.map((line, i) => {
           const isUser = line.role === "user";
           return (
@@ -190,7 +233,22 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
             </div>
           );
         })}
-        <div ref={endRef} />
+        </div>
+        {/* THE WAY BACK DOWN: pinned to the bottom of the visible area by a
+            zero-height sticky row, the chat's own "Latest" pattern. */}
+        {behind && (
+          <div className="pointer-events-none sticky bottom-2 flex h-0 items-end justify-center">
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              data-transcript-latest
+              className="pointer-events-auto h-9 px-3.5 rounded-full inline-flex items-center gap-1.5 text-[13px] font-semibold text-white border border-white/20 bg-[#1A1A1A] shadow-lg active:scale-95 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+            >
+              <ChevronDownIcon size={14} aria-hidden />
+              {copy.latest}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
