@@ -2979,9 +2979,15 @@ console.log("\n§30 a report becomes work — forward it, make a task from it");
   rule("the report shows each reader only the tasks To-do itself shows them — its one scope rule, a count for the rest", FU,
     (c) => (c.includes("const shared = (await sharedTodoIds(viewer)).filter((id) => taskIds.has(id));") && c.includes("await applyTodoScope(vq, viewer, shared);") && c.includes("return { tasks, count: all.length };") ? [] : ["every reader sees every task made from the report"]),
     (src) => src.replace("await applyTodoScope(vq, viewer, shared);", "await vq;"));
-  rule("To-do itself refuses a 'report' task — only the Reports app writes one, after checking the report and its line", "src/app/api/todos/route.ts",
-    (c) => (c.includes('if (body.source !== undefined && body.source !== "manual" && body.source !== "crm" && body.source !== "calendar") {') ? [] : ["anyone posts a task 'from a report' they never read"]),
-    (src) => src.replace('if (body.source !== undefined && body.source !== "manual" && body.source !== "crm" && body.source !== "calendar") {', "if (false) {"));
+  /* Since the To-do audit (e8875d4) every To-do write reads its fields
+     through one allow-list, lib/server/todo-input.ts; that is where 'report'
+     is kept out of the sources a caller may send. */
+  rule("To-do itself refuses a 'report' task — only the Reports app writes one, after checking the report and its line", "src/lib/server/todo-input.ts",
+    (c) => (c.includes('const SOURCES = new Set(["manual", "crm", "calendar"]);') && c.includes('if (typeof input.source !== "string" || !SOURCES.has(input.source)) throw new Error("Invalid source");') ? [] : ["anyone posts a task 'from a report' they never read"]),
+    (src) => src.replace('const SOURCES = new Set(["manual", "crm", "calendar"]);', 'const SOURCES = new Set(["manual", "crm", "calendar", "report"]);'));
+  rule("the To-do route reads its fields through that allow-list", "src/app/api/todos/route.ts",
+    (c) => (c.includes('import { readIdList, readTodoFields } from "@/lib/server/todo-input";') && /readTodoFields\(/.test(c.replace('import { readIdList, readTodoFields }', '')) ? [] : ["the route writes fields the allow-list never saw"]),
+    (src) => src.replace(/readTodoFields\(/g, "(").replace('import { readIdList, readTodoFields }', 'import { readIdList }'));
   rule("the page offers Forward and the people to pick only as the server allows", `${API}/[id]/route.ts`,
     (c) => (c.includes("forward: mayForward({ status: row.status, superseded: row.superseded, confidential: row.confidential, isAuthor }),") && c.includes("makeTask: canTask,")
       && c.includes("people: row.status === \"draft\" && isAuthor ? people.filter((p) => p.id !== me) : can.forward || can.makeTask ? people : undefined,") ? [] : ["every reader gets the staff list and a Forward button"]),
