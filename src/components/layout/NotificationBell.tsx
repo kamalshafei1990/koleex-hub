@@ -312,9 +312,14 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
            per-channel mute/mention rules for the same event. Both firing
            at once was the "two different sounds per message" bug. */
         /* …and never for a conversation the user muted (or set to
-           "Nothing"), the same per-channel rule push and DiscussApp follow. */
+           "Nothing"), nor — in one set to "Mentions only" — for a message
+           that doesn't @-mention them: the same per-channel rule push and
+           DiscussApp follow (the ping says mentionsYou; lib/discuss). */
+        const mentionsYou = !!(msg.metadata as { mentions_you?: boolean } | null)?.mentions_you;
+        const quietFor = (c: DiscussChannelWithState) =>
+          c.muted || c.notification_pref === "none" || (c.notification_pref === "mentions" && !mentionsYou);
         const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
-        const silenced = !!ch && (ch.muted || ch.notification_pref === "none");
+        const silenced = !!ch && quietFor(ch);
         const heard = !silenced && !window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours);
         if (heard) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
@@ -334,11 +339,11 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
         );
         void recountDiscuss().then((rows) => {
           /* The desktop app with its window not in front: a system
-             notification too (lib/desktop-toast), under the chime's rules.
-             Never for a "mentions only" conversation — this ping carries ids
-             only, so a mention can't be told from any other message. */
+             notification too (lib/desktop-toast), under the chime's rules —
+             read again on the fresh list, which knows a conversation that
+             was new to the bell. */
           const c = rows?.find((x) => x.id === msg.channel_id);
-          if (!heard || !c || c.muted || c.notification_pref === "none" || c.notification_pref === "mentions") return;
+          if (!heard || !c || quietFor(c)) return;
           const r = toastRef.current;
           if (!r) return;
           const preview = c.last_message?.body?.trim() || r.t("notif.newMessage");

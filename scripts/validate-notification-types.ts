@@ -704,8 +704,8 @@ check("a work notification pops under the chime's own switches and quiet hours",
   && [...bellQ.matchAll(/\bdesktopToast\(/g)].length === 2);
 const discussAt = bellQ.indexOf("onMessageInsert: (msg) => {");
 const discussBlock = discussAt < 0 ? "" : bellQ.slice(discussAt, bellQ.indexOf("onChannelChange:", discussAt));
-const guardAt = discussBlock.indexOf('if (!heard || !c || c.muted || c.notification_pref === "none" || c.notification_pref === "mentions") return;');
-check("a Discuss message pops only when it would chime — never a muted, \"nothing\" or \"mentions only\" conversation",
+const guardAt = discussBlock.indexOf("if (!heard || !c || quietFor(c)) return;");
+check("a Discuss message pops only when it would chime, by the conversation's own setting (read again on the fresh list)",
   /if \(heard\) playAppSound\("message"\);/.test(discussBlock) && guardAt > 0 && guardAt < discussBlock.indexOf("desktopToast("));
 check("clicking it brings the Hub forward and opens that notification or conversation",
   /n\.onclick = \(ev\) => \{[\s\S]{0,200}window\.focus\(\)[\s\S]{0,120}t\.open\(\)/.test(toastLib)
@@ -716,6 +716,39 @@ check("the desktop app mounts the real bell early, closed — browsers keep the 
   && /<Bell dk=\{dk\} defaultOpen=\{openOnMount\} \/>/.test(gateQ));
 check("a burst's words read in English, Chinese and Arabic",
   /"toast\.many":\s*\{\s*en: "[^"]*\{n\}[^"]*",\s*zh: "[^"]*\{n\}[^"]*",\s*ar: "[^"]*\{n\}[^"]*"/.test(fileSrc("src/lib/translations/notif-ui.ts")));
+
+/* ── R: "Mentions only" means mentions only — in the Hub too ─────────── */
+console.log("\nR. \"Mentions only\" means mentions only — in the Hub too");
+/* 26/09/2026: push honoured a "Mentions only" conversation, but the ping the
+   bell hears carried ids only — so the Hub chimed on every message there,
+   and the desktop app never popped a real mention up. The ping now says
+   whether the message mentions YOU (no content). */
+const rtb = fileSrc("src/lib/server/realtime-broadcast.ts");
+const pingFn = rtb.slice(rtb.indexOf("export async function pingChannelActivity"), rtb.indexOf("\n}\n", rtb.indexOf("export async function pingChannelActivity")));
+const mutateSrc = fileSrc("src/app/api/discuss/mutate/route.ts");
+check("the server marks only the mentioned members' pings",
+  /mentionedAccountIds\?\.has\(id\) \? \{ \.\.\.accountPayload, mentionsYou: true \} : accountPayload/.test(pingFn)
+  && /await pingChannelActivity\(channelId, memberIds, me, mentioned\);/.test(mutateSrc)
+  && /const mentioned = new Set\(\s*\(\(metadata\.mentions \?\? \[\]\)/.test(mutateSrc));
+const discussLib = fileSrc("src/lib/discuss.ts");
+check("the bell's message carries it",
+  /metadata: payload\?\.mentionsYou \? \{ mentions_you: true \} : \{\}/.test(discussLib) && /mentionsYou\?: boolean/.test(discussLib));
+check("the chime and the desktop pop-up both keep quiet in \"Mentions only\" unless you are mentioned — and in a muted or \"Nothing\" conversation",
+  /const quietFor = \(c: DiscussChannelWithState\) =>\s*c\.muted \|\| c\.notification_pref === "none" \|\| \(c\.notification_pref === "mentions" && !mentionsYou\);/.test(discussBlock)
+  && /const silenced = !!ch && quietFor\(ch\);/.test(discussBlock)
+  && /const mentionsYou = !!\(msg\.metadata as \{ mentions_you\?: boolean \} \| null\)\?\.mentions_you;/.test(discussBlock));
+
+/* ── S: a notification that failed to write leaves a trace ──────────── */
+console.log("\nS. a notification that failed to write leaves a trace");
+/* notify-lite (inventory, low stock, quotations, invoices) never read the
+   insert's result: a failed write vanished without a log line. */
+const lite = fileSrc("src/lib/server/notify-lite.ts");
+const liteFn = lite.slice(lite.indexOf("export async function notifyLite"), lite.indexOf("\n}\n", lite.indexOf("export async function notifyLite")));
+const throwAt = liteFn.indexOf("if (insertError) throw new Error(");
+check("a failed insert is logged, and no ping or push goes out for it",
+  /const \{ error: insertError \} = await supabaseServer\.from\("inbox_messages"\)\.insert\(/.test(liteFn)
+  && throwAt > 0 && throwAt < liteFn.indexOf("await emitPings(") && throwAt < liteFn.indexOf("await sendPushToAccounts(")
+  && /console\.error\("\[notify-lite\]"/.test(liteFn));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

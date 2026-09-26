@@ -52,7 +52,11 @@ export async function notifyLite(opts: {
     const subject = text?.subject ?? opts.subject ?? "";
     const body = text?.body ?? opts.body ?? null;
     if (opts.supersede) await supersedeUnread({ recipients: to, meta: opts.supersede });
-    await supabaseServer.from("inbox_messages").insert(
+    /* A failed write must be seen: it used to vanish (the result was never
+       read), so a notification nobody received left no trace at all. Thrown
+       to the catch below, which logs it — and no ping or push goes out for a
+       row that isn't in the bell. */
+    const { error: insertError } = await supabaseServer.from("inbox_messages").insert(
       to.map((recipient) => ({
         recipient_account_id: recipient,
         sender_account_id: opts.senderId ?? null,
@@ -64,6 +68,7 @@ export async function notifyLite(opts: {
         metadata: { ...(opts.metadata ?? {}), type: opts.type, ...(text?.tpl ? { tpl: text.tpl } : {}) },
       })),
     );
+    if (insertError) throw new Error(`inbox insert failed: ${insertError.message}`);
     /* Wake the recipients' bells now — without the ping the row waited for
        the 60s poll while every other producer showed up instantly. */
     await emitPings(to.map((id) => ({ topic: rtTopic.inbox(id) })));

@@ -657,7 +657,7 @@ export async function uploadDiscussAttachment(
    DiscussApp + NotificationBell + FloatingPanel on the account topic). We keep
    ONE shared realtime channel per topic and ref-count listeners so one
    component unmounting never tears down another's subscription. */
-type PingPayload = { channelId?: string; authorId?: string | null } | undefined;
+type PingPayload = { channelId?: string; authorId?: string | null; mentionsYou?: boolean } | undefined;
 const broadcastSubs = new Map<
   string,
   {
@@ -1206,7 +1206,9 @@ export function subscribeToMyChannels(
           kind: "text",
           body: null,
           body_html: null,
-          metadata: {},
+          /* The only thing known about the text: whether it @-mentions the
+             reader — what a "Mentions only" conversation turns on. */
+          metadata: payload?.mentionsYou ? { mentions_you: true } : {},
           edited_at: null,
           deleted_at: null,
           created_at: new Date().toISOString(),

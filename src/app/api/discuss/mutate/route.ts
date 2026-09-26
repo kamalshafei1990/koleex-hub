@@ -698,7 +698,7 @@ export async function POST(req: Request) {
             const rows = (memberRows ?? []) as Array<{ account_id: string; muted: boolean | null; notification_pref: string | null }>;
             const memberIds = rows.map((r) => r.account_id);
             post.mark("member_lookup");
-            await pingChannelActivity(channelId, memberIds, me);
+            await pingChannelActivity(channelId, memberIds, me, mentioned);
             post.mark("rt_dispatch");
             try {
               /* Push honours the recipient's own choices for THIS channel:
