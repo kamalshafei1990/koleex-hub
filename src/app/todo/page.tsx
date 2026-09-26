@@ -53,7 +53,7 @@ import { useWarm } from "@/lib/warm-cache";
 import { collapseSeries } from "@/lib/todo-series";
 import type { TodoAssigneeInfo, TodoLabelRow, TodoStatus, TodoWithRelations } from "@/types/supabase";
 import MyWorkStrip from "@/components/todo/MyWorkStrip";
-import QuickAdd, { type QuickAddValue } from "@/components/todo/QuickAdd";
+import QuickAdd, { type QuickAddValue, type QuickDraft } from "@/components/todo/QuickAdd";
 import TaskRow from "@/components/todo/TaskRow";
 import { todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
 import { dayKey, fmtDay, isDueTodayDate, isOverdueDate, todoLocale } from "@/components/todo/todo-dates";
@@ -65,6 +65,8 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Loaded on first use — none of these is needed to paint the list. */
 const TaskModal = dynamic(() => import("@/components/todo/TaskModal"), { ssr: false });
+/* The task in full — what a notification's link opens. */
+const TaskSheet = dynamic(() => import("@/components/todo/TaskSheet"), { ssr: false });
 const FiltersPanel = dynamic(() => import("@/components/todo/FiltersPanel"), { ssr: false });
 const RejectDialog = dynamic(() => import("@/components/todo/RejectDialog"), { ssr: false });
 const TodoBoard = dynamic(() => import("@/components/todo/TodoBoard"), { ssr: false, loading: () => <ListSkeleton /> });
@@ -120,10 +122,10 @@ export default function TodoPage() {
   const [sort, setSort] = useState<Sort>("smart");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [openId, setOpenId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const [modal, setModal] = useState<{ id: string | null; key: number } | null>(null);
+  const [modal, setModal] = useState<{ id: string | null; key: number; draft?: QuickDraft } | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const quickRef = useRef<HTMLInputElement>(null);
@@ -135,6 +137,9 @@ export default function TodoPage() {
      assigned to someone — assignees now see it, but may only move it. */
   const canManage = (x: TodoWithRelations) =>
     isSA || (!!accountId && (x.created_by_account_id === accountId || (!x.is_private && x.assigned_by_account_id === accountId)));
+  /* "Done" completes rather than submits for approval — use-todo-store's rule. */
+  const isOwner = (x: TodoWithRelations) =>
+    isSA || (!!accountId && (x.created_by_account_id === accountId || x.assigned_by_account_id === accountId));
 
   /* ── derived lists ── */
   /* Recurring series: one row per period is stored; superseded periods that
@@ -247,6 +252,7 @@ export default function TodoPage() {
     .filter(Boolean).length + (filters.source !== "all" ? 1 : 0) + (filters.saView !== "own" ? 1 : 0);
   const setF = (patch: Partial<TodoFilters>) => setFilters((f) => ({ ...f, ...patch }));
   const modalEntry = modal?.id ? todos.find((x) => x.id === modal.id) ?? null : null;
+  const sheetTask = openId && !hidden.has(openId) ? todos.find((x) => x.id === openId) ?? null : null;
 
   /* Finished history is fetched the first time someone looks at it — the
      Completed group opened, or the Done tab. Its count is only a number
@@ -261,11 +267,8 @@ export default function TodoPage() {
   const doneCount = (n: number) => (done.loaded ? `${n}${done.nextBefore ? "+" : ""}` : "");
 
   /* ── row callbacks (stable — rows are memoised) ── */
-  const toggleExpand = (id: string) => setExpanded((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const openTask = (id: string) => setOpenId(id);
+  const closeSheet = () => setOpenId(null);
   const toggleSelect = (id: string) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -274,10 +277,11 @@ export default function TodoPage() {
   const openEdit = (id: string) => setModal({ id, key: Date.now() });
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
 
-  /* Board card → the list, with that task opened and in view. */
+  /* Deep link → the task's sheet, with its row highlighted and in view
+     behind it (the list is where the reader returns to). */
   const focusTask = (id: string) => {
     setView("list");
-    setExpanded((prev) => new Set(prev).add(id));
+    setOpenId(id);
     setHighlightId(id);
     setTimeout(() => {
       document.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -286,8 +290,9 @@ export default function TodoPage() {
   };
 
   /* ── deep link: /todo?task=<id> (inbox, notifications, AI) ──
-     Opens the task IN the list — expanded, highlighted, scrolled to —
-     rather than the edit form, which an assignee is not allowed to use.
+     Opens the task's detail sheet over the list — highlighted and scrolled
+     to behind it — rather than the edit form, which an assignee is not
+     allowed to use.
      Filters that would hide it are cleared first. A task that no longer
      exists (or is not yours) says so instead of waiting forever. */
   const deepLink = useRef<string | null | undefined>(undefined);
@@ -314,7 +319,7 @@ export default function TodoPage() {
   }, [todos, synced]);
 
   /* ── keyboard: N = add, / = search, Esc = leave selection ── */
-  const modalOpen = !!modal || !!rejectId;
+  const modalOpen = !!modal || !!rejectId || !!sheetTask;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (modalOpen || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -333,10 +338,10 @@ export default function TodoPage() {
   const quickCreate = async (v: QuickAddValue) => {
     if (tab === "completed" || tab === "approvals") setTab("all");
     const problem = await actions.create({
-      title: v.title, description: null, priority: v.priority, label: v.label,
+      title: v.title, description: v.description, priority: v.priority, label: v.label,
       due_date: v.due, start_date: null, remind_at: null, status: "todo",
       recurrence: null, recurrence_until: null, assigned_department: null, assign_to_all: false, metadata: {},
-    }, []);
+    }, v.assigneeIds);
     if (problem) showToast(problem, "error");
     return !problem;
   };
@@ -347,8 +352,8 @@ export default function TodoPage() {
   const selectedIds = [...selected];
   const renderRow = (x: TodoWithRelations) => (
     <TaskRow key={x.id} task={x} t={t} lang={lang} meId={accountId} canManage={canManage(x)}
-      expanded={expanded.has(x.id)} selectMode={selectMode} selected={selected.has(x.id)} highlight={highlightId === x.id}
-      actions={actions} onToggleExpand={toggleExpand} onSelect={toggleSelect} onEdit={openEdit} onReject={setRejectId} />
+      selectMode={selectMode} selected={selected.has(x.id)} highlight={highlightId === x.id || openId === x.id}
+      actions={actions} onOpen={openTask} onSelect={toggleSelect} onEdit={openEdit} onReject={setRejectId} />
   );
 
   const pill = (on: boolean) => `${PILL} ${on ? PILL_ON : PILL_OFF}`;
@@ -566,7 +571,8 @@ export default function TodoPage() {
         {/* ── Scrolling content ── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full min-w-0 space-y-3">
-            <QuickAdd t={t} lang={lang} labels={labelsInUse} inputRef={quickRef} onCreate={quickCreate} />
+            <QuickAdd t={t} lang={lang} labels={labelsInUse} employees={employees} inputRef={quickRef} onCreate={quickCreate}
+              onOpenForm={(draft) => setModal({ id: null, key: Date.now(), draft })} />
 
             {error != null && data && (
               <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
@@ -606,7 +612,7 @@ export default function TodoPage() {
                 onClearSearch={() => setSearch("")} onClearFilters={() => setFilters({ ...NO_FILTERS })}
                 onAdd={() => quickRef.current?.focus()} />
             ) : view === "board" ? (
-              <TodoBoard tasks={flat} t={t} lang={lang} actions={actions} onOpen={focusTask} />
+              <TodoBoard tasks={flat} t={t} lang={lang} actions={actions} onOpen={openTask} />
             ) : sort !== "smart" || tab === "completed" || tab === "approvals" ? (
               <>
                 <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
@@ -643,8 +649,13 @@ export default function TodoPage() {
       </div>
 
       {/* Overlays live outside the z-[1] layer so they stack above the app. */}
+      {sheetTask && (
+        <TaskSheet key={sheetTask.id} task={sheetTask} t={t} lang={lang} meId={accountId}
+          canManage={canManage(sheetTask)} isOwner={isOwner(sheetTask)} paused={!!modal || !!rejectId}
+          actions={actions} onClose={closeSheet} onEdit={openEdit} onReject={setRejectId} />
+      )}
       {modal && (
-        <TaskModal key={modal.key} entry={modalEntry} employees={employees} departments={departments} labels={labels} canAssignAll={canAssignAll}
+        <TaskModal key={modal.key} entry={modalEntry} draft={modal.draft} employees={employees} departments={departments} labels={labels} canAssignAll={canAssignAll}
           onClose={() => setModal(null)} onSubmit={submitModal} onLabelCreated={actions.addLabel} />
       )}
       {rejectId && (

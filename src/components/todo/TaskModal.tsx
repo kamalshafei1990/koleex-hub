@@ -22,6 +22,12 @@ import type {
   TodoAssigneeInfo, TodoChecklistItem, TodoLabelRow, TodoMetadata, TodoPriority, TodoRecurrence, TodoStatus, TodoWithRelations,
 } from "@/types/supabase";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import BellIcon from "@/components/icons/ui/BellIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import FlagIcon from "@/components/icons/ui/FlagIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
@@ -35,7 +41,9 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import MiniAvatar from "./MiniAvatar";
-import { dayKey, isoToLocalInput, localInputToIso } from "./todo-dates";
+import { dayKey, dueTimeOf, isoToLocalInput, localInputToIso } from "./todo-dates";
+import { dueValue } from "./quick-add-parse";
+import type { QuickDraft } from "./QuickAdd";
 import {
   CHOICE, CHOICE_OFF, CHOICE_ON, FIELD_LABEL, INPUT, PRIORITIES, PRIORITY_ON, RECURRENCES, STATUS_DOT, STATUSES, type TFn,
 } from "./todo-ui";
@@ -64,6 +72,8 @@ export interface TaskModalProps {
   entry: TodoWithRelations | null;
   /** Prefill for a new task (from the list's current context). */
   initialDue?: string;
+  /** Everything typed and picked on the quick-add line ("Open full form"). */
+  draft?: QuickDraft | null;
   employees: TodoAssigneeInfo[];
   departments: string[];
   labels: TodoLabelRow[];
@@ -75,21 +85,22 @@ export interface TaskModalProps {
   onLabelCreated: (label: TodoLabelRow) => void;
 }
 
-export default function TaskModal({ entry, initialDue, employees, departments, labels, canAssignAll, onClose, onSubmit, onLabelCreated }: TaskModalProps) {
+export default function TaskModal({ entry, initialDue, draft, employees, departments, labels, canAssignAll, onClose, onSubmit, onLabelCreated }: TaskModalProps) {
   const { t, lang } = useTranslation(todoT);
   const meta0: TodoMetadata = entry?.metadata && typeof entry.metadata === "object" ? entry.metadata : {};
 
-  const [title, setTitle] = useState(entry?.title ?? "");
-  const [description, setDescription] = useState(entry?.description ?? "");
-  const [priority, setPriority] = useState<TodoPriority>(entry?.priority ?? "medium");
-  const [label, setLabel] = useState(entry?.label ?? "");
-  const [dueDate, setDueDate] = useState(dayKey(entry?.due_date) ?? initialDue ?? "");
+  const [title, setTitle] = useState(entry?.title ?? draft?.title ?? "");
+  const [description, setDescription] = useState(entry?.description ?? draft?.description ?? "");
+  const [priority, setPriority] = useState<TodoPriority>(entry?.priority ?? draft?.priority ?? "medium");
+  const [label, setLabel] = useState(entry?.label ?? draft?.label ?? "");
+  const [dueDate, setDueDate] = useState(dayKey(entry?.due_date) ?? draft?.day ?? initialDue ?? "");
+  const [dueTime, setDueTime] = useState(entry ? dueTimeOf(entry.due_date) : draft?.time ?? "");
   const [startDate, setStartDate] = useState(dayKey(entry?.start_date) ?? "");
   const [remindAt, setRemindAt] = useState(isoToLocalInput(entry?.remind_at ?? null));
   const [status, setStatus] = useState<TodoStatus>(entry?.status ?? "todo");
   const [recurrence, setRecurrence] = useState<TodoRecurrence>(entry?.recurrence ?? null);
   const [recurrenceUntil, setRecurrenceUntil] = useState(dayKey(entry?.recurrence_until) ?? "");
-  const [assignees, setAssignees] = useState<string[]>(entry?.assignees.map((a) => a.account_id) ?? []);
+  const [assignees, setAssignees] = useState<string[]>(entry?.assignees.map((a) => a.account_id) ?? draft?.assigneeIds ?? []);
   const [dept, setDept] = useState(entry?.assigned_department ?? "");
   const [assignAll, setAssignAll] = useState(entry?.assign_to_all ?? false);
   const [extras, setExtras] = useState<TodoMetadata>(meta0);
@@ -98,7 +109,7 @@ export default function TaskModal({ entry, initialDue, employees, departments, l
     !!(meta0.attachments?.length || meta0.mentions?.length || meta0.observers?.length || meta0.products?.length),
   );
   /* Assignment is folded away on a personal task — most tasks are your own. */
-  const [showAssign, setShowAssign] = useState(!!(entry && (entry.assignees.length || entry.assign_to_all || entry.assigned_department)));
+  const [showAssign, setShowAssign] = useState(!!(entry && (entry.assignees.length || entry.assign_to_all || entry.assigned_department)) || !!draft?.assigneeIds.length);
   const [empSearch, setEmpSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -119,7 +130,7 @@ export default function TaskModal({ entry, initialDue, employees, departments, l
       description: description.trim() || null,
       priority,
       label: label || null,
-      due_date: dueDate || null,
+      due_date: dueValue(dueDate || null, dueTime || null),
       start_date: startDate || null,
       remind_at: localInputToIso(remindAt),
       status,
@@ -186,14 +197,18 @@ export default function TaskModal({ entry, initialDue, employees, departments, l
     ? t("assign.everyone")
     : dept || employees.filter((e) => assignees.includes(e.account_id)).slice(0, 3).map((e) => e.full_name || e.username).join(", ");
 
+  /* Sections, in the order a phone reads them; on a desktop the two
+     columns hold Task · People · More | Priority & dates · Organize. */
+  const col = "contents md:flex md:flex-col md:gap-4 md:min-w-0";
+
   return (
-    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-16 md:pt-20 pb-6 overflow-y-auto bg-black/60 backdrop-blur-sm"
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-16 md:pt-16 pb-6 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="todo-modal-title"
-        className="kx-app kx-glass-pop kx-pop-in w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[92dvh] flex flex-col">
+        className="kx-app kx-glass-pop kx-pop-in w-full max-w-[880px] rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[92dvh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <ListTodoIcon size={18} className="text-[var(--text-dim)]" />
+            <span className="h-8 w-8 rounded-lg bg-[#567FB2]/15 text-[#7FA9D6] inline-flex items-center justify-center"><ListTodoIcon size={16} /></span>
             <h2 id="todo-modal-title" className="text-[15px] font-semibold text-[var(--text-primary)]">
               {entry ? t("modal.edit") : t("modal.add")}
             </h2>
@@ -204,220 +219,238 @@ export default function TaskModal({ entry, initialDue, employees, departments, l
           </button>
         </div>
 
-        <div className="p-4 md:p-5 space-y-4 flex-1 overflow-y-auto min-h-0">
+        <div className="p-3 md:p-5 flex-1 overflow-y-auto min-h-0">
           {error && (
-            <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px]">{error}</div>
+            <div role="alert" className="mb-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px]">{error}</div>
           )}
 
-          <div>
-            <label htmlFor="todo-title" className={FIELD_LABEL}>{t("f.title")} *</label>
-            <input id="todo-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("f.title.placeholder")} className={INPUT}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && title.trim()) { e.preventDefault(); void save(); } }} />
-          </div>
+          <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-4 md:items-start">
+            <div className={col}>
+              {/* ── Task ── */}
+              <FormSection icon={<ListTodoIcon size={13} />} title={t("sec.task")} className="order-1 md:order-none">
+                <div>
+                  <label htmlFor="todo-title" className={FIELD_LABEL}>{t("f.title")} *</label>
+                  <input id="todo-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
+                    placeholder={t("f.title.placeholder")} className={INPUT}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && title.trim()) { e.preventDefault(); void save(); } }} />
+                </div>
+                <div>
+                  <label htmlFor="todo-desc" className={FIELD_LABEL}>{t("f.description")} <span className="font-normal normal-case">{t("common.optional")}</span></label>
+                  <textarea id="todo-desc" value={description} onChange={(e) => setDescription(e.target.value)}
+                    placeholder={t("f.description.placeholder")} rows={4} className={`${INPUT} h-auto py-3 resize-y min-h-[96px]`} />
+                </div>
+              </FormSection>
 
-          <div>
-            <label htmlFor="todo-desc" className={FIELD_LABEL}>{t("f.description")} <span className="font-normal normal-case">{t("common.optional")}</span></label>
-            <textarea id="todo-desc" value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("f.description.placeholder")} rows={3} className={`${INPUT} h-auto py-3 resize-none`} />
-          </div>
-
-          {/* Priority + due side by side — the two fields almost every task sets. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <span className={FIELD_LABEL}>{t("f.priority")}</span>
-              <div className="flex gap-1.5" role="group" aria-label={t("f.priority")}>
-                {PRIORITIES.map((p) => (
-                  <button key={p} type="button" onClick={() => setPriority(p)} aria-pressed={priority === p}
-                    className={`flex-1 h-10 ${CHOICE} ${priority === p ? PRIORITY_ON[p] : CHOICE_OFF}`}>
-                    {t("p." + p)}
+              {/* ── People ── */}
+              <FormSection icon={<UsersIcon size={13} />} title={t("sec.people")} className="order-3 md:order-none">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                  <button type="button" onClick={() => setShowAssign((v) => !v)} aria-expanded={showAssign}
+                    className="w-full h-11 px-3.5 flex items-center gap-2 text-start rounded-xl">
+                    <span className="text-[12px] font-semibold text-[var(--text-muted)] shrink-0">{t("f.assignTo")}</span>
+                    <span className="text-[12px] text-[var(--text-primary)] truncate flex-1 min-w-0">
+                      {assigneeNames || <span className="text-[var(--text-dim)]">{t("assign.onlyMe")}</span>}
+                      {!assignAll && !dept && assignees.length > 3 ? ` +${assignees.length - 3}` : ""}
+                    </span>
+                    <AngleDownIcon size={13} className={`text-[var(--text-dim)] transition-transform shrink-0 ${showAssign ? "rotate-180" : ""}`} />
                   </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className={FIELD_LABEL}>{t("f.dueDate")}</span>
-              <DatePicker value={dueDate} onChange={setDueDate} placeholder={t("f.selectDate")} lang={lang} heightCls="h-10" min={startDate || undefined} />
-            </div>
-          </div>
-
-          <div>
-            <span className={FIELD_LABEL}>{t("f.status")}</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5" role="group" aria-label={t("f.status")}>
-              {STATUSES.map((s) => (
-                <button key={s} type="button" onClick={() => setStatus(s)} aria-pressed={status === s}
-                  className={`h-9 ${CHOICE} ${status === s ? CHOICE_ON : CHOICE_OFF}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s]}`} /> {t("st." + s)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Assign */}
-          <div className="rounded-xl border border-[var(--border-subtle)]">
-            <button type="button" onClick={() => setShowAssign((v) => !v)} aria-expanded={showAssign}
-              className="w-full h-11 px-3.5 flex items-center gap-2 text-start rounded-xl">
-              <UsersIcon size={14} className="text-[var(--text-dim)] shrink-0" />
-              <span className="text-[12px] font-semibold text-[var(--text-muted)]">{t("f.assignTo")}</span>
-              <span className="text-[12px] text-[var(--text-dim)] truncate flex-1 min-w-0">
-                {assigneeNames || t("assign.onlyMe")}
-                {!assignAll && !dept && assignees.length > 3 ? ` +${assignees.length - 3}` : ""}
-              </span>
-              <AngleDownIcon size={13} className={`text-[var(--text-dim)] transition-transform shrink-0 ${showAssign ? "rotate-180" : ""}`} />
-            </button>
-            {showAssign && (
-              <div className="px-3.5 pb-3.5 space-y-2.5">
-                <div className="flex flex-wrap gap-1.5">
-                  {/* Everyone in the company: admins only. A task that already
-                      carries it keeps the pill so it can be switched off. */}
-                  {(canAssignAll || assignAll) && (
-                    <button type="button" onClick={pickAll} aria-pressed={assignAll}
-                      className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors border flex items-center gap-1.5 ${assignAll ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : CHOICE_OFF}`}>
-                      <UsersIcon size={10} /> {t("assign.everyone")}
-                    </button>
-                  )}
-                  {departments.map((d) => (
-                    <button key={d} type="button" onClick={() => pickDept(d)} aria-pressed={dept === d}
-                      className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors border flex items-center gap-1.5 ${dept === d ? "bg-violet-500/15 border-violet-500/30 text-violet-300" : CHOICE_OFF}`}>
-                      <Building2Icon size={10} /> {d}
-                    </button>
-                  ))}
-                </div>
-                <div className="relative">
-                  <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-                  <input type="text" value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} aria-label={t("filters.searchEmployees")}
-                    placeholder={t("filters.searchEmployees")} className={`${INPUT} ps-9 h-9 text-[12px]`} />
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-[200px] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 [&>*]:min-w-0">
-                  {visibleEmployees.map((emp) => {
-                    const on = assignees.includes(emp.account_id);
-                    const alt = (emp.name_alt ?? "").trim();
-                    return (
-                      <button key={emp.account_id} type="button" onClick={() => toggleAssignee(emp.account_id)} aria-pressed={on}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${on ? "bg-[#567FB2]/15 ring-1 ring-[#567FB2]/40" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
-                        <span className="relative">
-                          <MiniAvatar info={emp} size={34} />
-                          {on && (
-                            <span className="absolute -bottom-0.5 -end-0.5 w-4 h-4 rounded-full bg-[#567FB2] flex items-center justify-center">
-                              <CheckCircleIcon size={10} className="text-white" />
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[10px] font-medium text-[var(--text-primary)] text-center leading-tight truncate w-full">{emp.full_name || emp.username}</span>
-                        {alt && alt !== (emp.full_name ?? "").trim() && (
-                          <span lang="zh" className="text-[10px] text-[var(--text-dim)] text-center leading-tight truncate w-full">{alt}</span>
+                  {showAssign && (
+                    <div className="px-3 pb-3 space-y-2.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        {/* Everyone in the company: admins only. A task that already
+                            carries it keeps the pill so it can be switched off. */}
+                        {(canAssignAll || assignAll) && (
+                          <button type="button" onClick={pickAll} aria-pressed={assignAll}
+                            className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors border flex items-center gap-1.5 ${assignAll ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : CHOICE_OFF}`}>
+                            <UsersIcon size={10} /> {t("assign.everyone")}
+                          </button>
                         )}
-                        {emp.position && <span className="text-[9px] text-[var(--text-dim)] text-center leading-tight truncate w-full">{emp.position}</span>}
-                      </button>
-                    );
-                  })}
-                  {visibleEmployees.length === 0 && (
-                    <div className="col-span-full text-center py-4 text-[12px] text-[var(--text-dim)]">{t("assign.none")}</div>
+                        {departments.map((d) => (
+                          <button key={d} type="button" onClick={() => pickDept(d)} aria-pressed={dept === d}
+                            className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors border flex items-center gap-1.5 ${dept === d ? "bg-violet-500/15 border-violet-500/30 text-violet-300" : CHOICE_OFF}`}>
+                            <Building2Icon size={10} /> {d}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="relative">
+                        <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+                        <input type="text" value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} aria-label={t("filters.searchEmployees")}
+                          placeholder={t("filters.searchEmployees")} className={`${INPUT} ps-9 h-9 text-[12px]`} />
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-[200px] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-2 [&>*]:min-w-0">
+                        {visibleEmployees.map((emp) => {
+                          const on = assignees.includes(emp.account_id);
+                          const alt = (emp.name_alt ?? "").trim();
+                          return (
+                            <button key={emp.account_id} type="button" onClick={() => toggleAssignee(emp.account_id)} aria-pressed={on}
+                              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${on ? "bg-[#567FB2]/15 ring-1 ring-[#567FB2]/40" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                              <span className="relative">
+                                <MiniAvatar info={emp} size={34} />
+                                {on && (
+                                  <span className="absolute -bottom-0.5 -end-0.5 w-4 h-4 rounded-full bg-[#567FB2] flex items-center justify-center">
+                                    <CheckCircleIcon size={10} className="text-white" />
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[10px] font-medium text-[var(--text-primary)] text-center leading-tight truncate w-full">{emp.full_name || emp.username}</span>
+                              {alt && alt !== (emp.full_name ?? "").trim() && (
+                                <span lang="zh" className="text-[10px] text-[var(--text-dim)] text-center leading-tight truncate w-full">{alt}</span>
+                              )}
+                              {emp.position && <span className="text-[9px] text-[var(--text-dim)] text-center leading-tight truncate w-full">{emp.position}</span>}
+                            </button>
+                          );
+                        })}
+                        {visibleEmployees.length === 0 && (
+                          <div className="col-span-full text-center py-4 text-[12px] text-[var(--text-dim)]">{t("assign.none")}</div>
+                        )}
+                      </div>
+                      {assignees.length > 0 && (
+                        <p className="text-[11px] text-[var(--text-muted)]">{assignees.length} {t("assign.selectedWord")}</p>
+                      )}
+                    </div>
                   )}
                 </div>
-                {assignees.length > 0 && (
-                  <p className="text-[11px] text-[var(--text-muted)]">{assignees.length} {t("assign.selectedWord")}</p>
-                )}
-              </div>
-            )}
-          </div>
+              </FormSection>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <span className={FIELD_LABEL}>{t("f.startDate")}</span>
-              <DatePicker value={startDate} onChange={setStartDate} placeholder={t("f.selectDate")} lang={lang} heightCls="h-10" max={dueDate || undefined} />
+              {/* ── More ── */}
+              <FormSection icon={<LayersIcon size={13} />} title={t("sec.more")} className="order-5 md:order-none">
+                <ChecklistField
+                  items={Array.isArray(extras.checklist) ? extras.checklist : []}
+                  onChange={(checklist) => setExtras((prev) => ({ ...prev, checklist }))}
+                  t={t}
+                />
+                {showExtras ? (
+                  <TaskExtras value={extras} onChange={setExtras} employees={employees} />
+                ) : (
+                  <button type="button" onClick={() => setShowExtras(true)}
+                    className="w-full h-10 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center gap-1.5">
+                    <PaperclipIcon size={12} /> {t("extras.toggle")}
+                  </button>
+                )}
+              </FormSection>
             </div>
-            <div>
-              <span className={FIELD_LABEL}>{t("f.reminder")} <span className="font-normal normal-case">{t("common.optional")}</span></span>
-              {/* Day/Month/Year picker + a plain HH:MM box: a native
-                  datetime-local renders month-first on an English browser. */}
-              <div className="flex items-center gap-1.5">
-                <div className="flex-1 min-w-0">
-                  <DatePicker value={remindAt.slice(0, 10)} lang={lang} heightCls="h-10" floating
-                    onChange={(iso) => setRemindAt(iso ? `${iso}T${remindAt.slice(11, 16) || "09:00"}` : "")}
-                    placeholder={t("f.selectDate")} />
+
+            <div className={col}>
+              {/* ── Priority & dates ── */}
+              <FormSection icon={<FlagIcon size={13} />} title={t("sec.planning")} className="order-2 md:order-none">
+                <div>
+                  <span className={FIELD_LABEL}>{t("f.priority")}</span>
+                  <div className="flex gap-1.5" role="group" aria-label={t("f.priority")}>
+                    {PRIORITIES.map((p) => (
+                      <button key={p} type="button" onClick={() => setPriority(p)} aria-pressed={priority === p}
+                        className={`flex-1 h-9 ${CHOICE} ${priority === p ? PRIORITY_ON[p] : CHOICE_OFF}`}>
+                        <FlagIcon size={11} /> {t("p." + p)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {/* The time, as a 24 h list in 15-minute steps: a native time box
-                    shows "--:--" / AM-PM depending on the browser, and meant
-                    nothing before a day was picked — so it appears with the day. */}
-                {remindAt && (
-                  <div className="w-[92px] shrink-0">
-                    <KdsSelect value={remindAt.slice(11, 16)} onChange={(v) => setRemindAt(`${remindAt.slice(0, 10)}T${v || "09:00"}`)}
-                      options={timeOptions(remindAt.slice(11, 16))}
-                      triggerClassName="w-full h-10 ps-3 pe-7 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
+                <div>
+                  <span className={FIELD_LABEL}>{t("f.status")}</span>
+                  <div className="grid grid-cols-2 gap-1.5 [&>*]:min-w-0" role="group" aria-label={t("f.status")}>
+                    {STATUSES.map((s) => (
+                      <button key={s} type="button" onClick={() => setStatus(s)} aria-pressed={status === s}
+                        className={`h-9 ${CHOICE} ${status === s ? CHOICE_ON : CHOICE_OFF}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s]}`} /> {t("st." + s)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className={FIELD_LABEL}><ClockIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.dueDate")}</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <DatePicker value={dueDate} onChange={(v) => { setDueDate(v); if (!v) setDueTime(""); }} placeholder={t("f.selectDate")} lang={lang} heightCls="h-10" min={startDate || undefined} />
+                    </div>
+                    {/* A time is optional — "by 15:00". */}
+                    {dueDate && (
+                      <div className="w-[108px] shrink-0">
+                        <KdsSelect value={dueTime} onChange={setDueTime} options={timeOptions(dueTime)} placeholder={t("f.noTime")}
+                          triggerClassName="w-full h-10 ps-3 pe-7 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3 [&>*]:min-w-0">
+                  <div>
+                    <span className={FIELD_LABEL}><CalendarRawIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.startDate")}</span>
+                    <DatePicker value={startDate} onChange={setStartDate} placeholder={t("f.selectDate")} lang={lang} heightCls="h-10" max={dueDate || undefined} floating />
+                  </div>
+                  <div>
+                    <span className={FIELD_LABEL}><BellIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.reminder")}</span>
+                    {/* Day/Month/Year picker + a 24 h list: a native
+                        datetime-local renders month-first on an English browser. */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <DatePicker value={remindAt.slice(0, 10)} lang={lang} heightCls="h-10" floating
+                          onChange={(iso) => setRemindAt(iso ? `${iso}T${remindAt.slice(11, 16) || "09:00"}` : "")}
+                          placeholder={t("f.selectDate")} />
+                      </div>
+                      {remindAt && (
+                        <div className="w-[84px] shrink-0">
+                          <KdsSelect value={remindAt.slice(11, 16)} onChange={(v) => setRemindAt(`${remindAt.slice(0, 10)}T${v || "09:00"}`)}
+                            options={timeOptions(remindAt.slice(11, 16))}
+                            triggerClassName="w-full h-10 ps-2.5 pe-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
+                        </div>
+                      )}
+                      {remindAt && (
+                        <button type="button" onClick={() => setRemindAt("")} aria-label={t("common.clear")}
+                          className="h-10 w-7 shrink-0 inline-flex items-center justify-center rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                          <CrossIcon size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <span className={FIELD_LABEL}><RefreshCwIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.recurrence")}</span>
+                  <div className="grid grid-cols-4 gap-1.5 [&>*]:min-w-0" role="group" aria-label={t("f.recurrence")}>
+                    {RECURRENCES.map((r) => (
+                      <button key={r ?? "once"} type="button" onClick={() => setRecurrence(r)} aria-pressed={recurrence === r}
+                        className={`h-9 ${CHOICE} ${recurrence === r ? CHOICE_ON : CHOICE_OFF}`}>
+                        {t(r ? "rec." + r : "rec.once")}
+                      </button>
+                    ))}
+                  </div>
+                  {recurrence && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[11px] text-[var(--text-muted)] shrink-0">{t("f.recurrenceUntil")}</span>
+                      <div className="flex-1 min-w-0">
+                        <DatePicker value={recurrenceUntil} onChange={setRecurrenceUntil} placeholder={t("f.recurrenceForever")} lang={lang} heightCls="h-9" min={dueDate || startDate || undefined} floating />
+                      </div>
+                      {recurrenceUntil && (
+                        <button type="button" onClick={() => setRecurrenceUntil("")}
+                          className="h-9 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0">
+                          {t("common.clear")}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </FormSection>
+
+              {/* ── Organize ── */}
+              <FormSection icon={<TagsIcon size={13} />} title={t("sec.organize")} className="order-4 md:order-none">
+                <div>
+                  <span className={FIELD_LABEL}>{t("f.label")}</span>
+                  <LabelPicker labels={labels} value={label} onChange={setLabel} t={t} onCreated={onLabelCreated} />
+                </div>
+                {(projects.length > 0 || extras.project) && (
+                  <div>
+                    <span className={FIELD_LABEL}><BriefcaseIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.project")}</span>
+                    {/* A project already linked but no longer active keeps its own
+                        row — otherwise the form would show "None" over a live link. */}
+                    <KdsSelect value={extras.project?.id ?? ""} onChange={setProject}
+                      options={[
+                        ...(extras.project && !projects.some((p) => p.id === extras.project?.id)
+                          ? [{ value: extras.project.id, label: extras.project.name }] : []),
+                        ...projects.map((p) => ({ value: p.id, label: p.name })),
+                      ]}
+                      placeholder={t("f.noProject")}
+                      triggerClassName="w-full h-10 ps-4 pe-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer text-start" />
                   </div>
                 )}
-                {remindAt && (
-                  <button type="button" onClick={() => setRemindAt("")} aria-label={t("common.clear")}
-                    className="h-10 w-8 shrink-0 inline-flex items-center justify-center rounded-xl text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-                    <CrossIcon size={12} />
-                  </button>
-                )}
-              </div>
+              </FormSection>
             </div>
           </div>
-
-          <div>
-            <span className={FIELD_LABEL}><RefreshCwIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.recurrence")}</span>
-            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={t("f.recurrence")}>
-              {RECURRENCES.map((r) => (
-                <button key={r ?? "once"} type="button" onClick={() => setRecurrence(r)} aria-pressed={recurrence === r}
-                  className={`h-9 ${CHOICE} ${recurrence === r ? CHOICE_ON : CHOICE_OFF}`}>
-                  {t(r ? "rec." + r : "rec.once")}
-                </button>
-              ))}
-            </div>
-            {recurrence && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[11px] text-[var(--text-muted)] shrink-0">{t("f.recurrenceUntil")}</span>
-                <div className="flex-1 min-w-0">
-                  <DatePicker value={recurrenceUntil} onChange={setRecurrenceUntil} placeholder={t("f.recurrenceForever")} lang={lang} heightCls="h-9" min={dueDate || startDate || undefined} />
-                </div>
-                {recurrenceUntil && (
-                  <button type="button" onClick={() => setRecurrenceUntil("")}
-                    className="h-9 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0">
-                    {t("common.clear")}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <span className={FIELD_LABEL}>{t("f.label")}</span>
-            <LabelPicker labels={labels} value={label} onChange={setLabel} t={t} onCreated={onLabelCreated} />
-          </div>
-
-          {(projects.length > 0 || extras.project) && (
-            <div>
-              <span className={FIELD_LABEL}><BriefcaseIcon size={11} className="inline me-1 -mt-0.5" /> {t("f.project")}</span>
-              {/* A project already linked but no longer active keeps its own
-                  row — otherwise the form would show "None" over a live link. */}
-              <KdsSelect value={extras.project?.id ?? ""} onChange={setProject}
-                options={[
-                  ...(extras.project && !projects.some((p) => p.id === extras.project?.id)
-                    ? [{ value: extras.project.id, label: extras.project.name }] : []),
-                  ...projects.map((p) => ({ value: p.id, label: p.name })),
-                ]}
-                placeholder={t("f.noProject")}
-                triggerClassName="w-full h-10 ps-4 pe-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer text-start" />
-            </div>
-          )}
-
-          <ChecklistField
-            items={Array.isArray(extras.checklist) ? extras.checklist : []}
-            onChange={(checklist) => setExtras((prev) => ({ ...prev, checklist }))}
-            t={t}
-          />
-
-          {showExtras ? (
-            <TaskExtras value={extras} onChange={setExtras} employees={employees} />
-          ) : (
-            <button type="button" onClick={() => setShowExtras(true)}
-              className="w-full h-10 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center gap-1.5">
-              <PlusIcon size={12} /> {t("extras.toggle")}
-            </button>
-          )}
         </div>
 
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 md:px-5 py-3.5 border-t border-[var(--border-subtle)]">
@@ -436,6 +469,19 @@ export default function TaskModal({ entry, initialDue, employees, departments, l
         </div>
       </div>
     </ScrollLockOverlay>
+  );
+}
+
+/* ── A titled group of the form: small icon tile + name, then its fields. ── */
+function FormSection({ icon, title, className = "", children }: { icon: React.ReactNode; title: string; className?: string; children: React.ReactNode }) {
+  return (
+    <section className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3.5 md:p-4 space-y-3.5 min-w-0 ${className}`}>
+      <h3 className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--text-primary)]">
+        <span className="h-6 w-6 rounded-md bg-[#567FB2]/15 text-[#7FA9D6] inline-flex items-center justify-center shrink-0">{icon}</span>
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 

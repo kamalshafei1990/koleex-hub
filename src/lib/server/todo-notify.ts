@@ -25,12 +25,14 @@ import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
+import { dmyDate } from "@/lib/work-reports";
 
 export interface TodoLike {
   id: string;
   title: string | null;
   description?: string | null;
   priority?: string | null;
+  due_date?: string | null;
   tenant_id?: string | null;
 }
 
@@ -90,12 +92,60 @@ async function deliver(opts: {
   }
 }
 
-/** "New task: …" to freshly assigned people (never the actor). */
+/** The first line of a description, cut to ~120 characters — enough to
+ *  say what the task is about in a notification without the whole text. */
+function firstLine(text: string | null | undefined, max = 120): string | undefined {
+  const line = (text ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+  if (!line) return undefined;
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
+}
+
+interface AssignmentContext { by?: string; dueDay?: string; desc?: string }
+
+/** What an employee needs to act on a notification without opening it:
+ *  WHO handed it over, WHEN it is due (D/M/Y) and WHAT it is about. The
+ *  actor's display name and the stored due date are read here, so no
+ *  caller has to pass them. Never throws — a missing piece is left out. */
+async function assignmentContext(todo: TodoLike, actorId: string | null): Promise<AssignmentContext> {
+  let due = todo.due_date;
+  let by: string | undefined;
+  try {
+    const [task, acc] = await Promise.all([
+      due === undefined
+        ? supabaseServer.from("koleex_todos").select("due_date").eq("id", todo.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      actorId
+        ? supabaseServer.from("accounts").select("username, person_id").eq("id", actorId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    if (due === undefined) due = (task.data as { due_date: string | null } | null)?.due_date ?? null;
+    const a = acc.data as { username: string | null; person_id: string | null } | null;
+    if (a?.person_id) {
+      const { data: p } = await supabaseServer.from("people").select("full_name").eq("id", a.person_id).maybeSingle();
+      by = (p as { full_name: string | null } | null)?.full_name || undefined;
+    }
+    by ??= a?.username || undefined;
+  } catch { /* the notification still goes, with less in it */ }
+  return {
+    by,
+    /* A date the form wrote is stored as midnight UTC: read it as that day. */
+    dueDay: due ? (/T00:00(:00(\.0+)?)?(Z|[+-]00(:?00)?)$/.test(due) ? due.slice(0, 10) : due) : undefined,
+    desc: firstLine(todo.description),
+  };
+}
+
+/** "New task: …" to freshly assigned people (never the actor) — the body
+ *  says who assigned it, when it is due and what it is about. */
 export async function notifyTodoAssigned(todo: TodoLike, recipients: string[], actorId: string | null): Promise<void> {
+  const to = recipients.filter((id) => id && id !== actorId);
+  if (to.length === 0) return;
   const title = todo.title ?? "Task";
+  const ctx = await assignmentContext(todo, actorId);
   await deliver({
-    todo, recipients, actorId,
-    tpl: { k: "todo_assignment", p: { title } },
+    todo, recipients: to, actorId,
+    tpl: ctx.by
+      ? { k: "todo_assignment", p: { title, by: ctx.by, due: ctx.dueDay ? dmyDate(ctx.dueDay) : undefined, desc: ctx.desc } }
+      : { k: "todo_assignment.system", p: { title, due: ctx.dueDay ? dmyDate(ctx.dueDay) : undefined, desc: ctx.desc } },
     body: todo.description || title,
     type: "todo_assignment",
     extra: { priority: todo.priority ?? "medium" },
@@ -110,12 +160,17 @@ export async function notifyTodoPeopleAdded(
   recipients: string[],
   actorId: string | null,
 ): Promise<void> {
+  const to = recipients.filter((id) => id && id !== actorId);
+  if (to.length === 0) return;
   const title = todo.title ?? "Task";
+  const ctx: AssignmentContext = kind === "mention" ? await assignmentContext(todo, actorId) : {};
   await deliver({
-    todo, recipients, actorId,
+    todo, recipients: to, actorId,
     tpl: kind === "observer"
       ? { k: "todo_observer", p: { title } }
-      : todo.description ? { k: "todo_mention", p: { title } } : { k: "todo_mention.plain", p: { title } },
+      : ctx.by
+        ? { k: "todo_mention", p: { title, by: ctx.by, due: ctx.dueDay ? dmyDate(ctx.dueDay) : undefined, desc: ctx.desc } }
+        : { k: "todo_mention.plain", p: { title } },
     body: todo.description || undefined,
     type: `todo_${kind}`,
   });

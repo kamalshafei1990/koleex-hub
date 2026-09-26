@@ -134,3 +134,56 @@ export function horizonRange(h: "today" | "week" | "month", now = new Date()): [
   }
   return [isoDay(new Date(y, m, 1)), isoDay(new Date(y, m + 1, 0))];
 }
+
+/* ── Task clarity helpers (row + detail sheet) ── */
+
+/** "15:30" when the stored due carries a real time; "" for a date-only
+ *  value (a bare day, or the midnight-UTC the form writes for one). */
+export function dueTimeOf(value: string | null | undefined): string {
+  if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  if (/^\d{4}-\d{2}-\d{2}T00:00(:00(\.0+)?)?(Z|[+-]00(:?00)?)$/.test(value)) return "";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "" : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** "28/09" (this year) or "28/09/2027" — the Hub's day-first short date. */
+export function fmtDm(value: string | null | undefined): string {
+  const key = dayKey(value);
+  if (!key) return "";
+  const [y, m, d] = key.split("-");
+  return Number(y) === new Date().getFullYear() ? `${d}/${m}` : `${d}/${m}/${y}`;
+}
+
+export type DueTone = "overdue" | "today" | "soon" | "later";
+
+/** What an employee needs from a due date at a glance:
+ *  "Due today" / "Due in 2 days" / "3 days overdue", plus "28/09" and the
+ *  time when one was set. */
+export function dueInfo(value: string | null | undefined, t: TFn): { rel: string; dm: string; time: string; tone: DueTone } | null {
+  const n = daysFromToday(value);
+  if (n === null) return null;
+  const rel = n === 0 ? t("due.today")
+    : n === 1 ? t("due.tomorrow")
+    : n > 1 ? t("due.inDays").replace("{n}", String(n))
+    : n === -1 ? t("due.overdue1")
+    : t("due.overdueDays").replace("{n}", String(-n));
+  return { rel, dm: fmtDm(value), time: dueTimeOf(value), tone: n < 0 ? "overdue" : n === 0 ? "today" : n <= 2 ? "soon" : "later" };
+}
+
+/** "5 min ago" / "yesterday" / "3 days ago" in the app language; older
+ *  than a week falls back to the day-first date. */
+export function fmtAgo(iso: string | null | undefined, lang: string, now = Date.now()): string {
+  if (!iso) return "";
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return "";
+  const s = Math.round((at - now) / 1000);
+  const abs = Math.abs(s);
+  try {
+    const rtf = new Intl.RelativeTimeFormat(todoLocale(lang), { numeric: "auto" });
+    if (abs < 60) return rtf.format(0, "second");
+    if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
+    if (abs < 86_400) return rtf.format(Math.round(s / 3600), "hour");
+    if (abs < 7 * 86_400) return rtf.format(Math.round(s / 86_400), "day");
+  } catch { /* fall through */ }
+  return fmtDay(iso, lang);
+}

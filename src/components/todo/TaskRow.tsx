@@ -1,47 +1,52 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   TaskRow — one task in the list, and its detail panel when opened.
+   TaskRow — one task in the list.
 
-   THE ORIGINAL ROW, rebuilt on the new plumbing (owner, 2026-09: "return the
-   old shape as UI design but with the same performance and codes as now"):
-   the full chip line, the avatar stack, the attachments / products /
-   mentions / observers strip and the always-visible actions are all back.
-   What stayed from the rebuild is underneath: memoised with stable handlers
-   (ticking one task re-renders one row), day-first dates, the approval rules
-   of the server, edit/delete only for the task's owner, private marker.
+   THE ORIGINAL ROW (owner, 2026-09: "return the old shape as UI design but
+   with the same performance and codes as now"), made to answer the four
+   questions an employee has at a glance (owner: "if I got a notification of
+   this task I don't know clearly what I should do"):
+     · WHAT   — the title and two lines of the description
+     · WHO    — the people's NAMES (not only faces) and who assigned it, when
+     · WHEN   — "Due in 2 days · 28/09 15:00" / "3 days overdue"
+     · NEXT   — the checklist's progress and its next open item
+   Status and priority are words on tinted badges, never a colour alone.
+   Opening the task (title, or the open button) shows the full detail sheet;
+   the inline panel it replaced lives on as TaskSheet.
+
+   Memoised with stable handlers: ticking one task re-renders one row.
    --------------------------------------------------------------------------- */
 
-import { memo, useState } from "react";
+import { memo } from "react";
 import Link from "next/link";
 import type { TodoMetadata, TodoWithRelations } from "@/types/supabase";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
 import CircleIcon from "@/components/icons/ui/CircleIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
-import FileIcon from "@/components/icons/ui/FileIcon";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
-import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import SquareIcon from "@/components/icons/ui/SquareIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
-import { todoAttachmentHref as attachmentHref } from "@/lib/todo-admin";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
 import MiniAvatar from "./MiniAvatar";
-import { dayKey, fmtDay, fmtDayTime, fmtDue, isOverdueDate } from "./todo-dates";
-import { CHOICE, CHOICE_OFF, CHOICE_ON, PRIORITY_TEXT, STATUS_DOT, STATUSES, initials, type TFn } from "./todo-ui";
+import { dayKey, dueInfo, fmtAgo, fmtDue } from "./todo-dates";
+import { PRIORITY_BADGE, STATUS_DOT, STATUS_PILL, metaOf, namesLine, nameOf, statusOf, type TFn } from "./todo-ui";
 import { isTempTask, type TodoActions } from "./use-todo-store";
 
 export interface TaskRowProps {
@@ -52,48 +57,52 @@ export interface TaskRowProps {
   /** Creator / assigner / super admin (creator only on a private task) —
    *  may edit, delete, tick the checklist. */
   canManage: boolean;
-  expanded: boolean;
   selectMode: boolean;
   selected: boolean;
   highlight: boolean;
   actions: TodoActions;
-  onToggleExpand: (id: string) => void;
+  onOpen: (id: string) => void;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onReject: (id: string) => void;
 }
 
 const BADGE = "inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded";
-const SUB = "text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]";
-
-function metaOf(task: TodoWithRelations): TodoMetadata {
-  return task.metadata && typeof task.metadata === "object" ? task.metadata : {};
-}
+const DUE_TONE = {
+  overdue: "text-red-400 bg-red-500/10",
+  today: "text-amber-300 bg-amber-500/10",
+  soon: "text-[#7FA9D6] bg-[#567FB2]/10",
+  later: "text-[var(--text-muted)] bg-[var(--bg-surface)]",
+} as const;
 
 function TaskRow({
-  task, t, lang, meId, canManage, expanded, selectMode, selected, highlight,
-  actions, onToggleExpand, onSelect, onEdit, onReject,
+  task, t, lang, meId, canManage, selectMode, selected, highlight,
+  actions, onOpen, onSelect, onEdit, onReject,
 }: TaskRowProps) {
   const meta = metaOf(task);
   const checklist = Array.isArray(meta.checklist) ? meta.checklist : [];
   const checkDone = checklist.filter((c) => c.done).length;
+  const nextItem = checklist.find((c) => !c.done);
+  const attachments = Array.isArray(meta.attachments) ? meta.attachments.length : 0;
   const rejection = (meta as { rejection?: { reason?: string } }).rejection?.reason;
 
-  const overdue = !task.completed && isOverdueDate(task.due_date);
+  const status = statusOf(task);
+  const due = task.completed ? null : dueInfo(task.due_date, t);
   const pending = task.approval_state === "pending";
   const awaitsMe = pending && task.assigned_by_account_id === meId;
   const temp = isTempTask(task.id);
   const doneKey = dayKey(task.completed_at);
   const dueKey = dayKey(task.due_date);
   const late = task.completed && !!doneKey && !!dueKey && doneKey > dueKey;
+  const byOther = task.assigner && task.assigner.account_id !== meId ? task.assigner : null;
+  const people = task.assign_to_all ? t("assign.everyone") : task.assignees.length ? namesLine(task.assignees, meId, t) : "";
 
   const toggleLabel = task.completed ? t("row.markUndone") : pending ? t("row.withdraw") : t("row.markDone");
 
   return (
     <div data-task-id={task.id}
-      className={`[content-visibility:auto] [contain-intrinsic-size:auto_84px] transition-all ${task.completed ? "opacity-50" : ""} ${highlight ? "bg-[#567FB2]/10" : ""} ${temp ? "opacity-70" : ""}`}>
+      className={`[content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all ${task.completed ? "opacity-50" : ""} ${highlight ? "bg-[#567FB2]/10" : ""} ${temp ? "opacity-70" : ""}`}>
       <div className={`group flex items-start gap-3 px-4 py-3.5 transition-all ${selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
-        {/* Bulk-select checkbox (only in select mode) */}
         {selectMode && (
           <button type="button" onClick={() => onSelect(task.id)} className="mt-0.5 shrink-0"
             aria-pressed={selected} aria-label={t("row.selectTask")}>
@@ -110,32 +119,36 @@ function TaskRow({
             : <CircleIcon size={20} className="text-[var(--text-ghost)]" />}
         </button>
 
-        {/* Content — the title opens the task's full details. Title and
-            description auto-translate to the reader's language. */}
         <div className="flex-1 min-w-0">
-          <button type="button" onClick={() => onToggleExpand(task.id)} aria-expanded={expanded} data-kx-keep-hover
+          {/* WHAT — the title opens the task; two lines of the description. */}
+          <button type="button" onClick={() => onOpen(task.id)} data-kx-keep-hover
             className="w-full text-start rounded-md">
-            <span className={`text-[13px] font-medium leading-snug flex items-start gap-1.5 ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
-              <AngleDownIcon size={13} className={`mt-0.5 shrink-0 text-[var(--text-dim)] transition-transform ${expanded ? "rotate-180" : ""}`} />
-              <span className="flex-1 min-w-0 break-words"><AutoTranslatedText text={task.title} plain /></span>
+            <span className={`block text-[13px] font-medium leading-snug break-words ${task.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
+              <AutoTranslatedText text={task.title} plain />
             </span>
             {task.description && (
-              <AutoTranslatedText text={task.description} plain block className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-1" />
+              <AutoTranslatedText text={task.description} plain block className="text-[12px] text-[var(--text-dim)] mt-0.5 line-clamp-2 whitespace-pre-line" />
             )}
           </button>
 
-          {/* Meta badges */}
-          <div className="flex items-center gap-1.5 md:gap-2 mt-1.5 flex-wrap min-w-0">
-            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${PRIORITY_TEXT[task.priority]}`}>
-              <FlagIcon size={10} /> {t("p." + task.priority)}
-            </span>
-            {(task.status === "in_progress" || task.status === "blocked") && (
-              <span className={`${BADGE} ${task.status === "blocked" ? "text-red-400 bg-red-500/10" : "text-[#7FA9D6] bg-[#567FB2]/10"}`}>
-                {t("st." + task.status)}
+          {/* Situation — status, priority and WHEN, in words. */}
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap min-w-0">
+            {!task.completed && (
+              <span className={`${BADGE} ${STATUS_PILL[status]}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[status]}`} /> {t("st." + status)}
               </span>
             )}
-            {/* Private: its creator (and admins with private access) plus the
-                people it is assigned to. Said so an assignee knows. */}
+            <span className={`${BADGE} ${PRIORITY_BADGE[task.priority]}`}>
+              <FlagIcon size={10} /> {t("p." + task.priority)}
+            </span>
+            {due && (
+              <span className={`${BADGE} ${DUE_TONE[due.tone]}`}>
+                {due.tone === "overdue" ? <ExclamationIcon size={10} /> : <ClockIcon size={10} />}
+                {due.rel}
+                <span className="font-medium opacity-80 tabular-nums">· {due.dm}{due.time && ` ${due.time}`}</span>
+              </span>
+            )}
+            {pending && <span className={`${BADGE} text-amber-400 bg-amber-500/10`}>{t("approval.pending")}</span>}
             {task.is_private && (
               <span className={`${BADGE} text-[var(--text-muted)] bg-[var(--bg-surface-active)]`}
                 title={task.created_by_account_id === meId ? t("row.privateMine") : t("row.privateShared")}>
@@ -147,22 +160,12 @@ function TaskRow({
                 <TagsIcon size={9} /> <AutoTranslatedText text={task.label} plain />
               </span>
             )}
-            {/* One badge for the whole series, with the period it is. */}
             {task.series_cadence && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface-active)] px-1.5 py-0.5 rounded">
                 <RefreshCwIcon size={9} /> {t("rec." + task.series_cadence)}
                 {task.series_period && <span className="font-medium text-[var(--text-faint)]">· {fmtDue(task.series_period, t, lang)}</span>}
               </span>
             )}
-            {pending && <span className={`${BADGE} text-amber-400 bg-amber-500/10`}>{t("approval.pending")}</span>}
-            {task.due_date && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${overdue ? "text-red-400" : task.completed ? "text-[var(--text-dim)]" : "text-[var(--text-faint)]"}`}>
-                {overdue ? <ExclamationIcon size={10} /> : <ClockIcon size={10} />}
-                {fmtDue(task.due_date, t, lang)}
-              </span>
-            )}
-            {/* A task made from a report (Reports 6A) opens that report —
-                the report page itself decides whether this reader may. */}
             {task.source === "report" && task.source_id ? (
               <Link href={`/reports/${task.source_id}`} onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-300 bg-violet-500/10 px-1.5 py-0.5 rounded hover:underline">
@@ -173,24 +176,65 @@ function TaskRow({
                 {task.source === "crm" ? t("src.crm") : t("src.calendar")}
               </span>
             )}
-            {/* Only when a DIFFERENT person assigned it. */}
-            {task.assigner && task.assigner.account_id !== meId && (
-              <span className={`${BADGE} text-[var(--text-muted)] bg-[var(--bg-surface-active)] max-w-full`}>
-                <UserCheckIcon size={9} className="shrink-0" />
-                <span className="truncate">{t("row.assignedBy")} {task.assigner.full_name || task.assigner.username}</span>
-              </span>
-            )}
-            {checklist.length > 0 && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${checkDone === checklist.length ? "text-[var(--text-primary)] bg-[var(--bg-surface-active)]" : "text-[var(--text-faint)] bg-[var(--bg-surface)]"}`}>
-                <CheckSquareIcon size={9} /> {checkDone}/{checklist.length}
-              </span>
-            )}
             {task.completed && dueKey && doneKey && (
               <span className={`${BADGE} ${late ? "text-red-400 bg-red-500/10" : "text-green-400 bg-green-500/10"}`}>
                 {late ? t("row.late") : t("row.onTime")}
               </span>
             )}
           </div>
+
+          {/* WHO — names, and who handed it over, when. */}
+          {(people || task.assigned_department || byOther) && (
+            <div className="flex items-center gap-x-2.5 gap-y-1 mt-2 flex-wrap min-w-0 text-[11px] text-[var(--text-muted)]">
+              {people && (
+                <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
+                  {task.assign_to_all ? <UsersIcon size={12} className="text-[var(--text-dim)] shrink-0" /> : (
+                    <span className="flex -space-x-1.5 shrink-0">
+                      {task.assignees.slice(0, 3).map((a) => <MiniAvatar key={a.account_id} info={a} size={20} ring />)}
+                    </span>
+                  )}
+                  <span className="truncate font-medium text-[var(--text-primary)]">{people}</span>
+                </span>
+              )}
+              {!people && task.assigned_department && (
+                <span className="inline-flex items-center gap-1 min-w-0"><Building2Icon size={11} className="shrink-0 text-[var(--text-dim)]" /> <span className="truncate">{task.assigned_department}</span></span>
+              )}
+              {byOther && (
+                <span className="inline-flex items-center gap-1 min-w-0 max-w-full text-[var(--text-dim)]">
+                  <UserCheckIcon size={11} className="shrink-0" />
+                  <span className="truncate">{t("row.byAgo").replace("{name}", nameOf(byOther)).replace("{ago}", fmtAgo(task.created_at, lang))}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* NEXT — checklist progress + the next open item; notes / files. */}
+          {(checklist.length > 0 || task.notes.length > 0 || attachments > 0) && (
+            <div className="flex items-center gap-2.5 mt-2 min-w-0 text-[11px]">
+              {checklist.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 shrink-0" title={t("checklist.title")}>
+                  <span className="relative w-12 h-1 rounded-full bg-[var(--bg-surface-active)] overflow-hidden" aria-hidden>
+                    <span className={`absolute inset-y-0 start-0 rounded-full ${checkDone === checklist.length ? "bg-green-400" : "bg-[#7FA9D6]"}`}
+                      style={{ width: `${Math.round((checkDone / checklist.length) * 100)}%` }} />
+                  </span>
+                  <span className="font-semibold tabular-nums text-[var(--text-muted)]">{checkDone}/{checklist.length}</span>
+                </span>
+              )}
+              {nextItem && !task.completed && (
+                <span className="min-w-0 truncate text-[var(--text-dim)]">
+                  <span className="font-semibold text-[var(--text-muted)]">{t("row.next")}</span> <AutoTranslatedText text={nextItem.text} plain />
+                </span>
+              )}
+              <span className="ms-auto inline-flex items-center gap-2 shrink-0 text-[var(--text-dim)]">
+                {task.notes.length > 0 && (
+                  <span className="inline-flex items-center gap-0.5" title={t("common.notes")}><MessageSquareIcon size={11} /> {task.notes.length}</span>
+                )}
+                {attachments > 0 && (
+                  <span className="inline-flex items-center gap-0.5" title={t("extras.attachments")}><PaperclipIcon size={11} /> {attachments}</span>
+                )}
+              </span>
+            </div>
+          )}
 
           {/* Returned for rework — the manager's reason stays on the card
               until the assignee finishes and resubmits. */}
@@ -203,21 +247,10 @@ function TaskRow({
             </div>
           )}
 
-          {/* Assignee avatars */}
-          {task.assignees.length > 0 && (
-            <div className="flex items-center gap-1 mt-2">
-              <div className="flex -space-x-1.5">
-                {task.assignees.slice(0, 5).map((a) => <MiniAvatar key={a.account_id} info={a} size={22} ring />)}
-              </div>
-              {task.assignees.length > 5 && <span className="text-[10px] text-[var(--text-dim)] ms-1">+{task.assignees.length - 5}</span>}
-            </div>
-          )}
-
-          {/* Project · attachments · linked products · mentions · observers */}
           <ExtrasStrip meta={meta} t={t} />
         </div>
 
-        {/* Approve / Reopen — always on the row for the assigner while a
+        {/* Approve / Send back — on the row for the assigner while a
             completion waits for them. */}
         {awaitsMe && !task.completed && (
           <div className="shrink-0 flex flex-col sm:flex-row items-stretch gap-1">
@@ -232,48 +265,40 @@ function TaskRow({
           </div>
         )}
         {/* Actions — always visible on mobile (no hover), fade in on desktop.
-            Edit / delete only for the task's owner — the server refuses
-            anyone else. */}
+            Edit / delete only for the task's owner. */}
         <div className="shrink-0 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <button type="button" onClick={() => onToggleExpand(task.id)} title={t("common.notes")} aria-label={t("common.notes")}
-            className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center">
-            <MessageSquareIcon size={14} />
-            {task.notes.length > 0 && <span className="ms-0.5 text-[9px] font-bold">{task.notes.length}</span>}
-          </button>
           {canManage && !temp && (
             <>
               <button type="button" onClick={() => onEdit(task.id)} title={t("modal.edit")} aria-label={t("modal.edit")}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
                 <PencilIcon size={14} />
               </button>
               <button type="button" onClick={() => actions.remove([task.id])} title={t("modal.delete")} aria-label={t("modal.delete")}
-                className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-[var(--text-dim)] hover:text-red-400">
+                className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-[var(--text-dim)] hover:text-red-400">
                 <TrashIcon size={14} />
               </button>
             </>
           )}
+          <button type="button" onClick={() => onOpen(task.id)} title={t("row.open")} aria-label={t("row.open")}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center">
+            <AngleRightIcon size={14} className="rtl:-scale-x-100" />
+          </button>
         </div>
       </div>
-
-      {expanded && (
-        <TaskDetails task={task} t={t} lang={lang} meId={meId} canManage={canManage}
-          actions={actions} checklist={checklist} awaitsMe={awaitsMe} onReject={onReject} />
-      )}
     </div>
   );
 }
 
 export default memo(TaskRow);
 
-/* ── Extras strip — project · attachments · products · mentions · observers.
-   Captured in the task form and shown compactly on every row. ── */
+/* ── Extras strip — project · products · mentions · observers. Files are
+   counted on the row and shown in full in the sheet. ── */
 function ExtrasStrip({ meta, t }: { meta: TodoMetadata; t: TFn }) {
-  const atts = Array.isArray(meta.attachments) ? meta.attachments : [];
   const prods = Array.isArray(meta.products) ? meta.products : [];
   const mentions = Array.isArray(meta.mentions) ? meta.mentions : [];
   const observers = Array.isArray(meta.observers) ? meta.observers : [];
   const proj = meta.project && typeof meta.project === "object" ? meta.project : null;
-  if (atts.length === 0 && prods.length === 0 && mentions.length === 0 && observers.length === 0 && !proj) return null;
+  if (prods.length === 0 && mentions.length === 0 && observers.length === 0 && !proj) return null;
 
   const chip = "inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] max-w-[150px]";
   return (
@@ -283,20 +308,6 @@ function ExtrasStrip({ meta, t }: { meta: TodoMetadata; t: TFn }) {
           <BriefcaseIcon className="h-2.5 w-2.5 shrink-0 text-[var(--text-dim)]" />
           <span className="truncate">{proj.name}</span>
         </span>
-      )}
-      {atts.map((a) =>
-        a.type?.startsWith("image/") ? (
-          <a key={a.path} href={attachmentHref(a.path)} target="_blank" rel="noreferrer" title={a.name}
-            className="block h-9 w-9 rounded-md overflow-hidden border border-[var(--border-subtle)] shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={attachmentHref(a.path)} alt={a.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-          </a>
-        ) : (
-          <a key={a.path} href={attachmentHref(a.path)} target="_blank" rel="noreferrer" className={`${chip} hover:text-[var(--text-primary)]`}>
-            <FileIcon className="h-2.5 w-2.5 shrink-0" />
-            <span className="truncate">{a.name}</span>
-          </a>
-        ),
       )}
       {prods.map((p) => (
         <span key={p.id} className={chip}>
@@ -316,149 +327,6 @@ function ExtrasStrip({ meta, t }: { meta: TodoMetadata; t: TFn }) {
           <span className="truncate">{o.full_name || o.username}</span>
         </span>
       ))}
-    </div>
-  );
-}
-
-/* ── Full detail panel — opens from the title or the notes button ── */
-function TaskDetails({ task, t, lang, meId, canManage, actions, checklist, awaitsMe, onReject }: {
-  task: TodoWithRelations;
-  t: TFn;
-  lang: string;
-  meId: string | null;
-  canManage: boolean;
-  actions: TodoActions;
-  checklist: NonNullable<TodoMetadata["checklist"]>;
-  awaitsMe: boolean;
-  onReject: (id: string) => void;
-}) {
-  const [note, setNote] = useState("");
-  const [sending, setSending] = useState(false);
-  const temp = isTempTask(task.id);
-
-  const send = async () => {
-    const body = note.trim();
-    if (!body || sending) return;
-    setSending(true);
-    const ok = await actions.addNote(task.id, body);
-    setSending(false);
-    if (ok) setNote("");
-  };
-
-  const fields = [
-    task.start_date ? { k: "start", label: t("f.startDate"), value: fmtDay(task.start_date, lang, true) } : null,
-    task.due_date ? { k: "due", label: t("f.dueDate"), value: fmtDay(task.due_date, lang, true) } : null,
-    task.remind_at ? { k: "remind", label: t("f.reminder"), value: fmtDayTime(task.remind_at, lang) } : null,
-    task.series_cadence ? { k: "rec", label: t("f.recurrence"), value: t("rec." + task.series_cadence) } : null,
-    task.series_cadence && task.series_period ? { k: "run", label: t("f.occurrence"), value: fmtDue(task.series_period, t, lang) } : null,
-    task.label ? { k: "label", label: t("f.label"), value: task.label } : null,
-  ].filter((f): f is { k: string; label: string; value: string } => f !== null);
-
-  return (
-    <div className="px-4 pb-3 ms-8 space-y-3">
-      {/* The manager who assigned this confirms or sends it back. */}
-      {awaitsMe && !task.completed && (
-        <div className="flex items-center gap-2 flex-wrap rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-          <span className="text-[11.5px] font-semibold text-amber-400 flex-1">{t("approval.awaitingYou")}</span>
-          <button type="button" onClick={() => void actions.approve(task.id)}
-            className="h-7 px-3 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 text-[11px] font-semibold flex items-center gap-1">
-            <CheckCircleIcon size={12} /> {t("approval.confirm")}
-          </button>
-          <button type="button" onClick={() => onReject(task.id)}
-            className="h-7 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11px] font-semibold">
-            {t("approval.reopen")}
-          </button>
-        </div>
-      )}
-      {task.approval_state === "pending" && !awaitsMe && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11.5px] font-semibold text-amber-400">
-          {t("approval.submitted")}
-        </div>
-      )}
-
-      {task.description && (
-        <div>
-          <div className={`${SUB} mb-1`}>{t("f.description")}</div>
-          <AutoTranslatedText text={task.description} block className="text-[12.5px] text-[var(--text-primary)] leading-relaxed" />
-        </div>
-      )}
-
-      {/* Situation — set it straight from here. */}
-      <div>
-        <div className={`${SUB} mb-1.5`}>{t("f.status")}</div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5" role="group" aria-label={t("f.status")}>
-          {STATUSES.map((s) => (
-            <button key={s} type="button" disabled={temp} aria-pressed={task.status === s}
-              onClick={() => void actions.setStatus(task.id, s)}
-              className={`h-8 ${CHOICE} ${task.status === s ? CHOICE_ON : CHOICE_OFF}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s]}`} /> {t("st." + s)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {fields.length > 0 && (
-        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
-          {fields.map((f) => (
-            <div key={f.k} className="min-w-0">
-              <dt className={SUB}>{f.label}</dt>
-              <dd className="text-[12px] text-[var(--text-primary)] mt-0.5">
-                {f.k === "label" ? <AutoTranslatedText text={f.value} plain /> : f.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      {checklist.length > 0 && (
-        <div>
-          <div className={`${SUB} mb-1.5`}>{t("checklist.title")} · {checklist.filter((c) => c.done).length}/{checklist.length}</div>
-          <div className="space-y-1">
-            {checklist.map((c) => (
-              <button key={c.id} type="button" disabled={!canManage || temp} aria-pressed={c.done}
-                onClick={() => void actions.toggleChecklistItem(task.id, c.id)}
-                className="w-full flex items-center gap-2 text-[12px] text-start rounded-md enabled:hover:bg-[var(--bg-surface-subtle)] disabled:cursor-default">
-                {c.done ? <CheckSquareIcon size={13} className="text-green-400 shrink-0" /> : <SquareIcon size={13} className="text-[var(--text-dim)] shrink-0" />}
-                <span className={c.done ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}>
-                  <AutoTranslatedText text={c.text} plain />
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Notes / comments */}
-      <div className={`${SUB} pt-1`}>{t("common.notes")}</div>
-      {task.notes.map((n) => (
-        <div key={n.id} className="flex items-start gap-2 text-[12px]">
-          <span aria-hidden className="w-5 h-5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[8px] font-bold text-[var(--text-dim)] shrink-0 mt-0.5">
-            {initials(n.author_full_name, n.author_username)}
-          </span>
-          <div className="flex-1 min-w-0">
-            <span className="font-semibold text-[var(--text-muted)]">{n.author_full_name || n.author_username}</span>
-            <span className="text-[var(--text-dim)] ms-2">{fmtDayTime(n.created_at, lang)}</span>
-            <AutoTranslatedText text={n.body} block className="text-[var(--text-primary)] mt-0.5 break-words" />
-          </div>
-          {n.author_account_id === meId && (
-            <button type="button" onClick={() => void actions.deleteNote(task.id, n.id)} aria-label={t("notes.delete")}
-              className="text-[var(--text-dim)] hover:text-red-400 p-0.5 shrink-0">
-              <CrossIcon size={10} />
-            </button>
-          )}
-        </div>
-      ))}
-      {!temp && (
-        <form className="flex items-center gap-2 mt-1" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
-            placeholder={t("notes.placeholder")} aria-label={t("notes.placeholder")}
-            className="flex-1 min-w-0 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all" />
-          <button type="submit" disabled={!note.trim() || sending} aria-label={t("notes.send")}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-all disabled:opacity-30">
-            <PaperPlaneIcon size={12} className="rtl:-scale-x-100" />
-          </button>
-        </form>
-      )}
     </div>
   );
 }

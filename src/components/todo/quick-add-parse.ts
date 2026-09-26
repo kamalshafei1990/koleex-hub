@@ -12,8 +12,12 @@
      today · tomorrow · day after tomorrow · monday…sunday (next occurrence;
      "next monday" = Monday of next week; mon…sun only after "on" / "next") · next week (Monday) · in 3 days / 2 weeks ·
      5/10 · 5/10/2026 · 5 oct · 今天 明天 后天 周一…周日 下周 · اليوم غدا بعد غد
+   Times: 3pm · 3:30pm · 15:30 · at 3 · 下午3点 · 上午10点半 · 3 مساء · 10 صباحا
+     (a time without a day is today, or tomorrow once that hour has passed)
    Priority: !high !med !low, !1 !2 !3, p1 p2 p3, !高 !中 !低
    Label: #name — only when a label with that name already exists.
+   People: @name — only when exactly one colleague answers to it (their
+     username, first name or full name without spaces).
    --------------------------------------------------------------------------- */
 
 import type { TodoPriority } from "@/types/supabase";
@@ -21,9 +25,21 @@ import { isoDay } from "./todo-dates";
 
 export interface QuickParse {
   title: string;
+  /** "YYYY-MM-DD" — the day. */
   due: string | null;
+  /** "HH:MM" (24 h) when a time was written. */
+  time: string | null;
   priority: TodoPriority | null;
   label: string | null;
+  /** account ids of the colleagues named with @. */
+  people: string[];
+}
+
+/** Who can be named with @ in the quick line. */
+export interface QuickPerson {
+  account_id: string;
+  username: string;
+  full_name: string | null;
 }
 
 const WEEKDAYS: Record<string, number> = {
@@ -87,16 +103,59 @@ const DATE_RULES: Rule[] = [
     day: (m, n) => dayMonth(n, Number(m[2]), MONTHS[m[3].toLowerCase()]) },
 ];
 
+/* Times — hour/minute, 24 h. Each returns null for an impossible time. */
+const hm = (h: number, m: number): [number, number] | null => (h >= 0 && h < 24 && m >= 0 && m < 60 ? [h, m] : null);
+const pm = (h: number) => (h < 12 ? h + 12 : h);
+const am = (h: number) => (h === 12 ? 0 : h);
+type TimeRule = { re: RegExp; time: (m: RegExpMatchArray) => [number, number] | null };
+const TIME_RULES: TimeRule[] = [
+  /* 下午3点 · 上午10点半 · 晚上8点30分 · 3点 — no spaces needed around it in Chinese. */
+  { re: /(上午|早上|中午|下午|晚上)?(\d{1,2})[点點时時](半|(\d{1,2})分?)?/,
+    time: (m) => {
+      let h = Number(m[2]);
+      if (m[1] && /下午|晚上/.test(m[1])) h = pm(h);
+      if (m[1] === "中午" && h < 11) h = pm(h);
+      return hm(h, m[3] === "半" ? 30 : Number(m[4] ?? 0));
+    } },
+  /* 3pm · 3:30 pm · at 11am */
+  { re: /(^|\s)(?:at\s)?(\d{1,2})(?:[:.](\d{2}))?\s?(am|pm|a\.m\.|p\.m\.)(?=\s|$)/i,
+    time: (m) => { const h = Number(m[2]); if (h < 1 || h > 12) return null; return hm(/^p/i.test(m[4]) ? pm(h) : am(h), Number(m[3] ?? 0)); } },
+  /* 3 مساء · 10:30 صباحا */
+  { re: /(^|\s)(\d{1,2})(?:[:.](\d{2}))?\s?(مساء|مساءً|مساءا|صباحا|صباحًا|صباحاً)(?=\s|$)/,
+    time: (m) => { const h = Number(m[2]); return hm(/^م/.test(m[4]) ? pm(h) : am(h), Number(m[3] ?? 0)); } },
+  /* 15:30 · at 9:05 */
+  { re: /(^|\s)(?:at\s)?([01]?\d|2[0-3]):([0-5]\d)(?=\s|$)/i, time: (m) => hm(Number(m[2]), Number(m[3])) },
+  /* at 3 — a bare hour only after "at"; 1–7 read as the afternoon. */
+  { re: /(^|\s)at\s(\d{1,2})(?=\s|$)/i,
+    time: (m) => { const h = Number(m[2]); return h >= 1 && h <= 7 ? hm(h + 12, 0) : hm(h, 0); } },
+];
+
+const squash = (v: string) => v.toLowerCase().replace(/\s+/g, "");
+
 export function parseQuickAdd(
   input: string,
   labels: string[],
-  opts: { dates?: boolean; priority?: boolean } = {},
+  opts: { dates?: boolean; priority?: boolean; people?: QuickPerson[] } = {},
   now = new Date(),
 ): QuickParse {
   let text = ` ${input.trim()} `;
   let due: string | null = null;
+  let time: string | null = null;
   let priority: TodoPriority | null = null;
   let label: string | null = null;
+  const people: string[] = [];
+
+  /* The time first: "明天下午3点" has no space between the day and the time,
+     and taking the time out leaves "明天" for the day rules. */
+  for (const rule of opts.dates === false ? [] : TIME_RULES) {
+    const m = text.match(rule.re);
+    if (!m) continue;
+    const v = rule.time(m);
+    if (!v) continue;
+    time = `${String(v[0]).padStart(2, "0")}:${String(v[1]).padStart(2, "0")}`;
+    text = text.replace(m[0], " ");
+    break;
+  }
 
   for (const rule of opts.dates === false ? [] : DATE_RULES) {
     const m = text.match(rule.re);
@@ -125,5 +184,37 @@ export function parseQuickAdd(
     });
   }
 
-  return { title: text.replace(/\s+/g, " ").trim(), due, priority, label };
+  /* A time alone means today — or tomorrow once that hour has gone. */
+  if (time && !due) {
+    const [h, m] = time.split(":").map(Number);
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+    due = isoDay(at.getTime() > now.getTime() ? at : addDays(now, 1));
+  }
+
+  const roster = opts.people ?? [];
+  if (roster.length > 0) {
+    text = text.replace(/(^|\s)@([^\s@]+)(?=\s|$)/g, (whole, lead: string, name: string) => {
+      const q = name.toLowerCase();
+      const hits = roster.filter((p) =>
+        p.username.toLowerCase() === q ||
+        squash(p.full_name ?? "") === q ||
+        (p.full_name ?? "").toLowerCase().split(/\s+/)[0] === q);
+      if (hits.length !== 1) return whole;
+      if (!people.includes(hits[0].account_id)) people.push(hits[0].account_id);
+      return lead;
+    });
+  }
+
+  return { title: text.replace(/\s+/g, " ").trim(), due, time, priority, label, people };
+}
+
+/** The stored due for a day + optional "HH:MM": a bare day stays a bare day
+ *  (the form's own format); with a time it is that local instant. */
+export function dueValue(day: string | null, time: string | null): string | null {
+  if (!day) return null;
+  if (!time) return day;
+  const [y, mo, d] = day.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const at = new Date(y, mo - 1, d, h, mi);
+  return Number.isNaN(at.getTime()) ? day : at.toISOString();
 }

@@ -4,8 +4,27 @@ import type { Translations } from "@/lib/i18n";
    api/cron/todo-reminders. */
 export const todoTpl: Translations = {
   "todo_assignment.s": { en: "New task: {title:free}", zh: "新任务：{title:free}", ar: "مهمة جديدة: {title:free}" },
+  /* Who handed it over, when it is due, what it is about — an employee can
+     act on the notification without opening it. */
+  "todo_assignment.b": {
+    en: "{by} assigned you this task[[ — due {due}]].[[ {desc:free}]]",
+    zh: "{by} 给你分配了这项任务[[，截止日期 {due}]]。[[{desc:free}]]",
+    ar: "أسند إليك {by} هذه المهمة[[ — موعد التسليم {due}]].[[ {desc:free}]]",
+  },
+  /* No person behind it (an automation) — the same facts without a name. */
+  "todo_assignment.system.s": { en: "New task: {title:free}", zh: "新任务：{title:free}", ar: "مهمة جديدة: {title:free}" },
+  "todo_assignment.system.b": {
+    en: "You have a new task[[ — due {due}]].[[ {desc:free}]]",
+    zh: "你有一项新任务[[，截止日期 {due}]]。[[{desc:free}]]",
+    ar: "لديك مهمة جديدة[[ — موعد التسليم {due}]].[[ {desc:free}]]",
+  },
 
   "todo_mention.s": { en: "You were mentioned: {title:free}", zh: "有人提到了你：{title:free}", ar: "تمت الإشارة إليك: {title:free}" },
+  "todo_mention.b": {
+    en: "{by} mentioned you on this task[[ — due {due}]].[[ {desc:free}]]",
+    zh: "{by} 在这项任务中提到了你[[，截止日期 {due}]]。[[{desc:free}]]",
+    ar: "أشار إليك {by} في هذه المهمة[[ — موعد التسليم {due}]].[[ {desc:free}]]",
+  },
   "todo_mention.plain.s": { en: "You were mentioned: {title:free}", zh: "有人提到了你：{title:free}", ar: "تمت الإشارة إليك: {title:free}" },
   "todo_mention.plain.b": { en: "You were mentioned on a task.", zh: "有人在一项任务中提到了你。", ar: "تمت الإشارة إليك في مهمة." },
 

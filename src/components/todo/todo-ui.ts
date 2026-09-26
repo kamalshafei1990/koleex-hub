@@ -4,7 +4,7 @@
    Labels are always t("p." + value) / t("st." + value) / t("rec." + value).
    --------------------------------------------------------------------------- */
 
-import type { TodoPriority, TodoStatus, TodoWithRelations } from "@/types/supabase";
+import type { TodoMetadata, TodoPriority, TodoStatus, TodoWithRelations } from "@/types/supabase";
 import { TODO_PRIORITIES, TODO_RECURRENCES, TODO_STATUSES } from "@/lib/todo-enums";
 
 export type TFn = (key: string, fallback?: string) => string;
@@ -64,3 +64,31 @@ export const CHOICE = "rounded-lg text-[11px] font-semibold transition-colors bo
 export const CHOICE_ON = "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]";
 export const CHOICE_OFF = "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]";
 export const SELECT_TRIGGER = "h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none cursor-pointer text-start";
+
+/** Status as a pill — the row and the sheet say the situation in words. */
+export const STATUS_PILL: Record<TodoStatus, string> = {
+  todo: "text-[var(--text-muted)] bg-[var(--bg-surface-active)]",
+  in_progress: "text-[#7FA9D6] bg-[#567FB2]/15",
+  blocked: "text-red-400 bg-red-500/10",
+  done: "text-green-400 bg-green-500/10",
+};
+/** Priority as a badge: high is tinted so it cannot be missed. */
+export const PRIORITY_BADGE: Record<TodoPriority, string> = {
+  high: "text-red-400 bg-red-500/10",
+  medium: "text-yellow-400 bg-yellow-500/10",
+  low: "text-[#7FA9D6] bg-[#567FB2]/10",
+};
+
+type Named = { account_id: string; full_name: string | null; username: string };
+export const nameOf = (p: Pick<Named, "full_name" | "username">) => p.full_name || p.username;
+
+/** "Sara Ahmed, Li Wei +2" — the first names in full, the rest counted;
+ *  the viewer reads as "You". */
+export function namesLine(list: Named[], meId: string | null, t: TFn, max = 2): string {
+  const names = list.slice(0, max).map((p) => (p.account_id === meId ? t("sheet.you") : nameOf(p)));
+  return names.join(", ") + (list.length > max ? ` +${list.length - max}` : "");
+}
+
+export function metaOf(task: TodoWithRelations): TodoMetadata {
+  return task.metadata && typeof task.metadata === "object" ? task.metadata : {};
+}
