@@ -177,7 +177,10 @@ export async function loadReportTasks(auth: ServerAuthContext, row: ReportRow): 
     accountId: auth.account_id, tenantId: auth.tenant_id, department: auth.department, isSuperAdmin: !!auth.is_super_admin, canViewPrivate: !!auth.can_view_private,
   };
   const taskIds = new Set(all.map((t) => t.id));
-  const shared = (await sharedTodoIds(viewer)).filter((id) => taskIds.has(id));
+  /* Narrowed to this report's tasks, keeping `assigned` so a private task
+     still shows to the people it is assigned to — To-do's own rule. */
+  const allShared = await sharedTodoIds(viewer);
+  const shared = Object.assign(allShared.filter((id) => taskIds.has(id)), { assigned: allShared.assigned });
   let vq = supabaseServer.from("koleex_todos").select("id").in("id", [...taskIds]);
   if (auth.tenant_id) vq = vq.eq("tenant_id", auth.tenant_id);
   const { data: vis, error: vErr } = await applyTodoScope(vq, viewer, shared);

@@ -50,30 +50,64 @@ import type {
   TodoAssigneeInfo,
   TodoMetadata,
 } from "@/types/supabase";
-import { todoListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
+import { todoListUrl, todoOpenListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
 
 /* ── Fetch todos ──
    The server scopes the list to the session (lib/server/todo-scope.ts):
    creator / assigner / assignee / observer / department / broadcast, minus
-   private tasks the caller did not create. Nothing is passed from here. */
+   private tasks the caller neither created nor is assigned to.
 
-export async function fetchTodos(): Promise<TodoWithRelations[]> {
-  try {
-    /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
-       a toggle repaints the cached, pre-toggle list. */
-    const res = await fetch(todoListUrl(), { credentials: "include" });
-    if (!res.ok) {
-      if (res.status !== 401 && res.status !== 403) {
-        console.error("[Todos] fetchTodos:", res.status);
-      }
-      return [];
-    }
-    const json = (await res.json()) as { todos: TodoWithRelations[] };
-    return json.todos;
-  } catch (e) {
-    console.error("[Todos] fetchTodos failed:", e);
-    return [];
+   THROWS on failure (a non-2xx, a network error): an empty array used to
+   stand for "you have no tasks" AND "the request failed", so a 500 painted
+   an empty list. The error carries the HTTP status (0 for a network error)
+   so a caller can tell 401/403 from a real failure. */
+
+export class TodoFetchError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "TodoFetchError";
   }
+}
+
+async function getTodoList(url: string): Promise<{ todos: TodoWithRelations[]; next_before?: string | null; truncated?: boolean }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: "include" });
+  } catch (e) {
+    throw new TodoFetchError(0, e instanceof Error ? e.message : "Network error");
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: unknown };
+    throw new TodoFetchError(res.status, typeof json.error === "string" ? json.error : `HTTP ${res.status}`);
+  }
+  const json = (await res.json()) as { todos?: TodoWithRelations[]; next_before?: string | null; truncated?: boolean };
+  return { todos: Array.isArray(json.todos) ? json.todos : [], next_before: json.next_before, truncated: json.truncated };
+}
+
+/** The whole visible list (the To-do screen's classic load). Throws on failure. */
+export async function fetchTodos(): Promise<TodoWithRelations[]> {
+  /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
+     a toggle repaints the cached, pre-toggle list. */
+  return (await getTodoList(todoListUrl())).todos;
+}
+
+/** Open tasks plus those completed in the last 24 hours (the lazy-completed
+ *  screen's first load). Throws on failure. */
+export async function fetchOpenTodos(): Promise<TodoWithRelations[]> {
+  return (await getTodoList(todoOpenListUrl())).todos;
+}
+
+/** One page of completed tasks, newest completion first. Pass the previous
+ *  page's `nextBefore` to continue; null means there is no more. Throws on
+ *  failure. */
+export async function fetchCompletedTodos(opts: { limit?: number; before?: string | null } = {}): Promise<{
+  todos: TodoWithRelations[];
+  nextBefore: string | null;
+}> {
+  const q = new URLSearchParams({ status: "completed", limit: String(opts.limit ?? 50) });
+  if (opts.before) q.set("before", opts.before);
+  const r = await getTodoList(`${todoListUrl()}&${q.toString()}`);
+  return { todos: r.todos, nextBefore: r.next_before ?? null };
 }
 
 /* ── Create todo ── */
@@ -426,3 +460,86 @@ export function subscribeToTodos(
     void supabase.removeChannel(channel);
   };
 }
+
+/* ── Writes that REPORT WHY they failed ─────────────────────────────────────
+   The helpers above answer a bare true/false (or null), so a screen can only
+   say "something went wrong" — for a lost race (409), a refused "assign to
+   everyone" (403), an invalid field (400, with the server's message) or a
+   duplicate label alike. These call the same routes and return the status
+   and the server's message; on success they announce the change exactly as
+   the helpers above do. */
+
+export type TodoWriteResult<T = undefined> =
+  | { ok: true; status: number; error: null; data: T }
+  | { ok: false; status: number; error: string | null; data: null };
+
+async function sendTodoWrite<T>(
+  url: string,
+  init: RequestInit,
+  pick: (json: Record<string, unknown>) => T,
+  announce = true,
+): Promise<TodoWriteResult<T>> {
+  try {
+    const res = await fetch(url, { credentials: "include", ...init });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      return { ok: false, status: res.status, error: typeof json.error === "string" ? json.error : null, data: null };
+    }
+    if (announce) await announceTodoChange();
+    return { ok: true, status: res.status, error: null, data: pick(json) };
+  } catch {
+    return { ok: false, status: 0, error: null, data: null };
+  }
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** POST /api/todos — the created row. */
+export function createTodoResult(body: Parameters<typeof createTodo>[0]): Promise<TodoWriteResult<TodoRow | null>> {
+  return sendTodoWrite("/api/todos", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) },
+    (j) => (j.todo ?? null) as TodoRow | null);
+}
+
+/** PATCH /api/todos/[id]. `rejectionReason` (≤ 1000 chars) sends a task back
+ *  without writing the whole metadata column — the server files it under
+ *  metadata.rejection. */
+export function updateTodoResult(
+  id: string,
+  updates: TodoUpdate,
+  opts: { newAssigneeIds?: string[]; rejectionReason?: string } = {},
+): Promise<TodoWriteResult> {
+  return sendTodoWrite(`/api/todos/${id}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ updates, newAssigneeIds: opts.newAssigneeIds, rejectionReason: opts.rejectionReason }),
+  }, () => undefined);
+}
+
+/** POST /api/todos/[id]/toggle — the server's resulting state: `completed`
+ *  on an owner's flip, `approval` on a participant's submit/withdraw. */
+export function toggleTodoResult(id: string): Promise<TodoWriteResult<{ completed: boolean | null; approval: "pending" | null | undefined }>> {
+  return sendTodoWrite(`/api/todos/${id}/toggle`, { method: "POST" }, (j) => ({
+    completed: typeof j.completed === "boolean" ? j.completed : null,
+    approval: (j.approval ?? undefined) as "pending" | null | undefined,
+  }));
+}
+
+/** POST /api/todo-labels — 409 when the name is taken. */
+export async function createTodoLabelResult(name: string, color?: string | null): Promise<TodoWriteResult<TodoLabelRow | null>> {
+  const r = await sendTodoWrite("/api/todo-labels", {
+    method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, color }),
+  }, (j) => (j.label ?? null) as TodoLabelRow | null, false);
+  if (r.ok) {
+    try {
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/todo-labels");
+    } catch { /* the next load refetches */ }
+  }
+  return r;
+}
+
+/** The session-gated link for a stored attachment (redirects to a
+ *  short-lived signed URL) — works for attachments saved before the bucket
+ *  goes private too. */
+export const todoAttachmentHref = (path: string): string =>
+  `/api/todos/attachment?path=${encodeURIComponent(path)}`;

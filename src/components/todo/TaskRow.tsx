@@ -37,12 +37,13 @@ import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import SquareIcon from "@/components/icons/ui/SquareIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import MiniAvatar from "./MiniAvatar";
 import { dayKey, fmtDay, fmtDayTime, fmtDue, isOverdueDate } from "./todo-dates";
 import { CHOICE, CHOICE_OFF, CHOICE_ON, PRIORITY_TEXT, STATUS_DOT, STATUSES, initials, type TFn } from "./todo-ui";
 import { isTempTask, type TodoActions } from "./use-todo-store";
-import { attachmentHref } from "./todo-write";
+import { todoAttachmentHref as attachmentHref } from "@/lib/todo-admin";
 
 export interface TaskRowProps {
   task: TodoWithRelations;
@@ -132,6 +133,15 @@ function TaskRow({
 
           {/* Scan line */}
           <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap min-w-0">
+            {/* Private: only its creator (and admins with private access)
+                see it — plus the people it is assigned to. Said on the row
+                so an assignee knows not to share it. */}
+            {task.is_private && (
+              <span className={`${BADGE} text-[var(--text-muted)] bg-[var(--bg-surface-active)]`}
+                title={task.created_by_account_id === meId ? t("row.privateMine") : t("row.privateShared")}>
+                <LockIcon size={9} /> {t("row.private")}
+              </span>
+            )}
             {task.priority !== "medium" && (
               <span className={`${META} font-semibold ${PRIORITY_TEXT[task.priority]}`}>
                 <FlagIcon size={10} /> {t("p." + task.priority)}

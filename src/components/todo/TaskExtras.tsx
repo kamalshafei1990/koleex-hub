@@ -22,7 +22,7 @@ import type {
   TodoAssigneeInfo,
 } from "@/types/supabase";
 import dynamic from "next/dynamic";
-import { attachmentHref } from "./todo-write";
+import { todoAttachmentHref as attachmentHref } from "@/lib/todo-admin";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";

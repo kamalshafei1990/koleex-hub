@@ -288,5 +288,12 @@ export const todoT: Translations = {
   "err.labelInvalid":  { en: "That label can't be saved — check the name.", zh: "无法保存该标签——请检查名称。", ar: "تعذّر حفظ هذا الوسم — تحقّق من الاسم." },
   "err.truncated":     { en: "Showing your newest tasks only — narrow the list with search or filters to find older ones.", zh: "仅显示最新的任务——使用搜索或筛选查找更早的任务。", ar: "يتم عرض أحدث مهامك فقط — استخدم البحث أو المرشحات للعثور على الأقدم." },
   "assign.everyone":   { en: "Everyone",                    zh: "所有人",                 ar: "الجميع" },
+  "row.private":       { en: "Private",                     zh: "私密",                   ar: "خاصة" },
+  "row.privateMine":   { en: "Private — only you and the people it is assigned to can see it.", zh: "私密——只有你和被分配的人可以看到。", ar: "خاصة — لا يراها إلا أنت ومن أُسندت إليهم." },
+  "row.privateShared": { en: "Private — shared with you because it is assigned to you. Only its creator can edit it.", zh: "私密——因分配给你而与你共享。只有创建者可以编辑。", ar: "خاصة — تمت مشاركتها معك لأنها مُسندة إليك. لا يعدّلها إلا منشئها." },
+  "done.loadMore":     { en: "Load older completed tasks",  zh: "加载更早的已完成任务",   ar: "تحميل المهام المنجزة الأقدم" },
+  "done.loadFailed":   { en: "Couldn't load completed tasks.", zh: "无法加载已完成的任务。", ar: "تعذّر تحميل المهام المنجزة." },
+  "done.searchHint":   { en: "Older completed tasks are searched once they are loaded — open Completed and load more to include them.", zh: "更早的已完成任务需先加载才会被搜索——打开“已完成”并加载更多。", ar: "يُبحث في المهام المنجزة الأقدم بعد تحميلها — افتح «المكتملة» وحمّل المزيد لتضمينها." },
+  "report.partial":    { en: "Very long history — the oldest completed tasks are not included. Pick a shorter period for exact numbers.", zh: "历史记录过长——最早的已完成任务未包含在内。请选择较短的周期以获得准确数字。", ar: "السجل طويل جدًا — لم تُضمَّن أقدم المهام المنجزة. اختر فترة أقصر للحصول على أرقام دقيقة." },
   "common.retry":      { en: "Retry",                       zh: "重试",                   ar: "إعادة المحاولة" },
 };

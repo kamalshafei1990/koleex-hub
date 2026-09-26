@@ -285,6 +285,21 @@ const clauses = todoScopeClauses(me, ["x1", "x2"]);
 check("the scope rule, written once: created · assigned · everyone · my department · shared (assignee or observer) — and private hidden unless mine",
   clauses !== null && clauses.scope === "created_by_account_id.eq.me-1,assigned_by_account_id.eq.me-1,assign_to_all.eq.true,assigned_department.eq.Sales,id.in.(x1,x2)" &&
   clauses.privacy === "is_private.eq.false,created_by_account_id.eq.me-1");
+/* OWNER DECISION 2026-09-27 ("yes let assignees see private tasks"): a
+   private task is visible to its creator AND its assignees — never to an
+   observer, the department or anyone else who is not an assignee. The
+   assignee ids ride on sharedTodoIds()'s result as `assigned`; the privacy
+   clause exempts exactly those, so private is still enforced for the rest. */
+const tagged = Object.assign(["x1", "x2"], { assigned: ["x1"] });
+check("  …a private task is seen by its creator and its ASSIGNEES only: the privacy clause exempts the assigned ids, not the observed ones",
+  todoScopeClauses(me, tagged)?.privacy === "is_private.eq.false,created_by_account_id.eq.me-1,id.in.(x1)" &&
+  todoScopeClauses(me, tagged)?.scope.endsWith("id.in.(x1,x2)") === true &&
+  todoScopeClauses(me, Object.assign(["x2"], { assigned: [] as string[] }))?.privacy === "is_private.eq.false,created_by_account_id.eq.me-1" &&
+  todoScopeClauses({ ...me, canViewPrivate: true }, tagged)?.privacy === null);
+const scopeSrc = readFileSync("src/lib/server/todo-scope.ts", "utf8");
+check("  …and sharedTodoIds tags the assignee subset (from koleex_todo_assignees), never the observers",
+  /const assigned = Array\.from\(new Set\(\(rows \?\? \[\]\)\.map\(\(r\) => \(r as \{ todo_id: string \}\)\.todo_id\)\)\);/.test(scopeSrc) &&
+  /return Object\.assign\(all, \{ assigned \}\);/.test(scopeSrc));
 check("  …no department and nothing shared drops those branches; break-glass drops the privacy clause; a super admin has no clauses at all",
   todoScopeClauses({ ...me, department: null }, [])?.scope === "created_by_account_id.eq.me-1,assigned_by_account_id.eq.me-1,assign_to_all.eq.true" &&
   todoScopeClauses({ ...me, canViewPrivate: true }, [])?.privacy === null && todoScopeClauses({ ...me, isSuperAdmin: true }, ["x1"]) === null);

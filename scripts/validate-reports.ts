@@ -3005,7 +3005,7 @@ console.log("\n§30 a report becomes work — forward it, make a task from it");
     (c) => (c.includes("if (body.share === true && mayForward(forwardFacts(loaded))) {") ? [] : ["a task carries a confidential report to anyone"]),
     (src) => src.replace("if (body.share === true && mayForward(forwardFacts(loaded))) {", "if (body.share === true) {"));
   rule("the report shows each reader only the tasks To-do itself shows them — its one scope rule, a count for the rest", FU,
-    (c) => (c.includes("const shared = (await sharedTodoIds(viewer)).filter((id) => taskIds.has(id));") && c.includes("await applyTodoScope(vq, viewer, shared);") && c.includes("return { tasks, count: all.length };") ? [] : ["every reader sees every task made from the report"]),
+    (c) => (c.includes("const shared = Object.assign(allShared.filter((id) => taskIds.has(id)), { assigned: allShared.assigned });") && c.includes("await applyTodoScope(vq, viewer, shared);") && c.includes("return { tasks, count: all.length };") ? [] : ["every reader sees every task made from the report"]),
     (src) => src.replace("await applyTodoScope(vq, viewer, shared);", "await vq;"));
   /* Since the To-do audit (e8875d4) every To-do write reads its fields
      through one allow-list, lib/server/todo-input.ts; that is where 'report'

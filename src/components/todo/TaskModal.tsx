@@ -40,7 +40,7 @@ import {
   CHOICE, CHOICE_OFF, CHOICE_ON, FIELD_LABEL, INPUT, PRIORITIES, PRIORITY_ON, RECURRENCES, STATUS_DOT, STATUSES, type TFn,
 } from "./todo-ui";
 import type { TaskFields } from "./use-todo-store";
-import { createLabel } from "./todo-write";
+import { createTodoLabelResult as createLabel } from "@/lib/todo-admin";
 
 /* Attachments · mentions · observers · products — its own chunk, fetched
    only when that section is opened. */

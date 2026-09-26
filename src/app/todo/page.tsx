@@ -53,7 +53,8 @@ import { todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
 import { dayKey, fmtDay, isDueTodayDate, isOverdueDate, todoLocale } from "@/components/todo/todo-dates";
 import { NO_FILTERS, activeFilterCount, filterChips, matchesFilters, type TodoFilters } from "@/components/todo/todo-filters";
 import { PILL, PILL_OFF, PILL_ON, PRIORITY_RANK, STATUSES, involves } from "@/components/todo/todo-ui";
-import { useTodoStore, type TaskFields } from "@/components/todo/use-todo-store";
+import { useTodoStore, type DoneState, type TaskFields } from "@/components/todo/use-todo-store";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Loaded on first use — none of these is needed to paint the list. */
 const TaskModal = dynamic(() => import("@/components/todo/TaskModal"), { ssr: false });
@@ -95,7 +96,7 @@ export default function TodoPage() {
      frame; the network answer replaces it behind a fully drawn screen. */
   const warmKey = todoWarmKey(accountId);
   const warm = useWarm<TodoSnap>(warmKey, 6 * 60 * 60 * 1000);
-  const { data, todos, hidden, loading, error, synced, actions } = useTodoStore({
+  const { data, todos, done, hidden, loading, error, synced, actions } = useTodoStore({
     warm, warmKey, accountId, isSA, tenantId, t, toast: showToast,
   });
   const employees = data?.employees ?? NO_PEOPLE;
@@ -123,8 +124,10 @@ export default function TodoPage() {
   /* ?new=1 (Smart Create) opens a blank task. */
   useOpenOnNewParam(() => setModal({ id: null, key: Date.now() }));
 
+  /* Edit / delete. A PRIVATE task stays its creator's even when it is
+     assigned to someone — assignees now see it, but may only move it. */
   const canManage = (x: TodoWithRelations) =>
-    isSA || (!!accountId && (x.created_by_account_id === accountId || x.assigned_by_account_id === accountId));
+    isSA || (!!accountId && (x.created_by_account_id === accountId || (!x.is_private && x.assigned_by_account_id === accountId)));
 
   /* ── derived lists ── */
   /* Recurring series: one row per period is stored; superseded periods that
@@ -219,6 +222,16 @@ export default function TodoPage() {
   const chips = filterChips(filters, t, lang, employees);
   const filterCount = activeFilterCount(filters);
   const modalEntry = modal?.id ? todos.find((x) => x.id === modal.id) ?? null : null;
+
+  /* Finished history is fetched the first time someone looks at it — the
+     Completed group opened, or the Done tab. Its count is only a number
+     once known: "12+" while older pages remain, nothing before the first. */
+  const moreDone = !done.loaded || !!done.nextBefore;
+  const wantDone = showCompleted || tab === "completed";
+  useEffect(() => {
+    if (wantDone && !done.loaded && !done.loading && !done.error) void actions.loadMoreDone();
+  }, [wantDone, done.loaded, done.loading, done.error, actions]);
+  const doneCount = (n: number) => (done.loaded ? `${n}${done.nextBefore ? "+" : ""}` : "");
 
   /* ── row callbacks (stable — rows are memoised) ── */
   const toggleExpand = (id: string) => setExpanded((prev) => {
@@ -379,12 +392,12 @@ export default function TodoPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 scrollbar-none">
               <div role="tablist" aria-label={t("app.title")} className="flex items-center gap-1.5 shrink-0">
               {([
-                ["all", t("pill.all"), counts.all],
-                ["active", t("pill.active"), counts.active],
-                ["completed", t("pill.done"), counts.done],
+                ["all", t("pill.all"), moreDone ? "" : String(counts.all)],
+                ["active", t("pill.active"), String(counts.active)],
+                ["completed", t("pill.done"), doneCount(counts.done)],
               ] as const).map(([k, label, n]) => (
                 <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={pill(tab === k)}>
-                  {label} <span className="tabular-nums opacity-70">{n}</span>
+                  {label} {n && <span className="tabular-nums opacity-70">{n}</span>}
                 </button>
               ))}
               {/* Waiting for MY sign-off — amber so a manager cannot miss it. */}
@@ -498,16 +511,21 @@ export default function TodoPage() {
                 <button type="button" onClick={actions.retry}
                   className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold">{t("common.retry")}</button>
               </div>
-            ) : shown.length === 0 ? (
+            ) : tab === "completed" && !done.loaded && shown.length === 0 ? (
+              done.error ? <LoadMore t={t} done={done} onMore={actions.loadMoreDone} /> : <ListSkeleton />
+            ) : shown.length === 0 && !(tab === "all" && moreDone && !deferredSearch.trim() && filterCount === 0) ? (
               <EmptyList t={t} tab={tab} searching={!!deferredSearch.trim()} filtered={filterCount > 0}
                 onClearSearch={() => setSearch("")} onClearFilters={() => setFilters({ ...NO_FILTERS })}
                 onAdd={() => quickRef.current?.focus()} />
             ) : view === "board" ? (
               <TodoBoard tasks={flat} t={t} lang={lang} actions={actions} onOpen={focusTask} />
             ) : sort !== "smart" || tab === "completed" || tab === "approvals" ? (
-              <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
-                {flat.map(renderRow)}
-              </div>
+              <>
+                <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+                  {flat.map(renderRow)}
+                </div>
+                {tab === "completed" && <LoadMore t={t} done={done} onMore={actions.loadMoreDone} />}
+              </>
             ) : (
               <div className="space-y-3">
                 <Section title={t("section.overdue")} count={groups.overdue.length} tone="text-red-400">{groups.overdue.map(renderRow)}</Section>
@@ -517,10 +535,16 @@ export default function TodoPage() {
                 {/* Folded by default: finished work is review, not today's list —
                     and it is usually the longest group by far. */}
                 <Section title={t("section.completed")} count={groups.completed.length} tone="text-[var(--text-dim)]"
+                  countLabel={done.loaded ? doneCount(groups.completed.length) : ""} keep={tab === "all" && moreDone}
                   open={showCompleted} onToggle={() => setShowCompleted((v) => !v)}>
                   {showCompleted && groups.completed.map(renderRow)}
+                  {showCompleted && <LoadMore t={t} done={done} onMore={actions.loadMoreDone} inline />}
                 </Section>
               </div>
+            )}
+
+            {deferredSearch.trim() && moreDone && (tab === "all" || tab === "completed") && (
+              <p className="text-center text-[11px] text-[var(--text-dim)]">{t("done.searchHint")}</p>
             )}
 
             {!loading && data && (
@@ -550,19 +574,24 @@ export default function TodoPage() {
 }
 
 /* ── Section — a collapsible group of the smart list ── */
-function Section({ title, count, tone, children, open: controlled, onToggle }: {
+function Section({ title, count, countLabel, keep, tone, children, open: controlled, onToggle }: {
   title: string; count: number; tone: string; children: React.ReactNode; open?: boolean; onToggle?: () => void;
+  /** Shown instead of the count (e.g. "50+"); "" hides the badge. */
+  countLabel?: string;
+  /** Render even while empty (there may be more to load). */
+  keep?: boolean;
 }) {
   const [own, setOwn] = useState(true);
   const open = controlled ?? own;
-  if (count === 0) return null;
+  if (count === 0 && !keep) return null;
+  const badge = countLabel ?? String(count);
   return (
     <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <button type="button" onClick={() => (onToggle ? onToggle() : setOwn((v) => !v))} aria-expanded={open}
         className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--bg-surface-subtle)] transition-colors rounded-2xl" data-kx-keep-hover>
         <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
         <h2 className={`text-[12px] font-bold uppercase tracking-wider ${tone}`}>{title}</h2>
-        <span className="text-[10px] font-semibold text-[var(--text-ghost)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-full tabular-nums">{count}</span>
+        {badge && <span className="text-[10px] font-semibold text-[var(--text-ghost)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-full tabular-nums">{badge}</span>}
       </button>
       {open && <div className="border-t border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">{children}</div>}
     </section>
@@ -575,6 +604,21 @@ function ViewLabel({ view, label }: { view: "list" | "board"; label: string }) {
       {view === "list" ? <LayoutListIcon size={13} /> : <LayoutGridIcon size={13} />}
       <span className="hidden md:inline">{label}</span>
     </>
+  );
+}
+
+/* History pager: "Load more" while older finished tasks remain. */
+function LoadMore({ t, done, onMore, inline = false }: { t: (k: string) => string; done: DoneState; onMore: () => void; inline?: boolean }) {
+  if (done.loaded && !done.nextBefore && !done.error) return null;
+  return (
+    <div className={`flex items-center justify-center gap-2 ${inline ? "py-2.5" : "pt-1"}`}>
+      {done.error && <span className="text-[11.5px] text-amber-300">{t("done.loadFailed")}</span>}
+      <button type="button" onClick={onMore} disabled={done.loading}
+        className="h-8 px-3.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 flex items-center gap-1.5">
+        {done.loading && <SpinnerIcon className="h-3.5 w-3.5" />}
+        {done.error ? t("common.retry") : t("done.loadMore")}
+      </button>
+    </div>
   );
 }
 

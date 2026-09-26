@@ -32,7 +32,7 @@ import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
 import { useInboxUnreadByApp } from "@/lib/inbox-unread-store";
-import { todoListUrl } from "@/lib/todo-list-url";
+import { todoOpenListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
@@ -130,7 +130,7 @@ const APP_DATA_PREFETCH: Record<string, string | (() => string)> = {
   projects: "/api/projects",
   /* To-do appends ?v=<write version> (busts its 30s HTTP cache after a
      write) — the prefetch must build the same key, hence the function. */
-  todo: todoListUrl,
+  todo: todoOpenListUrl,
   accounts: "/api/accounts",
   customers: "/api/contacts?type=customer",
   suppliers: "/api/contacts?type=supplier",

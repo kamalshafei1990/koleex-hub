@@ -23,15 +23,25 @@ import { notifyTodoAssigned, notifyTodoPeopleAdded, pingTodosChanged } from "@/l
          - appears in koleex_todo_assignees as me
          - assigned_department = my department
          - assign_to_all = true (broadcast)
-       MINUS any is_private=true unless I'm the creator or have
-       can_view_private (break-glass).
+       MINUS any is_private=true unless I'm the creator or an assignee
+       (owner, 2026-09-27) or have can_view_private (break-glass).
 
    Multi-tenancy: always filtered by auth.tenant_id.
 
    Paging (optional, additive): ?limit=N (1–500) returns the newest N and a
    `next_before` cursor; ?before=<created_at> continues from it. Without
    `limit` the whole visible list is returned, as the To-do screen expects,
-   up to LIST_CAP rows (`truncated: true` says the cap was hit). */
+   up to LIST_CAP rows (`truncated: true` says the cap was hit).
+
+   Lazy completed (optional, additive):
+     ?status=open       everything not completed, PLUS tasks completed in
+                        the last 24 hours (so a just-ticked task and its Undo
+                        still show). Paging as above, by created_at.
+     ?status=completed  completed tasks only, newest completion first;
+                        ?limit=N (default 50, max 500) and
+                        ?before=<completed_at> page it, `next_before` is the
+                        cursor for the next page.
+   No `status` behaves exactly as before. */
 
 const LIST_CAP = 3000;
 
@@ -65,9 +75,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, data: { open } });
   }
 
+  const statusParam = params.get("status");
+  if (statusParam !== null && statusParam !== "open" && statusParam !== "completed") {
+    return NextResponse.json({ error: "status must be open or completed" }, { status: 400 });
+  }
+  const completedOnly = statusParam === "completed";
   const limitParam = Number(params.get("limit"));
-  const paged = Number.isInteger(limitParam) && limitParam > 0;
-  const limit = paged ? Math.min(limitParam, 500) : LIST_CAP;
+  const paged = completedOnly || (Number.isInteger(limitParam) && limitParam > 0);
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : paged ? 50 : LIST_CAP;
   const before = params.get("before");
   if (before && !Number.isFinite(Date.parse(before))) {
     return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
@@ -86,14 +101,22 @@ export async function GET(req: Request) {
   };
   const sharedIds = await sharedTodoIds(viewer);
 
+  /* The page key: completion time for the completed list, creation time
+     for everything else. */
+  const cursorCol = completedOnly ? "completed_at" : "created_at";
   let query = supabaseServer
     .from("koleex_todos")
     .select("*")
-    .order("created_at", { ascending: false })
+    .order(cursorCol, { ascending: false })
     .order("id", { ascending: false })
     .limit(limit + 1);
   if (auth.tenant_id) query = query.eq("tenant_id", auth.tenant_id);
-  if (before) query = query.lt("created_at", before);
+  if (completedOnly) query = query.eq("completed", true).not("completed_at", "is", null);
+  else if (statusParam === "open") {
+    const justDone = new Date(Date.now() - 24 * 3600_000).toISOString();
+    query = query.or(`completed.eq.false,completed_at.gte.${justDone}`);
+  }
+  if (before) query = query.lt(cursorCol, before);
   query = applyTodoScope(query, viewer, sharedIds);
 
   const { data, error } = await query;
@@ -105,7 +128,7 @@ export async function GET(req: Request) {
   const more = all.length > limit;
   const todos = more ? all.slice(0, limit) : all;
   const pageInfo = paged
-    ? { next_before: more ? (todos[todos.length - 1].created_at as string) : null }
+    ? { next_before: more ? (todos[todos.length - 1][cursorCol] as string) : null }
     : more ? { truncated: true } : {};
   if (todos.length === 0) return NextResponse.json({ todos: [], ...pageInfo });
 

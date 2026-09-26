@@ -27,3 +27,9 @@ export function todoWriteVersion(): string {
 export function todoListUrl(): string {
   return `/api/todos?v=${todoWriteVersion()}`;
 }
+
+/** The open set the To-do screen loads first (not done, plus the last 24 h
+ *  of ticks). Home's hover prefetch must warm THIS key, not the full list. */
+export function todoOpenListUrl(): string {
+  return `${todoListUrl()}&status=open`;
+}

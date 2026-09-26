@@ -34,6 +34,7 @@ export interface TodoOwnership {
   status: string | null;
   completed: boolean;
   assign_to_all: boolean;
+  updated_at: string | null;
   due_date: string | null;
   remind_at: string | null;
   description: string | null;
@@ -53,7 +54,7 @@ export async function loadTodoOwnership(id: string, tenantId: string | null): Pr
   let q = supabaseServer
     .from("koleex_todos")
     .select(
-      "id, tenant_id, title, description, priority, status, completed, assign_to_all, due_date, remind_at, created_by_account_id, assigned_by_account_id, approval_state, metadata",
+      "id, tenant_id, title, description, priority, status, completed, assign_to_all, updated_at, due_date, remind_at, created_by_account_id, assigned_by_account_id, approval_state, metadata",
     )
     .eq("id", id);
   if (tenantId) q = q.eq("tenant_id", tenantId);

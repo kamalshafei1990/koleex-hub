@@ -49,6 +49,7 @@ import { resolveTaskTime, resolveTaskDay, describeWhen, parseRecurrence } from "
 import { buildTaskDraft, dayRangeISO, idList, UNKNOWN_PERSON_MESSAGE, type Person } from "./task-draft";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "../../todo-scope";
 import { ESCALATION_MARK } from "../../todo-escalation";
+import { attachmentPathsOf, releaseTodoAttachments } from "../../todo-attachments";
 
 const TODO_MODULE = "To-do";
 
@@ -1056,8 +1057,10 @@ const deleteTodo: ToolDef<
       console.error("[tool.deleteTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
-    /* Same as the HTTP DELETE: the task's notifications go with it. */
+    /* Same as the HTTP DELETE: the task's notifications go with it, and its
+       attachments once nothing else references them. */
     await clearTodoNotifications(t.id);
+    await releaseTodoAttachments(t.tenant_id, attachmentPathsOf(t.metadata));
     await pingTodosChanged(t.tenant_id);
     return {
       ok: true,

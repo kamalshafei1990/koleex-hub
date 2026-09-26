@@ -30,7 +30,7 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import MiniAvatar from "@/components/todo/MiniAvatar";
-import { loadTodoList, todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
+import { loadCompletedSince, loadOpenTodos, mergeTodos, todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
 import { dayKey, fmtDay, horizonRange, isOverdueDate } from "@/components/todo/todo-dates";
 import { statusOf } from "@/components/todo/todo-ui";
 
@@ -67,7 +67,7 @@ export default function TodoReportPage() {
      me", so rendering before the id lands would show an empty report. */
   const accountId = useCurrentAccountId();
   const warm = useWarm<TodoSnap>(todoWarmKey(accountId), 6 * 60 * 60 * 1000);
-  const [fresh, setFresh] = useState<{ todos: TodoWithRelations[]; people: TodoAssigneeInfo[] } | null>(null);
+  const [fresh, setFresh] = useState<{ todos: TodoWithRelations[]; people: TodoAssigneeInfo[]; partial: boolean } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -76,13 +76,22 @@ export default function TodoReportPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  /* The open set, plus finished history back to the period's first day —
+     a task created or due in the period and finished can only have been
+     finished on or after that day's tasks were created. A custom range with
+     no start reads all history (capped). */
+  const since = period === "custom" ? (from || null) : horizonRange(period)[0];
   useEffect(() => {
     let alive = true;
-    Promise.all([loadTodoList(attempt > 0), fetchAssignableEmployees()])
-      .then(([todos, people]) => { if (alive) { setFresh({ todos, people }); setFailed(false); } })
+    Promise.all([loadOpenTodos(attempt > 0), loadCompletedSince(since), fetchAssignableEmployees()])
+      .then(([open, doneSince, people]) => {
+        if (!alive) return;
+        setFresh({ todos: mergeTodos(open.todos, doneSince.todos), people, partial: !doneSince.complete || open.truncated });
+        setFailed(false);
+      })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, [attempt]);
+  }, [attempt, since]);
 
   const todos = fresh?.todos ?? warm?.todos ?? null;
   const people = fresh?.people ?? warm?.employees ?? [];
@@ -215,6 +224,10 @@ export default function TodoReportPage() {
                 <span className="flex-1 min-w-0">{todos ? t("err.loadStale") : t("err.loadFailed")}</span>
                 <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold underline underline-offset-2">{t("common.retry")}</button>
               </div>
+            )}
+
+            {fresh?.partial && (
+              <p className="text-[11.5px] text-[var(--text-dim)]">{t("report.partial")}</p>
             )}
 
             {!todos ? (

@@ -13,20 +13,24 @@ import "server-only";
      everyone else → OR of: I created it · I assigned it · I am an assignee ·
                      it is for my department · it is for everyone ·
                      I observe it (metadata.observers)
-     MINUS private tasks I did not create, unless can_view_private.
+     MINUS private tasks I neither created nor am assigned to (owner,
+     2026-09-27), unless can_view_private.
      Always within the tenant (the caller adds the tenant predicate on the
      query it builds; this module only adds the scope clauses).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 
-export { applyTodoScope, type TodoViewer } from "@/lib/server/todo-scope-rule";
-import type { TodoViewer } from "@/lib/server/todo-scope-rule";
+export { applyTodoScope, type TodoViewer, type SharedTodoIds } from "@/lib/server/todo-scope-rule";
+import type { SharedTodoIds, TodoViewer } from "@/lib/server/todo-scope-rule";
 
 /** The ids of tasks the viewer is an assignee of or observes — the "shared"
- *  branch of the scope. Empty for a super admin (who needs no branch). */
-export async function sharedTodoIds(v: TodoViewer): Promise<string[]> {
-  if (v.isSuperAdmin) return [];
+ *  branch of the scope — tagged with the assignee subset (`assigned`), which
+ *  the privacy clause exempts. Empty for a super admin (who needs no
+ *  branch). Pass it through as is: `.filter()` on it returns a plain array
+ *  without the tag, which drops the assignee exemption (the safe side). */
+export async function sharedTodoIds(v: TodoViewer): Promise<SharedTodoIds> {
+  if (v.isSuperAdmin) return Object.assign([] as string[], { assigned: [] as string[] });
   let obsQuery = supabaseServer
     .from("koleex_todos")
     .select("id")
@@ -36,11 +40,8 @@ export async function sharedTodoIds(v: TodoViewer): Promise<string[]> {
     supabaseServer.from("koleex_todo_assignees").select("todo_id").eq("account_id", v.accountId),
     obsQuery,
   ]);
-  return Array.from(
-    new Set([
-      ...(rows ?? []).map((r) => (r as { todo_id: string }).todo_id),
-      ...(obsRows ?? []).map((r) => (r as { id: string }).id),
-    ]),
-  );
+  const assigned = Array.from(new Set((rows ?? []).map((r) => (r as { todo_id: string }).todo_id)));
+  const all = Array.from(new Set([...assigned, ...(obsRows ?? []).map((r) => (r as { id: string }).id)]));
+  return Object.assign(all, { assigned });
 }
 

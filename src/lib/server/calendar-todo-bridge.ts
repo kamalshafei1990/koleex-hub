@@ -16,22 +16,23 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { accountTimezone } from "@/lib/server/calendar-notify";
 import { pingTodosChanged } from "@/lib/server/todo-notify";
 import { clearUnreadByMetaIn } from "@/lib/server/inbox-lifecycle";
+import { attachmentPathsOf, releaseTodoAttachments } from "@/lib/server/todo-attachments";
 import { zonedDateKey } from "@/lib/calendar-tz";
 import type { CalendarEventCore } from "@/lib/server/calendar-access";
 
 /** The To-do rows the Calendar→To-do bridge made from this event. */
-async function linkedTodoIds(eventId: string, tenantId: string | null): Promise<string[]> {
-  let q = supabaseServer.from("koleex_todos").select("id").eq("source", "calendar").eq("source_id", eventId);
+async function linkedTodos(eventId: string, tenantId: string | null): Promise<Array<{ id: string; metadata: unknown }>> {
+  let q = supabaseServer.from("koleex_todos").select("id, metadata").eq("source", "calendar").eq("source_id", eventId);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   const { data } = await q;
-  return ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
+  return (data ?? []) as Array<{ id: string; metadata: unknown }>;
 }
 
 /** Keep the bridged To-do in step with the event. Best-effort: the event is
  *  saved either way. */
 export async function syncLinkedTodo(ev: CalendarEventCore): Promise<void> {
   try {
-    const ids = await linkedTodoIds(ev.id, ev.tenant_id);
+    const ids = (await linkedTodos(ev.id, ev.tenant_id)).map((r) => r.id);
     if (ids.length === 0) return;
     const due = zonedDateKey(ev.start_at, await accountTimezone(ev.account_id));
     const { error } = await supabaseServer
@@ -47,12 +48,14 @@ export async function syncLinkedTodo(ev: CalendarEventCore): Promise<void> {
 
 export async function deleteLinkedTodos(eventId: string, tenantId: string | null): Promise<void> {
   try {
-    const ids = await linkedTodoIds(eventId, tenantId);
+    const rows = await linkedTodos(eventId, tenantId);
+    const ids = rows.map((r) => r.id);
     if (ids.length === 0) return;
     const { error } = await supabaseServer.from("koleex_todos").delete().in("id", ids);
     if (error) throw new Error(error.message);
     // Their notifications go with them — one chunked update, not one per task.
     await clearUnreadByMetaIn({}, "todo_id", ids);
+    await releaseTodoAttachments(tenantId, rows.flatMap((r) => attachmentPathsOf(r.metadata)));
     await pingTodosChanged(tenantId);
   } catch (e) {
     console.error("[calendar-todo-bridge] cleanup:", e instanceof Error ? e.message : e);

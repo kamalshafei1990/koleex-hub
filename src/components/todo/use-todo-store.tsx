@@ -27,13 +27,15 @@
    render's code — rows re-render only when their own task changes.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   TodoAssigneeInfo, TodoLabelRow, TodoMetadata, TodoPriority, TodoRecurrence, TodoRow, TodoStatus, TodoWithRelations,
 } from "@/types/supabase";
-import { addTodoNote, deleteTodo, deleteTodoNote, subscribeToTodos } from "@/lib/todo-admin";
-import { loadTodoSnap, saveTodoWarm, type TodoSnap } from "./todo-data";
-import { createTask, patchTask as patchTaskApi, toggleTask, type WriteResult } from "./todo-write";
+import {
+  addTodoNote, createTodoResult, deleteTodo, deleteTodoNote, subscribeToTodos, toggleTodoResult, updateTodoResult,
+  type TodoWriteResult,
+} from "@/lib/todo-admin";
+import { loadCompletedPage, loadTodoSnap, mergeTodos, saveTodoWarm, type TodoSnap } from "./todo-data";
 import type { TFn } from "./todo-ui";
 
 type Toast = (msg: ReactNode, kind?: "success" | "error" | "info", ms?: number) => void;
@@ -55,6 +57,16 @@ export interface TaskFields {
 }
 
 const EMPTY: TodoWithRelations[] = [];
+
+export interface DoneState {
+  rows: TodoWithRelations[];
+  /** Cursor for the next page; null once history is exhausted. */
+  nextBefore: string | null;
+  loaded: boolean;
+  loading: boolean;
+  error: boolean;
+}
+const NO_DONE: DoneState = { rows: [], nextBefore: null, loaded: false, loading: false, error: false };
 const UNDO_MS = 5000;
 export const isTempTask = (id: string) => id.startsWith("tmp-");
 
@@ -143,8 +155,13 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
   } | null>(null);
   const pendingDeletes = useRef(new Map<string, { ids: string[]; timer: ReturnType<typeof setTimeout> }>());
 
+  /* Finished history beyond the open set — paged in on demand. */
+  const [done, setDone] = useState<DoneState>(NO_DONE);
+  const doneBusy = useRef(false);
+
   const data = fresh ?? warm;
-  const todos = data?.todos ?? EMPTY;
+  const open = data?.todos ?? EMPTY;
+  const todos = useMemo(() => mergeTodos(open, done.rows), [open, done.rows]);
 
   /* ── load, realtime, resume ── */
   useEffect(() => {
@@ -211,8 +228,17 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
     });
   const patchTodos = (fn: (list: TodoWithRelations[]) => TodoWithRelations[]) =>
     patchSnap((s) => ({ ...s, todos: fn(s.todos) }));
-  const patchTask = (id: string, p: Partial<TodoWithRelations> | ((x: TodoWithRelations) => TodoWithRelations)) =>
-    patchTodos((list) => list.map((x) => (x.id === id ? (typeof p === "function" ? p(x) : { ...x, ...p }) : x)));
+  /* A task can sit in the open set or in loaded history — patch both. */
+  const patchTask = (id: string, p: Partial<TodoWithRelations> | ((x: TodoWithRelations) => TodoWithRelations)) => {
+    const apply = (list: TodoWithRelations[]) =>
+      list.map((x) => (x.id === id ? (typeof p === "function" ? p(x) : { ...x, ...p }) : x));
+    patchTodos(apply);
+    setDone((d) => (d.rows.some((x) => x.id === id) ? { ...d, rows: apply(d.rows) } : d));
+  };
+  const dropTasks = (ids: Set<string>) => {
+    patchTodos((list) => list.filter((x) => !ids.has(x.id)));
+    setDone((d) => (d.rows.some((x) => ids.has(x.id)) ? { ...d, rows: d.rows.filter((x) => !ids.has(x.id)) } : d));
+  };
   const unhide = (ids: string[]) =>
     setHidden((prev) => {
       const next = new Set(prev);
@@ -226,7 +252,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
   /* Why a write failed, in words the reader can act on. A 409 (the task
      changed under us) is already followed by the refresh every write
      schedules, so the row settles to the server's truth. */
-  const reason = (r: WriteResult<unknown> | null, assignAll = false): string => {
+  const reason = (r: TodoWriteResult<unknown> | null, assignAll = false): string => {
     if (!r || r.ok) return t("err.saveFailed");
     if (r.status === 409) return t("err.conflict");
     if (r.status === 403) return assignAll ? t("err.assignAllAdmin") : t("err.forbidden");
@@ -234,7 +260,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
     if (r.status === 0) return t("err.offline");
     return t("err.saveFailed");
   };
-  const fail = (r: WriteResult<unknown> | null = null) => toast(reason(r), "error");
+  const fail = (r: TodoWriteResult<unknown> | null = null) => toast(reason(r), "error");
 
   /* One write in flight per task: a second tap while the first was on the
      wire flipped the row twice and let a late rollback restore the wrong
@@ -264,7 +290,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         const submits = done && !isOwner(before) && before.approval_state !== "approved";
         if (submits) patchTask(id, { approval_state: "pending" });
         else patchTask(id, { status, completed: done, completed_at: done ? before.completed_at ?? new Date().toISOString() : null });
-        const r = await engine.mutate(() => patchTaskApi(id, { status }));
+        const r = await engine.mutate(() => updateTodoResult(id, { status }));
         if (!r.ok) {
           patchTask(id, { status: before.status, completed: before.completed, completed_at: before.completed_at, approval_state: before.approval_state });
           fail(r);
@@ -286,7 +312,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         if (!isOwner(before) && !before.completed && before.approval_state !== "approved") {
           const withdrawing = before.approval_state === "pending";
           patchTask(id, { approval_state: withdrawing ? null : "pending" });
-          const r = await engine.mutate(() => toggleTask(id));
+          const r = await engine.mutate(() => toggleTodoResult(id));
           if (!r.ok) { patchTask(id, { approval_state: before.approval_state }); fail(r); return; }
           if (!withdrawing) toast(withUndo(t("toast.submitted"), () => void undoRef.current?.toggle(id)), "success", UNDO_MS);
           return;
@@ -298,7 +324,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
           status: completing ? "done" : "todo",
           approval_state: completing ? (before.approval_state === "pending" ? "approved" : before.approval_state) : null,
         });
-        const r = await engine.mutate(() => toggleTask(id));
+        const r = await engine.mutate(() => toggleTodoResult(id));
         if (!r.ok) {
           patchTask(id, { completed: before.completed, completed_at: before.completed_at, status: before.status, approval_state: before.approval_state });
           fail(r);
@@ -324,7 +350,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         if (!before) return;
         const now = new Date().toISOString();
         patchTask(id, { approval_state: "approved", completed: true, completed_at: now, status: "done" });
-        const r = await engine.mutate(() => patchTaskApi(id, { approval_state: "approved", status: "done" }));
+        const r = await engine.mutate(() => updateTodoResult(id, { approval_state: "approved", status: "done" }));
         if (!r.ok) { patchTask(id, () => before); fail(r); }
       });
     },
@@ -340,7 +366,10 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
           rejection: { reason: text, by: accountId, at: new Date().toISOString() },
         };
         patchTask(id, { approval_state: "rejected", completed: false, completed_at: null, status: "in_progress", metadata });
-        const r = await engine.mutate(() => patchTaskApi(id, { approval_state: "rejected", status: "in_progress", metadata }));
+        /* The reason alone: the server writes it into the task's OWN
+           metadata, so a concurrent edit to attachments or the checklist is
+           never overwritten by our copy of the column. */
+        const r = await engine.mutate(() => updateTodoResult(id, { approval_state: "rejected", status: "in_progress" }, { rejectionReason: text }));
         if (!r.ok) { patchTask(id, () => before); fail(r); }
       });
     },
@@ -361,7 +390,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         pendingDeletes.current.delete(batch);
         const results = await engine.mutate(() => Promise.all(entry.ids.map((x) => deleteTodo(x))));
         const gone = new Set(entry.ids.filter((_, i) => results[i]));
-        if (gone.size) patchTodos((list) => list.filter((x) => !gone.has(x.id)));
+        if (gone.size) dropTasks(gone);
         unhide(entry.ids);
         if (gone.size < entry.ids.length) fail();
       };
@@ -386,7 +415,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         if (done && !isOwner(b) && b.approval_state !== "approved") patchTask(b.id, { approval_state: "pending" });
         else patchTask(b.id, { status, completed: done, completed_at: done ? b.completed_at ?? now : null });
       });
-      const results = await engine.mutate(() => Promise.all(befores.map((b) => patchTaskApi(b.id, { status }))));
+      const results = await engine.mutate(() => Promise.all(befores.map((b) => updateTodoResult(b.id, { status }))));
       const failed = results.filter((r) => !r.ok);
       befores.forEach((b, i) => { if (!results[i].ok) patchTask(b.id, () => b); });
       if (failed.length) fail(failed[0]);
@@ -397,7 +426,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
       const skipped = ids.length - befores.length;
       befores.forEach((b) => patchTask(b.id, { assignees: [assignee], assign_to_all: false, assigned_department: null }));
       const results = await engine.mutate(() =>
-        Promise.all(befores.map((b) => patchTaskApi(b.id, { assign_to_all: false, assigned_department: null }, [assignee.account_id]))),
+        Promise.all(befores.map((b) => updateTodoResult(b.id, { assign_to_all: false, assigned_department: null }, { newAssigneeIds: [assignee.account_id] }))),
       );
       const failed = results.filter((r) => !r.ok);
       befores.forEach((b, i) => { if (!results[i].ok) patchTask(b.id, () => b); });
@@ -440,7 +469,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
           .map((c) => (c.id === itemId ? { ...c, done: !c.done } : c));
         const metadata = { ...meta, checklist };
         patchTask(todoId, { metadata });
-        const r = await engine.mutate(() => patchTaskApi(todoId, { metadata }));
+        const r = await engine.mutate(() => updateTodoResult(todoId, { metadata }));
         if (!r.ok) { patchTask(todoId, { metadata: before.metadata }); fail(r); }
       });
     },
@@ -460,7 +489,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
         recurrence_spawned_for: null, source: "manual", source_id: null, is_private: false, tenant_id: null, reminded_at: null,
       }, assignees);
       patchTodos((list) => [temp, ...list]);
-      const r = await engine.mutate(() => createTask({ ...fields, assignee_account_ids: assigneeIds }));
+      const r = await engine.mutate(() => createTodoResult({ ...fields, assignee_account_ids: assigneeIds }));
       if (!r.ok || !r.data) {
         patchTodos((list) => list.filter((x) => x.id !== tempId));
         return reason(r.ok ? null : r, fields.assign_to_all);
@@ -475,7 +504,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
       if (!before) return t("toast.notFound");
       const assignees = (data?.employees ?? []).filter((e) => assigneeIds.includes(e.account_id));
       patchTask(id, { ...fields, assignees, completed: fields.status === "done" });
-      const r = await engine.mutate(() => patchTaskApi(id, fields, assigneeIds));
+      const r = await engine.mutate(() => updateTodoResult(id, fields, { newAssigneeIds: assigneeIds }));
       if (r.ok) return null;
       patchTask(id, () => before);
       return reason(r, fields.assign_to_all && !before.assign_to_all);
@@ -483,6 +512,24 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
 
     addLabel(label: TodoLabelRow) {
       patchSnap((s) => (s.labels.some((l) => l.id === label.id) ? s : { ...s, labels: [...s.labels, label] }));
+    },
+
+    /* Next page of finished tasks (the first call loads the first page). */
+    async loadMoreDone() {
+      if (doneBusy.current || (done.loaded && !done.nextBefore)) return;
+      doneBusy.current = true;
+      setDone((d) => ({ ...d, loading: true, error: false }));
+      try {
+        const page = await loadCompletedPage(done.loaded ? done.nextBefore : null);
+        setDone((d) => {
+          const have = new Set(d.rows.map((x) => x.id));
+          return { rows: [...d.rows, ...page.todos.filter((x) => !have.has(x.id))], nextBefore: page.nextBefore, loaded: true, loading: false, error: false };
+        });
+      } catch {
+        setDone((d) => ({ ...d, loading: false, error: true }));
+      } finally {
+        doneBusy.current = false;
+      }
     },
 
     retry() {
@@ -493,7 +540,7 @@ export function useTodoStore({ warm, warmKey, accountId, isSA, tenantId, t, toas
 
   useEffect(() => { undoRef.current = actions; }, [actions]);
 
-  return { data, todos, hidden, loading: !data && !error, error, synced, actions };
+  return { data, todos, done, hidden, loading: !data && !error, error, synced, actions };
 }
 
 function withRelations(row: TodoRow, assignees: TodoAssigneeInfo[]): TodoWithRelations {

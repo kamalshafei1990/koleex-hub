@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/todo-access";
 import { internalAccountIds } from "@/lib/server/internal-accounts";
 import { readIdList, readTodoFields } from "@/lib/server/todo-input";
+import { attachmentPathsOf, releaseTodoAttachments, removedAttachmentPaths } from "@/lib/server/todo-attachments";
 import { ESCALATION_MARK } from "@/lib/server/todo-escalation";
 import {
   clearTodoNotifications,
@@ -166,12 +167,24 @@ export async function PATCH(
     submittedForApproval = false;
   }
 
+  /* `rejectionReason` (≤ 1000 chars) is the send-back reason on its own, so
+     a caller never has to write the whole metadata column to return a task.
+     The server writes it into metadata.rejection — merged into the metadata
+     this request carries, or else into the task's OWN metadata; in that
+     second case the write is conditional on the row being unchanged since
+     it was read (updated_at below), so no concurrent edit is overwritten. */
+  if (body.rejectionReason !== undefined && body.rejectionReason !== null && typeof body.rejectionReason !== "string") {
+    return NextResponse.json({ error: "rejectionReason must be text" }, { status: 400 });
+  }
   const reason = typeof body.rejectionReason === "string" ? body.rejectionReason.trim() : "";
-  if (approvalDecision === "rejected" && !("metadata" in updates) && reason) {
-    updates.metadata = {
-      ...((existing.metadata as Record<string, unknown> | null) ?? {}),
-      rejection: { reason: reason.slice(0, 2000), by: auth.account_id, at: nowIso },
-    };
+  if (reason.length > 1000) {
+    return NextResponse.json({ error: "The reason is too long (max 1000 characters)" }, { status: 400 });
+  }
+  let mergedIntoExisting = false;
+  if (approvalDecision === "rejected" && reason) {
+    const base = (updates.metadata as Record<string, unknown> | undefined) ?? existing.metadata ?? {};
+    mergedIntoExisting = !("metadata" in updates);
+    updates.metadata = { ...base, rejection: { reason, by: auth.account_id, at: nowIso } };
   }
 
   /* A RETURN MUST CARRY A REASON. Sending work back without saying why just
@@ -187,6 +200,7 @@ export async function PATCH(
   /* The escalation stamp re-arms when the due date moves — dropped from
      whichever metadata this write carries. */
   if (dueMoved) {
+    if (!("metadata" in updates)) mergedIntoExisting = true;
     const base = (updates.metadata as Record<string, unknown> | undefined) ?? existing.metadata;
     if (base && ESCALATION_MARK in base) {
       const next = { ...base };
@@ -216,6 +230,9 @@ export async function PATCH(
      managers deciding at once — or a double-tapped submit — produce one
      decision and one notification, and the loser gets 409. */
   let q = supabaseServer.from("koleex_todos").update(updates).eq("id", id);
+  /* Metadata the SERVER derived from the row it read: write only if that
+     row is still the one read (optimistic lock on updated_at). */
+  if (mergedIntoExisting && "metadata" in updates && existing.updated_at) q = q.eq("updated_at", existing.updated_at);
   if (approvalDecision) q = q.eq("approval_state", "pending");
   else if (submittedForApproval) {
     q = existing.approval_state === null ? q.is("approval_state", null) : q.eq("approval_state", existing.approval_state);
@@ -275,7 +292,11 @@ export async function PATCH(
     priority: (updates.priority as string | undefined) ?? existing.priority ?? "medium",
     tenant_id: existing.tenant_id,
   };
+  /* Attachments this edit removed: their objects go once nothing else
+     (another period of the same series, a copy) still lists them. */
+  const releasedPaths = "metadata" in updates ? removedAttachmentPaths(existing.metadata, updates.metadata) : [];
   after(async () => {
+    if (releasedPaths.length > 0) await releaseTodoAttachments(existing.tenant_id, releasedPaths);
     if (submittedForApproval) await notifySubmittedForApproval({ ...existing, title }, auth.account_id);
     if (approvalDecision) {
       await notifyApprovalDecision(
@@ -330,6 +351,10 @@ export async function DELETE(
      otherwise it keeps counting in the bell and links to a row that no
      longer exists. Awaited: the client recounts the bell right after. */
   await clearTodoNotifications(id);
-  after(() => pingTodosChanged(existing.tenant_id ?? auth.tenant_id));
+  const paths = attachmentPathsOf(existing.metadata);
+  after(async () => {
+    if (paths.length > 0) await releaseTodoAttachments(existing.tenant_id, paths);
+    await pingTodosChanged(existing.tenant_id ?? auth.tenant_id);
+  });
   return NextResponse.json({ ok: true });
 }

@@ -3,8 +3,11 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    todo-attachments — the one definition of a task attachment's storage
    object: bucket, allowed types, size, and the exact path shape. The upload
-   route writes it; the attachment route reads it back.
+   route writes it; the attachment route reads it back; edits and deletes
+   release it.
    --------------------------------------------------------------------------- */
+
+import { supabaseServer } from "@/lib/server/supabase-server";
 
 export const TODO_ATTACHMENT_BUCKET = "todo-attachments";
 export const TODO_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
@@ -62,4 +65,57 @@ export function cleanAttachmentName(raw: unknown, fallback: string): string {
   const s = typeof raw === "string" ? raw : "";
   const base = s.split(/[\\/]/).pop()!.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 200);
   return base || fallback;
+}
+
+/** The storage paths a task's metadata references (metadata.attachments[].path). */
+export function attachmentPathsOf(meta: unknown): string[] {
+  const list = (meta as { attachments?: unknown } | null)?.attachments;
+  if (!Array.isArray(list)) return [];
+  return Array.from(new Set(
+    list.map((a) => (a as { path?: unknown })?.path).filter((p): p is string => typeof p === "string" && p.length > 0),
+  ));
+}
+
+/** Paths in `before` that `after` no longer references — what an edit removed. */
+export function removedAttachmentPaths(before: unknown, after: unknown): string[] {
+  const kept = new Set(attachmentPathsOf(after));
+  return attachmentPathsOf(before).filter((p) => !kept.has(p));
+}
+
+/**
+ * Delete the storage objects of attachments nothing references any more.
+ *
+ * Called AFTER the task write (a removed attachment, a deleted task).
+ * Reference-counted: a recurring template and every period spawned from it
+ * share the same objects, so a path is deleted only when no task in the
+ * tenant still lists it (`metadata @> {"attachments":[{"path":…}]}`, served
+ * by idx_koleex_todos_metadata_path). Only paths of the upload route's exact
+ * shape under THIS tenant are ever touched — metadata is client-written, so
+ * a path naming another tenant's (or any other) object is ignored.
+ * Best-effort: logged, never thrown.
+ */
+export async function releaseTodoAttachments(tenantId: string | null, paths: string[]): Promise<void> {
+  if (!tenantId || paths.length === 0) return;
+  const candidates = Array.from(new Set(paths)).filter((p) => isTodoAttachmentPath(p, tenantId));
+  const orphans: string[] = [];
+  for (const path of candidates) {
+    try {
+      const { data, error } = await supabaseServer
+        .from("koleex_todos")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .contains("metadata", { attachments: [{ path }] })
+        .limit(1);
+      if (error) {
+        console.error("[todo-attachments] refcount:", error.message);
+        continue;
+      }
+      if (!data || data.length === 0) orphans.push(path);
+    } catch (e) {
+      console.error("[todo-attachments] refcount:", e instanceof Error ? e.message : e);
+    }
+  }
+  if (orphans.length === 0) return;
+  const { error } = await supabaseServer.storage.from(TODO_ATTACHMENT_BUCKET).remove(orphans);
+  if (error) console.error("[todo-attachments] remove:", error.message);
 }
