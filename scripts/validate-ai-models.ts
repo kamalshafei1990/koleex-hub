@@ -198,8 +198,8 @@ async function main() {
       !/model-choice|koleex-models"/.test(readFileSync("src/lib/display-prefs.tsx", "utf8")) &&
       !/koleex-models"/.test(readFileSync("src/lib/access-control.ts", "utf8")));
   check("every turn carries the choice, and the send callback re-binds when it changes",
-    /model: modelChoice,\s*\}\),\s*signal: aborter\.signal,/.test(app) &&
-      /\[input, activeId, lang, stopTts, attachments, webSearch, modelChoice,/.test(app));
+    /model: modelChoice,[\s\S]{0,400}?\}\),\s*signal: aborter\.signal,/.test(app) &&
+      /\[input, activeId, activeProjectId, lang, stopTts, attachments, webSearch, modelChoice,/.test(app));
   check("both reply paths record who answered, through the served-model normaliser",
     /servedModel: normalizeServingModel\(json\?\.model\),/.test(app) &&
       /servedModel = normalizeServingModel\(json\.model\);/.test(app) &&
