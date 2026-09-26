@@ -62,7 +62,7 @@ import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clip
 import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { chatError } from "@/components/ai/chat-error";
-import { event as perfEvent } from "@/lib/perf/client";
+import { event as perfEvent, record as perfRecord } from "@/lib/perf/client";
 import { foldForSearch } from "@/lib/text-fold";
 import { isNetworkError } from "@/lib/ai/network-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
@@ -1367,6 +1367,13 @@ export default function KoleexAiApp() {
         if (partial) setError(partial);
       }
 
+      /* THE TURN, TIMED ON THE PHONE (owner, 2026-09-26: "it takes too too
+         long to reply", while the server wrote the reply a second after the
+         question). The server cannot see the link; these marks can: how long
+         until the answer's headers, its first words and its end arrived —
+         or how long before it failed — each tagged with whether the turn
+         also made its chat. Numbers only, through the perf beacon. */
+      const turnMark = { t0: 0, first: false, firstToken: false };
       try {
         /* Phase 6: SSE streaming. Emits start → (steps) → delta* → end.
            The client mutates the placeholder bubble as deltas arrive so
@@ -1382,6 +1389,8 @@ export default function KoleexAiApp() {
           if (activeIdRef.current === conversationId) setInput((cur) => (cur.trim() ? cur : text));
           return;
         }
+        turnMark.t0 = performance.now();
+        turnMark.first = pendingNewChatsRef.current.has(conversationId!);
         const res = await fetch(`/api/ai/agent`, {
           method: "POST",
           credentials: "include",
@@ -1509,6 +1518,7 @@ export default function KoleexAiApp() {
           return;
         }
 
+        perfRecord("ai.turn_headers_ms", performance.now() - turnMark.t0, { first: turnMark.first, status: res.status });
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = "";
@@ -1610,6 +1620,10 @@ export default function KoleexAiApp() {
                     pushPatch({ steps: json.steps });
                   }
                 } else if (json.type === "delta") {
+                  if (!turnMark.firstToken) {
+                    turnMark.firstToken = true;
+                    perfRecord("ai.turn_first_token_ms", performance.now() - turnMark.t0, { first: turnMark.first });
+                  }
                   /* The answer began after thinking: fix how long it took. */
                   if (thinkMs === undefined && (lookupsSeen > 0 || thinkNotes.length > 0)) {
                     thinkMs = Date.now() - thinkStartedAt;
@@ -1651,6 +1665,7 @@ export default function KoleexAiApp() {
            final steps (id/created_at now come from Supabase, not the
            temporary placeholder). */
         if (finalMessage) {
+          perfRecord("ai.turn_total_ms", performance.now() - turnMark.t0, { first: turnMark.first });
           /* The reply is saved, so the chat is: no longer pending. */
           pendingNewChatsRef.current.delete(turnConversationId ?? "");
           if (thinkMs === undefined && (lookupsSeen > 0 || thinkNotes.length > 0)) thinkMs = Date.now() - thinkStartedAt;
@@ -1725,6 +1740,7 @@ export default function KoleexAiApp() {
              is humanized so the user doesn't see the raw cause. */
           const raw = e instanceof Error ? e.message : String(e);
           const isNetwork = isNetworkError(e);
+          if (turnMark.t0) perfRecord("ai.turn_fail_ms", performance.now() - turnMark.t0, { first: turnMark.first, why: isNetwork ? "network" : "other" });
           /* A dropped send puts its words back in the composer (below), so
              its bubble goes too — kept, the resend showed the message twice. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId && !(isNetwork && m.id === optimistic.id)));
