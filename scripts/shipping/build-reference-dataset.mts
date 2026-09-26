@@ -105,12 +105,12 @@ const MANUAL_LOCODE: Record<string, { locode: string; iso2?: string; why: string
   "New York / NJ":         { locode: "USNYC", why: "USNYC 'New York'" },
   "Port Said West":        { locode: "EGPSW", why: "EGPSW 'Port Said West'" },
   Beihai:                  { locode: "CNBIH", why: "CNBIH 'Beihai Pt'" },
+  Taizhou:                 { locode: "CNTAZ", why: "CNTAZ 'Taizhou Pt', ZJ — the owner confirmed 26/09/2026 that Koleex's Taizhou is 台州, Zhejiang; CNTZO and CNTZU are Taizhou, JS (泰州)" },
 };
 
 /* Names the register genuinely cannot resolve. Listed so the next person does
    not re-run the same searches — and so a silent null is a decision, not a gap. */
 const KNOWN_UNRESOLVED: Record<string, string> = {
-  Taizhou: "three CN candidates (CNTAZ/CNTZO/CNTZU), no way to tell which terminal is meant",
   "Bandar Imam Khomeini": "IRBKK and IRBKM both plausible",
   Reykjanesbaer: "municipality, not a registered port location",
   Bosaso: "SOBSA is the airport; no seaport entry",
