@@ -486,8 +486,10 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
       onEnd={() => {}} searching /> as ReactElement,
   );
+  /* SAID AS "THINKING" — the owner's word for a lookup (2026-09-26: "replace
+     it with thinking"), the chat's and now the call's. */
   check("a lookup says so rather than leaving a silence",
-    text(searchingScreen).includes("Looking it up"));
+    text(searchingScreen).includes("Thinking") && !text(searchingScreen).includes("Looking it up"));
   check("and it outranks Listening, which is not what is happening",
     !/\bListening\b/.test(text(searchingScreen)));
   /* WHAT KOLEEX AI IS DOING OUTRANKS THE CALLER'S CLOSED MICROPHONE (review,
@@ -503,7 +505,7 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
       onEnd={() => {}} searching muted onToggleMute={() => {}} /> as ReactElement,
   );
-  check("a lookup is shown even while the caller is muted", text(searchingMuted).includes("Looking it up") && !text(searchingMuted).includes("Microphone off"));
+  check("a lookup is shown even while the caller is muted", text(searchingMuted).includes("Thinking") && !text(searchingMuted).includes("Microphone off"));
   const idleMuted = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
       onEnd={() => {}} muted onToggleMute={() => {}} /> as ReactElement,
@@ -532,7 +534,15 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
       onEnd={() => {}} searching /> as ReactElement,
   );
   check("and reconnecting wins over both", /reconnecting/i.test(text(searchingWobble)));
-  for (const [lang, needle] of [["zh", "正在查询"], ["ar", "بدوّر"]] as const) {
+  /* THE LIVE REGION speaks when the call's working state changes, not on
+     every turn (review, 2026-09-26). */
+  const srOf = (h: string) => /<p class="sr-only" role="status" aria-live="polite">([^<]*)<\/p>/.exec(h)?.[1] ?? null;
+  const speakingNow = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("the screen reader is not told Speaking / Thinking / Listening on every turn — but is told a muted microphone and a reconnect",
+    srOf(speakingNow) === "" && srOf(searchingScreen) === "" && srOf(idleMuted) === "Microphone off" && /reconnecting/i.test(srOf(searchingWobble) ?? ""));
+  for (const [lang, needle] of [["zh", "思考中"], ["ar", "بفكّر"]] as const) {
     const w = renderToStaticMarkup(
       <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang={lang}
         onEnd={() => {}} searching /> as ReactElement,
@@ -843,12 +853,17 @@ console.log("\n── VoiceCallScreen: the two controls ──");
     !/rotate\(135 12 12\)/.test(controls) && !/d="M21 15\.46v2\.71/.test(controls));
   /* Mic-off is drawn broken around its slash — the shape is cut, so the
      diagonal is part of the letterform rather than graffiti over it. */
+  /* Both from the library now (MicIcon, and its pair MicOffIcon), in the
+     house stroke — the screen's own 1.75 drawings sat beside 2px icons. */
+  const micCapsule = 'd="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"';
   check("muting swaps in a mic-off glyph rather than overdrawing the mic",
     /line x1="4" y1="3\.5" x2="20" y2="20\.5"/.test(mutedControls) &&
-    !/<rect x="9" y="2" width="6" height="12"/.test(mutedControls));
+    !mutedControls.includes(micCapsule));
   check("  …and unmuted draws the plain mic, with no slash at all",
-    /<rect x="9" y="2" width="6" height="12"/.test(controls) &&
+    controls.includes(micCapsule) &&
     !/y2="20\.5"/.test(controls));
+  check("  …and every control glyph on the call screen draws at the house 2px stroke",
+    !/stroke-width="1\.75"/.test(controls) && !/stroke-width="1\.75"/.test(mutedControls));
 
   /* TOUCH. This screen is used on a phone; the picker pills were 24px tall.
      Every control on it is now at least 40px, on the 8px grid. */
@@ -1285,7 +1300,7 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
         pendingWrite={pending} onConfirmWrite={() => {}} onCancelWrite={() => {}} /> as ReactElement,
     );
     check("the card shows the task in the caller's words, its due date and priority, and Save / Cancel",
-      /data-task-card/.test(card) && card.includes("Follow up with Ahmed about the KX-200") && text(card).includes("Due 2026-09-05") && text(card).includes("high") &&
+      /data-task-card/.test(card) && card.includes("Follow up with Ahmed about the KX-200") && text(card).includes("Due 2026-09-05") && text(card).includes("High priority") && !/·\s*high\b/.test(text(card)) &&
       text(card).includes("Save task") && text(card).includes("Cancel") && card.includes("bg-[#0066FF]"));
     const saved = renderToStaticMarkup(
       <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}} pendingWrite={null} writeSaved /> as ReactElement,
@@ -1406,7 +1421,7 @@ console.log("\n── The keyboard is kept where the eyes are (audit, 2026-09-11
     /useFocusTrap\(dialogRef, true\);/.test(pd) && /aria-labelledby="kx-project-dialog-title"/.test(pd) && /id="kx-project-dialog-title"/.test(pd) &&
     /useFocusTrap\(boxRef, !!photo, \{ initialFocus: "\[data-lightbox-close\]" \}\);/.test(lb));
   check("the call screen has one live region outside the layers that hide with the view; a partial transcript line is not announced; a prevented Escape does not end the call",
-    /<p className="sr-only" role="status" aria-live="polite">\{status\}<\/p>/.test(scr) && !/tracking-wide text-\[#AAAAAA\]" aria-live="polite">/.test(scr) &&
+    /<p className="sr-only" role="status" aria-live="polite">\{announced\}<\/p>/.test(scr) && !/tracking-wide text-\[#AAAAAA\]" aria-live="polite">/.test(scr) &&
     /if \(e\.key !== "Escape" \|\| e\.defaultPrevented\) return;/.test(scr) &&
     /aria-hidden=\{line\.final \? undefined : true\}/.test(tr));
   check("the hidden sidebar is inert — the drawer off screen on a phone, the collapsed column on a desktop",
