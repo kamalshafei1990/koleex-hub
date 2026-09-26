@@ -33,6 +33,14 @@ import { KOLEEX_MODELS, KOLEEX_MODEL_INFO, type KoleexModelId } from "@/lib/ai/k
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import KeyboardIcon from "@/components/icons/ui/KeyboardIcon";
+import MicIcon from "@/components/icons/ui/MicIcon";
+import MicOffIcon from "@/components/icons/ui/MicOffIcon";
+import ArrowUpLineIcon from "@/components/icons/ui/ArrowUpLineIcon";
+import Settings2LineIcon from "@/components/icons/ui/Settings2LineIcon";
+import CrossLineIcon from "@/components/icons/ui/CrossLineIcon";
+import ChevronDownIcon from "@/components/icons/ui/ChevronDownIcon";
+import CheckLineIcon from "@/components/icons/ui/CheckLineIcon";
+import SunLineIcon from "@/components/icons/ui/SunLineIcon";
 import { textDirection, textLang } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
@@ -76,6 +84,12 @@ const COPY: Record<Lang, {
   due: string;
   remind: string;
   forPeople: string;
+  /** A task's priority in words, and "everyone" for a task given to the
+   *  whole company — the card used to print the tool's raw "high" and "*". */
+  priority: { low: string; medium: string; high: string };
+  everyone: string;
+  /** The connecting counter, "{n}" replaced by the seconds. */
+  secondsShort: string;
   holdHint: string;
   modePick: string;
   modeHandsFree: string;
@@ -149,7 +163,9 @@ const COPY: Record<Lang, {
     mute: "Mute microphone",
     unmute: "Unmute microphone",
     muted: "Microphone off",
-    searching: "Looking it up…",
+    /* "THINKING", NOT "LOOKING IT UP" — the owner's word for a lookup in the
+       chat (2026-09-26: "replace it with thinking"), now the same on a call. */
+    searching: "Thinking…",
     title: "Voice call",
     hint: "Just talk. I answer when you pause.",
     voice: "Voice",
@@ -199,6 +215,9 @@ const COPY: Record<Lang, {
     due: "Due",
     remind: "Reminder",
     forPeople: "For",
+    priority: { low: "Low priority", medium: "Medium priority", high: "High priority" },
+    everyone: "Everyone",
+    secondsShort: "{n}s",
     holdHint: "Hold the button while you speak, let go when you are done.",
     modePick: "How you talk",
     modeHandsFree: "Hands-free",
@@ -218,7 +237,7 @@ const COPY: Record<Lang, {
     mute: "关闭麦克风",
     unmute: "打开麦克风",
     muted: "麦克风已关闭",
-    searching: "正在查询…",
+    searching: "思考中…",
     title: "语音通话",
     hint: "直接说话，你一停下我就回答。",
     voice: "音色",
@@ -268,6 +287,9 @@ const COPY: Record<Lang, {
     due: "截止",
     remind: "提醒",
     forPeople: "给",
+    priority: { low: "低优先级", medium: "中优先级", high: "高优先级" },
+    everyone: "所有人",
+    secondsShort: "{n}秒",
     holdHint: "说话时按住按钮，说完松开。",
     modePick: "说话方式",
     modeHandsFree: "免提",
@@ -287,7 +309,7 @@ const COPY: Record<Lang, {
     mute: "اكتم الميكروفون",
     unmute: "شغّل الميكروفون",
     muted: "الميكروفون مقفول",
-    searching: "بدوّر على المعلومة…",
+    searching: "بفكّر…",
     title: "مكالمة صوتية",
     hint: "اتكلم عادي، وأنا هرد لما تسكت.",
     voice: "الصوت",
@@ -337,6 +359,9 @@ const COPY: Record<Lang, {
     due: "موعدها",
     remind: "تذكير",
     forPeople: "لـ",
+    priority: { low: "أولوية قليلة", medium: "أولوية متوسطة", high: "أولوية عالية" },
+    everyone: "الكل",
+    secondsShort: "{n} ث",
     holdHint: "اضغط على الزرار وانت بتتكلم، وسيبه لما تخلص.",
     modePick: "طريقة الكلام",
     modeHandsFree: "كلام حر",
@@ -363,6 +388,13 @@ export function fitOrb(width: number, height: number): number {
   if (!(width > 0) || !(height > 0)) return ORB_MAX;
   const room = Math.floor(Math.min(width, height) - ORB_ROOM);
   return Math.max(ORB_MIN, Math.min(ORB_MAX, room));
+}
+
+/** A task's priority as the caller reads it. The tool speaks low / medium /
+ *  high; anything else (a value this card does not know) is left out rather
+ *  than printed raw. */
+export function priorityWords(raw: unknown, words: { low: string; medium: string; high: string }): string {
+  return raw === "low" || raw === "medium" || raw === "high" ? words[raw] : "";
 }
 
 export type VoiceCallScreenProps = {
@@ -597,11 +629,13 @@ export default function VoiceCallScreen({
       if (e.key !== "Escape") return;
       e.stopPropagation();
       e.preventDefault();
-      setVoiceSheet(false);
+      /* The same close as the button and the backdrop, so a sample that
+         is playing stops with the sheet (review, 2026-09-26). */
+      closeVoiceSheet();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [voiceSheet]);
+  }, [voiceSheet, closeVoiceSheet]);
   /* The picture being looked at, if any. Inside the app, over the call. */
   const [openPhoto, setOpenPhoto] = useState<TranscriptPhoto | null>(null);
   const closePhoto = useCallback(() => setOpenPhoto(null), []);
@@ -821,6 +855,15 @@ export default function VoiceCallScreen({
         ? copy.listening
         : copy.ready;
 
+  /* WHAT THE SCREEN READER HEARS. Not every turn of the conversation: read
+     aloud over Koleex AI's own voice, "Listening… Thinking… Speaking…" on
+     every turn was noise on top of the call (review, 2026-09-26). The
+     turn-by-turn states are left to the voice and the transcript; what is
+     announced is whether the call works — connecting, reconnecting, ready —
+     and the caller's own microphone. */
+  const turnState = status === copy.searching || status === copy.thinking || status === copy.speaking || status === copy.listening;
+  const announced = turnState ? "" : status;
+
   /* The two buttons that get a stuck call moving again (see the strip). */
   const showRetry = connectingSlow && (!live || !ready) && !!onRetry;
   const showSoundUnlock = soundBlocked && !!onEnableSound;
@@ -844,7 +887,7 @@ export default function VoiceCallScreen({
           {" "}
           <span className="kx-activity-dots align-baseline" aria-hidden><i /><i /><i /></span>
           {connectingSlow && (!live || !ready) && connectingFor > 0 && (
-            <span aria-hidden className="ms-2 normal-case tracking-normal font-normal">{connectingFor}s</span>
+            <span aria-hidden className="ms-2 normal-case tracking-normal font-normal">{copy.secondsShort.replace("{n}", String(connectingFor))}</span>
           )}
         </>
       ) : status}
@@ -1002,10 +1045,7 @@ export default function VoiceCallScreen({
                 data-brief-chip
                 className="h-9 px-4 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 text-white border border-white/25 bg-white/[0.06] hover:bg-white/[0.1] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
               >
-                <svg aria-hidden viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-                </svg>
+                <SunLineIcon size={14} aria-hidden className="shrink-0" />
                 {copy.brief}
               </button>
             )}
@@ -1046,6 +1086,10 @@ export default function VoiceCallScreen({
          300: a confirmation raised during a call has to be readable over it. */
       ref={rootRef}
       tabIndex={-1}
+      /* The screen's language, for the ar/zh size step in globals.css and
+         for a screen reader's pronunciation: it is drawn on <body>, outside
+         the app root that carries it elsewhere. */
+      lang={lang}
       className="kx-call-root fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white outline-none"
       /* Read by UpdateWatcher: a live call is never interrupted by a reload
          onto a new build — the stale bundle waits until the call ends. */
@@ -1059,7 +1103,7 @@ export default function VoiceCallScreen({
           a layer that is aria-hidden in chat view, so nothing was announced
           there; this copy is for readers, the visible line for eyes
           (audit, 2026-09-11). */}
-      <p className="sr-only" role="status" aria-live="polite">{status}</p>
+      <p className="sr-only" role="status" aria-live="polite">{announced}</p>
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
       {/* ── THE STAGE: the words underneath, the orb layer on top, one orb
           that travels between its home and the corner (see the state block:
@@ -1135,13 +1179,13 @@ export default function VoiceCallScreen({
                   const people = ([] as string[])
                     .concat(Array.isArray(pv.assignees) ? (pv.assignees as Array<{ name?: unknown }>).map((a) => String(a.name ?? "")).filter(Boolean) : [])
                     .concat(typeof pv.department === "string" && pv.department ? [pv.department] : [])
-                    .concat(pv.assign_to_all === true ? ["*"] : []);
+                    .concat(pv.assign_to_all === true ? [copy.everyone] : []);
                   const due = typeof when.due === "string" && when.due ? when.due : pendingWrite.args.due_date ? String(pendingWrite.args.due_date) : "";
                   const remind = typeof when.remind === "string" && when.remind ? when.remind : "";
                   const bits = [
                     due ? `${copy.due} ${due}` : "",
                     remind ? `${copy.remind} ${remind}` : "",
-                    pendingWrite.args.priority ? String(pendingWrite.args.priority) : "",
+                    priorityWords(pendingWrite.args.priority, copy.priority),
                     pendingWrite.args.label ? String(pendingWrite.args.label) : "",
                     people.length ? `${copy.forPeople} ${people.join(", ")}` : "",
                   ].filter(Boolean);
@@ -1170,7 +1214,7 @@ export default function VoiceCallScreen({
                 </div>
               </>
             ) : (
-              <div className="text-[13px] font-semibold text-white" role="status" data-task-saved>✓ {writeSavedTool === "startReportDraft" ? copy.draftSaved : copy.taskSaved}</div>
+              <div className="text-[13px] font-semibold text-white" role="status" data-task-saved><CheckLineIcon size={13} aria-hidden className="inline-block me-1.5 align-[-1px]" />{writeSavedTool === "startReportDraft" ? copy.draftSaved : copy.taskSaved}</div>
             )}
           </div>
         </div>
@@ -1222,10 +1266,7 @@ export default function VoiceCallScreen({
                 title={copy.sendTyped}
                 className="h-9 w-9 rounded-full inline-flex items-center justify-center shrink-0 bg-white text-[#0D0D0D] disabled:bg-white/[0.08] disabled:text-[#AAAAAA] transition-[background-color,color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
               >
-                <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="19" x2="12" y2="5" />
-                  <polyline points="6 11 12 5 18 11" />
-                </svg>
+                <ArrowUpLineIcon size={18} aria-hidden />
               </button>
             </div>
             {typedNotice && (
@@ -1298,11 +1339,7 @@ export default function VoiceCallScreen({
                     : "text-white border-white/25 bg-white/[0.06] hover:bg-white/[0.1]"
                 }`}
               >
-                <svg aria-hidden className="shrink-0" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="2" width="6" height="12" rx="3" />
-                  <path d="M5 10.5V12a7 7 0 0 0 14 0v-1.5" />
-                  <line x1="12" y1="19" x2="12" y2="22" />
-                </svg>
+                <MicIcon size={18} aria-hidden className="shrink-0" />
                 <span className="min-w-0 truncate">{copy.holdToTalk}</span>
               </button>
               <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} transition-colors ${holding ? "text-white" : "text-[#AAAAAA]"}`}>
@@ -1333,20 +1370,9 @@ export default function VoiceCallScreen({
                 {muted ? (
                   /* Cut around the slash — one glyph, not a drawing with a
                      line over it. */
-                  <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 9.5V5a3 3 0 0 0-5.86-.88" />
-                    <path d="M9 9.9V12a3 3 0 0 0 4.6 2.54" />
-                    <path d="M18.4 13.4A7 7 0 0 0 19 10.5" />
-                    <path d="M5 10.5V12a7 7 0 0 0 10.9 5.8" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                    <line x1="4" y1="3.5" x2="20" y2="20.5" />
-                  </svg>
+                  <MicOffIcon size={22} aria-hidden />
                 ) : (
-                  <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="2" width="6" height="12" rx="3" />
-                    <path d="M5 10.5V12a7 7 0 0 0 14 0v-1.5" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                  </svg>
+                  <MicIcon size={22} aria-hidden />
                 )}
               </button>
               {/* aria-hidden: the button above already carries the accessible
@@ -1398,11 +1424,7 @@ export default function VoiceCallScreen({
                     composer and "pick a voice" here — one shape, two meanings.
                     This opens Call settings, so it wears the settings glyph
                     (audit, 2026-09-11). */}
-                <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-                  <line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2" fill="#0D0D0D" />
-                  <line x1="4" y1="12" x2="20" y2="12" /><circle cx="15" cy="12" r="2" fill="#0D0D0D" />
-                  <line x1="4" y1="17" x2="20" y2="17" /><circle cx="7" cy="17" r="2" fill="#0D0D0D" />
-                </svg>
+                <Settings2LineIcon size={22} aria-hidden />
               </button>
               <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA] max-w-[72px] truncate`}>
                 {copy.settingsShort}
@@ -1423,10 +1445,7 @@ export default function VoiceCallScreen({
                   the glyph for leaving a mode is the same everywhere in the Hub:
                   a plain cross. Same stroke family as the mic; the red circle
                   still says this is the one that ends things. */}
-              <svg aria-hidden viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="6" y1="6" x2="18" y2="18" />
-                <line x1="18" y1="6" x2="6" y2="18" />
-              </svg>
+              <CrossLineIcon size={26} aria-hidden />
             </button>
             <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA]`}>
               {copy.endShort}
@@ -1503,9 +1522,7 @@ export default function VoiceCallScreen({
                     ends the call — and the sheet's Close wore the same glyph
                     with opposite stakes. Down is also the swipe that closes
                     it (audit, 2026-09-11). */}
-                <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                <ChevronDownIcon size={18} aria-hidden />
               </button>
             </div>
             </div>
@@ -1547,7 +1564,7 @@ export default function VoiceCallScreen({
                           being auditioned. */}
                       {chosen && (
                         <span aria-hidden data-voice-current className="absolute -top-0.5 -end-0.5 h-5 w-5 rounded-full bg-[#0066FF] ring-2 ring-[#111111] inline-flex items-center justify-center">
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                          <CheckLineIcon size={12} aria-hidden className="text-white" />
                         </span>
                       )}
                     </span>

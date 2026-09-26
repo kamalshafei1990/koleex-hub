@@ -101,20 +101,22 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
     "connection-lost": "连接中断且没有恢复，请重试。",
     "service-unreachable": "语音服务无响应，请稍后再试。",
     "service-refused": "语音服务拒绝了本次通话，通常需要管理员处理，请反馈此问题。",
-    "config-rejected": "通话已连接，但会话配置失败，请重试。",
+    "config-rejected": "通话已接通，但没能设置好，请重试。",
     "handshake-failed": "无法开始通话，请重试。",
   },
   ar: {
-    "no-microphone": "لا يوجد ميكروفون متاح، أو تم رفض الإذن.",
-    "not-allowed": "ليس لديك صلاحية استخدام المكالمات الصوتية.",
+    /* EGYPTIAN, LIKE THE REST OF THE ARABIC SCREENS (review, 2026-09-26):
+       these six were the last lines in formal Arabic. */
+    "no-microphone": "مفيش ميكروفون، أو إذن الميكروفون اترفض.",
+    "not-allowed": "حسابك مالوش صلاحية المكالمات الصوتية.",
     "too-many-calls": "بدأت مكالمات كتير في وقت قصير. استنى دقيقة وحاول تاني.",
     "signed-out": "الجلسة انتهت. سجّل دخول تاني.",
-    unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
-    "connection-lost": "الاتصال اتقطع وما رجعش تاني. حاول مرة أخرى.",
+    unavailable: "المكالمات الصوتية مش شغالة دلوقتي. جرّب تاني بعد شوية.",
+    "connection-lost": "الاتصال اتقطع وما رجعش. جرّب تاني.",
     "service-unreachable": "الخدمة الصوتية مش بتردّ. حاول كمان شوية.",
     "service-refused": "الخدمة الصوتية رفضت المكالمة. ده غالبًا محتاج مسؤول النظام — بلّغ عنه.",
-    "config-rejected": "المكالمة اتصلت بس تعذّر إعدادها. حاول تاني.",
-    "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",
+    "config-rejected": "المكالمة اتصلت بس ما اتظبطتش. جرّب تاني.",
+    "handshake-failed": "المكالمة ما بدأتش. جرّب تاني.",
   },
 };
 
@@ -1759,6 +1761,24 @@ export default function VoiceCallButton({
   }, [laneForModel, offerLane, rebuildCall]);
 
   const busy = state === "requesting-mic" || state === "connecting";
+
+  /* FOCUS COMES BACK TO THIS CONTROL AFTER A CALL. The call screen gives
+     focus back to what opened it, but the Speak pill that opened it is
+     swapped for the round control while a call is up, so the element it
+     returned to was gone and focus fell to the page (review, 2026-09-26).
+     When the call ends with focus nowhere, it lands here — on whichever of
+     the two is drawn now. */
+  const controlRef = useRef<HTMLButtonElement | null>(null);
+  const inCall = connected || busy;
+  const wasInCallRef = useRef(false);
+  useEffect(() => {
+    const ended = wasInCallRef.current && !inCall;
+    wasInCallRef.current = inCall;
+    if (!ended) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    try { controlRef.current?.focus({ preventScroll: true }); } catch { /* not focusable */ }
+  }, [inCall]);
   const labels = LABEL_COPY[lang];
   const label = connected ? labels.end : busy ? labels.connecting : labels.start;
 
@@ -1883,6 +1903,7 @@ export default function VoiceCallButton({
            or connecting call has the screen, and the composer's copy of the
            control goes back to the small round one. */
         <button
+          ref={controlRef}
           type="button"
           onClick={tapStartsCall}
           disabled={disabled}
@@ -1905,6 +1926,7 @@ export default function VoiceCallButton({
         </button>
       ) : (
       <button
+        ref={controlRef}
         type="button"
         onClick={connected || busy ? hangUp : tapStartsCall}
         disabled={disabled && !connected && !busy}

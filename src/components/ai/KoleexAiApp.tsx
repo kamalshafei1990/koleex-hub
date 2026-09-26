@@ -2977,8 +2977,11 @@ export default function KoleexAiApp() {
                 >
                   {copy.continueCall}
                 </button>
-                <button type="button" onClick={() => setInterruptedCall(null)} aria-label={copy.dismiss} className="rounded-full px-2 py-1 text-[12px] opacity-70 hover:opacity-100">
-                  ✕
+                <button type="button" onClick={() => setInterruptedCall(null)} aria-label={copy.dismiss} title={copy.dismiss} className="-my-1 h-9 w-9 shrink-0 rounded-full inline-flex items-center justify-center opacity-70 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]">
+                  {/* The library's cross, not a "✕" typed into the text — a
+                      glyph in whatever font the platform picked (review,
+                      2026-09-26). */}
+                  <CrossIcon size={10} aria-hidden />
                 </button>
               </div>
             )}

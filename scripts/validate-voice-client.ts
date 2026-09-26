@@ -2490,7 +2490,7 @@ console.log("\n── 12. Mute ──");
     /onClick=\{\(\) => setVoiceSheet\(true\)\}/.test(scr20) && /aria-haspopup="dialog"/.test(scr20) &&
     /<VoiceGlyph index=\{i\} on=\{on \|\| sampling === v\.key\} \/>/.test(scr20) && !/<AIOrb size=\{64\}/.test(scr20) &&
     /onClick=\{\(\) => tapVoice\(v\.key\)\}/.test(scr20) && /if \(!onPreviewVoice\) \{\s*onSelectVoice\?\.\(key\);\s*closeVoiceSheet\(\);\s*return;\s*\}/.test(scr20) &&
-    /window\.addEventListener\("keydown", onKey, true\);/.test(scr20) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*setVoiceSheet\(false\);/.test(scr20));
+    /window\.addEventListener\("keydown", onKey, true\);/.test(scr20) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*(\/\*[\s\S]*?\*\/\s*)?closeVoiceSheet\(\);/.test(scr20));
   /* A VOICE IS A SHAPE. Six distinct five-bar signatures; the chosen one is
      Hub Blue and breathes; off is monochrome. */
   check("each voice has its own waveform signature — six fixed patterns, all different, none derived from the label",
@@ -4646,7 +4646,7 @@ console.log("\n── 39. one voice control: a long press dictates through the s
     /const holdHandlers = dictation\s*\?/.test(btn) && ["en", "zh", "ar"].every((l) => new RegExp(`${l}: \\{[^\\n]*holdHint: "`).test(btn)));
   const scr = fsC.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
-    /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
+    /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<Settings2LineIcon size=\{22\} aria-hidden \/>/.test(scr) && /<ChevronDownIcon size=\{18\} aria-hidden \/>/.test(scr) &&
     /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-3 min-\[400px\]:gap-6 sm:gap-10 pb-6"/.test(scr));
 }
 /* ── 40. THE CALLER'S LINE STANDS; THE SCREEN TELLS STATE FROM WORDS (audit, 2026-09-11) ── */
@@ -5070,6 +5070,66 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     btnMod.failureMessage("no-microphone", "zh", true).includes("麦克风 → 允许") &&
     !btnMod.failureMessage("no-microphone", "en", false).includes("Settings") &&
     !btnMod.failureMessage("connection-lost", "en", true).includes("Settings"));
+}
+{
+  /* ── 61. CALL SCREEN POLISH (review items 8–12, owner: "كمّل من ٨ لـ ١٢") ── */
+  console.log("\n── 61. Call screen polish: words on the task card, Thinking, Arabic and Chinese, one icon family, quieter announcements ──");
+  const fs61 = await import("node:fs");
+  const scr = fs61.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const btn = fs61.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  const app = fs61.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const css = fs61.readFileSync("src/app/globals.css", "utf8");
+  const barrel = fs61.readFileSync("src/components/icons/ui/index.ts", "utf8");
+  const scrMod = await import("../src/components/ai/VoiceCallScreen");
+  const words = { low: "L", medium: "M", high: "H" };
+
+  /* 8 */
+  check("the task card says a priority in words and drops a value it does not know; a company-wide task reads Everyone, not \"*\"",
+    scrMod.priorityWords("high", words) === "H" && scrMod.priorityWords("low", words) === "L" && scrMod.priorityWords("medium", words) === "M" &&
+    scrMod.priorityWords("urgent", words) === "" && scrMod.priorityWords(undefined, words) === "" &&
+    /priorityWords\(pendingWrite\.args\.priority, copy\.priority\),/.test(scr) && !/String\(pendingWrite\.args\.priority\)/.test(scr) &&
+    /\.concat\(pv\.assign_to_all === true \? \[copy\.everyone\] : \[\]\);/.test(scr) && !/\["\*"\]/.test(scr) &&
+    (scr.match(/\n\s*everyone: "/g) ?? []).length === 3 && (scr.match(/\n\s*priority: \{ low: "[^"]+", medium: "[^"]+", high: "[^"]+" \},/g) ?? []).length === 3);
+
+  /* 9 */
+  check("a lookup on a call reads Thinking, as in the chat — in all three languages",
+    /searching: "Thinking…",/.test(scr) && /searching: "思考中…",/.test(scr) && /searching: "بفكّر…",/.test(scr) && !/Looking it up/.test(scr));
+
+  /* 10 */
+  check("Arabic and Chinese calls get the chrome size step: the screen carries its lang, and the step reaches .kx-call-root",
+    /lang=\{lang\}\s*className="kx-call-root fixed/.test(scr) &&
+    [["11", "12"], ["12", "13"], ["13", "14"]].every(([a, b]) => new RegExp(`:is\\(\\.kx-call-root:lang\\(ar\\), \\.kx-call-root:lang\\(zh\\)\\) \\.text-\\\\\\[${a}px\\\\\\] \\{\\s*font-size: ${b}px;`).test(css)));
+  check("  …the connecting counter is in the screen's language, not a Latin \"s\"",
+    !/\{connectingFor\}s</.test(scr) && /copy\.secondsShort\.replace\("\{n\}", String\(connectingFor\)\)/.test(scr) &&
+    /secondsShort: "\{n\}s",/.test(scr) && /secondsShort: "\{n\}秒",/.test(scr) && /secondsShort: "\{n\} ث",/.test(scr));
+  const arFail = /\n  ar: \{\n([\s\S]*?)\n  \},\n\};/.exec(btn.slice(btn.indexOf("const FAILURE_COPY")))?.[1] ?? "";
+  check("  …the failure lines are Egyptian like the rest of the Arabic screens, and the Chinese one drops the internal \"会话配置\"",
+    arFail.length > 0 && !/حاول مرة أخرى|تعذّر|لا يوجد|غير متاحة|ليس لديك|حاليًا|لاحقًا/.test(arFail) &&
+    /"no-microphone": "مفيش ميكروفون/.test(arFail) && !/会话配置/.test(btn));
+
+  /* 11 */
+  check("one icon family on the call screen: library icons at the house 2px stroke, no 1.75 drawings, no typed ✓ or ✕",
+    !/strokeWidth="1\.75"/.test(scr) && (scr.match(/<svg\b/g) ?? []).length === 1 && /function VoiceGlyph/.test(scr) &&
+    ["MicIcon", "MicOffIcon", "ArrowUpLineIcon", "Settings2LineIcon", "CrossLineIcon", "ChevronDownIcon", "CheckLineIcon", "SunLineIcon", "KeyboardIcon"].every((n) => new RegExp(`import ${n} from "@/components/icons/ui/${n}";`).test(scr)) &&
+    !/>✓ /.test(scr) && !/^\s*✕\s*$/m.test(app) && /<CrossIcon size=\{10\} aria-hidden \/>/.test(app));
+  check("  …the new marks live in the shared library, in its grammar, exported from the barrel",
+    ["MicIcon", "MicOffIcon", "ArrowUpLineIcon", "Settings2LineIcon", "CrossLineIcon", "CheckLineIcon", "SunLineIcon"].every((n) => {
+      const src = fs61.readFileSync(`src/components/icons/ui/${n}.tsx`, "utf8");
+      return barrel.includes(`export { default as ${n} } from "./${n}";`) && /viewBox="0 0 24 24"/.test(src) && /fill="none"/.test(src) &&
+        /stroke="currentColor"/.test(src) && /strokeWidth=\{2\}/.test(src) && /strokeLinecap="round"/.test(src) && /forwardRef/.test(src) && new RegExp(`${n}\\.displayName = "${n}";`).test(src);
+    }) &&
+    !/x1="2" x2="22" y1="2" y2="22"|x1="2" y1="2" x2="22" y2="22"/.test(fs61.readFileSync("src/components/icons/ui/MicOffIcon.tsx", "utf8")));
+
+  /* 12 */
+  check("the screen reader hears whether the call works, not every turn: listening / thinking / speaking are left to the voice and the transcript",
+    /const turnState = status === copy\.searching \|\| status === copy\.thinking \|\| status === copy\.speaking \|\| status === copy\.listening;\s*const announced = turnState \? "" : status;/.test(scr) &&
+    /<p className="sr-only" role="status" aria-live="polite">\{announced\}<\/p>/.test(scr));
+  check("  …Escape closes the settings sheet the same way its button does, so a playing sample stops with it",
+    /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*(\/\*[\s\S]*?\*\/\s*)?closeVoiceSheet\(\);\s*\};[\s\S]{0,200}?\}, \[voiceSheet, closeVoiceSheet\]\);/.test(scr) && !/setVoiceSheet\(false\);\s*\};\s*window\.addEventListener\("keydown", onKey, true\)/.test(scr));
+  check("  …after a call, focus that fell to the page comes back to the call control — whichever of the two is drawn",
+    /const inCall = connected \|\| busy;/.test(btn) &&
+    /const ended = wasInCallRef\.current && !inCall;\s*wasInCallRef\.current = inCall;\s*if \(!ended\) return;\s*const active = document\.activeElement;\s*if \(active && active !== document\.body && active\.isConnected\) return;\s*try \{ controlRef\.current\?\.focus\(\{ preventScroll: true \}\); \}/.test(btn) &&
+    (btn.match(/ref=\{controlRef\}/g) ?? []).length === 2);
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

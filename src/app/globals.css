@@ -2537,6 +2537,20 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   font-size: 14px;
 }
 
+/* THE CALL SCREEN TOO. It is drawn on <body>, outside .kx-ai-root, so the
+   step above never reached its status line, control labels and task card:
+   on an Arabic or Chinese call they stayed at the Latin size (review,
+   2026-09-26). The screen carries its own lang for this. */
+:is(.kx-call-root:lang(ar), .kx-call-root:lang(zh)) .text-\[11px\] {
+  font-size: 12px;
+}
+:is(.kx-call-root:lang(ar), .kx-call-root:lang(zh)) .text-\[12px\] {
+  font-size: 13px;
+}
+:is(.kx-call-root:lang(ar), .kx-call-root:lang(zh)) .text-\[13px\] {
+  font-size: 14px;
+}
+
 /* KOLEEX AI — A VISIBLE FOCUS RING ON EVERY CONTROL. Tab landed on the
    composer buttons, the sidebar rows and the prompt tiles with nothing to
    show for it; the call screen already draws this ring on its own controls
