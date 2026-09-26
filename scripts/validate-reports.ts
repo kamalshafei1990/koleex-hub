@@ -97,6 +97,9 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §35 the Reports home — both columns open with the same heading row so
+ *      their cards start on one line; every icon a type or the builder
+ *      offers is drawn on the 24 grid it is shown in (no blank tiles).
  *   §34 the launch preview — before counting starts, the first week as the
  *      reminder job would run it: the same calendar, the same rules and the
  *      same people told; reads only; the banner offers tomorrow and warns
@@ -3384,6 +3387,38 @@ console.log("\n§34 the launch preview — the first week, before anyone is aske
   const blanks = (s?: string) => (s?.match(/\{[a-z]+\}/g) ?? []).sort().join();
   const bad = LW.filter((k) => { const e = reportsT[k]; return !e?.en || !e.zh || !e.ar || blanks(e.en) !== blanks(e.zh) || blanks(e.en) !== blanks(e.ar); });
   expect(bad.length === 0, "every launch word speaks en / zh / ar and fills the same blanks in each", bad.join(", "));
+}
+
+/* ── §35 the Reports home: one line, whole icons (26 Sep 2026) ────────── */
+console.log("\n§35 the Reports home — both columns on one line, every icon whole");
+{
+  /* Owner, 26/09/2026: "this two columns not in the same line" — the latest
+     card stood a heading's height above the first family card. */
+  const RA = "src/components/reports/app/ReportsApp.tsx";
+  rule("both columns open with the same heading row, so their cards start on one line", RA,
+    (c) => (c.includes('const HEAD_ROW = "flex min-h-8 items-center px-1";')
+      && /<div className=\{HEAD_ROW\}><h2 id="kx-rep-write" className=\{HEAD\}>/.test(c)
+      && /<div className=\{`\$\{HEAD_ROW\}[^`]*`\}>\s*<h2 id="kx-rep-latest" className=\{HEAD\}>/.test(c)
+      && !/<section className=\{`\$\{CARD\}[^`]*`\} aria-labelledby="kx-rep-latest"/.test(c) ? [] : ["one column opens with a heading and the other with its card"]),
+    (src) => src.replace('<section className="min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start" aria-labelledby="kx-rep-latest">', '<section className={`${CARD} p-2 sm:p-3 xl:sticky xl:top-4 xl:self-start`} aria-labelledby="kx-rep-latest">'));
+
+  /* An icon drawn on a 512 grid inside the 24 viewBox shows only its empty
+     top-left corner — "graduation-cap" was a blank tile on two report types
+     (and in Finance and Inventory). A 24-grid path never needs a 3-digit
+     number; one that does is scaled onto the grid or it is refused. */
+  const offGrid = (c: string) => {
+    const out: string[] = [];
+    for (const m of c.slice(c.indexOf("const PATHS")).matchAll(/^ {2}("?)([a-z][a-z0-9-]*)\1: \(([\s\S]*?)^ {2}\),/gm)) {
+      const ds = [...m[3].matchAll(/\bd="([^"]+)"/g)].map((x) => x[1]).join(" ");
+      if (/(^|[^\d.])\d{3,}/.test(ds) && !/transform="scale\(/.test(m[3])) out.push(m[2]);
+    }
+    return out;
+  };
+  const offered = new Set<string>([...REPORT_HEADS.map((h) => h.icon), ...ICON_CHOICES].flatMap((x) => (x ? [String(x)] : [])));
+  rule("every icon a report type or the builder offers is drawn on the 24 grid it is shown in", "src/components/ui/RrIcon.tsx",
+    (c) => { const bad = offGrid(c).filter((n) => offered.has(n)); return bad.length ? [`drawn on a bigger grid: ${bad.join(", ")}`] : []; },
+    (src) => src.replace('<path transform="scale(0.046875)" d="M470.549', '<path d="M470.549'));
+  expect(offered.has("graduation-cap") && offGrid(code(read("src/components/ui/RrIcon.tsx"))).length === 0, "…and no icon in the set is off its grid today");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

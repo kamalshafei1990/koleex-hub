@@ -230,6 +230,11 @@ export default function ReportsApp() {
 
 type StartFn = (key: string, date?: string, opts?: { request?: string }) => void;
 
+/** A column's heading row: one height on both columns, so what follows
+ *  starts on the same line. */
+const HEAD_ROW = "flex min-h-8 items-center px-1";
+const HEAD = "text-[15px] font-semibold text-[var(--text-primary)]";
+
 function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, onOpenInbox }: {
   t: T; lang: string; bundle: ReportsBundle | null; ready: boolean; failed: boolean; creating: string | null; createError: string | null;
   onStart: StartFn; onOpenInbox: () => void;
@@ -255,7 +260,7 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
           The heading names the whole column; a family card names itself,
           with its own icon and how many of its types this person may start. */}
       <section className="min-w-0 space-y-3" aria-labelledby="kx-rep-write" aria-busy={!ready && !failed}>
-        <h2 id="kx-rep-write" className="px-1 text-[15px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
+        <div className={HEAD_ROW}><h2 id="kx-rep-write" className={HEAD}>{t("home.write")}</h2></div>
         {createError && <p className="px-1 text-[12.5px] text-red-400">{createError}</p>}
         {!ready ? (failed ? <div className={`${CARD} p-5 text-[12.5px] text-[var(--text-dim)]`}>{t("err.generic")}</div> : <WriteSkeleton />) : (
         <>
@@ -311,21 +316,26 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
       </section>
 
       {/* Its own height, and in view while the family cards scroll by — a
-          grid item stretches to its row, and the row is the whole column. */}
-      <section className={`${CARD} p-2 sm:p-3 xl:sticky xl:top-4 xl:self-start`} aria-labelledby="kx-rep-latest">
-        <div className="flex items-center justify-between px-2 pt-1 pb-2">
-          <h2 id="kx-rep-latest" className="text-[14px] font-semibold text-[var(--text-primary)]">{t("home.latest")}</h2>
-          <button type="button" onClick={onOpenInbox} className="text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("home.viewAll")}</button>
+          grid item stretches to its row, and the row is the whole column.
+          The same heading row as "Write a report", outside the card, so the
+          two columns' cards start on one line (owner, 26/09/2026: the card
+          stood a heading's height above the first family card). */}
+      <section className="min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start" aria-labelledby="kx-rep-latest">
+        <div className={`${HEAD_ROW} justify-between gap-3`}>
+          <h2 id="kx-rep-latest" className={HEAD}>{t("home.latest")}</h2>
+          <button type="button" onClick={onOpenInbox} className="shrink-0 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("home.viewAll")}</button>
         </div>
-        {!bundle ? (
-          <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div>
-        ) : bundle.latest.length === 0 ? (
-          <p className="px-3 py-8 text-center text-[13px] text-[var(--text-dim)]">{t("empty.inbox")}</p>
-        ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]">
-            {bundle.latest.map((r) => <ReportRowItem key={r.id} r={r} t={t} lang={lang} />)}
-          </ul>
-        )}
+        <div className={`${CARD} p-2 sm:p-3`}>
+          {!bundle ? (
+            <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div>
+          ) : bundle.latest.length === 0 ? (
+            <p className="px-3 py-8 text-center text-[13px] text-[var(--text-dim)]">{t("empty.inbox")}</p>
+          ) : (
+            <ul className="divide-y divide-[var(--border-subtle)]">
+              {bundle.latest.map((r) => <ReportRowItem key={r.id} r={r} t={t} lang={lang} />)}
+            </ul>
+          )}
+        </div>
       </section>
     </div>
     </div>
