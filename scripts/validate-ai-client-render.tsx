@@ -1621,11 +1621,13 @@ console.log("\n── An Arabic opening before an English code block reads right
      guard, and only a reload freed it. The caller's `if (!created)` handling
      was already right — it just never ran. */
   check("a chat that could not be started comes back as null on EVERY failure — a dropped link, an unreadable body, a refusal",
+    /* Asked up to three times now (2026-09-26, the phone's lost answers):
+       every failure still ends at the one `return null` after the loop. */
     /let res: Response;\s*try \{\s*res = await fetch\("\/api\/ai\/conversations"/.test(app) &&
-    /\} catch \{\s*return null;/.test(app) &&
-    /if \(!res\.ok\) return null;/.test(app) &&
-    /\(\{ conversation \} = \(await res\.json\(\)\) as \{ conversation: ConversationRow \}\);/.test(app) &&
-    /if \(!conversation\?\.id\) return null;/.test(app));
+    /\} catch \(e\) \{\s*why = `network:/.test(app) &&
+    /if \(!res\.ok\) \{\s*why = `status:/.test(app) &&
+    /\(\{ conversation \} = \(await res\.json\(\)\) as \{ conversation: ConversationRow \}\);\s*\} catch \(e\) \{\s*why = `body:/.test(app) &&
+    /if \(!conversation\?\.id\) \{\s*perfEvent\("ai\.chat_create_fail"[^\n]*\n\s*return null;/.test(app));
   /* ── ONE GATE, AND IT IS THE SHELL'S (owner, 2026-09-18: "remove it") ──
      `/ai` wrapped itself in <AdminAuth> while RootShell already wraps every
      non-bypassed route in <AuthGate>. The same gate twice, and not free: the

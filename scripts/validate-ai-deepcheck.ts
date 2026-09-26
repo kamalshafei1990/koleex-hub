@@ -136,7 +136,7 @@ console.log("\n── 6. Chat: no duplicate sends, no stuck spinners, Stop reall
     /setLoadingConv\(false\);\s*loadingConvRef\.current = false;\s*setLoadError\(false\);/.test(newChat));
   check("the first message's new chat is activated only if the user is still there; a switch or Stop ends the turn without jumping back",
     /const created = await createConversation\(\{ activate: false \}\);[\s\S]{0,900}?if \(aborter\.signal\.aborted\) \{[\s\S]{0,300}?return;\s*\}[\s\S]{0,300}?setActiveId\(created\);/.test(app) &&
-      /if \(opts\.activate !== false\) setActiveId\(conversation\.id\);/.test(app));
+      /if \(opts\.activate !== false\) setActiveId\(made\.id\);/.test(app));
   check("Stop before the request leaves takes both bubbles away and gives the words back",
     /if \(aborter\.signal\.aborted\) \{\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== optimistic\.id && m\.id !== placeholderId\)\);/.test(app));
   check("Regenerate, Edit and a tapped answer leave the composer's draft and files alone; dictation is still the composer's turn",

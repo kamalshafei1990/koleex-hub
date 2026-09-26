@@ -167,6 +167,32 @@ console.log("\n── 4. The route and the client, read ──");
     (app.match(/hint=\{searching \? contentHits\[c\.id\] : undefined\}/g) ?? []).length === 2);
 }
 
+/* ── A new chat survives a lost answer (owner, 2026-09-26, phone: "couldn't
+   start a new chat" six times while six rows were made) ── */
+{
+  const route = readFileSync("src/app/api/ai/conversations/route.ts", "utf8");
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  console.log("\n── A new chat survives a lost answer ──");
+  check("the route takes the client's id only when it is a UUID, and inserts with it",
+    /const UUID_RE = \/\^\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{4\}-\[0-9a-f\]\{12\}\$\/i;/.test(route) &&
+    /const clientId = typeof body\.id === "string" && UUID_RE\.test\(body\.id\) \? body\.id\.toLowerCase\(\) : null;/.test(route) &&
+    /\.\.\.\(clientId \? \{ id: clientId \} : \{\}\),\s*tenant_id: auth\.tenant_id,\s*account_id: auth\.account_id,/.test(route));
+  check("the same id again hands back the caller's own row, and only theirs — anyone else's id is a 409",
+    /if \(clientId && error\.code === "23505"\) \{[\s\S]{0,200}\.eq\("id", clientId\)\s*\.eq\("tenant_id", auth\.tenant_id\)\s*\.eq\("account_id", auth\.account_id\)\s*\.maybeSingle\(\);\s*if \(mine\) return NextResponse\.json\(\{ conversation: mine \}\);\s*return NextResponse\.json\(\{ error: "conflict" \}, \{ status: 409 \}\);/.test(route));
+  check("the app names the row before the first ask and asks up to three times with the same body; without an id, once",
+    /const CREATE_CHAT_TRIES = 3;/.test(app) &&
+    /const id = typeof crypto !== "undefined" && typeof crypto\.randomUUID === "function" \? crypto\.randomUUID\(\) : null;/.test(app) &&
+    /const tries = id \? CREATE_CHAT_TRIES : 1;/.test(app) &&
+    /for \(let attempt = 1; attempt <= tries && !conversation; attempt\+\+\)/.test(app) &&
+    /body: payload,/.test(app));
+  check("a refusal (4xx) is final; a lost answer, an unreadable one or a 5xx is asked again",
+    /if \(!res\.ok\) \{\s*why = `status:\$\{res\.status\}`;\s*if \(res\.status < 500\) break;\s*continue;\s*\}/.test(app));
+  check("every way it fails is counted by how, and the row is listed once",
+    /perfEvent\("ai\.chat_create_fail", \{ why: why \|\| "unknown", tries \}\);/.test(app) &&
+    /perfEvent\("ai\.chat_create_retry", \{ attempt, why \}\);/.test(app) &&
+    /setConversations\(\(prev\) => \[made, \.\.\.prev\.filter\(\(c\) => c\.id !== made\.id\)\]\);/.test(app));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
