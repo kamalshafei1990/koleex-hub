@@ -760,6 +760,59 @@ for (const [file, what, data] of [
   ]);
 }
 
+/* The rest of profit and cost in the accounting API (owner, 26/09/2026:
+   «أيوه اقفلهم بنفس القاعدة»): the ratios are margins («Bank & Profit»);
+   the inventory value is cost (the «private records» switch); gross profit
+   per invoice is both. */
+rule("requirePrivateData closes without the «private records» switch", EXP, (c) => {
+  const door = fnBody(c, "requirePrivateData");
+  return /^\s*if \(canSeeCostData\(auth\)\) return null;/m.test(door) && /code: "needs_private_data"/.test(door) && /status: 403/.test(door)
+    ? [] : ["requirePrivateData does not close without the switch"];
+}, [
+  { label: "the cost door open to everyone", caught: /does not close without the switch/,
+    mutate: (s) => once(s, "  if (canSeeCostData(auth)) return null;\n", "  return null;\n") },
+]);
+/** requireAuth → Finance → [«Bank & Profit» →] «private records» → read. */
+function privateDataDoorProblems(data: RegExp, afterProfit: boolean) {
+  return (c: string): string[] => {
+    const body = bodyOf(c, "GET");
+    if (!body) return ["no GET handler"];
+    const p = afterProfit ? bankProfitDoorProblems(data)(c) : [];
+    const financeAt = body.search(/^\s*if \(deny\) return deny;/m);
+    const gateAt = body.search(/^\s*const noCost = requirePrivateData\(auth, "[^"]+"\);/m);
+    const refusedAt = body.search(/^\s*if \(noCost\) return noCost;/m);
+    const dataAt = body.search(data);
+    if (gateAt < 0) { p.push("GET does not ask the «private records» switch"); return p; }
+    if (refusedAt < 0) { p.push("GET ignores the «private records» answer"); return p; }
+    if (!(financeAt >= 0 && financeAt < gateAt && gateAt < refusedAt)) p.push("GET: Finance → «private records» → return is out of order");
+    if (dataAt >= 0 && dataAt < refusedAt) p.push("GET reads before the «private records» switch has said yes");
+    return p;
+  };
+}
+rule("the financial ratios open only with «Bank & Profit»", "src/app/api/accounting/ratios/route.ts", bankProfitDoorProblems(/\bbuildFinancialRatios\(/), [
+  { label: "the ratios without the door", caught: /does not ask «Bank & Profit»/,
+    mutate: (s) => once(s, '  const denied = await requireBankAndProfit(auth, "The financial ratios");\n', "") },
+]);
+rule("the inventory value opens only with the «private records» switch", "src/app/api/accounting/statements/inventory-valuation/route.ts", privateDataDoorProblems(/\bbuildInventoryValuationSummary\(/, false), [
+  { label: "the inventory value without the door", caught: /does not ask the «private records» switch/,
+    mutate: (s) => once(s, '  const noCost = requirePrivateData(auth, "The inventory value");\n', "") },
+  { label: "the inventory value: the answer ignored", caught: /ignores the «private records» answer/,
+    mutate: (s) => once(s, "  if (noCost) return noCost;\n", "  void noCost;\n") },
+]);
+rule("gross profit per invoice needs both — «Bank & Profit» and the «private records» switch", "src/app/api/accounting/statements/gross-profit/route.ts", privateDataDoorProblems(/\bbuildGrossProfit\(/, true), [
+  { label: "gross profit without the profit door", caught: /does not ask «Bank & Profit»/,
+    mutate: (s) => once(s, '  const denied = await requireBankAndProfit(auth, "Gross profit per invoice");\n', "") },
+  { label: "gross profit without the cost door", caught: /does not ask the «private records» switch/,
+    mutate: (s) => once(s, '  const noCost = requirePrivateData(auth, "Gross profit per invoice");\n', "") },
+]);
+rule("Finance → Statements shows which switch opens a locked panel — a line, not a failure", "src/components/finance/FinanceStatements.tsx", (c) =>
+  c.includes('if (r.status === 403 && (j.code === "needs_bank_profit" || j.code === "needs_private_data")) throw Object.assign(new Error(String(j.error ?? "")), { name: j.code });')
+    && c.includes('{locked === "needs_private_data" ? t("statements.lockedCost"') && c.includes('t("statements.lockedCost", "Costs open with')
+    ? [] : ["a locked statement panel shows a red error"], [
+  { label: "the cost lock read as an error", caught: /red error/,
+    mutate: (s) => once(s, '(j.code === "needs_bank_profit" || j.code === "needs_private_data")', 'j.code === "needs_bank_profit"') },
+]);
+
 rule("the treasury feed keeps the balances to «Bank & Profit»", TRE, (c) => {
   const get = bodyOf(c, "GET");
   const p: string[] = [];

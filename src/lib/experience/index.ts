@@ -248,6 +248,17 @@ export async function requireBankAndProfit(auth: ServerAuthContext, what: string
   );
 }
 
+/** The same whole door for a screen that IS cost (owner, 26/09/2026: «أيوه
+ *  اقفلهم بنفس القاعدة») — the inventory value, the COGS beside each
+ *  invoice: the role's «private records» switch ("Can see private data"). */
+export function requirePrivateData(auth: ServerAuthContext, what: string): NextResponse | null {
+  if (canSeeCostData(auth)) return null;
+  return NextResponse.json(
+    { error: `${what} need "Can see private data" in Roles & Permissions.`, code: "needs_private_data" },
+    { status: 403 },
+  );
+}
+
 export interface UserExperience {
   account_id: string;
   can_see_cost_data: boolean;

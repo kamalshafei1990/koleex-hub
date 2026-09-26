@@ -134,8 +134,9 @@ function useJson<T>(url: string | null) {
     if (!url) throw new Error("no url");
     const r = await fetch(url, { credentials: "include", cache: "no-store" });
     const j = await r.json();
-    /* No «Bank & Profit» (the P&L and the cash flow): a line, not a failure. */
-    if (r.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
+    /* No «Bank & Profit» (profit, cash) or no «private records» (cost): a
+       line, not a failure. */
+    if (r.status === 403 && (j.code === "needs_bank_profit" || j.code === "needs_private_data")) throw Object.assign(new Error(String(j.error ?? "")), { name: j.code });
     if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
     return j as T;
   }, [url]);
@@ -145,7 +146,8 @@ function useJson<T>(url: string | null) {
      the exact question being asked — the "include the filter in the key"
      half of the cache's contract, rather than the opt-out half. */
   const { data, loading, error: loadError } = useWarmData<T>(url ? `fin:stmt:${url}` : "", load);
-  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  /* Which switch refused, or null. */
+  const locked = loadError instanceof Error && (loadError.name === "needs_bank_profit" || loadError.name === "needs_private_data") ? loadError.name : null;
   const error = loadError && !locked ? String(loadError instanceof Error ? loadError.message : loadError) : null;
   return { data, loading, error, locked };
 }
@@ -399,8 +401,9 @@ interface InvReport { as_of: string; rows: InvRow[]; totals: { total_qty: number
 
 function InventoryValuePanel() {
   const { t } = useTranslation(FIN_STATEMENTS);
-  const { data, loading, error } = useJson<{ report: InvReport }>("/api/accounting/statements/inventory-valuation");
+  const { data, loading, error, locked } = useJson<{ report: InvReport }>("/api/accounting/statements/inventory-valuation");
   const r = data?.report;
+  if (locked) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("statements.lockedCost", "Costs open with “Can see private data” in Roles & Permissions.")}</div></Panel>;
   if (loading && !r) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
   if (error) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
@@ -453,10 +456,11 @@ interface GPReport { as_of: string; from: string | null; to: string | null; rows
 
 function GrossProfitPanel({ from, to }: { from: string; to: string }) {
   const { t } = useTranslation(FIN_STATEMENTS);
-  const { data, loading, error } = useJson<{ report: GPReport }>(
+  const { data, loading, error, locked } = useJson<{ report: GPReport }>(
     `/api/accounting/statements/gross-profit?from=${from}&to=${to}`,
   );
   const r = data?.report;
+  if (locked) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[13px] text-[var(--text-dim)]">{locked === "needs_private_data" ? t("statements.lockedCost", "Costs open with “Can see private data” in Roles & Permissions.") : t("statements.locked", "Profit and cash open with «Bank & Profit» in Roles & Permissions.")}</div></Panel>;
   if (loading && !r) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
   if (error) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;

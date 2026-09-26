@@ -4,6 +4,9 @@ import type { Translations } from "@/lib/i18n";
    See the header of ../finance.ts for why. */
 
 export const FIN_STATEMENTS: Translations = {
+  "statements.lockedCost":      { en: "Costs open with “Can see private data” in Roles & Permissions.",
+                                  zh: "成本数据需要在角色与权限中开启“可查看私密数据”才能查看。",
+                                  ar: "التكاليف تُفتح مع «يرى البيانات الخاصة» في الأدوار والصلاحيات." },
   "statements.locked":          { en: "Profit and cash open with «Bank & Profit» in Roles & Permissions.",
                                   zh: "利润与现金需要在角色与权限中拥有「Bank & Profit」才能查看。",
                                   ar: "الأرباح والنقدية تُفتح مع «Bank & Profit» في الأدوار والصلاحيات." },
