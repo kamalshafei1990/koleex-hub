@@ -216,8 +216,9 @@ export const BOOK_VERSION = { label: "2.0", date: "27/09/2026" } as const;
 
 export const BOOK_BASE = "/knowledge/brand-guidelines";
 
-export function chapterHref(slug: string): string {
-  return `${BOOK_BASE}/${slug}`;
+/** `base` lets the same book live at another address (a public copy later). */
+export function chapterHref(slug: string, base: string = BOOK_BASE): string {
+  return `${base}/${slug}`;
 }
 
 export function chapterBySlug(slug: string): BookChapter | undefined {

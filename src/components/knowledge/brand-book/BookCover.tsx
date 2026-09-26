@@ -10,10 +10,11 @@ import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { BOOK_CHAPTERS, BOOK_PARTS, BOOK_VERSION, chapterHref, pad, READY_CHAPTERS } from "@/lib/brand-book/chapters";
 import { fill } from "@/lib/brand-book/ui";
-import { useBookLang } from "./kit";
+import { useBookBase, useBookLang } from "./kit";
 
 export default function BookCover() {
   const { lang, ui } = useBookLang();
+  const base = useBookBase();
   const first = READY_CHAPTERS[0];
 
   return (
@@ -30,7 +31,7 @@ export default function BookCover() {
           </p>
           {first && (
             <Link
-              href={chapterHref(first.slug)}
+              href={chapterHref(first.slug, base)}
               className="mt-7 inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[14px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
             >
               {ui.startReading}
@@ -62,7 +63,7 @@ export default function BookCover() {
                 return c.ready ? (
                   <Link
                     key={c.n}
-                    href={chapterHref(c.slug)}
+                    href={chapterHref(c.slug, base)}
                     className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)]"
                   >
                     {body}

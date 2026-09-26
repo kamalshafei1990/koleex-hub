@@ -24,12 +24,13 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import KoleexLogo from "@/components/layout/KoleexLogo";
-import { BOOK_BASE, BOOK_CHAPTERS, BOOK_PARTS, BOOK_VERSION, chapterHref, pad, READY_CHAPTERS } from "@/lib/brand-book/chapters";
+import { BOOK_CHAPTERS, BOOK_PARTS, BOOK_VERSION, chapterHref, pad, READY_CHAPTERS } from "@/lib/brand-book/chapters";
 import { fill } from "@/lib/brand-book/ui";
-import { useBookLang } from "./kit";
+import { useBookBase, useBookLang } from "./kit";
 
 function Contents({ current, onPick }: { current?: number; onPick?: () => void }) {
   const { lang, ui } = useBookLang();
+  const base = useBookBase();
   const [open, setOpen] = useState<Set<number>>(() => {
     const s = new Set<number>();
     for (const p of BOOK_PARTS) {
@@ -77,7 +78,7 @@ function Contents({ current, onPick }: { current?: number; onPick?: () => void }
                     <li key={c.n}>
                       {c.ready ? (
                         <Link
-                          href={chapterHref(c.slug)}
+                          href={chapterHref(c.slug, base)}
                           onClick={onPick}
                           aria-current={active ? "page" : undefined}
                           className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-[12.5px] transition-colors ${
@@ -105,19 +106,20 @@ function Contents({ current, onPick }: { current?: number; onPick?: () => void }
 
 export default function BookShell({ current, children }: { current?: number; children: ReactNode }) {
   const { ui } = useBookLang();
+  const base = useBookBase();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Link
-          href={current ? BOOK_BASE : "/knowledge"}
+          href={current ? base : "/knowledge"}
           className="kx-glass kx-hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
           aria-label={current ? ui.backToBook : ui.backToKnowledge}
         >
           <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
         </Link>
-        <Link href={BOOK_BASE} className="flex min-w-0 items-center gap-2.5">
+        <Link href={base} className="flex min-w-0 items-center gap-2.5">
           <span className="text-[var(--text-primary)]" style={{ width: 92 }}>
             <KoleexLogo className="block h-auto w-full" />
           </span>

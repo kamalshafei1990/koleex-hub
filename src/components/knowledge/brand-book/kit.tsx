@@ -30,7 +30,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { BRAND_BOOK_UI, fill } from "@/lib/brand-book/ui";
-import { BOOK_PARTS, chapterByNumber, chapterHref, neighbours, pad } from "@/lib/brand-book/chapters";
+import { BOOK_BASE, BOOK_PARTS, chapterByNumber, chapterHref, neighbours, pad } from "@/lib/brand-book/chapters";
 import { cmykText, rgbText, type BrandColor } from "@/lib/brand-book/tokens";
 
 const NO_DICTIONARY = {};
@@ -53,6 +53,15 @@ function useBodyUi(): (typeof BRAND_BOOK_UI)[Lang] {
   return body ? BRAND_BOOK_UI[body] : ui;
 }
 
+/* Where the book lives. The Knowledge route is the default; a copy served at
+   another address (the public link, a local preview) provides its own base
+   so every link inside stays inside that copy. */
+export const BookBase = createContext<string>(BOOK_BASE);
+
+export function useBookBase(): string {
+  return useContext(BookBase);
+}
+
 /* ── Chapter frame ─────────────────────────────────────────────────────── */
 
 export interface TocItem { id: string; title: string }
@@ -64,6 +73,7 @@ export function Chapter({ n, lead, toc, children }: {
   children: ReactNode;
 }) {
   const { lang, ui } = useBookLang();
+  const base = useBookBase();
   const ch = chapterByNumber(n);
   if (!ch) throw new Error(`brand-book: no chapter ${n}`);
   const part = BOOK_PARTS.find((p) => p.n === ch.part);
@@ -100,7 +110,7 @@ export function Chapter({ n, lead, toc, children }: {
 
         <nav className="mt-16 pt-6 border-t border-[var(--border-subtle)] grid grid-cols-2 gap-3" aria-label={ui.contents}>
           {prev ? (
-            <Link href={chapterHref(prev.slug)} className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 transition-colors hover:border-[var(--border-focus)]">
+            <Link href={chapterHref(prev.slug, base)} className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 transition-colors hover:border-[var(--border-focus)]">
               <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
                 <ArrowLeftIcon size={12} className="rtl:rotate-180" />{ui.previous}
               </span>
@@ -110,7 +120,7 @@ export function Chapter({ n, lead, toc, children }: {
             </Link>
           ) : <span />}
           {next ? (
-            <Link href={chapterHref(next.slug)} className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-end transition-colors hover:border-[var(--border-focus)]">
+            <Link href={chapterHref(next.slug, base)} className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-end transition-colors hover:border-[var(--border-focus)]">
               <span className="flex items-center justify-end gap-1.5 text-[11px] text-[var(--text-dim)]">
                 {ui.next}<ArrowRightIcon size={12} className="rtl:rotate-180" />
               </span>
@@ -184,11 +194,12 @@ export function B({ children }: { children: ReactNode }) {
 /** A cross-reference to another chapter: a link when it is written, plain
  *  text (with "soon") when it is not — never a link to an empty page. */
 export function Ref({ n }: { n: number }) {
+  const base = useBookBase();
   const ch = chapterByNumber(n);
   if (!ch) return null;
   const label = `ch. ${pad(n)} ${ch.title.en}`;
   return ch.ready ? (
-    <Link href={chapterHref(ch.slug)} className="font-medium text-[#3E6796] underline decoration-[#7FA9D6]/60 underline-offset-2 hover:decoration-[#3E6796] dark:text-[#7FA9D6]">
+    <Link href={chapterHref(ch.slug, base)} className="font-medium text-[#3E6796] underline decoration-[#7FA9D6]/60 underline-offset-2 hover:decoration-[#3E6796] dark:text-[#7FA9D6]">
       {label}
     </Link>
   ) : (
