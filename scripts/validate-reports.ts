@@ -97,6 +97,9 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §38 compliance by month — each report counted in the month its deadline
+ *      falls in; on time, late, missing, pending (out of the rate); the
+ *      board's scope; the months from counting's start; the house paper.
  *   §37 staff readiness — the first weeks' guide (what each person owes and
  *      when, on their own calendar; the reminder on their device, never in
  *      view-as), the Home greeting's "reports start" line, and the super
@@ -202,6 +205,8 @@ import { reportTeamT } from "../src/lib/translations/report-team";
 import { decisionRows, followupRows, meetingRows, occasionRows, scheduleRows, timeSplitRows, visitorRows, yearlyOn, type CalendarFact } from "../src/lib/reports/office";
 import type { BoardRow } from "../src/lib/reports/obligations";
 import { COST_KINDS, OPS_KINDS, currencyOrder, dmy, fmtAmount, moneyLines, quickAsOf, quickRange } from "../src/lib/reports/numbers";
+import { monthTallies, rateOf, statMonths } from "../src/lib/reports/compliance-stats";
+import { statCell } from "../src/components/reports/numbers/stats-paper";
 import * as NP from "../src/lib/reports/numbers-print";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -384,7 +389,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 23, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, the launch preview, about, links search, the builder's list and one type, the team summary, its weekly switch, the schedules, forward, tasks)`);
+  expect(files.length === 24, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, its monthly stats, obligations, the launch preview, about, links search, the builder's list and one type, the team summary, its weekly switch, the schedules, forward, tasks)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -2779,6 +2784,8 @@ console.log("\n§26 each Reports screen downloads only its own words");
     /* 6C: the number reports and their paper — the `num` words only. */
     { name: "the number reports", entry: ["src/app/reports/operational/page.tsx", "src/app/reports/statements/page.tsx"], dictFrom: ["src/components/reports/numbers/OperationalNumbers.tsx", "src/components/reports/numbers/StatementNumbers.tsx"], lazy: true },
     { name: "their paper", entry: ["src/app/reports/operational/print/page.tsx", "src/app/reports/statements/print/page.tsx"], dictFrom: ["src/components/reports/numbers/NumbersPrintPage.tsx"], lazy: true },
+    /* Compliance by month on paper (26/09/2026): the compliance words, the paper's chrome. */
+    { name: "the compliance paper", entry: ["src/app/reports/compliance/print/page.tsx"], dictFrom: ["src/app/reports/compliance/print/page.tsx", "src/components/reports/numbers/NumbersPrintPage.tsx"], lazy: true },
   ];
   const problems = (sc: Screen, virtual: Map<string, string> = new Map()): string[] => {
     const files = graph(sc.entry, virtual, sc.lazy);
@@ -3208,7 +3215,8 @@ console.log("\n§32 the number reports — same doors, one currency per figure, 
       (c) => (/printPaper\(/.test(c) && !/window\.print\(/.test(c) ? [] : ["the page prints the Hub layout"]),
       (src) => src.replace("printPaper(", "window.print(); void (").replace("import {\n  MoneyKpi", "import {\n  MoneyKpi"));
   }
-  expect(KIT.includes('Object.assign(frame.style, { position: "fixed", left: "-10000px"') && !/visibility:\s*"hidden"/.test(KIT), "…an off-screen frame, never a hidden one");
+  const FRAME = code(read("src/components/reports/numbers/print-frame.ts"));
+  expect(FRAME.includes('Object.assign(frame.style, { position: "fixed", left: "-10000px"') && !/visibility:\s*"hidden"/.test(FRAME) && KIT.includes('export { printPaper } from "./print-frame";'), "…an off-screen frame, never a hidden one (print-frame.ts, re-exported by the kit)");
   const PP = code(read("src/components/reports/numbers/NumbersPrintPage.tsx"));
   expect(PP.includes("<style>{PRINT_AND_DOC_STYLES}</style>") && PP.includes("__quotation_pdf_ready__ = true;") && PP.includes("document.title = paper.fileName;"),
     "the paper page keeps the print contract: the house styles, the ready flag, the file name");
@@ -3560,6 +3568,45 @@ console.log("\n§37 staff readiness — the first weeks' guide, the Home line, w
     "ready.title.none", "ready.title.soon", "ready.title.now", "ready.hint", "ready.used", "ready.usedNever", "ready.push.on", "ready.push.off", "ready.sent", "ready.notYet"]
     .filter((k) => { const e = reportsT[k]; const b = (x?: string) => (x?.match(/\{[a-z]+\}/g) ?? []).sort().join(); return !e?.en || !e.zh || !e.ar || b(e.en) !== b(e.zh) || b(e.en) !== b(e.ar); });
   expect(lack.length === 0, "the guide's and the list's words speak en / zh / ar and fill the same blanks", lack.join(", "));
+}
+
+/* ── §38 compliance by month (26 Sep 2026) ─────────────────────────────── */
+console.log("\n§38 compliance by month — counted where each deadline falls, the board's scope, the house paper");
+{
+  const OFF: Record<string, number> = { "Asia/Shanghai": 8 };
+  const clock: Clock = (day, hhmm, tz) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - (OFF[tz] ?? 0) * 3_600_000).toISOString();
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(), leave: new Set(["2026-10-16"]), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-10-12" };
+  const manager = { obliged: { daily: true, weekly: true, monthly: true }, clock: cn };
+  /* 12–15/10 sent on time, 19/10 late, 20/10 never; the week of 12/10 on time. */
+  const sentMap = new Map<string, Sent>([
+    ...["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15"].map((d) => [`daily|${d}`, { at: `${d}T09:00:00.000Z`, id: "x" }] as const),
+    ["daily|2026-10-19", { at: "2026-10-19T11:00:00.000Z", id: "x" }], ["weekly|2026-W42", { at: "2026-10-15T09:30:00.000Z", id: "x" }],
+  ]);
+  const look = (k: string, pk: string) => sentMap.get(`${k}|${pk}`) ?? null;
+  const tallies = monthTallies(manager, ["2026-10", "2026-11"], look, "2026-10-21T05:00:00.000Z", clock);
+  eq(tallies["2026-10"], { onTime: 5, late: 1, missing: 1, pending: 10 },
+    "October from the start (12/10): four dailies and the week's report (due Thursday, Friday was leave) on time, one late, one missing; eight dailies and two weeks still ahead — the day on leave asks for nothing");
+  eq(tallies["2026-11"], { onTime: 0, late: 0, missing: 0, pending: 26 },
+    "November: 21 dailies, the four weeks whose Friday falls in it (not the week ending 04/12), and October's monthly on its 3rd working day (04/11)");
+  eq([rateOf(tallies["2026-10"]), rateOf(tallies["2026-11"]), rateOf({ onTime: 9, late: 1, missing: 0, pending: 3 })], [71, null, 90], "the rate is on time out of what is decided; nothing decided is no rate, never 0%");
+  eq([statMonths("2026-11-10", 6, "2026-10-12"), statMonths("2027-06-10", 6, "2026-10-12").length, statMonths("2026-11-10", 6, null)], [["2026-10", "2026-11"], 6, []],
+    "the months: the last six at most, never before counting started, none before it is set");
+  eq(monthTallies({ ...manager, clock: { ...cn, from: "2026-10-26" } }, ["2026-10"], () => null, "2026-10-31T05:00:00.000Z", clock)["2026-10"].missing, 6,
+    "nothing before the person's start counts (hired on the 26th: five dailies and one weekly from then)");
+  eq([statCell({ onTime: 11, late: 1, missing: 0, pending: 2 }), statCell({ onTime: 0, late: 0, missing: 0, pending: 4 })], ["92% · 11/12", "—"], "a paper cell is one line: the rate and on time out of decided");
+
+  /* The server and the screen. */
+  const ST = "src/lib/server/reports/stats.ts";
+  rule("the months have the board's scope: everyone for a super admin or HR·view, a manager's own people, else nobody", ST,
+    (c) => (c.includes("const scope = everyone ? undefined : new Set(tree.descendantsOf(auth.account_id));") && c.includes("const owners = scope && scope.size === 0 ? [] : await loadOwners(tree, scope);") ? [] : ["the months are wider than the board"]),
+    (src) => src.replace("const scope = everyone ? undefined : new Set(tree.descendantsOf(auth.account_id));", "const scope = undefined;"));
+  rule("the months only read, and whether a report was sent — never its text", ST,
+    (c) => (!/\.(insert|update|upsert|delete)\(/.test(c) && c.includes("loadSent(") && !/sections|search_text/.test(c) ? [] : ["the months write, or read report text"]),
+    (src) => src.replace("  rows.sort(", '  await supabaseServer.from("work_reports").update({});\n  rows.sort('));
+  const CTX = code(read("src/components/reports/app/ComplianceTab.tsx"));
+  expect(CTX.includes('{view === "months" ? <MonthStats t={t} lang={lang} /> : (') && CTX.includes("const res = await fetchComplianceStats(6);") && CTX.includes("printPaper(`/reports/compliance/print?months=6&lang=${lang}`)"),
+    "the Compliance tab switches between the week and the months, loads the months only when asked, and prints them on the house paper");
+  expect(code(read("src/app/reports/compliance/print/page.tsx")).includes("return { paper: statsPaper(t, res.data) };"), "…the paper reads the same API with the reader's own session");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

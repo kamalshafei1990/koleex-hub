@@ -22,8 +22,8 @@ import DatePicker from "@/components/ui/DatePicker";
 import { addDays, localDayOf } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
 import {
-  dmyDate, dmyTime, fetchCompliance, fetchLaunchPlan, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
-  type ComplianceBoard, type LaunchPlan, type NudgePreview, type ObligationSetup, type ReadinessRow, type ReportPerson, type ScheduleSetup as ScheduleData,
+  dmyDate, dmyTime, fetchCompliance, fetchComplianceStats, fetchLaunchPlan, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
+  type ComplianceBoard, type ComplianceStats, type LaunchPlan, type NudgePreview, type ObligationSetup, type ReadinessRow, type ReportPerson, type ScheduleSetup as ScheduleData,
 } from "@/lib/work-reports";
 import { reportHead } from "@/lib/reports/catalog-heads";
 import { periodFor } from "@/lib/reports/templates";
@@ -31,6 +31,8 @@ import { isScheduleCadence } from "@/lib/reports/schedules";
 import { Avatar, CARD, FIELD, type T } from "./shared";
 import type { Lang } from "@/lib/i18n";
 import { reportComplianceT } from "@/lib/translations/report-ui/compliance";
+import { rateOf, type MonthTally } from "@/lib/reports/compliance-stats";
+import { printPaper } from "@/components/reports/numbers/print-frame";
 
 const STATE_STYLE: Record<CellState, { cls: string; icon: React.ReactNode }> = {
   sent: { cls: "border-emerald-500/30 bg-emerald-500/12 text-emerald-500", icon: <RrIcon name="check" size={11} /> },
@@ -64,6 +66,8 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
   const [board, setBoard] = useState<ComplianceBoard | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [setupOpen, setSetupOpen] = useState(false);
+  /* Compliance by month (26/09/2026): the week's board, or the months. */
+  const [view, setView] = useState<"week" | "months">("week");
 
   const load = useCallback(async (d: string) => {
     setPhase("loading");
@@ -85,6 +89,15 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
             <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">{t("compliance.hint")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1" role="radiogroup" aria-label={t("compliance.title")}>
+              {(["week", "months"] as const).map((v) => (
+                <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)}
+                  className={`h-7 rounded-lg px-2.5 text-[12px] font-medium transition-colors ${view === v ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+                  {t(`stats.view.${v}`)}
+                </button>
+              ))}
+            </div>
+            {view === "week" && (
             <div className="flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1">
               <button type="button" onClick={() => setDay((d) => addDays(d, -7))} aria-label={t("compliance.prev")} className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]">
                 <span className="inline-flex rtl:rotate-180"><RrIcon name="arrow-left" size={12} /></span>
@@ -96,6 +109,7 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
                 <span className="inline-flex rotate-180 rtl:rotate-0"><RrIcon name="arrow-left" size={12} /></span>
               </button>
             </div>
+            )}
             {board?.canSetUp && (
               <button type="button" onClick={() => setSetupOpen((v) => !v)} aria-expanded={setupOpen}
                 className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 text-[12.5px] font-medium text-[var(--text-primary)]">
@@ -105,7 +119,7 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
           </div>
         </div>
 
-        {s && (
+        {view === "week" && s && (
           <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
             {rate !== null && <span className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 font-semibold text-[var(--text-primary)] tabular-nums">{t("compliance.rate").replace("{n}", String(rate))}</span>}
             <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-500 tabular-nums">{t("compliance.s.sent")} {s.onTime}</span>
@@ -126,6 +140,7 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
       {/* Keyed on the start date, so a start set from the banner shows here too. */}
       {setupOpen && board?.canSetUp && <Setup key={board.trackingFrom ?? "none"} t={t} lang={lang} onChanged={() => void load(day)} />}
 
+      {view === "months" ? <MonthStats t={t} lang={lang} /> : (
       <section className={`${CARD} p-2 sm:p-3`}>
         {phase === "loading" && !board ? (
           <div className="grid place-items-center py-14"><SpinnerIcon size={18} /></div>
@@ -187,6 +202,7 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }
@@ -332,6 +348,86 @@ function Readiness({ t, rows, trackingFrom }: { t: T; rows: ReadinessRow[]; trac
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/** Compliance by month (owner's pick 26/09/2026): each person's rate per
+ *  month — on time out of what was due so far — and the team's; the tally
+ *  behind each cell in its title. Loaded when the view opens; prints on the
+ *  house paper (/reports/compliance/print). */
+function MonthStats({ t, lang }: { t: T; lang: string }) {
+  const [data, setData] = useState<ComplianceStats | null>(null);
+  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
+  const load = useCallback(async () => {
+    setPhase("loading");
+    const res = await fetchComplianceStats(6);
+    if (res.ok) { setData(res.data); setPhase("ready"); } else setPhase("error");
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  const label = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
+  const tone = (r: number | null) => (r === null ? "text-[var(--text-faint)]" : r >= 90 ? "text-emerald-500" : r >= 70 ? "text-amber-500" : "text-red-500");
+  const cell = (x: MonthTally | undefined, strong = false) => {
+    const tally = x ?? { onTime: 0, late: 0, missing: 0, pending: 0 };
+    const r = rateOf(tally);
+    const decided = tally.onTime + tally.late + tally.missing;
+    const detail = t("stats.detail").replace("{a}", String(tally.onTime)).replace("{b}", String(tally.late)).replace("{c}", String(tally.missing)).replace("{d}", String(tally.pending));
+    return (
+      <span title={detail} aria-label={detail} className="block">
+        <span className={`block text-[13px] tabular-nums ${strong ? "font-bold" : "font-semibold"} ${tone(r)}`}>{r === null ? "—" : `${r}%`}</span>
+        {decided > 0 && <span className="block text-[10.5px] tabular-nums text-[var(--text-faint)]">{t("stats.cell").replace("{a}", String(tally.onTime)).replace("{b}", String(decided))}</span>}
+      </span>
+    );
+  };
+  return (
+    <section className={`${CARD} p-2 sm:p-3`} aria-busy={phase === "loading"}>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1 pb-2">
+        <p className="min-w-0 max-w-[70ch] text-[12px] leading-snug text-[var(--text-dim)]">{t("stats.hint")}</p>
+        <button type="button" disabled={!data?.rows.length} onClick={() => printPaper(`/reports/compliance/print?months=6&lang=${lang}`)}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50">
+          <RrIcon name="print" size={13} />{t("stats.print")}
+        </button>
+      </div>
+      {phase === "loading" && !data ? (
+        <div className="grid place-items-center py-14"><SpinnerIcon size={18} /></div>
+      ) : phase === "error" ? (
+        <p className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("err.generic")} <button type="button" onClick={() => void load()} className="ms-2 underline">↻</button></p>
+      ) : !data || !data.months.length ? (
+        <p className="px-4 py-12 text-center text-[13px] text-[var(--text-dim)]">{t("stats.notStarted")}</p>
+      ) : !data.rows.length ? (
+        <p className="px-4 py-12 text-center text-[13px] text-[var(--text-dim)]">{t("compliance.empty")}</p>
+      ) : (
+        /* A wide table scrolls inside its own box; the name column stays. */
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] border-separate border-spacing-0 text-[12px]">
+            <thead>
+              <tr className="text-[var(--text-dim)]">
+                <th className="sticky start-0 z-[1] bg-[var(--bg-surface)] px-3 py-2 text-start font-medium">{t("compliance.person")}</th>
+                {data.months.map((m) => <th key={m} className="px-2 py-2 text-center font-medium tabular-nums">{label(m)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.person.id} className="border-t border-[var(--border-subtle)]">
+                  <td className="sticky start-0 z-[1] bg-[var(--bg-surface)] px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar person={r.person} size={24} />
+                      <span className="block max-w-[150px] truncate text-[12.5px] font-medium text-[var(--text-primary)]">{r.person.name}</span>
+                    </span>
+                  </td>
+                  {data.months.map((m) => <td key={m} className="px-2 py-2 text-center">{cell(r.months[m])}</td>)}
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-[var(--border-subtle)]">
+                <td className="sticky start-0 z-[1] bg-[var(--bg-surface)] px-3 py-2 text-[12.5px] font-semibold text-[var(--text-primary)]">{t("stats.team")}</td>
+                {data.months.map((m) => <td key={m} className="px-2 py-2 text-center">{cell(data.team[m], true)}</td>)}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

@@ -14,6 +14,7 @@ import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
 import type { AiDraftRequest } from "@/lib/reports/ai-draft";
 import type { BoardRow, BoardSummary, DayOffWhy, DueItem, Obliged, PlanItem, ReportGuide } from "@/lib/reports/obligations";
+import type { MonthTally } from "@/lib/reports/compliance-stats";
 import type { ReportTask, TaskPriority } from "@/lib/reports/follow-up";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
@@ -229,6 +230,9 @@ export interface ObligationSetup {
   rows: Array<{ person: ReportPerson; isSuperAdmin: boolean; hasTeam: boolean; defaults: Obliged; exceptions: Partial<Obliged> }>;
 }
 export const fetchCompliance = (day: string) => call<ComplianceBoard>(`/api/work-reports/compliance?week=${encodeURIComponent(day)}`);
+/** Compliance by month (26/09/2026): each person's months and the team's. */
+export interface ComplianceStats { months: string[]; trackingFrom: string | null; rows: Array<{ person: ReportPerson; months: Record<string, MonthTally> }>; team: Record<string, MonthTally> }
+export const fetchComplianceStats = (months = 6) => call<ComplianceStats>(`/api/work-reports/compliance/stats?months=${months}`);
 export const fetchObligations = () => call<ObligationSetup>("/api/work-reports/obligations");
 export const saveObligations = (body: { trackingFrom?: string | null; reminders?: boolean; escalations?: boolean; exceptions?: Array<{ accountId: string; key: "daily" | "weekly" | "monthly"; required: boolean | null }> }) =>
   call<ObligationSetup>("/api/work-reports/obligations", { method: "PUT", body: JSON.stringify(body) });

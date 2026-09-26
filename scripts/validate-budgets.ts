@@ -178,6 +178,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "reports/statements": { chunks: 9, kbytes: 565 },
   "reports/operational/print": { chunks: 12, kbytes: 720 },
   "reports/statements/print": { chunks: 12, kbytes: 720 },
+  "reports/compliance/print": { chunks: 12, kbytes: 720 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
      Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of
