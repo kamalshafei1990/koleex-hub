@@ -64,7 +64,17 @@ import { useTodoStore, type DoneState, type TaskFields } from "@/components/todo
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Loaded on first use — none of these is needed to paint the list. */
-const TaskModal = dynamic(() => import("@/components/todo/TaskModal"), { ssr: false });
+const loadTaskModal = () => import("@/components/todo/TaskModal");
+const TaskModal = dynamic(loadTaskModal, { ssr: false });
+/* The form, its extras chunk and the projects list, fetched while the page is
+   idle (and again on hover of "Add task"): the first open was two chunk
+   round-trips plus a request behind the click — owner: "when I press new
+   task take long time". Idempotent: every import() and loadProjects() is
+   cached after the first call. */
+const warmTaskForm = () => {
+  void loadTaskModal().then((m) => m.warmTaskModal());
+  void import("@/components/todo/TaskSheet");
+};
 /* The task in full — what a notification's link opens. */
 const TaskSheet = dynamic(() => import("@/components/todo/TaskSheet"), { ssr: false });
 const FiltersPanel = dynamic(() => import("@/components/todo/FiltersPanel"), { ssr: false });
@@ -266,6 +276,16 @@ export default function TodoPage() {
   }, [wantDone, done.loaded, done.loading, done.error, actions]);
   const doneCount = (n: number) => (done.loaded ? `${n}${done.nextBefore ? "+" : ""}` : "");
 
+  useEffect(() => {
+    const idle = typeof window.requestIdleCallback === "function"
+      ? window.requestIdleCallback(warmTaskForm, { timeout: 2500 })
+      : window.setTimeout(warmTaskForm, 800);
+    return () => {
+      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
+    };
+  }, []);
+
   /* ── row callbacks (stable — rows are memoised) ── */
   const openTask = (id: string) => setOpenId(id);
   const closeSheet = () => setOpenId(null);
@@ -418,7 +438,7 @@ export default function TodoPage() {
                 <BarChart3Icon size={14} />
                 <span className="hidden md:inline">{t("report.link")}</span>
               </Link>
-              <button type="button" onClick={() => setModal({ id: null, key: Date.now() })} aria-label={t("add")}
+              <button type="button" onClick={() => setModal({ id: null, key: Date.now() })} onPointerEnter={warmTaskForm} onFocus={warmTaskForm} aria-label={t("add")}
                 className="h-10 px-3 md:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
                 <PlusIcon size={16} />
                 <span className="hidden md:inline">{t("add")}</span>

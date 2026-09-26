@@ -22,6 +22,7 @@ import type {
   TodoAssigneeInfo,
 } from "@/types/supabase";
 import dynamic from "next/dynamic";
+import FloatLayer from "./FloatLayer";
 import { todoAttachmentHref as attachmentHref } from "@/lib/todo-admin";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -372,11 +373,13 @@ function PeoplePicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (ev: MouseEvent | TouchEvent) => {
-      if (rootRef.current && !rootRef.current.contains(ev.target as Node)) {
+      const n = ev.target as Node;
+      if (rootRef.current && !rootRef.current.contains(n) && !layerRef.current?.contains(n)) {
         setOpen(false);
         setQ("");
       }
@@ -413,8 +416,12 @@ function PeoplePicker({
           setOpen(true);
         }}
       />
+      {/* On <body> through FloatLayer: inside the task window the list sat in
+          the window's glass, came out see-through and ran over the hint and
+          the next section (owner's screenshot, 26/09). */}
       {open && (
-        <div className="kx-glass-pop absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+        <FloatLayer anchor={rootRef} inset={0} width={0} layerRef={layerRef}>
+        <div className="kx-glass-pop kx-pop-panel kx-pop-in max-h-64 overflow-y-auto">
           {list.length === 0 && (
             <div className="px-3 h-9 flex items-center text-[12px] text-[var(--text-dim)]">{noMatchesLabel}</div>
           )}
@@ -454,6 +461,7 @@ function PeoplePicker({
             );
           })}
         </div>
+        </FloatLayer>
       )}
     </div>
   );

@@ -24,7 +24,8 @@ export default function FloatLayer({ anchor, inset, width, layerRef, children }:
       if (!el) return;
       const r = el.getBoundingClientRect();
       const rtl = getComputedStyle(el).direction === "rtl";
-      const w = Math.min(width, window.innerWidth - 16);
+      /* width 0 = as wide as the anchor (a field's own list). */
+      const w = Math.min(width || r.width, window.innerWidth - 16);
       const room = window.innerWidth <= 767 ? 8 : inset;
       const x = rtl
         ? { right: Math.max(8, window.innerWidth - r.right + room) }

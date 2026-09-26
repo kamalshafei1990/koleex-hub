@@ -40,7 +40,6 @@ import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import SquareIcon from "@/components/icons/ui/SquareIcon";
-import TagsIcon from "@/components/icons/ui/TagsIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -48,6 +47,7 @@ import MiniAvatar from "./MiniAvatar";
 import { dayKey, dueInfo, fmtAgo, fmtDue } from "./todo-dates";
 import { PRIORITY_BADGE, STATUS_DOT, STATUS_PILL, metaOf, namesLine, nameOf, statusOf, type TFn } from "./todo-ui";
 import { isTempTask, type TodoActions } from "./use-todo-store";
+import LabelIcon from "./LabelIcon";
 
 export interface TaskRowProps {
   task: TodoWithRelations;
@@ -167,7 +167,7 @@ function TaskRow({
             )}
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
-                <TagsIcon size={9} /> <AutoTranslatedText text={task.label} plain />
+                <LabelIcon name={task.label} size={10} className="text-current" /> <AutoTranslatedText text={task.label} plain />
               </span>
             )}
             {task.series_cadence && (

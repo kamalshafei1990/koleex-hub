@@ -37,6 +37,7 @@ import { dueValue, parseQuickAdd } from "./quick-add-parse";
 import { fmtDue, todayIso } from "./todo-dates";
 import { PRIORITY_TEXT, nameOf, type TFn } from "./todo-ui";
 import type { QuickPanelKind } from "./QuickAddPanels";
+import LabelIcon from "./LabelIcon";
 
 const QuickPanel = dynamic(() => import("./QuickAddPanels"), { ssr: false });
 const MentionList = dynamic(() => import("./QuickAddPanels").then((m) => m.MentionList), { ssr: false });
@@ -282,7 +283,7 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
           )}
           {label && (
             <span className={`${chip} border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]`}>
-              <TagsIcon size={10} /> <span className="truncate">{label}</span>
+              <LabelIcon name={label} size={10} className="text-current" /> <span className="truncate">{label}</span>
               {x(() => clearPart("label"))}
             </span>
           )}

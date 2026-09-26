@@ -10,7 +10,6 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
@@ -42,6 +41,10 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import MiniAvatar from "./MiniAvatar";
 import FloatLayer from "./FloatLayer";
+/* Attachments · mentions · observers · products. In the form's own chunk:
+   Observers sit under People on every open, and as a separate chunk it was a
+   second round-trip (and a spinner) after the window appeared. */
+import TaskExtras from "./TaskExtras";
 import { dayKey, dueTimeOf, isoToLocalInput, localInputToIso } from "./todo-dates";
 import { dueValue } from "./quick-add-parse";
 import type { QuickDraft } from "./QuickAdd";
@@ -50,13 +53,8 @@ import {
 } from "./todo-ui";
 import type { TaskFields } from "./use-todo-store";
 import { createTodoLabelResult as createLabel } from "@/lib/todo-admin";
+import LabelIcon from "./LabelIcon";
 
-/* Attachments · mentions · observers · products — its own chunk, fetched
-   only when that section is opened. */
-const TaskExtras = dynamic(() => import("./TaskExtras"), {
-  ssr: false,
-  loading: () => <div className="h-24 flex items-center justify-center"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>,
-});
 
 /* Active projects for the optional "Related project" link — one request per
    page life, not one per open. fetchProjects answers [] without access,
@@ -67,6 +65,11 @@ function loadProjects() {
     .then((rows) => rows.map((r) => ({ id: r.id, name: r.name })))
     .catch(() => { projectsPromise = null; return []; });
   return projectsPromise;
+}
+
+/** The projects list, fetched ahead so "New task" opens complete. */
+export function warmTaskModal() {
+  void loadProjects();
 }
 
 export interface TaskModalProps {
@@ -608,14 +611,16 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
     <div className="relative">
       <button ref={triggerRef} type="button" onClick={() => (open ? close() : setOpen(true))} aria-expanded={open} aria-haspopup="listbox"
         className="w-full h-10 ps-3.5 pe-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] flex items-center gap-2 text-start hover:border-[var(--border-focus)] transition-colors">
-        <TagsIcon size={14} className="text-[var(--text-dim)] shrink-0" />
         {value ? (
           <span className="flex items-center gap-2 min-w-0 text-[var(--text-primary)]">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected?.color ?? "#94a3b8" }} />
+            <LabelIcon name={value} color={selected?.color} size={15} />
             <span className="truncate"><AutoTranslatedText text={value} plain /></span>
           </span>
         ) : (
-          <span className="text-[var(--text-dim)]">{t("f.label.choose")}</span>
+          <>
+            <TagsIcon size={14} className="text-[var(--text-dim)] shrink-0" />
+            <span className="text-[var(--text-dim)]">{t("f.label.choose")}</span>
+          </>
         )}
         <AngleDownIcon size={13} className={`ms-auto shrink-0 text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -641,7 +646,9 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
                   <button key={l.id} type="button" role="option" aria-selected={on} title={l.name}
                     onClick={() => { onChange(on ? "" : l.name); close(); }}
                     className={`h-9 px-2.5 rounded-lg text-[12.5px] flex items-center gap-2 text-start transition-colors ${on ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"}`}>
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color ?? "#94a3b8" }} />
+                    <span className="w-6 h-6 rounded-md shrink-0 inline-flex items-center justify-center" style={{ backgroundColor: `color-mix(in srgb, ${l.color ?? "#94a3b8"} 14%, transparent)` }}>
+                      <LabelIcon name={l.name} color={l.color ?? "#94a3b8"} size={13} />
+                    </span>
                     <span className="truncate"><AutoTranslatedText text={l.name} plain /></span>
                     {on && <CheckCircleIcon size={12} className="ms-auto shrink-0 text-[#7FA9D6]" />}
                   </button>

@@ -50,7 +50,6 @@ import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import PlayIcon from "@/components/icons/ui/PlayIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
-import TagsIcon from "@/components/icons/ui/TagsIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -61,6 +60,7 @@ import {
   CHOICE, CHOICE_OFF, CHOICE_ON, PRIORITY_BADGE, metaOf, STATUS_DOT, STATUS_PILL, STATUSES, nameOf, statusOf, type TFn,
 } from "./todo-ui";
 import { isTempTask, type TodoActions } from "./use-todo-store";
+import LabelIcon from "./LabelIcon";
 
 export interface TaskSheetProps {
   task: TodoWithRelations;
@@ -342,7 +342,7 @@ export default function TaskSheet({
               )}
               <div className="flex flex-wrap gap-1.5">
                 {proj && <LinkChip icon={<BriefcaseIcon size={12} />} text={proj.name} />}
-                {task.label && <LinkChip icon={<TagsIcon size={12} />} text={<AutoTranslatedText text={task.label} plain />} />}
+                {task.label && <LinkChip icon={<LabelIcon name={task.label} size={12} className="text-current" />} text={<AutoTranslatedText text={task.label} plain />} />}
                 {prods.map((p) => <LinkChip key={p.id} icon={<PackageIcon size={12} />} text={p.code ? `${p.code} · ${p.name}` : p.name} />)}
                 {mentions.map((m) => <LinkChip key={m.account_id} icon={<AtSignIcon size={12} />} text={m.full_name || m.username} />)}
                 {task.source === "report" && task.source_id && (

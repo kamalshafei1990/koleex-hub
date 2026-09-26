@@ -15,10 +15,10 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import TagsIcon from "@/components/icons/ui/TagsIcon";
 import MiniAvatar from "./MiniAvatar";
 import { isoDay } from "./todo-dates";
 import { PRIORITIES, PRIORITY_TEXT, nameOf, type TFn } from "./todo-ui";
+import LabelIcon from "./LabelIcon";
 
 export type QuickPanelKind = "assign" | "due" | "priority" | "label";
 
@@ -98,7 +98,7 @@ export default function QuickAddPanel(props: {
           {props.labels.map((l) => (
             <button key={l} type="button" onClick={() => props.onLabel(props.label === l ? null : l)} aria-pressed={props.label === l}
               className={`${ROW} ${props.label === l ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-hover)]"}`}>
-              <TagsIcon size={12} className="text-[var(--text-dim)]" />
+              <LabelIcon name={l} size={14} className="text-[var(--text-muted)]" />
               <span className="flex-1 truncate text-[var(--text-primary)]">{l}</span>
               {props.label === l && <CheckIcon size={13} className="text-[#7FA9D6]" />}
             </button>
