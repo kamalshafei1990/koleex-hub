@@ -34,12 +34,15 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import BellRawIcon from "@/components/icons/ui/BellIcon";
 import { setCurrentAccountId, useCurrentAccount } from "@/lib/identity";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 import {
   LEGACY_SESSION_KEY,
   LEGACY_SESSION_USER_KEY,
 } from "@/components/admin/session-keys";
 
 export default function UserMenu({ dk }: { dk: boolean }) {
+  const { t: tHub } = useTranslation(hubT);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -358,7 +361,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <InboxRawIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Inbox</span>
+                  <span className="flex-1 text-start">{tHub("app.inbox", "Notifications")}</span>
                   {unread > 0 && (
                     /* Mirrors the sidebar badge style — emerald pill
                        on the right side of the row. Capped at 99+ so

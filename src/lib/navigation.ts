@@ -353,7 +353,8 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.communication",
     label: "Communication",
     icon: CommunicationSidebarIcon,
-    appIds: ["todo", "discuss", "calendar", "notes", "reports"],
+    /* Notifications (the center, /inbox) sits beside Discuss — owner, 26/09. */
+    appIds: ["todo", "discuss", "inbox", "calendar", "notes", "reports"],
   },
   /* "Marketing & Growth" group dissolved 2026-07-31 (owner-approved): it
      rendered a single live item (Website, ~7 events/30d). Website now lives
@@ -428,7 +429,6 @@ export function getAppCategory(appId: string): string {
     if (group.appIds.includes(appId)) return group.id;
   }
   const extra: Record<string, string> = {
-    inbox: "communication",
     "price-calculator": "commercial",
     dashboard: "system",
   };
