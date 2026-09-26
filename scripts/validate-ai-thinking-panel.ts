@@ -186,6 +186,9 @@ console.log("\n── 7. Web sources read as small chips, not pasted addresses (
     sourceChipLabel(forbes, "the full list of the most valuable football clubs this year") === null);
   check("an address wrapped in brackets loses the brackets, so the chip is not inside stray parentheses",
     tidyBareLinks(`about $9.5 billion (${forbes}).`) === `about $9.5 billion  ${forbes}.`);
+  check("  …and so does a named link in brackets — \"([Rencol](url))\" — the owner's screenshot",
+    tidyBareLinks(`assembled ([Rencol](${forbes}), updated) and third ([Rencol](${forbes})).`) ===
+      `assembled ([Rencol](${forbes}), updated) and third  [Rencol](${forbes}).`);
   check("  …a markdown link's own (url) and code are left alone",
     tidyBareLinks(`[Forbes](${forbes})`) === `[Forbes](${forbes})` && tidyBareLinks("`(https://a.b/c)`") === "`(https://a.b/c)`");
   const md = readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
