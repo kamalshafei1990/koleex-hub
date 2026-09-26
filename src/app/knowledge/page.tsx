@@ -8,8 +8,20 @@ import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 
 const knowledgeBases = [
+  {
+    id: "brand-guidelines",
+    title: "KOLEEX Brand Guidelines",
+    description:
+      "The logo, the K monogram, colors, typography and every rule for using the KOLEEX brand — with real examples, the official files and downloads. 140 chapters, published in phases.",
+    icon: PaletteIcon,
+    href: "/knowledge/brand-guidelines",
+    pages: 140,
+    sections: ["Logo", "K Monogram", "Colors", "Typography", "Downloads", "Documents", "Social", "Packaging"],
+    color: "#567FB2",
+  },
   {
     id: "trade-terms",
     title: "Trade & Payment Terms",

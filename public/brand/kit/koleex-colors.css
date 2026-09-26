@@ -1,0 +1,20 @@
+/* KOLEEX brand colours — from the KOLEEX Brand Guidelines v2.0 (27/09/2026).
+   Hierarchy: black → white → Hub Blue. Status colours are for states only. */
+:root {
+  --koleex-black: #000000; /* KOLEEX Black */
+  --koleex-ink: #0A0A0A; /* Ink */
+  --koleex-white: #FFFFFF; /* White */
+  --koleex-deep: #3E6796; /* Hub Blue Deep */
+  --koleex-steel: #567FB2; /* Hub Blue Steel */
+  --koleex-sky: #7FA9D6; /* Hub Blue Sky */
+  --koleex-ice: #BCD8F0; /* Hub Blue Ice */
+  --koleex-ink-soft: #1A1A1A; /* Graphite */
+  --koleex-soft: #4B5563; /* Slate */
+  --koleex-ghost: #9CA3AF; /* Silver */
+  --koleex-border: #E5E7EB; /* Mist */
+  --koleex-surface: #F5F5F5; /* Cloud */
+  --koleex-success: #059669; /* Status Green */
+  --koleex-warning: #D97706; /* Status Amber */
+  --koleex-error: #DC2626; /* Status Red */
+  --koleex-hub-gradient: linear-gradient(180deg, #567FB2 0%, #BCD8F0 100%);
+}

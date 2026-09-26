@@ -60,6 +60,7 @@
     "validate:ai-core-boundaries": "tsx scripts/validate-ai-core-boundaries.ts",
     "validate:ai-rate-limit": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-rate-limit.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
+    "validate:brand-book": "tsx scripts/validate-brand-book.ts",
     "validate:contract-terms": "tsx scripts/validate-contract-terms.ts",
     "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
     "validate:trade-document": "tsx scripts/validate-trade-document-checks.ts",
