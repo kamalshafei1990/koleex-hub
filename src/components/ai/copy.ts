@@ -194,6 +194,10 @@ export const COPY: Record<Lang, {
   copyCode: string;
   codeLabel: string;
   closePhoto: string;
+  /** A picture in an answer that has no name of its own. */
+  photo: string;
+  /** Said to a screen reader when a reply has finished. */
+  replyReady: string;
   loadFailed: string;
   retry: string;
   supportedFiles: string;
@@ -358,6 +362,8 @@ export const COPY: Record<Lang, {
     copyCode: "Copy code",
     codeLabel: "code",
     closePhoto: "Close photo",
+    photo: "Photo",
+    replyReady: "Koleex AI replied.",
     loadFailed: "Couldn't load this right now. Check your connection and try again.",
     retry: "Try again",
     supportedFiles: "Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.",
@@ -521,6 +527,8 @@ export const COPY: Record<Lang, {
     copyCode: "复制代码",
     codeLabel: "代码",
     closePhoto: "关闭图片",
+    photo: "图片",
+    replyReady: "Koleex AI 已回复。",
     loadFailed: "现在加载不了，请检查网络后再试。",
     retry: "重试",
     supportedFiles: "支持的文件：图片、PDF、Excel、TXT、MD、CSV、JSON。",
@@ -556,7 +564,7 @@ export const COPY: Record<Lang, {
     savingTask: "جارٍ الحفظ…",
     taskSaved: "تم حفظ المهمة",
     taskFailed: "ما قدرنا نحفظها. حاول تاني.",
-    taskCancelled: "لم تُحفظ",
+    taskCancelled: "ما اتحفظتش",
     openTodo: "افتح في المهام",
     due: "موعدها",
     priorityHigh: "أولوية عالية",
@@ -570,7 +578,7 @@ export const COPY: Record<Lang, {
     remind: "تذكير",
     forPeople: "لـ",
     observers: "يتابع",
-    mentions: "أُخبِر",
+    mentions: "هيتبلّغ",
     repeats: "يتكرر",
     privateTask: "خاص",
     starts: "يبدأ",
@@ -685,6 +693,8 @@ export const COPY: Record<Lang, {
     copyCode: "انسخ الكود",
     codeLabel: "كود",
     closePhoto: "اقفل الصورة",
+    photo: "صورة",
+    replyReady: "Koleex AI رد.",
     loadFailed: "مش قادرين نحمّل ده دلوقتي. اتأكد من النت وجرّب تاني.",
     retry: "جرّب تاني",
     supportedFiles: "الملفات اللي بتتقري: صور، PDF، Excel، TXT، MD، CSV، JSON.",

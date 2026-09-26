@@ -41,6 +41,8 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import ThumbsUpIcon from "@/components/icons/ui/ThumbsUpIcon";
 import ThumbsDownIcon from "@/components/icons/ui/ThumbsDownIcon";
 import WaveformIcon from "@/components/icons/ui/WaveformIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import StopIcon from "@/components/icons/ui/StopIcon";
 
 /* ── Bubble ── */
 
@@ -399,7 +401,7 @@ function BubbleImpl({
                             className="inline-flex max-w-[240px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[12px]"
                             title={f.name}
                           >
-                            <span aria-hidden>📎</span>
+                            <PaperclipIcon size={12} aria-hidden className="shrink-0 opacity-70" />
                             <span className="truncate">{f.name}</span>
                           </span>
                         );
@@ -631,9 +633,7 @@ function BubbleImpl({
             with this flag, so a reload shows the plain partial text. */}
         {!isUser && msg.stopped && (
           <span className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)]" title={copy.stopped}>
-            <svg aria-hidden viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
+            <StopIcon size={11} aria-hidden />
             {copy.stopped}
           </span>
         )}

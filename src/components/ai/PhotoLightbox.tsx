@@ -18,6 +18,7 @@
 import { useEffect, useRef } from "react";
 import { useFocusTrap } from "./useFocusTrap";
 import { aiImage } from "@/lib/ai/image-url";
+import CrossLineIcon from "@/components/icons/ui/CrossLineIcon";
 
 export type LightboxPhoto = { url: string; label?: string | null };
 
@@ -68,9 +69,9 @@ export default function PhotoLightbox({
         className="absolute top-4 end-4 h-12 w-12 rounded-full inline-flex items-center justify-center text-white border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
         style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
+        {/* The library's outline cross at the house stroke (the call screen,
+            where this also opens, is outline-only); it was drawn here at 1.5. */}
+        <CrossLineIcon size={22} aria-hidden />
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

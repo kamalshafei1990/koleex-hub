@@ -2579,6 +2579,18 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   .kx-call-root [role="button"] {
     min-height: 44px;
   }
+  /* A SOURCE CHIP IS A TAP TARGET TOO: about 19px tall, and the rule above
+     only reached buttons (review, 2026-09-26). The same invisible 44px area,
+     centred on the chip. */
+  .kx-ai-root a.koleex-md-source::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
   .kx-ai-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
     font-size: 16px;
   }
@@ -4783,11 +4795,10 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    owner 2026-09-26). Quiet by design: the answer is the point, the chip says
    where it came from and opens it. */
 .koleex-md a.koleex-md-source {
+  position: relative;
   display: inline-flex;
   align-items: center;
   max-width: 14em;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: baseline;
   margin-inline: 2px;
@@ -4800,6 +4811,14 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   line-height: 1.7;
   text-decoration: none;
   unicode-bidi: isolate;
+}
+/* The words ellipsize on their own span, so the link is not clipped and can
+   carry the finger-sized hit area below. */
+.koleex-md .koleex-md-source-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .koleex-md a.koleex-md-source:hover {
   color: var(--text-primary, #e8edf5);

@@ -229,7 +229,7 @@ console.log("\n── 8. Design, part 1: a quieter screen ──");
   const card = read("src/components/ai/TaskCard.tsx");
   check("a task card says the priority in the reader's language and uses the app's own colours",
     /priority === "high" \? copy\.priorityHigh : priority === "low" \? copy\.priorityLow : ""/.test(card) &&
-      !/text-tertiary|var\(--danger|var\(--brand|12\.5px|bg-\[#0066FF\]/.test(card) && /lang === "ar" \? "←" : "→"/.test(card));
+      !/text-tertiary|var\(--danger|var\(--brand|12\.5px|bg-\[#0066FF\]/.test(card) && /<ArrowRightIcon size=\{12\} aria-hidden className=\{`inline-block align-\[-1px\] \$\{lang === "ar" \? "-scale-x-100" : ""\}`\} \/>/.test(card) && !/"←"|"→"/.test(card));
 }
 
 console.log("\n── 9. Design, part 2: the thread ──");

@@ -1822,6 +1822,53 @@ console.log("\n── An Arabic opening before an English code block reads right
     /\.kx-edit-box \{\s*field-sizing: content;\s*\}/.test(css));
 }
 
+/* ── CHAT POLISH 10–14 (owner: "ok do it") ───────────────────────────── */
+{
+  console.log("\n── Chat polish: tap targets, library icons, words, screen reader ──");
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const bub = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  const md = readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
+  const lb = readFileSync("src/components/ai/PhotoLightbox.tsx", "utf8");
+  const tc = readFileSync("src/components/ai/TaskCard.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+
+  /* 10 */
+  const chipAt = app.indexOf("data-remove-photo");
+  const chipBlock = app.slice(app.lastIndexOf('className="group relative inline-block h-16 w-16', chipAt), chipAt);
+  check("a photo waiting to be sent clips its picture, not its remove button — the finger-sized hit area stays whole",
+    chipAt > 0 && /className="group relative inline-block h-16 w-16"/.test(chipBlock) && !/h-16 w-16 overflow-hidden/.test(chipBlock) &&
+    /<span className="block h-full w-full overflow-hidden rounded-lg border/.test(chipBlock));
+
+  /* 11 */
+  const chipHtml = renderToStaticMarkup(<MessageMarkdown content="See [Forbes](https://www.forbes.com/x)." lang="en" /> as ReactElement);
+  check("a source chip is a finger-sized target on touch screens: the link carries the 44px area, its words ellipsize on their own span",
+    /<a[^>]*class="koleex-md-source"[^>]*><span class="koleex-md-source-text">Forbes<\/span><\/a>/.test(chipHtml) &&
+    /\.kx-ai-root a\.koleex-md-source::after \{\s*content: "";\s*position: absolute;[\s\S]{0,120}width: max\(100%, 44px\);\s*height: max\(100%, 44px\);/.test(css) &&
+    /\.koleex-md a\.koleex-md-source \{\s*position: relative;/.test(css) && !/\.koleex-md a\.koleex-md-source \{[^}]*overflow: hidden/.test(css) &&
+    /\.koleex-md \.koleex-md-source-text \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/.test(css));
+
+  /* 12 */
+  check("library icons, not typed glyphs: the jump chip's arrow, the file clip, the stopped mark, the task link's arrow, the lightbox cross",
+    !/↓ \{copy\.latest\}/.test(app) && /<ArrowDownIcon size=\{12\} aria-hidden \/>\s*\{copy\.latest\}/.test(app) &&
+    !/<span aria-hidden>📎<\/span>/.test(app + bub) && (app.match(/<PaperclipIcon /g) ?? []).length === 1 && (bub.match(/<PaperclipIcon /g) ?? []).length === 1 &&
+    /<StopIcon size=\{11\} aria-hidden \/>/.test(bub) && !/<rect x="6" y="6" width="12" height="12" rx="2" \/>/.test(bub) &&
+    /<ArrowRightIcon /.test(tc) && /<CrossLineIcon size=\{22\} aria-hidden \/>/.test(lb) && !/strokeWidth="1\.5"/.test(lb));
+
+  /* 13 */
+  const noAlt = renderToStaticMarkup(<MessageMarkdown content="![](https://example.com/a.jpg)" lang="ar" /> as ReactElement);
+  check("an unnamed picture is named in the screen's language, and the last formal Arabic lines are Egyptian",
+    new RegExp(`aria-label="${COPY.ar.photo}"`).test(noAlt) && !/aria-label="Photo"/.test(noAlt) && !/"Photo"/.test(md) &&
+    COPY.ar.taskCancelled === "ما اتحفظتش" && COPY.ar.mentions === "هيتبلّغ" && COPY.zh.photo === "图片");
+
+  /* 14 */
+  check("the screen reader hears an upload's progress and a finished reply — once per turn, not on opening a thread or after a failure",
+    /<div role="status" aria-live="polite" className="flex items-center gap-2 rounded-xl[^"]*">\s*<span className="h-3 w-3 shrink-0 motion-safe:animate-spin[^>]*\/>\s*\{attachStatus\}/.test(app) &&
+    /const replyAnnounce = turnsDone > 0 && !sending && lastMessage\?\.role === "assistant" && !!lastMessage\.content/.test(app) &&
+    /setSending\(false\);\s*setTurnsDone\(\(n\) => n \+ 1\);\s*\}/.test(app) &&
+    /<p className="sr-only" role="status" aria-live="polite" data-reply-announce>\{replyAnnounce\}<\/p>/.test(app) &&
+    ["en", "zh", "ar"].every((l) => !!COPY[l as "en"].replyReady));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
