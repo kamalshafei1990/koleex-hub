@@ -64,6 +64,7 @@ import { setIconBadge } from "@/lib/app-icon-badge";
 import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
 import PushNudge from "@/components/layout/PushNudge";
 import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
+import { desktopToast, inboxToastText, type Toast } from "@/lib/desktop-toast";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
@@ -204,6 +205,14 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     discussChannelsRef.current = discussChannels;
   }, [discussChannels]);
   const wrapRef = useRef<HTMLDivElement>(null);
+  /* What a desktop notification needs when it is shown or clicked — the
+     latest language, words and handlers. The realtime callbacks subscribe
+     once per account, so they read these through a ref (synced after each
+     commit, below the handlers it points at). */
+  const toastRef = useRef<{
+    lang: typeof lang; t: TFn; many: (n: number) => Toast;
+    openRow: (m: InboxMessageWithSender) => void; openChannel: (id: string) => void;
+  } | null>(null);
 
   /** Grace-period tracking: after a realtime bump, protect the optimistic
    *  `inboxUnread` from being overwritten by a stale poll result. */
@@ -264,16 +273,18 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   }, [accountId, iconKnown, inboxUnread, discussUnread]);
 
   /* ── Discuss: seed channel list ──────────────────────────────────── */
-  const recountDiscuss = useCallback(async () => {
+  const recountDiscuss = useCallback(async (): Promise<DiscussChannelWithState[] | null> => {
     const aid = accountIdRef.current;
     /* Signed out: the render-time transition above already emptied the list. */
-    if (!aid) return;
+    if (!aid) return null;
     try {
       const rows = await fetchMyChannels(aid);
       setDiscussChannels(rows);
       setIconKnown((k) => (k.discuss ? k : { ...k, discuss: true }));
+      return rows;
     } catch {
       /* Leave prior list in place. */
+      return null;
     }
   }, []);
 
@@ -304,7 +315,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
            "Nothing"), the same per-channel rule push and DiscussApp follow. */
         const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
         const silenced = !!ch && (ch.muted || ch.notification_pref === "none");
-        if (!silenced && !window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) playAppSound("message");
+        const heard = !silenced && !window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours);
+        if (heard) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
            (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
@@ -320,7 +332,24 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               : c,
           ),
         );
-        void recountDiscuss();
+        void recountDiscuss().then((rows) => {
+          /* The desktop app with its window not in front: a system
+             notification too (lib/desktop-toast), under the chime's rules.
+             Never for a "mentions only" conversation — this ping carries ids
+             only, so a mention can't be told from any other message. */
+          const c = rows?.find((x) => x.id === msg.channel_id);
+          if (!heard || !c || c.muted || c.notification_pref === "none" || c.notification_pref === "mentions") return;
+          const r = toastRef.current;
+          if (!r) return;
+          const preview = c.last_message?.body?.trim() || r.t("notif.newMessage");
+          const author = c.last_message?.author_username;
+          desktopToast({
+            key: `discuss:${c.id}`,
+            title: channelLabel(c, r.t),
+            body: author ? `${author}: ${preview}` : preview,
+            open: () => r.openChannel(c.id),
+          }, r.many);
+        });
       },
       onChannelChange: () => {
         void recountDiscuss();
@@ -519,6 +548,10 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       const qh = (notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours;
       if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {
         playAppSound("notification", activity);
+        /* The desktop app with its window not in front: a system
+           notification too (lib/desktop-toast) — the same switches decide. */
+        const r = toastRef.current;
+        if (r) desktopToast({ key: `inbox:${msg.id}`, ...inboxToastText(msg, r.lang), open: () => r.openRow(msg as unknown as InboxMessageWithSender) }, r.many);
       }
       setInboxUnread((n) => n + 1);
       setMessages((prev) => {
@@ -639,6 +672,17 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     /* Decided on the row: its work is done — it leaves the list. */
     onDecided: (m) => archiveRows([m]),
   };
+
+  /* The desktop notification's latest words and handlers (toastRef). */
+  useEffect(() => {
+    toastRef.current = {
+      lang,
+      t,
+      many: (n) => ({ key: "inbox:many", title: t("notif.title"), body: tUi("toast.many").replace("{n}", String(n)), open: () => setOpen(true) }),
+      openRow: (m) => void handleInboxRowClick(m),
+      openChannel: (id) => handleDiscussRowClick(id),
+    };
+  });
 
   /* Discuss section: only channels that actually have unread, sorted
      by the most recent activity so the freshest pings are at the top. */

@@ -672,7 +672,7 @@ check("the browser asks only after a press of Turn on",
   && !/useEffect/.test(nudgeCard));
 const decideBody = nudgeLib.slice(nudgeLib.indexOf("async function decide"));
 check("never during view-as, in the desktop app, once push is on here, or when the browser blocks it",
-  /if \(!scope\.endsWith\(":self"\)\) return null;/.test(decideBody) && /koleex\?\.isDesktop\) return null;/.test(decideBody)
+  /if \(!scope\.endsWith\(":self"\)\) return null;/.test(decideBody) && /if \(isDesktopApp\(\)\) return null;/.test(decideBody)
   && /permission === "denied"[^\n]*return null;/.test(decideBody) && /getSubscription\(\)\) return null;/.test(decideBody)
   && /if \(!isPushConfigured\(\)\) return null;/.test(decideBody));
 check("✕ closes it for good for this person on this device; turning push on does not",
@@ -682,6 +682,40 @@ const uiWords = fileSrc("src/lib/translations/notif-ui.ts");
 const nudgeKeys = [...new Set([...nudgeCard.matchAll(/tUi\("(push\.[a-zA-Z]+)"\)/g)].map((m) => m[1]))];
 const missingWords = nudgeKeys.filter((k) => !new RegExp(`"${k.replace(".", "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(uiWords));
 check(`its words read in English, Chinese and Arabic (${nudgeKeys.length} keys)`, nudgeKeys.length >= 8 && missingWords.length === 0, missingWords.join(", "));
+
+/* ── Q: the desktop app pops a system notification when it isn't in front ── */
+console.log("\nQ. the desktop app pops a system notification when it isn't in front");
+/* 26/09/2026: the desktop app has no push. While it was open behind another
+   program a new approval only chimed — and before the bell was first opened,
+   not even that. Now the bell mounts early there and each new notification
+   also shows as a Windows / Mac notification, under the chime's own rules. */
+const toastLib = fileSrc("src/lib/desktop-toast.ts");
+const bellQ = fileSrc("src/components/layout/NotificationBell.tsx");
+const gateQ = fileSrc("src/components/layout/NotificationBellGate.tsx");
+check("only in the desktop app, only while its window isn't in front, and silent (the chime already sounds)",
+  /if \(!isDesktopApp\(\) \|\| typeof Notification === "undefined" \|\| Notification\.permission !== "granted"\) return;/.test(toastLib)
+  && [...toastLib.matchAll(/if \(!outOfView\(\)\) return;/g)].length === 2 && /silent: true/.test(toastLib)
+  && /koleex\?\.isDesktop/.test(fileSrc("src/lib/desktop-app.ts")));
+check("a burst shows as one", /batch\.length > 2 \? \[many\(batch\.length\)\] : batch/.test(toastLib));
+const allowedAt = bellQ.indexOf("if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {");
+const allowedBlock = allowedAt < 0 ? "" : bellQ.slice(allowedAt, bellQ.indexOf("setInboxUnread((n) => n + 1);", allowedAt));
+check("a work notification pops under the chime's own switches and quiet hours",
+  /playAppSound\("notification", activity\)/.test(allowedBlock) && /desktopToast\(\{ key: `inbox:\$\{msg\.id\}`/.test(allowedBlock)
+  && [...bellQ.matchAll(/\bdesktopToast\(/g)].length === 2);
+const discussAt = bellQ.indexOf("onMessageInsert: (msg) => {");
+const discussBlock = discussAt < 0 ? "" : bellQ.slice(discussAt, bellQ.indexOf("onChannelChange:", discussAt));
+const guardAt = discussBlock.indexOf('if (!heard || !c || c.muted || c.notification_pref === "none" || c.notification_pref === "mentions") return;');
+check("a Discuss message pops only when it would chime — never a muted, \"nothing\" or \"mentions only\" conversation",
+  /if \(heard\) playAppSound\("message"\);/.test(discussBlock) && guardAt > 0 && guardAt < discussBlock.indexOf("desktopToast("));
+check("clicking it brings the Hub forward and opens that notification or conversation",
+  /n\.onclick = \(ev\) => \{[\s\S]{0,200}window\.focus\(\)[\s\S]{0,120}t\.open\(\)/.test(toastLib)
+  && /openRow: \(m\) => void handleInboxRowClick\(m\)/.test(bellQ) && /openChannel: \(id\) => handleDiscussRowClick\(id\)/.test(bellQ));
+const warmQ = gateQ.slice(gateQ.indexOf("const warm = () => {"), gateQ.indexOf("const t = window.setTimeout(", gateQ.indexOf("const warm = () => {")));
+check("the desktop app mounts the real bell early, closed — browsers keep the lazy one",
+  /if \(isDesktopApp\(\)\) \{[\s\S]*?setOpenOnMount\(false\);\s*setBell\([\s\S]*?return;\s*\}/.test(warmQ)
+  && /<Bell dk=\{dk\} defaultOpen=\{openOnMount\} \/>/.test(gateQ));
+check("a burst's words read in English, Chinese and Arabic",
+  /"toast\.many":\s*\{\s*en: "[^"]*\{n\}[^"]*",\s*zh: "[^"]*\{n\}[^"]*",\s*ar: "[^"]*\{n\}[^"]*"/.test(fileSrc("src/lib/translations/notif-ui.ts")));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

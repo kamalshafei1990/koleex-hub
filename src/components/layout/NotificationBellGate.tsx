@@ -28,6 +28,7 @@ import { cachedGet } from "@/lib/client-cache";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import { setIconBadge } from "@/lib/app-icon-badge";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
+import { isDesktopApp } from "@/lib/desktop-app";
 
 /* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
    and even with the module ALREADY imported and awaited, that wrapper renders
@@ -54,6 +55,9 @@ const discussUnreadOf = (channels: Channels | null) =>
 
 export default function NotificationBellGate({ dk }: { dk: boolean }) {
   const [Bell, setBell] = useState<BellComponent | null>(null);
+  /* A press opens the panel it mounts; the desktop app's early mount (below)
+     does not. */
+  const [openOnMount, setOpenOnMount] = useState(true);
   const [pending, setPending] = useState(false);
   const [count, setCount] = useState(0);
   const opened = Bell !== null;
@@ -114,6 +118,21 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
     let cancelled = false;
     const warm = () => {
       if (cancelled || document.visibilityState !== "visible") return;
+      /* THE DESKTOP APP MOUNTS THE REAL BELL NOW, CLOSED. It has no push,
+         so the bell's live feed is its only way to hear of a notification:
+         with the bell mounted, a new one chimes, moves the icon's number and
+         pops a Windows / Mac notification (lib/desktop-toast) while the
+         window is minimized or behind another program. Left to the first
+         press, a desktop session that never opened the bell heard nothing.
+         Browsers keep the lazy bell — push covers them. */
+      if (isDesktopApp()) {
+        void import("./NotificationBell").then((mod) => {
+          if (cancelled) return;
+          setOpenOnMount(false);
+          setBell(() => mod.default as BellComponent);
+        });
+        return;
+      }
       void import("./NotificationBell");
       /* Whether the panel will offer push on this device — decided now, so
          the first open shows it (or not) on its first frame. */
@@ -216,7 +235,7 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
      stub must disappear or there would be two bells. Rendering the resolved
      module directly means the stub's unmount and the real bell's mount happen
      in ONE commit — no frame without a bell. */
-  if (Bell) return <Bell dk={dk} defaultOpen />;
+  if (Bell) return <Bell dk={dk} defaultOpen={openOnMount} />;
 
   return (
     <button

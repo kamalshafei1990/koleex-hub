@@ -78,4 +78,7 @@ export const notifUiT: Translations = {
   "push.denied":    { en: "The browser blocked notifications. Allow them in its site settings, then try again from Settings → Notifications.", zh: "浏览器已阻止通知。请在网站设置中允许，然后在 设置 → 通知 中重试。", ar: "المتصفح منع الإشعارات. اسمح بها من إعدادات الموقع، ثم أعد المحاولة من الإعدادات، قسم الإشعارات." },
   "push.failed":    { en: "Couldn't turn them on. Try again, or use Settings → Notifications.", zh: "无法开启。请重试，或前往 设置 → 通知。", ar: "تعذّر التفعيل. حاول مرة أخرى، أو من الإعدادات، قسم الإشعارات." },
   "push.dismiss":   { en: "Don't show again", zh: "不再显示",  ar: "عدم الإظهار مرة أخرى" },
+
+  /* The desktop app's system notification for a burst (lib/desktop-toast). */
+  "toast.many":     { en: "{n} new notifications", zh: "{n} 条新通知", ar: "إشعارات جديدة: {n}" },
 };

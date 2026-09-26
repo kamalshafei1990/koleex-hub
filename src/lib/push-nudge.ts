@@ -24,6 +24,7 @@
    --------------------------------------------------------------------------- */
 
 import { currentScopeKey } from "@/lib/me-bootstrap";
+import { isDesktopApp } from "@/lib/desktop-app";
 import { isIosNeedsInstall, isPushConfigured, isPushSupported, permissionState } from "@/lib/push-client";
 
 /** "offer": a Turn on button · "install": iPhone/iPad, add to Home Screen first. */
@@ -60,7 +61,7 @@ async function decide(accountId: string): Promise<PushNudge | undefined> {
   const scope = currentScopeKey();
   if (scope === "anon") return undefined;
   if (!scope.endsWith(":self")) return null;
-  if ((window as { koleex?: { isDesktop?: boolean } }).koleex?.isDesktop) return null;
+  if (isDesktopApp()) return null;
   try { if (localStorage.getItem(KEY + accountId)) return null; } catch { /* no storage: offer */ }
   if (!isPushConfigured()) return null;
   if (isIosNeedsInstall()) return "install";
