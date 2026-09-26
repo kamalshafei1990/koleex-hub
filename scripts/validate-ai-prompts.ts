@@ -22,7 +22,8 @@
 
 import { readFileSync } from "node:fs";
 import { buildNowLine } from "../src/lib/server/ai/prompts/blocks";
-import { analyzeIntent, wantsList } from "../src/lib/server/ai/analyze-intent";
+import { analyzeIntent, wantsList, speaksOfOwnRecords } from "../src/lib/server/ai/analyze-intent";
+import { LIST_ANSWER_NOTE } from "../src/lib/server/ai/prompts";
 import { buildSmartPrompt } from "../src/lib/server/ai/prompt-builder";
 import { GENERAL_SEARCH_NOTE } from "../src/lib/server/ai/core/general-search";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
@@ -336,6 +337,31 @@ console.log("\n── Roadmap D4: a photo the user sent ──");
   check("the general lane's ceiling is the long one for a list asked for by name or for Deep, and 1400 otherwise",
     /const GENERAL_LONG_MAX_TOKENS = 4000;/.test(route) &&
     /: fastLane === "small" \? 200\s*: analysis\.expectedFormat === "list" \|\| chosenModel === "deep" \? GENERAL_LONG_MAX_TOKENS\s*: 1400;/.test(route));
+}
+
+/* ── THE TOOL LOOP GETS THE LIST RULE TOO (owner, 2026-09-26) ──
+   "what is the top 100 famous brands in the world ?" on Deep went to the tool
+   loop, whose prompt had no list rule: two rankings of five rows each and "the
+   rest is not published, so I won't invent it". The loop now carries the same
+   rule the general lane has — for the world only, never for Hub records. */
+{
+  check("the loop's list note asks for every row, a Source column, and labelled general-knowledge rows",
+    /give that many rows/.test(LIST_ANSWER_NOTE) && /add a Source column/.test(LIST_ANSWER_NOTE) &&
+    /general knowledge — may be out of date/.test(LIST_ANSWER_NOTE) && /never a reason to stop short/.test(LIST_ANSWER_NOTE) &&
+    /Never answer with only a link/.test(LIST_ANSWER_NOTE));
+  check("  …and says Koleex's own records are listed from tool results alone",
+    /Koleex's own records .* are listed from tool results alone, never completed from general knowledge/.test(LIST_ANSWER_NOTE));
+  check("a question about the asker's own things is recognised in English, Arabic and Chinese",
+    speaksOfOwnRecords("Which reports did I write this week? Just the list.") && speaksOfOwnRecords("list my tasks") &&
+    speaksOfOwnRecords("table of our customers") && speaksOfOwnRecords("قائمة بالعملاء بتوعنا") &&
+    speaksOfOwnRecords("جدول المنتجات اللي عندنا") && speaksOfOwnRecords("列出我的任务"));
+  check("  …and a list of the world is not",
+    !speaksOfOwnRecords("what is the top 100 famous brands in the world ?") && !speaksOfOwnRecords("top 20 richest people") &&
+    !speaksOfOwnRecords("اديني قائمة بأكبر 50 شركة في العالم") && !speaksOfOwnRecords("列出前20个最大的城市") &&
+    !speaksOfOwnRecords("list the biggest cities in China"));
+  const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
+  check("the loop appends the note only for a list that is not about Hub data or the asker's own records",
+    /\(wantsList\(userMessage\) &&\s*!isBusinessDataQuery\(userMessage\) &&\s*!isWorkDataQuery\(userMessage\) &&\s*!speaksOfOwnRecords\(userMessage\)\s*\? `\\n\\n\$\{LIST_ANSWER_NOTE\}`/.test(orch));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
