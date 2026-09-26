@@ -41,6 +41,14 @@ export const COPY: Record<Lang, {
    *  {model} is the Koleex name. */
   answeredByModel: string;
   summaryWriting: string;
+  thinkingTitle: string;
+  thoughtFor: string;
+  thinkSearching: string;
+  thinkSearched: string;
+  thinkReading: string;
+  thinkRead: string;
+  thinkingShow: string;
+  thinkingHide: string;
   dropHere: string;
   recommended: string;
   otherOption: string;
@@ -238,6 +246,14 @@ export const COPY: Record<Lang, {
     modelTextOnly: "Text only",
     answeredByModel: "Answered by {model}",
     summaryWriting: "Writing the call summary…",
+    thinkingTitle: "Thinking",
+    thoughtFor: "Thought for {s}s",
+    thinkSearching: "Searching",
+    thinkSearched: "Searched",
+    thinkReading: "Reading",
+    thinkRead: "Read",
+    thinkingShow: "Show how it thought",
+    thinkingHide: "Hide how it thought",
     dropHere: "Drop files to attach",
     recommended: "Recommended",
     otherOption: "Something else",
@@ -384,6 +400,14 @@ export const COPY: Record<Lang, {
     modelTextOnly: "仅文字",
     answeredByModel: "由 {model} 回答",
     summaryWriting: "正在整理通话摘要…",
+    thinkingTitle: "思考中",
+    thoughtFor: "思考了 {s} 秒",
+    thinkSearching: "正在搜索",
+    thinkSearched: "已搜索",
+    thinkReading: "正在阅读",
+    thinkRead: "已阅读",
+    thinkingShow: "显示思考过程",
+    thinkingHide: "隐藏思考过程",
     dropHere: "拖放文件以附加",
     recommended: "推荐",
     otherOption: "其他",
@@ -529,6 +553,14 @@ export const COPY: Record<Lang, {
     modelTextOnly: "كتابة بس",
     answeredByModel: "رد عليك {model}",
     summaryWriting: "بكتب ملخص المكالمة…",
+    thinkingTitle: "بفكّر",
+    thoughtFor: "فكّر {s} ثانية",
+    thinkSearching: "بدوّر على",
+    thinkSearched: "دوّرت على",
+    thinkReading: "بقرأ",
+    thinkRead: "قريت",
+    thinkingShow: "اعرض التفكير",
+    thinkingHide: "اخفي التفكير",
     dropHere: "سيب الملفات هنا",
     recommended: "الأنسب",
     otherOption: "حاجة تانية",

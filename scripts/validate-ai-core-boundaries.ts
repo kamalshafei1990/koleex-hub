@@ -336,7 +336,7 @@ check(
   check("general lane: the tools ride the first call only when offered, with toolChoice auto unless a world fact forces the lookup (the page reader joins only with a user's link)", /\.\.\.\(laneTools\s*\? \{ tools: laneTools, toolChoice: worldFactOnGeneral \? \{ forceTool: GENERAL_LANE_TOOL \} : \("auto" as const\) \}\s*: \{\}\)/.test(body) &&
     /const laneTools = generalTools && readOn && allowedLinks\.size > 0 \? \[\.\.\.generalTools, READ_PAGE_TOOL_DEF\] : generalTools;/.test(body));
   check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && laneTools && out\.response\.toolCalls\.length > 0\)/.test(body));
-  check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) (?:controller\.enqueue|emit)\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
+  check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) (?:controller\.enqueue|emit)\(send\((?:\{ type: "retract" \}|retractFrame\(accumulated\))\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
   /* The page reader (2026-09-26) adds ONE bounded hop: the second call may
      carry read_page alone, and the call after a read carries nothing. */
   check("general lane: the second call carries no tool but read_page, and only while reads are left — the call after it carries NO tools; a hop, never a loop",

@@ -18,6 +18,8 @@ import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import ActivityLine from "@/components/ai/ActivityLine";
+import ThinkingPanel from "@/components/ai/ThinkingPanel";
+import { hasThinking } from "@/components/ai/thinking-panel-model";
 /* THE MARKDOWN RENDERER LOADS WHEN A REPLY NEEDS IT (deep check,
    2026-09-24): react-markdown and its parsers are ~42 KB gzipped, and the
    app always opens on an empty new chat, which needs none of it. The app
@@ -114,6 +116,11 @@ function BubbleImpl({
   /* Memoised so the `?? []` fallback doesn't mint a new array each render
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
+  /* The Thinking panel (owner, 2026-09-26): shown when this turn looked
+     something up or said something before it did. It carries the activity
+     itself, so the separate activity line steps aside while it is there. */
+  const liveTurn = !!isLast && (orbState === "loading" || orbState === "typing");
+  const showThinking = !isUser && hasThinking(steps, msg.thinking);
   /* MessageBubble takes `lang`, not the resolved dictionary — resolve it here
      rather than threading another prop through every call site. */
   const copy = COPY[lang] ?? COPY.en;
@@ -235,6 +242,9 @@ function BubbleImpl({
             "just give the answer direct"). The steps still exist on the
             message — the orb's activity label uses the latest tool-call,
             and the quotation DraftCard below still surfaces its result. */}
+        {showThinking && (
+          <ThinkingPanel steps={steps} thinking={msg.thinking} live={liveTurn} lang={lang} />
+        )}
         {draftStep && (
           <DraftCard payload={draftStep.payload as QuotationDraftPayload} lang={lang} />
         )}
@@ -256,11 +266,11 @@ function BubbleImpl({
             latest tool-call step). Shown while the bubble is still empty,
             and again above a reply that is streaming while a lookup runs.
             Owner, looking at Grok: a small title with a simple motion. */}
-        {!isUser && msg.content && orbState === "typing" && orbActivity !== "none" && (
+        {!isUser && !showThinking && msg.content && orbState === "typing" && orbActivity !== "none" && (
           <ActivityLine activity={orbActivity} lang={lang} className="px-1" />
         )}
         {!isUser && !msg.content ? (
-          orbState === "loading" || orbState === "typing" ? (
+          showThinking ? null : orbState === "loading" || orbState === "typing" ? (
             <ActivityLine activity={orbActivity} lang={lang} className="px-1 py-1" />
           ) : (
             <TypingIndicator lang={lang} />
