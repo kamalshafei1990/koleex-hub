@@ -21,4 +21,4 @@ export { POST } from "../../../ai/agent/route";
 /* The segment config is written out rather than re-exported: Next.js reads
    `maxDuration` statically and refuses a re-export of it. The value is the
    legacy route's own, and the suite holds them equal. */
-export const maxDuration = 120;
+export const maxDuration = 300;

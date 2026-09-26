@@ -3,7 +3,7 @@
 /* ---------------------------------------------------------------------------
    ActivityLine — one small line that says what Koleex AI is doing right now.
 
-   "Thinking", "Searching the web", "Checking the records" — set in the muted
+   "Thinking", "Reading the details", "Checking the records" — set in the muted
    text colour with a slow light sweeping through the letters and three dots
    that breathe after it. The pattern every current assistant uses (the
    owner pointed at Grok's) for the seconds between a question and its

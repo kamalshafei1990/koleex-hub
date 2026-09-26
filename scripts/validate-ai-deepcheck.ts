@@ -276,7 +276,7 @@ console.log("\n── The tool loop always ends in an answer (owner, 2026-09-26)
      give-up path promoted the last step's progress line to the answer. */
   const orch = read("src/lib/server/ai-agent/orchestrator.ts");
   check("the last round carries no tool once tools have run, so the model writes the answer from what it gathered",
-    /const lastRound = iter === MAX_ITERATIONS - 1 && totalToolRuns > 0;/.test(orch) &&
+    /const lastRound =\s*totalToolRuns > 0 && \(iter === MAX_ITERATIONS - 1 \|\| Date\.now\(\) - tStart >= LOOP_ANSWER_AFTER_MS\);/.test(orch) &&
       /totalToolRuns >= MAX_TOOLS_PER_TURN \|\| lastRound\s*\? "none"/.test(orch));
   check("  …and the give-up path never promotes a progress line (a tool-call step) to the reply",
     /\.reverse\(\)\s*\.filter\(\(s\) => s\.kind !== "tool-call"\)\s*\.map\(\(s\) => cleanAssistantText\(s\.text \?\? ""\)\)/.test(orch));
@@ -284,6 +284,25 @@ console.log("\n── The tool loop always ends in an answer (owner, 2026-09-26)
     /const LOOP_MAX_TOKENS = 2048;/.test(orch) && /const LOOP_LONG_MAX_TOKENS = 4000;/.test(orch) &&
       /const longAnswer = model === "deep" \|\| wantsList\(userMessage\);/.test(orch) &&
       /maxTokens: longAnswer \? LOOP_LONG_MAX_TOKENS : LOOP_MAX_TOKENS,/.test(orch) && !/maxTokens: 2048,/.test(orch));
+}
+
+console.log("\n── A long answer starts in time (owner, 2026-09-26: \"No reply was received\") ──");
+{
+  /* "top 100 brands" on Deep hit the two-minute function wall twice: the
+     model was still looking things up when a hundred-row answer needed to
+     be writing. The loop now answers once 45 s are gone, and the route's
+     ceiling leaves that answer room to finish. */
+  const orch = read("src/lib/server/ai-agent/orchestrator.ts");
+  const route = read("src/app/api/ai/agent/route.ts");
+  const v1 = read("src/app/api/v1/ai/agent/route.ts");
+  const budget = Number((orch.match(/const LOOP_ANSWER_AFTER_MS = ([0-9_]+);/) ?? [])[1]?.replace(/_/g, "") ?? NaN);
+  const routeS = Number((route.match(/^export const maxDuration = (\d+);/m) ?? [])[1] ?? NaN);
+  const v1S = Number((v1.match(/^export const maxDuration = (\d+);/m) ?? [])[1] ?? NaN);
+  check("once lookups have run and the budget is spent, the next round is the answer round",
+    Number.isFinite(budget) && budget > 0 && budget <= 60_000);
+  check("the agent route gives a long answer room to finish after the budget (at least three minutes past it)",
+    Number.isFinite(routeS) && routeS * 1000 - budget >= 180_000);
+  check("  …and the v1 route carries the same ceiling", v1S === routeS);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

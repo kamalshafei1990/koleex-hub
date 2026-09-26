@@ -64,9 +64,9 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   searchCatalog: "searching",
   auditProductData: "analyzing",
   /* knowledge, web, machines, trade terms — the lookups. THE WEB IS
-     "browsing", so the line under the orb can say "Searching the web"
-     rather than a generic "Searching": the owner asked for the title to
-     say what is happening, and where a lookup goes is the useful part. */
+     "browsing", its own activity, so the orb and the trace can tell it
+     apart from a Hub search. The words for it are "Thinking" (owner,
+     2026-09-26 — see components/ai/activity-copy.ts). */
   search_web: "browsing",
   /* Koleex AI opening a result page (core/read-page.ts): "Reading the details". */
   read_page: "reading",

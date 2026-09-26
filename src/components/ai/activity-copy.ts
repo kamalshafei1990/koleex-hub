@@ -8,11 +8,15 @@
    an activity becomes a sentence, so the chat line, the voice caption and
    any future surface say the same thing for the same state.
 
-   THE WORDS NAME THE WORK, NEVER THE TOOL. "Searching the web" rather than
-   "search_web", "Checking the records" rather than "getProductFullDetails":
-   a tool name is an implementation detail and, for some tools, a vendor's
+   THE WORDS NAME THE WORK, NEVER THE TOOL. "Checking the records" rather
+   than "getProductFullDetails": a tool name is an implementation detail and, for some tools, a vendor's
    vocabulary. Short, present-tense, and the same shape in three languages
    so a shimmering line stays one line.
+
+   A WEB LOOKUP READS AS THINKING. Owner, 2026-09-26: "remove the word of
+   search the web and replace it with thinking". The lookup is part of how
+   the answer is worked out, and the line says so; the tool map still calls
+   it "browsing", so the orb's motion and any trace keep the distinction.
    --------------------------------------------------------------------------- */
 
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
@@ -22,7 +26,7 @@ export const ACTIVITY_COPY: Record<Lang, Record<AIOrbActivity, string>> = {
   en: {
     none: "Thinking",
     searching: "Searching",
-    browsing: "Searching the web",
+    browsing: "Thinking",
     reading: "Reading the details",
     analyzing: "Working it out",
     reasoning: "Thinking it through",
@@ -42,7 +46,7 @@ export const ACTIVITY_COPY: Record<Lang, Record<AIOrbActivity, string>> = {
   zh: {
     none: "思考中",
     searching: "搜索中",
-    browsing: "正在搜索网页",
+    browsing: "思考中",
     reading: "正在查看详情",
     analyzing: "正在分析",
     reasoning: "正在思考",
@@ -62,7 +66,7 @@ export const ACTIVITY_COPY: Record<Lang, Record<AIOrbActivity, string>> = {
   ar: {
     none: "بفكّر",
     searching: "ببحث",
-    browsing: "ببحث على النت",
+    browsing: "بفكّر",
     reading: "بقرأ التفاصيل",
     analyzing: "بحسبها",
     reasoning: "بفكّر فيها",
