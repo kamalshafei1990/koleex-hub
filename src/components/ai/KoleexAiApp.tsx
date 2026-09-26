@@ -62,6 +62,7 @@ import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clip
 import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { chatError } from "@/components/ai/chat-error";
+import { event as perfEvent } from "@/lib/perf/client";
 import { foldForSearch } from "@/lib/text-fold";
 import { isNetworkError } from "@/lib/ai/network-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
@@ -139,6 +140,10 @@ const VoiceCallButton = dynamic(() => import("@/components/ai/VoiceCallButton"),
 });
 
 const SIDEBAR_W = 248;
+/** How many times a new chat is asked for before the composer says it could
+ *  not be made, and the wait before the second ask (doubled for the third). */
+const CREATE_CHAT_TRIES = 3;
+const CREATE_CHAT_BACKOFF_MS = 1200;
 /** The shortest gap between two re-reads of the sidebar list on return. */
 const LIST_REFRESH_MIN_MS = 60_000;
 
@@ -920,30 +925,64 @@ export default function KoleexAiApp() {
        couldNotStartChat and unlocks. It simply never ran, because the thing
        it checks for was never produced. On this owner's link a drop is
        routine, so this is the ordinary case, not the exotic one. */
-    let res: Response;
-    try {
-      res = await fetch("/api/ai/conversations", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
-      });
-    } catch {
-      return null;   /* the link went — the caller says so and unlocks */
-    }
-    if (!res.ok) return null;
+    /* THE ROW IS NAMED HERE, AND ASKED FOR UP TO THREE TIMES (owner,
+       2026-09-26, from the phone: "couldn't start a new chat", six tries in
+       a row, while the server made all six rows — the answer never reached
+       the phone). The id is chosen before the first ask, so a second ask
+       gets the same row back instead of a second one (the route is
+       idempotent on it). A server's refusal (4xx) is final; a lost answer,
+       an unreadable one or a 5xx is asked again. Each failure is counted,
+       by how, so the next report says why without a screenshot. */
+    const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : null;
+    const payload = JSON.stringify({ ...(activeProjectId ? { project_id: activeProjectId } : {}), ...(id ? { id } : {}) });
     let conversation: ConversationRow | undefined;
-    try {
-      ({ conversation } = (await res.json()) as { conversation: ConversationRow });
-    } catch {
-      return null;   /* 200 with a body we cannot read is still no chat */
+    let why = "";
+    /* Without an id a second ask would make a second row: one ask only. */
+    const tries = id ? CREATE_CHAT_TRIES : 1;
+    for (let attempt = 1; attempt <= tries && !conversation; attempt++) {
+      if (attempt > 1) await new Promise((r) => setTimeout(r, CREATE_CHAT_BACKOFF_MS * (attempt - 1)));
+      let res: Response;
+      try {
+        res = await fetch("/api/ai/conversations", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        });
+      } catch (e) {
+        why = `network:${e instanceof Error ? e.name : "unknown"}`;   /* the link went */
+        continue;
+      }
+      if (!res.ok) {
+        why = `status:${res.status}`;
+        if (res.status < 500) break;
+        continue;
+      }
+      try {
+        ({ conversation } = (await res.json()) as { conversation: ConversationRow });
+      } catch (e) {
+        why = `body:${e instanceof Error ? e.name : "unknown"}`;   /* a 200 we cannot read is still no chat */
+        continue;
+      }
+      if (!conversation?.id) {
+        why = "no_id";
+        conversation = undefined;
+      } else if (attempt > 1) {
+        perfEvent("ai.chat_create_retry", { attempt, why });
+      }
     }
-    if (!conversation?.id) return null;
-    setConversations((prev) => [conversation, ...prev]);
+    if (!conversation?.id) {
+      perfEvent("ai.chat_create_fail", { why: why || "unknown", tries });
+      return null;   /* the caller says so and unlocks */
+    }
+    const made = conversation;
+    /* A retry after a lost answer returns the row the first ask made: it is
+       listed once. */
+    setConversations((prev) => [made, ...prev.filter((c) => c.id !== made.id)]);
     /* send() activates it itself, and only if the user is still here (see
        its first-message race); the call's persister wants it at once. */
-    if (opts.activate !== false) setActiveId(conversation.id);
-    return conversation.id;
+    if (opts.activate !== false) setActiveId(made.id);
+    return made.id;
   }, [activeProjectId]);
 
   /* A call writes into the OPEN conversation, or makes one. Read through the
