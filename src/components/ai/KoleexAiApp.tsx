@@ -71,6 +71,7 @@ import {
   type ProjectIcon,
 } from "@/lib/ai-projects";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { parseThinkingRecord } from "@/lib/ai/thinking-record";
 /* Phase 2J — the render contract and the localised strings moved out. Types
    compile away entirely and the copy table is frozen data, so neither can
    change behaviour by living in another file. */
@@ -739,7 +740,12 @@ export default function KoleexAiApp() {
         }
         const { messages: rows } = (await res.json()) as { messages: ChatMsg[] };
         if (!fresh()) return;
-        setMessages(rows ?? []);
+        /* The Thinking panel's saved record, checked on the way in: a value
+           that is not the saved shape shows no panel rather than a broken one. */
+        setMessages((rows ?? []).map((r) => {
+          const thinking = parseThinkingRecord((r as { thinking?: unknown }).thinking);
+          return thinking ? { ...r, thinking } : { ...r, thinking: undefined };
+        }));
       } catch {
         if (fresh()) setLoadError(true);
       } finally {

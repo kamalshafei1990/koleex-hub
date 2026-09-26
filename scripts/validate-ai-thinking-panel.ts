@@ -16,6 +16,7 @@ import { thinkingNote, THINKING_NOTE_MAX } from "../src/lib/server/ai/core/think
 import { thinkingRows, hasThinking, lookupDetail, siteOf, thoughtSeconds } from "../src/components/ai/thinking-panel-model";
 import { COPY } from "../src/components/ai/copy";
 import type { AgentStep, ThinkingRecord } from "../src/components/ai/types";
+import { buildThinkingRecord, parseThinkingRecord, THINKING_MAX_NOTES, THINKING_MAX_LOOKUPS } from "../src/lib/ai/thinking-record";
 
 let pass = 0;
 const failures: string[] = [];
@@ -115,6 +116,61 @@ console.log("\n── 5. The client keeps the note and times the thinking ──
   check("the bubble shows the panel when there is thinking, and the separate activity line steps aside",
     /\{showThinking && \(\s*<ThinkingPanel/.test(bubble) && /!isUser && !showThinking && msg\.content && orbState === "typing"/.test(bubble) &&
     /showThinking \? null : orbState === "loading"/.test(bubble));
+}
+
+console.log("\n── 6. The record saved with the reply (ai_messages.thinking) ──");
+{
+  const steps: AgentStep[] = [
+    { kind: "tool-call", tool: "search_web", payload: { query: "top 100 global brands 2026" } },
+    { kind: "tool-result", tool: "search_web", text: "ok" },
+    { kind: "tool-call", tool: "read_page", payload: { url: "https://www.interbrand.com/best-brands/" } },
+    { kind: "tool-call", tool: "getCustomer", payload: { name: "ACME Trading", phone: "+86 138 0000 0000" } },
+    { kind: "answer", text: "…" },
+  ];
+  const rec = buildThinkingRecord({ notes: [{ text: "I'll look it up.", at: 0 }], steps, ms: 23_400 });
+  check("a turn with lookups saves a v1 record: its notes, its lookups, how long it thought",
+    !!rec && rec.v === 1 && rec.notes.length === 1 && rec.lookups.length === 3 && rec.ms === 23_400);
+  check("a lookup keeps only a search's query or a read's site — another tool's arguments are never stored",
+    !!rec && rec.lookups[0].detail === "top 100 global brands 2026" && rec.lookups[1].detail === "interbrand.com" &&
+    rec.lookups[2].detail === null && !JSON.stringify(rec).includes("ACME") && !JSON.stringify(rec).includes("138"));
+  check("a turn with no lookup and nothing said saves nothing (the column stays NULL)",
+    buildThinkingRecord({ notes: [], steps: [{ kind: "answer", text: "Hi" }], ms: 900 }) === null);
+  const many = buildThinkingRecord({
+    notes: Array.from({ length: 30 }, (_, i) => ({ text: `note ${i} ` + "x".repeat(900), at: i })),
+    steps: Array.from({ length: 40 }, () => ({ kind: "tool-call", tool: "search_web", payload: { query: "q" } })),
+    ms: 1,
+  });
+  check(`the record is bounded: ≤ ${THINKING_MAX_NOTES} notes of ≤ 600 characters, ≤ ${THINKING_MAX_LOOKUPS} lookups, well under the column's 16 KB check`,
+    !!many && many.notes.length === THINKING_MAX_NOTES && many.notes.every((n) => n.text.length <= 600) &&
+    many.lookups.length === THINKING_MAX_LOOKUPS && JSON.stringify(many).length < 16384);
+  check("a saved record reads back as itself", JSON.stringify(parseThinkingRecord(JSON.parse(JSON.stringify(rec)))) === JSON.stringify(rec));
+  check("a value that is not the saved shape reads as no panel, never a broken one",
+    parseThinkingRecord(null) === null && parseThinkingRecord("x") === null && parseThinkingRecord({ v: 2, notes: [], lookups: [{ tool: "search_web", detail: "q" }], ms: 1 }) === null &&
+    parseThinkingRecord({ v: 1, notes: "no", lookups: [], ms: 1 }) === null && parseThinkingRecord({ v: 1, notes: [], lookups: [], ms: 1 }) === null);
+  const rows = thinkingRows(undefined, { notes: rec!.notes, lookups: rec!.lookups, ms: rec!.ms }, false);
+  check("a reloaded thread draws the saved record: the note, then each lookup, all done, same details",
+    rows.map((r) => r.kind).join(",") === "note,lookup,lookup,lookup" &&
+    rows.every((r) => r.kind !== "lookup" || r.done) &&
+    rows[1].kind === "lookup" && rows[1].detail === "top 100 global brands 2026" && rows[2].kind === "lookup" && rows[2].detail === "interbrand.com" &&
+    rows[3].kind === "lookup" && rows[3].detail === null);
+  check("  …and a saved record alone is enough for the panel to show", hasThinking(undefined, { notes: [], lookups: rec!.lookups, ms: 1 }));
+
+  const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+  check("the route reads the record off the frames it sends (every frame passes through the tracker)",
+    /const send = \(obj: unknown\) => \{\s*trackThinking\(obj\);/.test(route));
+  check("  …a retract's note is kept with the lookup count at that moment; a new lookup or retract restarts the answer clock",
+    /if \(typeof f\.note === "string" && f\.note\) thinkNotes\.push\(\{ text: f\.note, at: thinkLookups \}\);\s*thinkAnswerAt = null;/.test(route) &&
+    /if \(n > thinkLookups\) \{\s*thinkLookups = n;\s*thinkAnswerAt = null;/.test(route));
+  check("the reply's insert names the column only when there is a record",
+    /const thinking = buildThinkingRecord\(\{\s*notes: thinkNotes,\s*steps: agent\.steps,/.test(route) && /\.\.\.\(thinking \? \{ thinking \} : \{\}\),/.test(route));
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("an opened thread checks each saved record on the way in",
+    /const thinking = parseThinkingRecord\(\(r as \{ thinking\?: unknown \}\)\.thinking\);/.test(app));
+  const mig = readFileSync("supabase/migrations/ai_messages_thinking.sql", "utf8");
+  check("the migration adds one nullable jsonb column with no default (no rewrite), bounded by a CHECK",
+    /add column if not exists thinking jsonb;/.test(mig) && !/thinking jsonb[^;]*(not null|default)/i.test(mig) &&
+    /jsonb_typeof\(thinking\) = 'object' and octet_length\(thinking::text\) <= 16384/.test(mig));
+  check("  …and states its reason, index, RLS, load and rollback", ["WHY.", "SHAPE.", "INDEX.", "RLS.", "LOAD.", "ROLLBACK."].every((h) => mig.includes(h)));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

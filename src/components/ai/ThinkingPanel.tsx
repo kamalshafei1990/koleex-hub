@@ -57,7 +57,7 @@ export default function ThinkingPanel({
 
   const rows = useMemo(() => thinkingRows(steps, thinking, !working), [steps, thinking, working]);
 
-  const elapsed = thinking ? Math.max(0, now - thinking.startedAt) : 0;
+  const elapsed = thinking?.startedAt !== undefined ? Math.max(0, now - thinking.startedAt) : 0;
   const seconds = thinking?.ms !== undefined ? thoughtSeconds(thinking.ms) : null;
   const title = working || seconds === null ? copy.thinkingTitle : copy.thoughtFor.replace("{s}", String(seconds));
 
