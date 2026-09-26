@@ -60,20 +60,27 @@ export const rolesT: Translations = {
   "modal.namePlaceholder": { en: "e.g. Sales Manager",
                              zh: "例如：销售经理",
                              ar: "مثل: مدير المبيعات" },
+  "modal.advanced":     { en: "Advanced — scope overrides",
+                          zh: "高级 — 范围覆盖",
+                          ar: "متقدم — تجاوز النطاقات" },
   "modal.isSA":         { en: "Super Admin role",
                           zh: "超级管理员角色",
                           ar: "دور المسؤول الأعلى" },
-  "modal.isSA.help":    { en: "Bypasses every module + scope check. Grant carefully.",
-                          zh: "绕过所有模块和范围检查。请谨慎授予。",
-                          ar: "يتجاوز كل تحقق للوحدات والنطاقات. امنح بعناية." },
+  /* The old hard-coded line said a super admin sees everything but Private
+     records. Not so: salaries, costs and private to-dos are theirs; only
+     other people's private calendar events still need the private-data
+     switch (src/lib/server/calendar-access.ts). */
+  "modal.isSA.help":    { en: "Passes every app and scope check and sees all data, costs and salaries included. Other people's private calendar events still need «Can see private data». Grant carefully.",
+                          zh: "通过所有应用与范围检查，可查看全部数据，包括成本和薪资。他人的私密日历事件仍需「可查看私密数据」。请谨慎授予。",
+                          ar: "يتجاوز كل تحقق للتطبيقات والنطاقات ويرى كل البيانات، بما فيها التكاليف والرواتب. أما أحداث التقويم الخاصة بالآخرين فتحتاج أيضًا «يرى البيانات الخاصة». امنحه بعناية." },
   "modal.canViewPrivate":
-    { en: "Can view private records",
-      zh: "可查看私密记录",
-      ar: "يمكن رؤية السجلات الخاصة" },
+    { en: "Can see private data",
+      zh: "可查看私密数据",
+      ar: "يرى البيانات الخاصة" },
   "modal.canViewPrivate.help":
-    { en: "Grants access to records marked Private (personal mail, notes, sensitive HR). Every read is logged to koleex_private_access_log. Grant sparingly — typically only during legal discovery.",
-      zh: "授予访问标记为私密记录的权限（个人邮件、笔记、敏感 HR 数据）。每次读取都会记录到 koleex_private_access_log。请谨慎授予——通常仅用于法律调查期间。",
-      ar: "يمنح وصولًا إلى السجلات المصنّفة خاصة (بريد شخصي، ملاحظات، بيانات موارد بشرية حساسة). يُسجَّل كل وصول في koleex_private_access_log. امنح بحذر — عادةً ما يستخدم للاستقصاء القانوني فقط." },
+    { en: "Shows cost prices and inventory value, supplier bills and journals, customer and supplier credit terms, and employees' salaries, bank details and ID documents — inside the apps this role can already open. Also shows private to-dos within its reach (each such read is logged). Koleex AI follows the same rule. Bank balances and profit are a separate row: «Bank & Profit» under Finance. Give it only to roles that need these figures.",
+      zh: "显示成本价与库存价值、供应商账单与凭证、客户和供应商的信用条款，以及员工的薪资、银行信息和身份证件——仅限该角色本已能打开的应用。也会显示其范围内的私密待办（每次读取都会记录）。Koleex AI 遵循同一规则。银行余额和利润是单独的一行：Finance 下的「Bank & Profit」。只授予需要这些数据的角色。",
+      ar: "يُظهر أسعار التكلفة وقيمة المخزون، وفواتير الموردين والقيود، وشروط الائتمان للعملاء والموردين، ورواتب الموظفين وبياناتهم البنكية ووثائق هويتهم — داخل التطبيقات التي يفتحها هذا الدور أصلًا. ويُظهر أيضًا المهام الخاصة ضمن نطاقه (وتُسجَّل كل قراءة منها). ويلتزم Koleex AI بالقاعدة نفسها. أرصدة البنوك والأرباح لها صف مستقل: «Bank & Profit» تحت Finance. امنحه فقط للأدوار التي تحتاج هذه الأرقام." },
   "modal.delete.confirm":
     { en: "Delete this role? Users with this role will lose their permissions but their accounts remain active.",
       zh: "删除此角色？具有此角色的用户将失去其权限，但他们的帐户仍然有效。",
@@ -146,7 +153,7 @@ export const rolesT: Translations = {
   "gate.saOnly.sub":      { en: "Roles & Permissions defines who can access what across the hub — only Super Admins can open it.", zh: "角色与权限定义整个平台的访问控制，仅超级管理员可以打开。", ar: "الأدوار والصلاحيات تحدد من يصل إلى ماذا في المنصة كلها — لا يفتحها إلا مشرف النظام الأعلى." },
   "gate.backHome":        { en: "Back to home", zh: "返回首页", ar: "العودة للرئيسية" },
   "badge.superAdmin":     { en: "Super Admin", zh: "超级管理员", ar: "مشرف أعلى" },
-  "badge.breakGlass":     { en: "Private access", zh: "可见私密记录", ar: "وصول للخصوصي" },
+  "badge.breakGlass":     { en: "Private data", zh: "私密数据", ar: "بيانات خاصة" },
   "row.account.one":      { en: "account", zh: "个账户", ar: "حساب" },
   "row.account.many":     { en: "accounts", zh: "个账户", ar: "حسابات" },
   "row.deleteBlockedTip": { en: "In use — reassign its accounts before deleting", zh: "使用中——删除前请先改派其账户", ar: "قيد الاستخدام — أعد إسناد حساباته قبل الحذف" },

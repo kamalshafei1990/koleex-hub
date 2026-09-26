@@ -29,6 +29,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Cost-bearing columns on a variant — stripped when the caller can't see cost. */
 const COST_KEYS = ["cost_price", "head_only_price", "complete_set_price", "supplier"] as const;
+const LINK_COST_KEYS = ["unit_cost_cny", "cost_extras", "price_options", "price_tiers", "min_order_value", "tooling_cost", "sample_cost", "payment_terms"] as const;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -67,16 +68,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
      display only, never copy them into Product Data (binding rule). */
   const supplierIds = ((suppliers.data ?? []) as Array<{ supplier_id: string | null }>)
     .map((r) => r.supplier_id).filter((v): v is string => !!v);
-  const supplierNames = new Map<string, { name: string; logo: string | null }>();
+  const supplierNames = new Map<string, { name: string; logo: string | null; supply_type: string | null; incoterms: string | null }>();
   if (supplierIds.length) {
     const { data } = await supabaseServer
       .from("contacts")
-      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, incoterms")
       .in("id", supplierIds);
     for (const c of (data ?? []) as Array<Record<string, string | null>>) {
       supplierNames.set(c.id as string, {
         name: c.company_name_en || c.display_name || c.company_name_cn || "—",
         logo: c.photo_url || c.logo_url || null,
+        /* Supply type & incoterms live on the supplier record (Suppliers
+           app; the contacts column is spelled supplier_type) — the link
+           table's columns of the same name are legacy (incoterms removed
+           from the form by owner, 2026-07-31), so the profile view reads
+           these instead of the always-empty link ones. */
+        supply_type: c.supplier_type || null,
+        incoterms: c.incoterms || null,
       });
     }
   }
@@ -141,10 +149,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         : modelRows.map((m) => { const c = { ...m }; for (const k of COST_KEYS) delete c[k]; return c; }),
       media: mediaRows,
       translations: translations.data ?? [],
-      suppliers: ((suppliers.data ?? []) as Array<Record<string, unknown>>).map((s) => ({
-        ...s,
-        supplier: s.supplier_id ? supplierNames.get(s.supplier_id as string) ?? null : null,
-      })),
+      suppliers: ((suppliers.data ?? []) as Array<Record<string, unknown>>).map((s) => {
+        const row = { ...s };
+        /* The link's commercial numbers are cost data: the UI hid them, the
+           payload did not. Same gate as the model cost columns. */
+        if (!canSeeCosts) for (const k of LINK_COST_KEYS) delete row[k];
+        return { ...row, supplier: s.supplier_id ? supplierNames.get(s.supplier_id as string) ?? null : null };
+      }),
       certifications: certs.data ?? [],
       documents: docs.data ?? [],
       related: ((related.data ?? []) as Array<Record<string, unknown>>).map((r) => ({
@@ -154,6 +165,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       readiness,
       costVisible: canSeeCosts,
     },
-    { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=120" } },
+    { headers: { "Cache-Control": "private, max-age=15" } },
   );
 }

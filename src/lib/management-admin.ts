@@ -159,6 +159,10 @@ export interface PositionHistoryRow {
   to_position_id: string | null;
   notes: string | null;
   created_at: string;
+  /** Who made the change (26 Sep 2026) — the account, and its name as the
+   *  activity route reads it. Older rows have neither. */
+  changed_by_account_id?: string | null;
+  changed_by_name?: string | null;
 }
 
 export interface PersonRef {

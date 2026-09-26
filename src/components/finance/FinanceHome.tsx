@@ -20,7 +20,12 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { StatementsDashboard } from "@/components/finance/VisualStatements";
 import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_APP } from "@/lib/translations/finance/app";
+import { FIN_HOME } from "@/lib/translations/finance/home";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_APP, ...FIN_HOME } as const;
+
 
 interface SetupHealth {
   ready: boolean;
@@ -30,7 +35,7 @@ interface SetupHealth {
 }
 
 export default function FinanceHome() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [setupHealth, setSetupHealth] = useState<SetupHealth | null>(null);
 
   useEffect(() => {
@@ -53,7 +58,7 @@ export default function FinanceHome() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+      <div className="pb-5">
         <FinanceHeader
           title={t("app.title", "Finance")}
           subtitle={t("app.subtitle", "Income · Balance Sheet · Cash Flow — your full picture at a glance.")}
@@ -72,7 +77,7 @@ export default function FinanceHome() {
 }
 
 function SetupHealthBanner({ health }: { health: SetupHealth }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const pct = Math.round(health.completion * 100);
   const items = health.missingTitles.join(" · ");
   const more = health.missingCount > health.missingTitles.length

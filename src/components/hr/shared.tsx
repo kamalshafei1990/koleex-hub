@@ -5,10 +5,13 @@
    Matches the Koleex Hub admin design system.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import { useSyncExternalStore, type ReactNode, type ComponentType, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
+import FormModal from "@/components/kds/FormModal";
+
+/* Stable no-op subscription for the mounted-flag useSyncExternalStore. */
+const noopSubscribe = () => () => {};
 import Link from "next/link";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
 
 /* ── CSS class constants ── */
 
@@ -45,6 +48,8 @@ export const sectionTitleCls =
 
 export const LEAVE_STATUS_MAP: Record<string, string> = {
   pending:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  /* Phase B — manager said yes, HR has not decided yet. */
+  manager_approved: "bg-blue-500/15 text-blue-400 border-blue-500/20",
   approved:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   rejected:  "bg-red-500/15 text-red-400 border-red-500/20",
   cancelled: "bg-slate-500/15 text-slate-400 border-slate-500/20",
@@ -72,6 +77,14 @@ export const ATTENDANCE_STATUS_MAP: Record<string, string> = {
   late:     "bg-amber-500/15 text-amber-400 border-amber-500/20",
   absent:   "bg-red-500/15 text-red-400 border-red-500/20",
   half_day: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  /* Phase C sheet statuses — derived days, muted: they are not punches. */
+  leave:    "bg-blue-500/10 text-blue-400 border-blue-500/15",
+  holiday:  "bg-slate-500/10 text-slate-400 border-slate-500/15",
+  weekend:  "bg-slate-500/10 text-slate-500 border-slate-500/10",
+  /* Before attendance tracking started (policy tracking_from) or before the
+     hire date — the day is simply not counted, never "absent". */
+  not_tracked: "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)]",
+  future:   "bg-transparent text-[var(--text-faint)] border-transparent",
 };
 
 export const PAYSLIP_STATUS_MAP: Record<string, string> = {
@@ -151,45 +164,21 @@ export function ModalShell({
      modal's own title bar and first fields slid up underneath the app header
      and tab strip. Rendering into <body> escapes any such ancestor for good,
      whatever a parent does with transform/filter/contain later. */
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
-
-  /* Escape closes — expected of every dialog, and it was missing. */
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || !mounted) return null;
+  /* True after hydration, false during SSR — the store form of the classic
+     mounted flag, with no setState-in-effect render cascade. */
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  if (!mounted) return null;
+  /* The Hub's form dialog (kds FormModal): the Aurora glass panel, its
+     motion, Escape and the scroll lock. It used to be a hand-rolled copy on
+     the page's solid --bg-primary — and on <body> it sat outside the app's
+     Aurora scope, so the panel and every field in it rendered in the classic
+     look (owner, 26 Sep 2026: "this window belongs to classic design"). The
+     FormModal panel carries its own scope, so the fields come out Aurora on
+     <body> too. `space-y-4` keeps the rhythm the HR bodies were written for. */
   return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onTouchMove={(e) => e.stopPropagation()}
-    >
-      <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${width || "max-w-[520px]"} bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl flex flex-col max-h-[85vh]`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
-          <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
-            <CrossIcon size={16} className="text-[var(--text-dim)]" />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-color)] shrink-0">{footer}</div>}
-      </div>
-    </div>,
+    <FormModal open={open} onClose={onClose} title={title} width={width || "max-w-[520px]"} footer={footer}>
+      <div className="space-y-4">{children}</div>
+    </FormModal>,
     document.body,
   );
 }

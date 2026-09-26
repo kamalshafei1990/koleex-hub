@@ -1,12 +1,84 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": [
     "hnd1"
   ],
   "crons": [
-    { "path": "/api/cron/fx-refresh", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/todo-reminders", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/calendar-reminders", "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/project-task-reminders", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/hr-expiry-reminders", "schedule": "0 2 * * *" }
-  ]
+    {
+      "path": "/api/cron/fx-refresh",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/todo-reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-brief",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/calendar-reminders",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/project-task-reminders",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/hr-expiry-reminders",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/attendance",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/report-reminders",
+      "schedule": "5-59/15 * * * *"
+    },
+    {
+      "path": "/api/cron/finance-reminders",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/sales-reminders",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/voice-watch",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/voice-watch-sin1",
+      "schedule": "7-59/15 * * * *"
+    },
+    {
+      "path": "/api/cron/notes-trash-purge",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/discuss-pending-sweep",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/inbox-wake",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/approval-reminders",
+      "schedule": "20 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/ai/voice/session/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
+    "src/app/api/cron/voice-watch-sin1/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    }
+  }
 }

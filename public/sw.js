@@ -126,7 +126,69 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = payload.title || "Koleex Hub";
+  event.waitUntil(Promise.all([showPush(payload), badgeFromPush(payload)]));
+});
+
+/* THE ICON'S NUMBER while the Hub is closed (lib/app-icon-badge sets it
+   while it is open). The icon shows what the bell shows: unread
+   notifications + unread Discuss messages. Each push brings the recipient's
+   own unread-notification count (`unread`, from the server, exact); a
+   Discuss message adds one to the Discuss part the open Hub last told us.
+   The two parts live in the Cache API, which survives the worker being
+   stopped between pushes. Where setAppBadge is missing, nothing happens. */
+const BADGE_CACHE = "kx-icon-badge-v1";
+const BADGE_KEY = "/__kx/icon-badge";
+
+async function readBadgeParts() {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    const hit = await cache.match(BADGE_KEY);
+    const p = hit ? await hit.json() : null;
+    return { inbox: (p && p.inbox) | 0, discuss: (p && p.discuss) | 0 };
+  } catch {
+    return { inbox: 0, discuss: 0 };
+  }
+}
+
+async function writeBadgeParts(parts) {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    await cache.put(BADGE_KEY, new Response(JSON.stringify(parts), { headers: { "Content-Type": "application/json" } }));
+  } catch { /* no Cache API — the open Hub still sets the icon */ }
+}
+
+async function paintBadge(parts) {
+  const n = Math.max(0, parts.inbox | 0) + Math.max(0, parts.discuss | 0);
+  try {
+    if (n > 0 && self.navigator.setAppBadge) await self.navigator.setAppBadge(n);
+    else if (n === 0 && self.navigator.clearAppBadge) await self.navigator.clearAppBadge();
+  } catch { /* not allowed on this device */ }
+}
+
+async function badgeFromPush(payload) {
+  const parts = await readBadgeParts();
+  if (typeof payload.unread === "number") parts.inbox = payload.unread;
+  if (payload.kind === "discuss_message") parts.discuss = (parts.discuss | 0) + 1;
+  await writeBadgeParts(parts);
+  await paintBadge(parts);
+}
+
+self.addEventListener("message", (event) => {
+  const d = event.data;
+  if (!d || d.type !== "kx-icon-badge") return;
+  event.waitUntil(writeBadgeParts({ inbox: Math.max(0, d.inbox | 0), discuss: Math.max(0, d.discuss | 0) }));
+});
+
+/* FOLDING. A push that carries `group` (security alerts per person per day,
+   a busy chat) and lands on a tag that is still on the screen does not stack
+   a second card, and does not silently replace the first either: the
+   device counts them and shows the group's title — "Salt Leo — 6 alerts",
+   already in the reader's language, with `{n}` left for this count. The
+   body stays the newest one. The count lives on the notification itself, so
+   opening or clearing it starts over at one. Where getNotifications is not
+   available the push simply shows on its own, as before. */
+async function showPush(payload) {
+  let title = payload.title || "Koleex Hub";
   const options = {
     body: payload.body || "",
     icon: payload.icon || "/icon-192.png",
@@ -134,11 +196,23 @@ self.addEventListener("push", (event) => {
     tag: payload.tag || undefined,
     renotify: Boolean(payload.tag),
     timestamp: Date.now(),
-    data: { url: payload.url || "/super-admin/activity" },
+    /* No url → the Hub home. The old default sent every kind-less push to a
+       Super-Admin page most recipients cannot open. */
+    data: { url: payload.url || "/", count: 1 },
   };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
+  if (payload.tag && payload.group && payload.group.title) {
+    try {
+      const showing = await self.registration.getNotifications({ tag: payload.tag });
+      const prev = showing[0];
+      const count = prev ? ((prev.data && prev.data.count) || 1) + 1 : 1;
+      options.data.count = count;
+      if (count > 1) title = String(payload.group.title).replace("{n}", String(count));
+    } catch {
+      /* no getNotifications — the single push shows as it always did */
+    }
+  }
+  return self.registration.showNotification(title, options);
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

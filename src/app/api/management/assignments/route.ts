@@ -15,6 +15,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { historyRow } from "@/lib/management/position-history";
 
 function requireSA(auth: { is_super_admin?: boolean }) {
   return auth.is_super_admin
@@ -89,10 +90,13 @@ export async function PATCH(req: Request) {
 
 /* PUT — transfer someone to another position.
 
-   Three writes that must agree: move the assignment, then record BOTH sides in
-   the position history so the chart can answer "who left this seat" and "who
-   arrived". Done here as one operation; in the browser a failure between them
-   left a transfer with half a paper trail. */
+   Two writes that must agree: move the assignment, then record the move in
+   the position history — ONE row, from the old position to the new one, so
+   the chart can answer both "who left this seat" and "who arrived" (either
+   position's history finds it). Done here as one operation; in the browser a
+   failure between them left a transfer with half a paper trail. The row is
+   the table's own columns (lib/management/position-history): the insert used
+   to name columns the table does not have and never landed. */
 export async function PUT(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -128,24 +132,15 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
 
-  const { error: histErr } = await supabaseServer.from("koleex_position_history").insert([
-    {
-      position_id: cur.position_id,
-      person_id: cur.person_id,
-      department_id: cur.department_id,
-      change_type: "transfer_out",
-      changed_by_account_id: auth.account_id,
-      created_at: stamp,
-    },
-    {
-      position_id: t.newPositionId,
-      person_id: cur.person_id,
-      department_id: t.newDepartmentId,
-      change_type: "transfer_in",
-      changed_by_account_id: auth.account_id,
-      created_at: stamp,
-    },
-  ]);
+  const { error: histErr } = await supabaseServer.from("koleex_position_history").insert(historyRow({
+    action: "transferred",
+    personId: String(cur.person_id),
+    departmentId: t.newDepartmentId,
+    fromPositionId: typeof cur.position_id === "string" ? cur.position_id : null,
+    toPositionId: t.newPositionId,
+    changedBy: auth.account_id,
+    at: stamp,
+  }));
   /* The move already happened; a missing audit row must not report the whole
      transfer as failed, but it must be LOUD. */
   if (histErr) console.error("[api/management/assignments transfer history]", histErr.message);

@@ -40,7 +40,7 @@ const searchMachineKnowledge: ToolDef<
     const q = String(args.query ?? "").toLowerCase().trim();
     const limit = Math.min(Math.max(Number(args.limit ?? 2) || 2, 1), 4);
     if (!q) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Provide a search query." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Provide a search query." };
     }
     const words = q.split(/\s+/).filter((w) => w.length > 2);
     const scored = MACHINE_KNOWLEDGE.map((s) => {

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { logPrivateCalendarReads } from "@/lib/server/calendar-access";
 
 /* GET /api/employees/[id]/activity?accountId=…
    The cross-module activity snapshot on an employee's profile: their CRM
@@ -99,7 +100,10 @@ export async function GET(
      different one. */
   const acct = empRow.account_id ?? (accountId && accountId === empRow.account_id ? accountId : null);
 
-  const leave = await bucket<Row>(
+  /* Started, not awaited: leave is employee-keyed and independent of the
+     account resolution below, so it rides in parallel with the to-do link
+     lookup and the main bucket batch instead of adding its own stage. */
+  const leavePromise = bucket<Row>(
     "hr_leave_requests",
     () =>
       supabaseServer
@@ -119,6 +123,7 @@ export async function GET(
   );
 
   if (!acct) {
+    const leave = await leavePromise;
     return NextResponse.json({
       activity: {
         crmOpportunities: EMPTY, quotations: EMPTY, invoices: EMPTY,
@@ -137,8 +142,9 @@ export async function GET(
     .eq("account_id", acct);
   const todoIds = ((todoLinks ?? []) as { todo_id: string }[]).map((t) => t.todo_id);
 
-  const [crm, quotations, invoices, projectsManaged, tasksAssigned, todosAssigned, calendarEvents, notes] =
+  const [leave, crm, quotations, invoices, projectsManaged, tasksAssigned, todosAssigned, calendarEvents, notes] =
     await Promise.all([
+      leavePromise,
       /* expected_revenue, not `value`, and crm_opportunities has no currency
          column at all — the browser version asked for both and the whole
          bucket errored out on every load. */
@@ -233,19 +239,38 @@ export async function GET(
             }))
         : Promise.resolve(EMPTY),
 
-      bucket<Row>("koleex_calendar_events", () =>
-        supabaseServer
-          .from("koleex_calendar_events")
-          .select("id, title, start_at, end_at, event_type, created_at", { count: "exact" })
-          .eq("account_id", acct)
-          .gte("start_at", new Date(Date.now() - 90 * 86_400_000).toISOString())
-          .order("start_at", { ascending: false })
-          .limit(LIMIT),
-        (r) => ({
-          id: String(r.id),
-          title: s(r.title) ?? "Event", subtitle: s(r.start_at),
-          status: s(r.event_type), createdAt: s(r.created_at), href: "/calendar",
-        })),
+      /* Calendar is a personal module (Type C): the event TITLES are the
+         person's own, or a Super Admin's under the calendar's private rule
+         (someone else's private events only with can_view_private, and that
+         read is logged). Anyone else looking at the profile gets a count of
+         the non-private events and no titles. Always tenant-bounded. */
+      (async (): Promise<ActivityBucket> => {
+        const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+        const own = acct === auth.account_id;
+        const seeTitles = own || auth.is_super_admin;
+        const withPrivate = own || (auth.is_super_admin && auth.can_view_private);
+        const privateRead: string[] = [];
+        const b = await bucket<Row>("koleex_calendar_events", () => {
+          let q = supabaseServer
+            .from("koleex_calendar_events")
+            .select("id, title, start_at, end_at, event_type, is_private, created_at", { count: "exact", head: !seeTitles })
+            .eq("account_id", acct)
+            .gte("start_at", since);
+          if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+          if (!withPrivate) q = q.eq("is_private", false);
+          return q.order("start_at", { ascending: false }).limit(LIMIT);
+        }, (r) => {
+          if (r.is_private === true) privateRead.push(String(r.id));
+          return {
+            id: String(r.id),
+            title: s(r.title) ?? "Event", subtitle: s(r.start_at),
+            status: s(r.event_type), createdAt: s(r.created_at), href: `/calendar?event=${String(r.id)}`,
+          };
+        });
+        if (!seeTitles) return { count: b.count, recent: [] };
+        if (!own) logPrivateCalendarReads(auth, privateRead);
+        return b;
+      })(),
 
       bucket<Row>("notes", () =>
         supabaseServer

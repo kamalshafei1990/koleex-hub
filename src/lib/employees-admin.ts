@@ -55,6 +55,9 @@ export interface EmployeeListItem {
   work_email: string | null;
   work_phone: string | null;
   work_location: string;
+  /** Direct manager (koleex_employees.manager_id) — Phase B reads it to say
+      whether a leave request has a manager step in front of HR. */
+  manager_id: string | null;
   department_name: string | null;
   position_title: string | null;
   department_id: string | null;
@@ -93,6 +96,8 @@ export interface EmployeeWizardData {
   work_email: string;
   work_phone: string;
   work_location: string;
+  /** Phase C: ISO alpha-2 of the country the employee works in (calendar + attendance policy). */
+  work_country: string;
 
   // Department & Position
   department_id: string;
@@ -215,6 +220,7 @@ export function emptyWizardData(): EmployeeWizardData {
     work_email: "",
     work_phone: "",
     work_location: "office",
+    work_country: "",
     department_id: "",
     department_name: "",
     position_id: "",
@@ -749,6 +755,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
     work_email: s(emp.work_email),
     work_phone: s(emp.work_phone),
     work_location: s(emp.work_location) || "office",
+    work_country: s(emp.work_country),
 
     department_id: p.assignment?.department_id ?? "",
     position_id: p.assignment?.position_id ?? "",

@@ -43,6 +43,41 @@ const NOT_GOVERNABLE = new Set(["roles", "activity-monitor", "software-center"])
    Nothing new should be added here — new modules come from the registry. */
 const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance", "Brands"];
 
+/* Capabilities: a permission row that is not an app, listed right under the
+   app it belongs to, closed by default like any module (it is never
+   openAccess). Reports 4E (owner's pick, 25 Sep 2026): making, editing and
+   hiding report types — super admins always, anyone else only when a role or
+   an override grants "Report Templates". Reports 5B (owner's pick, 25 Sep
+   2026): "CEO Office" — starting the CEO office's report types, and reading
+   inside them the follow-up numbers per department, the birthdays and work
+   anniversaries, and the invited visitors. Finance (owner's pick, 26 Sep
+   2026): "Bank & Profit" — seeing bank balances, the cash position and
+   profit; "Finance Approvals" — approving and rejecting in the approvals
+   queue. Both used to follow from the department's name (src/lib/experience).
+   Reports 5C (owner's pick, 26 Sep 2026): "Payroll Reports" — starting the
+   salary report types, and reading salaries inside any report (the payroll
+   summary, the staff cost, the salary review). Reports 5D (owner's pick, 26
+   Sep 2026): "Management Reports" — starting the executive and control
+   report types (the weekly executive summary, the department KPIs, the
+   monthly business review, the access review, the system usage), and
+   reading the company-wide numbers they carry. */
+export const BANK_PROFIT_MODULE = "Bank & Profit";
+export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
+export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
+  { name: "Report Templates", app: "Reports" },
+  { name: "CEO Office", app: "Reports" },
+  { name: "Payroll Reports", app: "Reports" },
+  { name: "Management Reports", app: "Reports" },
+  { name: BANK_PROFIT_MODULE, app: "Finance" },
+  { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
+];
+
+/** The app a capability belongs to (its icon on the Roles page), or null. */
+export function capabilityApp(moduleName: string): string | null {
+  const lower = moduleName.toLowerCase();
+  return CAPABILITY_MODULES.find((c) => c.name.toLowerCase() === lower)?.app ?? null;
+}
+
 function isGovernable(app: AppDef): boolean {
   return app.active && !NOT_GOVERNABLE.has(app.id);
 }
@@ -61,6 +96,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = (() => {
       if (!app || !isGovernable(app)) continue;
       modules.push(app.name);
       placed.add(app.id);
+      for (const c of CAPABILITY_MODULES) if (c.app === app.name) modules.push(c.name);
     }
     if (modules.length) groups.push({ id: g.id, label: g.label, modules });
   }
@@ -68,7 +104,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = (() => {
   /* Registry apps that belong to no sidebar group (Mail, Price Calculator,
      Settings, …) still need to be governable — a missing group must never be
      the reason an app can't be granted. */
-  const ungrouped = APP_REGISTRY.filter((a) => isGovernable(a) && !placed.has(a.id)).map((a) => a.name);
+  const ungrouped = APP_REGISTRY.filter((a) => isGovernable(a) && !placed.has(a.id))
+    .flatMap((a) => [a.name, ...CAPABILITY_MODULES.filter((c) => c.app === a.name).map((c) => c.name)]);
   const legacy = LEGACY_MODULES.filter((m) => !ungrouped.includes(m));
   if (ungrouped.length || legacy.length) {
     groups.push({ id: "system", label: "System & Tools", modules: [...ungrouped, ...legacy] });

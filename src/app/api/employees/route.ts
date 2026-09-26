@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   let empQ = supabaseServer
     .from("koleex_employees")
     .select(
-      "id, person_id, account_id, employee_number, hire_date, employment_status, employment_type, work_email, work_phone, work_location",
+      "id, person_id, account_id, employee_number, hire_date, employment_status, employment_type, work_email, work_phone, work_location, manager_id",
     )
     .order("created_at", { ascending: false });
   if (activeOnly) empQ = empQ.eq("employment_status", "active");

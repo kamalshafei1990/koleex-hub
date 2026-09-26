@@ -41,7 +41,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -215,7 +214,6 @@ export const OVERLOCK_SCHEMA: ProductSchemaDefinition = {
     materialGroup(30),
     electricalGroup(40),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };
@@ -297,7 +295,6 @@ export const COVERSTITCH_SCHEMA: ProductSchemaDefinition = {
     materialGroup(30),
     electricalGroup(40),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };
@@ -369,7 +366,6 @@ export const CHAINSTITCH_SCHEMA: ProductSchemaDefinition = {
     materialGroup(30),
     electricalGroup(40),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };

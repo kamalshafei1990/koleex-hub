@@ -12,9 +12,11 @@
    header + title.
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -165,7 +167,7 @@ function BrandModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[480px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">
             {brand ? t("vl.brands.editBrand", "Edit Brand") : t("vl.brands.newBrand", "New Brand")}
@@ -276,7 +278,7 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[400px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[400px] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-color)] shadow-2xl">
         <div className="px-6 py-5">
           <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">{t("vl.brands.deleteBrand", "Delete Brand")}</h2>
           <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">
@@ -323,8 +325,6 @@ function DeleteModal({
 /* ── Main manager ── */
 export default function BrandsManager({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation(T);
-  const [brands, setBrands] = useState<BrandItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const [editBrand, setEditBrand] = useState<BrandItem | null>(null);
@@ -333,14 +333,12 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const data = await fetchBrandsWithDetails();
-    setBrands(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  /* Warm: the brand list takes no filter — search is applied client-side
+     below — so the response IS the default view. Paints from the last answer
+     on the first frame, refreshes behind it. */
+  const fetchAll = useCallback(() => fetchBrandsWithDetails(), []);
+  const { data, loading, reload: load } = useWarmData<BrandItem[]>("db:brands", fetchAll);
+  const brands = useMemo(() => data ?? [], [data]);
 
   const filtered = search.trim()
     ? brands.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
@@ -367,8 +365,9 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
       {!embedded && (
         <>
           <div className="flex items-center gap-3 mb-1">
-            <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("vl.brands.backHome", "Back to home")}>
-              <ArrowLeftIcon className="h-4 w-4" />
+            <Link href="/" className={BACK_CHROME} aria-label={t("vl.brands.backHome", "Back to home")}>
+              <ArrowLeftIcon size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
             </Link>
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <BrandIcon size={16} />
@@ -497,7 +496,7 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
   if (embedded) return <div>{body}</div>;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-6 py-8">{body}</div>
     </div>
   );

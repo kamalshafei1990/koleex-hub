@@ -9,18 +9,34 @@ import "server-only";
            · last_movement_at         (newest movement_date)
    POST — create a new bank account; enforces "one primary per currency"
 
-   Tenant-scoped, Finance-module gated.
+   Tenant-scoped, Finance-module gated. The balances go only to «Bank &
+   Profit» (src/lib/experience): anyone else gets them as 0 with
+   balances_hidden, and cannot set one either. Guarded by
+   validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { BankAccount, BankAccountStatus } from "@/lib/finance/types";
+import { bankLedgerBalances } from "@/lib/finance/bank";
+import { BANK_BALANCE_INPUTS, canSeeBankAndProfit, hideBankBalances } from "@/lib/experience";
 
 export interface BankAccountListItem extends BankAccount {
   unreconciled_count: number;
   last_import_at: string | null;
   last_movement_at: string | null;
+  /** The books' figure for this account (its 1010-xx sub-account), in the
+   *  account currency, against the statement balance the operator holds. */
+  gl_code: string | null;
+  ledger_balance: number;
+  ledger_base: number;
+  ledger_difference: number;
+  /** The books and the statement differ (by a cent or more). Kept for a
+   *  caller who sees no balances, whose ledger_difference is 0. Optional
+   *  only because a warm cache written before it existed lacks it. */
+  ledger_gap?: boolean;
+  ledger_last_entry: string | null;
 }
 
 export async function GET() {
@@ -29,7 +45,7 @@ export async function GET() {
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
 
-  const [accountsRes, movementsRes, importsRes] = await Promise.all([
+  const [accountsRes, movementsRes, importsRes, ledger, bankAndProfit] = await Promise.all([
     supabaseServer
       .from("finance_bank_accounts")
       .select("*")
@@ -45,6 +61,8 @@ export async function GET() {
       .from("finance_bank_statement_imports")
       .select("bank_account_id, uploaded_at, status")
       .eq("tenant_id", auth.tenant_id),
+    bankLedgerBalances(auth.tenant_id).catch(() => new Map()),
+    canSeeBankAndProfit(auth),
   ]);
 
   if (accountsRes.error) {
@@ -72,14 +90,27 @@ export async function GET() {
     if (i.uploaded_at > prev) lastImportByAcct.set(i.bank_account_id, i.uploaded_at);
   }
 
-  const items: BankAccountListItem[] = accounts.map((a) => ({
-    ...a,
-    unreconciled_count: unreconciledByAcct.get(a.id) ?? 0,
-    last_import_at: lastImportByAcct.get(a.id) ?? null,
-    last_movement_at: lastMovementByAcct.get(a.id) ?? null,
-  }));
+  const items: BankAccountListItem[] = accounts.map((a) => {
+    const l = ledger.get(a.id);
+    const ledger_difference = l ? +(l.ledger_native - Number(a.current_balance ?? 0)).toFixed(2) : -Number(a.current_balance ?? 0);
+    return {
+      ...a,
+      unreconciled_count: unreconciledByAcct.get(a.id) ?? 0,
+      last_import_at: lastImportByAcct.get(a.id) ?? null,
+      last_movement_at: lastMovementByAcct.get(a.id) ?? null,
+      gl_code: l?.gl_code ?? null,
+      ledger_balance: l?.ledger_native ?? 0,
+      ledger_base: l?.ledger_base ?? 0,
+      ledger_difference,
+      ledger_gap: Math.abs(ledger_difference) >= 0.01,
+      ledger_last_entry: l?.last_entry_date ?? null,
+    };
+  });
 
-  return NextResponse.json({ accounts: items });
+  return NextResponse.json({
+    accounts: bankAndProfit ? items : items.map(hideBankBalances),
+    visibility: { can_see_bank_balances: bankAndProfit },
+  });
 }
 
 interface CreateBody {
@@ -116,6 +147,11 @@ export async function POST(req: Request) {
   const currency = (body.currency ?? "").trim().toUpperCase();
   if (!VALID_CURRENCY_REGEX.test(currency)) {
     return NextResponse.json({ error: "Currency must be a 3–4 letter ISO code" }, { status: 400 });
+  }
+  /* Can't read → can't write: a balance is set only by whoever may see it. */
+  const bankAndProfit = await canSeeBankAndProfit(auth);
+  if (!bankAndProfit && BANK_BALANCE_INPUTS.some((f) => Number(body[f] ?? 0) !== 0)) {
+    return NextResponse.json({ error: "Setting a bank balance needs «Bank & Profit» in Roles & Permissions." }, { status: 403 });
   }
 
   /* Enforce one-primary-per-currency. If the new account is primary,
@@ -163,5 +199,13 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ account: data as BankAccount });
+
+  /* The account gets its own GL sub-account at once, and its opening
+     balance is booked (Dr bank / Cr Owner Capital) so the ledger and the
+     statement start from the same number. */
+  await supabaseServer.rpc("fn_accounting_ensure_bank_accounts", { p_tenant_id: auth.tenant_id });
+  if (opening !== 0) {
+    await supabaseServer.rpc("fn_accounting_post_bank_openings", { p_tenant_id: auth.tenant_id, p_by: auth.account_id, p_date: new Date().toISOString().slice(0, 10) });
+  }
+  return NextResponse.json({ account: bankAndProfit ? (data as BankAccount) : hideBankBalances(data as BankAccount) });
 }

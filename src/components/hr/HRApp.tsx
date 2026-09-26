@@ -9,8 +9,9 @@ import { useState, useEffect, useCallback, type ComponentType } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { hrT } from "@/lib/translations/hr";
 import type { EmployeeListItem } from "@/lib/employees-admin";
-import { cachedEmployeeList } from "@/lib/hr-admin";
+import { cachedEmployeeList, fetchHrModulePresence, type HrModulePresence } from "@/lib/hr-admin";
 import { type TabId, TAB_IDS, TAB_LABEL_KEYS } from "./shared";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 
 /* ── Icons ── */
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
@@ -59,6 +60,17 @@ const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string
   reports:     BarChart3Icon,
 };
 
+/* ── Tabs that only earn their place once they hold something ──
+   Recruitment and Training sit out of the strip while their tables are
+   empty (owner, 20/09/2026). The module itself still mounts through the
+   ?tab= deep link, which is how the first row gets in. */
+const OPTIONAL_TABS: Partial<Record<TabId, keyof HrModulePresence>> = {
+  recruitment: "recruitment",
+  training:    "training",
+};
+const PRESENCE_KEY = "kx:hr:presence";
+const PRESENCE_HIDDEN: HrModulePresence = { recruitment: false, training: false };
+
 /* ── Shared props interface for every module ── */
 export interface HRModuleProps {
   employees: EmployeeListItem[];
@@ -100,6 +112,47 @@ export default function HRApp() {
     return (TAB_IDS as string[]).includes(t ?? "") ? (t as TabId) : "dashboard";
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  /* A client-side navigation here (a notification's /hr?tab=leave, the
+     Reports Library's attendance sheet) renders this BEFORE the router
+     writes the new URL, so initialTab still read the old one. Read ?tab=
+     again once the navigation has committed. */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if ((TAB_IDS as string[]).includes(q ?? "")) setActiveTab(q as TabId);
+    });
+  }, []);
+
+  /* ── Which optional tabs are in the strip ──
+     Warm-start from the last session's answer so the strip does not
+     reflow after first paint; refresh in the background. Unknown = hidden,
+     which is the common case (both modules are empty today). */
+  const [presence, setPresence] = useState<HrModulePresence>(() => {
+    if (typeof window === "undefined") return PRESENCE_HIDDEN;
+    try {
+      const raw = sessionStorage.getItem(PRESENCE_KEY);
+      return raw ? { ...PRESENCE_HIDDEN, ...(JSON.parse(raw) as Partial<HrModulePresence>) } : PRESENCE_HIDDEN;
+    } catch { return PRESENCE_HIDDEN; }
+  });
+  useEffect(() => {
+    let cancelled = false;
+    fetchHrModulePresence().then((p) => {
+      if (cancelled) return;
+      setPresence(p);
+      try { sessionStorage.setItem(PRESENCE_KEY, JSON.stringify(p)); } catch { /* full */ }
+    });
+    return () => { cancelled = true; };
+  }, []);
+  /* A hidden tab reached by deep link still shows, so the strip always
+     names where the person is. */
+  const visibleTabs = TAB_IDS.filter((id) => {
+    const flag = OPTIONAL_TABS[id];
+    return flag === undefined || presence[flag] || id === activeTab;
+  });
+
+  /* Directional pane swap (owner pick 3A) — direction from the tab's index
+     in the strip order; RTL flips in CSS. */
+  const tabMotion = useTabMotion(visibleTabs.indexOf(activeTab));
 
   /* ── Shared employee list (many modules need it) ──
      Warm-start: hydrate instantly from the last session's snapshot so the
@@ -140,7 +193,7 @@ export default function HRApp() {
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
           searchPlaceholder={searchPlaceholder}
-          tabs={TAB_IDS.map((tabId) => {
+          tabs={visibleTabs.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             return {
               key: tabId,
@@ -158,7 +211,7 @@ export default function HRApp() {
         {empLoading ? (
           <BrandLoading className="h-full min-h-[40vh]" />
         ) : (
-          <div key={activeTab} className="kx-tab-in">
+          <div key={activeTab} className={tabMotion}>
             <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
           </div>
         )}

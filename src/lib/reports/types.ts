@@ -22,7 +22,11 @@ export type ReportType =
   | "reconciliation_report"
   | "treasury_report"
   | "expense_report"
-  | "executive_summary";
+  | "executive_summary"
+  /* Ledger-sourced — the control figures the accountant files and reconciles. */
+  | "vat_return"
+  | "ar_aging_ledger"
+  | "ap_aging_ledger";
 
 export type ReportChannel = "preview" | "pdf" | "print";
 
@@ -210,6 +214,9 @@ export interface ReportTemplateDescriptor {
   required_filters: Array<keyof ReportFilters>;
   optional_filters: Array<keyof ReportFilters>;
   icon: string;                  // RrIcon name
+  /** Set by GET /api/reports/templates for the caller: why this report is
+   *  closed to them (src/lib/experience, reportRefusal), or null. */
+  locked?: "needs_bank_profit" | "needs_private_data" | null;
 }
 
 /* ---------- Audit row shape -------------------------------------------- */

@@ -27,6 +27,11 @@ export const rtTopic = {
   channel: (channelId: string) => `discuss:channel:${channelId}`,
   account: (accountId: string) => `discuss:account:${accountId}`,
   inbox: (accountId: string) => `inbox:account:${accountId}`,
+  /* One topic per tenant for the To-do app: any task write pings it and the
+     open /todo screens refetch through the gated list route. koleex_todos
+     is service-role only, so the anon postgres_changes subscription the
+     page used to hold never received a row. */
+  todos: (tenantId: string) => `todos:tenant:${tenantId}`,
 };
 
 /** Emit one or more broadcast pings. Never throws — logs and returns. */
@@ -62,16 +67,22 @@ export async function emitPings(pings: BroadcastPing[]): Promise<void> {
  *  refresh AND everyone's sidebar re-sorts / re-counts). The account-topic
  *  payload carries the sender + channel ids ONLY (never message content) so
  *  the notification bell can chime / skip self before the reconciling refetch
- *  lands. */
+ *  lands — plus `mentionsYou` on the topic of each member the message
+ *  @-mentions. Without it the bell could not honour a "Mentions only"
+ *  conversation: it chimed on every message there, and the desktop app never
+ *  popped one up, while the phone (push, which knows) was right (26/09). */
 export async function pingChannelActivity(
   channelId: string,
   memberAccountIds: string[],
   authorAccountId?: string,
+  mentionedAccountIds?: ReadonlySet<string>,
 ): Promise<void> {
   const pings: BroadcastPing[] = [{ topic: rtTopic.channel(channelId) }];
   const accountPayload = { channelId, authorId: authorAccountId ?? null };
   for (const id of new Set(memberAccountIds)) {
-    if (id) pings.push({ topic: rtTopic.account(id), payload: accountPayload });
+    if (!id) continue;
+    const payload = mentionedAccountIds?.has(id) ? { ...accountPayload, mentionsYou: true } : accountPayload;
+    pings.push({ topic: rtTopic.account(id), payload });
   }
   await emitPings(pings);
 }

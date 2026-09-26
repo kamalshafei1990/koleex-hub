@@ -91,6 +91,10 @@ async function translateOne(
   return { translated: result.translated, cached: false };
 }
 
+/* Up to MAX_BATCH provider calls in flight behind one request: a ceiling
+   so a slow upstream ends here, not at the platform's hand. */
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -99,7 +103,7 @@ export async function POST(req: Request) {
     if (notInternal) return notInternal;
   }
 
-  const body = (await req.json()) as {
+  const body = (await req.json().catch(() => ({}))) as {
     text?: string;
     texts?: string[];
     target_lang?: string;
@@ -110,7 +114,13 @@ export async function POST(req: Request) {
   if (!target || !isTranslatableLang(target)) {
     return NextResponse.json({ error: "unsupported target_lang" }, { status: 400 });
   }
+  /* The source is allow-listed like the target: it is stored as a cache key
+     and written into the provider prompt, so it must be a language code or
+     "auto", not any string the client sends (audit, 2026-09-11). */
   const source = body.source_lang ?? "auto";
+  if (source !== "auto" && !isTranslatableLang(source)) {
+    return NextResponse.json({ error: "unsupported source_lang" }, { status: 400 });
+  }
 
   /* ── Batch: warm the cache for many messages in one request. Misses are
      translated concurrently so a channel of fresh messages resolves in ~one

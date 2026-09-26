@@ -27,6 +27,8 @@
          `data-kx-keep-hover`. See the block comment on that rule below.
      09  `kx-seg-on` / `kx-chip-on` need the element's OWN border-radius —
          they paint a ring, and a ring cannot be clipped into a curve.
+     10  A popup panel (a dialog or a side sheet over a dimming scrim) wears
+         the Aurora glass; portalled to <body>, it declares `kx-app` too.
    ========================================================================== */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -265,6 +267,80 @@ scan(
         rule: `09 ${m[0]} without a rounded-* on the same element`,
       });
     });
+  }
+}
+
+/* ── 10 — a popup panel wears the Aurora glass, and its own scope ─────────
+   ───────────────────────────────────────────────────────────────────────────
+   Owner, 26 Sep 2026, on HR's New Leave Request: "this window belongs to
+   classic design not aurora style, and this issue is in too many other apps."
+   Measured the same day: 62 dialogs and 7 side sheets hand-rolled their own
+   panel on --bg-primary / --bg-secondary / --bg-surface / --bg-card or a raw
+   hex. Inside an app's `kx-app` scope the remap makes those a hole (primary
+   → transparent) or a tint with no blur; portalled to <body> they leave the
+   scope entirely and render the classic solid box with classic fields.
+
+   THE RULE: a panel over a popup scrim (a `fixed inset-0` overlay that dims)
+   carries the popup material — `kx-glass-pop` (a dialog), `kx-glass-drawer`
+   (a side sheet), `kx-pop-clear` (the clear frost) or the older `kx-glass` —
+   and a panel whose overlay goes through createPortal declares `kx-app`
+   itself, so its fields and buttons read Aurora outside every app. The kds
+   dialogs (Modal, FormModal, ConfirmDialog, ConfirmWithReason, useInput,
+   Drawer) already do; reach for them before hand-rolling one.
+   Deliberately black viewers (photo lightboxes, the call screen, the
+   capture and annotation tools, the labs) are allowlisted by file, or — for
+   one viewer inside a bigger file — carry `data-kx-viewer` on the overlay. */
+{
+  const VIEWERS = [
+    /src\/app\/kds-lab\//, /PhotoLightbox\.tsx$/, /VoiceCallScreen\.tsx$/, /qa\/(CaptureOverlay|AnnotationEditor|FixEvidenceSection|QaFocusHighlight|ReportIssueButton)\.tsx$/,
+    /lib\/qa\/inspector-overlay\.tsx$/, /SquareLogoCropper\.tsx$/, /reports\/app\/AttachmentsView\.tsx$/, /form-sections\/MediaSection\.tsx$/,
+  ];
+  const SCRIM = /bg-black\/\d+|bg-\[var\(--bg-overlay\)\]/;
+  const MATERIAL = /\bkx-(glass-pop|glass-drawer|pop-clear|glass)\b/;
+  const check = (rel: string, lines: string[]) => {
+    const out: Finding[] = [];
+    lines.forEach((text, i) => {
+      if (!/className=[^\n]*\bfixed inset-0\b/.test(text) && !(/\bfixed inset-0\b/.test(text) && /className=/.test(lines[i - 1] ?? "") === false && /^\s*className=/.test(text))) return;
+      if (/pointer-events-none/.test(text)) return;
+      /* A deliberately black full-screen viewer (a zoomed photo) says so. */
+      if (/data-kx-viewer/.test(lines.slice(Math.max(0, i - 2), i + 3).join("\n"))) return;
+      /* A popup: the overlay dims, on its own line or on the scrim child just
+         under it (an absolute layer, or a drawer's flex-1 close button). */
+      const near = lines.slice(i, i + 6).join("\n");
+      if (!SCRIM.test(text) && !/(absolute inset-0|flex-1)[^\n]*(bg-black\/\d+|bg-\[var\(--bg-overlay\)\])/.test(near)) return;
+      /* The panel: the first class list after the overlay that is not the scrim. */
+      let panel = "";
+      for (let k = i + 1; k < Math.min(i + 16, lines.length); k++) {
+        const l = lines[k];
+        if (!/className=/.test(l)) continue;
+        if (/(absolute inset-0|flex-1)[^\n]*(bg-black\/\d+|bg-\[var\(--bg-overlay\)\])/.test(l) || /\bfixed inset-0\b/.test(l)) continue;
+        panel = l; break;
+      }
+      if (!panel) return;
+      const upTo = lines.slice(Math.max(0, i - 4), i + 1).join("\n");
+      const portalled = /createPortal\(/.test(upTo);
+      if (!MATERIAL.test(panel)) {
+        out.push({ file: rel, line: i + 1, text: panel.trim(), rule: "10 popup panel without the Aurora glass (kx-glass-pop / kx-glass-drawer)" });
+      } else if (portalled && !/\bkx-app\b/.test(panel)) {
+        out.push({ file: rel, line: i + 1, text: panel.trim(), rule: "10 portalled popup panel without its own kx-app scope" });
+      }
+    });
+    return out;
+  };
+  /* Proven in both directions before it guards anything: a classic panel and
+     a portalled glass panel without scope are caught, the canonical ones pass. */
+  const probe = (src: string) => check("probe.tsx", src.split("\n")).length;
+  const classic = `<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">\n  <div className="w-full max-w-md rounded-2xl bg-[var(--bg-primary)] shadow-2xl">`;
+  const unscoped = `return createPortal(\n  <div className="fixed inset-0 z-50 flex p-4">\n    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />\n    <div className="kx-glass-pop relative w-full">`;
+  const good = `return createPortal(\n  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">\n    <div className="kx-app kx-glass-pop kx-pop-in relative w-full">`;
+  const ground = `<div className="pointer-events-none fixed inset-0 z-0"><WavyBackground /></div>`;
+  if (probe(classic) !== 1 || probe(unscoped) !== 1 || probe(good) !== 0 || probe(ground) !== 0) {
+    findings.push({ file: "scripts/validate-design-system.ts", line: 0, text: `probe ${probe(classic)}/${probe(unscoped)}/${probe(good)}/${probe(ground)}`, rule: "10 the popup check no longer tells a classic panel from a glass one" });
+  }
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (!/\.tsx$/.test(rel) || VIEWERS.some((re) => re.test(rel))) continue;
+    findings.push(...check(rel, readFileSync(file, "utf8").split("\n")));
   }
 }
 

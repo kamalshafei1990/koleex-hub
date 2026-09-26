@@ -31,6 +31,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWarm, warmAge, writeWarm } from "@/lib/warm-cache";
 import { record, event } from "@/lib/perf/client";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -110,12 +111,33 @@ import {
   type MemoryState,
 } from "@/lib/intelligence";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_APPROVALS } from "@/lib/translations/finance/approvals";
+import { FIN_DASH } from "@/lib/translations/finance/dash";
+import { FIN_DASHBOARD } from "@/lib/translations/finance/dashboard";
+import { FIN_HOME } from "@/lib/translations/finance/home";
+import { FIN_SUBTAB } from "@/lib/translations/finance/subtab";
+import { FIN_TREASURY } from "@/lib/translations/finance/treasury";
+import { FIN_WORKFLOW } from "@/lib/translations/finance/workflow";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_APPROVALS, ...FIN_DASH, ...FIN_DASHBOARD, ...FIN_HOME, ...FIN_SUBTAB, ...FIN_TREASURY, ...FIN_WORKFLOW } as const;
+
 
 const MODE_STORAGE_KEY = "koleex-finance-mode";
 
+type DashboardStatic = {
+  orders: FinanceOrder[];
+  payments: FinancePayment[];
+  expenses: FinanceExpense[];
+  bankAccounts: BankAccount[];
+  cashMovements: CashMovement[];
+  reconciliationCandidates: FinanceReconciliationCandidate[];
+  bankStatementImports: BankStatementImport[];
+  treasuryPlans: TreasuryPlan[];
+};
+
 export default function FinanceDashboard() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
     { value: "week",    label: t("dashboard.period.week", "Week") },
     { value: "quarter", label: t("dashboard.period.quarter", "Quarter") },
@@ -123,23 +145,49 @@ export default function FinanceDashboard() {
   ];
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
   const [mode, setMode] = useState<FinanceMode>("operational");
-  const [kpi, setKpi] = useState<DashboardKpi | null>(null);
-  const [orders, setOrders] = useState<FinanceOrder[]>([]);
-  /* Phase 2.0: pull payments + expenses so the cross-module intelligence
-     layer can build customer behavior, supplier dependency, logistics
-     buckets, and event correlations. All from existing endpoints. */
-  const [payments, setPayments] = useState<FinancePayment[]>([]);
-  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
-  /* Phase 2.4 — treasury inputs (bank accounts + cash movements). */
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [cashMovements, setCashMovements] = useState<CashMovement[]>([]);
-  /* Phase 2.5 — reconciliation queue feeds the new intelligence signals. */
-  const [reconciliationCandidates, setReconciliationCandidates] = useState<FinanceReconciliationCandidate[]>([]);
-  /* Phase 2.6 — bank-statement imports feed 4 new intelligence signals. */
-  const [bankStatementImports, setBankStatementImports] = useState<BankStatementImport[]>([]);
-  /* Phase 2.9 — treasury plans feed 4 governance signals. */
-  const [treasuryPlans, setTreasuryPlans] = useState<TreasuryPlan[]>([]);
-  const [loading, setLoading] = useState(true);
+  /* WARM START. Eight feeds, and until all of them land this screen is a
+     spinner — the single worst wait in Finance. The seven non-period feeds
+     travel together as one snapshot (they are fetched together and used
+     together, so splitting them would only let the screen paint half a
+     dashboard), and the KPI block is keyed BY PERIOD, because handing the
+     quarter view last week's numbers is the one mistake a finance dashboard
+     may never make.
+
+     Derived, never copied into state: `fresh ?? warm` keeps one source of
+     truth and avoids seeding state from an effect, which is the shift this
+     codebase lints against. */
+  /* LOCKED = the KPI feed answered 403: this role has no «Bank & Profit»
+     (src/lib/experience, requireBankAndProfit). The page then shows one line
+     instead of the dashboard, and nothing below runs on data — the treasury
+     and health engines would read the zeroed balances as facts ("every
+     account near overdraft") and hand them to the Copilot. */
+  const [locked, setLocked] = useState(false);
+  const warmStatic = useWarm<DashboardStatic>("fin:dash:static");
+  const [freshStatic, setFreshStatic] = useState<DashboardStatic | null>(null);
+  const stat = locked ? null : (freshStatic ?? warmStatic);
+
+  const warmKpi = useWarm<DashboardKpi>(`fin:dash:kpi:${period}`);
+  const [freshKpi, setFreshKpi] = useState<{ period: DashboardPeriod; kpi: DashboardKpi | null } | null>(null);
+  /* The fresh KPI only counts for the period it was fetched for; on a period
+     switch it is stale by definition and the warm value for the NEW period
+     takes over until the refetch lands. */
+  const kpi = locked ? null : ((freshKpi && freshKpi.period === period ? freshKpi.kpi : null) ?? warmKpi);
+
+  const orders = useMemo(() => stat?.orders ?? [], [stat]);
+  const payments = useMemo(() => stat?.payments ?? [], [stat]);
+  const expenses = useMemo(() => stat?.expenses ?? [], [stat]);
+  const bankAccounts = useMemo(() => stat?.bankAccounts ?? [], [stat]);
+  const cashMovements = useMemo(() => stat?.cashMovements ?? [], [stat]);
+  const reconciliationCandidates = useMemo(() => stat?.reconciliationCandidates ?? [], [stat]);
+  const bankStatementImports = useMemo(() => stat?.bankStatementImports ?? [], [stat]);
+  const treasuryPlans = useMemo(() => stat?.treasuryPlans ?? [], [stat]);
+  /* `fetching` is "a request is in flight"; `loading` is "there is nothing to
+     show", and only the second one may put a spinner on the glass. Keeping
+     them the same variable is what would silently undo the warm start — the
+     cards would be ready and still hidden behind a spinner until the
+     revalidate came back. */
+  const [fetching, setFetching] = useState(true);
+  const loading = fetching && !stat && !kpi;
   /* Monotonic token so an out-of-order (slow, older-period) KPI response can
      never overwrite a newer one after a rapid period switch. */
   const kpiSeq = useRef(0);
@@ -166,10 +214,18 @@ export default function FinanceDashboard() {
     const seq = ++kpiSeq.current;
     try {
       const dashRes = await fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" });
+      if (dashRes.status === 403) {
+        if (seq === kpiSeq.current) { setLocked(true); setFreshKpi({ period: p, kpi: null }); }
+        return;
+      }
       const j = (await dashRes.json().catch(() => ({}))) as { kpi?: DashboardKpi };
-      if (seq === kpiSeq.current) setKpi(j.kpi ?? null); // ignore stale out-of-order period response
+      // ignore stale out-of-order period response
+      if (seq === kpiSeq.current) {
+        setFreshKpi({ period: p, kpi: j.kpi ?? null });
+        if (j.kpi) writeWarm(`fin:dash:kpi:${p}`, j.kpi);
+      }
     } catch {
-      if (seq === kpiSeq.current) setKpi(null);
+      if (seq === kpiSeq.current) setFreshKpi({ period: p, kpi: null });
       event("finance.dashboard.error");
     }
   }, []);
@@ -186,47 +242,53 @@ export default function FinanceDashboard() {
         fetch(`/api/finance/treasury-plans`, { cache: "no-store" }),
       ]);
       const ordersBody = (await ordersRes.json().catch(() => ({}))) as { orders?: FinanceOrder[] };
-      setOrders(Array.isArray(ordersBody.orders) ? ordersBody.orders : []);
       const paymentsBody = (await paymentsRes.json().catch(() => ({}))) as { payments?: FinancePayment[] };
-      setPayments(Array.isArray(paymentsBody.payments) ? paymentsBody.payments : []);
       const expensesBody = (await expensesRes.json().catch(() => ({}))) as { expenses?: FinanceExpense[] };
-      setExpenses(Array.isArray(expensesBody.expenses) ? expensesBody.expenses : []);
       const treasuryBody = (await treasuryRes.json().catch(() => ({}))) as { accounts?: BankAccount[]; movements?: CashMovement[] };
-      setBankAccounts(Array.isArray(treasuryBody.accounts) ? treasuryBody.accounts : []);
-      setCashMovements(Array.isArray(treasuryBody.movements) ? treasuryBody.movements : []);
       const reconBody = (await reconRes.json().catch(() => ({}))) as { candidates?: FinanceReconciliationCandidate[] };
-      setReconciliationCandidates(Array.isArray(reconBody.candidates) ? reconBody.candidates : []);
       const importsBody = (await importsRes.json().catch(() => ({}))) as { imports?: BankStatementImport[] };
-      setBankStatementImports(Array.isArray(importsBody.imports) ? importsBody.imports : []);
       const plansBody = (await plansRes.json().catch(() => ({}))) as { plans?: TreasuryPlan[] };
-      setTreasuryPlans(Array.isArray(plansBody.plans) ? plansBody.plans : []);
+      const next: DashboardStatic = {
+        orders: Array.isArray(ordersBody.orders) ? ordersBody.orders : [],
+        payments: Array.isArray(paymentsBody.payments) ? paymentsBody.payments : [],
+        expenses: Array.isArray(expensesBody.expenses) ? expensesBody.expenses : [],
+        bankAccounts: Array.isArray(treasuryBody.accounts) ? treasuryBody.accounts : [],
+        cashMovements: Array.isArray(treasuryBody.movements) ? treasuryBody.movements : [],
+        reconciliationCandidates: Array.isArray(reconBody.candidates) ? reconBody.candidates : [],
+        bankStatementImports: Array.isArray(importsBody.imports) ? importsBody.imports : [],
+        treasuryPlans: Array.isArray(plansBody.plans) ? plansBody.plans : [],
+      };
+      setFreshStatic(next);
+      writeWarm("fin:dash:static", next);
     } catch {
-      setOrders([]);
-      setPayments([]);
-      setExpenses([]);
-      setBankAccounts([]);
-      setCashMovements([]);
-      setReconciliationCandidates([]);
-      setBankStatementImports([]);
-      setTreasuryPlans([]);
+      /* Leave whatever is on screen. Blanking eight lists because one feed
+         blipped is worse than showing the last complete picture, and the
+         warm entry is deliberately not overwritten with emptiness. */
     }
   }, []);
 
   const didInitialLoad = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setFetching(true);
     const t0 = typeof performance !== "undefined" ? performance.now() : 0;
     const firstMount = !didInitialLoad.current;
     /* First mount loads everything; later period changes refetch only the
-       period-scoped KPI endpoint. */
-    const tasks = firstMount
-      ? [loadDashboard(period), loadStatic()]
-      : [loadDashboard(period)];
+       period-scoped KPI endpoint.
+       And neither runs at all while its stored answer is younger than the
+       stale window: eight feeds refetched because someone walked across the
+       tab bar is exactly the churn that made the painted screen feel laggy.
+       The stale check is per-feed, so the period KPI can refresh on its own
+       while the seven static ones stay put. */
+    const STALE = 60_000;
+    const tasks = [
+      ...(warmAge(`fin:dash:kpi:${period}`) < STALE ? [] : [loadDashboard(period)]),
+      ...(firstMount && warmAge("fin:dash:static") >= STALE ? [loadStatic()] : []),
+    ];
     didInitialLoad.current = true;
     void Promise.all(tasks).finally(() => {
       if (cancelled) return;
-      setLoading(false);
+      setFetching(false);
       /* Privacy-safe dashboard timing — durations only, no financial values. */
       const ms = (typeof performance !== "undefined" ? performance.now() : 0) - t0;
       if (firstMount) {
@@ -300,9 +362,10 @@ export default function FinanceDashboard() {
   );
   useEffect(() => {
     /* Persist the next-memory snapshot after each successful build so
-       the next run can reason about persistence + smooth the health. */
-    if (!loading) saveMemory(businessIntelligence.nextMemory);
-  }, [businessIntelligence, loading]);
+       the next run can reason about persistence + smooth the health.
+       Never from a locked page — that build ran on no data. */
+    if (!loading && !locked) saveMemory(businessIntelligence.nextMemory);
+  }, [businessIntelligence, loading, locked]);
 
   /* Publish proactive Copilot context whenever the operational picture
      changes. FloatingPanel listens and renders these as suggestion
@@ -311,6 +374,7 @@ export default function FinanceDashboard() {
      the cross-module intelligence — correlations first, then events. */
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (locked) return;
     const hints = businessIntelligence.copilotHints.map((h) => ({
       key: h.key,
       text: h.text,
@@ -320,11 +384,26 @@ export default function FinanceDashboard() {
     return () => {
       window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints: [] } }));
     };
-  }, [businessIntelligence]);
+  }, [businessIntelligence, locked]);
+
+  /* After every hook: a locked page is one line and the way back. */
+  if (locked) {
+    return (
+      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="pb-5">
+          <FinanceHeader title={t("dashboard.title", "Financial Intelligence")} subtitle={t("dash.locked", "This view is profit and cash — it opens with «Bank & Profit» in Roles & Permissions.")} />
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+            <RrIcon name="arrow-left" size={10} />
+            <Link href="/finance" className="hover:text-[var(--text-highlight)]">{t("dash.backHome", "Back to Finance Home")}</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+      <div className="pb-5">
         <FinanceHeader
           title={t("dashboard.title", "Financial Intelligence")}
           subtitle={pressureHeadline(pressure, intelligence.headline, t)}
@@ -732,6 +811,9 @@ function OperationalView({
         </ChartCard>
       </DashboardSection>
 
+      {/* The bridge needs the supplier cost; without the private-records
+          switch it arrives as 0 (kpi.cost_hidden) and the bridge would lie. */}
+      {!kpi?.cost_hidden && (
       <DashboardSection
         eyebrow={t("dash.section.profitFlow", "Profit flow")}
         title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
@@ -750,6 +832,7 @@ function OperationalView({
           currency={currency}
         />
       </DashboardSection>
+      )}
 
       <DashboardSection
         eyebrow={t("dash.section.detail", "Detail")}
@@ -864,6 +947,9 @@ function ExecutiveView({
             helpId="finance.dso"
             loading={loading}
           />
+          {/* CCC's payables leg divides by the supplier cost — hidden
+              without the private-records switch (kpi.cost_hidden). */}
+          {!kpi?.cost_hidden && (
           <OperationalKpi
             label={t("dash.kpi.ccc", "CCC")}
             value={`${ccc.ccc.toFixed(0)} d`}
@@ -872,6 +958,7 @@ function ExecutiveView({
             helpId="finance.ccc"
             loading={loading}
           />
+          )}
           <OperationalKpi
             label={t("dash.kpi.grossMargin", "Gross margin")}
             value={marginValue}
@@ -933,6 +1020,9 @@ function ExecutiveView({
             }
             severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
           />
+          {/* Shares of supplier cost — with the costs hidden (0) it would
+              read "Diversified supplier base", which nobody measured. */}
+          {!kpi?.cost_hidden && (
           <ConcentrationBar
             label={t("dash.risks.topSupplier", "Top supplier share")}
             party={concentration.topSupplier?.name ?? "—"}
@@ -944,6 +1034,7 @@ function ExecutiveView({
             }
             severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
           />
+          )}
         </div>
       </DashboardSection>
 
@@ -986,6 +1077,7 @@ function ExecutiveView({
         </ChartCard>
       </DashboardSection>
 
+      {!kpi?.cost_hidden && (
       <DashboardSection
         eyebrow={t("dash.section.profitFlow", "Profit flow")}
         title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
@@ -1002,6 +1094,7 @@ function ExecutiveView({
           currency={currency}
         />
       </DashboardSection>
+      )}
     </>
   );
 }

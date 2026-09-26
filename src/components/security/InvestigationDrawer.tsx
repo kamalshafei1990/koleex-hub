@@ -65,13 +65,13 @@ export default function InvestigationDrawer({ entity, report, onClose }: Investi
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={model ? `${model.subtitle}: ${model.title}` : "Investigation"}
-        className="absolute inset-0 flex flex-col bg-[var(--bg-surface)] md:inset-y-0 md:left-auto md:right-0 md:w-[480px] md:border-l md:border-[var(--border)]"
+        className="kx-app kx-glass-drawer absolute inset-0 flex flex-col bg-[var(--bg-surface)] md:inset-y-0 md:left-auto md:right-0 md:w-[480px] md:border-l md:border-[var(--border)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div className="min-w-0">

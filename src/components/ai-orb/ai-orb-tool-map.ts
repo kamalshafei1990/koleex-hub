@@ -27,6 +27,11 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   listMyProjects: "retrieving-data",
   listProjectTasks: "retrieving-data",
   createProjectTask: "creating-record",
+  addProjectMember: "updating-record",
+  /* notes.ts */
+  searchNotes: "searching",
+  readNote: "retrieving-data",
+  createNote: "creating-record",
   /* products.ts */
   searchProducts: "searching",
   countProducts: "analyzing",
@@ -38,6 +43,46 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   /* todos.ts */
   listMyTodos: "retrieving-data",
   createTodo: "creating-record",
+  updateTodo: "updating-record",
+  completeTodo: "updating-record",
+  reassignTodo: "updating-record",
+  deleteTodo: "executing-action",
+  /* projects.ts, planning.ts, calendar.ts — the edits */
+  updateProjectTask: "updating-record",
+  completeProjectTask: "updating-record",
+  deleteProjectTask: "executing-action",
+  updatePlanningItem: "updating-record",
+  copyLastWeek: "creating-record",
+  publishWeek: "updating-record",
+  deletePlanningItem: "executing-action",
+  updateCalendarEvent: "updating-record",
+  deleteCalendarEvent: "executing-action",
+  /* products.ts, product-price.ts, catalog */
+  getProductFullDetails: "reading",
+  getProductPrice: "retrieving-data",
+  listCatalogFamilies: "retrieving-data",
+  searchCatalog: "searching",
+  auditProductData: "analyzing",
+  /* knowledge, web, machines, trade terms — the lookups. THE WEB IS
+     "browsing", its own activity, so the orb and the trace can tell it
+     apart from a Hub search. The words for it are "Thinking" (owner,
+     2026-09-26 — see components/ai/activity-copy.ts). */
+  search_web: "browsing",
+  /* Koleex AI opening a result page (core/read-page.ts): "Reading the details". */
+  read_page: "reading",
+  search_knowledge: "searching",
+  searchMachineKnowledge: "searching",
+  searchTradeTerms: "searching",
+  suggest_team_knowledge: "creating-record",
+  /* people */
+  findTeamMember: "searching",
+  /* the user's own memory */
+  remember_about_user: "creating-record",
+  forget_about_user: "executing-action",
+  /* pictures */
+  generate_image: "generating",
+  /* a question back to the user is thinking, not doing */
+  askUser: "reasoning",
 };
 
 export function toolActivity(tool: string | undefined | null): AIOrbActivity {

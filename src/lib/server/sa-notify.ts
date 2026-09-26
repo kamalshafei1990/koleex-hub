@@ -7,21 +7,29 @@ import "server-only";
    (category 'alert'); no parallel notification UI. Best-effort: a notification
    write must never block the action that triggered it.
 
-   Respects notification_preferences per recipient: prefs[kind].inapp === false
-   suppresses the in-app alert for that admin. Default = on.
+   Two preference stores gate the in-app row, both default-on:
+     · notification_preferences.prefs[kind].inapp === false — the per-kind
+       switches in the Super-Admin "Alert preferences" modal.
+     · accounts.preferences.notifications.security_alerts === false — the
+       "Security alerts" switch in Settings → Notifications, which covers the
+       sign-in noise family only (see suppressedRecipients).
 
-   metadata shape: { sam: true, kind, severity, actor, ...extra } so the bell /
-   inbox can recognise Super-Admin security alerts.
+   metadata shape: { sam: true, kind, severity, actor, ...extra, tpl? } so the
+   bell / inbox can recognise Super-Admin security alerts (and, with `tpl`,
+   show them in the reader's language).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
 
+/* Every kind here has a live emitter: new_device (activity heartbeat),
+   failed_login_threshold (signin), the rest from audit.ts alertKindForAction.
+   "login" and "new_ip" were declared for years and emitted by nothing. */
 export type AlertKind =
-  | "login"
   | "new_device"
-  | "new_ip"
   | "failed_login_threshold"
   | "data_delete"
   | "price_cost_change"
@@ -33,7 +41,15 @@ export type AlertKind =
 
 export interface SaAlert {
   kind: AlertKind;
-  subject: string;
+  /** What happened, rendered in each reader's language (notification-
+   *  templates; words in translations/notif-templates/admin.ts). The stored
+   *  subject — and body, when the template has one — are its English, byte
+   *  for byte the sentence callers wrote before, so the dedupe and the
+   *  supersede below (both keyed on the subject) behave exactly as before.
+   *  Pass `subject` only for an alert with no template. */
+  tpl?: NotifTpl;
+  subject?: string;
+  /** The stored body when the template has none. */
   body?: string | null;
   severity?: "info" | "warning" | "critical";
   link?: string | null;
@@ -58,16 +74,33 @@ export interface SaAlert {
      {actor name}          ← push title (bold)
      {action} · from {loc} ← push body
    so we deliberately DON'T set title to "Koleex Hub" (that would duplicate the
-   app-name line); the actor's name goes in the title instead. */
-function buildPushPayload(alert: SaAlert, actorName: string | null) {
-  const actionText = alert.action || alert.subject;
+   app-name line); the actor's name goes in the title instead.
+
+   A reader whose Hub is in Chinese or Arabic gets the alert's template in
+   their language instead (web-push renders `tpl`) — but only where that
+   template still says WHO: the new-device and failed-sign-in sentences name
+   the account. An audited action's sentence ("Delete — product: …") does
+   not, and a security push that drops who did it is worse than one in
+   English, so those keep the English three lines. */
+const PUSH_TEMPLATED: ReadonlySet<AlertKind> = new Set(["new_device", "failed_login_threshold"]);
+
+function buildPushPayload(alert: SaAlert, subject: string, actorName: string | null, tpl: NotifTpl | null) {
+  const actionText = alert.action || subject;
   const body = alert.location ? `${actionText} · from ${alert.location}` : actionText;
+  const who = actorName || "Koleex Hub";
   return {
-    title: actorName || "Koleex Hub",
+    title: who,
     body,
     url: alert.link ?? "/super-admin/activity",
-    tag: alert.kind,
+    /* One lock-screen notification per kind, per person, per day: six
+       deletions by one person fold into "Salt Leo — 6 alerts" (the device
+       counts, public/sw.js), and a different person's alerts never overwrite
+       them. The tag used to be the kind alone, so every deletion by anyone
+       silently replaced the last one. */
+    tag: `sa:${alert.kind}:${alert.actorAccountId ?? "-"}:${new Date().toISOString().slice(0, 10)}`,
     kind: alert.kind,
+    tpl: PUSH_TEMPLATED.has(alert.kind) ? tpl : null,
+    group: { tpl: { k: "push_group.alerts", p: { actor: who, n: "{n}" } } },
   };
 }
 
@@ -96,24 +129,6 @@ async function resolveActorName(id?: string | null): Promise<string | null> {
     return acc.username || acc.login_email || null;
   } catch {
     return null;
-  }
-}
-
-/** Send a Web Push to every Super Admin's devices (no in-app row). The actor is
- *  excluded. Thin convenience wrapper around sendPushToAccounts() — note that
- *  notifySuperAdmins() already does both in-app + push with per-recipient
- *  preference filtering; use this only when you want push-only delivery. */
-export async function sendPushToSuperAdmins(alert: SaAlert): Promise<void> {
-  try {
-    const admins = await superAdminAccountIds(alert.tenantId);
-    const targets = admins.filter((id) => id !== alert.actorAccountId);
-    if (targets.length === 0) return;
-    const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
-    await sendPushToAccounts(targets, buildPushPayload(alert, actorName), {
-      actorAccountId: alert.actorAccountId,
-    });
-  } catch (e) {
-    console.error("[sa-notify.sendPushToSuperAdmins]", e instanceof Error ? e.message : e);
   }
 }
 
@@ -147,13 +162,29 @@ export async function superAdminAccountIds(tenantId?: string | null): Promise<st
 async function suppressedRecipients(ids: string[], kind: AlertKind): Promise<Set<string>> {
   const off = new Set<string>();
   if (ids.length === 0) return off;
-  const { data } = await supabaseServer
-    .from("notification_preferences")
-    .select("account_id, prefs")
-    .in("account_id", ids);
-  for (const row of (data ?? []) as Array<{ account_id: string; prefs: Record<string, unknown> }>) {
+  /* The sign-in noise family answers to the "Security alerts" switch in
+     Settings → Notifications (accounts.preferences), the same switch that
+     already gates its push and chime — one switch, three channels. The
+     sensitive admin kinds (data_delete, admin_role_change, sensitive_export,
+     settings_change, file_change, price_cost_change) stay out of its reach
+     on purpose: a super-admin silencing "someone deleted data" with a broad
+     toggle is a hole, not a preference. They answer only to their own row
+     in the Alert preferences modal (notification_preferences). */
+  const UMBRELLA_KINDS: ReadonlySet<AlertKind> = new Set([
+    "new_device", "failed_login_threshold", "suspicious",
+  ]);
+  const [{ data: kindRows }, { data: accountRows }] = await Promise.all([
+    supabaseServer.from("notification_preferences").select("account_id, prefs").in("account_id", ids),
+    UMBRELLA_KINDS.has(kind)
+      ? supabaseServer.from("accounts").select("id, preferences").in("id", ids)
+      : Promise.resolve({ data: [] as Array<{ id: string; preferences: unknown }> }),
+  ]);
+  for (const row of (kindRows ?? []) as Array<{ account_id: string; prefs: Record<string, unknown> | null }>) {
     const pref = row.prefs?.[kind] as { inapp?: boolean } | undefined;
     if (pref && pref.inapp === false) off.add(row.account_id);
+  }
+  for (const row of (accountRows ?? []) as Array<{ id: string; preferences: { notifications?: Record<string, unknown> } | null }>) {
+    if (row.preferences?.notifications?.security_alerts === false) off.add(row.id);
   }
   return off;
 }
@@ -165,14 +196,17 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     if (recipients.length === 0) return;
 
     const off = await suppressedRecipients(recipients, alert.kind);
+    const text = alert.tpl ? prepareTpl(alert.tpl) : null;
+    const subject = text?.subject ?? alert.subject ?? "";
+    const body = text?.body ?? alert.body ?? null;
     const rows = recipients
       .filter((id) => !off.has(id))
       .map((id) => ({
         recipient_account_id: id,
         sender_account_id: alert.actorAccountId ?? null,
         category: "alert" as const,
-        subject: alert.subject,
-        body: alert.body ?? null,
+        subject,
+        body,
         link: alert.link ?? "/super-admin/activity",
         metadata: {
           sam: true,
@@ -180,9 +214,39 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
           severity: alert.severity ?? "info",
           actor: alert.actorAccountId ?? null,
           ...(alert.metadata ?? {}),
+          ...(text?.tpl ? { tpl: text.tpl } : {}),
         },
       }));
     if (rows.length === 0) return;
+    /* The SAME alert fired twice within seconds is one event, not two.
+       Measured 26/09: 5 deletions raised their alert twice, 2 s apart. The
+       supersede below already keeps only one unread row, but both calls
+       still pushed — two phone notifications and two chimes for one delete.
+       An identical subject to these recipients in the last minute ends it
+       here, before the row and before the push. Best-effort: a failed check
+       lets the alert through rather than risk losing it. */
+    const since = new Date(Date.now() - 60_000).toISOString();
+    let dupe = supabaseServer
+      .from("inbox_messages")
+      .select("id")
+      .in("recipient_account_id", rows.map((r) => r.recipient_account_id))
+      .eq("category", "alert")
+      .eq("subject", subject)
+      .gte("created_at", since);
+    /* Same RECORD, not just the same words: two different products that
+       share a name (the catalogue had duplicates) are two deletions. */
+    const entityId = (alert.metadata as { entity_id?: unknown } | undefined)?.entity_id;
+    if (entityId != null) dupe = dupe.eq("metadata->>entity_id", String(entityId));
+    const { data: recent } = await dupe.limit(1);
+    if (recent && recent.length > 0) return;
+    /* Security alerts REPEAT ("xiang signed in" ×25 measured on the
+       owner's inbox). The newest unread copy represents the series; the
+       audit log keeps full history. Superseded by recipient+subject. */
+    await supersedeUnread({
+      recipients,
+      category: "alert",
+      subject,
+    });
     await supabaseServer.from("inbox_messages").insert(rows);
     await emitPings(rows.map((r) => ({ topic: rtTopic.inbox((r as { recipient_account_id: string }).recipient_account_id) })));
 
@@ -192,7 +256,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     const pushTargets = recipients.filter((id) => !off.has(id));
     if (pushTargets.length) {
       const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
-      await sendPushToAccounts(pushTargets, buildPushPayload(alert, actorName), {
+      await sendPushToAccounts(pushTargets, buildPushPayload(alert, subject, actorName, text?.tpl ?? null), {
         actorAccountId: alert.actorAccountId,
       });
     }

@@ -460,7 +460,12 @@ function Combobox({
   const { t } = useTranslation(employeesT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [highlight, setHighlight] = useState(0);
+  /* Highlight remembers WHICH query it belongs to, so a query change
+     resets it at render instead of via a setState-in-effect pass. */
+  const [hl, setHl] = useState<{ q: string; i: number }>({ q: "", i: 0 });
+  const highlight = hl.q === query ? hl.i : 0;
+  const setHighlight = (v: number | ((h: number) => number)) =>
+    setHl({ q: query, i: typeof v === "function" ? v(highlight) : v });
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -478,15 +483,19 @@ function Combobox({
     return [...starts, ...contains];
   }, [query, options]);
 
+  /* Closing resets the search; done in the close paths themselves so no
+     setState runs inside an effect body. */
+  const close = useCallback(() => { setOpen(false); setQuery(""); }, []);
+
   /* Close on outside click. */
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) close();
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
+  }, [open, close]);
 
   /* Focus search input when opening. */
   useEffect(() => {
@@ -494,12 +503,9 @@ function Combobox({
       const t = setTimeout(() => inputRef.current?.focus(), 0);
       return () => clearTimeout(t);
     }
-    setQuery("");
   }, [open]);
 
-  useEffect(() => { setHighlight(0); }, [query]);
-
-  const pick = (v: string) => { onChange(v); setOpen(false); };
+  const pick = (v: string) => { onChange(v); close(); };
 
   return (
     <div ref={rootRef} data-field={name}>
@@ -508,7 +514,9 @@ function Combobox({
         <button
           type="button"
           data-combobox-trigger
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => (open ? close() : setOpen(true))}
+          role="combobox"
+          aria-controls={`combo-${name}-listbox`}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={ariaLabel || label}
@@ -548,7 +556,7 @@ function Combobox({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") { setOpen(false); return; }
+                    if (e.key === "Escape") { close(); return; }
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
                       setHighlight((h) => Math.min(filtered.length - 1, h + 1));
@@ -566,7 +574,7 @@ function Combobox({
                 />
               </div>
             </div>
-            <ul role="listbox" className="max-h-64 overflow-y-auto">
+            <ul id={`combo-${name}-listbox`} role="listbox" className="max-h-64 overflow-y-auto">
               {filtered.length === 0 && (
                 <li className="px-3 py-6 text-center text-[12px] text-[var(--text-faint)]">{emptyText}</li>
               )}
@@ -1018,7 +1026,7 @@ const TRACKED_EMPLOYEE_FIELDS: readonly (keyof EmployeeWizardData)[] = [
   "photo_url", "title", "first_name", "last_name",
   "gender", "birthday", "nationality", "marital_status",
   "personal_phone", "personal_email",
-  "hire_date", "employment_type", "work_email", "work_phone", "work_location",
+  "hire_date", "employment_type", "work_email", "work_phone", "work_location", "work_country",
   "department_id", "position_id",
   "private_address_line1", "private_city", "private_country",
   "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
@@ -1409,7 +1417,7 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
       aria-modal="true"
       aria-labelledby="saved-title"
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 max-w-md w-full">
+      <div className="kx-app kx-glass-pop kx-pop-in relative bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 max-w-md w-full">
         <div className="flex items-center gap-3 mb-4">
           <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-500/10">
             <CheckIcon size={20} className="text-emerald-400" />
@@ -1955,6 +1963,17 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               )}
               <DateInput name="hire_date" label={t("f.emp.hireDate")} value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
               <SelectInput label={t("f.emp.workLocation")} value={form.work_location} onChange={(v) => set("work_location", v)} options={tOpts(t, WORK_LOCATION_OPTIONS)} />
+              {/* Where they WORK (not where they live): picks the working
+                  calendar (weekend + public holidays) and the attendance
+                  policy — Phase C. */}
+              <Combobox
+                label={t("f.emp.workCountry")}
+                value={form.work_country}
+                onChange={(v) => set("work_country", v)}
+                options={countryOptions}
+                placeholder={t("f.ph.selectCountry")}
+                searchPlaceholder="Search 249 countries…"
+              />
               <Combobox
                 label={t("f.emp.manager")}
                 value={form.manager_id}

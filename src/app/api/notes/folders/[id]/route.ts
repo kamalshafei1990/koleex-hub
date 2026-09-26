@@ -2,21 +2,16 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { NOTE_LIMITS } from "@/lib/notes-policy";
+import { folderWouldCycle, isUuid, ownsFolder } from "@/lib/notes-server";
 
-/* PATCH  /api/notes/folders/[id] — rename / move / reorder
+/* PATCH  /api/notes/folders/[id] — rename / move / reorder. Whitelisted
+                                     fields only; a new parent must be the
+                                     caller's own folder and must not create
+                                     a cycle.
    DELETE /api/notes/folders/[id] — delete folder (notes inside get folder_id=null
                                      via the DB FK's ON DELETE SET NULL) */
-
-async function ownsFolder(id: string, accountId: string): Promise<boolean> {
-  const { data } = await supabaseServer
-    .from("notes_folders")
-    .select("id")
-    .eq("id", id)
-    .eq("account_id", accountId)
-    .maybeSingle();
-  return data !== null;
-}
 
 export async function PATCH(
   req: Request,
@@ -32,19 +27,52 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const patch = (await req.json()) as Record<string, unknown>;
-  delete patch.id;
-  delete patch.account_id;
-  delete patch.tenant_id;
-  delete patch.created_at;
+  let body: Record<string, unknown> = {};
+  try { body = ((await req.json()) ?? {}) as Record<string, unknown>; } catch { /* empty */ }
+
+  const patch: Record<string, unknown> = {};
+  if ("name" in body) {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > NOTE_LIMITS.folderName) {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+    patch.name = name;
+  }
+  if ("icon" in body) {
+    const icon = body.icon;
+    if (icon !== null && (typeof icon !== "string" || icon.length > NOTE_LIMITS.folderIcon)) {
+      return NextResponse.json({ error: "Invalid icon" }, { status: 400 });
+    }
+    patch.icon = icon;
+  }
+  if ("sort_order" in body) {
+    if (!Number.isInteger(body.sort_order)) {
+      return NextResponse.json({ error: "Invalid sort order" }, { status: 400 });
+    }
+    patch.sort_order = body.sort_order;
+  }
+  if ("parent_id" in body) {
+    const parentId = body.parent_id;
+    if (parentId !== null) {
+      if (!isUuid(parentId) || !(await ownsFolder(parentId, auth.account_id))) {
+        return NextResponse.json({ error: "Parent folder not found" }, { status: 400 });
+      }
+      if (await folderWouldCycle(auth.account_id, id, parentId)) {
+        return NextResponse.json({ error: "A folder cannot be moved inside itself" }, { status: 400 });
+      }
+    }
+    patch.parent_id = parentId;
+  }
+  if (Object.keys(patch).length === 0) return NextResponse.json({ ok: true });
 
   const { error } = await supabaseServer
     .from("notes_folders")
     .update(patch)
-    .eq("id", id);
+    .eq("id", id)
+    .eq("account_id", auth.account_id);
   if (error) {
     console.error("[api/notes/folders/[id] PATCH]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update folder" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -66,10 +94,11 @@ export async function DELETE(
   const { error } = await supabaseServer
     .from("notes_folders")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("account_id", auth.account_id);
   if (error) {
     console.error("[api/notes/folders/[id] DELETE]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete folder" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

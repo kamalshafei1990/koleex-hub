@@ -99,7 +99,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
     <div className="fixed inset-0 z-[90] flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-[640px] flex-col border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="kx-app kx-glass-drawer relative flex h-full w-full max-w-[640px] flex-col border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">

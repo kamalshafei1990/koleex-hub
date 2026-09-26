@@ -11,7 +11,7 @@
         route is gated: body contains requireAuth AND a Product Data gate
         (hasProductDataAccess or requireModuleAccess).
      4. The taxonomy routes use a kind whitelist (no raw table name from URL).
-     5. list-view only exposes suppliers behind canSeeSecrets.
+     5. signals exposes supplier names only behind the cost gate.
      6. search escapes ilike wildcards.
    ========================================================================== */
 
@@ -115,17 +115,17 @@ for (const f of ["src/app/api/taxonomy/[kind]/route.ts", "src/app/api/taxonomy/[
     src.includes("TAXONOMY_KINDS") && src.includes("divisions") && src.includes(".includes("));
 }
 
-/* ── 5. list-view supplier gating ────────────────────────────────────── */
-const listView = read("src/app/api/products/list-view/route.ts");
-/* `canSeeCosts` is `canSeeSecrets && hasProductCostAccess` — STRICTER than
-   what this check was written to demand. The route tightened and the check did
-   not follow, so it reported the supplier names as ungated while they were in
-   fact gated twice over. Accept either, and fail loudly if neither appears. */
-const SUPPLIER_GATE = /(canSeeSecrets|canSeeCosts)/;
-check("list-view selects supplier column only behind the supplier gate",
-  new RegExp(`${SUPPLIER_GATE.source}\\s*\\?\\s*\`product_id, supplier`).test(listView));
-check("list-view populates suppliers only behind the supplier gate",
-  new RegExp(`${SUPPLIER_GATE.source} && row\\.supplier`).test(listView));
+/* ── 5. supplier names ship only behind the cost gate ───────────────── */
+/* This check used to read /api/products/list-view, the P0-A consolidated
+   read that ProductList never adopted; the route was retired on 22 Sep 2026
+   (no caller anywhere in src). The same rule now lives in the route that
+   actually serves the grid's supplier names: /api/products/signals hands
+   out `allSuppliers` only when `canSeeCosts`. */
+const signals = read("src/app/api/products/signals/route.ts");
+check("signals lists supplier names only behind the cost gate",
+  /const allSuppliers = canSeeCosts\s*\?/.test(signals));
+check("signals resolves cost access with hasProductCostAccess",
+  /hasProductCostAccess\(auth\)/.test(signals));
 
 /* ── 6. search escapes ilike wildcards ───────────────────────────────── */
 const search = read("src/app/api/products/search/route.ts");

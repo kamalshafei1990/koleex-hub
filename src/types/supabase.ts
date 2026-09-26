@@ -279,6 +279,10 @@ export interface FeatureCard {
 
 export interface ProductRow {
   feature_cards?: FeatureCard[] | null;
+  /* Catalogue badges as a bitmask (products-freshness.ts): NEW=1,
+     Updated=2, Price updated=4. Computed by the list API from three
+     timestamps that never reach the browser; absent when 0. */
+  fresh?: number;
   id: string;
   product_name: string;
   slug: string;
@@ -385,6 +389,8 @@ export interface ProductModelRow {
   slug: string;
   sku: string;
   tagline: string | null;
+  /** Per-member packing differences vs products.logistics (partial, same shape). */
+  logistics_overrides?: Record<string, unknown> | null;
   supplier: string | null;
   reference_model: string | null;
   /** Commercial KOLEEX code (e.g. "XCS-7800"). Unique when set.
@@ -642,6 +648,8 @@ export interface EmployeeRow {
   contract_end_date: string | null;
   probation_end_date: string | null;
   work_location: WorkLocation;
+  /** Phase C: ISO alpha-2 of the country the employee works in (calendar + policy). */
+  work_country: string | null;
 
   // Bank account
   bank_name: string | null;
@@ -1065,11 +1073,39 @@ export type CalendarEventInsert = Omit<
 >;
 export type CalendarEventUpdate = Partial<CalendarEventInsert>;
 
+/** What GET /api/calendar/events hands the views: real rows, expanded
+ *  occurrences of a series, events the viewer is invited to, and read-only
+ *  mirrors of other modules. The optional fields say which. */
+export type CalendarMirrorSource = "planning" | "todo" | "project" | "leave" | "report";
+export interface CalendarViewEvent extends CalendarEventRow {
+  /** Set on each occurrence of a recurring series; the id is `<base>~<i>`. */
+  series_base_id?: string;
+  /** Owned by someone else; the viewer is on the guest list. */
+  invited?: boolean;
+  /** Present on mirrors — never editable as an event. */
+  source?: CalendarMirrorSource;
+  source_kind?: string | null;
+  role_name?: string | null;
+  linked_entity_label?: string | null;
+  todo_id?: string;
+  project_task_id?: string;
+  leave_request_id?: string;
+  /** Report deadlines: the report type, a day inside its period, and the
+   *  report to open (the one sent, or the draft started). One an event asked
+   *  for also carries its request and what it is about. */
+  report_key?: string;
+  report_date?: string;
+  report_id?: string;
+  report_request?: string;
+  report_subject?: string;
+}
+
+export type CalendarAttendeeStatus = "invited" | "accepted" | "declined";
 export interface CalendarAttendeeRow {
   id: string;
   event_id: string;
   account_id: string;
-  status: "invited" | "accepted" | "declined";
+  status: CalendarAttendeeStatus;
   tenant_id: string | null;
   created_at: string;
 }
@@ -1125,7 +1161,8 @@ export type InboxMessageCategory =
   | "membership_request"
   | "alert"
   | "external_email"
-  | "task";
+  | "task"
+  | "calendar";
 
 /** Direction an inbox message flowed:
  *   internal — in-app Koleex message (original default)
@@ -1140,6 +1177,9 @@ export interface InboxMessageRow {
   id: string;
   recipient_account_id: string;
   sender_account_id: string | null;
+  /** Set by tenant-aware producers; NULL on rows written by the crons and
+   *  the to-do fan-out, which resolve recipients without a tenant. */
+  tenant_id: string | null;
   category: InboxMessageCategory;
   subject: string;
   body: string | null;
@@ -1148,6 +1188,9 @@ export interface InboxMessageRow {
   read_at: string | null;
   archived_at: string | null;
   created_at: string;
+  /** Put off until then ("Later"; 20260927_inbox_snooze.sql). The slim bell
+   *  projection leaves it out — only the center's Later view reads it. */
+  snoozed_until?: string | null;
 
   /* ── External-email fields (all NULL for internal Koleex messages) ── */
   mail_connection_id: string | null;
@@ -1982,7 +2025,8 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
 
 /* ─── To-do System ───────────────────────────────────────────────────── */
 
-export type TodoSource = "manual" | "crm" | "calendar";
+/** "report": made from a line of a report (Reports 6A — source_id = the report). */
+export type TodoSource = "manual" | "crm" | "calendar" | "report";
 export type TodoPriority = "high" | "medium" | "low";
 
 /** Workflow stage for a task (Phase 2). */
@@ -2023,6 +2067,11 @@ export interface TodoRow {
   source_id: string | null;
   assigned_department: string | null;
   assign_to_all: boolean;
+  /** Visible only to the creator and can_view_private roles. */
+  is_private: boolean;
+  tenant_id: string | null;
+  /** When the reminder cron last fired for the current remind_at. */
+  reminded_at: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -2067,7 +2116,7 @@ export interface TodoMetadata {
   checklist?: TodoChecklistItem[];
   [key: string]: unknown;
 }
-export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;
+export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at" | "reminded_at">;
 export type TodoUpdate = Partial<TodoInsert> & { completed_at?: string | null };
 
 export interface TodoAssigneeRow {
@@ -2092,6 +2141,7 @@ export interface TodoLabelRow {
   id: string;
   name: string;
   color: string | null;
+  tenant_id: string | null;
   created_at: string;
 }
 export type TodoLabelInsert = Omit<TodoLabelRow, "id" | "created_at">;
@@ -2166,7 +2216,8 @@ export interface LeaveBalanceRow {
 }
 export type LeaveBalanceInsert = Omit<LeaveBalanceRow, "id" | "created_at" | "updated_at">;
 
-export type LeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+/** Phase B: `manager_approved` = the direct manager said yes, HR has not yet. */
+export type LeaveRequestStatus = "pending" | "manager_approved" | "approved" | "rejected" | "cancelled";
 
 export interface LeaveRequestRow {
   id: string;
@@ -2197,10 +2248,14 @@ export interface LeaveRequestRow {
   half_day_period: string | null;
   /** Who filed it — self-service vs HR acting on someone's behalf. */
   requested_by: string | null;
+  /* ── Phase B: the manager's step (migration 20260920_leave_manager_review) ── */
+  manager_reviewed_by: string | null;
+  manager_reviewed_at: string | null;
+  manager_notes: string | null;
   created_at: string;
   updated_at: string;
 }
-export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at">;
+export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at" | "manager_reviewed_by" | "manager_reviewed_at" | "manager_notes">;
 
 /** The optional detail block. Every field is nullable in the DB, so callers
  *  may omit the whole thing — used to keep createLeaveRequest's signature
@@ -2222,12 +2277,18 @@ export type LeaveRequestDetails = Pick<
 export interface AttendancePolicyRow {
   id: string;
   name: string;
+  /** Phase C: ISO alpha-2 the policy applies to; null = default. */
+  country: string | null;
+  /** IANA zone in which work_start / work_end are read. */
+  timezone: string;
   work_start: string;
   work_end: string;
   late_threshold_min: number;
   min_hours: number;
   weekend_days: string[];
   is_default: boolean;
+  /** Phase 1: first day attendance counts (ISO date); null = not started. */
+  tracking_from: string | null;
   created_at: string;
 }
 
@@ -2244,6 +2305,10 @@ export interface AttendanceRecordRow {
   status: AttendanceStatus;
   source: string;
   notes: string | null;
+  /** Phase 1 flags: punched from outside the office / closed by the nightly job / changed by HR or an approved request. */
+  remote?: boolean;
+  auto_closed?: boolean;
+  corrected?: boolean;
   created_at: string;
   updated_at: string;
 }

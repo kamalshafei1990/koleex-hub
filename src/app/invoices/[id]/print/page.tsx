@@ -56,6 +56,23 @@ export default function InvoicePrintPage({
     };
   }, [id]);
 
+  /* Name the saved PDF. The browser's "Save as PDF" dialog uses
+     document.title as the default filename, so without this every export
+     lands as the app's own title and they all collide in the download
+     folder. Owner's order: customer - company - number. Blanks are dropped
+     rather than left as empty separators. */
+  useEffect(() => {
+    if (!invoice) return;
+    const safe = (s: unknown) => (typeof s === "string" ? s.trim() : "");
+    const name =
+      [safe(invoice.customerName), safe(invoice.companyName), safe(invoice.invoiceNo)]
+        .filter(Boolean)
+        .join(" - ") || "Invoice";
+    const prev = document.title;
+    document.title = name;
+    return () => { document.title = prev; };
+  }, [invoice]);
+
   /* PDF-ready flag + auto-print trigger -- identical to the
      quotation print page so the Export PDF flow is consistent. */
   useEffect(() => {
@@ -77,6 +94,23 @@ export default function InvoicePrintPage({
          to the system typeface on slow networks. */
       if (typeof document !== "undefined" && "fonts" in document) {
         try { await document.fonts.ready; } catch { /* ignore */ }
+      }
+
+      /* The document measures its own rows after paint and may re-split its
+
+         pages once fonts and images settle. Snapshotting before that pass has
+
+         confirmed the split would print the estimate, not the page the screen
+
+         shows — it flags the stack root when the measured split is final. */
+
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+      const deadline = Date.now() + 3000;
+
+      while (!document.querySelector('.quot-a4-stack[data-paginated="1"]') && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 50));
+
       }
       if (cancelled) return;
       (window as unknown as { __quotation_pdf_ready__?: boolean }).__quotation_pdf_ready__ = true;

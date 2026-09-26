@@ -15,13 +15,15 @@
    DEFAULT_PREFERENCES.notifications, and in the two Settings screens.
    --------------------------------------------------------------------------- */
 
+import { notificationTypeDef } from "@/lib/notification-types";
+
 export const NOTIFICATION_ACTIVITIES = [
   "mentions", "approvals", "assignments", "tasks_due",
   "calendar_events", "projects_planning",
   "quotation_activity", "low_stock", "inventory_activity",
   "finance_activity", "qa_reports", "price_fx",
   "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
-  "membership_requests",
+  "membership_requests", "reports_activity",
 ] as const;
 export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 
@@ -29,6 +31,24 @@ export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
  *  into an activity key — null when it matches none (never gated). */
 export function classifyNotificationActivity(raw: unknown): NotificationActivity | null {
   const type = typeof raw === "string" ? raw : "";
+  if (!type) return null;
+  /* The registry first (lib/notification-types): a registered type's switch
+     is DECLARED there, not guessed from words inside its name. The substring
+     rules below remain the fallback for strings nobody registered — rows
+     written before the registry, or a writer the validator has not seen —
+     and validate:notification-types pins that every registered type still
+     lands exactly where these rules put it, so adopting the registry moved
+     no one's mute or chime. */
+  const def = notificationTypeDef(type);
+  if (def) return def.activity;
+  return classifyBySubstring(type);
+}
+
+/** The pre-registry rules, kept as the fallback for unregistered strings and
+ *  exported for validate:notification-types, which proves every registered
+ *  type still lands where these rules put it. Order matters: specific
+ *  families before generic word matches. */
+export function classifyBySubstring(type: string): NotificationActivity | null {
   if (!type) return null;
   /* Order matters: specific families before generic word matches. */
   if (type.includes("mention")) return "mentions";
@@ -39,15 +59,25 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
     type.includes("suspicious")
   ) return "security_alerts";
   /* Before the generic word matches: "membership_request" would otherwise
-     fall through to null and the activity would be a dead switch. */
-  if (type.includes("membership")) return "membership_requests";
+     fall through to null and the activity would be a dead switch. A
+     sign-in help request ("support_request") is the same audience asking
+     for the same thing — access — so it rides the same switch. */
+  if (type.includes("membership") || type.includes("support")) return "membership_requests";
   if (type.includes("comment")) return "comments_activity";
+  /* Work reports (report_submitted, report_decided). A review request
+     (report_approval_request) already went to "approvals" above, and a
+     comment on a report to "comments_activity" — both are the same event
+     the reader silences elsewhere. */
+  if (type.startsWith("report")) return "reports_activity";
   if (type.startsWith("qa")) return "qa_reports";
-  if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";
+  /* Sales: quotations, and — since phase E — orders and contracts, which
+     ride the same switch (Settings shows it as "Sales activity"). */
+  if (type.includes("quotation") || type.includes("quote") || type.startsWith("order") || type.startsWith("contract")) return "quotation_activity";
   if (type.includes("stock")) return "low_stock";
   if (
     type.includes("movement") || type.includes("transfer") || type.includes("warehouse") ||
-    type.includes("inventory") || type.includes("requisition") || type.startsWith("return")
+    type.includes("inventory") || type.includes("requisition") || type.startsWith("return") ||
+    type.startsWith("purchase")
   ) return "inventory_activity";
   if (
     type.includes("payment") || type.includes("expense") || type.includes("invoice") ||
@@ -135,4 +165,27 @@ export function inQuietHours(
   return start < end
     ? cur >= start && cur < end
     : cur >= start || cur < end; // crosses midnight
+}
+
+/* ── Pause ─────────────────────────────────────────────────────────────────
+   A pause the reader takes from the bell (an hour, until the morning, while
+   a meeting runs): until `pause_until` (ISO, in preferences.notifications)
+   no sound, no pop-up card, no desktop notification and no push — the bell
+   still collects everything, and its number still counts. Unlike quiet
+   hours it ends by itself, once, and silences the cards too. Evaluated
+   where quiet hours are: sendPushToAccounts and the bell. */
+export const PAUSE_MAX_MS = 7 * 24 * 3_600_000;
+
+/** The moment a pause ends, or null when none is running. */
+export function pausedUntil(prefs: unknown, now: Date = new Date()): Date | null {
+  const raw = (prefs as { pause_until?: unknown } | null | undefined)?.pause_until;
+  if (typeof raw !== "string") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) && ms > now.getTime() ? new Date(ms) : null;
+}
+
+/** Quiet hours or a pause: no sound and no push right now. */
+export function hushedNow(prefs: unknown, now: Date = new Date()): boolean {
+  return inQuietHours((prefs as { quiet_hours?: QuietHoursLike } | null | undefined)?.quiet_hours, now)
+    || pausedUntil(prefs, now) !== null;
 }

@@ -108,7 +108,7 @@ export default function AssetQuality({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className={`text-[13px] font-semibold capitalize ${toneText(tone)}`}>{t(`vl.quality.status.${q.overall_status}`, q.overall_status)}</span>
-              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{q.complexity_level ?? "—"}</span>
+              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{q.complexity_level ?? "—"}</span>
             </div>
             <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{t("vl.quality.overall", "Overall visual quality")}</p>
             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
@@ -167,7 +167,7 @@ export default function AssetQuality({
           ))}
           {/* dark-bg sample */}
           <div className="flex flex-col items-center gap-1">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
               {asset.public_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={asset.public_url} alt="" className="h-5 w-5 object-contain" style={{ filter: "invert(1)" }} />
@@ -226,7 +226,7 @@ export default function AssetQuality({
       {/* 7 · Manual review */}
       <Section title={t("vl.quality.manualReview", "Manual review")}>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t("vl.quality.notesPh", "Reviewer notes…")}
-          className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+          className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {(QUALITY_STATUSES).map((s) => (
             <button key={s} type="button" disabled={savingReview} onClick={() => review(s)}

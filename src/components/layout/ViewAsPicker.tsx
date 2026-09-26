@@ -32,8 +32,9 @@ import { useToast } from "@/components/kds/useToast";
 import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { useSkin } from "@/lib/appearance";
+import { viewAsListCache, invalidateViewAsLists } from "./view-as-cache";
+import ViewAsTrigger from "./view-as-trigger";
 
 interface AccountRow {
   id: string;
@@ -74,20 +75,15 @@ type FetchResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number | null; message: string };
 
-const moduleCache: {
+/* The cache object itself lives in ./view-as-cache (the exit banner clears
+   it without importing this picker); this is its typed view. */
+const moduleCache = viewAsListCache as {
   users: AccountRow[] | null;
   roles: RoleRow[] | null;
   usersFetchedAt: number;
   rolesFetchedAt: number;
   inflightUsers: Promise<FetchResult<AccountRow[]>> | null;
   inflightRoles: Promise<FetchResult<RoleRow[]>> | null;
-} = {
-  users: null,
-  roles: null,
-  usersFetchedAt: 0,
-  rolesFetchedAt: 0,
-  inflightUsers: null,
-  inflightRoles: null,
 };
 /* Refresh module cache after this many ms. */
 const CACHE_TTL_MS = 60_000;
@@ -97,14 +93,8 @@ function isFresh(ts: number): boolean {
   return Date.now() - ts < CACHE_TTL_MS;
 }
 
-/** Public hook so other components (e.g. ViewAsBanner) can invalidate
- *  the picker's caches on exit. */
-export function invalidateViewAsLists(): void {
-  moduleCache.users = null;
-  moduleCache.roles = null;
-  moduleCache.usersFetchedAt = 0;
-  moduleCache.rolesFetchedAt = 0;
-}
+/* invalidateViewAsLists lives beside the cache; re-exported for importers. */
+export { invalidateViewAsLists };
 
 async function fetchWithTimeout(url: string): Promise<Response> {
   const ctrl = new AbortController();
@@ -213,7 +203,7 @@ async function fetchRoles(): Promise<FetchResult<RoleRow[]>> {
   return moduleCache.inflightRoles;
 }
 
-export default function ViewAsPicker({ dk }: { dk: boolean }) {
+export default function ViewAsPicker({ dk, defaultOpen = false }: { dk: boolean; defaultOpen?: boolean }) {
   const { t } = useTranslation(hubT);
   const { showToast, toastElement } = useToast();
 
@@ -221,7 +211,8 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
   const { data: bootstrap } = useMeBootstrap();
   const [accounts, setAccounts] = useState<AccountRow[] | null>(moduleCache.users);
   const [roles, setRoles] = useState<RoleRow[] | null>(moduleCache.roles);
-  const [open, setOpen] = useState(false);
+  /* defaultOpen: the header's stand-in was pressed before this loaded. */
+  const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<Mode>("user");
   const aurora = useSkin() === "aurora";
   const [search, setSearch] = useState("");
@@ -429,21 +420,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
   return (
     <div ref={wrapRef} className="relative">
       {toastElement}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        onMouseEnter={handleTriggerHover}
-        className={`h-8 w-8 px-0 justify-center sm:w-auto sm:px-3 md:h-9 rounded-lg md:rounded-xl border text-[12px] font-medium flex items-center sm:gap-2 transition-all ${
-          dk
-            ? "kx-hover-glow bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
-            : "kx-hover-glow bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"
-        }`}
-        title={t("viewAs.tooltip", "Super Admin — view the system as another user or role")}
-      >
-        <UsersIcon size={14} className="shrink-0" />
-        <span className="max-w-[120px] truncate hidden sm:inline">{t("viewAs.label", "View as")}</span>
-        <AngleDownIcon size={11} className="shrink-0 opacity-60 hidden sm:block" />
-      </button>
+      <ViewAsTrigger dk={dk} onClick={() => setOpen((o) => !o)} onMouseEnter={handleTriggerHover} />
 
       {/* Portalled — inside the header pane the glass was starved. */}
       <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="w-[360px] max-w-[calc(100vw-1rem)]">

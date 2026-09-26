@@ -1,14 +1,16 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { getNoteRole, canRead } from "@/lib/server/note-access";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { notifyLite } from "@/lib/server/notify-lite";
+import { canRead, getNoteAccess, isUuid } from "@/lib/notes-server";
 
 /* GET  /api/notes/[id]/shares — collaborators on a note (any reader may view
                                  the list). Includes the owner + each share.
    POST /api/notes/[id]/shares — owner adds a collaborator
-                                 body: { account_id, permission: 'view'|'edit' } */
+                                 body: { account_id, permission: 'view'|'edit' }
+                                 The target is notified (inbox + push). */
 
 interface AccountLite {
   id: string;
@@ -49,7 +51,7 @@ export async function GET(
   const deny = await requireModuleAccess(auth, "Notes");
   if (deny) return deny;
 
-  const access = await getNoteRole(id, auth.account_id);
+  const access = await getNoteAccess(id, auth.account_id);
   if (!canRead(access.role)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -61,7 +63,7 @@ export async function GET(
     .order("created_at", { ascending: true });
   if (error) {
     console.error("[api/notes/[id]/shares GET]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load sharing" }, { status: 500 });
   }
 
   const rows = shares ?? [];
@@ -95,33 +97,39 @@ export async function POST(
   const { id } = await params;
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Notes");
+  const deny = await requireModuleAction(auth, "Notes", "edit");
   if (deny) return deny;
 
-  const access = await getNoteRole(id, auth.account_id);
-  if (access.role !== "owner") {
+  const access = await getNoteAccess<{ title: string | null }>(id, auth.account_id, "title");
+  if (access.role !== "owner" || !access.note) {
     return NextResponse.json({ error: "Only the owner can share this note." }, { status: 403 });
   }
+  if (access.note.deleted_at) {
+    return NextResponse.json({ error: "Restore the note before sharing it." }, { status: 400 });
+  }
 
-  const body = (await req.json()) as { account_id?: string; permission?: string };
-  const accountId = (body.account_id ?? "").trim();
+  let body: { account_id?: unknown; permission?: unknown } = {};
+  try { body = ((await req.json()) ?? {}) as typeof body; } catch { /* empty */ }
+  const accountId = typeof body.account_id === "string" ? body.account_id.trim() : "";
   const permission = body.permission === "view" ? "view" : "edit";
-  if (!accountId) {
+  if (!isUuid(accountId)) {
     return NextResponse.json({ error: "account_id required" }, { status: 400 });
   }
   if (accountId === access.ownerId) {
     return NextResponse.json({ error: "You already own this note." }, { status: 400 });
   }
 
-  // The target must be an active account in the SAME tenant.
+  // The target must be an ACTIVE account in the SAME tenant.
   const { data: target } = await supabaseServer
     .from("accounts")
     .select("id, tenant_id, status")
     .eq("id", accountId)
     .maybeSingle();
-  if (!target || target.tenant_id !== auth.tenant_id) {
+  if (!target || target.tenant_id !== auth.tenant_id || target.status !== "active") {
     return NextResponse.json({ error: "Account not found in your organization." }, { status: 404 });
   }
+
+  const alreadyShared = access.shares.some((s) => s.shared_with_account_id === accountId);
 
   const { data, error } = await supabaseServer
     .from("note_shares")
@@ -140,7 +148,26 @@ export async function POST(
     .single();
   if (error) {
     console.error("[api/notes/[id]/shares POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to share note" }, { status: 500 });
   }
+
+  if (!alreadyShared) {
+    const title = (access.note.title ?? "").trim();
+    after(() => notifyLite({
+      tenantId: auth.tenant_id,
+      recipients: [accountId],
+      senderId: auth.account_id,
+      tpl: auth.username
+        ? { k: "note_shared", p: { actor: auth.username } }
+        : { k: "note_shared.someone" },
+      /* The body is the note's title — the owner's own words, stored as is. */
+      body: title || null,
+      link: `/notes?id=${id}`,
+      type: "note_shared",
+      metadata: { note_id: id, permission },
+      tag: `note_shared:${id}`,
+    }));
+  }
+
   return NextResponse.json({ share: data });
 }

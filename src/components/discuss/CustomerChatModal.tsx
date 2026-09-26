@@ -5,9 +5,11 @@
 
    What it does:
      · Lets the user search their CRM contacts
-     · On pick, calls findOrCreateCustomerChannel() which either returns
-       the existing channel for that contact or creates a new one and
-       links it via `discuss_channels.linked_contact_id`
+     · On pick, calls findOrCreateCustomerChannel() — server-side
+       (/api/discuss/mutate createCustomerChannel, session identity +
+       tenant) — which returns the tenant's existing channel for that
+       contact (joining the caller to it) or creates one linked via
+       `discuss_channels.linked_contact_id`
      · On success, bubbles the new channel id up so DiscussApp can
        refresh the sidebar and select the channel automatically
 
@@ -18,13 +20,12 @@
        retouching the internal-chat code paths at all
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { fpAvatar } from "@/lib/cdn";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { DiscussAvatar } from "./DiscussAvatar";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
-import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -46,8 +47,6 @@ function useDebounced<T>(value: T, delay = 220): T {
 }
 
 export interface CustomerChatModalProps {
-  /** Logged-in account id — becomes the channel creator. */
-  currentAccountId: string;
   /** Called when the user hits "Start chat" and the channel exists. */
   onCreated: (channelId: string) => void;
   /** Called when the user cancels. */
@@ -56,8 +55,7 @@ export interface CustomerChatModalProps {
   t: (key: string, fallback?: string) => string;
 }
 
-export function CustomerChatModal({
-  currentAccountId,
+export default function CustomerChatModal({
   onCreated,
   onCancel,
   t,
@@ -70,6 +68,16 @@ export function CustomerChatModal({
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const debouncedQuery = useDebounced(query, 220);
+  const titleId = useId();
+
+  /* Escape closes (unless a create is in flight). */
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape" && !creating) onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel, creating]);
 
   /* Fetch contacts whenever the debounced query changes. First mount
      triggers with an empty string, which returns the most recent
@@ -109,8 +117,6 @@ export function CustomerChatModal({
     try {
       const channelId = await findOrCreateCustomerChannel({
         contactId: selected.id,
-        createdBy: currentAccountId,
-        displayName: selected.display_name,
       });
       if (!channelId) {
         setErrorMsg(
@@ -127,7 +133,7 @@ export function CustomerChatModal({
       );
       setCreating(false);
     }
-  }, [selected, currentAccountId, onCreated, t]);
+  }, [selected, onCreated, t]);
 
   const listBody = useMemo(() => {
     if (loading) {
@@ -163,11 +169,11 @@ export function CustomerChatModal({
               onClick={() => setSelected(c)}
               className={`w-full px-3 py-2.5 flex items-center gap-3 text-start rounded-lg transition-colors ${
                 isOn
-                  ? "bg-blue-500/10 ring-1 ring-inset ring-blue-500/30"
+                  ? "bg-[var(--bg-surface-active)] ring-1 ring-inset ring-[#567FB2]/50"
                   : "hover:bg-[var(--bg-surface)]"
               }`}
             >
-              <ContactAvatar contact={c} />
+              <DiscussAvatar name={c.display_name} url={c.avatar_url} size={36} />
               <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
                   {c.display_name}
@@ -188,7 +194,7 @@ export function CustomerChatModal({
                 </div>
               </div>
               {isOn && (
-                <CheckIcon className="h-4 w-4 text-blue-400 shrink-0" />
+                <CheckIcon className="h-4 w-4 text-[#567FB2] dark:text-[#7FA9D6] shrink-0" />
               )}
             </button>
           );
@@ -202,24 +208,29 @@ export function CustomerChatModal({
       className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !creating) onCancel();
+      }}
     >
       <div
-        className="w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
         style={{ maxWidth: 520 }}
       >
         {/* Header */}
         <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-blue-500/15 text-blue-300">
+            <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] text-[var(--text-muted)]">
               <UserPlusIcon className="h-3.5 w-3.5" />
             </div>
-            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+            <h2 id={titleId} className="text-[14px] font-semibold text-[var(--text-primary)]">
               {t("customer.newChat.title", "Start a customer conversation")}
             </h2>
           </div>
           <button
             type="button"
             onClick={onCancel}
+            aria-label={t("btn.close", "Close")}
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
             <CrossIcon className="h-4 w-4" />
@@ -283,7 +294,7 @@ export function CustomerChatModal({
             type="button"
             disabled={!canCreate}
             onClick={handleCreate}
-            className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
+            className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold hover:bg-[var(--bg-inverted-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
           >
             {creating ? (
               <>
@@ -296,166 +307,6 @@ export function CustomerChatModal({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------------------
-   ContactCard — compact card shown inside the Discuss details pane when
-   the selected channel is a customer chat. Renders the linked CRM
-   contact's basics + a "View in CRM" link.
-   --------------------------------------------------------------------------- */
-
-export interface CustomerContactCardProps {
-  contact: DiscussLinkedContact;
-  /** i18n helper. */
-  t: (key: string, fallback?: string) => string;
-  /** Optional href for the CRM deep-link; defaults to /contacts/{id}. */
-  crmHref?: string;
-}
-
-export function CustomerContactCard({
-  contact,
-  t,
-  crmHref,
-}: CustomerContactCardProps) {
-  const href = crmHref ?? `/contacts/${contact.id}`;
-  return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
-      {/* Header row */}
-      <div className="p-3 flex items-center gap-3 border-b border-[var(--border-subtle)]">
-        <ContactAvatar contact={contact} size={44} />
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-            {contact.display_name}
-          </div>
-          {contact.company && (
-            <div className="text-[11px] text-[var(--text-dim)] truncate">
-              {contact.company}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Details */}
-      <div className="p-3 flex flex-col gap-2.5 text-[11.5px]">
-        {contact.email && (
-          <DetailRow
-            icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
-            label={t("customer.email", "Email")}
-            value={
-              <a
-                href={`mailto:${contact.email}`}
-                className="text-blue-300 hover:underline break-all"
-              >
-                {contact.email}
-              </a>
-            }
-          />
-        )}
-        {contact.phone && (
-          <DetailRow
-            icon={<PhoneIcon className="h-3.5 w-3.5" />}
-            label={t("customer.phone", "Phone")}
-            value={
-              <a
-                href={`tel:${contact.phone}`}
-                className="text-blue-300 hover:underline"
-              >
-                {contact.phone}
-              </a>
-            }
-          />
-        )}
-        {contact.company && (
-          <DetailRow
-            icon={<Building2Icon className="h-3.5 w-3.5" />}
-            label={t("customer.company", "Company")}
-            value={
-              <span className="text-[var(--text-primary)]">
-                {contact.company}
-              </span>
-            }
-          />
-        )}
-      </div>
-
-      {/* View in CRM */}
-      <a
-        href={href}
-        className="h-10 flex items-center justify-center gap-1.5 border-t border-[var(--border-subtle)] text-[11.5px] font-semibold text-blue-300 hover:bg-blue-500/5 transition-colors"
-      >
-        {t("customer.viewInCRM", "View in CRM")}
-      </a>
-    </div>
-  );
-}
-
-function DetailRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-2">
-      <div className="h-5 w-5 shrink-0 flex items-center justify-center text-[var(--text-dim)]">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[9.5px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-          {label}
-        </div>
-        <div className="mt-0.5 break-words">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-/* Shared tiny avatar used by the picker row and the contact card. */
-function ContactAvatar({
-  contact,
-  size = 36,
-}: {
-  contact: DiscussLinkedContact;
-  size?: number;
-}) {
-  const initials = contact.display_name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-  const style = {
-    width: size,
-    height: size,
-    fontSize: Math.max(10, Math.round(size * 0.36)),
-  } as React.CSSProperties;
-  if (contact.avatar_url) {
-    return (
-      <div
-        className="rounded-full overflow-hidden bg-gradient-to-br from-sky-500 to-blue-600 shrink-0"
-        style={style}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={fpAvatar(contact.avatar_url)}
-          alt={contact.display_name}
-          className="w-full h-full object-cover"
-        />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="rounded-full flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-semibold shrink-0"
-      style={style}
-      aria-hidden
-    >
-      {initials || "?"}
     </div>
   );
 }

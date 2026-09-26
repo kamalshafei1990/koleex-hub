@@ -1,23 +1,14 @@
 import "server-only";
 
-/* ===========================================================================
-   POST /api/accounting/draft
-   Body: { kind: "payment" | "expense" | "cash_movement", source_id: string }
-
-   Creates a draft journal entry for an operational source row.
-   Idempotent: if a non-voided entry already exists for the source,
-   returns the existing entry id. On success the source row's
-   accounting_status flips to 'drafted'.
-   ========================================================================== */
+/* POST /api/accounting/draft   { kind, source_id }
+   Creates the draft journal entry for a source document (payment, expense,
+   cash_movement, sales_revenue, inventory_cogs, vendor_bill,
+   inventory_receipt, payroll, fx_exchange). Idempotent: an existing
+   non-voided entry is returned. The source row mirrors 'drafted'. */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
-import { draftCashMovement, draftExpense, draftPayment } from "@/lib/accounting/posting";
-
-interface Body {
-  kind?: "payment" | "expense" | "cash_movement";
-  source_id?: string;
-}
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { draftSource, isSourceKind } from "@/lib/accounting/posting";
 
 export async function POST(req: Request) {
   const auth = await requireAuth();
@@ -25,16 +16,11 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Finance", "create");
   if (deny) return deny;
 
-  const body = (await req.json().catch(() => ({}))) as Body;
-  if (!body.kind || !body.source_id) {
+  const body = (await req.json().catch(() => ({}))) as { kind?: unknown; source_id?: unknown };
+  if (!isSourceKind(body.kind) || typeof body.source_id !== "string" || !body.source_id) {
     return NextResponse.json({ error: "kind + source_id required" }, { status: 400 });
   }
-  const ctx = { tenantId: auth.tenant_id, postedByAccountId: auth.account_id };
-  const res =
-    body.kind === "payment"  ? await draftPayment(ctx, body.source_id)
-    : body.kind === "expense" ? await draftExpense(ctx, body.source_id)
-    : await draftCashMovement(ctx, body.source_id);
-
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.code ?? 500 });
+  const res = await draftSource({ tenantId: auth.tenant_id, postedByAccountId: auth.account_id }, body.kind, body.source_id);
+  if (!res.ok) return NextResponse.json({ error: res.error, details: res.details }, { status: res.code ?? 500 });
   return NextResponse.json(res);
 }

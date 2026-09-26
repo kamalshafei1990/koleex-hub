@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildBalancesSnapshot } from "@/lib/inventory/queries";
 import { buildDrilledBalances } from "@/lib/inventory/variants";
+import { canSeeCostData, hideInventoryCost } from "@/lib/experience";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -38,7 +39,13 @@ export async function GET(req: Request) {
         warehouseId,
       });
       const filtered = onlyPositive ? rows.filter((r) => r.qty_on_hand > 0) : rows;
-      return NextResponse.json({ balances: filtered, group_by: "item,variant,batch,warehouse" });
+      /* The drilled rows carry the weighted cost and the value: 0 with
+         cost_hidden without the private-records switch (src/lib/experience).
+         The default shape is quantities only. Guarded by validate:finance-perf §G. */
+      return NextResponse.json({
+        balances: canSeeCostData(auth) ? filtered : filtered.map(hideInventoryCost),
+        group_by: "item,variant,batch,warehouse",
+      });
     }
     const balances = await buildBalancesSnapshot({
       tenantId: auth.tenant_id,

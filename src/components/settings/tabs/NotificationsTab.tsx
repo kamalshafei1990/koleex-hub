@@ -13,18 +13,22 @@ import { withDefaults } from "@/lib/access-control";
 import type { NotificationPrefs } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { SettingsCard, SwitchRow, Chevron } from "./ui";
-import { isPushSupported, isIosNeedsInstall, permissionState, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
+import { isPushSupported, isIosNeedsInstall, permissionState, resyncPushSubscription, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
 import type { QuietHoursPref } from "@/lib/access-control";
 import { inQuietHours } from "@/lib/notification-activity";
 import { fetchMyChannels, setChannelMuted } from "@/lib/discuss";
-import { useCurrentAccount } from "@/lib/identity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import type { DiscussChannelWithState } from "@/types/supabase";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+/* Fetch only: nothing the bell's chunk holds may be imported here — a shared
+   module splits the bell into several files (validate:budgets §L). The
+   server names each topic in the reader's language. */
+import { fetchMutes, unmuteTopic, type NotificationMute } from "@/lib/notification-mute-client";
 
-type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app" | "quiet_hours">;
+type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours" | "popup_cards" | "pause_until">;
 
 /* SEVENTEEN SWITCHES IN THREE GROUPS, NOT ONE FLAT RUN.
    This was a single undifferentiated list — the same "not organised enough"
@@ -48,6 +52,7 @@ const ACTIVITY_GROUPS: { tKey: string; items: { key: ActivityKey; tKey: string }
       { key: "comments_activity", tKey: "act.comments" },
       { key: "discuss_messages", tKey: "act.discuss" },
       { key: "membership_requests", tKey: "act.membership" },
+      { key: "reports_activity", tKey: "act.reports" },
     ],
   },
   {
@@ -91,7 +96,11 @@ function PushEnableCard() {
         if ("serviceWorker" in navigator) {
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
-          setSubscribed(!!sub && permissionState() === "granted");
+          const on = !!sub && permissionState() === "granted";
+          setSubscribed(on);
+          /* "On" here must mean on for THIS account: re-save the device's
+             subscription for whoever is signed in (lib/push-client). */
+          if (on) void resyncPushSubscription(getCurrentAccountIdSync());
         }
       } catch { /* ignore */ }
     })();
@@ -248,6 +257,51 @@ function MutedConversationsCard() {
   );
 }
 
+/* ── Muted topics ────────────────────────────────────────────────────────
+   One task, issue or quotation the user stopped hearing about from a
+   notification's ⋯ (lib/notification-mute) — listed here to undo. */
+function MutedTopicsCard() {
+  const { t, lang } = useTranslation(settingsT);
+  const [mutes, setMutes] = useState<NotificationMute[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMutes(lang).then((rows) => { if (!cancelled) setMutes(rows ?? []); });
+    return () => { cancelled = true; };
+  }, [lang]);
+
+  async function unmute(id: string) {
+    setBusyId(id);
+    const ok = await unmuteTopic(id);
+    if (ok) setMutes((prev) => (prev ?? []).filter((m) => m.id !== id));
+    setBusyId(null);
+  }
+
+  return (
+    <SettingsCard title={t("notif.topics")} subtitle={t("notif.topics.sub")}>
+      {mutes === null ? (
+        <div className="flex justify-center py-4"><SpinnerIcon size={14} className="text-[var(--text-dim)]" /></div>
+      ) : mutes.length === 0 ? (
+        <p className="py-2 text-[12px] text-[var(--text-faint)]">{t("notif.topics.none")}</p>
+      ) : mutes.map((m, i) => (
+        <div key={m.id} className={`flex items-center justify-between gap-3 py-2.5 ${i === mutes.length - 1 ? "" : "border-b border-[var(--border-faint)]"}`}>
+          {m.app && <BoundIcon semanticKey={`app.${m.app}`} className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" fallback={null} />}
+          <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">{m.name}</span>
+          <button
+            type="button"
+            disabled={busyId === m.id}
+            onClick={() => void unmute(m.id)}
+            className="kx-hover-glow shrink-0 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+          >
+            {busyId === m.id ? "…" : t("notif.muted.unmute")}
+          </button>
+        </div>
+      ))}
+    </SettingsCard>
+  );
+}
+
 export default function NotificationsTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
@@ -285,10 +339,20 @@ export default function NotificationsTab({ account, onChanged }: {
   return (
     <div className="space-y-4">
       <PushEnableCard />
-      <SettingsCard title={t("notif.channels")} subtitle={t("notif.channels.sub")}>
-        <SwitchRow label={t("notif.email")} hint={t("notif.email.hint")} checked={n.email} onChange={(v) => patch({ email: v })} />
-        <SwitchRow label={t("notif.inApp")} hint={t("notif.inApp.hint")} checked={n.in_app} onChange={(v) => patch({ in_app: v })} last />
+      {/* Pop-up cards while the Hub is in front (layout/NotificationCards). */}
+      <SettingsCard title={t("notif.cards")} subtitle={t("notif.cards.sub")}>
+        <SwitchRow
+          label={t("notif.cards.enable")}
+          hint={t("notif.cards.enable.hint")}
+          checked={n.popup_cards !== false}
+          onChange={(v) => patch({ popup_cards: v })}
+          last
+        />
       </SettingsCard>
+      {/* No "Channels" card. It offered Email (there is no email channel) and
+          In-app (read by nothing) — two switches that changed no behaviour.
+          Push is the card above; the chime is Settings → Sounds; the in-app
+          row is always on, and quiet hours below silence both. */}
 
       {/* One card per group. The gap between cards does the separating, so the
           group titles stay small and the switches keep the whole width. */}
@@ -321,6 +385,7 @@ export default function NotificationsTab({ account, onChanged }: {
       />
 
       <MutedConversationsCard />
+      <MutedTopicsCard />
 
       {/* Device management page is Super-Admin-only — don't link regular
           users into a lock screen. */}

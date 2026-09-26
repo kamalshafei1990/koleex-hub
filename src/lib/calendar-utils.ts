@@ -8,53 +8,27 @@
    Conventions:
    - ISO weekday numbers: 1 = Monday, 7 = Sunday (matches the weekday list in
      access-control.ts and accounts.preferences.calendar.working_hours.days).
-   - Calendar grids start on Monday by default.
-   - Everything operates in the user's local browser timezone for now — the
-     rendered timezone is shown via Intl for display only. (Adding strict
-     per-account timezone layout is a follow-up once Supabase Auth lands.)
+   - Grids start on the viewer's first day of week (Settings → Language &
+     region); Monday is the default because that is the ISO week.
+   - The grid works on WALL dates of the calendar's timezone (the account's
+     Settings → Calendar zone): CalendarApp converts every instant with
+     toWall (lib/calendar-tz) before it reaches these helpers, so the local
+     fields they read ARE that zone's clock, whatever the browser's zone.
+   - All-day items are dates: they carry start_date / end_date and are put
+     on a day by date key, never by instant overlap.
+   - Text is rendered with the active UI language (`locale`), never the
+     browser's default, so an Arabic Hub shows Arabic month names. Dates read
+     D/M/Y and times are 24-hour (house rule).
    --------------------------------------------------------------------------- */
 
-import type { CalendarEventRow, CalendarEventType } from "@/types/supabase";
-
-/** Event type → default color. Kept in one place for legend consistency. */
-export const EVENT_TYPE_COLORS: Record<CalendarEventType, string> = {
-  meeting: "#3B82F6",       // blue
-  task: "#10B981",          // emerald
-  reminder: "#F59E0B",      // amber
-  event: "#A855F7",         // purple
-  holiday: "#EC4899",       // pink
-  out_of_office: "#EF4444", // red
-};
-
-export const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
-  meeting: "Meeting",
-  task: "Task",
-  reminder: "Reminder",
-  event: "Event",
-  holiday: "Holiday",
-  out_of_office: "Out of Office",
-};
-
-export const EVENT_TYPES: CalendarEventType[] = [
-  "meeting",
-  "task",
-  "reminder",
-  "event",
-  "holiday",
-  "out_of_office",
-];
+import type { CalendarEventRow } from "@/types/supabase";
+import { EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
 
 /* ── Day helpers ────────────────────────────────────────────────────────── */
 
 export function startOfDay(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-export function endOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
   return x;
 }
 
@@ -82,8 +56,16 @@ export function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-export function isToday(d: Date): boolean {
-  return isSameDay(d, new Date());
+/** `today` is the wall "now" of the calendar's zone. */
+export function isToday(d: Date, today: Date): boolean {
+  return isSameDay(d, today);
+}
+
+/** yyyy-mm-dd of a local date — the key the holiday overlay uses. */
+export function isoDateKey(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 /** Convert JS getDay() (0=Sun..6=Sat) to ISO weekday (1=Mon..7=Sun). */
@@ -94,9 +76,7 @@ export function isoWeekday(d: Date): number {
 
 /* ── Week helpers ───────────────────────────────────────────────────────── */
 
-/** Which day the user's week starts on: 0=Sunday, 1=Monday, 6=Saturday.
- *  Comes from Settings → Language & region (preferences.display.week_start);
- *  Monday stays the default because that is the ISO week. */
+/** Which day the user's week starts on: 0=Sunday, 1=Monday, 6=Saturday. */
 export type WeekStart = 0 | 1 | 6;
 
 /** Start of the week containing d, anchored on `weekStart`. */
@@ -105,10 +85,6 @@ export function startOfWeek(d: Date, weekStart: WeekStart = 1): Date {
   const isoStart = weekStart === 0 ? 7 : weekStart; // Sun=7, Mon=1, Sat=6
   const back = (iso - isoStart + 7) % 7;            // days since the anchor
   return startOfDay(addDays(d, -back));
-}
-
-export function endOfWeek(d: Date, weekStart: WeekStart = 1): Date {
-  return endOfDay(addDays(startOfWeek(d, weekStart), 6));
 }
 
 /** Seven consecutive days starting on the user's first day of week. */
@@ -130,103 +106,129 @@ export function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-export function endOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-/**
- * Build the 6-row × 7-column grid for a month view.
- * Always returns 42 dates so layout stays stable across months.
- */
+/** The 6-row × 7-column grid for a month view — always 42 dates so the
+ *  layout stays stable across months. */
 export function monthGrid(d: Date, weekStart: WeekStart = 1): Date[] {
-  const first = startOfMonth(d);
-  const gridStart = startOfWeek(first, weekStart);
+  const gridStart = startOfWeek(startOfMonth(d), weekStart);
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
-/* ── Event overlap / layout ─────────────────────────────────────────────── */
+/* ── Grouping by day ────────────────────────────────────────────────────── */
 
-/** True if the event overlaps the [from, to) window. */
-export function eventOverlapsRange(
-  event: CalendarEventRow,
-  from: Date,
-  to: Date,
-): boolean {
-  const start = new Date(event.start_at);
-  const end = new Date(event.end_at);
-  return start < to && end >= from;
+type Dated = CalendarEventRow & { start_date?: string; end_date?: string };
+
+/** An all-day item's first and last day (YYYY-MM-DD, end inclusive). */
+function allDayRange(e: Dated): { start: string; end: string } {
+  const start = e.start_date ?? isoDateKey(new Date(e.start_at));
+  const end = e.end_date ?? isoDateKey(new Date(e.end_at));
+  return { start, end: end < start ? start : end };
 }
 
-/** Return only events that touch this specific day. */
-export function eventsOnDay(
-  events: CalendarEventRow[],
-  day: Date,
-): CalendarEventRow[] {
-  const from = startOfDay(day);
-  const to = addDays(from, 1);
-  return events
-    .filter((e) => eventOverlapsRange(e, from, to))
-    .sort(
-      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-    );
+/** Every visible day's items, grouped ONCE (instead of filtering the whole
+ *  list per cell): all-day items by date key, timed items by the wall days
+ *  their span touches. Each day lists all-day items first, then by start. */
+export function groupEventsByDay<E extends Dated>(events: E[], days: Date[]): Map<string, E[]> {
+  const out = new Map<string, E[]>();
+  if (days.length === 0) return out;
+  const keys = days.map(isoDateKey);
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  for (const k of keys) out.set(k, []);
+  const firstMs = startOfDay(days[0]).getTime();
+  const endMs = addDays(startOfDay(days[days.length - 1]), 1).getTime();
+  for (const e of events) {
+    if (e.all_day) {
+      const r = allDayRange(e);
+      if (r.end < first || r.start > last) continue;
+      for (const k of keys) if (k >= r.start && k <= r.end) out.get(k)!.push(e);
+      continue;
+    }
+    const s = new Date(e.start_at).getTime();
+    const en = new Date(e.end_at).getTime();
+    if (s >= endMs || en < firstMs) continue;
+    for (let i = 0; i < days.length; i++) {
+      const from = startOfDay(days[i]).getTime();
+      const to = addDays(days[i], 1).getTime();
+      /* An event ending exactly at midnight does not spill into the next day,
+         but a zero-length one at midnight still shows on its own day. */
+      if (s < to && (en > from || (en === from && s === from))) out.get(keys[i])!.push(e);
+    }
+  }
+  for (const list of out.values()) {
+    list.sort((a, b) =>
+      (a.all_day === b.all_day ? 0 : a.all_day ? -1 : 1) ||
+      new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+  }
+  return out;
 }
 
-/** Get the color used to render an event. */
-export function colorForEvent(event: CalendarEventRow): string {
-  return event.color || EVENT_TYPE_COLORS[event.event_type];
+/** The color an event renders with: its override, else its type's. */
+export function colorForEvent(event: Pick<CalendarEventRow, "color" | "event_type">): string {
+  return event.color || EVENT_TYPE_COLORS[event.event_type] || EVENT_TYPE_COLORS.event;
 }
 
-/* ── Formatting ─────────────────────────────────────────────────────────── */
+/* ── Formatting (in the UI language; D/M/Y, 24-hour) ───────────────────── */
 
-export function formatMonthYear(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+export function formatMonthYear(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { month: "long", year: "numeric" });
 }
 
-export function formatDayShort(d: Date): string {
-  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
-}
-
-export function formatWeekRange(d: Date): string {
-  const s = startOfWeek(d);
+export function formatWeekRange(d: Date, locale: string, weekStart: WeekStart = 1): string {
+  const s = startOfWeek(d, weekStart);
   const e = addDays(s, 6);
   const sameMonth = s.getMonth() === e.getMonth();
   const sameYear = s.getFullYear() === e.getFullYear();
-  const sMonth = s.toLocaleDateString(undefined, { month: "short" });
-  const eMonth = e.toLocaleDateString(undefined, { month: "short" });
-  if (sameMonth) {
-    return `${sMonth} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`;
-  }
-  if (sameYear) {
-    return `${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}, ${e.getFullYear()}`;
-  }
-  return `${sMonth} ${s.getDate()}, ${s.getFullYear()} – ${eMonth} ${e.getDate()}, ${e.getFullYear()}`;
+  const sMonth = s.toLocaleDateString(locale, { month: "short" });
+  const eMonth = e.toLocaleDateString(locale, { month: "short" });
+  if (sameMonth) return `${s.getDate()} – ${e.getDate()} ${sMonth} ${e.getFullYear()}`;
+  if (sameYear) return `${s.getDate()} ${sMonth} – ${e.getDate()} ${eMonth} ${e.getFullYear()}`;
+  return `${s.getDate()} ${sMonth} ${s.getFullYear()} – ${e.getDate()} ${eMonth} ${e.getFullYear()}`;
 }
 
+export function formatFullDay(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+/** "14:05" — 24-hour, whatever the language. */
 export function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-export function formatEventTimeRange(event: CalendarEventRow): string {
-  if (event.all_day) return "All day";
+/** "25/09/2026". */
+export function formatDMY(d: Date): string {
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+/** "25/09/2026" from a "2026-09-25" key. */
+function formatDateKeyDMY(key: string): string {
+  const [y, m, d] = key.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** The label of an hour row on the time grid ("09:00"). */
+export function formatHourLabel(h: number): string {
+  return `${pad2(h)}:00`;
+}
+
+/** "14:00 – 15:00", a two-day span "25/09/2026 22:00 → 26/09/2026 01:00",
+ *  or for an all-day item its date(s) after `allDayLabel`. */
+export function formatEventTimeRange(event: Dated, allDayLabel: string): string {
+  if (event.all_day) {
+    const r = allDayRange(event);
+    return r.start === r.end ? allDayLabel : `${allDayLabel} · ${formatDateKeyDMY(r.start)} → ${formatDateKeyDMY(r.end)}`;
+  }
   const s = new Date(event.start_at);
   const e = new Date(event.end_at);
-  if (isSameDay(s, e)) {
-    return `${formatTime(s)} – ${formatTime(e)}`;
-  }
-  return `${s.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })} → ${e.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })}`;
+  if (isSameDay(s, e)) return `${formatTime(s)} – ${formatTime(e)}`;
+  return `${formatDMY(s)} ${formatTime(s)} → ${formatDMY(e)} ${formatTime(e)}`;
+}
+
+/** The tooltip of a chip: "Title · 25/09/2026 14:00 – 15:00". */
+export function chipTooltip(event: Dated, title: string, allDayLabel: string): string {
+  if (event.all_day) return `${title} · ${formatEventTimeRange(event, allDayLabel)}`;
+  return `${title} · ${formatDMY(new Date(event.start_at))} ${formatEventTimeRange(event, allDayLabel)}`;
 }
 
 /* ── Input helpers ──────────────────────────────────────────────────────── */
@@ -252,20 +254,31 @@ export function fromDateInput(value: string): Date {
   return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
 }
 
-export function toDateInput(d: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 /* ── Time grid helpers for week / day views ─────────────────────────────── */
 
 /** Hours 0..23 used by the time grid on the week / day views. */
 export const HOURS_OF_DAY = Array.from({ length: 24 }, (_, i) => i);
 
-/**
- * Given an event, return its vertical position + height (in pixels) for a
- * time grid with the given row height per hour. Clamps to the day window.
- */
+/** The working-hours band of a preferences block, in pixels from the top of
+ *  a grid with `hourHeight` per hour. */
+export function workingHoursBand(
+  wh: { start: string; end: string },
+  hourHeight: number,
+): { topPx: number; heightPx: number } {
+  const [sh, sm] = wh.start.split(":").map(Number);
+  const [eh, em] = wh.end.split(":").map(Number);
+  const startH = (sh || 0) + (sm || 0) / 60;
+  const endH = (eh || 0) + (em || 0) / 60;
+  return { topPx: startH * hourHeight, heightPx: Math.max(0, endH - startH) * hourHeight };
+}
+
+/** Where the "now" line sits on a time grid; `now` is the wall "now". */
+export function nowOffsetPx(now: Date, hourHeight: number): number {
+  return (now.getHours() + now.getMinutes() / 60) * hourHeight;
+}
+
+/** An event's vertical position + height (in pixels) for a time grid with
+ *  the given row height per hour, clamped to the day window. */
 export function eventLayoutInDay(
   event: CalendarEventRow,
   day: Date,
@@ -280,9 +293,100 @@ export function eventLayoutInDay(
   const startMs = clampedStart.getTime() - dayStart.getTime();
   const endMs = clampedEnd.getTime() - dayStart.getTime();
   const topPx = (startMs / (60 * 60 * 1000)) * hourHeight;
-  const heightPx = Math.max(
-    20, // minimum readable height
-    ((endMs - startMs) / (60 * 60 * 1000)) * hourHeight,
-  );
+  const heightPx = Math.max(20, ((endMs - startMs) / (60 * 60 * 1000)) * hourHeight);
   return { topPx, heightPx };
+}
+
+/** Side by side, for a day's timed events: blocks that overlap on the grid
+ *  form a cluster, each takes the first lane free where it starts, and the
+ *  cluster shares the column width between its lanes. Overlap is judged on
+ *  the DRAWN block (never under 20 px), so two short meetings back to back
+ *  cannot cover each other either. Before this every block took the full
+ *  width and a second one at the same time was drawn on top of the first —
+ *  which report deadlines make routine: the daily and the weekly fall due
+ *  at the same moment every week. */
+export function dayLanes(events: CalendarEventRow[], day: Date, hourHeight: number): Map<string, { lane: number; lanes: number }> {
+  const boxes = events
+    .map((e) => { const { topPx, heightPx } = eventLayoutInDay(e, day, hourHeight); return { id: e.id, top: topPx, bottom: topPx + heightPx }; })
+    .sort((a, b) => a.top - b.top || b.bottom - a.bottom);
+  const out = new Map<string, { lane: number; lanes: number }>();
+  let group: Array<{ id: string; lane: number }> = [];
+  let ends: number[] = [];
+  let groupBottom = 0;
+  const close = () => {
+    for (const g of group) out.set(g.id, { lane: g.lane, lanes: ends.length });
+    group = [];
+    ends = [];
+  };
+  for (const b of boxes) {
+    if (group.length && b.top >= groupBottom) close();
+    let lane = ends.findIndex((end) => end <= b.top);
+    if (lane < 0) { lane = ends.length; ends.push(b.bottom); } else ends[lane] = b.bottom;
+    group.push({ id: b.id, lane });
+    groupBottom = group.length === 1 ? b.bottom : Math.max(groupBottom, b.bottom);
+  }
+  close();
+  return out;
+}
+
+/** Where a block sits across its day column, from its lane: `pad` px kept
+ *  at each side of the column, `gap` px between lanes. Inline-start, so the
+ *  first lane is on the reading side in Arabic too. */
+export function laneStyle(l: { lane: number; lanes: number } | undefined, pad: number, gap = 2): { insetInlineStart: string; width: string } {
+  const { lane, lanes } = l ?? { lane: 0, lanes: 1 };
+  const share = `(100% - ${2 * pad + (lanes - 1) * gap}px) / ${lanes}`;
+  return {
+    insetInlineStart: `calc(${pad}px + (${share}) * ${lane} + ${lane * gap}px)`,
+    width: `calc(${share})`,
+  };
+}
+
+/** Round a Date forward to the next :00 or :30. */
+export function roundToNextHalfHour(d: Date): Date {
+  const x = new Date(d);
+  const m = x.getMinutes();
+  if (m === 0 || m === 30) { x.setSeconds(0, 0); return x; }
+  if (m < 30) x.setMinutes(30, 0, 0);
+  else x.setHours(x.getHours() + 1, 0, 0, 0);
+  return x;
+}
+
+/* ── Meeting links, tentative items ─────────────────────────────────────── */
+
+/** Show a "Join" button: the event has a call link and it is on today (the
+ *  calendar's wall "now") and not over — or it is running right now. */
+export function joinableNow(event: Dated & { meeting_url?: string | null }, now: Date): boolean {
+  if (!event.meeting_url) return false;
+  if (event.all_day) {
+    const r = allDayRange(event);
+    const key = isoDateKey(now);
+    return key >= r.start && key <= r.end;
+  }
+  const s = new Date(event.start_at);
+  const e = new Date(event.end_at);
+  if (e.getTime() < now.getTime()) return false;
+  return isSameDay(s, now) || s.getTime() <= now.getTime();
+}
+
+/** A tentative item — pending leave — is drawn dashed. */
+export function isTentative(event: { source?: string | null; source_kind?: string | null }): boolean {
+  return event.source === "leave" && event.source_kind === "pending";
+}
+
+/** Add whole days to a "YYYY-MM-DD" key. */
+export function addDaysToDateKey(key: string, n: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + n)).toISOString().slice(0, 10);
+}
+
+/** Whole days from one "YYYY-MM-DD" key to another. */
+export function daysBetweenKeys(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
+}
+
+/** Snap minutes to a step (15 by default). */
+export function snapMinutes(min: number, step = 15): number {
+  return Math.round(min / step) * step;
 }

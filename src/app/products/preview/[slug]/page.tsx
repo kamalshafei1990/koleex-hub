@@ -23,10 +23,16 @@ export async function generateMetadata({
   const { slug } = await params;
   const loaded = await loadPublicSchemaProduct(slug);
   if (!loaded) return { title: "Product not found — KOLEEX" };
-  return {
-    title: `${loaded.productName} — KOLEEX`,
-    description: loaded.tagline ?? undefined,
-  };
+  /* Same derivation the admin "Search & Social" preview shows, so what the
+     operator previews is what search engines and shared links actually get:
+     meta overrides first, then name | brand and the short description. */
+  const { seo } = loaded;
+  const title =
+    (seo.metaTitle || "").trim() ||
+    `${loaded.productName}${seo.brand ? ` | ${seo.brand}` : " | KOLEEX"}`;
+  const description =
+    (seo.metaDescription || "").trim() || (seo.excerpt || "").trim() || loaded.tagline || undefined;
+  return { title, description };
 }
 
 export default async function PublicProductPage({
@@ -38,8 +44,23 @@ export default async function PublicProductPage({
   const loaded = await loadPublicSchemaProduct(slug);
   if (!loaded) notFound();
 
+  /* schema.org Product for the website reader (phase 7). No `offers`: the
+     public audience has no price, and a stale price in a search snippet is
+     worse than none. The brand is named here as data, not drawn as text. */
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: loaded.productName,
+    ...(loaded.preview.primaryModel ? { sku: loaded.preview.primaryModel, mpn: loaded.preview.primaryModel } : {}),
+    ...(loaded.seo.excerpt || loaded.tagline ? { description: loaded.seo.excerpt || loaded.tagline } : {}),
+    ...(loaded.preview.mainImageUrl ? { image: [loaded.preview.mainImageUrl] } : {}),
+    brand: { "@type": "Brand", name: loaded.seo.brand || "KOLEEX" },
+    ...(loaded.sections.classification.category ? { category: loaded.sections.classification.category.name } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <header className="border-b border-[var(--border-subtle)]">
         <div className="mx-auto w-full max-w-6xl px-4 md:px-8 py-4">
           <Link
@@ -52,7 +73,13 @@ export default async function PublicProductPage({
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 md:px-8 py-6 md:py-10">
-        <ProductPreview {...loaded.preview} />
+        <ProductPreview
+          {...loaded.preview}
+          productId={loaded.id}
+          slug={loaded.slug}
+          audience={loaded.audience}
+          sections={loaded.sections}
+        />
       </main>
     </div>
   );

@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { seriesPeriodOf } from "@/lib/todo-series";
 
 /* ⚠️ `series_cadence` AND `series_period` ARE NOT COLUMNS. They are derived by
    the list route from the real ones, and selecting them makes PostgREST fail
@@ -36,7 +37,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
      start_date/created_at  the template's own first period
 */
 type OpenRow = {
-  id: string; status: string | null; completed: boolean | null;
+  id: string; title: string | null; status: string | null; completed: boolean | null;
   approval_state: string | null;
   recurrence: string | null; recurrence_parent_id: string | null;
   recurrence_spawned_for: string | null; start_date: string | null; created_at: string | null;
@@ -53,18 +54,44 @@ export async function countOpenTodos(
   accountId: string,
   tenantId: string | null | undefined,
 ): Promise<number> {
+  return (await openTodoItems(db, accountId, tenantId)).length;
+}
+
+/** One open item, as the dashboard's To-do list card shows it. */
+export type OpenTodoItem = { id: string; title: string; createdAt: string | null };
+
+/**
+ * The open items themselves — THE SAME set countOpenTodos counts, so a list
+ * card and the count badge can never disagree (the 36-over-an-empty-list bug
+ * family: two answers to one question IS the defect).
+ */
+export async function openTodoItems(
+  db: SupabaseClient,
+  accountId: string,
+  tenantId: string | null | undefined,
+): Promise<OpenTodoItem[]> {
   const { data: mine } = await db
     .from("koleex_todo_assignees")
     .select("todo_id")
     .eq("account_id", accountId);
   const ids = (mine ?? []).map((r) => (r as { todo_id: string }).todo_id);
-  if (ids.length === 0) return 0;
+  if (ids.length === 0) return [];
 
+  /* ⚠️ DONE ROWS ARE FETCHED ON PURPOSE — this line used to carry
+     `.neq("status","done")`, and that filter was the zombie bug the owner
+     reported as "the notifications system is not working": with dead periods
+     piled behind a recurring task, completing TODAY'S period removed it from
+     this result set, so yesterday's untouched period became "the newest" and
+     took its place in the count. The badge could not go down by doing the
+     work — only by doing every dead period one by one. The UI list computes
+     newest over ALL rows (done included) and never had the bug; this was the
+     second implementation of the one rule this file exists to unify. Done
+     rows now claim their series' newest slot below and are excluded from the
+     RESULT, not from the derivation. */
   let q = db
     .from("koleex_todos")
-    .select("id, status, completed, approval_state, recurrence, recurrence_parent_id, recurrence_spawned_for, start_date, created_at")
-    .in("id", ids)
-    .neq("status", "done");
+    .select("id, title, status, completed, approval_state, recurrence, recurrence_parent_id, recurrence_spawned_for, start_date, created_at")
+    .in("id", ids);
   /* ⚠️ The tenant filter was missing from the badge's own version. `ids` comes
      from this account's assignments so it is mostly implied — but "mostly" is
      not a filter, and the corrected route had it. */
@@ -72,41 +99,40 @@ export async function countOpenTodos(
 
   const { data, error } = await q;
   if (error) {
-    console.error("[countOpenTodos]", error.message);
-    return 0;
+    console.error("[openTodoItems]", error.message);
+    return [];
   }
 
   const rows = (data ?? []) as OpenRow[];
+  const toItem = (r: OpenRow): OpenTodoItem =>
+    ({ id: r.id, title: r.title || "Untitled task", createdAt: r.created_at });
 
   /* Cadence lives on the TEMPLATE, so a spawned period has to read its
      parent's — and a parent can sit outside this result set (created by
      someone else, broadcast only from a later period), which is why the
-     missing ones are fetched rather than assumed absent. */
+     missing ones are fetched rather than assumed absent. Any row with a
+     cadence or a parent MAY be in a series, so the parents and the notes
+     of those candidates are read together, in one round trip. */
   const cadence = new Map<string, string>();
   rows.forEach((r) => { if (r.recurrence) cadence.set(r.id, r.recurrence); });
+  const candidates = rows.filter((r) => r.recurrence || r.recurrence_parent_id);
+  if (candidates.length === 0) return rows.filter((r) => r.status !== "done").map(toItem);
   const orphans = Array.from(new Set(
     rows.map((r) => r.recurrence_parent_id).filter((p): p is string => !!p && !cadence.has(p)),
   ));
-  if (orphans.length > 0) {
-    const { data: parents } = await db.from("koleex_todos").select("id, recurrence").in("id", orphans);
-    ((parents ?? []) as Array<{ id: string; recurrence: string | null }>)
-      .forEach((p) => { if (p.recurrence) cadence.set(p.id, p.recurrence); });
-  }
+  const [{ data: parents }, { data: noteRows }] = await Promise.all([
+    orphans.length > 0
+      ? db.from("koleex_todos").select("id, recurrence").in("id", orphans)
+      : Promise.resolve({ data: [] as Array<{ id: string; recurrence: string | null }> }),
+    db.from("koleex_todo_notes").select("todo_id").in("todo_id", candidates.map((r) => r.id)),
+  ]);
+  ((parents ?? []) as Array<{ id: string; recurrence: string | null }>)
+    .forEach((p) => { if (p.recurrence) cadence.set(p.id, p.recurrence); });
+  const hasNote = new Set(((noteRows ?? []) as Array<{ todo_id: string }>).map((n) => n.todo_id));
 
   const cadenceOf = (r: OpenRow) =>
     r.recurrence ?? (r.recurrence_parent_id ? cadence.get(r.recurrence_parent_id) ?? null : null);
-  const periodOf = (r: OpenRow) =>
-    r.recurrence_spawned_for ?? r.start_date ?? (r.created_at ?? "").slice(0, 10);
-
-  const series = rows.filter((r) => cadenceOf(r));
-  if (series.length === 0) return rows.length;
-
-  /* Only asked for when a series is involved — most callers never pay it. */
-  const { data: noteRows } = await db
-    .from("koleex_todo_notes")
-    .select("todo_id")
-    .in("todo_id", series.map((r) => r.id));
-  const hasNote = new Set(((noteRows ?? []) as Array<{ todo_id: string }>).map((n) => n.todo_id));
+  const periodOf = seriesPeriodOf;
 
   const newestPerSeries = new Map<string, string>();
   for (const r of rows) {
@@ -117,6 +143,9 @@ export async function countOpenTodos(
   }
 
   return rows.filter((r) => {
+    /* Done rows have already claimed their series' newest slot above; they
+       are never open items themselves. */
+    if (r.status === "done") return false;
     if (!cadenceOf(r)) return true;
     const key = r.recurrence_parent_id ?? r.id;
     if (periodOf(r) === newestPerSeries.get(key)) return true;
@@ -126,5 +155,5 @@ export async function countOpenTodos(
       r.approval_state !== null ||
       hasNote.has(r.id)
     );
-  }).length;
+  }).map(toItem);
 }

@@ -2,22 +2,18 @@
 
 /* ---------------------------------------------------------------------------
    UserMenu — avatar + dropdown that replaces the static "KS" circle in
-   MainHeader. Works in both auth modes:
+   MainHeader.
 
-     - Legacy (NEXT_PUBLIC_USE_SUPABASE_AUTH ≠ "true"):
-         · Shows "KS" avatar + "Koleex Admin" identity
-         · "Sign Out" clears sessionStorage["koleex-admin"] and hard-reloads,
-           kicking the user back to the AdminAuth password gate.
-         · "Sign In" opens the legacy password prompt (already rendered by
-           AdminAuth on protected routes), so we just link to "/".
+     · Shows the current account (src/lib/identity.ts), falling back to a
+       "KS" avatar + "Koleex Admin" identity while it loads.
+     · "Sign Out" revokes the session cookie (POST /api/auth/signout),
+       clears localStorage["koleex-admin"] and hard-reloads, kicking the
+       user back to the AdminAuth password gate.
+     · "Sign In" opens the password prompt (already rendered by AdminAuth on
+       protected routes), so we just link to "/".
 
-     - Supabase (flag on):
-         · Reads the current user from auth-client.getCurrentUser()
-         · Avatar initials derived from email or user_metadata.username
-         · "Sign Out" calls auth-client.signOut() (which also writes the
-           audit log entry + revokes the account_sessions row) then
-           redirects to the root, where AdminAuth renders the form.
-         · "Sign In" → "/" (AdminAuth renders the sign-in form there)
+   (The Supabase-Auth mode this menu also handled was retired with
+   SupabaseGate on 26/09/2026 — see AuthGate.)
 
    Theme aware: uses the same dk/light branches as MainHeader.
    --------------------------------------------------------------------------- */
@@ -38,67 +34,24 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import BellRawIcon from "@/components/icons/ui/BellIcon";
 import { setCurrentAccountId, useCurrentAccount } from "@/lib/identity";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 import {
   LEGACY_SESSION_KEY,
   LEGACY_SESSION_USER_KEY,
-} from "@/components/admin/AdminAuth";
-
-/* Same check as auth-client.isSupabaseAuthEnabled — inlined so this always-
-   mounted header component never statically imports the supabase client. */
-const isSupabaseAuthEnabled = () =>
-  process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
-
-type Identity =
-  | { mode: "supabase"; signedIn: true; email: string; username?: string }
-  | { mode: "supabase"; signedIn: false }
-  | { mode: "legacy"; signedIn: true }
-  | { mode: "legacy"; signedIn: false };
-
-function initialsFor(identity: Identity): string {
-  if (identity.mode === "legacy") return "KS";
-  if (!identity.signedIn) return "—";
-  const source = identity.username || identity.email;
-  const clean = source.split("@")[0].replace(/[^a-zA-Z0-9]/g, " ").trim();
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  if (parts.length === 1 && parts[0].length >= 2) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return "KX";
-}
-
-function displayNameFor(identity: Identity): string {
-  if (identity.mode === "legacy") {
-    return identity.signedIn ? "Koleex Admin" : "Not signed in";
-  }
-  if (!identity.signedIn) return "Not signed in";
-  return identity.username || identity.email;
-}
-
-function subLineFor(identity: Identity): string {
-  if (identity.mode === "legacy") {
-    return identity.signedIn ? "Legacy session" : "Password gate";
-  }
-  if (!identity.signedIn) return "Supabase session";
-  return identity.email;
-}
+} from "@/components/admin/session-keys";
 
 export default function UserMenu({ dk }: { dk: boolean }) {
+  const { t: tHub } = useTranslation(hubT);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [identity, setIdentity] = useState<Identity>(() =>
-    isSupabaseAuthEnabled()
-      ? { mode: "supabase", signedIn: false }
-      : { mode: "legacy", signedIn: false },
-  );
+  const [signedIn, setSignedIn] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* Load the richer "current account" row so we can show the real person
-     name, avatar, role, and user type — not just the stub initials. This
-     resolves in both auth modes (see src/lib/identity.ts). */
+     name, avatar, role, and user type — not just the stub initials (see
+     src/lib/identity.ts). */
   const { account } = useCurrentAccount();
 
   /* Inbox unread count — shown as a badge next to the Inbox menu entry.
@@ -118,60 +71,28 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     const fullName = account.person?.full_name || account.username;
 
     const subtitle = [
-      account.user_type,
+      account.user_type ? tHub(`um.type.${account.user_type}`, account.user_type) : null,
       account.role?.name,
     ]
       .filter(Boolean)
       .join(" · ");
     return { avatar, fullName, subtitle };
-  }, [account]);
+  }, [account, tHub]);
 
-  /* Load initial identity + keep it in sync. */
+  /* Load the signed-in flag + keep it in sync. */
   useEffect(() => {
     let cancelled = false;
 
     async function refresh() {
-      if (isSupabaseAuthEnabled()) {
-        const { getCurrentUser } = await import("@/lib/auth-client");
-        const user = await getCurrentUser();
-        if (cancelled) return;
-        if (user?.email) {
-          const username = (user.user_metadata?.username as string | undefined) ?? undefined;
-          setIdentity({
-            mode: "supabase",
-            signedIn: true,
-            email: user.email,
-            username,
-          });
-        } else {
-          setIdentity({ mode: "supabase", signedIn: false });
-        }
-      } else {
-        const signedIn =
-          typeof window !== "undefined" &&
-          window.localStorage.getItem(LEGACY_SESSION_KEY) === "true";
-        setIdentity({ mode: "legacy", signedIn });
-      }
+      const next =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(LEGACY_SESSION_KEY) === "true";
+      if (!cancelled) setSignedIn(next);
     }
 
     void refresh();
 
-    /* Supabase: react to sign-in / sign-out events in this or other tabs. */
-    if (isSupabaseAuthEnabled()) {
-      let unsub: (() => void) | null = null;
-      void import("@/lib/auth-client").then(({ onAuthStateChange }) => {
-        if (cancelled) return;
-        unsub = onAuthStateChange(() => {
-          void refresh();
-        });
-      });
-      return () => {
-        cancelled = true;
-        unsub?.();
-      };
-    }
-
-    /* Legacy: localStorage syncs across tabs via the "storage" event. We
+    /* localStorage syncs across tabs via the "storage" event. We
        also refresh on focus to cover the "just logged in on another tab"
        case where the listener might not have fired yet. */
     function onFocus() {
@@ -196,9 +117,8 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
   const handleSignIn = useCallback(() => {
     setOpen(false);
-    /* Both modes land on the root: AdminAuth renders the username + password
-       form there when there is no session, and it is the only sign-in screen
-       the Hub has. */
+    /* The root: AdminAuth renders the username + password form there when
+       there is no session, and it is the only sign-in screen the Hub has. */
     window.location.href = "/";
   }, []);
 
@@ -207,24 +127,38 @@ export default function UserMenu({ dk }: { dk: boolean }) {
     /* WS3 (safe cache strategy): a session boundary is being crossed. Wipe every
        tenant/account-scoped client cache so the NEXT session — including a
        different user on a shared device — can never paint the previous user's
-       identity, permitted modules, or tenant data. The Supabase path does a SOFT
-       nav (router.replace) so the long-lived QueryClient + warm-start stores
-       would otherwise survive; the legacy path hard-reloads (drops the
-       QueryClient) but localStorage survives a reload, so both paths need this. */
+       identity, permitted modules, or tenant data. The hard reload below drops
+       the QueryClient, but localStorage survives a reload, so this is needed. */
     try { queryClient.clear(); } catch { /* ignore */ }
+    /* SIGN OUT USED TO LEAVE THE SESSION ITSELF ALIVE. Everything below
+       clears the CLIENT's idea of the session — the flags, the caches, the
+       stored identity — and until now that was all it did: the HttpOnly
+       `koleex_session` cookie, the thing the server actually trusts, stayed
+       in the browser jar for its full 30 days. On the office machines this
+       menu's "shared computer" option exists for, that is a signed-out screen
+       over a session anyone can still present. /api/auth/signout is what
+       revokes it (and any view-as cookie with it); it is idempotent, and the
+       sign-out proceeds whether or not it answers — a cleanup that can
+       strand the user when the network hiccups is worse than the bug it
+       fixes. `keepalive` carries it across the navigation below. */
+    /* This device stops receiving this account's notifications — BEFORE the
+       session is revoked, so the server still knows whose row to retire
+       (lib/push-client: the next person on this phone must not get them). */
+    try {
+      const { releasePushOnSignOut } = await import("@/lib/push-client");
+      await releasePushOnSignOut();
+    } catch { /* never blocks sign-out */ }
+    try {
+      await fetch("/api/auth/signout", { method: "POST", keepalive: true });
+    } catch {
+      /* offline / aborted — the client-side clear below still runs */
+    }
     /* AWAITED on purpose — the contacts directory lives in IndexedDB now and
        deleting from there is async. Not awaiting lets the legacy path's hard
        reload below cut the delete short, which would leave the previous user's
        directory readable by the next one on a shared device. */
     await clearSessionScopedCaches();
-    if (identity.mode === "supabase") {
-      const { signOut: supabaseSignOut } = await import("@/lib/auth-client");
-      await supabaseSignOut();
-      setIdentity({ mode: "supabase", signedIn: false });
-      router.replace("/");
-      return;
-    }
-    /* Legacy — clear the client-side session flags, drop the stored
+    /* Clear the client-side session flags, drop the stored
        "current account id" (so the next sign-in doesn't inherit the old
        identity), and bounce home so AdminAuth re-renders the login form. */
     try {
@@ -234,23 +168,22 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       /* ignore */
     }
     setCurrentAccountId(null);
-    setIdentity({ mode: "legacy", signedIn: false });
+    setSignedIn(false);
     /* Hard reload so the AuthGate re-mounts and shows the login form. */
     window.location.href = "/";
-  }, [identity, router, queryClient]);
+  }, [queryClient]);
 
-  const avatarLabel = initialsFor(identity);
-  const displayName = profile?.fullName ?? displayNameFor(identity);
-  const subLine = profile?.subtitle ?? subLineFor(identity);
+  const avatarLabel = "KS";
+  const displayName = profile?.fullName ?? (signedIn ? tHub("um.fallback.admin", "Koleex Admin") : tHub("um.fallback.out", "Not signed in"));
+  const subLine = profile?.subtitle ?? (signedIn ? tHub("um.fallback.legacy", "Legacy session") : tHub("um.fallback.gate", "Password gate"));
   const avatarUrl = profile?.avatar ?? null;
-  const signedIn = identity.signedIn;
 
   return (
     <div ref={menuRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Account menu"
+        aria-label={tHub("um.menu", "Account menu")}
         aria-haspopup="menu"
         aria-expanded={open}
         /* A pill chip, like its neighbours. Every other control on this bar
@@ -322,7 +255,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
       {/* Portalled: inside the header pane its backdrop-filter was starved,
           so the glass never rendered. See kds/PopoverPanel. */}
-      <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in w-64">
+      {/* kx-pop-clear: the owner-picked frosted-transparent material with
+          Hub-Blue neon hairlines (ballot "L", clarified "frosted transparent") */}
+      <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in kx-pop-clear w-64">
           {/* Identity block */}
           <div className={`px-4 py-3.5 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>
             <div className="flex items-center gap-3">
@@ -352,15 +287,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
               </div>
             </div>
             <div className="mt-2.5 flex items-center gap-1.5">
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  identity.mode === "supabase"
-                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                    : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                }`}
-              >
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                 <ShieldIcon className="h-2.5 w-2.5" />
-                {identity.mode === "supabase" ? "Supabase Auth" : "Legacy"}
+                {tHub("um.badge.legacy", "Legacy")}
               </span>
               {signedIn && (
                 <span
@@ -370,7 +299,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                       : "bg-black/[0.04] text-black/60 border border-black/[0.08]"
                   }`}
                 >
-                  Active
+                  {tHub("um.badge.active", "Active")}
                 </span>
               )}
             </div>
@@ -389,7 +318,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                 }`}
               >
                 <SignInIcon className="h-4 w-4" />
-                Sign in
+                {tHub("um.signIn", "Sign in")}
               </button>
             ) : (
               <>
@@ -412,12 +341,12 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                   title={
                     account
-                      ? "Open your account profile"
-                      : "Profile unavailable — no linked account"
+                      ? tHub("um.profile.open", "Open your account profile")
+                      : tHub("um.profile.none", "Profile unavailable — no linked account")
                   }
                 >
                   <UserIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Profile</span>
+                  <span className="flex-1 text-start">{tHub("um.profile", "Profile")}</span>
                 </button>
                 <button
                   type="button"
@@ -432,7 +361,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <InboxRawIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Inbox</span>
+                  <span className="flex-1 text-start">{tHub("app.inbox", "Notifications")}</span>
                   {unread > 0 && (
                     /* Mirrors the sidebar badge style — emerald pill
                        on the right side of the row. Capped at 99+ so
@@ -459,7 +388,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <Settings2Icon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Account Settings</span>
+                  <span className="flex-1 text-start">{tHub("um.settings", "Account Settings")}</span>
                 </button>
                 {isSuperAdmin && (
                   <button
@@ -475,7 +404,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     }`}
                   >
                     <ActivityIcon className="h-4 w-4" />
-                    <span className="flex-1 text-start">Activity Monitor</span>
+                    <span className="flex-1 text-start">{tHub("app.activity-monitor", "Activity Monitor")}</span>
                   </button>
                 )}
                 {isSuperAdmin && (
@@ -492,7 +421,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     }`}
                   >
                     <BellRawIcon className="h-4 w-4" />
-                    <span className="flex-1 text-start">Mobile Notifications</span>
+                    <span className="flex-1 text-start">{tHub("um.mobileNotif", "Mobile Notifications")}</span>
                   </button>
                 )}
                 <div className={`my-1 border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`} />
@@ -506,7 +435,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <SignOutIcon className="h-4 w-4" />
-                  <span className="flex-1 text-start">Sign out</span>
+                  <span className="flex-1 text-start">{tHub("um.signOut", "Sign out")}</span>
                 </button>
               </>
             )}

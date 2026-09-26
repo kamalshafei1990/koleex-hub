@@ -1,3 +1,8 @@
+"use client";
+
+import { useCallback } from "react";
+import { useWarmData } from "@/lib/warm-cache";
+
 /* Shared types + tokens for the Purchase app. Mirrors the Sales
    pattern so the two procure-to-pay / order-to-cash apps feel like
    siblings. */
@@ -212,3 +217,42 @@ export const STATUS_TONE_REQ: Record<string, string> = {
   converted: TONE_INFO,
   cancelled: TONE_BAD,
 };
+
+/* ── usePurchaseList — every module's data call, warm ──────────────────────
+   All thirteen Purchase modules ask the same endpoint for a different
+   resource and then sit on a spinner until it answers. Measured in dev on
+   an already-compiled route, that spinner is the whole wait: the route
+   commits in ~45ms and the screen stays blank for 0.7–2.0s. Owner: "why
+   when I swipe to other tab the page should loading, not appear
+   immediately?"
+
+   So the list is served from the last answer on the first frame and
+   revalidated behind the painted screen. Safe to warm without a per-query
+   key because this endpoint takes no filters — the response IS the default
+   view. Anything that grows server-side filtering must key by the filter or
+   stop using this. */
+export function usePurchaseList<T>(resource: string) {
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/purchase/list?resource=${resource}`, { credentials: "include" });
+    /* Throw rather than fall back to an empty payload: useWarmData does not
+       cache a rejection, so a blip leaves the last good list on screen
+       instead of memorising "nothing" as the answer. */
+    if (!res.ok) throw new Error(`purchase/${resource}: ${res.status}`);
+    return (await res.json()) as T;
+  }, [resource]);
+  return useWarmData<T>(`purchase:${resource}`, load);
+}
+
+/** The supplier lookup nine modules were each building by hand from the same
+ *  `suppliers` array that rides along with every list response. */
+export type SupplierRef = {
+  id: string;
+  display_name: string | null;
+  company_name: string | null;
+  full_name: string | null;
+};
+export function supplierNames(list: SupplierRef[] | undefined | null): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const c of list ?? []) m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
+  return m;
+}

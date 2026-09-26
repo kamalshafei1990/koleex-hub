@@ -2,15 +2,18 @@
 
 /* Preorder document — editable customer price-request (RFQ). Monochrome white
    "paper" + black, rounded panels, per-buyer colour coding, uploadable machine
-   photos, and everything editable inline. Print / export-to-PDF ready. Data is
-   seeded from the customer's sheet; edits live in local state (DB persistence,
-   product photos and convert-to-quotation come next). */
+   photos, and everything editable inline. Print / export-to-PDF ready. Saved
+   through /api/quotations/preorders (list, open, save); product photos are
+   matched by model code through /api/quotations/preorders/match-products. */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import PermissionGate from "@/components/layout/PermissionGate";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
 import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
@@ -48,8 +51,22 @@ function AutoText({ value, onChange, placeholder, className }: { value: string; 
   );
 }
 
-/** A fresh seeded preorder (used for "New" and the initial state). */
+/** An EMPTY preorder (used for "New" and the initial state): no customer, no
+ *  buyers, no items. The sample order in ./data.ts is a real customer's sheet
+ *  and only loads behind the explicit "Load sample" action below. */
 function freshDoc(): Doc {
+  return {
+    customerAr: "",
+    reference: "",
+    currency: "USD",
+    date: new Date().toISOString().slice(0, 10),
+    buyers: [],
+    sections: [],
+  };
+}
+
+/** The sample order from ./data.ts, as a document. */
+function sampleDoc(): Doc {
   return {
     customerAr: PREORDER_META.customerAr,
     reference: PREORDER_META.reference,
@@ -119,6 +136,14 @@ function PreRowBtn({
 }
 
 export default function PreorderPage() {
+  return (
+    <PermissionGate module="Quotations">
+      <PreorderEditor />
+    </PermissionGate>
+  );
+}
+
+function PreorderEditor() {
   const [doc, setDoc] = useState<Doc>(freshDoc);
 
   // Persistence
@@ -155,6 +180,25 @@ export default function PreorderPage() {
     try { window.history.replaceState(null, "", "/quotations/preorder"); } catch { /* ignore */ }
   };
 
+  /* Explicit, unsaved: the sample becomes a new (unsaved) document the
+     operator can look at or edit — never the starting point of "New". */
+  const loadSample = () => {
+    setDoc(sampleDoc());
+    setDocId(null);
+    setSavedMsg("");
+    try { window.history.replaceState(null, "", "/quotations/preorder"); } catch { /* ignore */ }
+  };
+
+  /* The server's own sentence when it has one ("too large", "no access",
+     …) — a bare "save failed" hid the one thing the operator could act on. */
+  const serverError = async (r: Response): Promise<string> => {
+    try {
+      const j = (await r.json()) as { error?: unknown };
+      if (typeof j?.error === "string" && j.error.trim()) return j.error;
+    } catch { /* not JSON */ }
+    return `HTTP ${r.status}`;
+  };
+
   const save = async () => {
     setSaving(true);
     setSavedMsg("");
@@ -168,21 +212,22 @@ export default function PreorderPage() {
       };
       if (docId) {
         const r = await fetch(`/api/quotations/preorders/${docId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
-        if (!r.ok) throw new Error();
+        if (!r.ok) throw new Error(await serverError(r));
       } else {
         const r = await fetch("/api/quotations/preorders", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
-        const j = await r.json();
-        if (!r.ok) throw new Error();
-        setDocId(j.id as string);
+        if (!r.ok) throw new Error(await serverError(r));
+        const j = (await r.json()) as { id: string };
+        setDocId(j.id);
         try { window.history.replaceState(null, "", `/quotations/preorder?id=${j.id}`); } catch { /* ignore */ }
       }
       setSavedMsg("تم الحفظ ✓");
       refreshList();
-    } catch {
-      setSavedMsg("فشل الحفظ");
+    } catch (e) {
+      const detail = e instanceof Error && e.message ? e.message : "";
+      setSavedMsg(detail ? `فشل الحفظ — ${detail}` : "فشل الحفظ");
     } finally {
       setSaving(false);
-      setTimeout(() => setSavedMsg(""), 2500);
+      setTimeout(() => setSavedMsg(""), 4000);
     }
   };
 
@@ -193,7 +238,6 @@ export default function PreorderPage() {
       const id = new URLSearchParams(window.location.search).get("id");
       if (id) loadDoc(id);
     } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Excel import — parse the customer's sheet into sections/buyers/items.
@@ -232,6 +276,11 @@ export default function PreorderPage() {
             while (totalCol > 0 && !cells[totalCol]) totalCol--;
             firstBuyerCol = descCol + 1;
             buyers = cells.slice(firstBuyerCol, totalCol).filter((x) => x);
+            /* Quantity columns with blank headers still get a column each —
+               numbered, not named after anyone. */
+            if (buyers.length === 0 && totalCol > firstBuyerCol) {
+              buyers = cells.slice(firstBuyerCol, totalCol).map((_, i) => String(i + 1));
+            }
             continue;
           }
         }
@@ -251,14 +300,26 @@ export default function PreorderPage() {
 
         if (model || desc || hasQty) {
           if (!cur) { cur = { ar: "بنود", en: "Items", items: [] }; sections.push(cur); }
-          const bs = buyers.length ? buyers : [...PREORDER_BUYERS];
-          const q = bs.map((_, i) => { const v = Number(cells[firstBuyerCol + i]); return Number.isFinite(v) ? v : 0; });
+          const q = buyers.map((_, i) => { const v = Number(cells[firstBuyerCol + i]); return Number.isFinite(v) ? v : 0; });
           cur.items.push({ model, desc, q, price: 0, photo: null });
         }
       }
 
       if (sections.length === 0) { setSavedMsg("لم يتم العثور على بنود في الملف"); setTimeout(() => setSavedMsg(""), 3000); return; }
-      setDoc((d) => ({ ...d, buyers: buyers.length ? buyers : d.buyers, sections }));
+      setDoc((d) => {
+        /* A sheet with no buyer header keeps the document's own buyer
+           columns; every imported row is padded to that width so the
+           quantity cells and the legend never disagree. */
+        const bs = buyers.length ? buyers : d.buyers;
+        return {
+          ...d,
+          buyers: bs,
+          sections: sections.map((s) => ({
+            ...s,
+            items: s.items.map((it) => ({ ...it, q: bs.map((_, i) => it.q[i] ?? 0) })),
+          })),
+        };
+      });
       setDocId(null);
       try { window.history.replaceState(null, "", "/quotations/preorder"); } catch { /* ignore */ }
       setSavedMsg("تم الاستيراد ✓ — راجع ثم احفظ");
@@ -374,6 +435,28 @@ export default function PreorderPage() {
       ),
     }));
 
+  /* Building a document by hand. A new preorder starts empty, so these are
+     the only way to get a first section, row or buyer column without a
+     sheet to import. */
+  const addSection = () =>
+    setDoc((d) => ({ ...d, sections: [...d.sections, { ar: "", en: "", items: [] }] }));
+  const addItemPre = (si: number) =>
+    setDoc((d) => ({
+      ...d,
+      sections: d.sections.map((s, i) =>
+        i !== si ? s : { ...s, items: [...s.items, { model: "", desc: "", q: d.buyers.map(() => 0), price: 0, photo: null }] },
+      ),
+    }));
+  const addBuyer = () =>
+    setDoc((d) => {
+      if (d.buyers.length >= BUYER_COLORS.length) return d;
+      return {
+        ...d,
+        buyers: [...d.buyers, ""],
+        sections: d.sections.map((s) => ({ ...s, items: s.items.map((it) => ({ ...it, q: [...it.q, 0] })) })),
+      };
+    });
+
   const totals = useMemo(() => {
     let units = 0, value = 0, lines = 0, priced = 0;
     const bq = doc.buyers.map(() => 0);
@@ -404,7 +487,7 @@ export default function PreorderPage() {
   const cell = "w-full bg-transparent outline-none rounded-md px-1.5 py-1 transition-colors focus:bg-neutral-100 print:focus:bg-transparent";
 
   return (
-    <div dir="rtl" className="min-h-screen bg-black px-3 py-6 text-neutral-300 sm:px-6" style={{ colorScheme: "light" }}>
+    <div dir="rtl" className="min-h-full bg-black px-3 py-6 text-neutral-300 sm:px-6" style={{ colorScheme: "light" }}>
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
@@ -432,9 +515,11 @@ export default function PreorderPage() {
 
       {/* Toolbar (screen only) */}
       <div className="no-print mx-auto mb-4 flex max-w-[1160px] items-center justify-between gap-3">
-        <a href="/quotations" className="text-[13px] text-neutral-300 transition-colors hover:text-white" dir="ltr">← Quotations</a>
+        <Link href="/quotations" className="text-[13px] text-neutral-300 transition-colors hover:text-white" dir="ltr">← Quotations</Link>
         <div className="flex flex-wrap items-center gap-2">
-          {savedMsg && <span className="text-[12px] font-medium text-emerald-400">{savedMsg}</span>}
+          {savedMsg && (
+            <span className={`text-[12px] font-medium ${savedMsg.startsWith("فشل") ? "text-red-400" : "text-emerald-400"}`}>{savedMsg}</span>
+          )}
           {/* Open a saved preorder */}
           <select
             value={docId ?? ""}
@@ -448,6 +533,7 @@ export default function PreorderPage() {
             ))}
           </select>
           <button type="button" onClick={newDoc} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">جديد</button>
+          <button type="button" onClick={loadSample} title="Load sample" className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">تحميل نموذج</button>
           <button type="button" onClick={() => importRef.current?.click()} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">استيراد Excel</button>
           <input ref={importRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { onImportExcel(e.target.files?.[0]); e.target.value = ""; }} />
           <button type="button" onClick={linkProductPhotos} disabled={linking} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50">{linking ? "جارٍ…" : "جلب صور المنتجات"}</button>
@@ -513,16 +599,31 @@ export default function PreorderPage() {
             {doc.buyers.map((b, bi) => (
               <span key={bi} className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[12px] font-semibold shadow-sm" style={{ border: `1px solid ${BUYER_COLORS[bi]}33` }}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: BUYER_COLORS[bi] }} />
-                <input value={b} onChange={(e) => setDoc((d) => ({ ...d, buyers: d.buyers.map((x, i) => (i === bi ? e.target.value : x)) }))} className="w-20 bg-transparent text-center outline-none focus:bg-neutral-100 rounded" style={{ color: BUYER_COLORS[bi] }} />
+                <input value={b} placeholder="اسم العميل" onChange={(e) => setDoc((d) => ({ ...d, buyers: d.buyers.map((x, i) => (i === bi ? e.target.value : x)) }))} className="w-20 bg-transparent text-center outline-none focus:bg-neutral-100 rounded" style={{ color: BUYER_COLORS[bi] }} />
               </span>
             ))}
+            {doc.buyers.length < BUYER_COLORS.length && (
+              <button type="button" onClick={addBuyer} className="no-print inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-neutral-300 px-2.5 text-[11.5px] font-semibold text-neutral-500 transition-colors hover:border-black hover:text-black">
+                <PlusIcon size={12} /> عميل
+              </button>
+            )}
           </div>
+
+          {doc.sections.length === 0 && (
+            <div className="no-print mt-6 rounded-2xl border border-dashed border-neutral-300 px-6 py-10 text-center">
+              <p className="text-[14px] font-bold">طلب فارغ</p>
+              <p className="mt-1 text-[12.5px] text-neutral-500">استورد ملف Excel، أو أضف قسمًا وابدأ بإدخال البنود يدويًا.</p>
+              <button type="button" onClick={addSection} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-black px-4 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-85">
+                <PlusIcon size={13} /> إضافة قسم
+              </button>
+            </div>
+          )}
 
           {/* ── Sections ── */}
           {doc.sections.map((sec, si) => (
             <section key={si} className="mt-6 overflow-hidden rounded-2xl border border-neutral-200">
               <div className="pre-band flex items-center justify-between gap-3 bg-black px-5 py-3.5">
-                <input value={sec.ar} onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 rounded bg-transparent px-1 text-[19px] font-black tracking-wide text-white outline-none placeholder:text-white/40 focus:bg-white/10" />
+                <input value={sec.ar} placeholder="اسم القسم" onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 rounded bg-transparent px-1 text-[19px] font-black tracking-wide text-white outline-none placeholder:text-white/40 focus:bg-white/10" />
                 <span className="text-[15px] font-bold uppercase tracking-[0.12em] text-white" dir="ltr">{sec.en} · {sec.items.length}</span>
               </div>
 
@@ -689,8 +790,21 @@ export default function PreorderPage() {
                   })()}
                 </tbody>
               </table>
+              <div className="no-print flex items-center gap-2 border-t border-neutral-200 bg-neutral-50 px-3 py-2">
+                <button type="button" onClick={() => addItemPre(si)} className="inline-flex h-7 items-center gap-1 rounded-md border border-neutral-300 bg-white px-2.5 text-[11.5px] font-semibold text-neutral-700 transition-colors hover:border-black hover:text-black">
+                  <PlusIcon size={12} /> إضافة صف
+                </button>
+              </div>
             </section>
           ))}
+
+          {doc.sections.length > 0 && (
+            <div className="no-print mt-4">
+              <button type="button" onClick={addSection} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 px-4 text-[12.5px] font-semibold text-neutral-600 transition-colors hover:border-black hover:text-black">
+                <PlusIcon size={13} /> إضافة قسم
+              </button>
+            </div>
+          )}
 
           {/* ── Per-customer totals ── */}
           <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">

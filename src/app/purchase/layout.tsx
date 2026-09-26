@@ -23,6 +23,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
+import RouteTabPane from "@/components/ui/RouteTabPane";
 import PurchaseHeader from "@/components/purchase/PurchaseHeader";
 import { useSkin } from "@/lib/appearance";
 
@@ -87,7 +88,7 @@ export default function PurchaseLayout({ children }: { children: React.ReactNode
       )}
       <div className="relative z-[1] mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <PurchaseHeader title={meta.title} subtitle={meta.subtitle} />
-        {children}
+        <RouteTabPane>{children}</RouteTabPane>
       </div>
     </div>
   );

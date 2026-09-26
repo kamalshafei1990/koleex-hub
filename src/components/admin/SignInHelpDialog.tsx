@@ -159,7 +159,7 @@ export default function SignInHelpDialog({ open, onClose }: Props) {
       aria-modal="true"
       aria-label="Request sign-in help"
     >
-      <div className="w-full max-w-[440px] max-h-[90dvh] overflow-y-auto bg-[#121212] rounded-2xl border border-white/[0.08] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[440px] max-h-[90dvh] overflow-y-auto bg-[#121212] rounded-2xl border border-white/[0.08] shadow-2xl">
         <div className="flex items-center justify-between px-5 h-14 border-b border-white/[0.06]">
           <h2 className="text-[15px] font-semibold text-white">
             {sentRef ? t("help.sentTitle") : t("help.title")}

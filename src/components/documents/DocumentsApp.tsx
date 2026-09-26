@@ -43,6 +43,7 @@ import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 
 type OpenKind = DocKind; // "quotation" | "invoice" | "packing_list"
 
@@ -330,6 +331,18 @@ function DocEditor({
 
       <DocToolbar
         onBack={onBack}
+        leading={
+          <DocTitlePicker
+            titleId={current.docTitleId}
+            titleText={current.docTitleText}
+            fallbackLabel={kind === "invoice" ? "COMMERCIAL INVOICE" : "QUOTATION"}
+            onPick={({ id, text, noun, validity, code }) =>
+              setCurrent((q) =>
+                q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
+              )
+            }
+          />
+        }
         status={status}
         statuses={kind === "invoice" ? ["draft", "sent", "paid", "cancelled"] : ["draft", "final", "sent"]}
         onStatusChange={(next) => doSave(next)}
@@ -501,6 +514,27 @@ export default function DocumentsApp() {
   useEffect(() => {
     if (openKind === null) void refresh();
   }, [openKind, refresh]);
+
+  /* Deep link — /documents?doc=<id> opens that document straight into its
+     editor. Without this a packing list raised from an invoice could only be
+     found by scrolling the list, which is not a link at all.
+
+     Runs once: the id is read from the URL rather than watched, so closing
+     the document with Back returns to the list instead of being yanked
+     straight back into it. */
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id) return;
+    deepLinked.current = true;
+    void (async () => {
+      const full = await getDocument(id);
+      if (!full) return;
+      setEditing(full);
+      setOpenKind(full.doc_kind);
+    })();
+  }, []);
 
   const openTemplate = (kind: OpenKind) => {
     setEditing(null);

@@ -281,7 +281,7 @@ if (denied) return denied;
 | `SUPABASE_SERVICE_ROLE_KEY` | Service‑role key (privileged server client) | Required | **Server‑only** | Both |
 | `SESSION_SECRET` | HMAC secret signing `koleex_session` (≥32 bytes). Rotating logs everyone out. | Required | Server‑only | Both |
 | `NEXT_PUBLIC_APP_URL` | Canonical app URL (links, emails, desktop) | Recommended | Browser | Both |
-| `NEXT_PUBLIC_USE_SUPABASE_AUTH` | Toggle Supabase‑Auth path vs custom | Optional | Browser | Both |
+| `NEXT_PUBLIC_USE_SUPABASE_AUTH` | **Retired 26/09/2026** — nothing reads it; the Supabase‑Auth path (SupabaseGate, auth-client) was removed. Setting it does nothing. | — | Browser | — |
 | `CRON_SECRET` | Guards `/api/cron/*` | Required (prod cron) | Server‑only | Prod |
 | `AUTH_RATELIMIT` | `off\|observe\|enforce` (enforce not implemented) | Optional (default off) | Server‑only | Both |
 | `AUTH_LAZY_REHASH` / `AUTH_NEW_HASH_ON_WRITE` | Argon2 migration toggles | Optional | Server‑only | Both |

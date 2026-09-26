@@ -2,10 +2,15 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* GET  /api/todo-labels     — list label catalogue (tenant-scoped)
-   POST /api/todo-labels     — create a new label */
+   POST /api/todo-labels     — create a new label
+     Body: { name (1–60 chars), color? ("#rgb" / "#rrggbb") }
+     409 when the name is already taken (the catalogue's name is unique). */
+
+const LABEL_COLS = "id, name, color, tenant_id, created_at";
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export async function GET() {
   const auth = await requireAuth();
@@ -15,7 +20,7 @@ export async function GET() {
 
   let query = supabaseServer
     .from("koleex_todo_labels")
-    .select("*")
+    .select(LABEL_COLS)
     .order("name");
   if (auth.tenant_id) query = query.eq("tenant_id", auth.tenant_id);
 
@@ -28,26 +33,34 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "To-do", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as { name: string; color?: string | null };
-  if (!body.name?.trim()) {
-    return NextResponse.json({ error: "Name required" }, { status: 400 });
+  let body: { name?: unknown; color?: unknown };
+  try {
+    body = ((await req.json()) ?? {}) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+  if (name.length > 60) return NextResponse.json({ error: "Name is too long" }, { status: 400 });
+  const color = body.color == null || body.color === "" ? null : body.color;
+  if (color !== null && (typeof color !== "string" || !HEX_COLOR.test(color))) {
+    return NextResponse.json({ error: "Invalid color" }, { status: 400 });
   }
 
   const { data, error } = await supabaseServer
     .from("koleex_todo_labels")
-    .insert({
-      name: body.name,
-      color: body.color ?? null,
-      tenant_id: auth.tenant_id,
-    })
-    .select("*")
+    .insert({ name, color, tenant_id: auth.tenant_id })
+    .select(LABEL_COLS)
     .single();
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "A label with this name already exists" }, { status: 409 });
+    }
     console.error("[api/todo-labels POST]", error.message);
     return NextResponse.json({ error: "Failed to create label" }, { status: 500 });
   }

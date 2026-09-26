@@ -21,6 +21,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { adminRecipients } from "@/lib/server/admin-recipients";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { prepareTpl } from "@/lib/notification-templates";
 
 /* Ids match RELATIONSHIPS in AdminAuth — changing one without the other
    silently files every request as "Other". */
@@ -292,13 +293,16 @@ export async function POST(req: Request) {
       `Reference     ${ref}`,
     ].filter(Boolean) as string[];
 
+    /* The subject in the reader's language; the body is the form, line by
+       line — data, stored as written. */
+    const text = prepareTpl({ k: "membership_request", p: { name: full_name } });
     const { error: mailErr } = await supabaseServer.from("inbox_messages").insert(
       recipients.map((rid) => ({
         recipient_account_id: rid,
         sender_account_id: null,
         category: "membership_request",
-        subject: `Account request · ${full_name}`,
-        body: lines.join("\n"),
+        subject: text.subject,
+        body: text.body ?? lines.join("\n"),
         /* Straight to the queue, not a generic inbox. The old DB trigger
            linked at /admin/requests/<id>, which does not exist. */
         link: "/accounts/requests",
@@ -309,6 +313,7 @@ export async function POST(req: Request) {
           relationship_label: RELATIONSHIPS[relationship],
           full_name, email,
           company: company || null,
+          ...(text.tpl ? { tpl: text.tpl } : {}),
         },
       })),
     );
@@ -334,6 +339,7 @@ export async function POST(req: Request) {
           url: "/accounts/requests",
           tag: `membership-${ref}`,
           kind: "membership_request",
+          tpl: text.tpl,
         },
         { actorAccountId: null },
       ).catch((e) =>

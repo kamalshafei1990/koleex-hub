@@ -1,11 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-/* /finance/overview — operator-friendly alias for VisualStatements.
-   The Coffee-Inc-2-style statements page already exists; this route
-   makes it a top-level destination from the new Finance Home tiles. */
-
-import VisualStatements from "@/components/finance/VisualStatements";
-
-export default function FinanceOverviewPage() {
-  return <VisualStatements />;
+/* /finance/overview was one of three routes rendering the same statements
+   screen. The statements live at /finance/statements; old links follow. */
+export default function FinanceOverviewRedirect() {
+  redirect("/finance/statements");
 }

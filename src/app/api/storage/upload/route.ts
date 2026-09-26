@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { normaliseUploadPath } from "@/lib/server/storage-tenant";
 import { checkDiscussUpload, mb } from "@/lib/discuss-upload-policy";
 import { checkSupplierUpload, supplierMb } from "@/lib/suppliers/upload-policy";
+import { recordDiscussUpload } from "@/lib/discuss-pending-uploads";
 
 /* POST /api/storage/upload
    Phase S.2 — tenant isolation hardening.
@@ -123,6 +124,18 @@ export async function POST(req: Request) {
   if (error) {
     console.error("[api/storage/upload]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  /* Discuss objects are bound to their uploader, so the unsent-file preview
+     (/api/discuss/pending-media) serves a path only to the account that
+     uploaded it. No-op for every other bucket, and when the table is absent. */
+  if (bucket === "discuss-media" || bucket === "discuss-voice") {
+    await recordDiscussUpload({
+      bucket,
+      path: data.path,
+      accountId: auth.account_id,
+      tenantId: auth.tenant_id,
+    });
   }
 
   /* Private buckets have no public URL — return the path only. Callers store

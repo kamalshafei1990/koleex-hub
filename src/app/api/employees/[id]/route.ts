@@ -57,7 +57,7 @@ export async function GET(
   /* Parallelise everything we can. The assignment lookup scopes to
      the most recent active+primary record — rare to have more than
      one, but `.maybeSingle()` protects us from bad data. */
-  const [{ data: person }, accountRes, { data: assignment }] = await Promise.all([
+  const [{ data: person }, accountRes, { data: assignment }, { data: skillRows }] = await Promise.all([
     supabaseServer.from("people").select("*").eq("id", emp.person_id).maybeSingle(),
     /* Resolve by account_id when it's set, otherwise fall back to the PERSON
        link. `accounts.person_id` and `koleex_employees.account_id` are two
@@ -76,6 +76,12 @@ export async function GET(
       .eq("is_active", true)
       .eq("is_primary", true)
       .maybeSingle(),
+    /* Skill assessments — needed by the edit form and the profile. Keyed on
+       the route id alone, so it rides this stage instead of a third one. */
+    supabaseServer
+      .from("employee_skill_assessments")
+      .select("skill_id, source, employee_score, years_of_experience, notes, is_verified, last_assessed_at")
+      .eq("employee_id", id),
   ]);
 
   if (!person) {
@@ -95,13 +101,6 @@ export async function GET(
   /* Column-level policy (shared registry, same rules as Koleex AI):
      · salary / banking / legal-ID columns need can_view_private (or SA)
      · account login secrets (password_hash etc.) never leave the server */
-  /* Skill assessments — needed by the edit form and the profile. Small set,
-     fetched alongside rather than in a second round-trip from the client. */
-  const { data: skillRows } = await supabaseServer
-    .from("employee_skill_assessments")
-    .select("skill_id, source, employee_score, years_of_experience, notes, is_verified, last_assessed_at")
-    .eq("employee_id", id);
-
   return NextResponse.json({
     person,
     skills: skillRows ?? [],

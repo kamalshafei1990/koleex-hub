@@ -3,17 +3,14 @@
 /* ---------------------------------------------------------------------------
    discuss — data layer for the Discuss (chat) app.
 
-   Mirrors the pattern established in src/lib/inbox.ts:
-     - Plain async functions, not hooks
-     - supabaseAdmin client (anon key, dev-mode permissive RLS)
-     - Resilient: returns empty arrays / stub success if a table hasn't
-       been migrated yet, so the UI never crashes on a fresh DB
-     - Leaves all React state management to the caller — this module
-       only speaks to Supabase
-
-   Real-time lives in a dedicated helper (`subscribeToChannel`) because
-   that's the one place where a caller needs the raw Supabase channel
-   object back so they can unsubscribe on unmount.
+   Plain async functions, not hooks; React state stays with the caller.
+     - Every read goes through the gated server routes (/api/discuss/read,
+       /api/discuss/state) and every write through /api/discuss/mutate —
+       identity and tenant come from the session, never from arguments.
+     - The browser Supabase client is used ONLY for Realtime broadcast
+       pings and presence/typing; it never touches discuss_* tables.
+     - Live delivery: the first-party SSE stream (connectDiscussStream) is
+       primary; broadcast pings are a supplement where the websocket works.
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
@@ -41,11 +38,8 @@ import type {
 } from "@/types/supabase";
 import { record as perfRecord, event as perfEvent } from "@/lib/perf/client";
 
-const CHANNELS = "discuss_channels";
-/* discuss_pinned / discuss_starred / discuss_drafts are read via the gated
-   /api/discuss/state route and written via /api/discuss/mutate, so their table
-   names live server-side only (RLS: service_role). */
-const CONTACTS = "contacts";
+/* Table names live server-side only: every discuss_* read goes through
+   /api/discuss/read|state and every write through /api/discuss/mutate. */
 /* No storage-bucket constant here by design (Unit 2): Discuss uploads name
    their PRIVATE bucket at the call site — `discuss-media` for images and
    documents, `discuss-voice` for audio. The old shared public `media` bucket
@@ -56,17 +50,6 @@ const CONTACTS = "contacts";
 const rtChannelTopic = (channelId: string) => `discuss:channel:${channelId}`;
 const rtAccountTopic = (accountId: string) => `discuss:account:${accountId}`;
 
-/** Silent fallback when a table hasn't been migrated yet. Matches the
- *  detection logic in inbox.ts so behavior is consistent. */
-function isMissingTable(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("does not exist") ||
-    m.includes("not found") ||
-    m.includes("schema cache") ||
-    m.includes("404")
-  );
-}
 
 /** Route a write through the authenticated server endpoint. Every Discuss
  *  mutation goes through /api/discuss/mutate, so the browser's anon key can
@@ -77,7 +60,7 @@ function isMissingTable(message: string): boolean {
 async function discussMutate<T = unknown>(
   action: string,
   payload: Record<string, unknown>,
-): Promise<{ ok: boolean; data?: T; error?: string }> {
+): Promise<{ ok: boolean; data?: T; error?: string; status?: number }> {
   try {
     const res = await fetch("/api/discuss/mutate", {
       method: "POST",
@@ -92,7 +75,7 @@ async function discussMutate<T = unknown>(
     };
     if (!res.ok || !json.ok) {
       console.error("[Discuss] mutate", action, json.error ?? `HTTP ${res.status}`);
-      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+      return { ok: false, error: json.error ?? `HTTP ${res.status}`, status: res.status };
     }
 /* Any state change (read, pin, mute, hide, send…) may alter the
        myChannels projection — drop the coalesced copy so the very next
@@ -219,19 +202,18 @@ export async function createChannel(input: {
   return res.ok ? (res.data ?? null) : null;
 }
 
-/** Update a channel's editable metadata (name, description, icon, color).
- *  Used by the channel settings modal. */
-export async function updateChannel(
-  channelId: string,
-  patch: Partial<Pick<DiscussChannelRow, "name" | "description" | "icon" | "color">>,
-): Promise<boolean> {
-  return (await discussMutate("updateChannel", { channelId, patch })).ok;
-}
-
-/** Soft-archive a channel. We never hard-delete so message history
- *  stays intact for audit. */
-export async function archiveChannel(channelId: string): Promise<boolean> {
-  return (await discussMutate("archiveChannel", { channelId })).ok;
+/** For "chat with these people" links: which of `accountIds` the caller may
+ *  message (server-validated: UUIDs, not self, ≤ 50, active internal accounts
+ *  of the caller's tenant) and the id of an existing non-archived group whose
+ *  active members are exactly the caller + those accounts. `null` = the read
+ *  failed. */
+export async function resolveGroupWith(
+  accountIds: string[],
+): Promise<{ allowed: string[]; channelId: string | null } | null> {
+  const data = await discussRead<{ allowed: string[]; channelId: string | null }>("groupWith", {
+    ids: accountIds.join(","),
+  });
+  return data && Array.isArray(data.allowed) ? data : null;
 }
 
 /** Fetch every channel the account is a member of, enriched with:
@@ -245,9 +227,29 @@ export async function archiveChannel(channelId: string): Promise<boolean> {
    nothing after it. See the note inside fetchMyChannels. */
 let shellChannelsUsed = false;
 
+/** Fields the sidebar read adds on top of DiscussChannelWithState:
+ *   · muted_unread_count — unread messages of a MUTED conversation. For a
+ *     muted row `unread_count` is 0 so every badge that sums unread_count
+ *     (bell, home tile, floating panel) leaves it out, WeChat-style; Discuss
+ *     still shows this count on the row. A muted row the user manually
+ *     marked unread arrives as muted_unread_count 1 with marked_unread
+ *     false (and muted_mark_only true), so it stays off the badges as well
+ *     and an unmute can turn it back into the dot.
+ *   · linked_project_id — set when the conversation belongs to a Project
+ *     (column added by the Projects migration; absent until it is applied). */
+export type DiscussChannelExtras = {
+  muted_unread_count?: number;
+  /** A muted row whose muted_unread_count is ONLY a folded manual "unread"
+   *  mark (no real unread message). Lets an unmute put the dot back
+   *  (marked_unread) instead of showing a count of "1". */
+  muted_mark_only?: boolean;
+  linked_project_id?: string | null;
+};
+export type DiscussChannelListRow = DiscussChannelWithState & DiscussChannelExtras;
+
 export async function fetchMyChannels(
   accountId: string,
-): Promise<DiscussChannelWithState[]> {
+): Promise<DiscussChannelListRow[]> {
   void accountId; // identity comes from the session server-side
 
   /* THE FIRST READ OF THE PAGE RIDES THE SHELL BATCH, which already carries
@@ -265,7 +267,7 @@ export async function fetchMyChannels(
     try {
       const { getShell } = await import("./client-cache");
       const shell = await getShell();
-      const seeded = (shell?.channels as { data?: DiscussChannelWithState[] } | null)?.data;
+      const seeded = (shell?.channels as { data?: DiscussChannelListRow[] } | null)?.data;
       if (Array.isArray(seeded)) return seeded;
     } catch { /* fall through to the endpoint */ }
   }
@@ -278,7 +280,7 @@ export async function fetchMyChannels(
      and every discuss mutate invalidates this key so mark-read / pin /
      mute never read their own stale snapshot. */
   try {
-    const json = await cachedGet<{ ok?: boolean; data?: DiscussChannelWithState[] }>(
+    const json = await cachedGet<{ ok?: boolean; data?: DiscussChannelListRow[] }>(
       "/api/discuss/read?resource=myChannels", 8_000,
     );
     return json?.data ?? [];
@@ -290,29 +292,6 @@ export async function fetchMyChannels(
 /* ═══════════════════════════════════════════════════════════════════════
    Members
    ═══════════════════════════════════════════════════════════════════════ */
-
-/** Add one or more members to a channel. No-op on duplicates — the
- *  table's UNIQUE(channel_id, account_id) constraint absorbs them and
- *  we swallow the error. */
-export async function addMembers(
-  channelId: string,
-  accountIds: string[],
-): Promise<number> {
-  if (accountIds.length === 0) return 0;
-  const res = await discussMutate<number>("addMembers", { channelId, accountIds });
-  return res.ok ? (res.data ?? accountIds.length) : 0;
-}
-
-/** Soft-leave: sets `left_at` so the user stops seeing the channel in
- *  their sidebar but historical messages still reference the member
- *  for author display. */
-export async function leaveChannel(
-  channelId: string,
-  accountId: string,
-): Promise<boolean> {
-  void accountId; // identity comes from the session server-side
-  return (await discussMutate("leaveChannel", { channelId })).ok;
-}
 
 /** Fetch active members of a channel with their account + person info.
  *  Used by the channel details pane and the mention autocomplete. */
@@ -335,6 +314,41 @@ export async function markChannelRead(
 ): Promise<boolean> {
   void accountId; // identity comes from the session server-side
   return (await discussMutate("markRead", { channelId })).ok;
+}
+
+/** Mark EVERY conversation I am in as read (sidebar menu). */
+export async function markAllChannelsRead(): Promise<boolean> {
+  return (await discussMutate("markAllRead", {})).ok;
+}
+
+/* ── Channel administration (details pane) ─────────────────────────────
+   The server re-checks everything: add → any active member (accounts must
+   be in my tenant); rename / archive / remove / role → channel admin. A
+   failure carries the server's message so the pane can say why. */
+type AdminResult = { ok: boolean; error?: string };
+const adminResult = (r: { ok: boolean; error?: string }): AdminResult => ({ ok: r.ok, error: r.error });
+
+export async function addChannelMembers(channelId: string, accountIds: string[]): Promise<AdminResult> {
+  return adminResult(await discussMutate("addMembers", { channelId, accountIds }));
+}
+export async function removeChannelMember(channelId: string, accountId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("removeMember", { channelId, accountId }));
+}
+export async function setChannelMemberRole(
+  channelId: string,
+  accountId: string,
+  role: "admin" | "member",
+): Promise<AdminResult> {
+  return adminResult(await discussMutate("setMemberRole", { channelId, accountId, role }));
+}
+export async function renameChannel(channelId: string, name: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("updateChannel", { channelId, patch: { name } }));
+}
+export async function leaveChannel(channelId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("leaveChannel", { channelId }));
+}
+export async function archiveChannel(channelId: string): Promise<AdminResult> {
+  return adminResult(await discussMutate("archiveChannel", { channelId }));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -395,14 +409,34 @@ export async function sendDiscussMessage(input: {
   return res.ok ? (res.data ?? null) : null;
 }
 
-/** Edit the body of an existing message. Sets `edited_at` so the UI
- *  can show "(edited)". */
-export async function editDiscussMessage(
-  id: string,
-  body: string,
-  metadata?: DiscussMessageMetadata,
-): Promise<boolean> {
-  return (await discussMutate("editMessage", { id, body, metadata: metadata ?? {} })).ok;
+/** Same as sendDiscussMessage, but says WHY a send failed so the composer can
+ *  keep a "Not sent — Retry" bubble for failures a retry can fix (network,
+ *  timeout, 5xx, rate limit) and drop the bubble for ones it cannot (not a
+ *  member, too long, invalid). Retrying MUST reuse the same clientMsgId: the
+ *  server dedupes on (channel_id, client_msg_id), so a send that committed
+ *  but whose answer was lost comes back as the original row. */
+export async function sendDiscussMessageResult(
+  input: Parameters<typeof sendDiscussMessage>[0],
+): Promise<{ row: DiscussMessageRow | null; retryable: boolean; error?: string }> {
+  const res = await discussMutate<DiscussMessageRow>("sendMessage", {
+    channelId: input.channelId,
+    body: input.body,
+    kind: input.kind ?? "text",
+    replyToMessageId: input.replyToMessageId ?? null,
+    metadata: input.metadata ?? {},
+    clientMsgId: input.clientMsgId ?? null,
+  });
+  if (res.ok && res.data) return { row: res.data, retryable: false };
+  const st = res.status;
+  const retryable = st === undefined || st >= 500 || st === 408 || st === 429;
+  return { row: null, retryable, error: res.error };
+}
+
+/** Edit the BODY of your own message. Sets `edited_at` so the UI can show
+ *  "(edited)". Metadata (attachments, voice, mentions, products) is never
+ *  sent on edit — the server refuses to touch it. */
+export async function editDiscussMessage(id: string, body: string): Promise<boolean> {
+  return (await discussMutate("editMessage", { id, body })).ok;
 }
 
 /** Soft-delete. The UI will render a "message deleted" placeholder. */
@@ -414,17 +448,17 @@ export async function deleteDiscussMessage(id: string): Promise<boolean> {
    Reactions
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Toggle an emoji reaction on a message by the current user. If the
- *  row already exists it's deleted; otherwise inserted. Returns the
- *  new reacted state (true = now reacted). */
+/** Toggle an emoji reaction on a message by the current user. Returns the
+ *  new reacted state (true = now reacted), or `null` when the write failed
+ *  so the caller can roll its optimistic flip back. */
 export async function toggleReaction(
   messageId: string,
   accountId: string,
   emoji: string,
-): Promise<boolean> {
+): Promise<boolean | null> {
   void accountId; // identity comes from the session server-side
   const res = await discussMutate<boolean>("toggleReaction", { messageId, emoji });
-  return res.ok ? (res.data ?? false) : false;
+  return res.ok ? (res.data ?? false) : null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -447,13 +481,15 @@ export async function unpinMessage(
   return (await discussMutate("unpinMessage", { channelId, messageId })).ok;
 }
 
+/** Toggle "save for later". Returns the new starred state, or `null` when
+ *  the write failed (the UI must not claim success). */
 export async function toggleStar(
   accountId: string,
   messageId: string,
-): Promise<boolean> {
+): Promise<boolean | null> {
   void accountId; // identity comes from the session server-side
   const res = await discussMutate<boolean>("toggleStar", { messageId });
-  return res.ok ? (res.data ?? false) : false;
+  return res.ok ? (res.data ?? false) : null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -547,6 +583,13 @@ async function compressImageForChat(file: File): Promise<File> {
 
 export async function uploadDiscussAttachment(
   file: File,
+  opts: {
+    /** Retry of a failed send's kept file (DiscussApp uploadPendingFiles):
+     *  skip the composer's transport refusal and let uploadToStorage route a
+     *  file above DIRECT_UPLOAD_THRESHOLD straight to Storage. The policy
+     *  (type + policy max) still applies, here and at the server. */
+    allowDirect?: boolean;
+  } = {},
 ): Promise<
   | { ok: true; attachment: DiscussAttachment }
   | { ok: false; reason: "type" | "size" | "transport" | "failed" }
@@ -563,7 +606,7 @@ export async function uploadDiscussAttachment(
   /* Refuse over-transport files NOW, not after minutes of doomed uploading:
      the platform kills request bodies past ~4.5MB, so waiting can only end
      in the silent failure users reported. */
-  if (payload.size > DISCUSS_TRANSPORT_MAX_BYTES) {
+  if (!opts.allowDirect && payload.size > DISCUSS_TRANSPORT_MAX_BYTES) {
     return { ok: false, reason: "transport" };
   }
 
@@ -614,7 +657,7 @@ export async function uploadDiscussAttachment(
    DiscussApp + NotificationBell + FloatingPanel on the account topic). We keep
    ONE shared realtime channel per topic and ref-count listeners so one
    component unmounting never tears down another's subscription. */
-type PingPayload = { channelId?: string; authorId?: string | null } | undefined;
+type PingPayload = { channelId?: string; authorId?: string | null; mentionsYou?: boolean } | undefined;
 const broadcastSubs = new Map<
   string,
   {
@@ -629,6 +672,40 @@ const broadcastSubs = new Map<
     status: string;
   }
 >();
+
+/** A subscription that held this long is a recovery; shorter is a flap. */
+export const REJOIN_STABLE_MS = 30_000;
+/* A RECOVERY STEPS THE BACKOFF DOWN; IT DOES NOT ZERO IT (owner's session,
+   2026-09-18 17:29-17:31 UTC, `discuss:account`). The flap rule below was
+   already doing its job — the ramp climbed cleanly — and then one
+   subscription held for 34.1s, one tick over REJOIN_STABLE_MS, and the whole
+   session's history was thrown away:
+
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s +36.3s
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s …
+
+   Fourteen socket opens in ten minutes on a link that has never once held a
+   subscription for a full minute. On this owner's link — mainland China, no
+   VPN, the case the whole product is built for — a 34-second subscription is
+   not a healthy channel, it is a slightly longer flap, and treating it as
+   proof of a good link puts the storm straight back.
+
+   Halving keeps both truths: a channel that recovers IS rewarded, and gets
+   back to a short retry after a couple of genuine recoveries; a channel that
+   flaps at 34s forever settles near the 60s cap instead of sprinting back to
+   0.9s. Pure, so the ladder is pinned by the suite without a browser. */
+export function retryAfterRecovery(retry: number): number {
+  return retry > 1 ? Math.floor(retry / 2) : 0;
+}
+/* The least time between two honoured nudges on one topic. `online` and
+   `visibilitychange` arrive in bursts on a phone changing network, and each
+   nudge is a teardown plus a fresh socket. */
+export const KICK_FLOOR_MS = 3_000;
+/** Capped exponential backoff with jitter: 1 s, 2 s, 4 s … 60 s. Pure
+ *  apart from the jitter, which the suite pins by range. */
+export function rejoinDelayMs(retry: number, random: () => number = Math.random): number {
+  return Math.min(60_000, 1_000 * 2 ** Math.min(retry, 6)) * (0.8 + random() * 0.4);
+}
 
 function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
   let entry = broadcastSubs.get(topic);
@@ -648,11 +725,23 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
          tab-visible events (below) trigger an immediate retry. */
       retry: 0,
       rejoinTimer: null as number | null,
+      /* When the current channel reached SUBSCRIBED, for the flap rule
+         below. A join that dies within seconds is not a recovery. */
+      subscribedAt: 0,
+      /* When the last online/visible nudge was honoured (see kick). */
+      lastKickAt: 0,
+      /* What opened the CURRENT channel, reported on rt.reconnect. A ramp
+         read from metrics alone cannot tell a scheduled rejoin from a nudge,
+         and the difference is the whole diagnosis: the same 250ms gap is
+         normal for a nudge and impossible for a timer (the floor is 800ms).
+         One tag turns the next round of this into a reading. */
+      via: "init" as "init" | "timer" | "kick",
     };
 
     const scope = topic.split(":").slice(0, 2).join(":");
 
-    const join = () => {
+    const join = (via: "init" | "timer" | "kick") => {
+      created.via = via;
       const channel = supabase.channel(topic);
       created.channel = channel;
       channel
@@ -671,13 +760,34 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
           try {
             if (status === "SUBSCRIBED") {
               created.joins += 1;
-              created.retry = 0;
+              created.subscribedAt = performance.now();
+              /* THE FLAP. A channel that subscribes and is closed within a
+                 second, over and over, reset its backoff on every SUBSCRIBED
+                 and rejoined ~once a second for hours (production, 2026-09-07:
+                 the same page reported CLOSED → reconnect every 0.8 s from
+                 15:00 to 17:33, then died mid-call). A subscription counts as
+                 recovered — and the backoff resets — only once it has held
+                 for STABLE_MS; a shorter life keeps climbing the backoff. */
+              if (created.retry > 0 && created.joins > 1) {
+                /* reset deferred: see the CLOSED branch */
+              } else {
+                created.retry = 0;
+              }
               if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
-              else perfEvent("rt.reconnect", { scope });
+              else perfEvent("rt.reconnect", { scope, via: created.via, r: created.retry });
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-              perfEvent("rt.status", { s: status, scope });
+              /* How long this subscription lived, to the second. Without it a
+                 drop is a bare event and the flap rule below cannot be
+                 checked against what actually happened on the link. */
+              const heldMs = created.subscribedAt > 0 ? performance.now() - created.subscribedAt : 0;
+              perfEvent("rt.status", { s: status, scope, held: Math.round(heldMs / 1000) });
+              /* Held long enough to count as a real recovery? Then the wait
+                 steps back down. Otherwise it flapped, and the next wait is
+                 longer than the last. Either way the link's history survives:
+                 see retryAfterRecovery. */
+              if (heldMs >= REJOIN_STABLE_MS) created.retry = retryAfterRecovery(created.retry);
+              created.subscribedAt = 0;
             }
-            perfRecord("rt.channels", broadcastSubs.size);
           } catch { /* metrics never break realtime */ }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             scheduleRejoin();
@@ -688,27 +798,74 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
     const scheduleRejoin = () => {
       if (created.listeners.size === 0) return; // real teardown, not a drop
       if (created.rejoinTimer != null) return;  // one pending rejoin at a time
-      const delay = Math.min(15_000, 1_000 * 2 ** created.retry) * (0.8 + Math.random() * 0.4);
+      /* NOT WHILE HIDDEN. A background page that rejoins on a timer keeps a
+         socket storm going for hours; the visible/online nudge (kickAll)
+         retries the moment the page is back. */
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      /* NOT UNDER A LIVE CALL EITHER (2026-09-08). The metrics of a call
+         that died with the phone's network show this channel closing and
+         rejoining every second or two for the whole call — a socket storm
+         on the same flaky link the call's own socket was fighting for. A
+         call is the one thing on the page that matters while it is up; the
+         channel rejoins the moment it ends (the kx-call-ended nudge). */
+      if (typeof document !== "undefined" && document.querySelector("[data-kx-call-active='1']")) return;
+      const delay = rejoinDelayMs(created.retry);
       created.retry += 1;
       created.rejoinTimer = window.setTimeout(() => {
         created.rejoinTimer = null;
         if (created.listeners.size === 0) return;
         try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-        join();
+        join("timer");
       }, delay);
     };
 
-    /* Expose an immediate-retry hook for the global online/visible nudges. */
+    /* Expose an immediate-retry hook for the global online/visible nudges.
+
+       IT DOES NOT RESET THE BACKOFF, and that line is the whole point
+       (owner, 2026-09-18, from his own session's metrics). The flap rule
+       above — a join counts as recovered only once it has held for
+       REJOIN_STABLE_MS — was written for the 2026-09-07 storm and it works;
+       this hook was quietly undoing it. `created.retry = 0` sat here, and
+       `kick` fires on `online`, on `kx-call-ended`, and on every return to
+       the tab. On a phone that is changing networks and switching apps —
+       which is the whole of this owner's usage — the ramp never got to
+       climb. His metrics, one session, reconnects on `discuss:account`:
+
+         +0.8s  +1.8s  +4.4s  +7.1s  +15.9s   … then back to +0.8s
+         +1.1s  +1.7s  +4.2s  +7.0s  +13.3s  +27.5s  … and again
+
+       That is the backoff working correctly and being zeroed, over and
+       over, for the length of the session — a socket storm on the same
+       flaky link his voice call is fighting for, which is exactly what the
+       call guard in scheduleRejoin already exists to prevent.
+
+       A nudge means "do not sit out the wait", not "forget what this link
+       has been doing". It still rejoins AT ONCE; what the next failure
+       waits is still owned by the one rule that has evidence behind it —
+       a subscription that held. */
     (created as unknown as { kick: () => void }).kick = () => {
       if (created.status === "SUBSCRIBED" || created.listeners.size === 0) return;
+      /* AND NOT TEN TIMES IN A SECOND. `online` and `visibilitychange` both
+         fire in bursts when a phone changes network; each nudge tears the
+         channel down and opens a new one, so a burst of events was itself a
+         burst of sockets. One nudge per KICK_FLOOR_MS; the rest fall through
+         to the scheduled rejoin, which is still pending. */
+      const now = Date.now();
+      if (now - created.lastKickAt < KICK_FLOOR_MS) return;
+      created.lastKickAt = now;
       if (created.rejoinTimer != null) { window.clearTimeout(created.rejoinTimer); created.rejoinTimer = null; }
-      created.retry = 0;
       try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-      join();
+      join("kick");
     };
 
-    join();
+    join("init");
     broadcastSubs.set(topic, created);
+    /* The gauge belongs where the SET actually changes — here and in the
+       teardown below. It used to fire inside the status callback as well,
+       once per status change, where the size cannot have moved: on this
+       owner's link that was half of every perf beacon spent re-sending a
+       constant, on the one link in the product that cannot spare it. */
+    perfRecord("rt.channels", broadcastSubs.size);
     entry = created;
   }
   entry.listeners.add(onPing);
@@ -735,6 +892,7 @@ if (typeof window !== "undefined") {
     }
   };
   window.addEventListener("online", kickAll);
+  window.addEventListener("kx-call-ended", kickAll);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") kickAll();
   });
@@ -800,6 +958,23 @@ let sseSource: EventSource | null = null;
 let sseHealthy = false;
 let sseRefs = 0;
 const sseListeners = new Set<(m: DiscussMessageWithAuthor) => void>();
+/** `meta` = a sidebar-level change (rename, archive, my own membership)
+ *  rather than an edit / reaction / pin inside the conversation.
+ *  `members` = the channel's member set or a member's role changed — the
+ *  only case a member list needs reloading. */
+export type DiscussStreamChange = { meta?: boolean; members?: boolean };
+const sseChangeListeners = new Set<(channelId: string, info: DiscussStreamChange) => void>();
+/* Newest created_at seen on the stream — sent as ?since= on reconnect so a
+   dropped connection (routine on the China link) replays the gap instead of
+   losing it. The server bounds the replay; frames are deduped below. */
+let sseLastSeenAt: string | null = null;
+/* Ids already dispatched. The server re-reads a small overlap window and a
+   reconnect replays from `since`, so the same row can legitimately arrive
+   twice — every listener sees it once. Bounded FIFO. */
+const sseSeen = new Set<string>();
+const SSE_SEEN_MAX = 2000;
+/* Consecutive failed connects → backoff (2s, 4s … 60s). Reset on `hello`. */
+let sseErrors = 0;
 
 export function isDiscussStreamHealthy(): boolean {
   return sseHealthy;
@@ -807,20 +982,49 @@ export function isDiscussStreamHealthy(): boolean {
 
 function sseOpen() {
   if (sseSource || typeof window === "undefined") return;
-  const src = new EventSource("/api/discuss/stream");
+  const url = sseLastSeenAt
+    ? `/api/discuss/stream?since=${encodeURIComponent(sseLastSeenAt)}`
+    : "/api/discuss/stream";
+  const src = new EventSource(url);
   sseSource = src;
   src.addEventListener("hello", () => {
     sseHealthy = true;
+    sseErrors = 0;
     try { perfEvent("sse.open"); } catch { /* metrics never break delivery */ }
   });
   src.addEventListener("msg", (ev) => {
     try {
       const m = JSON.parse((ev as MessageEvent).data) as DiscussMessageWithAuthor;
-      if (m?.channel_id) lastPingAt.set(m.channel_id, performance.now());
+      if (!m?.id) return;
+      if (m.created_at && (!sseLastSeenAt || m.created_at > sseLastSeenAt)) sseLastSeenAt = m.created_at;
+      if (sseSeen.has(m.id)) return;
+      sseSeen.add(m.id);
+      if (sseSeen.size > SSE_SEEN_MAX) {
+        const first = sseSeen.values().next().value;
+        if (first) sseSeen.delete(first);
+      }
+      if (m.channel_id) lastPingAt.set(m.channel_id, performance.now());
       for (const l of sseListeners) {
         try { l(m); } catch { /* one bad listener must not break the rest */ }
       }
       try { perfRecord("sse.msg", 1); } catch { /* ignore */ }
+    } catch { /* malformed frame — ignore */ }
+  });
+  src.addEventListener("chg", (ev) => {
+    /* An edit / delete / reaction / pin touched this channel. Marks it
+       dirty for the reconcile loop and tells listeners to refresh. */
+    try {
+      const { channelId, meta, members } = JSON.parse((ev as MessageEvent).data) as {
+        channelId?: string;
+        meta?: boolean;
+        members?: boolean;
+      };
+      if (!channelId) return;
+      lastPingAt.set(channelId, performance.now());
+      const info: DiscussStreamChange = { meta: meta === true, members: members === true };
+      for (const l of sseChangeListeners) {
+        try { l(channelId, info); } catch { /* isolate listeners */ }
+      }
     } catch { /* malformed frame — ignore */ }
   });
   src.addEventListener("bye", () => {
@@ -830,10 +1034,17 @@ function sseOpen() {
     if (sseRefs > 0 && document.visibilityState !== "hidden") sseOpen();
   });
   src.onerror = () => {
-    /* EventSource auto-reconnects (honouring `retry:`). Mark unhealthy so the
-       fallback poll takes over during the gap. */
+    /* Reopen ourselves (not EventSource's built-in retry) so the new
+       connection carries the CURRENT ?since= cursor. Mark unhealthy so the
+       fallback poll bridges the gap. */
     sseHealthy = false;
     try { perfEvent("sse.err"); } catch { /* ignore */ }
+    sseClose();
+    sseErrors += 1;
+    const delay = Math.min(60_000, 2000 * 2 ** Math.min(sseErrors - 1, 5));
+    window.setTimeout(() => {
+      if (sseRefs > 0 && !sseSource && document.visibilityState !== "hidden") sseOpen();
+    }, delay);
   };
 }
 
@@ -845,7 +1056,7 @@ function sseClose() {
 
 /* Cost + battery: hold the stream only while a Discuss surface is mounted AND
    the tab is visible. Hidden tabs are covered by web-push; on return the
-   caller's visibility refresh reconciles anything missed. */
+   stream reopens with ?since= and replays what was missed. */
 if (typeof window !== "undefined") {
   document.addEventListener("visibilitychange", () => {
     if (sseRefs === 0) return;
@@ -854,18 +1065,33 @@ if (typeof window !== "undefined") {
   });
 }
 
-/** Connect to the first-party message stream. Returns an unsubscribe fn.
- *  Ref-counted: many consumers share ONE EventSource. */
-export function connectDiscussStream(
-  onMessage: (m: DiscussMessageWithAuthor) => void,
-): () => void {
-  sseListeners.add(onMessage);
+function sseRetain(): () => void {
   sseRefs += 1;
   if (typeof document === "undefined" || document.visibilityState !== "hidden") sseOpen();
+  let released = false;
   return () => {
-    sseListeners.delete(onMessage);
+    if (released) return;
+    released = true;
     sseRefs = Math.max(0, sseRefs - 1);
     if (sseRefs === 0) sseClose();
+  };
+}
+
+/** Connect to the first-party message stream. Returns an unsubscribe fn.
+ *  Ref-counted: many consumers share ONE EventSource. `onChange` (optional)
+ *  fires with a channel id when an edit / delete / reaction / pin touched
+ *  that channel — no row data, the consumer refetches what it shows. */
+export function connectDiscussStream(
+  onMessage: (m: DiscussMessageWithAuthor) => void,
+  onChange?: (channelId: string, info: DiscussStreamChange) => void,
+): () => void {
+  sseListeners.add(onMessage);
+  if (onChange) sseChangeListeners.add(onChange);
+  const release = sseRetain();
+  return () => {
+    sseListeners.delete(onMessage);
+    if (onChange) sseChangeListeners.delete(onChange);
+    release();
   };
 }
 
@@ -980,7 +1206,9 @@ export function subscribeToMyChannels(
           kind: "text",
           body: null,
           body_html: null,
-          metadata: {},
+          /* The only thing known about the text: whether it @-mentions the
+             reader — what a "Mentions only" conversation turns on. */
+          metadata: payload?.mentionsYou ? { mentions_you: true } : {},
           edited_at: null,
           deleted_at: null,
           created_at: new Date().toISOString(),
@@ -1155,19 +1383,6 @@ export async function searchDiscussMessages(input: {
    Phase C — Drafts / Pinned / Starred list views
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Fetch every draft the current user has saved across all channels —
- *  used by the Drafts sidebar section. Joined with the channel so the
- *  UI can render a pill per draft without a second fetch. */
-export async function fetchAllDrafts(
-  accountId: string,
-): Promise<DiscussDraftPublic[]> {
-  void accountId; // identity comes from the session server-side
-  /* DiscussDraftPublic, not the DB row: `allDrafts` serializes server-side, so
-     no `metadata` — and therefore no storage path — reaches this client. */
-  const { data } = await discussState<DiscussDraftPublic[]>("allDrafts");
-  return data ?? [];
-}
-
 /** Fetch the pinned panel for a channel. Pinned → messages join so
  *  the caller gets the full MessageWithAuthor shape it already knows
  *  how to render. */
@@ -1180,13 +1395,17 @@ export async function fetchPinnedMessages(
   return data ?? [];
 }
 
-/** Fetch every message the current user has starred, most-recent first.
- *  Used by the Starred sidebar view — a global bookmarks list. */
+/** Messages the current user has starred, most-recent first — optionally
+ *  only those in one channel (the details pane's "Starred" list). */
 export async function fetchStarredMessages(
   accountId: string,
+  channelId?: string,
 ): Promise<DiscussMessageWithAuthor[]> {
   void accountId; // identity comes from the session server-side
-  const { data } = await discussState<DiscussMessageWithAuthor[]>("starred");
+  const { data } = await discussState<DiscussMessageWithAuthor[]>(
+    "starred",
+    channelId ? { channelId } : {},
+  );
   return data ?? [];
 }
 
@@ -1331,121 +1550,52 @@ export async function uploadDiscussVoice(input: {
    Phase E — Customer chat
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Atomically find-or-create a customer-chat channel bound to a CRM
- *  contact. Wraps the `find_or_create_customer_channel` RPC created
- *  in extend_discuss_phase_bcde.sql. */
+/** Find-or-create the customer-chat channel bound to a CRM contact.
+ *  Server-side (POST /api/discuss/mutate → createCustomerChannel): the
+ *  creator is the session account, the channel is stamped with the caller's
+ *  tenant, and the contact must belong to that tenant. Returns the channel
+ *  id, or null on failure. */
 export async function findOrCreateCustomerChannel(input: {
   contactId: string;
-  createdBy: string;
-  displayName: string;
   additionalMemberIds?: string[];
 }): Promise<string | null> {
-  const { data, error } = await supabase.rpc("find_or_create_customer_channel", {
-    p_contact_id: input.contactId,
-    p_created_by: input.createdBy,
-    p_display_name: input.displayName,
+  const res = await discussMutate<string>("createCustomerChannel", {
+    contactId: input.contactId,
+    memberIds: input.additionalMemberIds ?? [],
   });
-  if (error) {
-    console.error("[Discuss] Find/create customer channel:", error.message);
-    return null;
-  }
-  const channelId = (data as string) ?? null;
-  if (!channelId) return null;
-
-  /* Optionally add additional team members beyond the creator. The RPC
-     only auto-adds the creator so the channel is immediately visible
-     in their sidebar; everyone else joins via this call. */
-  if (input.additionalMemberIds && input.additionalMemberIds.length > 0) {
-    const extra = input.additionalMemberIds.filter((id) => id !== input.createdBy);
-    if (extra.length > 0) await addMembers(channelId, extra);
-  }
-  return channelId;
+  return res.ok ? (res.data ?? null) : null;
 }
 
-/** Fetch the CRM contact linked to a customer-chat channel. Returns
- *  null for internal channels. Used by the details pane to render the
- *  customer contact card. */
-export async function fetchLinkedContact(
-  channelId: string,
-): Promise<DiscussLinkedContact | null> {
-  const { data: ch, error: chErr } = await supabase
-    .from(CHANNELS)
-    .select("linked_contact_id")
-    .eq("id", channelId)
-    .maybeSingle();
-  if (chErr || !ch) return null;
-  const contactId = (ch as { linked_contact_id: string | null }).linked_contact_id;
-  if (!contactId) return null;
-
-  const { data: contact } = await supabase
-    .from(CONTACTS)
-    .select(
-      "id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type",
-    )
-    .eq("id", contactId)
-    .maybeSingle();
-  if (!contact) return null;
-
-  const row = contact as {
-    id: string;
-    display_name: string | null;
-    full_name: string | null;
-    first_name: string | null;
-    last_name: string | null;
-    company: string | null;
-    email: string | null;
-    phone: string | null;
-    photo_url: string | null;
-    contact_type: string | null;
-  };
-  const displayName =
-    row.display_name ??
-    row.full_name ??
-    [row.first_name, row.last_name].filter(Boolean).join(" ") ??
-    "Unnamed contact";
-  return {
-    id: row.id,
-    display_name: displayName || "Unnamed contact",
-    full_name: row.full_name,
-    company: row.company,
-    email: row.email,
-    phone: row.phone,
-    avatar_url: row.photo_url,
-    contact_type: row.contact_type,
-  };
-}
-
-/** Lightweight contact search for the "Start customer chat" picker.
- *  Searches display_name + company + email with an ILIKE prefix. */
+/** Customer contacts for the "Start customer chat" picker, via the
+ *  tenant-scoped /api/contacts/search-customers endpoint (contacts are not
+ *  readable with the browser's anon key). Empty query → the first customers
+ *  alphabetically so the picker has something to show. */
 export async function searchContactsForChat(
   query: string,
   limit = 12,
 ): Promise<DiscussLinkedContact[]> {
-  const q = query.trim();
-  if (q.length < 1) {
-    /* Empty query → return the most recent customers so the picker
-       has something to show on first open. */
-    const { data } = await supabase
-      .from(CONTACTS)
-      .select(
-        "id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type",
-      )
-      .eq("contact_type", "customer")
-      .order("updated_at", { ascending: false })
-      .limit(limit);
-    return toLinkedContacts(data);
+  const qs = new URLSearchParams({ q: query.trim(), limit: String(limit) });
+  try {
+    const res = await fetch(`/api/contacts/search-customers?${qs.toString()}`, {
+      credentials: "same-origin",
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      rows?: Array<{ id: string; displayName: string; companyName: string; email: string; phone: string }>;
+    };
+    return (json.rows ?? []).map((r) => ({
+      id: r.id,
+      display_name: r.displayName || r.companyName || r.email || "—",
+      full_name: null,
+      company: r.companyName || null,
+      email: r.email || null,
+      phone: r.phone || null,
+      avatar_url: null,
+      contact_type: "customer",
+    }));
+  } catch {
+    return [];
   }
-  const escaped = q.replace(/[%_]/g, (c) => `\\${c}`);
-  const { data } = await supabase
-    .from(CONTACTS)
-    .select(
-      "id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type",
-    )
-    .or(
-      `display_name.ilike.%${escaped}%,full_name.ilike.%${escaped}%,company.ilike.%${escaped}%,email.ilike.%${escaped}%`,
-    )
-    .limit(limit);
-  return toLinkedContacts(data);
 }
 
 /** Accounts that can receive messages — used by the DM + @mention picker.
@@ -1462,98 +1612,24 @@ export async function fetchMessageableAccounts(): Promise<
     role_name: string | null;
   }>
 > {
-  /* API-first: accounts/people/roles are service-role-only (P0 lockdown), so the
-     anon query below returns nothing for normal users. The server route resolves
-     the tenant-scoped list with the service role. Fall back to the anon query
-     only if the endpoint is unavailable. */
+  /* accounts/people/roles are service-role-only (P0 lockdown); the server
+     route resolves the tenant-scoped list. There is no anon fallback — it
+     could only ever return nothing (or, if RLS regressed, too much). */
   try {
     const res = await fetch("/api/discuss/recipients", { credentials: "include" });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        recipients?: Array<{
-          id: string;
-          username: string;
-          full_name: string | null;
-          name_alt: string | null;
-          avatar_url: string | null;
-          role_name: string | null;
-        }>;
-      };
-      if (Array.isArray(json.recipients)) return json.recipients;
-    }
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      recipients?: Array<{
+        id: string;
+        username: string;
+        full_name: string | null;
+        name_alt: string | null;
+        avatar_url: string | null;
+        role_name: string | null;
+      }>;
+    };
+    return Array.isArray(json.recipients) ? json.recipients : [];
   } catch {
-    /* network error → fall through to anon query */
-  }
-
-  const { data, error } = await supabase
-    .from("accounts")
-    .select(
-      `
-      id,
-      username,
-      avatar_url,
-      person:people ( full_name, name_alt, avatar_url ),
-      role:roles ( name )
-      `,
-    )
-    .eq("user_type", "internal")
-    .eq("status", "active")
-    .order("username");
-  if (error) {
-    console.error("[Discuss] Fetch recipients:", error.message);
     return [];
   }
-  type Row = {
-    id: string;
-    username: string;
-    avatar_url: string | null;
-    person:
-      | { full_name: string; avatar_url: string | null }
-      | Array<{ full_name: string; avatar_url: string | null }>
-      | null;
-    role: { name: string } | Array<{ name: string }> | null;
-  };
-  return (data as unknown as Row[]).map((row) => {
-    const person = Array.isArray(row.person) ? row.person[0] ?? null : row.person;
-    const role = Array.isArray(row.role) ? row.role[0] ?? null : row.role;
-    return {
-      id: row.id,
-      username: row.username,
-      full_name: person?.full_name ?? null,
-    name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null,
-      avatar_url: row.avatar_url ?? person?.avatar_url ?? null,
-      role_name: role?.name ?? null,
-    };
-  });
-}
-
-function toLinkedContacts(data: unknown): DiscussLinkedContact[] {
-  return ((data ?? []) as Array<{
-    id: string;
-    display_name: string | null;
-    full_name: string | null;
-    first_name: string | null;
-    last_name: string | null;
-    company: string | null;
-    email: string | null;
-    phone: string | null;
-    photo_url: string | null;
-    contact_type: string | null;
-  }>).map((row) => {
-    const name =
-      row.display_name ??
-      row.full_name ??
-      [row.first_name, row.last_name].filter(Boolean).join(" ") ??
-      "Unnamed contact";
-    return {
-      id: row.id,
-      display_name: name || "Unnamed contact",
-      full_name: row.full_name,
-      company: row.company,
-      email: row.email,
-      phone: row.phone,
-      avatar_url: row.photo_url,
-      contact_type: row.contact_type,
-    };
-  });
 }

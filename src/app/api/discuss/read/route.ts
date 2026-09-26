@@ -12,6 +12,8 @@ import "server-only";
      · channelMessages&channelId   → a channel's messages (membership-gated)
      · thread&parentId             → a thread (membership-gated via parent)
      · members&channelId           → a channel's members (membership-gated)
+     · groupWith&ids=a,b,…         → which of those accounts the caller may
+                                     message + an existing exact-match group
      · search&q=…[&channelId]      → full-text over the caller's channels only
 
    Identity is ALWAYS the session account — never client-supplied. Freshness is
@@ -21,9 +23,16 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
-import { serializeDiscussMessageForClient } from "@/lib/server/discuss-serialize";
+import {
+  serializeDiscussMessageForClient,
+  flattenDiscussAuthor as flattenAuthor,
+  buildDiscussReactionMap as buildReactionMap,
+  DISCUSS_AUTHOR_SELECT as AUTHOR_SELECT,
+  type DiscussAuthorJoin as AuthorJoin,
+} from "@/lib/server/discuss-serialize";
+import { filterTenantAccounts } from "@/lib/server/discuss-validate";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -31,68 +40,86 @@ const MESSAGES = "discuss_messages";
 const REACTIONS = "discuss_reactions";
 const CONTACTS = "contacts";
 
-type AuthorJoin =
-  | {
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
+type LastMessage = {
+  id: string;
+  body: string | null;
+  kind: string;
+  author_username: string | null;
+  created_at: string;
+};
+
+/* Whether the discuss_last_messages RPC (20260925_discuss_audit.sql) exists
+   in this database. Unknown until the first call; a "function does not
+   exist" answer flips it off for the life of the instance so the fallback
+   is not preceded by a doomed round trip on every sidebar load. */
+let lastMessagesRpc: boolean | null = null;
+
+/** The newest non-deleted message of EACH channel. The old sidebar read the
+ *  newest max(50, 2n) messages across ALL channels and kept the first per
+ *  channel, so one busy channel pushed every quieter one out of the window
+ *  and their rows rendered a blank preview. */
+async function lastMessagePerChannel(
+  channelIds: string[],
+  lastAt: Map<string, string | null>,
+): Promise<Map<string, LastMessage>> {
+  const out = new Map<string, LastMessage>();
+  if (channelIds.length === 0) return out;
+
+  if (lastMessagesRpc !== false) {
+    const { data, error } = await supabaseServer.rpc("discuss_last_messages", { p_channel_ids: channelIds });
+    if (!error) {
+      lastMessagesRpc = true;
+      for (const r of (data ?? []) as Array<LastMessage & { channel_id: string }>) {
+        out.set(r.channel_id, {
+          id: r.id, body: r.body, kind: r.kind, author_username: r.author_username ?? null, created_at: r.created_at,
+        });
+      }
+      return out;
     }
-  | Array<{
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
-    }>
-  | null;
-
-function flattenAuthor(raw: AuthorJoin) {
-  const acc = Array.isArray(raw) ? raw[0] ?? null : raw;
-  if (!acc) return null;
-  const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-  return {
-    id: acc.id,
-    username: acc.username,
-    avatar_url: acc.avatar_url,
-    full_name: person?.full_name ?? null,
-    name_alt: (person as { name_alt?: string | null } | null)?.name_alt ?? null,
-  };
-}
-
-const AUTHOR_SELECT = `
-  *,
-  author:accounts!discuss_messages_author_account_id_fkey (
-    id, username, avatar_url, person:people ( full_name, name_alt )
-  )
-`;
-
-/** Aggregate reaction rows into the per-message summary the UI renders. */
-function buildReactionMap(
-  rxRows: Array<{ message_id: string; emoji: string; account_id: string }>,
-  me: string,
-) {
-  const map = new Map<
-    string,
-    Array<{ emoji: string; count: number; account_ids: string[]; reacted_by_me: boolean }>
-  >();
-  for (const rx of rxRows) {
-    const bucket = map.get(rx.message_id) ?? [];
-    const existing = bucket.find((b) => b.emoji === rx.emoji);
-    if (existing) {
-      existing.count += 1;
-      existing.account_ids.push(rx.account_id);
-      if (rx.account_id === me) existing.reacted_by_me = true;
-    } else {
-      bucket.push({
-        emoji: rx.emoji,
-        count: 1,
-        account_ids: [rx.account_id],
-        reacted_by_me: rx.account_id === me,
-      });
+    if (/does not exist|could not find the function|PGRST202/i.test(`${error.code ?? ""} ${error.message}`)) {
+      lastMessagesRpc = false;
     }
-    map.set(rx.message_id, bucket);
   }
-  return map;
+
+  /* Fallback without DDL: one batched window catches the busy channels,
+     then an indexed `limit 1` per channel that is still missing a preview
+     (and has had a message at all). Bounded so a huge sidebar cannot fan
+     out unboundedly; channels past the cap keep last_message_at ordering. */
+  const addRow = (row: {
+    id: string; channel_id: string; body: string | null; kind: string; created_at: string;
+    author: { username: string } | Array<{ username: string }> | null;
+  }) => {
+    if (out.has(row.channel_id)) return;
+    const a = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
+    out.set(row.channel_id, {
+      id: row.id, body: row.body, kind: row.kind, author_username: a?.username ?? null, created_at: row.created_at,
+    });
+  };
+  const SELECT = `id, channel_id, body, kind, created_at, author:accounts!discuss_messages_author_account_id_fkey ( username )`;
+  const { data: recent } = await supabaseServer
+    .from(MESSAGES)
+    .select(SELECT)
+    .in("channel_id", channelIds)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(Math.max(50, channelIds.length * 2));
+  for (const row of (recent ?? []) as Array<Parameters<typeof addRow>[0]>) addRow(row);
+
+  const missing = channelIds.filter((id) => !out.has(id) && lastAt.get(id)).slice(0, 60);
+  await Promise.all(
+    missing.map(async (id) => {
+      const { data } = await supabaseServer
+        .from(MESSAGES)
+        .select(SELECT)
+        .eq("channel_id", id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const row = ((data ?? []) as Array<Parameters<typeof addRow>[0]>)[0];
+      if (row) addRow(row);
+    }),
+  );
+  return out;
 }
 
 /* Time ONE enrichment query without altering its result or its failure mode.
@@ -120,6 +147,10 @@ export async function GET(req: Request) {
   const timing = stageTimer("discuss.read"); /* kx-perf */
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  /* Discuss is a permissioned module like every other Hub app: a role
+     without Discuss (e.g. Customer) reads nothing here. */
+  const denied = await requireModuleAccess(auth, "Discuss");
+  if (denied) return denied;
   timing.mark("auth");
   const me = auth.account_id;
 
@@ -170,62 +201,63 @@ export async function GET(req: Request) {
           ]),
         );
 
-        const { data: channels } = await supabaseServer
-          .from(CHANNELS)
-          .select("*")
-          .in("id", channelIds)
-          .is("archived_at", null)
-          .order("last_message_at", { ascending: false });
+        /* Round trip 2 — everything that needs only the channel ids, in
+           parallel: the channel rows, my drafts. (Was 7 sequential queries.) */
+        const [{ data: channels }, { data: drafts }] = await Promise.all([
+          supabaseServer
+            .from(CHANNELS)
+            .select("*")
+            .in("id", channelIds)
+            .is("archived_at", null)
+            .order("last_message_at", { ascending: false }),
+          supabaseServer
+            .from("discuss_drafts")
+            .select("channel_id, body, metadata")
+            .eq("account_id", me)
+            .in("channel_id", channelIds),
+        ]);
         const chanRows = (channels ?? []) as Array<Record<string, unknown> & { id: string; kind: string; linked_contact_id: string | null; last_message_at: string | null }>;
         if (chanRows.length === 0) return NextResponse.json({ ok: true, data: [] });
+        const liveIds = chanRows.map((c) => c.id);
+        const lastAt = new Map(chanRows.map((c) => [c.id, c.last_message_at]));
 
-        /* DM peers — service_role resolves the accounts→people join directly. */
+        const draftChannelIds = new Set<string>();
+        for (const d of (drafts ?? []) as Array<{ channel_id: string; body: string | null; metadata: { attachments?: unknown[] } | null }>) {
+          if ((d.body && d.body.trim()) || d.metadata?.attachments?.length) draftChannelIds.add(d.channel_id);
+        }
+
+        /* Round trip 3 — the enrichments that depend on the channel rows,
+           all independent of each other, in parallel. */
         const directIds = chanRows.filter((c) => c.kind === "direct").map((c) => c.id);
-        const otherByChannel = new Map<string, ReturnType<typeof flattenAuthor>>();
-        if (directIds.length > 0) {
-          const { data: others } = await supabaseServer
-            .from(MEMBERS)
-            .select(
-              `channel_id, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`,
-            )
-            .in("channel_id", directIds)
-            .neq("account_id", me);
-          for (const row of (others ?? []) as Array<{ channel_id: string; account: AuthorJoin }>) {
-            const a = flattenAuthor(row.account);
-            if (a) otherByChannel.set(row.channel_id, a);
-          }
-        }
+        const customerRows = chanRows.filter((c) => c.kind === "customer" && c.linked_contact_id);
+        const contactIds = Array.from(new Set(customerRows.map((c) => c.linked_contact_id as string)));
 
-        /* Last-message preview per channel (newest first, pick first seen). */
-        const { data: recentMsgs } = await supabaseServer
-          .from(MESSAGES)
-          .select(
-            `id, channel_id, body, kind, author_account_id, created_at, author:accounts!discuss_messages_author_account_id_fkey ( username )`,
-          )
-          .in("channel_id", channelIds)
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false })
-          .limit(Math.max(50, channelIds.length * 2));
-        const lastByChannel = new Map<string, unknown>();
-        for (const row of (recentMsgs ?? []) as Array<{
-          id: string; channel_id: string; body: string | null; kind: string; created_at: string;
-          author: { username: string } | Array<{ username: string }> | null;
-        }>) {
-          if (lastByChannel.has(row.channel_id)) continue;
-          const a = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-          lastByChannel.set(row.channel_id, {
-            id: row.id, body: row.body, kind: row.kind,
-            author_username: a?.username ?? null, created_at: row.created_at,
-          });
-        }
+        const othersQ = directIds.length > 0
+          ? supabaseServer
+              .from(MEMBERS)
+              .select(
+                `channel_id, account:accounts!discuss_members_account_id_fkey ( id, username, avatar_url, person:people ( full_name, name_alt ) )`,
+              )
+              .in("channel_id", directIds)
+              .neq("account_id", me)
+          : null;
+        let contactsQ = contactIds.length > 0
+          ? supabaseServer
+              .from(CONTACTS)
+              .select("id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type")
+              .in("id", contactIds)
+          : null;
+        /* A linked contact is shown only if it belongs to the caller's
+           tenant — the channel link alone is not proof of that. */
+        if (contactsQ) contactsQ = auth.tenant_id ? contactsQ.eq("tenant_id", auth.tenant_id) : contactsQ.is("tenant_id", null);
 
-        /* Unread counts — provably-zero shortcut, else exact head count. */
-        const unread = await Promise.all(
+        const unreadP = Promise.all(
           chanRows.map(async (ch) => {
             const cursor = readState.get(ch.id)?.last_read_at;
             if (!cursor) return [ch.id, 0] as const;
             const lastMs = ch.last_message_at ? new Date(ch.last_message_at).getTime() : NaN;
             const curMs = new Date(cursor).getTime();
+            /* Provably-zero shortcut, else exact head count. */
             if (Number.isFinite(lastMs) && Number.isFinite(curMs) && lastMs <= curMs) {
               return [ch.id, 0] as const;
             }
@@ -239,24 +271,30 @@ export async function GET(req: Request) {
             return [ch.id, count ?? 0] as const;
           }),
         );
+
+        const [othersRes, contactsRes, unread, lastByChannel] = await Promise.all([
+          othersQ ?? Promise.resolve({ data: [] as unknown[] }),
+          contactsQ ?? Promise.resolve({ data: [] as unknown[] }),
+          unreadP,
+          lastMessagePerChannel(liveIds, lastAt),
+        ]);
+
+        const otherByChannel = new Map<string, ReturnType<typeof flattenAuthor>>();
+        for (const row of (othersRes.data ?? []) as Array<{ channel_id: string; account: AuthorJoin }>) {
+          const a = flattenAuthor(row.account);
+          if (a) otherByChannel.set(row.channel_id, a);
+        }
         const unreadMap = new Map(unread);
 
-        /* Linked CRM contacts for customer channels. */
-        const customerRows = chanRows.filter((c) => c.kind === "customer" && c.linked_contact_id);
         const contactByChannel = new Map<string, unknown>();
         if (customerRows.length > 0) {
-          const contactIds = Array.from(new Set(customerRows.map((c) => c.linked_contact_id as string)));
-          const { data: contacts } = await supabaseServer
-            .from(CONTACTS)
-            .select("id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type")
-            .in("id", contactIds);
           const byId = new Map<string, unknown>();
-          for (const row of (contacts ?? []) as Array<Record<string, string | null> & { id: string }>) {
+          for (const row of (contactsRes.data ?? []) as Array<Record<string, string | null> & { id: string }>) {
             const displayName =
-              row.display_name ?? row.full_name ??
-              [row.first_name, row.last_name].filter(Boolean).join(" ") ?? "Unnamed contact";
+              row.display_name || row.full_name ||
+              [row.first_name, row.last_name].filter(Boolean).join(" ") || "";
             byId.set(row.id, {
-              id: row.id, display_name: displayName || "Unnamed contact", full_name: row.full_name,
+              id: row.id, display_name: displayName || "—", full_name: row.full_name,
               company: row.company, email: row.email, phone: row.phone,
               avatar_url: row.photo_url, contact_type: row.contact_type,
             });
@@ -264,19 +302,6 @@ export async function GET(req: Request) {
           for (const c of customerRows) {
             const linked = byId.get(c.linked_contact_id as string);
             if (linked) contactByChannel.set(c.id, linked);
-          }
-        }
-
-        /* Draft flags. */
-        const draftChannelIds = new Set<string>();
-        {
-          const { data: drafts } = await supabaseServer
-            .from("discuss_drafts")
-            .select("channel_id, body, metadata")
-            .eq("account_id", me)
-            .in("channel_id", channelIds);
-          for (const d of (drafts ?? []) as Array<{ channel_id: string; body: string | null; metadata: { attachments?: unknown[] } | null }>) {
-            if ((d.body && d.body.trim()) || d.metadata?.attachments?.length) draftChannelIds.add(d.channel_id);
           }
         }
 
@@ -294,15 +319,28 @@ export async function GET(req: Request) {
           })
           .map((ch) => {
             const st = readState.get(ch.id);
+            const unreadN = unreadMap.get(ch.id) ?? 0;
             return {
               ...ch,
-              unread_count: unreadMap.get(ch.id) ?? 0,
+              /* Muted conversations do not count toward any badge (bell, home
+                 tile, floating panel — they all sum unread_count), exactly
+                 like WeChat. Their count still travels, separately, as
+                 muted_unread_count so Discuss can show it on the row. */
+              unread_count: st?.muted ? 0 : unreadN,
+              /* A muted chat the user manually marked unread counts here as
+                 1 (like its other unread) and NOT as marked_unread below —
+                 every badge adds marked_unread as 1, and a muted chat must
+                 stay off all of them. */
+              muted_unread_count: st?.muted ? unreadN || (st?.marked_unread ? 1 : 0) : 0,
+              /* …and says when that 1 is only the mark, so unmuting shows
+                 the dot again instead of a count. */
+              muted_mark_only: !!st?.muted && unreadN === 0 && st?.marked_unread === true,
               last_read_at: st?.last_read_at ?? null,
               muted: st?.muted ?? false,
               notification_pref: st?.notification_pref ?? "all",
               pinned: !!st?.pinned_at,
               pinned_at: st?.pinned_at ?? null,
-              marked_unread: st?.marked_unread ?? false,
+              marked_unread: st?.muted ? false : (st?.marked_unread ?? false),
               other: otherByChannel.get(ch.id) ?? null,
               linked_contact: contactByChannel.get(ch.id) ?? null,
               last_message: lastByChannel.get(ch.id) ?? null,
@@ -404,12 +442,16 @@ export async function GET(req: Request) {
               .from(MESSAGES)
               .select(`id, body, kind, deleted_at, author:accounts!discuss_messages_author_account_id_fkey ( username, person:people ( full_name ) )`)
               .in("id", replyTargetIds)
+              /* Scoped to THIS channel: a reply id is client-influenced, so
+                 an unscoped lookup could preview a message from elsewhere. */
+              .eq("channel_id", channelId)
           : null;
 
         const threadQuery = messageIds.length > 0
           ? supabaseServer
               .from(MESSAGES).select("reply_to_message_id, author_account_id, created_at")
               .in("reply_to_message_id", messageIds).is("deleted_at", null)
+              .eq("channel_id", channelId)
           : null;
 
         /* Each query is timed individually INSIDE the same Promise.all, so the
@@ -438,7 +480,8 @@ export async function GET(req: Request) {
           const a = Array.isArray(p.author) ? p.author[0] ?? null : p.author;
           const person = a && (Array.isArray(a.person) ? a.person[0] ?? null : a.person);
           replyPreviewById.set(p.id, {
-            id: p.id, body: p.body, kind: p.kind, deleted_at: p.deleted_at,
+            /* A deleted parent previews as a tombstone — never its text. */
+            id: p.id, body: p.deleted_at ? null : p.body, kind: p.kind, deleted_at: p.deleted_at,
             author_username: a?.username ?? null, author_full_name: person?.full_name ?? null,
           });
         }
@@ -488,10 +531,15 @@ export async function GET(req: Request) {
         if (!scope.includes((parentRow as { channel_id: string }).channel_id)) {
           return NextResponse.json({ ok: true, data: [] });
         }
+        /* Children must live in the parent's channel: reply_to_message_id is
+           set by the sender, so without this a member of ANOTHER channel
+           could inject rows into this thread view. */
         const { data: childRows } = await supabaseServer
           .from(MESSAGES).select(AUTHOR_SELECT)
           .eq("reply_to_message_id", parentId)
-          .order("created_at", { ascending: true });
+          .eq("channel_id", (parentRow as { channel_id: string }).channel_id)
+          .order("created_at", { ascending: true })
+          .limit(500);
         const all = [parentRow, ...((childRows ?? []) as unknown[])];
         const ids = [parentId, ...((childRows ?? []) as Array<{ id: string }>).map((r) => r.id)];
         let reactionMap = new Map<string, unknown>();
@@ -505,6 +553,60 @@ export async function GET(req: Request) {
             reactions: reactionMap.get(row.id) ?? [], reply_preview: null, thread: null,
           }));
         return NextResponse.json({ ok: true, data: out });
+      }
+
+      /* ---- "Chat with these people" resolver (/discuss?with=…) ---------
+         ids=<uuid,uuid,…> → { allowed, channelId }.
+           · allowed   — the requested accounts the caller may actually
+             message: valid UUIDs, not the caller, capped at 50, active
+             INTERNAL accounts of the caller's tenant (filterTenantAccounts,
+             the same gate createChannel / directChannel apply on write).
+           · channelId — an existing non-archived GROUP the caller is in
+             whose active member set is exactly {caller} ∪ allowed, or null
+             (the client then creates one through createChannel).
+         Read-only; creating anything stays with /api/discuss/mutate. */
+      case "groupWith": {
+        const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const requested = Array.from(
+          new Set(
+            (url.searchParams.get("ids") ?? "")
+              .split(",")
+              .map((s) => s.trim().toLowerCase())
+              .filter((s) => UUID.test(s) && s !== me.toLowerCase()),
+          ),
+        ).slice(0, 50);
+        const allowed = await filterTenantAccounts(requested, auth.tenant_id ?? null);
+        if (allowed.length < 2) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const want = new Set([me, ...allowed]);
+        const scope = await myChannelIds(me);
+        if (scope.length === 0) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const { data: groups } = await supabaseServer
+          .from(CHANNELS)
+          .select("id, last_message_at")
+          .in("id", scope)
+          .eq("kind", "group")
+          .is("archived_at", null);
+        const groupIds = ((groups ?? []) as Array<{ id: string; last_message_at: string | null }>)
+          .sort((a, b) => (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""))
+          .map((g) => g.id);
+        if (groupIds.length === 0) return NextResponse.json({ ok: true, data: { allowed, channelId: null } });
+        const { data: rows } = await supabaseServer
+          .from(MEMBERS)
+          .select("channel_id, account_id")
+          .in("channel_id", groupIds)
+          .is("left_at", null);
+        const sets = new Map<string, Set<string>>();
+        for (const r of (rows ?? []) as Array<{ channel_id: string; account_id: string }>) {
+          const set = sets.get(r.channel_id) ?? new Set<string>();
+          set.add(r.account_id);
+          sets.set(r.channel_id, set);
+        }
+        /* Most recently active exact match wins. */
+        const match = groupIds.find((id) => {
+          const set = sets.get(id);
+          return !!set && set.size === want.size && [...want].every((a) => set.has(a));
+        });
+        return NextResponse.json({ ok: true, data: { allowed, channelId: match ?? null } });
       }
 
       /* ---- a channel's members (membership-gated) --------------------- */

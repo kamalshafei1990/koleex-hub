@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { FinancePayment } from "@/lib/finance/types";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { ledgerDraft, refuseIfInLedger } from "@/lib/accounting/hooks";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -61,10 +62,13 @@ export async function POST(req: Request) {
     linked_order_id: body.linked_order_id ?? null,
     linked_order_supplier_id: body.linked_order_supplier_id ?? null,
     linked_expense_id: body.linked_expense_id ?? null,
+    bank_account_id: body.bank_account_id ?? null,
     notes: body.notes ?? null,
     updated_at: new Date().toISOString(),
   };
   if (body.id) {
+    const refuse = await refuseIfInLedger("finance_payments", body.id, auth.tenant_id);
+    if (refuse) return refuse;
     const { data, error } = await supabaseServer
       .from("finance_payments")
       .update(payload)
@@ -73,6 +77,11 @@ export async function POST(req: Request) {
       .select("*")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    /* An approved payment that has just been completed is ready for the books. */
+    const p = data as { status?: string; approval_status?: string | null };
+    if (p.status === "completed" && (p.approval_status === "approved" || p.approval_status === "partially_approved")) {
+      await ledgerDraft("payment", body.id, auth.tenant_id, auth.account_id);
+    }
     return NextResponse.json({ payment: data });
   }
   const { data, error } = await supabaseServer

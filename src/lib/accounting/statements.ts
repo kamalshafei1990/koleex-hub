@@ -1,144 +1,106 @@
 import "server-only";
 
 /* ===========================================================================
-   Phase A.3 — Financial Statements & Accounting Reporting.
+   Financial statements — pure reads over the ledger.
 
-   Pure read functions powering the four statement views:
-     · buildProfitLoss          revenue → gross → operating → net
-     · buildCashFlow            direct-method operating / investing / financing
-     · buildEquityStatement     opening → contributions → CYE → closing
-     · buildFinancialRatios     current/quick/cash/debt/margin/runway
+     · buildProfitLoss        revenue → gross → operating → net
+     · buildCashFlow          direct method: operating / investing / financing
+     · buildEquityStatement   opening → contributions → earnings → closing
+     · buildFinancialRatios   liquidity / solvency / margins / runway
 
-   HARD RULES (the brief is emphatic):
-     · every number comes from POSTED journal lines only
-       (status='posted', tenant-scoped)
-     · never read operational tables directly
-     · never include drafted/failed/voided entries
-     · cross-statement consistency: TB net = P&L net = Equity CYE
+   HARD RULES
+     · every number comes from the ledger's effective lines (posted, plus
+       voided originals that net against their reversal), through the SQL
+       aggregates in lib/accounting/queries.ts — in the tenant base currency
+     · never read operational tables here
+     · cross-statement consistency: TB net = P&L net = equity earnings
 
-   Account-section mapping uses the COA seeded in A.1 (the 16-account
-   default set). The classification matrix lives in one place at the
-   top of this file so future COA edits land in a single spot.
+   Classification is by account TYPE and SUBTYPE (what fn_accounting_ensure_coa
+   seeds), not by hard-coded code lists, so a tenant that adds accounts
+   still gets a correct statement.
    ========================================================================== */
 
-import { getSupabaseServer } from "@/lib/server/supabase-server";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { accountBalances, signedBalance } from "./queries";
 import type { AccountingAccount } from "./types";
 
-/* ─── Account classification ──────────────────────────────────── */
+/* ─── Classification ─────────────────────────────────────────── */
 
-/* Direct-cost expense accounts. With no COGS module yet, freight +
-   customs are the closest direct-cost analogue in the Hub COA. */
-/* Cost-of-sales codes — freight (5200), customs (5300), and the
-   Phase A.4 COGS account (5400). Anything else under 5xxx falls into
-   operating expenses by default. */
-const DIRECT_COST_CODES = new Set(["5200", "5300", "5400"]);
+/** Direct-cost subtypes: cost of goods, freight and customs. */
+const DIRECT_COST_SUBTYPES = new Set(["cogs", "shipping", "customs"]);
+/** Assets that are not current: fixed assets and their depreciation. */
+const NON_CURRENT_ASSET_SUBTYPES = new Set(["fixed", "accum_dep"]);
+/** Liabilities that are financing, not operating. */
+const FINANCING_LIABILITY_SUBTYPES = new Set(["loan"]);
+/** Cash and cash equivalents. */
+const CASH_SUBTYPES = new Set(["cash", "bank"]);
 
-/* Current-asset codes — excludes 1400-1999 (would be fixed assets
-   when those accounts are added in a later phase). */
-const CURRENT_ASSET_CODES = new Set(["1000", "1010", "1100", "1200", "1300"]);
+type Acct = Pick<AccountingAccount, "id" | "code" | "name" | "type" | "subtype" | "normal_balance">;
 
-/* Current-liability codes — AP + Taxes Payable. Loans Payable
-   (2100) sits in long-term liabilities. */
-const CURRENT_LIABILITY_CODES = new Set(["2000", "2200"]);
-
-/* Cash-equivalent codes — used by cash flow + cash ratio. */
-const CASH_CODES = new Set(["1000", "1010"]);
-
-/* Liability codes that flow through financing activities (loans). */
-const FINANCING_LIABILITY_CODES = new Set(["2100"]);
-
-/* ─── Shared period type + helper ─────────────────────────────── */
-
-export interface Period {
-  from: string;   // ISO yyyy-mm-dd inclusive
-  to: string;     // ISO yyyy-mm-dd inclusive
-}
-
-/** Returns the immediately-prior period of equal length. */
-export function priorPeriod(period: Period): Period {
-  const from = new Date(period.from);
-  const to = new Date(period.to);
-  const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1);
-  const priorTo = new Date(from);
-  priorTo.setDate(priorTo.getDate() - 1);
-  const priorFrom = new Date(priorTo);
-  priorFrom.setDate(priorFrom.getDate() - days + 1);
-  return {
-    from: priorFrom.toISOString().slice(0, 10),
-    to:   priorTo.toISOString().slice(0, 10),
-  };
-}
-
-/* ─── Core helper: posted-lines aggregator ────────────────────── */
-
-interface AggRow {
-  account_id: string;
-  code: string;
-  name: string;
-  type: AccountingAccount["type"];
-  normal_balance: AccountingAccount["normal_balance"];
+interface AggRow extends Acct {
   debit_total: number;
   credit_total: number;
 }
 
-async function aggregatePostedLines(tenantId: string, period?: Period): Promise<AggRow[]> {
-  /* All accounts loaded once so empty-period statements still render
-     every section header (even if the amount is zero). */
-  const { data: accountsRaw } = await getSupabaseServer()
-    .from("accounting_accounts")
-    .select("id, code, name, type, normal_balance")
-    .eq("tenant_id", tenantId);
-  const accounts = (accountsRaw ?? []) as Array<Pick<AccountingAccount, "id" | "code" | "name" | "type" | "normal_balance">>;
-  const acctById = new Map(accounts.map((a) => [a.id, a]));
-
-  let q = getSupabaseServer()
-    .from("accounting_journal_lines")
-    .select("account_id, debit, credit, accounting_journal_entries!inner(entry_date, status, tenant_id)")
-    .eq("tenant_id", tenantId)
-    .eq("accounting_journal_entries.tenant_id", tenantId)
-    .eq("accounting_journal_entries.status", "posted");
-  if (period) {
-    q = q.gte("accounting_journal_entries.entry_date", period.from)
-         .lte("accounting_journal_entries.entry_date", period.to);
-  }
-  const { data, error } = await q;
-  if (error) {
-    /* Surface the error so silent zeros never hide a real fault on
-       Vercel. Log + rethrow so the route's catch block returns 500. */
-    console.error("[aggregatePostedLines] supabase error:", {
-      tenantId,
-      period,
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    });
-    throw new Error(`aggregatePostedLines failed: ${error.message}`);
-  }
-
-  const aggMap = new Map<string, AggRow>();
-  for (const a of accounts) {
-    aggMap.set(a.id, { account_id: a.id, code: a.code, name: a.name, type: a.type, normal_balance: a.normal_balance, debit_total: 0, credit_total: 0 });
-  }
-  for (const row of (data ?? []) as Array<{ account_id: string; debit: number | string; credit: number | string }>) {
-    const cur = aggMap.get(row.account_id);
-    if (!cur) continue;
-    cur.debit_total  += Number(row.debit)  || 0;
-    cur.credit_total += Number(row.credit) || 0;
-  }
-  /* Preserve account_id even on accounts that the period skipped. */
-  void acctById;
-  return Array.from(aggMap.values());
+/** Every account of the tenant with its base-currency totals over the
+ *  period (zero for accounts the period did not touch, so empty sections
+ *  still render). */
+async function aggregateLines(tenantId: string, period?: Period): Promise<AggRow[]> {
+  const [{ data: accountsRaw }, balances] = await Promise.all([
+    supabaseServer
+      .from("accounting_accounts")
+      .select("id, code, name, type, subtype, normal_balance")
+      .eq("tenant_id", tenantId),
+    accountBalances(tenantId, period ?? {}),
+  ]);
+  const byId = new Map(balances.map((b) => [b.account_id, b]));
+  return ((accountsRaw ?? []) as Acct[]).map((a) => {
+    const b = byId.get(a.id);
+    return { ...a, debit_total: b?.debit_total ?? 0, credit_total: b?.credit_total ?? 0 };
+  });
 }
 
-/* Signed balance respecting normal_balance direction. */
 function balanceFor(row: AggRow): number {
-  return row.normal_balance === "debit"
-    ? row.debit_total - row.credit_total
-    : row.credit_total - row.debit_total;
+  return signedBalance(row.normal_balance, row.debit_total, row.credit_total);
 }
 
-/* ─── Profit & Loss ───────────────────────────────────────────── */
+/** A contra account reduces its section. */
+function sectionValue(row: AggRow): number {
+  return row.type.startsWith("contra_") ? -balanceFor(row) : balanceFor(row);
+}
+
+const isRevenue   = (r: Acct) => r.type === "revenue" || r.type === "contra_revenue";
+const isExpense   = (r: Acct) => r.type === "expense" || r.type === "contra_expense";
+const isAsset     = (r: Acct) => r.type === "asset" || r.type === "contra_asset";
+const isLiability = (r: Acct) => r.type === "liability" || r.type === "contra_liability";
+const isEquity    = (r: Acct) => r.type === "equity" || r.type === "contra_equity";
+const isCash      = (r: Acct) => r.type === "asset" && CASH_SUBTYPES.has(r.subtype ?? "");
+
+/* ─── Period helpers ─────────────────────────────────────────── */
+
+export interface Period {
+  from: string;   // YYYY-MM-DD inclusive
+  to: string;     // YYYY-MM-DD inclusive
+}
+
+function shiftDay(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The same-length period immediately before `period`. */
+export function priorPeriod(period: Period): Period {
+  const from = new Date(`${period.from}T00:00:00Z`);
+  const to = new Date(`${period.to}T00:00:00Z`);
+  const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1);
+  const prevTo = shiftDay(period.from, -1);
+  const prevFrom = shiftDay(prevTo, -(days - 1));
+  return { from: prevFrom, to: prevTo };
+}
+
+/* ─── Profit & Loss ──────────────────────────────────────────── */
 
 export interface PLAccountLine {
   account_id: string;
@@ -165,8 +127,7 @@ export interface ProfitLoss {
   operating_margin_pct: number;
   net_profit:         number;
   net_margin_pct:     number;
-  /** Optional same-shape comparison period (caller passes
-   *  compare_prior=1 → builder fills in priorPeriod(...)). */
+  /** Optional same-shape comparison period. */
   comparison?: ProfitLoss;
 }
 
@@ -175,78 +136,40 @@ interface PLBuildOpts {
   currency?: string;
 }
 
-export async function buildProfitLoss(
-  tenantId: string,
-  period: Period,
-  opts: PLBuildOpts = {},
-): Promise<ProfitLoss> {
-  const rows = await aggregatePostedLines(tenantId, period);
+function section(label: string, rows: AggRow[]): PLSection {
+  const accounts = rows
+    .map((r) => ({ account_id: r.id, code: r.code, name: r.name, amount: sectionValue(r) }))
+    .filter((a) => Math.abs(a.amount) > 0.005)
+    .sort((a, b) => a.code.localeCompare(b.code));
+  return { label, amount: accounts.reduce((s, a) => s + a.amount, 0), accounts };
+}
 
-  const revenueRows = rows.filter((r) => r.type === "revenue" || r.type === "contra_revenue");
-  const expenseRows = rows.filter((r) => r.type === "expense" || r.type === "contra_expense");
+export async function buildProfitLoss(tenantId: string, period: Period, opts: PLBuildOpts = {}): Promise<ProfitLoss> {
+  const [rows, currency] = await Promise.all([
+    aggregateLines(tenantId, period),
+    opts.currency ? Promise.resolve(opts.currency) : resolveBaseCurrency(tenantId),
+  ]);
+  const revenue = section("Revenue", rows.filter(isRevenue));
+  const expenseRows = rows.filter(isExpense);
+  const cost_of_sales = section("Cost of sales", expenseRows.filter((r) => DIRECT_COST_SUBTYPES.has(r.subtype ?? "")));
+  const operating_expenses = section("Operating expenses", expenseRows.filter((r) => !DIRECT_COST_SUBTYPES.has(r.subtype ?? "")));
 
-  const revenue: PLSection = {
-    label: "Revenue",
-    amount: revenueRows.reduce((s, r) => s + balanceFor(r), 0),
-    accounts: revenueRows
-      .map((r) => ({ account_id: r.account_id, code: r.code, name: r.name, amount: balanceFor(r) }))
-      .filter((a) => Math.abs(a.amount) > 0.005)
-      .sort((a, b) => a.code.localeCompare(b.code)),
-  };
-
-  const costRows = expenseRows.filter((r) => DIRECT_COST_CODES.has(r.code));
-  const opexRows = expenseRows.filter((r) => !DIRECT_COST_CODES.has(r.code));
-
-  const cost_of_sales: PLSection = {
-    label: "Cost of sales",
-    amount: costRows.reduce((s, r) => s + balanceFor(r), 0),
-    accounts: costRows
-      .map((r) => ({ account_id: r.account_id, code: r.code, name: r.name, amount: balanceFor(r) }))
-      .filter((a) => Math.abs(a.amount) > 0.005)
-      .sort((a, b) => a.code.localeCompare(b.code)),
-  };
-
-  const operating_expenses: PLSection = {
-    label: "Operating expenses",
-    amount: opexRows.reduce((s, r) => s + balanceFor(r), 0),
-    accounts: opexRows
-      .map((r) => ({ account_id: r.account_id, code: r.code, name: r.name, amount: balanceFor(r) }))
-      .filter((a) => Math.abs(a.amount) > 0.005)
-      .sort((a, b) => a.code.localeCompare(b.code)),
-  };
-
-  const gross_profit     = revenue.amount - cost_of_sales.amount;
+  const gross_profit = revenue.amount - cost_of_sales.amount;
   const operating_profit = gross_profit - operating_expenses.amount;
-  /* Net = operating; tax + financial charges are handled inside opex
-     until the tax engine ships (A.4). */
-  const net_profit       = operating_profit;
-
-  const gross_margin_pct     = revenue.amount > 0 ? (gross_profit / revenue.amount) * 100 : 0;
-  const operating_margin_pct = revenue.amount > 0 ? (operating_profit / revenue.amount) * 100 : 0;
-  const net_margin_pct       = revenue.amount > 0 ? (net_profit / revenue.amount) * 100 : 0;
+  const net_profit = operating_profit;
+  const pct = (n: number) => (revenue.amount > 0 ? (n / revenue.amount) * 100 : 0);
 
   const result: ProfitLoss = {
-    period,
-    currency: opts.currency ?? "USD",
-    revenue,
-    cost_of_sales,
-    gross_profit,
-    gross_margin_pct,
-    operating_expenses,
-    operating_profit,
-    operating_margin_pct,
-    net_profit,
-    net_margin_pct,
+    period, currency,
+    revenue, cost_of_sales, gross_profit, gross_margin_pct: pct(gross_profit),
+    operating_expenses, operating_profit, operating_margin_pct: pct(operating_profit),
+    net_profit, net_margin_pct: pct(net_profit),
   };
-
-  if (opts.comparePrior) {
-    result.comparison = await buildProfitLoss(tenantId, priorPeriod(period), { currency: opts.currency });
-  }
-
+  if (opts.comparePrior) result.comparison = await buildProfitLoss(tenantId, priorPeriod(period), { currency });
   return result;
 }
 
-/* ─── Cash Flow (direct method) ───────────────────────────────── */
+/* ─── Cash Flow (direct method) ──────────────────────────────── */
 
 export interface CashFlowLine {
   label: string;
@@ -269,182 +192,81 @@ export interface CashFlowStatement {
   financing:      CashFlowSection;
   net_change:     number;
   closing_cash:   number;
-  /** True when opening + net = closing (within rounding). */
+  /** True when opening + net = closing cash on the trial balance. */
   reconciled:     boolean;
 }
 
-/** Cash-impact of a single line on a cash account:
- *  Dr cash = inflow (positive), Cr cash = outflow (negative). */
-function cashImpactDr(row: { debit: number | string; credit: number | string }): number {
-  return (Number(row.debit) || 0) - (Number(row.credit) || 0);
-}
+const CASH_FLOW_LABELS: Record<string, (inflow: boolean) => string> = {
+  payment:           (i) => (i ? "Customer collections" : "Supplier payments"),
+  expense:           () => "Operating disbursements",
+  cash_movement:     (i) => (i ? "Unclassified bank inflow" : "Unclassified bank outflow"),
+  opening_balance:   () => "Opening / capital movements",
+  payroll:           () => "Salaries paid",
+  fx_exchange:       () => "Currency exchange",
+  void:              () => "Reversals",
+  manual:            () => "Manual entries",
+};
 
 export async function buildCashFlow(tenantId: string, period: Period): Promise<CashFlowStatement> {
-  /* Resolve cash account ids for this tenant. */
-  const { data: cashAccts } = await getSupabaseServer()
-    .from("accounting_accounts")
-    .select("id, code")
-    .eq("tenant_id", tenantId)
-    .in("code", Array.from(CASH_CODES));
-  const cashIds = new Set(((cashAccts ?? []) as Array<{ id: string; code: string }>).map((a) => a.id));
-  if (cashIds.size === 0) {
-    /* No cash accounts seeded — return a zeroed statement, never crash. */
-    return zeroedCashFlow(tenantId, period);
-  }
+  const [{ data, error }, currency, beforeRows, endRows] = await Promise.all([
+    supabaseServer.rpc("fn_accounting_cash_flow_lines", { p_tenant_id: tenantId, p_from: period.from, p_to: period.to }),
+    resolveBaseCurrency(tenantId),
+    aggregateLines(tenantId, { from: "1900-01-01", to: shiftDay(period.from, -1) }),
+    aggregateLines(tenantId, { from: "1900-01-01", to: period.to }),
+  ]);
+  if (error) throw new Error(`fn_accounting_cash_flow_lines: ${error.message}`);
 
-  /* Pull every posted line that hits a cash account in the period
-     PLUS the contra account info on the same journal so we can
-     classify Operating / Investing / Financing. */
-  const { data: cashLines } = await getSupabaseServer()
-    .from("accounting_journal_lines")
-    .select(
-      "id, entry_id, account_id, debit, credit, accounting_journal_entries!inner(id, entry_date, status, source_type, tenant_id)",
-    )
-    .eq("tenant_id", tenantId)
-    .in("account_id", Array.from(cashIds))
-    .eq("accounting_journal_entries.tenant_id", tenantId)
-    .eq("accounting_journal_entries.status", "posted")
-    .gte("accounting_journal_entries.entry_date", period.from)
-    .lte("accounting_journal_entries.entry_date", period.to);
+  type Row = { entry_id: string; entry_date: string; source_type: string; impact: number | string; contra_codes: string[] | null; contra_types: string[] | null };
+  const operating = new Map<string, number>();
+  const investing = new Map<string, number>();
+  const financing = new Map<string, number>();
+  const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v);
 
-  type CashLineRow = {
-    id: string; entry_id: string; account_id: string;
-    debit: number | string; credit: number | string;
-    accounting_journal_entries: { id: string; entry_date: string; status: string; source_type: string };
-  };
-  const lines = (cashLines ?? []) as unknown as CashLineRow[];
+  /* The subtype of every contra account decides the section: equity or a
+     loan is financing, a fixed asset is investing, everything else operates. */
+  const { data: acctsRaw } = await supabaseServer
+    .from("accounting_accounts").select("code, subtype").eq("tenant_id", tenantId);
+  const subtypeByCode = new Map(((acctsRaw ?? []) as Array<{ code: string; subtype: string | null }>).map((a) => [a.code, a.subtype ?? ""]));
 
-  /* For each cash line we also need to know the contra account
-     (the OTHER side of the journal) so financing/investing can be
-     identified. Pull all sibling lines in a single batch. */
-  const entryIds = Array.from(new Set(lines.map((l) => l.entry_id)));
-  let contraMap = new Map<string, Array<{ account_id: string; debit: number; credit: number; account_code: string; account_type: string }>>();
-  if (entryIds.length > 0) {
-    const { data: siblings } = await getSupabaseServer()
-      .from("accounting_journal_lines")
-      .select("entry_id, account_id, debit, credit, account:account_id(code, type)")
-      .eq("tenant_id", tenantId)
-      .in("entry_id", entryIds);
-    contraMap = new Map();
-    /* Supabase types the embedded relation as an array even on a 1:1 FK,
-       so we widen via `unknown` and assert the runtime shape. */
-    for (const s of (siblings ?? []) as unknown as Array<{
-      entry_id: string; account_id: string; debit: number | string; credit: number | string;
-      account: { code: string; type: string } | null;
-    }>) {
-      if (cashIds.has(s.account_id)) continue; /* skip the cash side itself */
-      const list = contraMap.get(s.entry_id) ?? [];
-      list.push({
-        account_id: s.account_id,
-        debit:  Number(s.debit) || 0,
-        credit: Number(s.credit) || 0,
-        account_code: s.account?.code ?? "",
-        account_type: s.account?.type ?? "",
-      });
-      contraMap.set(s.entry_id, list);
-    }
-  }
-
-  /* Classify each cash line by source_type + contra account. */
-  const operating: CashFlowLine[] = [];
-  const investing: CashFlowLine[] = [];
-  const financing: CashFlowLine[] = [];
-
-  for (const l of lines) {
-    const impact = cashImpactDr(l);
+  for (const r of (data ?? []) as Row[]) {
+    const impact = Number(r.impact) || 0;
     if (Math.abs(impact) < 0.005) continue;
-    const e = l.accounting_journal_entries;
-    const contra = contraMap.get(l.entry_id) ?? [];
-    const equityContra = contra.some((c) => c.account_type === "equity");
-    const loanContra   = contra.some((c) => FINANCING_LIABILITY_CODES.has(c.account_code));
-
-    const isFinancing =
-      e.source_type === "opening_balance" || equityContra || loanContra;
-    const isInvesting = false; /* no investing-class accounts seeded yet */
-
-    const label =
-      e.source_type === "payment"          ? (impact > 0 ? "Customer collections" : "Supplier payments")
-      : e.source_type === "expense"        ? "Operating disbursements"
-      : e.source_type === "cash_movement"  ? (impact > 0 ? "Unclassified cash inflow" : "Unclassified cash outflow")
-      : e.source_type === "opening_balance" ? "Opening / capital movements"
-      : "Manual entry";
-
-    const dest = isFinancing ? financing : isInvesting ? investing : operating;
-    dest.push({ label, amount: impact, detail: e.entry_date });
+    const contraTypes = r.contra_types ?? [];
+    const contraSubtypes = (r.contra_codes ?? []).map((c) => subtypeByCode.get(c) ?? "");
+    /* A transfer between two cash accounts has no contra — it is not a flow. */
+    if (contraTypes.length === 0 && r.source_type !== "fx_exchange") continue;
+    const isFinancing = r.source_type === "opening_balance" || contraTypes.some((t) => t === "equity" || t === "contra_equity") || contraSubtypes.some((s) => FINANCING_LIABILITY_SUBTYPES.has(s));
+    const isInvesting = !isFinancing && contraSubtypes.some((s) => NON_CURRENT_ASSET_SUBTYPES.has(s));
+    const label = (CASH_FLOW_LABELS[r.source_type] ?? (() => "Other"))(impact > 0);
+    add(isFinancing ? financing : isInvesting ? investing : operating, label, impact);
   }
 
-  /* Collapse the per-line list into one row per label for readability. */
-  const collapse = (arr: CashFlowLine[]): CashFlowSection => {
-    const m = new Map<string, number>();
-    for (const x of arr) m.set(x.label, (m.get(x.label) ?? 0) + x.amount);
-    const grouped: CashFlowLine[] = Array.from(m.entries())
-      .map(([label, amount]) => ({ label, amount }))
+  const collapse = (label: string, m: Map<string, number>): CashFlowSection => {
+    const lines = Array.from(m.entries())
+      .map(([l, amount]) => ({ label: l, amount }))
       .filter((x) => Math.abs(x.amount) > 0.005)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-    return {
-      label: "",
-      amount: grouped.reduce((s, x) => s + x.amount, 0),
-      lines: grouped,
-    };
+    return { label, amount: lines.reduce((s, x) => s + x.amount, 0), lines };
   };
+  const opSection = collapse("Operating activities", operating);
+  const invSection = collapse("Investing activities", investing);
+  const finSection = collapse("Financing activities", financing);
 
-  const opSection = { ...collapse(operating), label: "Operating activities" };
-  const invSection = { ...collapse(investing), label: "Investing activities" };
-  const finSection = { ...collapse(financing), label: "Financing activities" };
-
-  /* Opening cash = cash balance at start of period (period-prior
-     aggregate). Closing cash = opening + net. */
-  const beforeRows = await aggregatePostedLines(tenantId, { from: "1900-01-01", to: shiftDateBackOneDay(period.from) });
-  let opening_cash = 0;
-  for (const r of beforeRows) {
-    if (CASH_CODES.has(r.code)) opening_cash += balanceFor(r);
-  }
+  const cashOf = (rows: AggRow[]) => rows.filter(isCash).reduce((s, r) => s + balanceFor(r), 0);
+  const opening_cash = cashOf(beforeRows);
   const net_change = opSection.amount + invSection.amount + finSection.amount;
   const closing_cash = opening_cash + net_change;
-
-  /* Sanity check: closing cash from CF should equal closing cash
-     from the TB. Drift means a posted-but-not-classified line. */
-  const periodEnd = await aggregatePostedLines(tenantId, { from: "1900-01-01", to: period.to });
-  let tbCash = 0;
-  for (const r of periodEnd) {
-    if (CASH_CODES.has(r.code)) tbCash += balanceFor(r);
-  }
-  const reconciled = Math.abs(closing_cash - tbCash) < 0.01;
+  const tbCash = cashOf(endRows);
 
   return {
-    period,
-    currency: "USD",
-    opening_cash,
-    operating: opSection,
-    investing: invSection,
-    financing: finSection,
-    net_change,
-    closing_cash,
-    reconciled,
+    period, currency, opening_cash,
+    operating: opSection, investing: invSection, financing: finSection,
+    net_change, closing_cash,
+    reconciled: Math.abs(closing_cash - tbCash) < 0.01,
   };
 }
 
-function shiftDateBackOneDay(iso: string): string {
-  const d = new Date(iso);
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function zeroedCashFlow(_tenantId: string, period: Period): CashFlowStatement {
-  return {
-    period,
-    currency: "USD",
-    opening_cash: 0,
-    operating: { label: "Operating activities", amount: 0, lines: [] },
-    investing: { label: "Investing activities", amount: 0, lines: [] },
-    financing: { label: "Financing activities", amount: 0, lines: [] },
-    net_change: 0,
-    closing_cash: 0,
-    reconciled: true,
-  };
-}
-
-/* ─── Statement of Equity ────────────────────────────────────── */
+/* ─── Equity ─────────────────────────────────────────────────── */
 
 export interface EquityMovement {
   label: string;
@@ -460,131 +282,147 @@ export interface EquityStatement {
   current_year_earnings: number;
   closing_equity: number;
   movements:      EquityMovement[];
-  /** Retained earnings standing balance at period end (3100). */
+  /** Retained earnings standing balance at period end. */
   retained_earnings: number;
 }
 
+/** Book equity plus the earnings not yet closed to retained earnings. */
+function economicEquity(rows: AggRow[]): number {
+  const book = rows.filter(isEquity).reduce((s, r) => s + sectionValue(r), 0);
+  const revenue = rows.filter(isRevenue).reduce((s, r) => s + sectionValue(r), 0);
+  const expense = rows.filter(isExpense).reduce((s, r) => s + sectionValue(r), 0);
+  return book + revenue - expense;
+}
+
 export async function buildEquityStatement(tenantId: string, period: Period): Promise<EquityStatement> {
-  /* Opening equity = sum of equity-type accounts at period start. */
-  const beforeRows = await aggregatePostedLines(tenantId, { from: "1900-01-01", to: shiftDateBackOneDay(period.from) });
-  let opening_equity = 0;
-  for (const r of beforeRows) {
-    if (r.type === "equity" || r.type === "contra_equity") opening_equity += balanceFor(r);
-  }
-
-  /* Period movements — split into owner contributions (Owner Capital
-     account 3000) and current-year earnings (revenue - expense for
-     the period, which is the standard P&L → equity rollup). */
-  const periodRows = await aggregatePostedLines(tenantId, period);
-  let contributions = 0;
-  for (const r of periodRows) {
-    if (r.code === "3000") contributions += balanceFor(r);
-  }
-  /* Current year earnings comes from the P&L (revenue - expenses). */
-  const pl = await buildProfitLoss(tenantId, period);
-  const current_year_earnings = pl.net_profit;
-
-  /* Closing equity = sum of equity-type accounts at period end. */
-  const periodEnd = await aggregatePostedLines(tenantId, { from: "1900-01-01", to: period.to });
-  let closing_equity_balance = 0;
-  let retained_earnings = 0;
-  for (const r of periodEnd) {
-    if (r.type === "equity" || r.type === "contra_equity") closing_equity_balance += balanceFor(r);
-    if (r.code === "3100") retained_earnings += balanceFor(r);
-  }
-  /* Add the unrealised current-year earnings (revenue - expense not
-     yet rolled into retained) so closing reflects economic equity. */
-  const closing_equity = closing_equity_balance + current_year_earnings;
+  const [beforeRows, periodRows, endRows, currency] = await Promise.all([
+    aggregateLines(tenantId, { from: "1900-01-01", to: shiftDay(period.from, -1) }),
+    aggregateLines(tenantId, period),
+    aggregateLines(tenantId, { from: "1900-01-01", to: period.to }),
+    resolveBaseCurrency(tenantId),
+  ]);
+  const opening_equity = economicEquity(beforeRows);
+  const closing_equity = economicEquity(endRows);
+  const contributions = periodRows.filter((r) => isEquity(r) && r.subtype === "capital").reduce((s, r) => s + sectionValue(r), 0);
+  const revenue = periodRows.filter(isRevenue).reduce((s, r) => s + sectionValue(r), 0);
+  const expense = periodRows.filter(isExpense).reduce((s, r) => s + sectionValue(r), 0);
+  const current_year_earnings = revenue - expense;
+  const retained_earnings = endRows.filter((r) => r.subtype === "retained").reduce((s, r) => s + sectionValue(r), 0);
+  const other = closing_equity - opening_equity - contributions - current_year_earnings;
 
   const movements: EquityMovement[] = [
     { label: "Owner contributions / withdrawals", amount: contributions },
-    { label: "Current year earnings",             amount: current_year_earnings },
+    { label: "Earnings for the period", amount: current_year_earnings },
+    { label: "Other equity movements", amount: other },
   ].filter((m) => Math.abs(m.amount) > 0.005);
 
-  return {
-    period,
-    currency: "USD",
-    opening_equity,
-    contributions,
-    current_year_earnings,
-    closing_equity,
-    movements,
-    retained_earnings,
-  };
+  return { period, currency, opening_equity, contributions, current_year_earnings, closing_equity, movements, retained_earnings };
 }
 
-/* ─── Financial Ratios ─────────────────────────────────────────── */
+/* ─── Ratios ─────────────────────────────────────────────────── */
 
 export interface FinancialRatios {
   as_of: string;
   currency: string;
-  /* Liquidity */
   current_ratio:        number;
   quick_ratio:          number;
   cash_ratio:           number;
-  /* Solvency */
   debt_to_equity:       number;
-  /* Profitability — computed from the trailing YTD P&L */
   gross_margin_pct:     number;
   operating_margin_pct: number;
   net_margin_pct:       number;
-  /* Runway — months of cash at current burn (negative net only). */
+  /** Months of cash at the current burn (negative net only). */
   runway_months:        number | null;
-  /* Concentration — placeholder, no operational join. */
   receivables_balance:  number;
   payables_balance:     number;
 }
 
 export async function buildFinancialRatios(tenantId: string, asOf: string): Promise<FinancialRatios> {
-  const ytdFrom = `${new Date(asOf).getUTCFullYear()}-01-01`;
-  const ytdPeriod: Period = { from: ytdFrom, to: asOf };
-
+  const ytdPeriod: Period = { from: `${asOf.slice(0, 4)}-01-01`, to: asOf };
   const [snapshot, pl] = await Promise.all([
-    aggregatePostedLines(tenantId, { from: "1900-01-01", to: asOf }),
+    aggregateLines(tenantId, { from: "1900-01-01", to: asOf }),
     buildProfitLoss(tenantId, ytdPeriod),
   ]);
 
-  let cash = 0;
-  let currentAssets = 0;
-  let currentLiabilities = 0;
-  let receivablesBalance = 0;
-  let payablesBalance = 0;
-  let totalLiabilities = 0;
-  let totalEquity = 0;
+  let cash = 0, currentAssets = 0, currentLiabilities = 0, receivables = 0, payables = 0, totalLiabilities = 0;
   for (const r of snapshot) {
-    const b = balanceFor(r);
-    if (CASH_CODES.has(r.code)) cash += b;
-    if (CURRENT_ASSET_CODES.has(r.code)) currentAssets += b;
-    if (CURRENT_LIABILITY_CODES.has(r.code)) currentLiabilities += b;
-    if (r.code === "1100") receivablesBalance += b;
-    if (r.code === "2000") payablesBalance += b;
-    if (r.type === "liability" || r.type === "contra_liability") totalLiabilities += b;
-    if (r.type === "equity" || r.type === "contra_equity") totalEquity += b;
+    const v = sectionValue(r);
+    if (isCash(r)) cash += v;
+    if (isAsset(r) && !NON_CURRENT_ASSET_SUBTYPES.has(r.subtype ?? "")) currentAssets += v;
+    if (isLiability(r) && !FINANCING_LIABILITY_SUBTYPES.has(r.subtype ?? "")) currentLiabilities += v;
+    if (isLiability(r)) totalLiabilities += v;
+    if (r.subtype === "receivable") receivables += v;
+    if (r.subtype === "payable" || r.subtype === "grni") payables += v;
   }
-  /* Add CYE into equity for the runway / D/E calc — economic equity
-     reflects unrolled earnings. */
-  totalEquity += pl.net_profit;
-
+  const totalEquity = economicEquity(snapshot);
   const monthsInYtd = Math.max(1, Math.round(daysBetween(ytdPeriod.from, ytdPeriod.to) / 30));
   const burnPerMonth = pl.net_profit < 0 ? Math.abs(pl.net_profit) / monthsInYtd : 0;
-  const runwayMonths = burnPerMonth > 0 ? cash / burnPerMonth : null;
 
   return {
     as_of: asOf,
-    currency: "USD",
+    currency: pl.currency,
     current_ratio:        currentLiabilities > 0 ? currentAssets / currentLiabilities : 0,
-    quick_ratio:          currentLiabilities > 0 ? (cash + receivablesBalance) / currentLiabilities : 0,
+    quick_ratio:          currentLiabilities > 0 ? (cash + receivables) / currentLiabilities : 0,
     cash_ratio:           currentLiabilities > 0 ? cash / currentLiabilities : 0,
     debt_to_equity:       totalEquity > 0 ? totalLiabilities / totalEquity : 0,
     gross_margin_pct:     pl.gross_margin_pct,
     operating_margin_pct: pl.operating_margin_pct,
     net_margin_pct:       pl.net_margin_pct,
-    runway_months:        runwayMonths,
-    receivables_balance:  receivablesBalance,
-    payables_balance:     payablesBalance,
+    runway_months:        burnPerMonth > 0 ? cash / burnPerMonth : null,
+    receivables_balance:  receivables,
+    payables_balance:     payables,
   };
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
   return Math.max(1, Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 86_400_000) + 1);
+}
+
+/* ─── Balance sheet (per account, for the visual statements) ─── */
+
+export interface BalanceLine { code: string; name: string; amount: number }
+export interface BalanceSection { label: string; amount: number; accounts: BalanceLine[] }
+export interface BalanceSheet {
+  as_of: string;
+  currency: string;
+  assets: BalanceSection;
+  liabilities: BalanceSection;
+  equity: BalanceSection;
+  total_assets: number;
+  total_liab_eq: number;
+  reconciled: boolean;
+}
+
+export async function buildBalanceSheet(tenantId: string, asOf: string, currency?: string): Promise<BalanceSheet> {
+  const [rows, ccy] = await Promise.all([
+    aggregateLines(tenantId, { from: "1900-01-01", to: asOf }),
+    currency ? Promise.resolve(currency) : resolveBaseCurrency(tenantId),
+  ]);
+  const build = (label: string, group: AggRow[]): BalanceSection => {
+    const accounts = group
+      .map((a) => ({ code: a.code, name: a.name, amount: sectionValue(a) }))
+      .filter((x) => Math.abs(x.amount) > 0.005)
+      .sort((a, b) => a.code.localeCompare(b.code));
+    return { label, amount: accounts.reduce((s, l) => s + l.amount, 0), accounts };
+  };
+  const assets = build("Assets", rows.filter(isAsset));
+  const liabilities = build("Liabilities", rows.filter(isLiability));
+  const equity = build("Equity", rows.filter(isEquity));
+
+  /* Earnings not yet closed to retained earnings — inception to date, so
+     the identity holds in every year, not only the first. */
+  const revenue = rows.filter(isRevenue).reduce((s, r) => s + sectionValue(r), 0);
+  const expense = rows.filter(isExpense).reduce((s, r) => s + sectionValue(r), 0);
+  const earnings = revenue - expense;
+  if (Math.abs(earnings) > 0.005) {
+    equity.accounts.push({ code: "3200", name: "Current Year Earnings", amount: earnings });
+    equity.amount += earnings;
+  }
+  const total_assets = assets.amount;
+  const total_liab_eq = liabilities.amount + equity.amount;
+  return {
+    as_of: asOf, currency: ccy, assets, liabilities, equity,
+    total_assets, total_liab_eq,
+    reconciled: Math.abs(total_assets - total_liab_eq) < 0.05,
+  };
 }

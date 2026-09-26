@@ -29,6 +29,7 @@ import { stageTimer } from "@/lib/server/perf";
 import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
+import { FRESHNESS_COLUMNS, foldFreshness } from "@/lib/products-freshness";
 import { PRODUCTS_LIST_CONFIG } from "@/lib/server-list/products-config";
 import { resolveProductSearchReach } from "@/lib/server/product-search-reach";
 
@@ -44,7 +45,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const listView = url.searchParams.get("view") === "list";
   const canSeeSecrets = await hasProductDataAccess(auth);
-  const cols = listView ? LIST_PRODUCT_COLUMNS : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
+  /* The list ALSO reads the three freshness moments — and folds them into
+     one small `fresh` number before responding (products-freshness.ts says
+     why: 60 KB of timestamps for a fact that is 0 on nearly every row). They
+     are appended here, not in LIST_PRODUCT_COLUMNS, so that constant keeps
+     describing what the browser receives. */
+  const cols = listView
+    ? `${LIST_PRODUCT_COLUMNS}, ${FRESHNESS_COLUMNS.join(", ")}`
+    : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
   _t.mark("auth");
 
   /* ── ?paged=1 — server-driven list (search / filter / sort / page in SQL) ──
@@ -114,6 +122,8 @@ export async function GET(req: Request) {
        objects and the grid needs no second code path. The cast is only
        because `select()` takes a runtime string, which erases the row type. */
     const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    const now = Date.now();
+    for (const r of rows) foldFreshness(r, now);
 
     /* MODEL CODES TRAVEL WITH THE PAGE. They used to arrive later, in the
        signals payload, and the card is built around them — the heading is the
@@ -147,6 +157,48 @@ export async function GET(req: Request) {
           .then((r) => r)
       : null;
     const groupsPromise = buildGroupCountsQuery()?.then((r) => r) ?? null;
+    /* FACETS FOR THE CATEGORY RAIL (owner, 22 Sep 2026). The rail's cards
+       FILTER by category, so they must keep showing every category of the
+       match set — with its count — while one of them is selected. The group
+       count above runs over the match set INCLUDING the category and
+       subcategory filters, so it would collapse to the chosen card. Same
+       scan, those two filters dropped; page 1 only, and only while one of
+       them is applied — otherwise the group counts ARE the facets and no
+       second query runs. */
+    const facetReq = (listReq.filters.category || listReq.filters.subcategory)
+      ? { ...listReq, filters: Object.fromEntries(Object.entries(listReq.filters).filter(([k]) => k !== "category" && k !== "subcategory")) }
+      : null;
+    const facetsPromise = listReq.page === 1 && facetReq
+      ? (() => {
+          let fq = supabaseServer
+            .from("products")
+            .select("category_slug, subcategory_slug")
+            .eq("tenant_id", auth.tenant_id);
+          if (!canSeeSecrets) fq = fq.eq("status", "active");
+          return applyServerList(fq, facetReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
+            .range(0, GROUP_SCAN_MAX - 1)
+            .then((r) => r);
+        })()
+      : null;
+    /* DIVISIONS WITH PRODUCTS — the whole tenant, NOT the match set. The
+       division strip is navigation: it must show where products exist
+       regardless of the filter currently applied (a strip filtered by its
+       own selection would collapse to one pill). Page 1 only, one indexed
+       column, and the catalogue rule applies (active only for callers
+       without the Product Data grant) so a customer never sees a division
+       whose only products are drafts. Owner (22 Sep 2026): the eight empty
+       divisions were on every customer's screen, promising ranges that do
+       not exist yet. */
+    const divisionsPromise = listReq.page === 1
+      ? (() => {
+          let dq = supabaseServer
+            .from("products")
+            .select("division_slug")
+            .eq("tenant_id", auth.tenant_id);
+          if (!canSeeSecrets) dq = dq.eq("status", "active");
+          return dq.range(0, GROUP_SCAN_MAX - 1).then((r) => r);
+        })()
+      : null;
 
     let models: {
       counts: Record<string, number>;
@@ -184,7 +236,7 @@ export async function GET(req: Request) {
     _t.mark("models");
 
     let groupCounts:
-      | { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean }
+      | { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; facets?: { categories: Record<string, number>; subcategories: Record<string, number> }; capped: boolean }
       | undefined;
     if (groupsPromise) {
       const { data: gRows, error: gErr } = await groupsPromise;
@@ -206,14 +258,56 @@ export async function GET(req: Request) {
         const capped = (gRows?.length ?? 0) >= GROUP_SCAN_MAX;
         if (capped) console.warn("[api/products paged groupCounts] scan capped at", GROUP_SCAN_MAX);
         groupCounts = { categories, subcategories, capped };
+        if (facetsPromise) {
+          const { data: fRows, error: fErr } = await facetsPromise;
+          /* A failed facet scan must not fail the page: the rail then shows
+             the group counts, i.e. the selected card alone, until the next
+             load. */
+          if (fErr) console.error("[api/products paged facets]", fErr.message);
+          else {
+            const fc: Record<string, number> = {};
+            const fs: Record<string, number> = {};
+            for (const g of (fRows ?? []) as { category_slug: string | null; subcategory_slug: string | null }[]) {
+              const c = g.category_slug || "_uncategorized";
+              const s = g.subcategory_slug || "_uncategorized";
+              fc[c] = (fc[c] ?? 0) + 1;
+              fs[`${c}/${s}`] = (fs[`${c}/${s}`] ?? 0) + 1;
+            }
+            groupCounts.facets = { categories: fc, subcategories: fs };
+          }
+        } else {
+          groupCounts.facets = { categories, subcategories };
+        }
+      }
+    }
+    if (divisionsPromise) {
+      const { data: dRows, error: dErr } = await divisionsPromise;
+      /* A failed count must not fail the page; the strip then shows every
+         division, as it always did. */
+      if (dErr) console.error("[api/products paged divisionCounts]", dErr.message);
+      else {
+        const divisions: Record<string, number> = {};
+        for (const d of (dRows ?? []) as { division_slug: string | null }[]) {
+          const k = d.division_slug || "_uncategorized";
+          divisions[k] = (divisions[k] ?? 0) + 1;
+        }
+        groupCounts = { categories: {}, subcategories: {}, capped: false, ...groupCounts, divisions };
       }
     }
     _t.mark("groups");
 
     const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
+    /* SYNC RULE (owner, 19/09/2026): a change in Product Data shows on the
+       next open. `max-age` alone keeps that promise — within 30 s a repeat
+       open is served from the browser cache, after that it must ask again.
+       The old `stale-while-revalidate=300` broke it: for five minutes the
+       browser answered the app's fetch INSTANTLY WITH THE STALE COPY and
+       revalidated in the background, and the app never re-read, so a
+       renamed product kept its old name for the whole session. The warm
+       snapshot still paints first, so nothing waits on this request. */
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header },
+      headers: { "Cache-Control": "private, max-age=30", "Server-Timing": header },
     });
   }
 
@@ -235,10 +329,15 @@ export async function GET(req: Request) {
     _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load products" }, { status: 500 });
   }
-  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: (data ?? []).length });
+  const products = (data ?? []) as unknown as Record<string, unknown>[];
+  if (listView) {
+    const now = Date.now();
+    for (const r of products) foldFreshness(r, now);
+  }
+  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: products.length });
   return NextResponse.json(
-    { products: data ?? [] },
-    { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=900", "Server-Timing": header } },
+    { products },
+    { headers: { "Cache-Control": "private, max-age=60", "Server-Timing": header } },
   );
 }
 

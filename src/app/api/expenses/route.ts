@@ -27,6 +27,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import type { FinanceExpense } from "@/lib/finance/types";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { refuseIfInLedger } from "@/lib/accounting/hooks";
 
 interface JoinedExpense {
   category?: { name: string } | { name: string }[] | null;
@@ -104,6 +105,8 @@ export async function POST(req: Request) {
   };
 
   if (body.id) {
+    const refuse = await refuseIfInLedger("finance_expenses", body.id, auth.tenant_id);
+    if (refuse) return refuse;
     const { data, error } = await supabaseServer
       .from("finance_expenses")
       .update(payload)

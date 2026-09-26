@@ -9,6 +9,7 @@
    produces the same event keys, so consumers can dedupe trivially.
    ========================================================================== */
 
+import { supplierOutstanding } from "@/lib/finance/calc";
 import type { DashboardKpi, FinanceOrder } from "@/lib/finance/types";
 import type {
   OperationalEvent,
@@ -127,7 +128,7 @@ export function synthesizeEvents(args: {
   /* ── Suppliers: due / overdue / dependency ───────────── */
   for (const o of orders) {
     for (const s of o.suppliers ?? []) {
-      const outstanding = Math.max(0, (s.supplier_cost ?? 0) - (s.paid_amount ?? 0));
+      const outstanding = supplierOutstanding(s);
       if (outstanding <= 0) continue;
       const due = daysFromToday(s.due_date);
       if (due == null) continue;

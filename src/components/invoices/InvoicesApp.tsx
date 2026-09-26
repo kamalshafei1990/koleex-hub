@@ -21,6 +21,7 @@ import { invoicesT } from "@/lib/translations/invoices";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
@@ -496,11 +497,9 @@ function InvoiceDetailView({
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden print:hidden">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
           <div className="flex items-center gap-3 pt-4 pb-3 flex-wrap">
-            <button
-              onClick={onBack}
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-            >
-              <RrIcon name="arrow-left" size={16} />
+            <button type="button" onClick={onBack} aria-label={t("app.title")} className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{t("app.title")}</span>
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-[18px] md:text-[20px] font-bold tracking-tight truncate flex items-center gap-2">
@@ -890,7 +889,7 @@ function InvoiceFormModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh]">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">{t("action.new")}</h2>
           <button onClick={onClose} className="h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center">
@@ -1005,7 +1004,7 @@ function PaymentModal({
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">{t("pay.title")}</h2>
           <button onClick={onClose} className="h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center">

@@ -1,29 +1,56 @@
+import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductCostAccess, requireProductDataAction } from "@/lib/server/product-access";
 import { resolveSchema, computeReadiness } from "@/lib/product-schema";
+import { inChunks } from "@/lib/server/in-chunks";
 import type { ProductKnowledgeBlock } from "@/types/product-schema";
 
 /* ---------------------------------------------------------------------------
-   GET /api/products/signals — INTERNAL work signals for the Product Data
-   grid. One round-trip returning, per product id:
+   POST /api/products/signals — INTERNAL work signals for the Product Data
+   grid, for a LIST of product ids. Per product:
 
      readiness  — 0-100, the SAME computeReadiness engine the editor uses,
                   so the card and the detail page never disagree
      missing    — up to 3 actionable gap keys (photo/specs/cost/desc/code)
-     cost       — primary model cost in CNY (cost-permission gated)
+     cost       — effective cost in CNY (cost-permission gated)
      visible    — customers can see it (distinct from status)
      updatedAt  — staleness
-     supplier   — primary supplier {name, logo} (link first, else the
-                  model's supplier text matched by name)
+     supplier   — { id } into the `suppliers` dictionary, or { id: null,
+                  name } when the model row carries free text
 
-   Deliberately a SEPARATE endpoint, not extra weight on
-   /api/products?view=list: the public /products catalogue must keep its
-   slim, fast payload — only /product-data asks for signals.
+   WHY IDS, NOT THE WHOLE CATALOGUE (22 Sep 2026). The GET version read every
+   product, every model, every media row, every supplier link, every
+   translation and EVERY contact on every open, then shipped 408 KB back:
+   190 KB of signals (each carrying a full supplier object with a 200-byte
+   logo URL — the same eight suppliers, repeated 394 times), 158 KB of model
+   maps the list response already delivers with each page, and 60 KB of
+   thumbnails. That was for 394 products; at the owner's 3,000 it is ~3 MB
+   per open, and the grid only ever shows one page at a time. The list is
+   paged; this now follows the page. Same discipline as /api/products/
+   fob-prices: the client posts the ids it is holding and merges.
+
+   WHAT LEFT THE PAYLOAD, AND WHERE IT WENT:
+     · models (counts / codes / rosters) — ride with each list page.
+     · supplier objects — one `suppliers` dictionary per response; the
+       signal carries the id.
+     · every other per-product field is unchanged, so the card is unchanged.
+
+   COST SOURCE (owner's source-of-truth rule): the SUPPLIER LINK is the
+   record; the variant's cost_price is the fallback. The profile's Price tab
+   reads them in the same order — the GET version read the variant first,
+   and the same product could show "Not set" on one screen and ¥6,554 on
+   the other.
+
+   Deliberately a SEPARATE endpoint, not extra weight on /api/products: the
+   public /products catalogue must keep its slim, fast payload — only
+   /product-data asks for signals.
    --------------------------------------------------------------------------- */
 
 export const dynamic = "force-dynamic";
+
+const MAX_IDS = 500;
 
 interface ProductRow {
   id: string;
@@ -42,7 +69,97 @@ interface ProductRow {
   updated_at: string | null;
 }
 
-export async function GET() {
+interface ModelRow {
+  product_id: string;
+  primary_model: string | null;
+  model_name: string | null;
+  cost_price: number | null;
+  global_price: number | null;
+  supplier: string | null;
+  pricing_mode: string | null;
+  price_note: string | null;
+}
+
+interface LinkRow {
+  product_id: string;
+  supplier_id: string | null;
+  is_primary: boolean | null;
+  unit_cost_cny: number | string | null;
+  notes?: string | null;
+  price_options?: Array<{ price?: unknown; note?: unknown }> | null;
+}
+
+interface ContactRow {
+  id: string;
+  company_name_en: string | null;
+  company_name_cn: string | null;
+  display_name: string | null;
+  photo_url: string | null;
+  logo_url: string | null;
+}
+
+export interface SignalsSupplier { name: string; cn: string | null; logo: string | null }
+
+/* THE TENANT'S LINKED SUPPLIERS, memoised for a minute per tenant.
+   The supplier FILTER lists every supplier with a product in this tenant,
+   not only the ones on this page — otherwise the dropdown would grow as the
+   operator scrolled. The first version asked PostgREST for that with an
+   embedded-resource filter (`products!inner(tenant_id)`), which the HTTP
+   client refused outright; this reads the two small tables it needs —
+   supplier contacts of the tenant, and the distinct supplier ids that hold a
+   product link — and intersects them. Eight rows today, tens later; the memo
+   keeps it off the hot path. A link edit shows here within a minute, which
+   is the freshness the signals themselves already advertise. */
+/* The card's supplier line is a LABEL, not a legal document (owner's
+   UI review, 22 Sep 2026): "ZHEJIANG LEJIANG MACHINE CO., LTD" cut to
+   "ZHEJIANG LEJIANG MACHINE C…" on every card. The short trade name the
+   contact carries wins when it differs from the legal name ("KILO (麒龙)",
+   "Stao (狮涛)"), and a legal name typed in capitals is read back in title
+   case — mixed-case names are left exactly as entered. The same string
+   feeds the supplier filter, so the two always agree. */
+function titleCaseShout(s: string): string {
+  const letters = s.replace(/[^A-Za-z]/g, "");
+  if (!letters || letters !== letters.toUpperCase()) return s;
+  return s.toLowerCase().replace(/(^|[\s(\/,.\-])([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase());
+}
+function readableSupplierName(c: ContactRow): string {
+  const legal = (c.company_name_en || "").trim();
+  const short = (c.display_name || "").trim();
+  const picked = short && short !== legal && short.length <= legal.length ? short : legal || short;
+  return titleCaseShout(picked || (c.company_name_cn || "").trim());
+}
+interface SupplierMemo { at: number; dict: Record<string, SignalsSupplier> }
+const gs = globalThis as typeof globalThis & { __kxSignalSuppliers?: Map<string, SupplierMemo> };
+const SUPPLIER_MEMO_MS = 60_000;
+
+async function tenantLinkedSuppliers(tenantId: string): Promise<Record<string, SignalsSupplier>> {
+  const store = (gs.__kxSignalSuppliers ??= new Map());
+  const hit = store.get(tenantId);
+  if (hit && Date.now() - hit.at < SUPPLIER_MEMO_MS) return hit.dict;
+  const [contactsRes, linksRes] = await Promise.all([
+    supabaseServer
+      .from("contacts")
+      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+      .eq("tenant_id", tenantId)
+      .eq("contact_type", "supplier"),
+    supabaseServer.from("product_suppliers").select("supplier_id"),
+  ]);
+  const linked = new Set<string>();
+  for (const r of (linksRes.data ?? []) as Array<{ supplier_id: string | null }>) if (r.supplier_id) linked.add(r.supplier_id);
+  const dict: Record<string, SignalsSupplier> = {};
+  for (const c of (contactsRes.data ?? []) as ContactRow[]) {
+    if (!linked.has(c.id)) continue;
+    const name = readableSupplierName(c);
+    if (!name) continue;
+    dict[c.id] = { name, cn: c.company_name_cn, logo: c.photo_url || c.logo_url || null };
+  }
+  /* Only a complete answer is memoised — a failed read must not pin an
+     empty filter for a minute. */
+  if (!contactsRes.error && !linksRes.error) store.set(tenantId, { at: Date.now(), dict });
+  return dict;
+}
+
+export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   /* Work signals expose completeness + cost posture — Product Data only. */
@@ -50,33 +167,55 @@ export async function GET() {
   if (denied) return denied;
   const canSeeCosts = await hasProductCostAccess(auth);
 
-  const [prodRes, subRes, mediaRes, modelRes, supRes, linkRes, trRes] = await Promise.all([
-    supabaseServer
-      .from("products")
-      .select(
-        "id, division_slug, category_slug, subcategory_slug, product_name, schema_specs, schema_knowledge, excerpt, description, warranty, moq, lead_time, visible, updated_at",
-      ),
+  let ids: string[] = [];
+  try {
+    const body = (await req.json()) as { ids?: unknown };
+    if (Array.isArray(body.ids)) {
+      ids = body.ids.filter((v): v is string => typeof v === "string" && v.length > 0);
+    }
+  } catch {
+    return NextResponse.json({ error: "invalid json body" }, { status: 400 });
+  }
+  ids = Array.from(new Set(ids)).slice(0, MAX_IDS);
+
+  const empty = { signals: {}, suppliers: {}, allSuppliers: [] as string[], nameAlts: {}, mainImages: {}, costVisible: canSeeCosts };
+  if (ids.length === 0) return NextResponse.json(empty);
+
+  /* Every per-product read is scoped to the posted ids and goes through
+     inChunks (see in-chunks.ts: 394 ids in one `.in()` URL is a `fetch
+     failed`, not a slow query). The subcategory code map is the one read
+     that is not per product — one short row per taxonomy node, and only
+     the code it maps to is used. */
+  const [prodRes, subRes, mediaRes, modelRes, linkRes, trRes, supplierDict] = await Promise.all([
+    inChunks<ProductRow>(ids, (chunk) =>
+      supabaseServer
+        .from("products")
+        .select(
+          "id, division_slug, category_slug, subcategory_slug, product_name, schema_specs, schema_knowledge, excerpt, description, warranty, moq, lead_time, visible, updated_at",
+        )
+        .eq("tenant_id", auth.tenant_id)
+        .in("id", chunk)),
     supabaseServer.from("subcategories").select("slug, code"),
-    supabaseServer
-      .from("product_media")
-      .select('product_id, type, url, "order"')
-      .order("order", { ascending: true }),
-    supabaseServer
-      .from("product_models")
-      .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, visible, status, "order"')
-      .order("order", { ascending: true }),
-    /* Supplier directory — 145 rows, logo columns are URLs (verified: 0
-       base64), so shipping them in a bulk payload is safe. */
-    supabaseServer
-      .from("contacts")
-      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
-      .eq("contact_type", "supplier")
-      .eq("tenant_id", auth.tenant_id),
-    supabaseServer.from("product_suppliers").select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options"),
-    /* Translated product names (中文/العربية) — the grid's search haystack
-       needs them so 熔接机 finds the fusing machine. Names only; nothing
-       cost-side rides on this query. */
-    supabaseServer.from("product_translations").select("product_id, product_name"),
+    inChunks<{ product_id: string; type: string; url: string | null }>(ids, (chunk) =>
+      supabaseServer
+        .from("product_media")
+        .select('product_id, type, url, "order"')
+        .in("product_id", chunk)
+        .order("order", { ascending: true })),
+    inChunks<ModelRow>(ids, (chunk) =>
+      supabaseServer
+        .from("product_models")
+        .select('product_id, primary_model, model_name, cost_price, global_price, supplier, pricing_mode, price_note, visible, status, "order"')
+        .in("product_id", chunk)
+        .order("order", { ascending: true })),
+    inChunks<LinkRow>(ids, (chunk) =>
+      supabaseServer
+        .from("product_suppliers")
+        .select("product_id, supplier_id, is_primary, unit_cost_cny, notes, price_options")
+        .in("product_id", chunk)),
+    inChunks<{ product_id: string; product_name: string | null }>(ids, (chunk) =>
+      supabaseServer.from("product_translations").select("product_id, product_name").in("product_id", chunk)),
+    tenantLinkedSuppliers(auth.tenant_id),
   ]);
 
   if (prodRes.error) {
@@ -89,9 +228,7 @@ export async function GET() {
     if (s.slug && s.code) subCode.set(s.slug, s.code);
   }
 
-  /* media counts by product + type, plus the first main image per product.
-     The thumbnail map rides along because this endpoint already reads the
-     whole media table — see the round-trip note at the bottom. */
+  /* media counts by product + type, plus the first main image per product. */
   const media = new Map<string, { main: number; gallery: number; packing: number; manual: number; video: number }>();
   const mainImages: Record<string, string> = {};
   for (const m of (mediaRes.data ?? []) as Array<{ product_id: string; type: string; url: string | null }>) {
@@ -107,41 +244,14 @@ export async function GET() {
     media.set(m.product_id, b);
   }
 
-  /* Supplier lookup — by id AND by every name variant, because most
-     products carry the supplier as free TEXT on the model rather than a
-     product_suppliers link (only a handful are linked today). */
-  interface SupLite { id: string | null; name: string; logo: string | null; cn: string | null }
-  const supById = new Map<string, SupLite>();
-  const supByName = new Map<string, SupLite>();
-  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
-  for (const c of (supRes.data ?? []) as Array<{
-    id: string;
-    company_name_en: string | null;
-    company_name_cn: string | null;
-    display_name: string | null;
-    photo_url: string | null;
-    logo_url: string | null;
-  }>) {
-    const name = c.company_name_en || c.display_name || c.company_name_cn || "";
-    if (!name) continue;
-    const lite: SupLite = { id: c.id, name, logo: c.photo_url || c.logo_url || null, cn: c.company_name_cn };
-    supById.set(c.id, lite);
-    for (const variant of [c.company_name_en, c.company_name_cn, c.display_name]) {
-      if (variant && variant.trim()) supByName.set(norm(variant), lite);
-    }
-  }
-  const linkedSupplier = new Map<string, string>();
-  /* Cost can be recorded in EITHER place: on the variant (Price tab) or on
-     the supplier link (Supplier tab). The grid only ever read the variant, so
-     a product priced through its supplier showed "Cost not set" and carried a
-     "No cost" gap chip while the cost was sitting right there on the record.
+  /* Supplier links for THIS page: cost, annotations, and the linked id.
      Primary link wins, else the first link with a figure. */
   const linkCost = new Map<string, number>();
-  /* Price annotations ride with the cost so the CARD can show them. */
   const linkNote = new Map<string, string>();
   const linkExtras = new Map<string, { price: number | null; note: string }[]>();
-  for (const l of (linkRes.data ?? []) as Array<{ product_id: string; supplier_id: string | null; is_primary: boolean | null; unit_cost_cny: number | string | null; notes?: string | null; price_options?: Array<{ price?: unknown; note?: unknown }> | null }>) {
-    const c = l.unit_cost_cny == null ? null : Number(l.unit_cost_cny);
+  const linkedSupplier = new Map<string, string>();
+  for (const l of (linkRes.data ?? []) as LinkRow[]) {
+    const c = l.unit_cost_cny == null || l.unit_cost_cny === "" ? null : Number(l.unit_cost_cny);
     if (c != null && Number.isFinite(c) && (l.is_primary || !linkCost.has(l.product_id))) {
       linkCost.set(l.product_id, c);
     }
@@ -158,73 +268,49 @@ export async function GET() {
     if (l.is_primary || !linkedSupplier.has(l.product_id)) linkedSupplier.set(l.product_id, l.supplier_id);
   }
 
-  /* Model summary — the exact shape /api/product-models?summary=1 returns,
-     including its permission rule: supplier names are COST-side data and
-     only ship when the caller passes hasProductCostAccess. */
-  const counts: Record<string, number> = {};
-  const suppliersByProduct: Record<string, string[]> = {};
-  const supplierSet = new Set<string>();
-  const primaryModelNames: Record<string, string> = {};
-  /* EVERY model label per product, in order — the family chips on the card
-     and "find XF-600 even though it lives inside XF-450" both need the full
-     roster, not just the primary. ~700 short strings ≈ a few KB. */
-  const modelNamesByProduct: Record<string, string[]> = {};
-
-  /* first model per product (rows pre-sorted by order) */
-  const primary = new Map<
-    string,
-    { primary_model: string | null; model_name: string | null; cost_price: number | null; global_price: number | null; supplier: string | null; pricing_mode: string | null; price_note: string | null }
-  >();
-  for (const m of (modelRes.data ?? []) as Array<{
-    product_id: string;
-    primary_model: string | null;
-    model_name: string | null;
-    cost_price: number | null;
-    global_price: number | null;
-    supplier: string | null;
-    pricing_mode: string | null;
-    price_note: string | null;
-  }>) {
+  /* First model per product (rows pre-sorted by order). */
+  const primary = new Map<string, ModelRow>();
+  const freeTextSuppliers = new Set<string>();
+  for (const m of (modelRes.data ?? []) as ModelRow[]) {
     if (!primary.has(m.product_id)) primary.set(m.product_id, m);
-    counts[m.product_id] = (counts[m.product_id] || 0) + 1;
-    const label = m.primary_model?.trim() || m.model_name;
-    if (label && !primaryModelNames[m.product_id]) primaryModelNames[m.product_id] = label;
-    /* The roster advertises SELLABLE members (card chips, search).
-       Status inherits from the product; a member leaves the roster only
-       when someone manually discontinued or hid it. The profile and the
-       edit form still show every member — this is advertising, not the
-       record. */
-    const mv = m as unknown as { visible?: boolean | null; status?: string | null };
-    if (label && mv.visible !== false && mv.status !== "discontinued") {
-      if (!modelNamesByProduct[m.product_id]) modelNamesByProduct[m.product_id] = [];
-      if (!modelNamesByProduct[m.product_id].includes(label)) modelNamesByProduct[m.product_id].push(label);
-    }
-    if (canSeeCosts && m.supplier) {
-      if (!suppliersByProduct[m.product_id]) suppliersByProduct[m.product_id] = [];
-      if (!suppliersByProduct[m.product_id].includes(m.supplier)) {
-        suppliersByProduct[m.product_id].push(m.supplier);
-      }
-      supplierSet.add(m.supplier);
-    }
+    if (canSeeCosts && m.supplier && m.supplier.trim()) freeTextSuppliers.add(m.supplier.trim());
   }
 
-  /* The grid's supplier filter/search maps were fed ONLY by the free-text
-     model.supplier column — which is empty on every current row, while the
-     card chip resolves through product_suppliers→contacts. Feed the same
-     link path into the maps, so search/filter agree with what the card
-     shows. supplierAltByProduct carries the Chinese company names so 易利
-     finds YILI's machines. */
-  const supplierAltByProduct: Record<string, string> = {};
-  const supplierLogos: Record<string, string> = {};
-  for (const [pid, sid] of linkedSupplier) {
-    const lite = supById.get(sid);
-    if (!lite) continue;
-    if (!suppliersByProduct[pid]) suppliersByProduct[pid] = [];
-    if (!suppliersByProduct[pid].includes(lite.name)) suppliersByProduct[pid].push(lite.name);
-    supplierSet.add(lite.name);
-    if (lite.cn) supplierAltByProduct[pid] = lite.cn;
-    if (lite.logo) supplierLogos[lite.name] = lite.logo;
+  /* The supplier dictionary is the tenant's linked suppliers (memoised);
+     the GET version read the entire contacts table — 347 rows, customers
+     and employees included — on every open to resolve eight of them. A
+     supplier linked seconds ago and not yet in the memo still resolves:
+     the page's own link ids are looked up directly below. */
+  const suppliers: Record<string, SignalsSupplier> = { ...supplierDict };
+  const missingSup = Array.from(new Set(Array.from(linkedSupplier.values()).filter((id) => !suppliers[id])));
+  if (missingSup.length) {
+    const { data: fresh } = await supabaseServer
+      .from("contacts")
+      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+      .eq("tenant_id", auth.tenant_id)
+      .in("id", missingSup.slice(0, 150));
+    for (const c of (fresh ?? []) as ContactRow[]) {
+      const name = c.company_name_en || c.display_name || c.company_name_cn || "";
+      if (name) suppliers[c.id] = { name, cn: c.company_name_cn, logo: c.photo_url || c.logo_url || null };
+    }
   }
+  const supByName = new Map<string, string>();
+  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+  for (const [id, sup] of Object.entries(suppliers)) {
+    for (const variant of [sup.name, sup.cn]) {
+      if (variant && variant.trim()) supByName.set(norm(variant), id);
+    }
+  }
+  /* The filter's option list: every linked supplier's display name, plus
+     any free-text supplier a model row still carries. Names are cost-side
+     data (who we buy from), so they ship only with cost access — the
+     dictionary itself is needed by every card and always ships. */
+  const allSuppliers = canSeeCosts
+    ? Array.from(new Set([
+        ...Object.values(suppliers).map((s) => s.name),
+        ...Array.from(freeTextSuppliers),
+      ])).sort()
+    : [];
 
   const signals: Record<
     string,
@@ -236,7 +322,7 @@ export async function GET() {
       priceNote: string | null;
       visible: boolean;
       updatedAt: string | null;
-      supplier: { id: string | null; name: string; logo: string | null } | null;
+      supplier: { id: string | null; name?: string } | null;
       costNote: string | null;
       costExtras: { price: number | null; note: string }[];
     }
@@ -247,8 +333,9 @@ export async function GET() {
     const model = primary.get(p.id);
     const values = (p.schema_specs ?? {}) as Record<string, unknown>;
     /* One definition of "this product's cost", used by all three consumers
-       below so the bar, the chip and the number can never disagree. */
-    const effectiveCost = model?.cost_price ?? linkCost.get(p.id) ?? null;
+       below so the bar, the chip and the number can never disagree — and the
+       same order the Price tab uses: link first, variant as fallback. */
+    const effectiveCost = linkCost.get(p.id) ?? model?.cost_price ?? null;
     const { schema } = resolveSchema({
       divisionCode: p.division_slug || "",
       categoryCode: p.category_slug || "",
@@ -304,53 +391,32 @@ export async function GET() {
       costNote: canSeeCosts ? (linkNote.get(p.id) ?? null) : null,
       costExtras: canSeeCosts ? (linkExtras.get(p.id) ?? []) : [],
       supplier: (() => {
-        /* id rides along so the card can deep-link to the Suppliers app. */
-        const pick = (l: SupLite) => ({ id: l.id, name: l.name, logo: l.logo });
         const linkId = linkedSupplier.get(p.id);
-        if (linkId && supById.has(linkId)) return pick(supById.get(linkId)!);
+        if (linkId && suppliers[linkId]) return { id: linkId };
         const txt = (model?.supplier || "").trim();
         if (!txt) return null;
-        /* Known supplier → real logo+id; unknown free text → name only. */
+        /* Free text that names a known supplier resolves to it (logo, deep
+           link); anything else stays a bare name. */
         const byName = supByName.get(norm(txt));
-        return byName ? pick(byName) : { id: null, name: txt, logo: null };
+        return byName ? { id: byName } : { id: null, name: txt };
       })(),
     };
   }
 
-  /* ROUND-TRIP BUDGET: on the operators' network a single request costs
-     ~1-2s before any work happens (a static edge asset measures the same),
-     and parallel requests contend with each other. This endpoint already
-     reads product_models and product_media in full, so it also returns the
-     model summary and the thumbnail map — three requests collapse into one
-     for the Product Data grid. The public catalogue still calls the
-     separate endpoints, which are unchanged.
+  /* Translated names for THIS page's products — the browser-side haystack
+     uses them so 熔接机 narrows the loaded rows on the keystroke, before the
+     server search confirms. */
+  const nameAlts: Record<string, string> = {};
+  for (const t of (trRes.data ?? []) as Array<{ product_id: string; product_name: string | null }>) {
+    if (!t.product_name) continue;
+    nameAlts[t.product_id] = nameAlts[t.product_id] ? nameAlts[t.product_id] + " " + t.product_name : t.product_name;
+  }
 
-     Private SWR cache: signals move at data-entry speed, not per click.
-     30s fresh / 5min stale keeps repeat opens instant without ever
-     serving another account's view (private). */
+  /* POST responses are not cached by the browser, and this one should not
+     be: signals move at data-entry speed, and the page-level warm start
+     (thumbnails in localStorage) already covers the repeat open. */
   return NextResponse.json(
-    {
-      signals,
-      costVisible: canSeeCosts,
-      models: {
-        counts,
-        suppliers: suppliersByProduct,
-        supplierAlt: supplierAltByProduct,
-        modelNames: modelNamesByProduct,
-        nameAlts: (() => {
-          const alt: Record<string, string> = {};
-          for (const t of (trRes.data ?? []) as Array<{ product_id: string; product_name: string | null }>) {
-            if (!t.product_name) continue;
-            alt[t.product_id] = alt[t.product_id] ? alt[t.product_id] + " " + t.product_name : t.product_name;
-          }
-          return alt;
-        })(),
-        allSuppliers: Array.from(supplierSet).sort(),
-        supplierLogos,
-        primaryModelNames,
-      },
-      mainImages,
-    },
-    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+    { signals, suppliers, allSuppliers, nameAlts, mainImages, costVisible: canSeeCosts },
+    { headers: { "Cache-Control": "private, no-store" } },
   );
 }

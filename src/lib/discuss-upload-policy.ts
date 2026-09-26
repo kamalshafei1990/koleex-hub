@@ -78,6 +78,15 @@ export const DISCUSS_TRANSPORT_MAX_BYTES = 4 * 1024 * 1024;
 /** 25MB — the pre-existing `discuss-voice` bucket limit, retained. */
 export const DISCUSS_VOICE_MAX_BYTES = 25 * 1024 * 1024;
 
+/** The policy maximum for one file in a Discuss bucket — THE single source
+ *  for "how big may a Discuss file be" (checkDiscussUpload enforces it; the
+ *  unsent-file IndexedDB store caps by it). Not the transport limit: files
+ *  above DISCUSS_TRANSPORT_MAX_BYTES can still reach Storage through the
+ *  direct path of uploadToStorage (src/lib/storage-client.ts). */
+export function discussUploadMaxBytes(bucket: "discuss-media" | "discuss-voice"): number {
+  return bucket === "discuss-voice" ? DISCUSS_VOICE_MAX_BYTES : DISCUSS_MEDIA_MAX_BYTES;
+}
+
 /** The <input type="file" accept="…"> value for the Discuss composer. UX only. */
 export const DISCUSS_ACCEPT_ATTR = DISCUSS_MEDIA_MIME.join(",");
 
@@ -98,7 +107,7 @@ export function checkDiscussUpload(
   file: { size: number; type?: string | null },
 ): UploadRejection {
   const allowed = bucket === "discuss-voice" ? DISCUSS_VOICE_MIME : DISCUSS_MEDIA_MIME;
-  const max = bucket === "discuss-voice" ? DISCUSS_VOICE_MAX_BYTES : DISCUSS_MEDIA_MAX_BYTES;
+  const max = discussUploadMaxBytes(bucket);
   const mime = normalizeMime(file.type);
   if (!allowed.includes(mime)) return { ok: false, reason: "type", mime };
   if (file.size > max) return { ok: false, reason: "size", max, actual: file.size };

@@ -110,6 +110,17 @@ export default function VoiceRecorder({
   const [durationMs, setDurationMs] = useState(0);
   const [waveform, setWaveform] = useState<number[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  /* Mirror of previewUrl for cleanup paths. The unmount effect below closes
+     over the FIRST render, where previewUrl is still null — so it never
+     revoked anything and every recorded clip leaked its Blob. */
+  const previewUrlRef = useRef<string | null>(null);
+  const setPreview = (url: string | null) => {
+    if (previewUrlRef.current && previewUrlRef.current !== url) {
+      try { URL.revokeObjectURL(previewUrlRef.current); } catch { /* ignore */ }
+    }
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+  };
   const [isPlaying, setIsPlaying] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -163,7 +174,7 @@ export default function VoiceRecorder({
         });
         blobRef.current = blob;
         const url = URL.createObjectURL(blob);
-        setPreviewUrl(url);
+        setPreview(url);
 
         /* Decode for waveform. Some browsers need an AudioContext just
            to get the raw PCM; we tear it down immediately after. */
@@ -242,9 +253,8 @@ export default function VoiceRecorder({
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     mediaRecorderRef.current = null;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     blobRef.current = null;
-    setPreviewUrl(null);
+    setPreview(null);
     setWaveform([]);
     setDurationMs(0);
     setState("idle");
@@ -260,9 +270,16 @@ export default function VoiceRecorder({
         durationMs,
         waveform,
       });
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      /* Sent: the clip is gone from the recorder. The parent normally
+         unmounts us here; reset anyway so a lingering instance is clean. */
+      blobRef.current = null;
+      setPreview(null);
+      setWaveform([]);
+      setDurationMs(0);
+      setState("idle");
     } catch {
-      /* If the upload fails, drop back into preview so the user can retry. */
+      /* Upload or send failed (the parent throws): drop back into preview
+         with the clip intact so the user can retry. */
       setState("preview");
     }
   };
@@ -272,9 +289,11 @@ export default function VoiceRecorder({
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        try { URL.revokeObjectURL(previewUrlRef.current); } catch { /* ignore */ }
+        previewUrlRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* Auto-kick a start on mount — the component only mounts when the
@@ -307,9 +326,9 @@ export default function VoiceRecorder({
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
         <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center">
-          <MicrophoneIcon className="h-4 w-4 text-red-300" />
+          <MicrophoneIcon className="h-4 w-4 text-red-500 dark:text-red-300" />
         </div>
-        <div className="flex-1 min-w-0 text-[12px] text-red-300">
+        <div className="flex-1 min-w-0 text-[12px] text-red-500 dark:text-red-300">
           {errorMsg}
         </div>
         <button
@@ -345,11 +364,11 @@ export default function VoiceRecorder({
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
         <div className="relative h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center">
-          <MicrophoneIcon className="h-4 w-4 text-red-300" />
+          <MicrophoneIcon className="h-4 w-4 text-red-500 dark:text-red-300" />
           <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-75" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-semibold text-red-300">
+          <div className="text-[12px] font-semibold text-red-500 dark:text-red-300">
             {labels.recording}
           </div>
           <div className="text-[10.5px] text-[var(--text-dim)] tabular-nums">

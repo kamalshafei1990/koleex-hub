@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useReducer, useRef, useMemo } from "react";
 import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabels } from "@/lib/doc-labels";
@@ -18,6 +19,7 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
+import { cdnImage } from "@/lib/cdn";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
@@ -27,6 +29,13 @@ import { docsT } from "@/lib/translations/docs";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
+import { EmptyState, Modal as KdsModal, Pagination, SearchInput, StatusPill } from "@/components/kds";
+import ChevronDownIcon from "@/components/icons/ui/ChevronDownIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import Redo2Icon from "@/components/icons/ui/Redo2Icon";
+import { isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "./QuotationPreviewSkeleton";
 import { type PickResult } from "./ProductPickerModal";
@@ -46,6 +55,8 @@ import {
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -172,6 +183,16 @@ export interface Quotation {
      formatted text is also baked into `terms` for the printed doc.
      All optional — legacy quotes have these undefined. */
   paymentTermId?: string;
+  /* Heading this document prints under — see DocTitlePicker. Stored on the
+     doc so the same record can go out as a Proforma Invoice now and a
+     Commercial Invoice later. */
+  docTitleId?: string;
+  docTitleText?: string;
+  docTitleNoun?: string;
+  /* The chosen title's stable code (e.g. "proforma_invoice"). Read for
+     behaviour; docTitleText is only ever for printing. */
+  docTitleCode?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   /* Picked Incoterm's short code (FOB, CIF, DDP, ...). Stored
      alongside incotermId so the items-table header can show the
@@ -260,8 +281,204 @@ export interface Quotation {
    Constants
    ══════════════════════════════════════════════════════════ */
 
-const STORAGE_KEY = "koleex.quotations.v1";
-const COUNTER_KEY = "koleex.quotations.counter";
+/* Editor surface geometry (screen only — see the fit-to-width note in the
+   component). Module constants: they never change and were being re-declared
+   on every render. */
+const QUOT_PAPER_W = 794;    // 210mm at 96dpi
+const QUOT_GUTTERS_W = 720;  // .quot-a4-stack padding-inline: 360px × 2
+
+/* Status → KDS StatusPill tone, the same reading as doc-status's colour
+   ladder (amber draft, blue sent, green accepted, red rejected, quiet
+   expired) expressed in the pill's own vocabulary. */
+const PILL_TONE: Record<QuoteStatus, "neutral" | "brand" | "success" | "warning" | "error"> = {
+  draft: "warning", sent: "brand", accepted: "success", rejected: "error", expired: "neutral",
+};
+
+/* How many list rows one page shows. The list used to render every
+   quotation as a card at once; past a few hundred that is seconds of
+   layout on a phone for rows nobody scrolls to. */
+const LIST_PAGE_SIZE = 40;
+
+/* Symbol for the currencies the document is issued in. Anything unmapped
+   prints as its ISO code, which is still unambiguous — the old list bolted
+   a "$" onto every total regardless of the quote's currency. */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", CNY: "¥", JPY: "¥", AED: "AED ", SAR: "SAR ",
+  EGP: "E£", TRY: "₺", INR: "₹", AUD: "A$", CAD: "C$",
+};
+function fmtMoney(n: number, currency: string | undefined): string {
+  const code = (currency || "USD").toUpperCase();
+  const sym = CURRENCY_SYMBOLS[code];
+  return sym ? `${sym}${fmt(n)}` : `${code} ${fmt(n)}`;
+}
+
+/* D/M/Y with the time — the one place this file shows a timestamp (the
+   conflict dialog). The house rule is D/M/Y everywhere; toLocaleString()
+   gave every operator their browser's own order. */
+function fmtDateTimeDMY(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* The dirty check compares the working copy with the last saved snapshot.
+   A full JSON.stringify of the quotation ran on EVERY keystroke, and the
+   items carry base64 photos — megabytes of string serialised per character
+   typed. Long strings are replaced by a cheap stand-in (length plus their
+   two ends), which still changes whenever a photo is swapped, cleared or
+   uploaded, and costs nothing. */
+function fingerprint(q: Quotation): string {
+  return JSON.stringify(q, (_k, v) =>
+    typeof v === "string" && v.length > 256 ? `~${v.length}:${v.slice(0, 24)}:${v.slice(-24)}` : v,
+  );
+}
+
+/* Thrown instead of returning null when a save is REFUSED locally (the
+   hydration guard below) — the caller can tell "the server said no" from
+   "we never asked", and say so. */
+class SaveRefusedError extends Error {
+  constructor() { super("save refused: document not hydrated yet"); this.name = "SaveRefusedError"; }
+}
+
+/* ── Undo / redo ──
+   Snapshots of the whole document, taken from the state BEFORE each edit.
+   Snapshots share structure with each other (an edit replaces one row, the
+   other rows are the same objects), so a hundred of them cost little. A
+   burst of edits to the same field within COALESCE_MS is one step, so one
+   Undo takes back a typed word or a dragged number, not one character. */
+const HISTORY_MAX = 100;
+const COALESCE_MS = 1200;
+/* Which top-level field changed between two snapshots — "items:3" when
+   exactly row 3 changed, so consecutive edits to different rows stay
+   separate steps. */
+function changeKey(prev: Quotation, next: Quotation): string {
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const changed: string[] = [];
+  for (const k of keys) {
+    const a = (prev as unknown as Record<string, unknown>)[k];
+    const b = (next as unknown as Record<string, unknown>)[k];
+    if (a !== b) changed.push(k);
+  }
+  if (changed.length === 1 && changed[0] === "items" && prev.items.length === next.items.length) {
+    let idx = -1;
+    let count = 0;
+    for (let i = 0; i < next.items.length; i++) {
+      if (prev.items[i] !== next.items[i]) { idx = i; count++; }
+    }
+    if (count === 1) return `items:${idx}`;
+  }
+  return changed.join(",");
+}
+/* The server owns these; an undo must never resurrect an older version
+   number or quote number, or the next save would report a conflict that
+   never happened. */
+function withServerFields(snapshot: Quotation, live: Quotation): Quotation {
+  return {
+    ...snapshot,
+    id: live.id,
+    invoiceNo: live.invoiceNo || snapshot.invoiceNo,
+    version: live.version,
+    createdAt: live.createdAt,
+    updatedAt: live.updatedAt,
+    updatedByName: live.updatedByName,
+    serverTotal: live.serverTotal,
+  };
+}
+type DocUpdater = Quotation | null | ((prev: Quotation | null) => Quotation | null);
+type HistCommand =
+  | { __hist: "raw"; next: DocUpdater }
+  | { __hist: "reset" }
+  | { __hist: "undo" }
+  | { __hist: "redo" };
+type HistAction = DocUpdater | HistCommand;
+interface HistState { current: Quotation | null; past: Quotation[]; future: Quotation[]; lastKey: string | null; lastAt: number }
+const EMPTY_HIST: HistState = { current: null, past: [], future: [], lastKey: null, lastAt: 0 };
+/** Replace the document without recording a step (server truth, not an edit). */
+const histRaw = (next: DocUpdater): HistCommand => ({ __hist: "raw", next });
+/** Forget the stacks — a different document is on screen now. */
+const HIST_RESET: HistCommand = { __hist: "reset" };
+const HIST_UNDO: HistCommand = { __hist: "undo" };
+const HIST_REDO: HistCommand = { __hist: "redo" };
+const isHistCommand = (a: HistAction): a is HistCommand => !!a && typeof a === "object" && "__hist" in a;
+const resolveDoc = (u: DocUpdater, prev: Quotation | null): Quotation | null => (typeof u === "function" ? u(prev) : u);
+function histReducer(s: HistState, a: HistAction): HistState {
+  if (isHistCommand(a)) {
+    switch (a.__hist) {
+      case "raw":
+        return { ...s, current: resolveDoc(a.next, s.current) };
+      case "reset":
+        return { ...EMPTY_HIST, current: s.current };
+      case "undo": {
+        const prev = s.past[s.past.length - 1];
+        if (!prev || !s.current) return s;
+        return { current: withServerFields(prev, s.current), past: s.past.slice(0, -1), future: [...s.future, s.current], lastKey: null, lastAt: 0 };
+      }
+      case "redo": {
+        const next = s.future[s.future.length - 1];
+        if (!next || !s.current) return s;
+        return { current: withServerFields(next, s.current), past: [...s.past, s.current], future: s.future.slice(0, -1), lastKey: null, lastAt: 0 };
+      }
+    }
+  }
+  const value = resolveDoc(a, s.current);
+  if (!(s.current && value && value !== s.current && value.id === s.current.id)) {
+    return { ...s, current: value };
+  }
+  const key = changeKey(s.current, value);
+  const now = Date.now();
+  const coalesce = s.lastKey === key && now - s.lastAt < COALESCE_MS && s.past.length > 0;
+  return {
+    current: value,
+    past: coalesce ? s.past : [...s.past, s.current].slice(-HISTORY_MAX),
+    future: coalesce ? s.future : [],
+    lastKey: key,
+    lastAt: now,
+  };
+}
+
+/* ── Opening a quotation before it is asked for ──
+   The list carries no items, so every open fetched the full document and
+   showed a one-row placeholder until it arrived. The row the cursor is on is
+   almost certainly the one about to be opened: fetch it on hover / focus and
+   hand it to the editor the instant the click lands. Sixty seconds is long
+   enough for the hover-then-click gap and short enough that a colleague's
+   save in between is caught by the silent refetch the editor still runs. */
+const DOC_WARM_TTL_MS = 60_000;
+const docWarm = new Map<string, { row: RemoteDocRow; at: number }>();
+const docWarmInflight = new Set<string>();
+function warmDoc(id: string): void {
+  if (id.length !== 36 || docWarmInflight.has(id)) return;
+  const have = docWarm.get(id);
+  if (have && Date.now() - have.at < DOC_WARM_TTL_MS) return;
+  docWarmInflight.add(id);
+  fetchDocOne(QUOTATIONS_SYNC, id)
+    .then((row) => { if (row) docWarm.set(id, { row, at: Date.now() }); })
+    .catch(() => { /* the open will fetch normally */ })
+    .finally(() => docWarmInflight.delete(id));
+}
+function readWarmDoc(id: string): RemoteDocRow | null {
+  const have = docWarm.get(id);
+  return have && Date.now() - have.at < DOC_WARM_TTL_MS ? have.row : null;
+}
+
+/* Line photos live in the media bucket; the document keeps the URL. The
+   compressed data URL is still shown at once (and kept as the fallback if
+   the upload fails, e.g. offline) so the operator never waits on a round
+   trip to see the picture. */
+async function uploadItemImage(dataUrl: string): Promise<string | null> {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const form = new FormData();
+    form.append("file", blob, "item.jpg");
+    const res = await fetch("/api/quotations/item-images", { method: "POST", credentials: "include", body: form });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { url?: string };
+    return typeof j.url === "string" ? j.url : null;
+  } catch {
+    return null;
+  }
+}
 
 /* Default terms shell for a fresh quotation. Each labelled row is
    its own <div> with a dashed bottom border so the rows visually
@@ -374,6 +591,11 @@ export function fromRow(row: RemoteDocRow): Quotation {
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
+    docTitleId: doc.docTitleId,
+    docTitleText: doc.docTitleText,
+    docTitleNoun: doc.docTitleNoun,
+    docTitleCode: doc.docTitleCode,
+    docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
@@ -477,8 +699,9 @@ async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
      This happened twice to KL2026-1520 ($303k, 50 items). Both times
      a click on Export PDF / Save raced the hydration fetch.
      Hard guard: if the doc has a server UUID AND the outgoing items
-     look like the default-blank placeholder, refuse the save. The
-     UI shows an alert instead so the operator knows to wait + retry. */
+     look like the default-blank placeholder, refuse the save. The refusal
+     is a typed error so the caller can tell the operator to wait + retry
+     instead of reporting a server failure that never happened. */
   const looksLikeEmptyPlaceholder =
     Array.isArray(q.items) &&
     q.items.length === 1 &&
@@ -493,7 +716,7 @@ async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
         { id: q.id, quote_no: q.invoiceNo },
       );
     }
-    return null;
+    throw new SaveRefusedError();
   }
   const row = await upsertDoc(QUOTATIONS_SYNC, {
     id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
@@ -1144,7 +1367,16 @@ export default function Quotations() {
   const [snap] = useState(readQuotSnap);
   const [quotations, setQuotations] = useState<Quotation[]>(snap ?? []);
   const [view, setView] = useState<"list" | "editor">("list");
-  const [current, setCurrent] = useState<Quotation | null>(null);
+  /* The document plus its undo / redo stacks live in one reducer, so every
+     edit — `setCurrent(next)`, exactly as before — records the snapshot it
+     replaces, and loads / saves / document switches say so explicitly with
+     histRaw() and HIST_RESET (not the operator's edits, never undoable).
+     A reducer rather than a ref: the dispatch is stable, the history is
+     state React owns, and queued functional updates each see the latest
+     document instead of the one committed before the event. */
+  const [hist, setCurrent] = useReducer(histReducer, EMPTY_HIST);
+  const current = hist.current;
+  const histSize = { past: hist.past.length, future: hist.future.length };
   const [loaded, setLoaded] = useState(snap !== null);
   /* Save state for the Save Draft / Save Final buttons. "idle" is the
      resting state; "saving" while the POST is in flight; "saved" for a
@@ -1172,8 +1404,33 @@ export default function Quotations() {
      beforeunload prompt (tab close / refresh). */
   const baselineRef = useRef<string>("");
   const markSaved = useCallback((q: Quotation | null) => {
-    baselineRef.current = q ? JSON.stringify(q) : "";
+    baselineRef.current = q ? fingerprint(q) : "";
   }, []);
+  /* The committed `current`, readable from async code (the late hydration
+     fetch) without reaching into a state updater — updaters must stay pure. */
+  const currentRef = useRef<Quotation | null>(null);
+  currentRef.current = current;
+
+  /* Ctrl/Cmd+Z and Ctrl+Y / Ctrl+Shift+Z — outside text fields only. Inside
+     a field the browser's own undo is what the operator expects, and each
+     field commits one history step when it blurs anyway. */
+  useEffect(() => {
+    if (view !== "editor") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "z" && k !== "y") return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      setCurrent(k === "y" || e.shiftKey ? HIST_REDO : HIST_UNDO);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [view]);
+  /* Why the list could not load, when it could not. Drives the retry state;
+     a failed mount fetch used to leave "Loading…" on screen forever. */
+  const [loadError, setLoadError] = useState<string | null>(null);
   /* When set, the "unsaved changes" modal is open and this callback runs
      once the user chooses to leave (after an optional save). */
   const [exitPromptOpen, setExitPromptOpen] = useState(false);
@@ -1225,8 +1482,6 @@ export default function Quotations() {
     ro.observe(fitInner);
     return () => ro.disconnect();
   }, [fitInner]);
-  const QUOT_PAPER_W = 794;    // 210mm at 96dpi
-  const QUOT_GUTTERS_W = 720;  // .quot-a4-stack padding-inline: 360px × 2
   const fitNeeded = (hidePanels ? QUOT_PAPER_W : QUOT_PAPER_W + QUOT_GUTTERS_W) + 24;
   const fitScale = fitW > 0 ? Math.min(1, fitW / fitNeeded) : 1;
   /* Narrow screens open in focus view: with the gutter cards shown, a phone
@@ -1264,17 +1519,24 @@ export default function Quotations() {
   const { data: meBootstrap } = useMeBootstrap();
   const isSuperAdmin = meBootstrap?.auth?.is_super_admin ?? false;
 
-  /* ── Load from Supabase on mount ── */
-  useEffect(() => {
-    let cancelled = false;
-    loadQuotationsRemote().then((list) => {
-      if (!cancelled) {
-        setQuotations(list);
-        setLoaded(true);
-      }
-    });
-    return () => { cancelled = true; };
+  /* ── Load from Supabase on mount (and on Retry) ── */
+  const loadGen = useRef(0);
+  const loadList = useCallback(async () => {
+    const gen = ++loadGen.current;
+    setLoadError(null);
+    try {
+      const list = await loadQuotationsRemote();
+      if (gen !== loadGen.current) return;
+      setQuotations(list);
+      setLoaded(true);
+    } catch (e) {
+      if (gen !== loadGen.current) return;
+      setLoadError(humanizeError(e));
+    }
   }, []);
+  /* No cleanup needed: a load that lands after a newer one started is
+     discarded by the generation check inside loadList. */
+  useEffect(() => { void loadList(); }, [loadList]);
 
   /* ── Create new quotation. Kept as optimistic local-only until the
         user hits Save; the server mints the real UUID + quote_no at
@@ -1308,10 +1570,43 @@ export default function Quotations() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setCurrent(q);
+    setCurrent(histRaw(q));
+    setCurrent(HIST_RESET);
     markSaved(q);            // a pristine new quote isn't "dirty" until edited
     setView("editor");
   }, [markSaved]);
+  /* ?new=1 (Smart Create) opens a blank quotation in the editor. */
+  useOpenOnNewParam(handleNew);
+
+  /* ── Deep link ──
+     /quotations?doc=<id> opens that quotation straight into the editor, so
+     an order's "KL2026-1520" is a link rather than an instruction to go and
+     find it in a list.
+
+     Fires ONCE via a ref, reading the id rather than watching it, so Back
+     returns to the list instead of pulling the reader straight back in.
+     markSaved sets the dirty baseline — without it the editor would think
+     the freshly-loaded quotation had unsaved edits. */
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id || id.length !== 36) return;
+    deepLinkedRef.current = true;
+    void (async () => {
+      try {
+        const row = await fetchDocOne(QUOTATIONS_SYNC, id);
+        if (!row) return;
+        const loaded = fromRow(row);
+        setCurrent(histRaw(loaded));
+        setCurrent(HIST_RESET);
+        markSaved(loaded);
+        setView("editor");
+      } catch (e) {
+        showToast(t("toast.loadFail").replace("{err}", humanizeError(e)), "error");
+      }
+    })();
+  }, [markSaved, showToast, t]);
 
   /* ── Open existing ──
      The list endpoint strips `items` from the doc payload to keep the
@@ -1319,20 +1614,32 @@ export default function Quotations() {
      Re-fetch the full quotation by id before mounting the editor —
      otherwise the items table renders as a single empty placeholder. */
   const handleOpen = useCallback(async (q: Quotation) => {
-    // Optimistic mount so the editor opens immediately with header data…
-    const optimistic = { ...q, items: q.items.map((i) => ({ ...i })) };
-    setCurrent(optimistic);
+    /* Warmed on hover? Mount the FULL document at once — no placeholder
+       row, no loading bar. The silent refetch below still runs so a
+       colleague's save in the last minute is picked up. */
+    const warm = readWarmDoc(q.id);
+    const optimistic = warm
+      ? (() => { const h = fromRow(warm); return { ...h, items: h.items.map((i) => ({ ...i })) }; })()
+      : { ...q, items: q.items.map((i) => ({ ...i })) };
+    setCurrent(histRaw(optimistic));
+    setCurrent(HIST_RESET);
     markSaved(optimistic);   // baseline = loaded state (not dirty yet)
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
       const requestedId = q.id;
-      setHydrating(true);
+      if (!warm) setHydrating(true);
       let full: RemoteDocRow | null = null;
       try {
         full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+        if (full) docWarm.set(q.id, { row: full, at: Date.now() });
+      } catch (e) {
+        /* The editor stays open on the header data; the operator sees why
+           the items did not arrive instead of a one-row document with no
+           explanation (the save guard refuses to persist that state). */
+        if (!warm) showToast(t("toast.loadFail").replace("{err}", humanizeError(e)), "error");
       } finally {
-        setHydrating(false);
+        if (!warm) setHydrating(false);
       }
       /* Guard against a late response overwriting a NEWER open.
          If the operator clicked row A then quickly clicked row B,
@@ -1340,31 +1647,33 @@ export default function Quotations() {
          check the editor would silently revert to A's data. */
       if (full) {
         const hydrated = fromRow(full);
-        setCurrent((prev) => {
-          if (prev?.id && prev.id !== requestedId) return prev;
-          const serverView = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
-          /* Did the operator edit anything during the hydration window?
-             The optimistic mount set baselineRef to the list-row snapshot,
-             so any divergence means a live edit (e.g. switching the
-             currency the instant the editor opened). Without this check the
-             late detail-fetch clobbered that edit back to the saved value —
-             the currency would visibly snap back to USD and never reach a
-             save or the exported PDF. Preserve the operator's in-flight
-             scalar edits and only fill in the field the list view strips
-             (items). Baseline stays the server truth so the edit still
-             registers as unsaved (dirty). */
-          const userTouched =
-            !!prev && !!baselineRef.current && JSON.stringify(prev) !== baselineRef.current;
-          if (userTouched && prev) {
-            markSaved(serverView);
-            return { ...serverView, ...prev, items: serverView.items };
-          }
-          markSaved(serverView);   // untouched → adopt the fully-hydrated doc
-          return serverView;
-        });
+        const prev = currentRef.current;
+        if (prev?.id && prev.id !== requestedId) return;
+        const serverView = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+        /* Did the operator edit anything during the hydration window?
+           The optimistic mount set baselineRef to the list-row snapshot,
+           so any divergence means a live edit (e.g. switching the
+           currency the instant the editor opened). Without this check the
+           late detail-fetch clobbered that edit back to the saved value —
+           the currency would visibly snap back to USD and never reach a
+           save or the exported PDF. Preserve the operator's in-flight
+           scalar edits and only fill in the field the list view strips
+           (items). Baseline stays the server truth so the edit still
+           registers as unsaved (dirty). Decided OUTSIDE the state updater:
+           an updater that writes a ref is not pure, and React may run it
+           more than once. */
+        const userTouched =
+          !!prev && !!baselineRef.current && fingerprint(prev) !== baselineRef.current;
+        /* Nothing to do when the warm copy already was the server copy. */
+        if (!userTouched && prev && fingerprint(prev) === fingerprint(serverView)) return;
+        markSaved(serverView);
+        /* Server truth arriving is not an edit: raw, and the steps taken
+           since the open stay undoable only while they are still on top. */
+        setCurrent(histRaw(userTouched && prev ? { ...serverView, ...prev, items: serverView.items } : serverView));
+        if (!userTouched) setCurrent(HIST_RESET);
       }
     }
-  }, [markSaved]);
+  }, [markSaved, showToast, t]);
 
   /* ── Delete from list ── */
   /* Track which row's Duplicate button is in flight so the icon can
@@ -1389,7 +1698,7 @@ export default function Quotations() {
       try {
         const full = await fetchDocOne(QUOTATIONS_SYNC, id);
         if (!full) {
-          showToast("Could not load the quotation to duplicate.", "error");
+          showToast(t("toast.dupLoadFail"), "error");
           return;
         }
         const source = fromRow(full);
@@ -1413,46 +1722,55 @@ export default function Quotations() {
         /* Open the new draft in the editor — the operator almost
            always wants to tweak the customer name / address right
            after duplicating, so the extra click would be friction. */
-        setCurrent(next);
+        setCurrent(histRaw(next));
+        setCurrent(HIST_RESET);
         markSaved(next);     // the duplicate is persisted → not dirty yet
         setView("editor");
       } catch (e) {
-        showToast(`Duplicate failed: ${humanizeError(e)}`, "error");
+        showToast(t("toast.dupFail").replace("{err}", humanizeError(e)), "error");
       } finally {
         setDuplicatingId(null);
       }
     },
-    [duplicatingId],
+    [duplicatingId, markSaved, showToast, t],
   );
 
   const handleDeleteFromList = useCallback(
     async (id: string) => {
-      if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
+      if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: t("btn.delete") }))) return;
       // Optimistic: remove from local state immediately so the user
       // sees the row disappear even if the browser HTTP cache is still
       // holding the pre-delete list.
       setQuotations((prev) => prev.filter((q) => q.id !== id));
-      await deleteQuotationRemote(id);
-      // `fresh: true` bypasses both the in-memory and browser HTTP
-      // cache so the reconciliation read reflects the post-delete state.
-      const list = await loadQuotationsRemote({ fresh: true });
-      setQuotations(list);
+      try {
+        await deleteQuotationRemote(id);
+        // `fresh: true` bypasses both the in-memory and browser HTTP
+        // cache so the reconciliation read reflects the post-delete state.
+        const list = await loadQuotationsRemote({ fresh: true });
+        setQuotations(list);
+      } catch (e) {
+        showToast(humanizeError(e), "error");
+      }
     },
-    [t]
+    [showToast, t]
   );
 
   /* ── Delete current (from editor) ── */
   const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
-    if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
+    if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: t("btn.delete") }))) return;
     const id = current.id;
     setQuotations((prev) => prev.filter((q) => q.id !== id));
     setCurrent(null);
     setView("list");
-    await deleteQuotationRemote(id);
-    const list = await loadQuotationsRemote({ fresh: true });
-    setQuotations(list);
-  }, [current, t]);
+    try {
+      await deleteQuotationRemote(id);
+      const list = await loadQuotationsRemote({ fresh: true });
+      setQuotations(list);
+    } catch (e) {
+      showToast(humanizeError(e), "error");
+    }
+  }, [current, showToast, t]);
 
   /* ── Save current ──
      The status parameter is overloaded: callers passing "final" want
@@ -1506,7 +1824,8 @@ export default function Quotations() {
           if (typeof performance !== "undefined") {
             record("quotations.save.ack_ms", performance.now() - saveT0);
           }
-          setCurrent(saved);
+          setCurrent(histRaw(saved));   // the server echo is not an edit
+          docWarm.delete(saved.id);
           markSaved(saved);   // clears the dirty flag — editor matches server
           // Tell anyone else viewing this quotation that it just changed.
           if (typeof saved.version === "number") announceSavedRef.current(saved.version);
@@ -1523,7 +1842,8 @@ export default function Quotations() {
           // generic message and keep the editor unchanged.
           event("quotations.save.error");
           setSaveState("error");
-          setSaveError("Save failed. Please retry — if it keeps failing, refresh the page.");
+          setSaveError(t("toast.saveFail"));
+          showToast(t("toast.saveFail"), "error");
           setTimeout(() => setSaveState("idle"), 4000);
           return false;
         }
@@ -1536,13 +1856,18 @@ export default function Quotations() {
           setSaveState("idle");
           return false;
         }
+        /* The hydration guard refused the save: nothing reached the server,
+           the document simply has not finished loading. Say that, not
+           "save failed". */
+        const msg = e instanceof SaveRefusedError ? t("toast.saveRefused") : humanizeError(e);
         setSaveState("error");
-        setSaveError(humanizeError(e));
+        setSaveError(msg);
+        showToast(msg, "error");
         setTimeout(() => setSaveState("idle"), 4000);
         return false;
       }
     },
-    [current, markSaved]
+    [current, markSaved, showToast, t]
   );
 
   /* ── Convert current to invoice. Uses the server-side helper which
@@ -1563,16 +1888,22 @@ export default function Quotations() {
       showToast(t("alert.saveFirstConvert"), "error");
       return;
     }
-    const invoice = await convertQuotationToInvoice(quotationId);
-    if (invoice) {
-      window.location.href = "/invoices";
+    try {
+      const invoice = await convertQuotationToInvoice(quotationId);
+      if (invoice) {
+        window.location.href = "/invoices";
+      } else {
+        showToast(t("toast.convertFail"), "error");
+      }
+    } catch (e) {
+      showToast(humanizeError(e), "error");
     }
-  }, [current, handleSave]);
+  }, [current, handleSave, showToast, t]);
 
   /* ── Create delivery project from an accepted quote ── */
   const handleCreateProject = useCallback(async () => {
     if (!current || current.id.length !== 36) {
-      showToast("Save the quotation first, then create the project.", "error");
+      showToast(t("toast.saveFirstProject"), "error");
       return;
     }
     try {
@@ -1586,14 +1917,14 @@ export default function Quotations() {
         | { project?: { id: string }; already?: boolean; error?: string }
         | null;
       if (!res.ok || !json?.project) {
-        showToast(`Could not create the project: ${json?.error ?? `HTTP ${res.status}`}`);
+        showToast(t("toast.projectFail").replace("{err}", json?.error ?? `HTTP ${res.status}`), "error");
         return;
       }
       window.location.assign("/projects");
     } catch (err) {
-      showToast(`Could not create the project: ${humanizeError(err)}`, "error");
+      showToast(t("toast.projectFail").replace("{err}", humanizeError(err)), "error");
     }
-  }, [current]);
+  }, [current, showToast, t]);
 
   /* ── Print ── */
   const handlePrint = useCallback(() => {
@@ -1639,8 +1970,19 @@ export default function Quotations() {
      numeric so the recipient can re-sum / re-format in Excel. Section-band
      rows ("header" kind) become a labelled separator row; only priced lines
      feed the totals — mirroring computeGrandTotal exactly. */
+  const [excelBusy, setExcelBusy] = useState(false);
   const handleExportExcel = useCallback(async () => {
-    if (!current) return;
+    if (!current || excelBusy) return;
+    setExcelBusy(true);
+    try {
+      await exportExcel(current);
+    } catch (e) {
+      showToast(t("toast.excelFail").replace("{err}", humanizeError(e)), "error");
+    } finally {
+      setExcelBusy(false);
+    }
+  }, [current, excelBusy, showToast, t]);
+  async function exportExcel(current: Quotation) {
     /* Structured cells ONLY. The old "pixel-perfect first" path rendered the
        print page with html2canvas and pasted ONE PNG into the sheet — an
        "Excel" file that was really a screenshot: nothing selectable, nothing
@@ -1669,7 +2011,7 @@ export default function Quotations() {
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
       // Column order matches the document: NO. · ITEM · MODEL · PICTURE · UNIT PRICE · QTY · TOTAL
       rows.push([n, it.description || "", it.model || "", "", money(it.unitPrice), Number(it.qty) || 0, lineTotal]);
-      images.push(it.image || null);
+      images.push(it.image ? cdnImage(it.image, { width: 256, quality: 75 }) : null);
     }
 
     const TL = docLabels(q.docLang);
@@ -1726,10 +2068,13 @@ export default function Quotations() {
       totals,
       terms: q.terms,
     });
-  }, [current]);
+  }
 
   const handleExportPdf = useCallback(async () => {
-    if (!current) return;
+    /* One save at a time: Export saves first, and a Save click racing it
+       would carry the same base_version and 409 into the conflict dialog
+       for no reason. */
+    if (!current || pdfState === "loading" || saveState === "saving") return;
     /* Print via a HIDDEN IFRAME pointing at the dedicated
        /quotations/<id>/print page. The dedicated page is a
        standalone route with NO Hub shell -- its print CSS is
@@ -1767,7 +2112,8 @@ export default function Quotations() {
         const full = await fetchDocOne(QUOTATIONS_SYNC, working.id);
         if (full) {
           working = fromRow(full);
-          setCurrent(working);
+          setCurrent(histRaw(working));
+          setCurrent(HIST_RESET);
         }
       }
 
@@ -1787,19 +2133,25 @@ export default function Quotations() {
       const saved = await saveQuotationRemote(intent);
       if (!saved) {
         setPdfState("error");
-        showToast("Save failed before export. Please click Save and try Export PDF again.", "error");
+        showToast(t("toast.exportSaveFail"), "error");
         setTimeout(() => setPdfState("idle"), 2_500);
         return;
       }
-      setCurrent(saved);
+      setCurrent(histRaw(saved));
+      docWarm.delete(saved.id);
+      /* The save just landed, so the editor is clean — without this the
+         "Unsaved" pill lit up right after a successful export. */
+      markSaved(saved);
+      if (typeof saved.version === "number") announceSavedRef.current(saved.version);
       const refreshed = await loadQuotationsRemote({ fresh: true });
+      setQuotations(refreshed);
       const match = refreshed.find(
         (q) => q.id === saved.id || q.invoiceNo === saved.invoiceNo,
       );
       const quotationId = match?.id ?? saved.id;
       if (quotationId.length !== 36) {
         setPdfState("error");
-        showToast("Please save the quotation before exporting.", "error");
+        showToast(t("toast.saveBeforeExport"), "error");
         setTimeout(() => setPdfState("idle"), 2_000);
         return;
       }
@@ -1845,7 +2197,17 @@ export default function Quotations() {
          same doc always re-fetches fresh server state (and so
          the iframe's `load` event reliably fires even when
          the URL is otherwise identical to the previous export). */
-      iframe.src = `/quotations/${encodeURIComponent(quotationId)}/print?_t=${Date.now()}`;
+      /* Listener first, then the navigation, so a fast (cached) load can
+         never fire before anyone is listening. Any previous export's
+         listener is dropped so repeated exports do not stack them. */
+      const prevOnLoad = (iframe as HTMLIFrameElement & { __kxOnLoad?: () => void }).__kxOnLoad;
+      if (prevOnLoad) iframe.removeEventListener("load", prevOnLoad);
+      /* The print page signals readiness by setting a flag; if it never
+         does (404, image that never decodes, a script error) the poll used
+         to run ten times a second for the life of the tab with the Export
+         button disabled forever. A deadline turns that into a message. */
+      const DEADLINE_MS = 20_000;
+      const startedAt = Date.now();
       const onLoad = () => {
         iframe!.removeEventListener("load", onLoad);
         const checkReady = () => {
@@ -1857,16 +2219,21 @@ export default function Quotations() {
               win.focus();
               win.print();
             } catch (err) {
-              showToast(`Print failed: ${humanizeError(err)}`, "error");
+              showToast(t("toast.printFail").replace("{err}", humanizeError(err)), "error");
             }
             setPdfState("idle");
+          } else if (Date.now() - startedAt > DEADLINE_MS) {
+            setPdfState("idle");
+            showToast(t("toast.exportTimeout"), "error");
           } else {
             setTimeout(checkReady, 100);
           }
         };
         checkReady();
       };
+      (iframe as HTMLIFrameElement & { __kxOnLoad?: () => void }).__kxOnLoad = onLoad;
       iframe.addEventListener("load", onLoad);
+      iframe.src = `/quotations/${encodeURIComponent(quotationId)}/print?_t=${Date.now()}`;
     } catch (e) {
       /* A conflict during the pre-export save: don't export a stale doc —
          surface the conflict dialog so the user resolves it first. */
@@ -1876,10 +2243,11 @@ export default function Quotations() {
         return;
       }
       setPdfState("error");
-      showToast(`Export failed: ${humanizeError(e)}`, "error");
+      const msg = e instanceof SaveRefusedError ? t("toast.saveRefused") : t("toast.exportFail").replace("{err}", humanizeError(e));
+      showToast(msg, "error");
       setTimeout(() => setPdfState("idle"), 2_000);
     }
-  }, [current, handleSave]);
+  }, [current, markSaved, pdfState, saveState, showToast, t]);
 
   /* ── Send by email ──
      Opens a print window so the operator can "Save as PDF" the
@@ -1898,17 +2266,21 @@ export default function Quotations() {
     if (!current) return;
     const to = (current.toEmail || "").trim();
     if (!to) {
-      showToast("Add the customer's email in the QUOTATION TO card before sending.", "error");
+      showToast(t("toast.emailMissing"), "error");
       return;
     }
     /* Same popup-blocker workaround as handleExportPdf: open the
        print window NOW (inside the click's user-gesture stack)
        and navigate it to the real URL once the save/refetch
        resolves. window.open() called after async awaits is
-       silently blocked by every modern browser. */
-    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+       silently blocked by every modern browser.
+       No "noopener" here: with it, window.open RETURNS NULL by spec, so
+       every Send used to land in the popup-blocked branch — and the
+       window has to be navigated below, which needs the handle. Same
+       origin, so there is nothing to protect against. */
+    const win = window.open("about:blank", "_blank");
     if (!win) {
-      showToast("The browser blocked the print window. Please allow popups for this site and try again.", "error");
+      showToast(t("toast.popupBlocked"), "error");
       return;
     }
     try {
@@ -1920,7 +2292,8 @@ export default function Quotations() {
           ? current.status
           : "sent";
       if (current.id.length !== 36 || current.status !== targetStatus) {
-        await handleSave(targetStatus);
+        const ok = await handleSave(targetStatus);
+        if (!ok) { win.close(); return; }   // handleSave already said why
       }
       const refreshed = await loadQuotationsRemote({ fresh: true });
       const match = refreshed.find(
@@ -1929,12 +2302,13 @@ export default function Quotations() {
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
         win.close();
-        showToast("Please save the quotation before sending.", "error");
+        showToast(t("toast.saveBeforeSend"), "error");
         return;
       }
 
       /* Build a friendly cover-email skeleton. The operator can
-         tweak it in their mail client before pressing send. */
+         tweak it in their mail client before pressing send. The mail is
+         customer-facing and stays in English like the printed document. */
       const greetingName = current.customerName?.trim() || "there";
       const grandTotalNum =
         current.serverTotal != null && current.serverTotal > 0
@@ -1947,7 +2321,7 @@ export default function Quotations() {
         `Dear ${greetingName},`,
         "",
         `Please find attached our quotation ${current.invoiceNo || ""} ` +
-          `for your review. The total amount is US$ ${fmt(grandTotalNum)}, ` +
+          `for your review. The total amount is ${(current.currency || "USD").toUpperCase()} ${fmt(grandTotalNum)}, ` +
           `valid until ${current.validTill || "the date noted on the quote"}.`,
         "",
         "We're happy to discuss any of the items, prices, or delivery terms — just reply to this email or give us a call.",
@@ -1972,9 +2346,9 @@ export default function Quotations() {
       }, 600);
     } catch (e) {
       try { win.close(); } catch { /* already closed */ }
-      showToast(`Send failed: ${humanizeError(e)}`, "error");
+      showToast(t("toast.sendFail").replace("{err}", humanizeError(e)), "error");
     }
-  }, [current, handleSave]);
+  }, [current, handleSave, showToast, t]);
 
   /* ── Duplicate ──
      Clones the current quote into a fresh draft and drops the user
@@ -2000,7 +2374,8 @@ export default function Quotations() {
       serverTotal: undefined,
       items: current.items.map((it) => ({ ...it })),
     };
-    setCurrent(copy);
+    setCurrent(histRaw(copy));
+    setCurrent(HIST_RESET);
     setView("editor");
   }, [current]);
 
@@ -2104,6 +2479,55 @@ export default function Quotations() {
     },
     [current],
   );
+
+  /* Save the typed party details as a CRM customer.
+
+     A details card filled by hand is a dead end otherwise: the buyer exists
+     on this one document and the operator retypes them on the next. Creating
+     the customer also earns them a permanent code (BD-100 …), which is what
+     makes the same buyer recognisable across every document afterwards.
+
+     The new customer is linked straight back onto the document, so the button
+     disappears and the card behaves exactly as if it had been picked from the
+     CRM in the first place. */
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const saveCurrentPartyAsCustomer = useCallback(async () => {
+    if (!current || savingCustomer) return;
+    const name = (current.customerName || current.companyName || "").trim();
+    if (!name) return;
+
+    setSavingCustomer(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          company_name: current.companyName?.trim() || null,
+          email: current.toEmail?.trim() || null,
+          phone: current.toPhone?.trim() || null,
+          /* The card holds a free-text address; the country is parsed out of
+             its last line, which is where an export address puts it. A wrong
+             guess only costs an XX- prefix, never a failed save. */
+          country: (current.toAddress || "").split(/[\n,]/).map((x) => x.trim()).filter(Boolean).pop() || null,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { customer?: { id: string; customer_code: string | null }; error?: string }
+        | null;
+      if (!res.ok || !json?.customer) {
+        showToast(json?.error ? humanizeError(json.error) : t("toast.customerSaveFail"), "error");
+        return;
+      }
+      setCurrent((q) => (q ? { ...q, customerContactId: json.customer!.id } : q));
+      showToast(t("toast.customerSaved"));
+    } catch (e) {
+      showToast(e instanceof Error ? humanizeError(e) : t("toast.customerSaveFail"), "error");
+    } finally {
+      setSavingCustomer(false);
+    }
+  }, [current, savingCustomer, showToast, t]);
 
   /* Append a new item pre-filled from the catalog picker. If the
      bottom-most row is still completely blank (typical right after
@@ -2218,7 +2642,7 @@ export default function Quotations() {
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          showToast(`Upload failed: ${humanizeError(j.error)}`, "error");
+          showToast(t("toast.uploadFail").replace("{err}", humanizeError(j.error)), "error");
           return;
         }
         const json = (await res.json()) as { kind: string; url: string };
@@ -2230,10 +2654,10 @@ export default function Quotations() {
           if (current) setCurrent({ ...current, signatureUrl: json.url });
         }
       } catch (e) {
-        showToast(`Upload failed: ${humanizeError(e)}`, "error");
+        showToast(t("toast.uploadFail").replace("{err}", humanizeError(e)), "error");
       }
     },
-    [current],
+    [current, showToast, t],
   );
 
   const removeItem = useCallback(
@@ -2263,12 +2687,27 @@ export default function Quotations() {
 
   const handleImageUpload = useCallback(
     async (idx: number, file: File) => {
+      let base64 = "";
       try {
-        const base64 = await compressImage(file);
+        base64 = await compressImage(file);
         updateItem(idx, "image", base64);
       } catch (e) {
         console.error("Image compression failed", e);
+        return;
       }
+      /* Then move it to storage. The swap targets the row that still holds
+         this exact data URL (the operator may have moved rows meanwhile),
+         and is not an undo step of its own — the upload was. */
+      const url = await uploadItemImage(base64);
+      if (!url) return;
+      setCurrent(histRaw((q) => {
+        if (!q) return q;
+        const i = q.items.findIndex((it) => it.image === base64);
+        if (i < 0) return q;
+        const items = q.items.slice();
+        items[i] = { ...items[i], image: url };
+        return { ...q, items };
+      }));
     },
     [updateItem]
   );
@@ -2303,15 +2742,14 @@ export default function Quotations() {
      `dirty` = the working copy diverged from the last loaded/saved
      snapshot. Drives the native tab-close prompt + the styled in-app
      confirm modal shown when the operator presses Back. */
-  /* Memoized: JSON.stringify over `current` (which embeds the full
-     items[] incl. base64 image data URLs) is expensive, and the editor
-     re-renders on every keystroke / collab-presence tick. The dirty
-     check only depends on view, current, and the saved baseline — so
-     skip the stringify when none of those changed. */
+  /* Memoized, and computed on the fingerprint rather than the full
+     serialisation (see fingerprint): the editor re-renders on every
+     keystroke / collab-presence tick, and the base64 photos in items[]
+     made each of those a multi-megabyte stringify. */
   const dirty = useMemo(
     () =>
       view === "editor" && current
-        ? JSON.stringify(current) !== baselineRef.current
+        ? fingerprint(current) !== baselineRef.current
         : false,
     [view, current],
   );
@@ -2344,7 +2782,8 @@ export default function Quotations() {
     if (!full) return null;
     const fresh = fromRow(full);
     const serverView = { ...fresh, items: fresh.items.map((i) => ({ ...i })) };
-    setCurrent(serverView);
+    setCurrent(histRaw(serverView));
+    setCurrent(HIST_RESET);
     markSaved(serverView);
     return serverView;
   }, [current, markSaved]);
@@ -2405,7 +2844,10 @@ export default function Quotations() {
     // On failure the modal stays open; the Save-state pill shows why.
   }, [handleSave, leaveEditor]);
 
-  /* ── Sorted list ── */
+  /* ── Sorted list, then the operator's search / status filter / page ──
+     The list used to be every quotation as one unpaged card wall with no
+     way to find a quote except scrolling. Filtering runs on the fields the
+     slim list payload carries (number, customer, company, client no). */
   const sortedQuotations = useMemo(
     () =>
       [...quotations].sort(
@@ -2414,14 +2856,101 @@ export default function Quotations() {
       ),
     [quotations],
   );
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
+  const [page, setPage] = useState(1);
+  const filteredQuotations = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return sortedQuotations.filter((r) =>
+      (statusFilter === "all" || r.status === statusFilter) &&
+      (!needle ||
+        [r.invoiceNo, r.customerName, r.companyName, r.clientNo].some((s) =>
+          (s || "").toLowerCase().includes(needle))),
+    );
+  }, [sortedQuotations, query, statusFilter]);
+  const statusCounts = useMemo(() => {
+    const c: Record<QuoteStatus | "all", number> = { all: quotations.length, draft: 0, sent: 0, accepted: 0, rejected: 0, expired: 0 };
+    for (const q of quotations) c[q.status] = (c[q.status] ?? 0) + 1;
+    return c;
+  }, [quotations]);
+  const pages = Math.max(1, Math.ceil(filteredQuotations.length / LIST_PAGE_SIZE));
+  const safePage = Math.min(page, pages);
+  const pageRows = filteredQuotations.slice((safePage - 1) * LIST_PAGE_SIZE, safePage * LIST_PAGE_SIZE);
+
+  /* While the list is being read: pull in the document editor's chunk (it
+     is loaded on demand, and the first open used to pay for its download)
+     and warm the two most recent quotations, which are the ones opened
+     most. Gated like every other idle preload — never on Save-Data or 2G. */
+  useEffect(() => {
+    if (view !== "list" || !loaded) return;
+    if (!isPreloadAllowed(readNetworkContext())) return;
+    const timer = window.setTimeout(() => {
+      void import("./QuotationA4Preview");
+      for (const q of sortedQuotations.slice(0, 2)) warmDoc(q.id);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [view, loaded, sortedQuotations]);
+
+  /* One-off housekeeping, super-admins only: quotations saved before line
+     photos moved to storage still carry them inline and open slowly. The
+     count is fetched once per list visit; the button loops the server
+     endpoint a few documents at a time until none are left. */
+  const [compactPending, setCompactPending] = useState(0);
+  const [compacting, setCompacting] = useState<number | null>(null);
+  useEffect(() => {
+    if (view !== "list" || !isSuperAdmin) return;
+    let alive = true;
+    fetch("/api/quotations/compact-images", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { pending?: number } | null) => { if (alive && j) setCompactPending(Number(j.pending) || 0); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [view, isSuperAdmin]);
+  const runCompaction = useCallback(async () => {
+    if (compacting !== null) return;
+    setCompacting(compactPending);
+    let total = 0;
+    try {
+      for (let round = 0; round < 60; round++) {
+        const res = await fetch("/api/quotations/compact-images", { method: "POST", credentials: "include" });
+        const j = (await res.json().catch(() => ({}))) as { done?: number; remaining?: number; error?: string };
+        if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+        total += Number(j.done) || 0;
+        const remaining = Number(j.remaining) || 0;
+        setCompacting(remaining);
+        if (remaining === 0 || !(Number(j.done) > 0)) break;
+      }
+      setCompactPending(0);
+      docWarm.clear();
+      showToast(t("toast.compactDone").replace("{n}", String(total)));
+    } catch (e) {
+      showToast(t("toast.compactFail").replace("{err}", humanizeError(e)), "error");
+    } finally {
+      setCompacting(null);
+    }
+  }, [compacting, compactPending, showToast, t]);
 
   if (!loaded) {
     return (
       /* min-h-full, never min-h-screen: the Hub scroller is already
          100svh − var(--kx-header-h), so 100vh here is a phantom scroll the
          exact height of the header on every quotations screen. */
-      <AuroraShell className="flex items-center justify-center">
-        <div className="text-gray-400 text-lg">Loading...</div>
+      <AuroraShell className="flex items-center justify-center px-4">
+        {loadError ? (
+          <EmptyState
+            className="w-full max-w-md"
+            icon={<DocumentIcon size={36} className="opacity-40" />}
+            title={t("list.loadError")}
+            hint={loadError}
+            action={<Button variant="secondary" size="sm" onClick={() => void loadList()}>{t("btn.retry")}</Button>}
+          />
+        ) : (
+          <div className="flex items-center gap-2 text-[13px] text-[var(--text-dim)]" role="status" aria-live="polite">
+            <SpinnerIcon size={16} />
+            {t("list.loading")}
+          </div>
+        )}
+        {toastElement}
       </AuroraShell>
     );
   }
@@ -2432,8 +2961,6 @@ export default function Quotations() {
   if (view === "list") {
     return (
       <AuroraShell className="text-[var(--text-primary)]">
-        <style>{PRINT_AND_DOC_STYLES}</style>
-
         {/* Top bar — canonical Hub PageHeader */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 pb-2">
           <PageHeader
@@ -2446,15 +2973,27 @@ export default function Quotations() {
                 {/* Link, not <a>. A plain anchor to an internal route is a FULL
                     PAGE RELOAD — the whole shell, every provider, the account
                     request and the ground all torn down and rebuilt to move
-                    between two screens of the same app. eslint had been calling
-                    this out; it is a loading-speed bug wearing a lint warning. */}
+                    between two screens of the same app. */}
                 <Link
                   href="/quotations/preorder"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
-                  title="Preorder — customer price request / طلب مُسبق"
+                  className="inline-flex items-center h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 text-[12.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
+                  title={t("list.preorderHint")}
                 >
-                  Preorder
+                  {t("list.preorder")}
                 </Link>
+                {isSuperAdmin && compactPending > 0 && (
+                  <Button
+                    variant="secondary"
+                    onClick={runCompaction}
+                    disabled={compacting !== null}
+                    loading={compacting !== null}
+                    title={t("list.compactHint")}
+                  >
+                    {compacting !== null
+                      ? t("list.compacting").replace("{n}", String(compacting))
+                      : t("list.compact").replace("{n}", String(compactPending))}
+                  </Button>
+                )}
                 <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
                   {t("quot.new")}
                 </Button>
@@ -2463,37 +3002,52 @@ export default function Quotations() {
           />
         </div>
 
+        {/* The snapshot painted the list; the refresh behind it failed. */}
+        {loadError && (
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-3">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-[12.5px] text-rose-400" role="alert">
+              <span className="flex-1 min-w-[200px]">{t("list.loadError")} {loadError}</span>
+              <Button variant="secondary" size="sm" onClick={() => void loadList()}>{t("btn.retry")}</Button>
+            </div>
+          </div>
+        )}
+
         {/* KPI strip */}
         {/* Same px-4 md:px-6 lg:px-8 as the header above and the list below.
             MEASURED: the header resolved to 32px of padding and these two to
             16px, so the title sat 16px inboard of every card under it. */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4">
           {(() => {
-            const drafts = quotations.filter((q) => q.status === "draft").length;
-            const sent = quotations.filter((q) => q.status === "sent").length;
-            const accepted = quotations.filter((q) => q.status === "accepted").length;
-            /* Prefer the server-side total column. The list payload
-               has items stripped, so a local recomputation would
-               give 0 for every saved quotation. */
-            const total = quotations.reduce((s, q) => {
-              const tt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
-              return s + tt;
-            }, 0);
-            const now = new Date();
-            const soon = new Date(now); soon.setDate(now.getDate() + 7);
+            /* The money tile is a USD figure, so only USD quotes feed it —
+               a EUR quote added to a USD sum is not a total of anything.
+               The hint says how many were left out. */
+            let total = 0;
+            let otherCurrencies = 0;
+            for (const q of quotations) {
+              if ((q.currency || "USD").toUpperCase() !== "USD") { otherCurrencies++; continue; }
+              total += q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
+            }
+            /* Day granularity: a quote valid until TODAY is still expiring
+               soon, and "now" with a clock time excluded it after midnight. */
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const soon = new Date(today); soon.setDate(today.getDate() + 7);
             const expiringSoon = quotations.filter((q) => {
               if (q.status !== "sent") return false;
               const iso = ddmmyyyyToISO(q.validTill);
               if (!iso) return false;
               const d = new Date(iso);
-              return d >= now && d <= soon;
+              return d >= today && d <= soon;
             }).length;
+            const hints = [
+              expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : "",
+              otherCurrencies > 0 ? t("kpi.otherCurrencies").replace("{n}", String(otherCurrencies)) : "",
+            ].filter(Boolean);
             return (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <KpiCard label={t("kpi.total")}  value={String(quotations.length)} icon="document"     tone="info"     />
-                <KpiCard label={t("kpi.drafts")} value={String(drafts)}            icon="file"         tone="warning"  />
-                <KpiCard label="SENT"            value={String(sent)}              icon="paper-plane"  tone="info"     />
-                <KpiCard label="ACCEPTED"        value={String(accepted)}          icon="check"        tone="positive" />
+                <KpiCard label={t("kpi.total")}    value={String(quotations.length)}      icon="document"     tone="info"     />
+                <KpiCard label={t("kpi.drafts")}   value={String(statusCounts.draft)}    icon="file"         tone="warning"  />
+                <KpiCard label={t("kpi.sent")}     value={String(statusCounts.sent)}     icon="paper-plane"  tone="info"     />
+                <KpiCard label={t("kpi.accepted")} value={String(statusCounts.accepted)} icon="check"        tone="positive" />
                 {/* The money tile spans both mobile columns. KpiCard renders its
                     value at a fixed 26px and a formatted total is ONE unbreakable
                     token (comma separators are not break opportunities), so at a
@@ -2508,25 +3062,71 @@ export default function Quotations() {
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
                   icon="balance-scale-left"
-                  hint={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
+                  hint={hints.length ? hints.join(" · ") : undefined}
                 />
               </div>
             );
           })()}
         </div>
 
-        {/* List */}
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6">
-          {sortedQuotations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-              <DocumentIcon size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium">{t("quot.none")}</p>
-              <p className="text-sm mt-1">
-                {t("quot.createFirst")}
-              </p>
+        {/* Search + status filter */}
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchInput
+              value={query}
+              onChange={(v) => { setQuery(v); setPage(1); }}
+              placeholder={t("list.searchPh")}
+              className="w-full sm:w-80"
+            />
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t("quot.title")}>
+              {(["all", ...QUOTE_STATUS_OPTIONS.map((o) => o.value)] as const).map((s) => {
+                const active = statusFilter === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => { setStatusFilter(s); setPage(1); }}
+                    className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
+                      active
+                        ? s === "all"
+                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                          : statusTone(s)
+                        : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {s === "all" ? t("list.allStatuses") : t(`stl.${s}`)}
+                    <span className="tabular-nums opacity-60">{statusCounts[s]}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5">
+          {sortedQuotations.length === 0 ? (
+            <EmptyState
+              icon={<DocumentIcon size={40} className="opacity-40" />}
+              title={t("quot.none")}
+              hint={t("quot.createFirst")}
+              action={<Button onClick={handleNew} icon={<PlusIcon size={12} />}>{t("quot.new")}</Button>}
+            />
+          ) : filteredQuotations.length === 0 ? (
+            <EmptyState
+              icon={<DocumentIcon size={40} className="opacity-40" />}
+              title={t("list.noMatch")}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => { setQuery(""); setStatusFilter("all"); setPage(1); }}>
+                  {t("list.clearFilters")}
+                </Button>
+              }
+            />
           ) : (
-            /* grid-cols-1 is NOT cosmetic here. A bare `grid` leaves the
+            <>
+            {/* grid-cols-1 is NOT cosmetic here. A bare `grid` leaves the
                implicit column at `auto`, whose minimum is the item's
                min-content — and a card full of `truncate` (nowrap) text has a
                min-content of ~518px. MEASURED at 390px viewport: the column
@@ -2535,24 +3135,40 @@ export default function Quotations() {
                horizontal scroll, so the whole app slid sideways under the
                finger. Tailwind's grid-cols-1 emits repeat(1, minmax(0, 1fr));
                that explicit 0 minimum is what lets the column shrink.
-               Re-measured after: overflow 144px → 0. */
+               Re-measured after: overflow 144px → 0. */}
             <div className="grid grid-cols-1 gap-3">
-              {sortedQuotations.map((q) => {
+              {pageRows.map((q) => {
                 /* The list endpoint strips items from the doc payload
                    to keep responses small, so recomputing here gives 0.
                    Prefer the server-side `serverTotal` (the row's total
-                   column). Fall back to local compute for unsaved
-                   drafts where serverTotal hasn't been set yet. */
-                const computed = q.items.reduce(
-                  (s, i) => s + i.unitPrice * i.qty,
-                  0
-                ) + q.tax + q.shipping + q.others;
-                const gt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computed;
+                   column). Fall back to the SAME formula every other
+                   surface uses (computeGrandTotal: tax %, shipping,
+                   others, whole-bill discount) for unsaved drafts —
+                   the old inline sum used the legacy flat tax field and
+                   ignored the discount, so a draft showed one total in
+                   the list and another on its own document. */
+                const gt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
+                const busy = duplicatingId === q.id;
+                /* Row actions used to be hover-only: invisible on touch
+                   and to keyboard users tabbing onto a focusable they could
+                   not see. Shown on hover, on focus within the row, and
+                   always on devices without hover. */
+                const rowAction =
+                  "p-2 rounded-lg transition opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] disabled:opacity-40 disabled:cursor-not-allowed";
                 return (
                   <div
                     key={q.id}
-                    className="kx-glass kx-hover-card bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-4 sm:p-5 hover:border-[var(--border-strong)] transition cursor-pointer group"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${t("list.openHint")}: ${q.invoiceNo || t("list.unnamedCustomer")}`}
+                    className="kx-glass kx-hover-card bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-4 sm:p-5 hover:border-[var(--border-strong)] transition cursor-pointer group focus-visible:outline-none focus-visible:border-[var(--border-focus)]"
                     onClick={() => handleOpen(q)}
+                    onPointerEnter={() => warmDoc(q.id)}
+                    onFocus={() => warmDoc(q.id)}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void handleOpen(q); }
+                    }}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -2560,48 +3176,42 @@ export default function Quotations() {
                           <span className="text-sm font-mono text-emerald-400 font-semibold">
                             {q.invoiceNo}
                           </span>
-                          <span
-                            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
-                              statusTone(q.status)
-                            }`}
-                          >
-                            {q.status}
-                          </span>
+                          <StatusPill tone={PILL_TONE[q.status]}>{t(`stl.${q.status}`)}</StatusPill>
                         </div>
                         <p className="text-[var(--text-primary)] font-medium truncate">
                           {q.customerName || t("list.unnamedCustomer")}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-[var(--text-dim)] mt-0.5">
                           {q.date}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 sm:gap-4">
                         <span className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">
-                          ${fmt(gt)}
+                          {fmtMoney(gt, q.currency)}
                         </span>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDuplicateFromList(q.id);
+                            void handleDuplicateFromList(q.id);
                           }}
-                          disabled={duplicatingId === q.id}
-                          className="p-2 rounded-lg text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="Duplicate this quotation as a new draft"
+                          disabled={busy}
+                          className={`${rowAction} text-[var(--text-dim)] hover:text-emerald-400 hover:bg-emerald-500/10`}
+                          title={t("list.duplicateHint")}
+                          aria-label={t("list.duplicateHint")}
                         >
-                          {duplicatingId === q.id ? (
-                            <SpinnerIcon className="h-4 w-4" />
-                          ) : (
-                            <CopyIcon size={16} />
-                          )}
+                          {busy ? <SpinnerIcon className="h-4 w-4" /> : <CopyIcon size={16} />}
                         </button>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteFromList(q.id);
+                            void handleDeleteFromList(q.id);
                           }}
-                          className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100"
+                          className={`${rowAction} text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10`}
                           title={t("list.delete")}
+                          aria-label={t("list.delete")}
                         >
                           <TrashIcon size={16} />
                         </button>
@@ -2611,8 +3221,21 @@ export default function Quotations() {
                 );
               })}
             </div>
+            {pages > 1 && (
+              <Pagination
+                className="mt-4"
+                page={safePage}
+                pages={pages}
+                summary={`${(safePage - 1) * LIST_PAGE_SIZE + 1}–${Math.min(safePage * LIST_PAGE_SIZE, filteredQuotations.length)} / ${filteredQuotations.length}`}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(pages, p + 1))}
+              />
+            )}
+            </>
           )}
         </div>
+        {toastElement}
+        {confirmDialog}
       </AuroraShell>
     );
   }
@@ -2653,56 +3276,60 @@ export default function Quotations() {
           flexWrap: "wrap",
         }}
       >
-        <button
-          onClick={requestExit}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-        >
-          <ArrowLeftIcon size={15} />
+        {/* KDS buttons throughout — the toolbar used to carry ten copies of
+            one hand-rolled class string with a raw text-gray-300 that never
+            flipped in the light skin. Labels fold to icons under 640px so
+            fifteen actions do not wrap into six rows of chrome on a phone. */}
+        <Button variant="secondary" size="sm" onClick={requestExit} icon={<ArrowLeftIcon size={15} />}>
           {t("btn.back")}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => { panelsTouched.current = true; setHidePanels((v) => !v); }}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title={
-            hidePanels
-              ? "Show the internal panels (Cost Price, Internal notes, Document settings)"
-              : "Hide the internal panels (Cost Price, Internal notes, Document settings) for a clean focus view"
-          }
+          title={hidePanels ? t("tb.showPanelsHint") : t("tb.hidePanelsHint")}
+          icon={hidePanels ? <EyeIcon size={15} /> : <EyeOffIcon size={15} />}
         >
-          {hidePanels ? <EyeIcon size={15} /> : <EyeOffIcon size={15} />}
-          {hidePanels ? "Show panels" : "Hide panels"}
-        </button>
+          <span className="hidden sm:inline">{hidePanels ? t("tb.showPanels") : t("tb.hidePanels")}</span>
+        </Button>
+        <div className="inline-flex items-center gap-1" role="group" aria-label={`${t("tb.undo")} / ${t("tb.redo")}`}>
+          <Button variant="secondary" size="sm" onClick={() => setCurrent(HIST_UNDO)} disabled={histSize.past === 0} title={t("tb.undo")} aria-label={t("tb.undo")} icon={<Undo2Icon size={14} />} />
+          <Button variant="secondary" size="sm" onClick={() => setCurrent(HIST_REDO)} disabled={histSize.future === 0} title={t("tb.redo")} aria-label={t("tb.redo")} icon={<Redo2Icon size={14} />} />
+        </div>
+        {/* Document heading — a top-level decision, so it sits in the
+            toolbar rather than inside Quick Fill. */}
+        <DocTitlePicker
+          titleId={current.docTitleId}
+          titleText={current.docTitleText}
+          fallbackLabel="QUOTATION"
+          onPick={({ id, text, noun, validity, code }) =>
+            setCurrent((q) =>
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
+            )
+          }
+        />
         <div style={{ flex: 1 }} />
         {/* ── Presence — who else is on this quotation right now ── */}
         {peers.length > 0 && (
-          <div title="People viewing this quotation now" style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 2 }}>
+          <div title={t("tb.peersTitle")} className="flex items-center gap-1.5 me-0.5" aria-live="polite">
             {peers.slice(0, 3).map((p) => (
-              <span
-                key={p.id}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                  fontSize: 11, fontWeight: 600, padding: "4px 9px", borderRadius: 999,
-                  background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.82)",
-                  border: "1px solid rgba(255,255,255,0.10)", whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.status === "editing" ? "#FFCC00" : "#00CC66", flexShrink: 0 }} />
-                {p.name.split(" ")[0]} {p.status === "editing" ? "editing" : "viewing"}
-              </span>
+              <StatusPill key={p.id} tone="neutral">
+                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${p.status === "editing" ? "bg-amber-400" : "bg-emerald-400"}`} />
+                {p.name.split(" ")[0]} {p.status === "editing" ? t("tb.editing") : t("tb.viewing")}
+              </StatusPill>
             ))}
             {peers.length > 3 && (
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>+{peers.length - 3}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">+{peers.length - 3}</span>
             )}
           </div>
         )}
         {/* Unsaved-changes indicator (calm, only when idle + dirty). */}
         {dirty && saveState === "idle" && (
-          <span
-            title="You have unsaved changes"
-            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 9px", borderRadius: 999, background: "rgba(255,204,0,0.12)", color: "#FFCC00", border: "1px solid rgba(255,204,0,0.28)" }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFCC00" }} />
-            Unsaved
+          <span title={t("tb.unsavedHint")}>
+            <StatusPill tone="warning">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              {t("tb.unsaved")}
+            </StatusPill>
           </span>
         )}
         {/* Clickable status pill — opens a menu of transitions. The
@@ -2724,97 +3351,52 @@ export default function Quotations() {
             this, both Save buttons did their network call silently
             and the user couldn't tell if anything was happening. */}
         {saveState !== "idle" && (
-          <span
-            className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${
-              saveState === "saving" ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
-              : saveState === "saved" ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/35"
-              : "bg-rose-500/12 text-rose-400 border-rose-500/35"
-            }`}
-            title={saveError || undefined}
-          >
-            {saveState === "saving" && "Saving…"}
-            {saveState === "saved" && "✓ Saved"}
-            {saveState === "error" && "✕ Save failed"}
+          <span title={saveError || undefined} role="status" aria-live="polite">
+            <StatusPill tone={saveState === "saving" ? "brand" : saveState === "saved" ? "success" : "error"}>
+              {saveState === "saving" && <><SpinnerIcon size={11} /> {t("quot.saving")}</>}
+              {saveState === "saved" && <><CheckIcon size={10} /> {t("tb.saved")}</>}
+              {saveState === "error" && <><CrossIcon size={10} /> {t("tb.saveFailed")}</>}
+            </StatusPill>
           </span>
         )}
-        <button
-          onClick={() => handleSave("draft")}
-          disabled={saveState === "saving"}
-          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saveState === "saving" ? "Saving…" : t("btn.saveDraft")}
-        </button>
-        <button
-          onClick={() => handleSave("final")}
-          disabled={saveState === "saving"}
-          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
-        </button>
-        <button
-          onClick={handleDuplicate}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title="Clone this quote into a new draft (fresh number, today's date)."
-        >
-          <CopyIcon size={14} />
-          Duplicate
-        </button>
-        <button
-          onClick={handleConvertToInvoice}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title={t("tip.convert")}
-        >
-          <DocumentIcon size={14} />
-          {t("btn.convertToInvoice")}
-        </button>
+        <Button variant="secondary" size="sm" onClick={() => handleSave("draft")} disabled={saveState === "saving"}>
+          {t("btn.saveDraft")}
+        </Button>
+        <Button variant="primary" size="sm" onClick={() => handleSave("final")} disabled={saveState === "saving"} loading={saveState === "saving"}>
+          {t("btn.saveFinal")}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleDuplicate} title={t("tb.duplicateHint")} icon={<CopyIcon size={14} />}>
+          <span className="hidden sm:inline">{t("btn.duplicate")}</span>
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleConvertToInvoice} title={t("tip.convert")} icon={<DocumentIcon size={14} />}>
+          <span className="hidden sm:inline">{t("btn.convertToInvoice")}</span>
+        </Button>
         {current.status === "accepted" && (
-          <button
-            onClick={handleCreateProject}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-            title="Create a delivery project in the Projects app linked to this quote's customer, with the quote total as its budget."
-          >
-            <BriefcaseIcon size={14} />
-            {t("btn.createProject", "Create Project")}
-          </button>
+          <Button variant="secondary" size="sm" onClick={handleCreateProject} title={t("tb.createProjectHint")} icon={<BriefcaseIcon size={14} />}>
+            <span className="hidden sm:inline">{t("btn.createProject")}</span>
+          </Button>
         )}
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleExportPdf}
           disabled={pdfState === "loading"}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Open the browser print dialog and pick 'Save as PDF'."
+          loading={pdfState === "loading"}
+          title={t("tb.exportPdfHint")}
+          icon={<DownloadIcon size={14} />}
         >
-          <DownloadIcon size={14} />
-          {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
-        </button>
-        <button
-          onClick={handleExportExcel}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title="Download this quotation as an Excel (.xlsx) spreadsheet."
-        >
-          <TableIcon size={14} />
-          {t("btn.exportExcel", "Excel")}
-        </button>
-        <button
-          onClick={handleSendEmail}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title="Open your mail app pre-filled with the customer's email, quote number, and a cover note. A print window also opens so you can save the PDF and attach it."
-        >
-          <PaperPlaneIcon size={14} />
-          Send
-        </button>
-        <button
-          onClick={handlePrint}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-        >
-          <PrintIcon size={14} />
-          {t("btn.print")}
-        </button>
-        <button
-          onClick={handleDeleteCurrent}
-          className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"
-        >
-          <TrashIcon size={14} />
-        </button>
+          <span className="hidden sm:inline">{pdfState === "loading" ? t("btn.opening") : t("btn.exportPDF")}</span>
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleExportExcel} disabled={excelBusy} loading={excelBusy} title={t("tb.exportExcelHint")} icon={<TableIcon size={14} />}>
+          <span className="hidden sm:inline">{t("btn.exportExcel")}</span>
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleSendEmail} title={t("tb.sendHint")} icon={<PaperPlaneIcon size={14} />}>
+          <span className="hidden sm:inline">{t("btn.send")}</span>
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handlePrint} icon={<PrintIcon size={14} />}>
+          <span className="hidden sm:inline">{t("btn.print")}</span>
+        </Button>
+        <Button variant="danger" size="sm" onClick={handleDeleteCurrent} icon={<TrashIcon size={14} />} title={t("btn.delete")} aria-label={t("btn.delete")} />
       </div>
 
       {/* ── Loading bar — full doc (items) is hydrating from the server ── */}
@@ -2828,7 +3410,7 @@ export default function Quotations() {
           }}
         >
           <SpinnerIcon size={14} />
-          Loading quotation… fetching items, customer & products
+          {t("tb.hydrating")}
         </div>
       )}
 
@@ -2850,35 +3432,25 @@ export default function Quotations() {
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: dirty ? "#FFCC00" : "#3385FF", flexShrink: 0 }} />
           <span style={{ flex: 1, minWidth: 180 }}>
-            {dirty ? (
-              <><b>{saveNotice.byName}</b> updated this quotation — you have unsaved edits, so it wasn&apos;t applied automatically.</>
-            ) : (
-              <>Applied <b>{saveNotice.byName}</b>&apos;s latest changes in real time.</>
-            )}
+            {(dirty ? t("collab.updatedDirty") : t("collab.applied")).split("{name}").map((part, i, arr) => (
+              <span key={i}>{part}{i < arr.length - 1 && <b>{saveNotice.byName}</b>}</span>
+            ))}
           </span>
           {dirty && (
             <>
-              <button
-                type="button"
-                onClick={() => askConfirm("Load the latest version? Your unsaved edits will be replaced.", async () => {
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => askConfirm(t("collab.loadLatestConfirm"), async () => {
                   await loadLatest();
                   clearNotice();
-                }, { confirmLabel: "Load latest", tone: "neutral" })}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg"
-                style={{ border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF" }}
+                }, { confirmLabel: t("collab.loadLatest"), tone: "neutral" })}
               >
-                Load Latest
-              </button>
-              {confirmDialog}
-              {toastElement}
-              <button
-                type="button"
-                onClick={clearNotice}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg"
-                style={{ border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)" }}
-              >
-                Ignore for now
-              </button>
+                {t("collab.loadLatest")}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearNotice}>
+                {t("collab.ignore")}
+              </Button>
             </>
           )}
         </div>
@@ -2915,7 +3487,7 @@ export default function Quotations() {
             onChange={(e) =>
               setCurrent({ ...current, customerName: e.target.value })
             }
-            placeholder="e.g. Mr. Ahmed"
+            placeholder={t("field.customerPh")}
             className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
@@ -2939,7 +3511,7 @@ export default function Quotations() {
             onChange={(e) =>
               setCurrent({ ...current, companyName: e.target.value })
             }
-            placeholder="e.g. ABC Trading Co."
+            placeholder={t("field.companyPh")}
             className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
@@ -2981,6 +3553,8 @@ export default function Quotations() {
         addHeader={addHeader}
         onPickFromCatalog={() => setPickerOpen(true)}
         onPickCustomer={() => setCustomerPickerOpen(true)}
+        onSaveCustomer={saveCurrentPartyAsCustomer}
+        savingCustomer={savingCustomer}
         savedStampUrl={savedStampUrl}
         savedSignatureUrl={savedSignatureUrl}
         isSuperAdmin={isSuperAdmin}
@@ -3008,6 +3582,12 @@ export default function Quotations() {
       </div>
       </div>
       </div>
+      {/* The reports about this quotation (Reports 4B) — under the paper,
+          only when there are some, never printed. */}
+      {current.id && (
+        <ReportsAboutCard quiet type="quotation" id={current.id}
+          className="no-print mx-4 mb-10 mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 sm:mx-auto sm:w-full sm:max-w-[794px]" />
+      )}
       <ProductPickerModal
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setInsertAtIdx(null); }}
@@ -3020,124 +3600,93 @@ export default function Quotations() {
       />
 
       {/* Unsaved-changes confirm — shown when the operator presses Back with
-          pending edits. Styled to the Hub design system (dark surface, single
-          blue CTA, calm ghost / discard actions). */}
-      {exitPromptOpen && (
-        <div
-          onClick={() => setExitPromptOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("quot.unsavedTitle", "Unsaved changes")}
-            style={{ width: "100%", maxWidth: 420, background: "var(--bg-secondary, #1f2937)", color: "var(--text-primary, #e5e7eb)", border: "1px solid var(--border-color, #374151)", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
-          >
-            <style>{`
-              .qz-btn{height:38px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:background .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease;font-family:inherit;}
-              .qz-btn:disabled{opacity:.55;cursor:not-allowed;}
-              .qz-btn--ghost{background:transparent;border-color:var(--border-color,#374151);color:var(--text-secondary,#cbd5e1);}
-              .qz-btn--ghost:hover{background:rgba(255,255,255,0.06);color:var(--text-primary,#fff);}
-              .qz-btn--danger{background:transparent;color:#f87171;}
-              .qz-btn--danger:hover{background:rgba(239,68,68,0.12);}
-              .qz-btn--primary{background:#fff;color:#0D0D0D;border-color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.35);}
-              .qz-btn--primary:hover:not(:disabled){background:#E0E0E0;border-color:#E0E0E0;}
-            `}</style>
-            <div style={{ padding: "20px 22px 6px" }}>
-              <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "0.01em" }}>
-                {t("quot.unsavedTitle", "Unsaved changes")}
-              </div>
-              <p style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary, #9ca3af)" }}>
-                {t("quot.unsavedBody", "You have unsaved changes in this quotation. Do you want to save them before leaving?")}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", padding: "14px 22px 18px", flexWrap: "wrap" }}>
-              <button type="button" className="qz-btn qz-btn--ghost" onClick={() => setExitPromptOpen(false)}>
-                {t("btn.cancel", "Cancel")}
-              </button>
-              <button type="button" className="qz-btn qz-btn--danger" onClick={leaveEditor}>
-                {t("quot.discardLeave", "Discard & leave")}
-              </button>
-              <button type="button" className="qz-btn qz-btn--primary" disabled={saveState === "saving"} onClick={saveAndExit}>
-                {saveState === "saving" ? t("quot.saving", "Saving…") : t("quot.saveLeave", "Save & leave")}
-              </button>
-            </div>
-          </div>
+          pending edits. The elected KDS Modal: Escape and backdrop close it,
+          primary action first. */}
+      <KdsModal open={exitPromptOpen} onClose={() => setExitPromptOpen(false)} title={t("quot.unsavedTitle")}>
+        <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">{t("quot.unsavedBody")}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="primary" size="md" disabled={saveState === "saving"} loading={saveState === "saving"} onClick={saveAndExit}>
+            {t("quot.saveLeave")}
+          </Button>
+          <Button variant="danger" size="md" onClick={leaveEditor}>{t("quot.discardLeave")}</Button>
+          <Button variant="ghost" size="md" onClick={() => setExitPromptOpen(false)}>{t("btn.cancel")}</Button>
         </div>
-      )}
+      </KdsModal>
 
       {/* ── Conflict dialog — save was BLOCKED because the quotation changed
             on the server since we loaded it. The stale write was rejected
             (never overwrote newer data). User chooses how to proceed. ── */}
-      {conflict && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 16 }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Quotation updated by another user"
-            className="kx-glass-pop"
-            style={{ width: "100%", maxWidth: 460, color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
+      <KdsModal
+        open={!!conflict}
+        onClose={() => { if (!conflictBusy) setConflict(null); }}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+            {t("conflict.title")}
+          </span>
+        }
+      >
+        {conflict && (
+          <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+            {conflict.updated_by_name
+              ? t("conflict.newerBy").split("{name}").map((part, i, arr) => (
+                  <span key={i}>{part}{i < arr.length - 1 && <b className="text-[var(--text-primary)]">{conflict.updated_by_name}</b>}</span>
+                ))
+              : t("conflict.newer")}
+            {conflict.updated_at ? ` (${fmtDateTimeDMY(conflict.updated_at)})` : ""}. {t("conflict.body")}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            size="md"
+            disabled={conflictBusy}
+            loading={conflictBusy}
+            onClick={async () => {
+              setConflictBusy(true);
+              try { await loadLatest(); setConflict(null); }
+              catch (e) { showToast(humanizeError(e), "error"); }
+              finally { setConflictBusy(false); }
+            }}
           >
-            <div style={{ padding: "20px 22px 6px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#FFCC00", flexShrink: 0 }} />
-                <div style={{ fontSize: 16, fontWeight: 700 }}>Quotation was updated by another user</div>
-              </div>
-              <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.6, color: "#AAAAAA" }}>
-                {conflict.updated_by_name ? <><b style={{ color: "#fff" }}>{conflict.updated_by_name}</b> saved a newer version</> : "A newer version was saved"}
-                {conflict.updated_at ? ` (${new Date(conflict.updated_at).toLocaleString()})` : ""}. To protect their changes, your save was not applied. Please load the latest version before saving — or save your edits as a separate copy.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", padding: "14px 22px 18px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                disabled={conflictBusy}
-                onClick={() => setConflict(null)}
-                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid #2E2E2E", background: "transparent", color: "#cbd5e1", opacity: conflictBusy ? 0.55 : 1 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={conflictBusy}
-                onClick={async () => {
-                  if (!current) return;
-                  setConflictBusy(true);
-                  try {
-                    const copy = await saveQuotationAsCopy(current);
-                    if (copy) {
-                      setCurrent(copy);
-                      markSaved(copy);
-                      if (typeof copy.version === "number") announceSavedRef.current(copy.version);
-                      const list = await loadQuotationsRemote({ fresh: true });
-                      setQuotations(list);
-                    }
-                    setConflict(null);
-                  } finally { setConflictBusy(false); }
-                }}
-                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.06)", color: "#fff", opacity: conflictBusy ? 0.55 : 1 }}
-              >
-                Save as Copy
-              </button>
-              <button
-                type="button"
-                disabled={conflictBusy}
-                onClick={async () => {
-                  setConflictBusy(true);
-                  try { await loadLatest(); setConflict(null); }
-                  finally { setConflictBusy(false); }
-                }}
-                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#0D0D0D", opacity: conflictBusy ? 0.55 : 1 }}
-              >
-                {conflictBusy ? "Working…" : "Load Latest Version"}
-              </button>
-            </div>
-          </div>
+            {t("conflict.loadLatest")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            disabled={conflictBusy}
+            onClick={async () => {
+              if (!current) return;
+              setConflictBusy(true);
+              try {
+                const copy = await saveQuotationAsCopy(current);
+                if (copy) {
+                  setCurrent(histRaw(copy));
+                  setCurrent(HIST_RESET);
+                  markSaved(copy);
+                  if (typeof copy.version === "number") announceSavedRef.current(copy.version);
+                  const list = await loadQuotationsRemote({ fresh: true });
+                  setQuotations(list);
+                }
+                setConflict(null);
+              } catch (e) {
+                showToast(humanizeError(e), "error");
+              } finally { setConflictBusy(false); }
+            }}
+          >
+            {t("conflict.saveCopy")}
+          </Button>
+          <Button variant="ghost" size="md" disabled={conflictBusy} onClick={() => setConflict(null)}>
+            {t("btn.cancel")}
+          </Button>
         </div>
-      )}
+      </KdsModal>
+      {/* Toast + confirm hosts, once per view. They used to sit inside the
+          collab notice — which only renders while a peer has just saved AND
+          the doc is dirty — so sixteen showToast() calls in this file had no
+          element to render into and every failure was silent. */}
+      {toastElement}
+      {confirmDialog}
     </AuroraShell>
   );
 }
@@ -3153,6 +3702,7 @@ function StatusMenu({
   status: QuoteStatus;
   onChange: (next: QuoteStatus) => void;
 }) {
+  const { t } = useTranslation(docsT);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -3163,71 +3713,53 @@ function StatusMenu({
         setOpen(false);
       }
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
-  const colourFor = (s: QuoteStatus): string =>
-    s === "accepted"
-      ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/35"
-      : s === "sent"
-        ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
-        : s === "rejected"
-          ? "bg-rose-500/12 text-rose-400 border-rose-500/35"
-          : s === "expired"
-            ? "bg-[var(--bg-inverted)]/[0.06] text-[var(--text-muted)] border-[var(--border-subtle)]"
-            : "bg-amber-500/12 text-amber-400 border-amber-500/35";
-
-  const labelFor = (s: QuoteStatus): string =>
-    s.charAt(0).toUpperCase() + s.slice(1);
-
+  /* Colours come from doc-status's one ladder — this menu carried a
+     byte-for-byte copy of it, which is how the two surfaces drift apart. */
   return (
-    <div ref={wrapRef} style={{ position: "relative" }}>
+    <div ref={wrapRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1 h-[22px] px-2 rounded-full border text-[11px] font-semibold whitespace-nowrap ${colourFor(status)}`}
-        style={{ cursor: "pointer" }}
-        title="Click to change status"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1 h-[22px] ps-2 pe-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${statusTone(status)}`}
+        title={t("stl.hint")}
       >
-        {labelFor(status)}
-        <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+        {t(`stl.${status}`)}
+        <ChevronDownIcon size={11} className="opacity-70" aria-hidden />
       </button>
       {open && (
         <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            right: 0,
-            background: "var(--bg-secondary, #1f2937)",
-            border: "1px solid var(--border-color, #374151)",
-            borderRadius: 8,
-            padding: 4,
-            minWidth: 140,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-            zIndex: 30,
-            display: "flex",
-            flexDirection: "column",
-          }}
+          role="menu"
+          className="absolute end-0 z-30 mt-1 flex min-w-[150px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 shadow-xl shadow-black/40"
         >
           {QUOTE_STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
+              role="menuitem"
               onClick={() => {
                 setOpen(false);
                 onChange(opt.value);
               }}
               disabled={opt.value === status}
-              className={`text-left px-2 py-1.5 rounded text-xs font-medium ${
+              className={`flex items-center gap-2 rounded px-2 py-1.5 text-start text-xs font-medium ${
                 opt.value === status
-                  ? "opacity-50 cursor-default"
-                  : "hover:bg-white/[0.05] cursor-pointer text-gray-300"
+                  ? "opacity-50 cursor-default text-[var(--text-primary)]"
+                  : "cursor-pointer text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
               }`}
-              style={{ background: "transparent", border: "none" }}
             >
-              <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${colourFor(opt.value).split(" ")[0]}`}></span>
-              {opt.label}
+              <span className={`inline-block h-2 w-2 rounded-full border ${statusTone(opt.value)}`} />
+              {t(`stl.${opt.value}`)}
             </button>
           ))}
         </div>
@@ -3235,9 +3767,3 @@ function StatusMenu({
     </div>
   );
 }
-
-/** Compact Hub-style KPI card, matched to the strip on Planning / Projects
- *  so all list-view dashboards share one visual language. */
-/* Local KpiCard replaced — use shared src/components/ui/KpiCard.tsx via the
-   import alias below. We re-export under the same name so existing call
-   sites keep working. */

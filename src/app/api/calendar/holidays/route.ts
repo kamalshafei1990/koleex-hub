@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* ---------------------------------------------------------------------------
    /api/calendar/holidays  (report GEN-10)
@@ -18,7 +18,10 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 
    Calendar is a personal/Type-C module; any authenticated user with Calendar
    module access can read holidays. Writes are restricted to Super Admin
-   (holidays are tenant-wide reference data).
+   (holidays are tenant-wide reference data); the Calendar's holidays panel
+   (components/admin/calendar/HolidaysPanel) calls POST and DELETE. A
+   customer holiday must name a customer of the caller's tenant.
+   A session without a tenant reads and writes the tenant-less rows.
    --------------------------------------------------------------------------- */
 
 const SELECT =
@@ -37,8 +40,8 @@ export async function GET(req: Request) {
   let q = supabaseServer
     .from("koleex_holidays")
     .select(SELECT)
-    .eq("tenant_id", auth.tenant_id)
     .eq("is_active", true);
+  q = auth.tenant_id ? q.eq("tenant_id", auth.tenant_id) : q.is("tenant_id", null);
 
   /* When a country is requested, also return that country's holidays plus any
      customer-scoped holidays the caller asked for. Filters are additive and
@@ -47,7 +50,10 @@ export async function GET(req: Request) {
   if (customerId) q = q.eq("customer_id", customerId);
 
   const { data, error } = await q.order("holiday_date", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/calendar/holidays GET]", error.message);
+    return NextResponse.json({ error: "Failed to load holidays" }, { status: 500 });
+  }
   return NextResponse.json(
     { holidays: data ?? [] },
     { headers: { "Cache-Control": "private, no-store" } },
@@ -91,8 +97,26 @@ export async function POST(req: Request) {
     body.holiday_date && String(body.holiday_date).trim()
       ? String(body.holiday_date).trim()
       : null;
+  if (holidayDate && !/^\d{4}-\d{2}-\d{2}$/.test(holidayDate)) {
+    return NextResponse.json({ error: "holiday_date must be YYYY-MM-DD" }, { status: 400 });
+  }
   if (holidayType !== "weekly" && !holidayDate) {
     return NextResponse.json({ error: "national/official holidays need a date" }, { status: 400 });
+  }
+
+  const customerId = scopeType === "customer" ? String(body.customer_id ?? "").trim() : "";
+  if (scopeType === "customer") {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)) {
+      return NextResponse.json({ error: "customer holidays need a customer_id" }, { status: 400 });
+    }
+    let cq = supabaseServer.from("customers").select("id").eq("id", customerId);
+    cq = auth.tenant_id ? cq.eq("tenant_id", auth.tenant_id) : cq.is("tenant_id", null);
+    const { data: cust, error: custErr } = await cq.maybeSingle();
+    if (custErr) {
+      console.error("[api/calendar/holidays POST] customer:", custErr.message);
+      return NextResponse.json({ error: "Failed to create holiday" }, { status: 500 });
+    }
+    if (!cust) return NextResponse.json({ error: "unknown customer" }, { status: 400 });
   }
 
   const row = {
@@ -101,7 +125,7 @@ export async function POST(req: Request) {
     holiday_type: holidayType,
     scope_type: scopeType,
     country: scopeType === "country" ? (String(body.country ?? "").trim() || null) : null,
-    customer_id: scopeType === "customer" ? (String(body.customer_id ?? "").trim() || null) : null,
+    customer_id: scopeType === "customer" ? customerId : null,
     holiday_date: holidayType === "weekly" ? null : holidayDate,
     weekday: holidayType === "weekly" ? weekday : null,
     recurs_annually: Boolean(body.recurs_annually),
@@ -113,6 +137,9 @@ export async function POST(req: Request) {
     .insert(row)
     .select(SELECT)
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/calendar/holidays POST]", error.message);
+    return NextResponse.json({ error: "Failed to create holiday" }, { status: 500 });
+  }
   return NextResponse.json({ holiday: data }, { status: 201 });
 }

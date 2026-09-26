@@ -5,14 +5,25 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
+/* Trim, and treat blank as absent — the same helper lives in ./[id]/route.ts
+   so a value round-trips identically through create and update. */
 const str = (v: unknown, n: number): string | null =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null;
+
+/* A preorder doc is sections + items + a few data-URL photos. 2 MB is far
+   above any real document and well under what the function should ever hold
+   in memory for one request; a larger body is refused before it is parsed.
+   Not exported (route modules may only export handlers); ./[id]/route.ts
+   repeats the value. */
+const DOC_MAX_BYTES = 2 * 1024 * 1024;
 
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Quotations");
+  if (deny) return deny;
 
   const { data, error } = await supabaseServer
     .from("quotation_preorders")
@@ -33,7 +44,12 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Quotations", "create");
   if (deny) return deny;
 
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const raw = await req.text().catch(() => "");
+  if (raw.length > DOC_MAX_BYTES) {
+    return NextResponse.json({ error: "Preorder is too large to save (limit 2 MB)." }, { status: 413 });
+  }
+  let body: Record<string, unknown> | null = null;
+  try { body = JSON.parse(raw) as Record<string, unknown>; } catch { body = null; }
   const doc = body?.doc && typeof body.doc === "object" && !Array.isArray(body.doc) ? body.doc : {};
 
   const row = {

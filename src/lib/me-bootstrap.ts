@@ -291,16 +291,28 @@ export async function getMeBootstrap(opts?: {
         try {
           const res = await fetchWithTimeout("/api/me/bootstrap", timeoutMs, noStore);
           if (!res.ok) {
-            /* Capture status so the UI can hint specifically — 401 →
-               "please sign in again", 5xx → "server is having a
-               moment". */
+            /* NOT EVERY 401 IS AN EXPIRED SESSION, and saying so sent people
+               in circles. The server now sends a `code` with the reason; a
+               deactivated account needs an administrator, not another sign-in,
+               and telling it to "sign in again" is advice that can never
+               succeed — the same shape of closed loop as the 2026-08-30
+               lockout. Read defensively: an older deployment sends no code and
+               must keep behaving exactly as before. */
+            let code: string | null = null;
+            try {
+              const j = (await res.clone().json()) as { code?: unknown };
+              if (typeof j?.code === "string") code = j.code;
+            } catch { /* not JSON, or a body already consumed — fall through */ }
+
             _lastError = {
               kind: `http_${res.status}`,
               status: res.status,
               raw: `bootstrap returned ${res.status}`,
               message:
                 res.status === 401
-                  ? "Session expired — please sign in again."
+                  ? code === "account_inactive"
+                    ? "This account is not active. Contact an administrator."
+                    : "Session expired — please sign in again."
                   : res.status >= 500
                     ? "Server is having a moment. Tap Retry."
                     : `Server responded ${res.status}. Tap Retry.`,
@@ -308,6 +320,21 @@ export async function getMeBootstrap(opts?: {
             if (res.status === 401) {
               cache = null;
               clearPersisted();
+              /* THE COOKIE IS GONE AND THE CLIENT STILL THINKS IT IS SIGNED
+                 IN. This route 401s only when there is no valid session, so
+                 the flag the gate reads (`koleex-admin`, localStorage, no
+                 expiry) is now a lie — and while it says "true" the Hub keeps
+                 painting, every call keeps 401ing, and the sign-in form never
+                 comes back. Clearing the hints flips the gate to the password
+                 form by itself, which is the one action that can actually fix
+                 it. Exception: `account_inactive` is a valid session belonging
+                 to a deactivated account — signing in again cannot help, so
+                 leave that message on screen. */
+              if (code !== "account_inactive") {
+                void import("./session-hints")
+                  .then((m) => m.dropClientSessionHints())
+                  .catch(() => undefined);
+              }
               for (const cb of listeners) cb(null);
               return null;   // No point retrying 401
             }

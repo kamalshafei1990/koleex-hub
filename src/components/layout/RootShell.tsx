@@ -14,8 +14,10 @@ import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
 import AppLaunchSplash from "./AppLaunchSplash";
+import AppLaunchZoom from "./AppLaunchZoom";
 import ViewTransitions from "./ViewTransitions";
 import Sidebar from "./Sidebar";
+import DockClearance from "./DockClearance";
 import ViewAsBanner from "./ViewAsBanner";
 import dynamic from "next/dynamic";
 /* QA reporter is post-paint tooling — keep it (and everything it pulls)
@@ -25,7 +27,9 @@ const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButto
    client — lazy so the shell's first paint never waits on or ships them. */
 const FloatingPanel = dynamic(() => import("./FloatingPanel"), { ssr: false });
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
-import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
+/* The QA Open Route highlighter loads only for a page opened from the QA
+   console — see QaFocusGate. */
+import QaFocusGate from "@/components/qa/QaFocusGate";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import DevReload from "@/components/pwa/DevReload";
@@ -298,6 +302,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <NavigationProgress />
       <ViewTransitions />
       <AppLaunchSplash />
+      {/* The bloom-from-tile app-open motion. Sits ABOVE the splash (z-95 vs
+          z-90): a slow launch holds the card fullscreen, then hands off to
+          the brand splash beneath. Never uncovers Home mid-launch. */}
+      <AppLaunchZoom />
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
           another user. Sits below MainHeader (fixed, top-14) and is
@@ -370,11 +378,14 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           post-paint tooling, not needed for first interaction) off every route's
           critical path on weak clients. */}
       {panelReady && <FloatingPanel />}
+      {/* Bottom room in each app's scroller so its last row can scroll clear
+          of the dock above (and the report button over it). */}
+      {panelReady && <DockClearance />}
       {/* Global QA issue reporter (floating button + modal). */}
       {panelReady && <ReportIssueButton />}
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
           picked component on arrival (issue dc295123 follow-up). */}
-      <Suspense fallback={null}><QaFocusHighlight /></Suspense>
+      <Suspense fallback={null}><QaFocusGate /></Suspense>
       {/* Headless presence heartbeat + page tracking (Super Admin monitoring). */}
       <ActivityTracker />
       {/* Registers the push service worker (PWA / Web Push). */}

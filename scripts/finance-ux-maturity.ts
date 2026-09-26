@@ -71,7 +71,7 @@ async function main() {
      proximity matching is unreliable across multi-line JSX, so we
      accept the assertion when both signatures coexist. */
   ok("07  FinanceOrders wraps KPI cards in <Link> (Revenue / Net Profit / Outstanding)",
-     orders.includes('href="/finance/visual"')
+     orders.includes('href="/finance/statements"')
        && orders.includes('href="/reports/statements?tab=ar"')
        && orders.includes("<HeroKpiCard"));
   ok("08  VisualStatements wraps KPI headers in <Link>",

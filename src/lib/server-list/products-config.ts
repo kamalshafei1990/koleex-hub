@@ -30,7 +30,17 @@ export const PRODUCTS_LIST_CONFIG: ServerListConfig = {
      abandoned: past the auto-complete threshold the scroll path takes over,
      which is what the 3000 products he is about to enter actually need. */
   defaultPageSize: 150,
-  maxPageSize: 200,
+  /* ⚠️ 400, NOT 200 — SO TODAY'S CATALOGUE IS ONE REQUEST.
+     Measured 18/09/2026 with 394 products: at 200 the default view needed TWO
+     pages, so a cold open painted a partial grid and finished in public — the
+     owner caught it in two screenshots a minute apart, "Fabric preparation —
+     3 of 67 products" then "67 products". The bytes were never the problem
+     (394 rows = 223 KB raw, ~45 KB on the wire); the second ROUND TRIP was,
+     on a link where one costs about a second.
+     400 covers the whole catalogue in one response and still bounds the page
+     at 3,000 products, where the auto-complete threshold stops applying and
+     pages arrive on scroll anyway. */
+  maxPageSize: 400,
   sortFields: {
     name: "product_name",
     brand: "brand",

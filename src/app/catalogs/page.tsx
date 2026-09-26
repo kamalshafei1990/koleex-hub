@@ -8,6 +8,7 @@ import { currentScopeKey } from "@/lib/me-bootstrap";
 import Link from "next/link";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -790,7 +791,7 @@ function QuickAddContactModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative flex max-h-[88vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl">
         {/* Header (fixed) */}
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-6 py-4">
           <div className="flex items-center gap-2.5">
@@ -1468,7 +1469,7 @@ function CatalogModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div {...kxInspectAttrs({ component: "CatalogUploadModal", module: "Catalogs", section: "Upload" })} className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div {...kxInspectAttrs({ component: "CatalogUploadModal", module: "Catalogs", section: "Upload" })} className="kx-app kx-glass-pop kx-pop-in relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
@@ -1815,7 +1816,7 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="px-6 py-5">
           <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{t("del.title")}</h2>
           <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
@@ -2701,7 +2702,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" {...kxInspectAttrs({ component: "CatalogPreviewViewer", module: "Catalogs", section: "Preview", recordId: catalog.id })}>
+    <div data-kx-viewer className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" {...kxInspectAttrs({ component: "CatalogPreviewViewer", module: "Catalogs", section: "Preview", recordId: catalog.id })}>
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 text-white shrink-0" {...kxInspectAttrs({ component: "CatalogPreviewHeader", module: "Catalogs", section: "Preview" })}>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold truncate">{catalog.title}</p>
@@ -3131,8 +3132,9 @@ function CatalogsApp() {
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label={t("cat.backHome", "Back to home")}>
-            <ArrowLeftIcon className="h-4 w-4" />
+          <Link href="/" className={BACK_CHROME} aria-label={t("cat.backHome", "Back to home")}>
+            <ArrowLeftIcon size={14} />
+            <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">

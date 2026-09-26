@@ -12,6 +12,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { issueLink, reporterIssueLink, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
+import type { NotifTpl } from "@/lib/notification-templates";
 import type { QaWatcher } from "@/lib/qa/types";
 
 /** Add the caller as a watcher (idempotent — UNIQUE(issue_id, account_id)). */
@@ -102,6 +103,10 @@ export async function getWatchers(tenantId: string, issueId: string): Promise<Qa
  *
  * Returned targets are appended AFTER the reporter/assignee/mention targets so
  * notifyIssue's per-recipient dedupe keeps the more specific one (mentions win).
+ *
+ * `tpl` is the watcher's sentence — third person: a "…assigned you" event
+ * passes its `.watcher` key (e.g. qa_issue_assigned.watcher), never the
+ * assignee's.
  */
 export async function watcherTargets(opts: {
   tenantId: string;
@@ -109,8 +114,9 @@ export async function watcherTargets(opts: {
   actorId: string | null;
   internal: boolean;
   type: QaNotificationType;
-  title: string;
-  body: string;
+  tpl?: NotifTpl;
+  title?: string;
+  body?: string;
   alert?: boolean;
 }): Promise<NotifyTarget[]> {
   const { data, error } = await supabaseServer
@@ -132,6 +138,7 @@ export async function watcherTargets(opts: {
     out.push({
       recipientId: row.account_id,
       type: opts.type,
+      tpl: opts.tpl,
       title: opts.title,
       body: opts.body,
       alert: opts.alert,

@@ -9,12 +9,21 @@
    expenses) with subtotals + margin %.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT, translateAccountName } from "@/lib/translations/finance";
+import { useWarmData } from "@/lib/warm-cache";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_PL } from "@/lib/translations/finance/pl";
+import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
 import type { Lang } from "@/lib/i18n";
+
+/* Only the namespaces this screen reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_PL } as const;
+
 
 interface PLAccountLine { account_id: string; code: string; name: string; amount: number }
 interface PLSection { label: string; amount: number; accounts: PLAccountLine[] }
@@ -33,44 +42,34 @@ interface ProfitLoss {
   comparison?: ProfitLoss;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 function pct(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return `${n.toFixed(1)}%`;
 }
 
 export default function FinanceProfitLoss() {
-  const { t, lang } = useTranslation(financeT);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { t, lang } = useTranslation(DICT);
+  const today = useMemo(() => todayIso(), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);
   const [compare, setCompare] = useState(true);
-  const [data, setData] = useState<ProfitLoss | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams({ from, to });
-      if (compare) qs.set("compare_prior", "1");
-      const res = await fetch(`/api/accounting/profit-loss?${qs.toString()}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.statement as ProfitLoss);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const qs = new URLSearchParams({ from, to });
+    if (compare) qs.set("compare_prior", "1");
+    const res = await fetch(`/api/accounting/profit-loss?${qs.toString()}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    /* No «Bank & Profit» (src/lib/experience): a line, not a failure. */
+    if (res.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.statement as ProfitLoss;
   }, [from, to, compare]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<ProfitLoss>(`fin:pl:${from}:${to}:${compare ? 1 : 0}`, fetchData);
+  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  const error = loadError && !locked ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   /* Variance helper for the comparison column. */
   const variance = (cur: number, prev: number): { amount: number; pct: number } => ({
@@ -80,7 +79,7 @@ export default function FinanceProfitLoss() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.pl.title", "Profit & Loss")}
           subtitle={t("accounting.pl.subtitle.long", "Revenue, costs, and net profit — calculated from posted journal lines only.")}
@@ -105,6 +104,9 @@ export default function FinanceProfitLoss() {
           </div>
         </div>
 
+        {locked && (
+          <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("pl.locked", "The profit and loss opens with «Bank & Profit» in Roles & Permissions.")}</div>
+        )}
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
         )}

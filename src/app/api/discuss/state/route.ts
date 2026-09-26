@@ -28,58 +28,36 @@ import {
   serializeDiscussMessageForClient,
   serializeDiscussDraftForClient,
   serializeDiscussDraftsForClient,
+  flattenDiscussAuthor as flattenAuthor,
+  buildDiscussReactionMap,
+  DISCUSS_AUTHOR_SELECT as AUTHOR_SELECT,
+  type DiscussAuthorJoin as AuthorJoin,
 } from "@/lib/server/discuss-serialize";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 const CHANNELS = "discuss_channels";
+const MEMBERS = "discuss_members";
 const MESSAGES = "discuss_messages";
 const REACTIONS = "discuss_reactions";
 const PINNED = "discuss_pinned";
 const STARRED = "discuss_starred";
 const DRAFTS = "discuss_drafts";
 
-type AuthorJoin =
-  | {
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
-    }
-  | Array<{
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person: { full_name: string } | Array<{ full_name: string }> | null;
-    }>
-  | null;
-
-/** Normalise the accounts→people author join into the flat DiscussAuthor
- *  shape the client renders (identical to discuss.ts). */
-function flattenAuthor(raw: AuthorJoin) {
-  const acc = Array.isArray(raw) ? raw[0] ?? null : raw;
-  if (!acc) return null;
-  const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-  return {
-    id: acc.id,
-    username: acc.username,
-    avatar_url: acc.avatar_url,
-    full_name: person?.full_name ?? null,
-  };
+/** The caller's active channel ids — the gate for every message-bearing read. */
+async function myChannelIds(me: string): Promise<string[]> {
+  const { data } = await supabaseServer
+    .from(MEMBERS)
+    .select("channel_id")
+    .eq("account_id", me)
+    .is("left_at", null);
+  return ((data ?? []) as Array<{ channel_id: string }>).map((r) => r.channel_id);
 }
-
-const AUTHOR_SELECT = `
-  *,
-  author:accounts!discuss_messages_author_account_id_fkey (
-    id,
-    username,
-    avatar_url,
-    person:people ( full_name )
-  )
-`;
 
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const denied = await requireModuleAccess(auth, "Discuss");
+  if (denied) return denied;
   const me = auth.account_id;
 
   const url = new URL(req.url);
@@ -108,6 +86,7 @@ export async function GET(req: Request) {
 
       /* ---- every non-empty draft the caller owns (+channel) ------------- */
       case "allDrafts": {
+        const scope = new Set(await myChannelIds(me));
         const { data, error } = await supabaseServer
           .from(DRAFTS)
           .select(`*, channel:${CHANNELS}!discuss_drafts_channel_id_fkey ( * )`)
@@ -125,6 +104,9 @@ export async function GET(req: Request) {
             const ch = Array.isArray(row.channel) ? row.channel[0] ?? null : row.channel ?? null;
             return { ...row, channel: ch };
           })
+          /* Only drafts for conversations I am still in — a draft must not
+             keep a left channel's name/metadata reachable. */
+          .filter((row) => scope.has(String((row as { channel_id?: unknown }).channel_id ?? "")))
           .filter(
             (row) =>
               (typeof row.body === "string" && row.body.trim().length > 0) ||
@@ -159,6 +141,10 @@ export async function GET(req: Request) {
       /* ---- a channel's pinned messages (author + reactions) ------------ */
       case "pinned": {
         if (!channelId) return NextResponse.json({ error: "channelId required" }, { status: 400 });
+        /* Membership-gated: pinned messages are channel content. */
+        if (!auth.is_super_admin && !(await myChannelIds(me)).includes(channelId)) {
+          return NextResponse.json({ ok: true, data: [] });
+        }
         const { data: pinnedRows, error } = await supabaseServer
           .from(PINNED)
           .select("message_id")
@@ -168,40 +154,25 @@ export async function GET(req: Request) {
         const ids = ((pinnedRows ?? []) as Array<{ message_id: string }>).map((r) => r.message_id);
         if (ids.length === 0) return NextResponse.json({ ok: true, data: [] });
 
-        const { data: msgs } = await supabaseServer
-          .from(MESSAGES)
-          .select(AUTHOR_SELECT)
-          .in("id", ids)
-          .is("deleted_at", null);
-
-        const { data: rxRows } = await supabaseServer
-          .from(REACTIONS)
-          .select("*")
-          .in("message_id", ids);
-        const reactionsByMessage = new Map<
-          string,
-          Array<{ emoji: string; count: number; account_ids: string[]; reacted_by_me: boolean }>
-        >();
-        for (const rx of (rxRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>) {
-          const bucket = reactionsByMessage.get(rx.message_id) ?? [];
-          const existing = bucket.find((b) => b.emoji === rx.emoji);
-          if (existing) {
-            existing.count += 1;
-            existing.account_ids.push(rx.account_id);
-            if (rx.account_id === me) existing.reacted_by_me = true;
-          } else {
-            bucket.push({
-              emoji: rx.emoji,
-              count: 1,
-              account_ids: [rx.account_id],
-              reacted_by_me: rx.account_id === me,
-            });
-          }
-          reactionsByMessage.set(rx.message_id, bucket);
-        }
-
-        const out = ((msgs ?? []) as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>).map(
-          (row) =>
+        const [{ data: msgs }, { data: rxRows }] = await Promise.all([
+          supabaseServer
+            .from(MESSAGES)
+            .select(AUTHOR_SELECT)
+            .in("id", ids)
+            /* Defence in depth: a pin row whose message lives elsewhere
+               (pre-fix data) is never returned. */
+            .eq("channel_id", channelId)
+            .is("deleted_at", null),
+          supabaseServer.from(REACTIONS).select("*").in("message_id", ids),
+        ]);
+        const reactionsByMessage = buildDiscussReactionMap(
+          (rxRows ?? []) as Array<{ message_id: string; emoji: string; account_id: string }>,
+          me,
+        );
+        const order = new Map(ids.map((id, i) => [id, i]));
+        const out = ((msgs ?? []) as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>)
+          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+          .map((row) =>
             serializeDiscussMessageForClient({
               ...row,
               author: flattenAuthor(row.author),
@@ -209,7 +180,7 @@ export async function GET(req: Request) {
               reply_preview: null,
               thread: null,
             }),
-        );
+          );
         return NextResponse.json({ ok: true, data: out });
       }
 
@@ -225,20 +196,29 @@ export async function GET(req: Request) {
         const ids = ((starRows ?? []) as Array<{ message_id: string }>).map((r) => r.message_id);
         if (ids.length === 0) return NextResponse.json({ ok: true, data: [] });
 
+        /* A bookmark is not an access grant: only messages in channels I am
+           STILL a member of come back (optionally narrowed to one channel). */
+        let scope = await myChannelIds(me);
+        if (channelId) scope = scope.filter((id) => id === channelId);
+        if (scope.length === 0) return NextResponse.json({ ok: true, data: [] });
         const { data: msgs } = await supabaseServer
           .from(MESSAGES)
           .select(AUTHOR_SELECT)
           .in("id", ids)
+          .in("channel_id", scope)
           .is("deleted_at", null);
 
-        const out = ((msgs ?? []) as Array<Record<string, unknown> & { author: AuthorJoin }>).map((row) =>
-          serializeDiscussMessageForClient({
-            ...row,
-            author: flattenAuthor(row.author),
-            reactions: [],
-            reply_preview: null,
-            thread: null,
-          }));
+        const order = new Map(ids.map((id, i) => [id, i]));
+        const out = ((msgs ?? []) as Array<Record<string, unknown> & { id: string; author: AuthorJoin }>)
+          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+          .map((row) =>
+            serializeDiscussMessageForClient({
+              ...row,
+              author: flattenAuthor(row.author),
+              reactions: [],
+              reply_preview: null,
+              thread: null,
+            }));
         return NextResponse.json({ ok: true, data: out });
       }
 

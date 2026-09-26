@@ -24,10 +24,12 @@ import "server-only";
    Both gates use the existing requireModuleAccess plumbing.
    ========================================================================== */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { ApprovalStatus, FinanceExpense } from "@/lib/finance/types";
+import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
+import { notifyExpenseTransition } from "@/lib/server/commerce-notify";
 
 type Action =
   | "submit"
@@ -182,6 +184,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (error) {
     console.error("[expense approval POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  /* The ledger follows the approval: an approved expense is drafted for
+     posting; an approval taken back reverses whatever was booked. */
+  if (next === "approved" || next === "partially_approved") {
+    await ledgerDraft("expense", id, auth.tenant_id, auth.account_id);
+  } else if (body.action === "reset" && (current === "approved" || current === "partially_approved")) {
+    await ledgerVoid("expense", id, auth.tenant_id, auth.account_id, "Expense approval reset");
+  }
+  /* Submitted → the approvers are asked; decided or withdrawn → the ask
+     clears and the submitter hears the answer. */
+  if (current !== next) {
+    const saved = data as FinanceExpense;
+    const note = body.notes ?? null;
+    after(() => notifyExpenseTransition(auth, saved, next, note));
   }
   return NextResponse.json({ expense: data as FinanceExpense });
 }

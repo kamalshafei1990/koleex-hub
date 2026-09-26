@@ -7,9 +7,10 @@
    request auto-approves or needs a manager / director / CFO sign-
    off before becoming an RFQ or PO. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ, TONE_INFO } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ, TONE_INFO, usePurchaseList } from "../shared";
 import { NewRequisitionDialog } from "../dialogs";
 import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -42,18 +43,11 @@ const PRIORITY_TONE = [
 ];
 
 export default function RequisitionsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Requisition[]>([]);
-  const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/purchase/list?resource=requisitions", { credentials: "include" });
-    const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Requisition[] };
-    setRows(data.rows);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  /* ?new=1 / ?create=1 (Smart Create, Data Entry hub, Purchase home) opens the dialog. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
+  const { data, loading, reload: load } = usePurchaseList<{ rows: Requisition[] }>("requisitions");
+  const rows = data?.rows ?? [];
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

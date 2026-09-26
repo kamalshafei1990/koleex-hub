@@ -46,7 +46,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

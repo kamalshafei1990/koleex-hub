@@ -308,10 +308,12 @@ export function Segmented<T extends string | number>({ value, onChange, options 
 /** iOS-style on/off switch row. ON = emerald green with a white knob — the
  *  ONE toggle design for the whole system (standing rule): green track when
  *  on, neutral track when off, white circle always. */
-export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
+export function SwitchRow({ label, hint, checked, onChange, last, icon, disabled }: {
   label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean;
   /** Optional leading glyph (Semantic Icon Registry). */
   icon?: React.ReactNode;
+  /** Shown but not flippable (e.g. decided elsewhere, or saving). */
+  disabled?: boolean;
 }) {
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
@@ -329,8 +331,9 @@ export function SwitchRow({ label, hint, checked, onChange, last, icon }: {
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
+        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
           checked ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"
         }`}
       >

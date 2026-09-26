@@ -6,6 +6,7 @@ import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/ser
 import { computeSupplierTotals } from "@/lib/finance/calc";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceSupplierAccount, FinanceExpense, FinanceOrderSupplier, FinancePayment } from "@/lib/finance/types";
+import { canSeeCostData, hideSupplierTotals } from "@/lib/experience";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -91,6 +92,15 @@ export async function GET() {
     };
   });
 
+  /* Without the private-records switch (src/lib/experience) what was bought
+     and what was paid go out as 0 with cost_hidden, and the list is ranked by
+     what is still owed — ranked by purchases it would be the hidden figure
+     again. Guarded by validate:finance-perf §G. */
+  if (!canSeeCostData(auth)) {
+    const hidden = out.map(hideSupplierTotals);
+    hidden.sort((a, b) => (b.outstanding_payable ?? 0) - (a.outstanding_payable ?? 0));
+    return NextResponse.json({ suppliers: hidden });
+  }
   out.sort((a, b) => (b.total_purchases ?? 0) - (a.total_purchases ?? 0));
   return NextResponse.json({ suppliers: out });
 }

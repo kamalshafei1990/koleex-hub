@@ -38,7 +38,7 @@ import { replacePermissionOverrides, fetchRoles } from "@/lib/accounts-admin";
 import { createRole, upsertPermissions } from "@/lib/management-admin";
 import { fetchPermissions, type PermissionRow } from "@/lib/management-admin";
 import { APP_REGISTRY } from "@/lib/navigation";
-import { PERMISSION_GROUPS as REGISTRY_PERMISSION_GROUPS } from "@/lib/permission-modules";
+import { PERMISSION_GROUPS as REGISTRY_PERMISSION_GROUPS, capabilityApp } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
 import {
@@ -118,7 +118,7 @@ const EMPTY_PERMS: ModulePerms = {
    ═══════════════════════════════════════════════════ */
 
 function getAppIcon(moduleName: string) {
-  const base = moduleName.includes(" > ") ? moduleName.split(" > ")[0] : moduleName;
+  const base = capabilityApp(moduleName) ?? (moduleName.includes(" > ") ? moduleName.split(" > ")[0] : moduleName);
   const app = APP_REGISTRY.find(
     (a) => a.name === base || a.name.toLowerCase() === base.toLowerCase(),
   );

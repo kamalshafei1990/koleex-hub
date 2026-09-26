@@ -1219,8 +1219,8 @@ export default function AccountForm({ mode, account }: Props) {
       {/* Post-create: show the password ONCE so the creator can capture it.
           After this it only exists as a one-way hash and can never be shown. */}
       {createdInfo && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl">
             <div className="flex items-center gap-2 mb-1">
               <CheckCircleIcon className="h-5 w-5 text-emerald-400" />
               <h3 className="text-[16px] font-bold text-[var(--text-primary)]">{t("acc.created.title", "Account created")}</h3>

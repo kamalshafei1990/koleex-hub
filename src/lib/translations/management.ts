@@ -179,6 +179,10 @@ export const managementT: Translations = {
   "mgmt.directReports":        { en: "Direct Reports",               zh: "直接下属",                     ar: "التقارير المباشرة" },
   "mgmt.history":              { en: "History",                       zh: "历史",                        ar: "السجل" },
   "mgmt.noHistoryYet":         { en: "No history recorded yet.",      zh: "暂无历史记录。",                ar: "لا يوجد سجل مسجل بعد." },
+  "mgmt.act.assigned":         { en: "Assigned",                      zh: "已任命",                       ar: "تم التعيين" },
+  "mgmt.act.transferred":      { en: "Transferred",                   zh: "已调动",                       ar: "تم النقل" },
+  "mgmt.act.removed":          { en: "Left the position",             zh: "已离任",                       ar: "ترك المنصب" },
+  "mgmt.by":                   { en: "by",                            zh: "操作人",                       ar: "بواسطة" },
   "mgmt.employeeNotFound":     { en: "Employee not found",            zh: "未找到员工",                   ar: "لم يتم العثور على الموظف" },
   "mgmt.since":                { en: "Since",                         zh: "自",                          ar: "منذ" },
 

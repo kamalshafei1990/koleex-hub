@@ -1,3 +1,6 @@
+import { DEFAULT_AI_PERSONALIZATION, type AiPersonalization } from "@/lib/ai-personalization";
+import { normalizeKoleexModel, type KoleexModelId } from "@/lib/ai/koleex-model-ids";
+
 /* ---------------------------------------------------------------------------
    Access Control Catalog — module keys, access levels, and preferences shape
    for the Accounts Manager v2 (Odoo-inspired) refactor.
@@ -230,16 +233,20 @@ export function defaultAccessFromPreset(
 /*  Preferences Shape                                                         */
 /* ========================================================================== */
 
-export type LanguagePref = "en" | "ar";
+/* The language this account READS in. The interface itself follows the
+   device (localStorage "koleex-lang"); each device reports it here
+   (lib/account-language), and the server writes the person's push
+   notifications in it (lib/server/web-push + notification-templates). */
+export type LanguagePref = "en" | "zh" | "ar";
 export type ThemePref = "light" | "dark" | "system";
-export type NotificationChannel = "email" | "in_app" | "both";
-
 export interface NotificationPrefs {
-  email: boolean;
-  in_app: boolean;
   /* ── Per-activity toggles (optional; default on) ──
-     Let a user silence specific event types without turning off a whole
-     channel. Consumed by the notification dispatcher when present. */
+     One switch per activity, gating the push (web-push.ts), the chime
+     (NotificationBell) and — for security alerts — the in-app row
+     (sa-notify.ts). The keys mirror NOTIFICATION_ACTIVITIES in
+     lib/notification-activity.ts. There is no channel switch: the Hub has
+     no email channel, and an "in-app" switch that hid the bell row was
+     never read by anything. */
   mentions?: boolean;
   approvals?: boolean;
   assignments?: boolean;
@@ -257,11 +264,20 @@ export interface NotificationPrefs {
   discuss_messages?: boolean;
   security_alerts?: boolean;
   comments_activity?: boolean;
+  reports_activity?: boolean;
   /* Quiet hours — a daily window (recipient-local) during which push and
      chimes stay silent. `tz` is snapshotted from the browser at save time so
      the SERVER can evaluate the window without guessing the user's zone.
      Enforced in sendPushToAccounts and the NotificationBell chime. */
   quiet_hours?: QuietHoursPref;
+  /* Pop-up cards (components/layout/NotificationCards): a card for each new
+     notification while the Hub is in front. Default on; quiet hours only
+     silence them. Carried by withDefaults' notifications spread. */
+  popup_cards?: boolean;
+  /* A pause taken from the bell (lib/notification-activity pausedUntil):
+     ISO end, or null when none. No sound, card or push until then. Set only
+     by /api/notifications/pause; carried by the same spread. */
+  pause_until?: string | null;
 }
 
 export interface QuietHoursPref {
@@ -356,6 +372,27 @@ export interface AccountPreferences {
      lives in lib/wallpaper.ts, and importing it would drag the catalogue into
      everything that reads an account. Absent means the Aurora wave field. */
   wallpaper?: { id: string; photoUrl?: string; photoPath?: string; fit?: string; dim?: number; tint?: string };
+  /* How Koleex AI speaks to this user: style dials, standing instructions,
+     memory controls. Shape and limits live in lib/ai-personalization.ts;
+     every prompt lane reads it from here. */
+  ai?: AiPersonalization;
+  /* Which drawing of the Koleex AI orb this user sees, everywhere it appears
+     (Home, the chat, the call screen, Discuss). Appearance, not tone — so it
+     lives beside `ai`, not inside it: that slice is normalised by the
+     personalization route and would drop a key it does not know. Values and
+     the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
+  orb?: "aura" | "dots";
+  /* Which Koleex AI model this user asks for (the picker beside the message
+     box). A preference the server resolves, never a permission: an unknown
+     or switched-off model is served as Auto. Values and the store live in
+     lib/ai/koleex-models.ts and components/ai/model-choice.ts. Absent means
+     "auto". */
+  ai_model?: KoleexModelId;
+  /* The "My apps" row at the top of Home: the person's pinned app ids in
+     their order, and where they came from ("none" = never set, so Home seeds
+     it once from their own usage; "usage" = seeded; "user" = edited). Shape
+     and rules live in lib/home/my-apps.ts. */
+  home_apps?: { pins: string[]; source: "none" | "usage" | "user" };
 }
 
 /**
@@ -375,8 +412,6 @@ export const DEFAULT_PREFERENCES: Required<
   wallpaper: { id: "hub-live" },
   profile: { pronouns: "", links: {} },
   notifications: {
-    email: true,
-    in_app: true,
     mentions: true,
     approvals: true,
     assignments: true,
@@ -394,6 +429,8 @@ export const DEFAULT_PREFERENCES: Required<
     discuss_messages: true,
     security_alerts: true,
     comments_activity: true,
+    reports_activity: true,
+    popup_cards: true,
   },
   display: {
     text_size: "default",
@@ -417,6 +454,10 @@ export const DEFAULT_PREFERENCES: Required<
     default_meeting_duration_min: 30,
     out_of_office: { enabled: false },
   },
+  ai: DEFAULT_AI_PERSONALIZATION,
+  orb: "aura",
+  ai_model: "auto",
+  home_apps: { pins: [], source: "none" },
 };
 
 /** Merge stored preferences with frontend defaults for display. */
@@ -437,18 +478,16 @@ export function withDefaults(
         whatsapp: p.profile?.links?.whatsapp ?? "",
       },
     },
+    /* Spread, never enumerate. This block used to name eleven keys by hand
+       and silently DROPPED the other eight activities (calendar, projects,
+       inventory, finance, HR, discuss, security, comments) on every read:
+       Settings drew those switches ON while the stored `false` still muted
+       the push — the worst version of a bug, a switch that lies. Defaults
+       first, stored values on top, so a new activity added to
+       DEFAULT_PREFERENCES is complete here without a second edit. */
     notifications: {
-      email:  p.notifications?.email  ?? DEFAULT_PREFERENCES.notifications.email,
-      in_app: p.notifications?.in_app ?? DEFAULT_PREFERENCES.notifications.in_app,
-      mentions: p.notifications?.mentions ?? DEFAULT_PREFERENCES.notifications.mentions,
-      approvals: p.notifications?.approvals ?? DEFAULT_PREFERENCES.notifications.approvals,
-      assignments: p.notifications?.assignments ?? DEFAULT_PREFERENCES.notifications.assignments,
-      tasks_due: p.notifications?.tasks_due ?? DEFAULT_PREFERENCES.notifications.tasks_due,
-      quotation_activity: p.notifications?.quotation_activity ?? DEFAULT_PREFERENCES.notifications.quotation_activity,
-      membership_requests: p.notifications?.membership_requests ?? DEFAULT_PREFERENCES.notifications.membership_requests,
-      low_stock: p.notifications?.low_stock ?? DEFAULT_PREFERENCES.notifications.low_stock,
-      qa_reports: p.notifications?.qa_reports ?? DEFAULT_PREFERENCES.notifications.qa_reports,
-      price_fx: p.notifications?.price_fx ?? DEFAULT_PREFERENCES.notifications.price_fx,
+      ...DEFAULT_PREFERENCES.notifications,
+      ...(p.notifications ?? {}),
       quiet_hours: p.notifications?.quiet_hours ?? { enabled: false, start: "22:00", end: "08:00" },
     },
     display: {
@@ -488,6 +527,18 @@ export function withDefaults(
        Required<> on DEFAULT_PREFERENCES catches a missing DEFAULT; nothing
        catches a missing passthrough, which is why this comment exists. */
     wallpaper: p.wallpaper ?? DEFAULT_PREFERENCES.wallpaper,
+    /* Same passthrough, same reason as wallpaper: a key this function does
+       not name is a key every wholesale save deletes. */
+    ai: p.ai ?? DEFAULT_PREFERENCES.ai,
+    /* And again: without this line, changing the language would quietly put
+       the orb back to the default. */
+    orb: p.orb === "dots" ? "dots" : DEFAULT_PREFERENCES.orb,
+    /* And the model choice, for the same reason: a language change must not
+       quietly put the picker back to Auto. */
+    ai_model: normalizeKoleexModel(p.ai_model),
+    /* Same passthrough again. Without this line every Settings save would
+       erase the person's My apps row and Home would re-seed it from usage. */
+    home_apps: p.home_apps ?? DEFAULT_PREFERENCES.home_apps,
   };
 }
 

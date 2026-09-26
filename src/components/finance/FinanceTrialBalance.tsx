@@ -9,14 +9,23 @@
    total). Period filter optional; defaults to all-time.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT, translateAccountName } from "@/lib/translations/finance";
+import { useWarmData } from "@/lib/warm-cache";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_TB } from "@/lib/translations/finance/tb";
+import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
 import type { TrialBalance } from "@/lib/accounting/types";
+
+/* Only the namespaces this screen reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_TB } as const;
+
 
 const TYPE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
   { key: "tb.group.assets",      label: "Assets",      types: ["asset", "contra_asset"] },
@@ -26,11 +35,6 @@ const TYPE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
   { key: "tb.group.expenses",    label: "Expenses",    types: ["expense", "contra_expense"] },
 ];
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
@@ -46,33 +50,25 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceTrialBalance() {
-  const { t, lang } = useTranslation(financeT);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { t, lang } = useTranslation(DICT);
+  const today = useMemo(() => todayIso(), []);
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time
   const [to,   setTo]   = useState<string>(today);
-  const [data, setData] = useState<TrialBalance | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams();
-      if (from) qs.set("from", from);
-      if (to)   qs.set("to", to);
-      const res = await fetch(`/api/accounting/trial-balance?${qs.toString()}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.trial_balance as TrialBalance);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to)   qs.set("to", to);
+    const res = await fetch(`/api/accounting/trial-balance?${qs.toString()}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.trial_balance as TrialBalance;
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<TrialBalance>(`fin:tb:${from}:${to}`, fetchData);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   const grouped = useMemo(() => {
     if (!data) return [];
@@ -87,7 +83,7 @@ export default function FinanceTrialBalance() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.tb.title", "Trial Balance")}
           subtitle={t("accounting.tb.subtitle.long", "Every account with its posted debit / credit totals. The ledger is balanced when the totals strip nets to zero.")}

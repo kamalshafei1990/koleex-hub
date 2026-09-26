@@ -13,6 +13,8 @@ import "server-only";
    Categories:
      catalog/<catalogId>            → catalogs.file_path      (module-gated)
      discuss/<messageId>/<index>    → message attachment path (membership-gated)
+     report/<attachmentId>[/thumb]  → work report photo/file  (the report's
+                                      own read rule, loadForViewer)
 
    Security model: docs/performance/STORAGE_SECURITY_MODEL.md. Highlights:
    uniform 404 for missing AND unauthorized (no existence oracle); bucket
@@ -33,6 +35,7 @@ import { requireAuth, requireModuleAccess, type ServerAuthContext } from "@/lib/
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { stageTimer } from "@/lib/server/perf";
 import { discussMediaList } from "@/lib/server/discuss-media";
+import { loadForViewer } from "@/lib/server/reports/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +59,7 @@ const UPSTREAM_TIMEOUT_MS = 50_000;
 const CATEGORY_BUCKETS: Record<string, string[]> = {
   catalog: ["media"],
   discuss: ["discuss-media", "discuss-voice", "media"],
+  report: ["report-attachments"],
 };
 
 /** MIME types allowed to render inline. Everything else (incl. SVG/HTML/XML,
@@ -209,6 +213,28 @@ async function resolveDiscuss(
   return { bucket: src.bucket, path: src.path, filename: src.name };
 }
 
+/* Work reports (Phase 2C): the attachment row names the report, and the
+   report's OWN read rule decides — loadForViewer, the same call every
+   /api/work-reports route makes (author; recipients; the manager chain and a
+   super admin for non-confidential sent reports; a draft is the author's
+   alone). Tenant-scoped in the query. `thumb` serves the small preview made
+   on the phone, falling back to the photo itself. */
+async function resolveReport(auth: ServerAuthContext, attachmentId: string, variant: string | undefined): Promise<Resolved | null> {
+  if (variant !== undefined && variant !== "thumb") return null;
+  let q = supabaseServer
+    .from("work_report_attachments")
+    .select("report_id, storage_path, thumb_path, file_name")
+    .eq("id", attachmentId);
+  if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+  const { data } = await q.maybeSingle();
+  if (!data) return null;
+  const readable = await loadForViewer(data.report_id as string, auth);
+  if (!readable) return null;
+  const path = variant === "thumb" && data.thumb_path ? (data.thumb_path as string) : (data.storage_path as string);
+  if (unsafePath(path)) return null;
+  return { bucket: "report-attachments", path, filename: (data.file_name as string) || "file" };
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ ref: string[] }> },
@@ -233,6 +259,8 @@ export async function GET(
     const idx = Number(indexRaw ?? "0");
     if (!Number.isInteger(idx) || idx < 0 || idx > 50) return deny();
     resolved = await resolveDiscuss(auth, id, idx);
+  } else if (category === "report") {
+    resolved = await resolveReport(auth, id, indexRaw);
   }
   if (!resolved || !CATEGORY_BUCKETS[category].includes(resolved.bucket)) return deny();
   timing.mark("authorize");

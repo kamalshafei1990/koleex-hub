@@ -22,6 +22,7 @@
    top of fields the existing endpoints already return.
    ========================================================================== */
 
+import { supplierOutstanding } from "@/lib/finance/calc";
 import type {
   DashboardKpi,
   DashboardPeriod,
@@ -209,7 +210,7 @@ export function computeApAging(orders: FinanceOrder[]): AgingBucket[] {
   };
   for (const o of orders) {
     for (const s of o.suppliers ?? []) {
-      const outstanding = Math.max(0, (s.supplier_cost ?? 0) - (s.paid_amount ?? 0));
+      const outstanding = supplierOutstanding(s);
       if (outstanding <= 0) continue;
       const due = daysFromToday(s.due_date);
       const overdueDays = due == null ? 0 : Math.max(0, -due);
@@ -257,7 +258,7 @@ export function buildOutgoingTimeline(orders: FinanceOrder[], horizonDays = 45):
   const events: TimelineEvent[] = [];
   for (const o of orders) {
     for (const s of o.suppliers ?? []) {
-      const outstanding = Math.max(0, (s.supplier_cost ?? 0) - (s.paid_amount ?? 0));
+      const outstanding = supplierOutstanding(s);
       if (outstanding <= 0) continue;
       const due = s.due_date;
       const days = daysFromToday(due);

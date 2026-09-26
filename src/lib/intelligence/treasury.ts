@@ -20,6 +20,7 @@
      · events compete in the shared pipeline; no treasury-only shortcuts
    ========================================================================== */
 
+import { supplierOutstanding } from "@/lib/finance/calc";
 import type {
   BankAccount,
   CashMovement,
@@ -157,7 +158,7 @@ function buildTimeline(
   /* AP forecasts from order supplier lines. */
   for (const o of orders) {
     for (const s of o.suppliers ?? []) {
-      const outstanding = Math.max(0, (Number(s.supplier_cost ?? 0)) - Number(s.paid_amount ?? 0));
+      const outstanding = supplierOutstanding(s);
       if (outstanding <= 0) continue;
       if (!s.due_date) continue;
       const days = daysFromToday(s.due_date);

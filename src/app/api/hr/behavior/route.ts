@@ -220,7 +220,7 @@ export async function POST(req: Request) {
   }
 
   if (finalize) {
-    const err = await finalizeAssessment(auth, shell.id, req);
+    const err = await finalizeAssessment(auth, shell.id);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
   }
 
@@ -296,7 +296,7 @@ export async function PUT(req: Request) {
   await supabaseServer.from("employee_behavior_assessments").update(patch).eq("id", assessmentId);
 
   if (body.status === "finalized") {
-    const err = await finalizeAssessment(auth, assessmentId, req);
+    const err = await finalizeAssessment(auth, assessmentId);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
   }
 
@@ -313,7 +313,6 @@ export async function PUT(req: Request) {
 async function finalizeAssessment(
   auth: { tenant_id: string | null; account_id: string | null },
   assessmentId: string,
-  _req: Request,
 ): Promise<string | null> {
   const { data: items } = await supabaseServer
     .from("employee_behavior_assessment_items")

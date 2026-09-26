@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_RS } from "@/lib/translations/contacts/rs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   RISK_LEVEL_LABELS, RISK_LEVEL_ORDER, riskLevelTone,
@@ -118,7 +118,7 @@ export default function RiskSection({
   risk: { level: string | null; score: number | null; trustLevel: string | null; openItems: number; openHighRisks: number } | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_RS);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -373,7 +373,7 @@ export default function RiskSection({
 
       {addOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => !iBusy && setAddOpen(false)}>
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><ShieldExclamationIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("rs.raiseARisk", "Raise a risk")}</span></div>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("rs.dimension", "Dimension")}><select className={inputCls} value={iDim} onChange={(e) => setIDim(e.target.value)}>{RISK_DIMENSIONS.map((dm) => <option key={dm} value={dm}>{t("opt." + dm, RISK_DIMENSION_LABELS[dm])}</option>)}</select></Field>

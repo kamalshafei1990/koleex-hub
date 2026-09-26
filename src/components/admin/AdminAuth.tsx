@@ -26,6 +26,9 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { SESSION_INVALID_EVENT } from "@/lib/session-hints";
+import { noteSignInShown } from "@/lib/perf/client";
+import { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY, LAST_USER_KEY } from "./session-keys";
 import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -174,14 +177,9 @@ const INK_MOTION =
    the tab strip scrolling away is the lesser evil at 300px of height. */
 const MIN_BODY_H = 160;
 
-/* localStorage keys. Using localStorage (not sessionStorage) so the session
-   survives browser restarts — the user only has to sign in again after an
-   explicit Sign Out. */
-export const LEGACY_SESSION_KEY = "koleex-admin";
-export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
-/* Survives sign-out — LEGACY_SESSION_USER_KEY does not. Who you are is worth
-   remembering across a deliberate sign-out; that you were signed in is not. */
-export const LAST_USER_KEY = "koleex-last-user";
+/* The localStorage keys live in ./session-keys (read on every page by the
+   signed-in gate and the user menu); re-exported for existing importers. */
+export { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY, LAST_USER_KEY };
 
 
 /* `title`/`subtitle` used to be required props, but the gate stopped rendering
@@ -459,6 +457,35 @@ export default function AdminAuth({ children }: Props) {
     }
   }, []);
 
+  /* The form is on screen: a Home that mounts after this sign-in includes
+     the time spent typing, so it is not recorded as a Home load
+     (isCountableHomeLoad in src/lib/perf/client.ts). */
+  useEffect(() => { if (authed === false) noteSignInShown(); }, [authed]);
+
+  /* THIS FLAG OUTLIVES THE COOKIE. The read above is the whole decision
+     between "show the Hub" and "ask for a password", and it consults nothing
+     but localStorage — which never expires, while the session cookie it
+     stands for does (30 days, a browser-session cookie on a shared device,
+     or whenever a mobile browser decides to drop it). When they diverge the
+     device is stranded: the Hub paints, every API answers 401, and the
+     screen that could fix it is the one screen the gate will not show.
+     `dropClientSessionHints` (src/lib/session-hints.ts) is fired the moment
+     the server refuses the cookie, and this listener is how that reaches the
+     gate — the form comes back on its own, in this tab and, via `storage`,
+     in every other tab on the device. */
+  useEffect(() => {
+    const onInvalid = () => setAuthed(false);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LEGACY_SESSION_KEY && e.newValue !== "true") setAuthed(false);
+    };
+    window.addEventListener(SESSION_INVALID_EVENT, onInvalid);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(SESSION_INVALID_EVENT, onInvalid);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setSignInError(null);
@@ -667,16 +694,16 @@ export default function AdminAuth({ children }: Props) {
             only on the viewport — never on the content. */}
         <div className="shrink-0 flex flex-col items-center pt-[clamp(40px,calc((100dvh-665px)/2),200px)] pb-6">
             {/* Hub logo v2 — login screen is always dark, so the for-dark
-                composite (untouched KOLEEX wordmark + gradient hub script). */}
+                composite (untouched KOLEEX wordmark + gradient Birdman "hub"). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/hub-logo/koleex-hub-logo-for-dark.webp"
+              src="/brand/hub-logo/koleex-hub-logo-for-dark-e.webp"
               alt="Koleex Hub"
               /* Same reason as the header: a double-click on an image selects
                  it, and a blue selection box across the wordmark is the first
                  thing a new user would see on the sign-in screen. */
               draggable={false}
-              className="h-8 w-auto select-none [-webkit-user-drag:none] drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
+              className="h-6 w-auto select-none [-webkit-user-drag:none] drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
             />
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />
@@ -1189,9 +1216,9 @@ function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
           <div style={{ padding: "48px 56px", fontFamily: "inherit" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/hub-logo/koleex-hub-logo-for-light.webp"
+              src="/brand/hub-logo/koleex-hub-logo-for-light-e.webp"
               alt="Koleex Hub"
-              style={{ height: 30, width: "auto" }}
+              style={{ height: 22, width: "auto" }}
             />
             <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#666" }}>
               {t("join.receiptTitle")}

@@ -38,19 +38,30 @@ interface AccountInfo {
   role: string | null;
   avatar_url: string | null;
 }
-interface OnlineRow {
+interface OnlineSession {
   session_id: string;
-  account: AccountInfo;
   status: "online" | "idle" | "offline";
   current_route: string | null;
-  current_module: string | null;
-  last_action: string | null;
-  device_type: string | null;
   browser: string | null;
   os: string | null;
-  ip: string | null;
   country: string | null;
   started_at: string;
+  last_seen_at: string;
+}
+/* One row per PERSON — the monitor API folds that person's live sessions in.
+   The four questions the owner actually asks of this list — who is on, when
+   did they sign in, how long today, what are they doing — are all columns of
+   this shape, so the list can answer them without a click. */
+interface PersonRow {
+  account: AccountInfo;
+  status: "online" | "idle" | "offline";
+  device_count: number;
+  sessions: OnlineSession[];
+  current_route: string | null;
+  current_module: string | null;
+  current_doc: string | null;
+  signed_in_today_at: string | null;
+  today_seconds: number;
   last_seen_at: string;
 }
 interface FeedRow {
@@ -64,6 +75,7 @@ interface FeedRow {
   ip: string | null;
   country: string | null;
   created_at: string;
+  doc_label?: string | null;
 }
 interface Kpis {
   online_users: number;
@@ -435,7 +447,7 @@ export default function SuperAdminActivityPage() {
   const isSA = !!boot?.isSuperAdmin;
 
   const [kpis, setKpis] = useState<Kpis | null>(null);
-  const [online, setOnline] = useState<OnlineRow[]>([]);
+  const [people, setPeople] = useState<PersonRow[]>([]);
   const [feed, setFeed] = useState<FeedRow[]>([]);
   const [loadingMonitor, setLoadingMonitor] = useState(true);
   const [loadingFeed, setLoadingFeed] = useState(true);
@@ -467,9 +479,9 @@ export default function SuperAdminActivityPage() {
         return;
       }
       if (!res.ok) throw new Error(String(res.status));
-      const j = (await res.json()) as { kpis: Kpis; online: OnlineRow[] };
+      const j = (await res.json()) as { kpis: Kpis; people: PersonRow[] };
       setKpis(j.kpis);
-      setOnline(j.online);
+      setPeople(j.people ?? []);
       setError(null);
     } catch {
       /* transient — keep last data */
@@ -518,17 +530,46 @@ export default function SuperAdminActivityPage() {
     return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
   }, [isSA, loadFeed]);
 
-  const visibleOnline = useMemo(
-    () => (onlineOnly ? online.filter((r) => r.status === "online") : online),
-    [online, onlineOnly],
+  /* CONSECUTIVE-DUPLICATE COLLAPSE. Measured on the live feed: 53 of 60 rows
+     were page views, with runs like the same person viewing the same module
+     three rows straight — a wall a person cannot read. Adjacent rows from the
+     same account with the same event and route fold into the FIRST (newest)
+     one carrying a ×count; severity != info never folds, because a repeated
+     warning is itself information. Display-only — the server rows are
+     untouched, and filters/search still act on the full set. */
+  const collapsedFeed = useMemo(() => {
+    const out: Array<FeedRow & { repeat: number }> = [];
+    for (const f of feed) {
+      const prev = out[out.length - 1];
+      if (
+        prev &&
+        f.severity === "info" &&
+        prev.severity === "info" &&
+        prev.account.account_id === f.account.account_id &&
+        prev.event_type === f.event_type &&
+        prev.route === f.route &&
+        prev.title === f.title &&
+        (prev.doc_label ?? null) === (f.doc_label ?? null)
+      ) {
+        prev.repeat += 1;
+        continue;
+      }
+      out.push({ ...f, repeat: 1 });
+    }
+    return out;
+  }, [feed]);
+
+  const visiblePeople = useMemo(
+    () => (onlineOnly ? people.filter((r) => r.status === "online") : people),
+    [people, onlineOnly],
   );
 
   const moduleOptions = useMemo(() => {
     const set = new Set<string>();
     feed.forEach((f) => f.module && set.add(f.module));
-    online.forEach((o) => o.current_module && set.add(o.current_module));
+    people.forEach((o) => o.current_module && set.add(o.current_module));
     return Array.from(set).sort();
-  }, [feed, online]);
+  }, [feed, people]);
 
   if (bootLoading) {
     return (
@@ -598,7 +639,7 @@ export default function SuperAdminActivityPage() {
               <div className="flex items-center gap-2">
                 <UsersIcon className="h-4 w-4 text-[var(--text-dim)]" />
                 <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Live users</h3>
-                <span className="text-[11px] text-[var(--text-dim)]">{visibleOnline.length}</span>
+                <span className="text-[11px] text-[var(--text-dim)]">{visiblePeople.length}</span>
               </div>
               <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] cursor-pointer select-none">
                 <input type="checkbox" checked={onlineOnly} onChange={(e) => setOnlineOnly(e.target.checked)} className="accent-[var(--accent)]" />
@@ -606,14 +647,18 @@ export default function SuperAdminActivityPage() {
               </label>
             </div>
             <div className="overflow-y-auto max-h-[520px]">
-              {loadingMonitor && online.length === 0 ? (
+              {loadingMonitor && people.length === 0 ? (
                 <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
-              ) : visibleOnline.length === 0 ? (
+              ) : visiblePeople.length === 0 ? (
                 <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No users online right now.</p>
               ) : (
                 <ul className="divide-y divide-[var(--border-subtle)]">
-                  {visibleOnline.map((r) => (
-                    <li key={r.session_id}>
+                  {/* One row per PERSON. The row itself answers the four
+                      standing questions — who / signed in when / how long
+                      today / doing what — so checking on the team is a
+                      glance, not a expedition through session rows. */}
+                  {visiblePeople.map((r) => (
+                    <li key={r.account.account_id}>
                       <button
                         type="button"
                         onClick={() => setDrawerId(r.account.account_id)}
@@ -624,15 +669,25 @@ export default function SuperAdminActivityPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">{r.account.name || r.account.username || "Unknown"}</span>
                             <StatusBadge status={r.status} />
+                            {r.device_count > 1 && (
+                              <span className="inline-flex items-center h-[17px] px-1.5 rounded-full border border-[var(--border-subtle)] text-[9.5px] font-semibold text-[var(--text-dim)]">
+                                ×{r.device_count}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11.5px] text-[var(--text-dim)] truncate">
-                            {r.current_module || routeToModule(r.current_route)} · {r.browser || "?"} on {r.os || "?"}
-                            {r.country ? ` · ${r.country}` : ""}
+                            {r.signed_in_today_at
+                              ? `Signed in ${new Date(r.signed_in_today_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                              : "Signed in earlier"}
+                            {r.today_seconds > 0 ? ` · ${fmtHours(r.today_seconds)} today` : ""}
                           </div>
                         </div>
                         <div className="text-[10.5px] text-[var(--text-ghost)] shrink-0 text-end">
+                          <div className="text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-[190px]">
+                            {r.current_module || routeToModule(r.current_route) || "—"}
+                            {r.current_doc ? ` — ${r.current_doc}` : ""}
+                          </div>
                           <div>{rel(r.last_seen_at)}</div>
-                          <div className="truncate max-w-[120px]">{r.current_route || "—"}</div>
                         </div>
                       </button>
                     </li>
@@ -679,11 +734,11 @@ export default function SuperAdminActivityPage() {
             <div className="overflow-y-auto max-h-[520px]">
               {loadingFeed && feed.length === 0 ? (
                 <div className="h-40 flex items-center justify-center"><SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" /></div>
-              ) : feed.length === 0 ? (
+              ) : collapsedFeed.length === 0 ? (
                 <p className="h-40 flex items-center justify-center text-[12px] text-[var(--text-ghost)]">No activity matches these filters.</p>
               ) : (
                 <ul className="divide-y divide-[var(--border-subtle)]">
-                  {feed.map((f) => (
+                  {collapsedFeed.map((f) => (
                     <li key={f.id}>
                       <button
                         type="button"
@@ -695,10 +750,17 @@ export default function SuperAdminActivityPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{f.account.name || f.account.username || "Unknown"}</span>
                             <span className="text-[11.5px] text-[var(--text-secondary)] truncate">{eventLabel(f)}</span>
+                            {f.repeat > 1 && (
+                              <span className="inline-flex items-center h-[16px] px-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[9.5px] font-semibold text-[var(--text-dim)]">
+                                ×{f.repeat}
+                              </span>
+                            )}
                             {f.severity !== "info" && <SeverityPill severity={f.severity} />}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-dim)] truncate">
-                            {f.module || "—"}{f.route ? ` · ${f.route}` : ""}{f.country ? ` · ${f.country}` : ""}
+                            {f.module || "—"}
+                            {f.doc_label ? ` — ${f.doc_label}` : f.route ? ` · ${f.route}` : ""}
+                            {f.country ? ` · ${f.country}` : ""}
                           </div>
                         </div>
                         <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">{rel(f.created_at)}</span>

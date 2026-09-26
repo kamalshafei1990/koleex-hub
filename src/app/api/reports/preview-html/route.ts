@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     channel: "preview",
     skipAudit: true,
   });
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  if (!res.ok) return NextResponse.json({ error: res.error, code: res.code }, { status: res.status });
 
   const html = renderReportHtml(res.result.payload, { autoPrint: false });
   return new NextResponse(html, {

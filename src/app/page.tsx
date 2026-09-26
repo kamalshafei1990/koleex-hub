@@ -7,14 +7,18 @@
    Zone B: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { PRODUCTS_PREFETCH_URL, PRODUCT_DATA_PREFETCH_URL } from "@/lib/products-list-params";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexGlowOrb from "@/components/ai/KoleexGlowOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+import { homeLauncherT } from "@/lib/translations/home-launcher";
+import type { Translations } from "@/lib/i18n";
 import {
   APP_REGISTRY,
   ALL_APPS_CATEGORIES,
@@ -27,6 +31,8 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
+import { useInboxUnreadByApp } from "@/lib/inbox-unread-store";
+import { todoOpenListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
@@ -35,6 +41,59 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+import { launcherColumns, packAppBands } from "@/lib/home/app-bands";
+import {
+  HOME_APPS_NONE, MY_APPS_MAX, MY_APPS_SEED, cacheHomeApps, readCachedHomeApps, readHomeAppsPref,
+  saveHomeApps, seedPins, type HomeAppsPref,
+} from "@/lib/home/my-apps";
+import { whenNetworkQuiet } from "@/lib/net-idle";
+import { useReportDue } from "@/lib/home/report-due";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import MinusIcon from "@/components/icons/ui/MinusIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+/* Home dashboard is code-split: it only matters after the grid is usable,
+   and keeping it out of the critical chunk protects the home budget. */
+/* Timezone label — computed once per client, cached at module level.
+   e.g. "Dubai (GMT+4)". */
+const noopSubscribe = () => () => {};
+let tzLabelCache: string | null = null;
+function getTzLabel(): string {
+  if (tzLabelCache === null) {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
+      const offset = -new Date().getTimezoneOffset();
+      const sign = offset >= 0 ? "+" : "-";
+      const hrs = Math.floor(Math.abs(offset) / 60);
+      const mins = Math.abs(offset) % 60;
+      tzLabelCache = `${city} (GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""})`;
+    } catch {
+      tzLabelCache = "";
+    }
+  }
+  return tzLabelCache;
+}
+
+const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
+/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20; widened 2026-08-22) ──
+   The dashboard is still being built and must NOT appear on production —
+   but three sessions share this tree and any of them pushing main would
+   carry it out. This gate keeps it dark wherever the flag is absent, and
+   is inlined at build time so a build without it tree-shakes the chunk
+   away entirely.
+
+   The `NODE_ENV === "development"` half is GONE on purpose. Production was
+   already clean — measured 2026-08-22, zero dashboard cards on prod Home —
+   but a development tree still painted 56 of them, which is what the owner
+   was actually looking at when he said "remove any dashboard cards from
+   home screen, we will work on it later then add it back". Off everywhere
+   is the honest reading of that, and it keeps every session's local Home
+   showing the same thing production shows.
+
+   TO BRING IT BACK: set NEXT_PUBLIC_HOME_DASHBOARD=1 (locally in
+   .env.local, or on Vercel when it is ready to ship). No code change —
+   the component, its data route and its widgets are all untouched. */
+const HOME_DASHBOARD_ON = process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1";
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
@@ -58,18 +117,20 @@ function getGreetingKey(): string {
    apps whose list endpoint sends max-age/stale-while-revalidate AND whose
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
-const APP_DATA_PREFETCH: Record<string, string> = {
-  /* MUST match the catalogue's request BYTE FOR BYTE or the warm entry is a
-     different cache key and the download is pure waste. It has been wrong
-     twice now: first the bare /api/products (the full 80-column projection),
-     and then ?view=list after the grid moved to server paging — 72 KB
-     downloaded and never read on every hover, which at the owner's 3000
-     products becomes ~1.8 MB competing with the real page load. If
-     ProductList's serverParams change, change this with them. */
-  products: "/api/products?view=list&paged=1&pageSize=150&division=garment-machinery&status=active",
-  "product-data": "/api/products?view=list&paged=1&pageSize=150",
+const APP_DATA_PREFETCH: Record<string, string | (() => string)> = {
+  /* ⚠️ BUILT, NOT TYPED. This must match the catalogue's request byte for
+     byte or the warm entry is a different cache key and the download is pure
+     waste — and it had been wrong THREE times: the bare /api/products (full
+     80-column projection), then a stale ?view=list after the grid moved to
+     server paging, then pageSize=150 while the grid asked for 200. A comment
+     asking the next person to keep two strings in sync lost three times, so
+     both now come from products-list-params.ts. */
+  products: PRODUCTS_PREFETCH_URL,
+  "product-data": PRODUCT_DATA_PREFETCH_URL,
   projects: "/api/projects",
-  todo: "/api/todos",
+  /* To-do appends ?v=<write version> (busts its 30s HTTP cache after a
+     write) — the prefetch must build the same key, hence the function. */
+  todo: todoOpenListUrl,
   accounts: "/api/accounts",
   customers: "/api/contacts?type=customer",
   suppliers: "/api/contacts?type=supplier",
@@ -95,7 +156,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     pm: false,
     blink: true,
   });
-  const [tzLabel, setTzLabel] = useState("");
+  /* Timezone never changes within a session: read once on the client via
+     useSyncExternalStore (server snapshot is "", matching the old initial
+     state, so the static prerender still hydrates cleanly). */
+  const tzLabel = useSyncExternalStore(noopSubscribe, getTzLabel, () => "");
   const [dateLabel, setDateLabel] = useState("");
 
   /* The clock, the date and the timezone label are all seeded in an EFFECT, not
@@ -137,20 +201,6 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       if (document.visibilityState === "visible") tick();
     };
     document.addEventListener("visibilitychange", onClockVis);
-
-    /* Timezone label — e.g. "Dubai (GMT+4)" */
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
-      const offset = -new Date().getTimezoneOffset();
-      const sign = offset >= 0 ? "+" : "-";
-      const hrs = Math.floor(Math.abs(offset) / 60);
-      const mins = Math.abs(offset) % 60;
-      const gmtStr = `GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""}`;
-      setTzLabel(`${city} (${gmtStr})`);
-    } catch {
-      setTzLabel("");
-    }
 
     return () => {
       clearInterval(id);
@@ -199,6 +249,44 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 }
 
 /* ── Full App Card (for grid) ── */
+/* ── Launcher layout (owner pick F, 23 Sep 2026) ──
+   From 640 px up the launcher is size-driven: tiles never narrower than
+   112 px (lib/home/app-bands.ts), groups packed into bands on one column
+   grid, icons 30 px. Below 640 px the phone stack of three columns stays as
+   it was. Read as an external store so the first client render already
+   knows which one it is drawing. */
+/* hubT (shared with the shell) + the launcher's own strings, merged once here
+   so the launcher strings stay in the Home chunk. */
+const HOME_T: Translations = { ...hubT, ...homeLauncherT };
+
+const WIDE_QUERY = "(min-width: 640px)";
+function subscribeWide(cb: () => void): () => void {
+  const mq = window.matchMedia(WIDE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+function readWide(): boolean {
+  return window.matchMedia(WIDE_QUERY).matches;
+}
+/** First-render guess of the column count; the layout effect corrects it
+    before the first paint when the measured grid differs. */
+function estimateLauncherColumns(): number {
+  if (typeof window === "undefined") return 10;
+  const vw = window.innerWidth;
+  return launcherColumns(Math.min(vw, 1400) - (vw >= 768 ? 80 : 32));
+}
+
+/** The Koleex AI tile's orb, as a multiple of the icon slot (30/34 px):
+ *  54/61 px. Checked in a rendered tile at 1, 1.7, 1.8 and 1.9 — the sphere
+ *  stays clear of the label below it at every one. */
+const AI_TILE_ORB = 1.8;
+
+/* The tiles that count something of their own: Discuss its unread messages,
+   To-do the open tasks on you, Projects your open tasks, Planning your
+   shifts this week (useAppBadges). Every other tile counts its unread
+   notifications. */
+const OWN_TILE_NUMBER = new Set(["discuss", "todo", "projects", "planning"]);
+
 const AppCard = memo(function AppCard({
   app,
   t,
@@ -207,6 +295,14 @@ const AppCard = memo(function AppCard({
   appUnreadNoun,
   dk,
   onPrefetch,
+  iconPx = 34,
+  edit = null,
+  pinned = false,
+  pinFull = false,
+  onPin,
+  onMoveBy,
+  pinIndex = 0,
+  pinTotal = 0,
 }: {
   app: AppDef;
   t: (key: string, fb: string) => string;
@@ -215,6 +311,17 @@ const AppCard = memo(function AppCard({
   appUnreadNoun: string;
   dk: boolean;
   onPrefetch: (app: AppDef) => void;
+  /** 34 on phones, 30 on the size-driven desktop launcher. */
+  iconPx?: number;
+  /** Edit mode for My apps: "mine" = a tile in the row (drag, −), "catalog" =
+      a tile in the groups below (tap to add or remove). */
+  edit?: "mine" | "catalog" | null;
+  pinned?: boolean;
+  pinFull?: boolean;
+  onPin?: (id: string) => void;
+  onMoveBy?: (id: string, delta: number) => void;
+  pinIndex?: number;
+  pinTotal?: number;
 }) {
   const Icon = app.icon;
   const label = t(app.tKey, app.name);
@@ -235,12 +342,7 @@ const AppCard = memo(function AppCard({
     appUnread > 0
       ? `${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`
       : `${appBadgeCount} open item${appBadgeCount === 1 ? "" : "s"}`;
-  return (
-    <AppLaunchLink
-      app={app}
-      onPreload={onPrefetch}
-      aria-label={label}
-      className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
+  const tileCls = `relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
         dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
       } ${
         isAi
@@ -258,10 +360,11 @@ const AppCard = memo(function AppCard({
                     : "tile-hover-neon kx-hover-card kx-hover-tile kx-glass bg-[#f8f8f8] border-black/[0.06]"
                 }`
             : `cursor-default border kx-glass ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
-      }`}
-    >
+      }`;
+  const body = (
+    <>
 
-      {(badge === "new" || badge === "updated") && (
+      {!edit && (badge === "new" || badge === "updated") && (
         <span
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
             badge === "new"
@@ -313,9 +416,24 @@ const AppCard = memo(function AppCard({
                  mask — owner: "the Koleex AI Icon should be our Animated AI
                  face (orb)". The orb is the product's identity and it moves;
                  a bound icon is a flat SVG mask and can never be it. */
-              return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
+              /* BIGGER IN ITS TILE (owner, 2026-09-23, on the Koleex AI app
+                 tile: "make the new orb … more bigger — I mean the app
+                 icon"). The orb draws its sphere inside a margin, so at the
+                 line icons' 30/34 px it read as a small ring beside full-
+                 bleed glyphs. It is drawn at AI_TILE_ORB × the icon slot and
+                 centred on the slot, which keeps its 30/34 px layout box: the
+                 tile, the label and the grid do not move. Drawn at size, not
+                 CSS-scaled, so the dots stay sharp. */
+              const orbPx = Math.round(iconPx * AI_TILE_ORB);
+              return (
+                <span className="relative block" style={{ width: iconPx, height: iconPx }}>
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <AnimatedIcon size={orbPx} animated scaleClass="scale-100" />
+                  </span>
+                </span>
+              );
             }
-            return <BoundIcon semanticKey={`app.${app.id}`} className="h-[34px] w-[34px]" fallback={<Icon size={34} />} />;
+            return <BoundIcon semanticKey={`app.${app.id}`} className={iconPx === 30 ? "h-[30px] w-[30px]" : "h-[34px] w-[34px]"} fallback={<Icon size={iconPx} />} />;
           })()}
         </span>
       </span>
@@ -328,6 +446,73 @@ const AppCard = memo(function AppCard({
       }`}>
         {label}
       </span>
+    </>
+  );
+
+  /* ── My apps edit mode ──
+     "catalog": every tile below is a toggle — tap to add it to My apps or
+     take it out; the corner shows + or ✓. "mine": a tile in the row can be
+     dragged to a new place (lib loaded on Edit) or moved with the arrow
+     keys, and its − takes it out. Neither navigates while editing. */
+  const pinText = (pinned ? t("home.unpinApp", "Remove {name} from My apps") : t("home.pinApp", "Add {name} to My apps")).replace("{name}", label);
+  const badgeCls = dk ? "bg-white/[0.08] border-white/20 text-white/85" : "bg-black/[0.05] border-black/15 text-black/70";
+  if (edit === "catalog") {
+    const blocked = !app.active || (!pinned && pinFull);
+    return (
+      <button
+        type="button"
+        data-app-tile={app.id}
+        aria-pressed={pinned}
+        aria-label={app.active && blocked ? t("home.myAppsFull", "My apps is full — remove one to add another") : pinText}
+        disabled={blocked}
+        onClick={() => onPin?.(app.id)}
+        className={`${tileCls} ${blocked ? "opacity-60" : ""}`}
+      >
+        {app.active && (
+          <span aria-hidden className={`absolute top-1.5 start-1.5 z-10 grid h-6 w-6 place-items-center rounded-full border ${pinned ? "bg-[#567FB2] border-[#7FA9D6]/70 text-white" : badgeCls}`}>
+            {pinned ? <CheckIcon size={13} /> : <PlusIcon size={13} />}
+          </span>
+        )}
+        {body}
+      </button>
+    );
+  }
+  if (edit === "mine") {
+    const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl";
+    return (
+      <div
+        data-pin-id={app.id}
+        tabIndex={0}
+        role="group"
+        aria-label={t("home.moveApp", "{name}, {pos} of {total}. Use the arrow keys to move it.")
+          .replace("{name}", label).replace("{pos}", String(pinIndex + 1)).replace("{total}", String(pinTotal))}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          e.preventDefault();
+          onMoveBy?.(app.id, (e.key === "ArrowRight") !== rtl ? 1 : -1);
+        }}
+        className={`${tileCls.replace("cursor-pointer", "cursor-grab")} touch-none data-[dragging=1]:ring-2 data-[dragging=1]:ring-[#7FA9D6]/80`}
+      >
+        <button
+          type="button"
+          aria-label={pinText}
+          onClick={() => onPin?.(app.id)}
+          className={`absolute top-1.5 start-1.5 z-10 grid h-6 w-6 place-items-center rounded-full border transition-colors ${badgeCls} ${dk ? "hover:bg-white/[0.16]" : "hover:bg-black/[0.1]"}`}
+        >
+          <MinusIcon size={13} />
+        </button>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <AppLaunchLink
+      app={app}
+      onPreload={onPrefetch}
+      aria-label={label}
+      className={tileCls}
+    >
+      {body}
     </AppLaunchLink>
   );
 });
@@ -347,11 +532,15 @@ const AIGreeter = memo(function AIGreeter({
   firstName,
   t,
   lang,
+  reportsOn,
 }: {
   dk: boolean;
   firstName: string | null;
   t: (key: string, fb: string) => string;
   lang: string;
+  /** The Reports app is on this person's launcher — only then does the
+   *  greeting look at what they owe. */
+  reportsOn: boolean;
 }) {
   const skin = useSkin();
   const greetingText = `${t(getGreetingKey(), "")}${firstName ? `, ${firstName}` : ""}`;
@@ -384,20 +573,35 @@ const AIGreeter = memo(function AIGreeter({
     };
   }, [lang]);
 
-  const quoteTyping = quoteTyped.length < quote.length;
+  /* Reports Phase 3C (owner's pick, 25 Sep 2026): while a report is owed,
+     this line says so in place of the quote — the same line, so nothing on
+     the page appears or moves — and opens it. The answer rides in with the
+     work snapshot the shell already fetches, so it usually lands while the
+     greeting is still typing; if not, the line waits up to 1.5 s before it
+     types a quote, so it seldom types one only to take it back. */
+  const dueLine = useReportDue(reportsOn, lang);
+  const [waited, setWaited] = useState(false);
   useEffect(() => {
-    if (!introDone || !quote) return;
+    if (!introDone) return;
+    const id = setTimeout(() => setWaited(true), 1500);
+    return () => clearTimeout(id);
+  }, [introDone]);
+  const line = !introDone || (dueLine === undefined && !waited) ? "" : dueLine ? dueLine.text : quote;
+
+  const quoteTyping = quoteTyped.length < line.length;
+  useEffect(() => {
+    if (!introDone || !line) return;
     setQuoteTyped("");
     let i = 0;
     let timer: ReturnType<typeof setTimeout>;
     const step = () => {
       i += 1;
-      setQuoteTyped(quote.slice(0, i));
-      if (i < quote.length) timer = setTimeout(step, 26 + Math.random() * 42);
+      setQuoteTyped(line.slice(0, i));
+      if (i < line.length) timer = setTimeout(step, 26 + Math.random() * 42);
     };
     timer = setTimeout(step, 220);
     return () => clearTimeout(timer);
-  }, [quote, introDone]);
+  }, [line, introDone]);
 
   useEffect(() => {
     if (!greetingText) return;
@@ -436,7 +640,21 @@ const AIGreeter = memo(function AIGreeter({
   return (
     <>
       {/* The CSS glow-orb is the system-wide AI face (owner-approved). */}
-      <KoleexGlowOrb state={orbState} greetKey={greet} size={72} className="shrink-0" />
+      {/* BIGGER, AND IT WANDERS (owner, 2026-09-23, on this greeting: "I
+          want the orb more bigger and changed randomly with the orb motion
+          shapes"). 112px from md up, beside a card about that tall; 72px on
+          a phone, where the greeting needs the width. The orb is drawn once
+          at 112 and scaled in its 72px box below md, so there is one canvas
+          and no size swap after load. `wander`: the dotted orb, at rest,
+          drifts through its shapes; the aura orb ignores it.
+          (Taken to 144 and then 208 on a misread of "the orb in the home
+          page app" — which meant the Koleex AI app tile — and returned
+          here at the owner's word: "reduce the main one same as before".) */}
+      <div className="relative shrink-0 w-[72px] h-[72px] md:w-[112px] md:h-[112px]">
+        <div className="absolute top-0 start-0 max-md:scale-[0.6429] origin-top-left rtl:origin-top-right">
+          <KoleexGlowOrb state={orbState} greetKey={greet} size={112} wander />
+        </div>
+      </div>
       <div
         /* kx-glass cannot win against an inline style, so under Aurora the
            inline background is simply not written and the class paints. Core
@@ -476,13 +694,39 @@ const AIGreeter = memo(function AIGreeter({
           )}
         </h1>
         <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-          <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug min-h-[2.8em] ${dk ? "text-white/45" : "text-black/50"}`}>
-            <span aria-hidden>{quoteTyped || " "}</span>
-            {quoteTyping && (
-              <span
-                aria-hidden
-                className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
-              />
+          {/* Two lines held from the first frame. Arabic letters stand taller
+              than the line height, so its two lines hold more — measured
+              40.3 px at 13 px where 2.8em holds 36.4 — or the card would
+              grow as the second line types. */}
+          <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug ${lang === "ar" ? "min-h-[3.1em]" : "min-h-[2.8em]"} ${dk ? "text-white/45" : "text-black/50"}`}>
+            {dueLine ? (
+              /* Two lines at most, whatever the language or the screen: the
+                 space the quote holds is the space this line gets. */
+              <Link
+                href={dueLine.href}
+                prefetch={false}
+                aria-label={dueLine.text}
+                className={`line-clamp-2 rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#567FB2]/60 ${dk ? "text-white/85 hover:text-white" : "text-black/80 hover:text-black"}`}
+              >
+                <span aria-hidden>{quoteTyped || " "}</span>
+                {!quoteTyping && <span aria-hidden className="ms-1 text-[#7FA9D6]">›</span>}
+                {quoteTyping && (
+                  <span
+                    aria-hidden
+                    className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/60" : "bg-black/60"}`}
+                  />
+                )}
+              </Link>
+            ) : (
+              <>
+                <span aria-hidden>{quoteTyped || " "}</span>
+                {quoteTyping && (
+                  <span
+                    aria-hidden
+                    className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
+                  />
+                )}
+              </>
             )}
           </p>
         </div>
@@ -494,7 +738,7 @@ const AIGreeter = memo(function AIGreeter({
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t, lang } = useTranslation(hubT);
+  const { t, lang } = useTranslation(HOME_T);
   const currentAppId = getActiveAppId(pathname);
   const { account } = useCurrentAccount();
 
@@ -552,10 +796,11 @@ export default function HomePage() {
   /* ── Search + filter ── */
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("all");
+  /* Category chips were removed from the grid; the filter plumbing stays
+     for their return, pinned to "all" until then. */
+  const [activeCategory] = useState("all");
 
   /* ── Per-user data ── */
-  const [dataLoaded, setDataLoaded] = useState(false);
   const accountIdRef = useRef<string | null>(null);
   /* Unread Discuss messages → notification badge on the Discuss app tile.
      Mirrors the NotificationBell source of truth (fetchMyChannels +
@@ -578,7 +823,6 @@ export default function HomePage() {
   useEffect(() => {
     const id = getCurrentAccountIdSync();
     accountIdRef.current = id;
-    setDataLoaded(true);
   }, []);
 
   /* ── Discuss unread badge ──
@@ -693,6 +937,29 @@ export default function HomePage() {
     };
   }, [account?.id, badgesReady]);
 
+  /* ── Every other app's tile: its unread notifications ──
+     Discuss, To-do, Projects and Planning keep their own numbers (above and
+     useAppBadges). Every other tile shows the notifications from that app
+     still unread — the registry's app for each type, security alerts left
+     out as the bell's All tab leaves them out (/api/inbox/feed badges →
+     byApp). No request of their own: the header's Gate publishes them with
+     the unread count it already reads (the shell batch, then its poll).
+     Only when the count moves WITHOUT them — the real bell, once opened,
+     publishes the count alone — are they read again, once per move. */
+  const tileCounts = useInboxUnreadByApp(account?.id ?? null);
+  const [refetched, setRefetched] = useState<{ at: number; byApp: Record<string, number> } | null>(null);
+  const needsRead = badgesReady && tileCounts.published && !tileCounts.fresh;
+  useEffect(() => {
+    if (!needsRead) return;
+    let cancelled = false;
+    const at = tileCounts.count;
+    void import("@/lib/inbox")
+      .then(({ fetchUnreadByApp }) => fetchUnreadByApp())
+      .then((byApp) => { if (!cancelled) setRefetched({ at, byApp }); });
+    return () => { cancelled = true; };
+  }, [needsRead, tileCounts.count]);
+  const unreadByApp = !tileCounts.fresh && refetched?.at === tileCounts.count ? refetched.byApp : tileCounts.byApp;
+
   /* App launch (navigation + telemetry + pressed feedback + modifier keys) is
      handled by the shared <AppLaunchLink> primitive that AppCard renders. This
      page only supplies the intent-preload warm callback below. */
@@ -708,7 +975,8 @@ export default function HomePage() {
       try { router.prefetch(app.route); } catch { /* ignore */ }
       /* Warm the app's data too (default cache mode → populates the browser
          HTTP cache), so the app's own fetch on mount is served from cache. */
-      const dataUrl = APP_DATA_PREFETCH[app.id];
+      const entry = APP_DATA_PREFETCH[app.id];
+      const dataUrl = typeof entry === "function" ? entry() : entry;
       if (dataUrl) {
         try { void fetch(dataUrl, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ }
       }
@@ -771,6 +1039,10 @@ export default function HomePage() {
     });
   }, [permLoading, permittedModules, isSuperAdmin]);
 
+  /* The greeting looks at what reports are owed only for someone whose
+     launcher shows Reports (staff); for anyone else it is the quote. */
+  const reportsOn = useMemo(() => visibleRegistry.some((a) => a.id === "reports"), [visibleRegistry]);
+
   /* ── Derived ── */
   const filteredApps = useMemo(() => {
     let result = visibleRegistry;
@@ -802,13 +1074,162 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
-  const dateLocale = dateLocaleFor(lang);
-  const today = new Date().toLocaleDateString(dateLocale, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  /* ── Launcher layout: size-driven columns + bands (owner pick F) ──
+     `launcherRef` wraps the whole apps zone, so its width IS the grid's.
+     The first render uses a guess from the window; the layout effect measures
+     and, if the count differs, React re-renders before the first paint — the
+     bands never visibly rearrange. Resizing only re-packs when the column
+     count actually changes. */
+  const wide = useSyncExternalStore(subscribeWide, readWide, () => false);
+  const iconPx = wide ? 30 : 34;
+  const launcherRef = useRef<HTMLDivElement | null>(null);
+  const [cols, setCols] = useState<number>(estimateLauncherColumns);
+  useLayoutEffect(() => {
+    const el = launcherRef.current;
+    if (!el) return;
+    const measure = () => {
+      const next = launcherColumns(el.clientWidth);
+      setCols((c) => (c === next ? c : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const bands = useMemo(
+    () => (wide ? packAppBands(groupedApps.map((g) => g.apps.length), cols) : null),
+    [wide, groupedApps, cols],
+  );
 
-  const activeCount = filteredApps.filter((a) => a.active).length;
-  const totalCount = filteredApps.length;
+  /* ── My apps (lib/home/my-apps.ts) ──
+     1. the device's copy, read in the initialiser, so a returning visit
+        paints the row on the first frame with no request;
+     2. the account's own value, adopted ONCE when the account arrives
+        (during render, like useWallpaper — an effect would be a second
+        paint), unless the person already edited here;
+     3. never set ("none"): seeded once from their own usage of the last 30
+        days — placeholder tiles hold the row's exact size until it lands, so
+        nothing moves. */
+  const [homeApps, setHomeApps] = useState<HomeAppsPref | null>(() => readCachedHomeApps(getCurrentAccountIdSync()));
+  const [homeAppsFor, setHomeAppsFor] = useState("");
+  const [editedHere, setEditedHere] = useState(false);
+  if (account && homeAppsFor !== account.id && !editedHere) {
+    setHomeAppsFor(account.id);
+    const stored = readHomeAppsPref(account.preferences?.home_apps) ?? HOME_APPS_NONE;
+    const local = readCachedHomeApps(account.id);
+    const next = stored.source === "none" && local && local.source !== "none" ? local : stored;
+    setHomeApps(next);
+    if (next.source !== "none") cacheHomeApps(account.id, next);
+  }
+  const pinnable = useMemo(() => visibleRegistry.filter((a) => a.active), [visibleRegistry]);
+  const appById = useMemo(() => new Map(pinnable.map((a) => [a.id, a])), [pinnable]);
+  const myApps = useMemo(
+    () => (homeApps?.pins ?? []).map((id) => appById.get(id)).filter((a): a is AppDef => !!a),
+    [homeApps, appById],
+  );
+  const pinIds = useMemo(() => myApps.map((a) => a.id), [myApps]);
+  const pinnedSet = useMemo(() => new Set(pinIds), [pinIds]);
+  const seedingMyApps = homeApps === null || (homeApps.source === "none" && homeApps.pins.length === 0);
+  const seedCount = Math.min(MY_APPS_SEED, pinnable.length);
+
+  /* Set on mount, not only in the initialiser: StrictMode (dev) mounts,
+     unmounts and mounts again, and a flag cleared by the first cleanup would
+     stay false and silently drop the seed. */
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  const seedStarted = useRef(false);
+  useEffect(() => {
+    if (!account || seedStarted.current || pinnable.length === 0) return;
+    if (!homeApps || homeApps.source !== "none" || homeApps.pins.length > 0) return;
+    seedStarted.current = true;
+    const accountId = account.id;
+    const routed = pinnable.map((a) => ({ id: a.id, route: a.route }));
+    void whenNetworkQuiet({ quietMs: 300, maxWaitMs: 2500 }).then(async () => {
+      let views: Record<string, number> = {};
+      let ok = false;
+      try {
+        const qs = encodeURIComponent(routed.map((r) => r.route).join(","));
+        const res = await fetch(`/api/home/app-usage?routes=${qs}`, { credentials: "include", cache: "no-store" });
+        if (res.ok) {
+          views = ((await res.json()) as { views?: Record<string, number> }).views ?? {};
+          ok = true;
+        }
+      } catch {
+        /* offline: the row is filled in launcher order for this visit and
+           seeded properly next time */
+      }
+      if (!mountedRef.current) return;
+      const next: HomeAppsPref = { pins: seedPins(views, routed), source: ok ? "usage" : "none" };
+      setHomeApps(next);
+      if (ok) {
+        cacheHomeApps(accountId, next);
+        void saveHomeApps(accountId, next);
+      }
+    });
+  }, [account, homeApps, pinnable]);
+
+  const [editingApps, setEditingApps] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSave = useRef<(() => void) | null>(null);
+  const commitPins = useCallback((pins: string[]) => {
+    const next: HomeAppsPref = { pins: pins.slice(0, MY_APPS_MAX), source: "user" };
+    const accountId = account?.id ?? getCurrentAccountIdSync();
+    setEditedHere(true);
+    setHomeApps(next);
+    cacheHomeApps(accountId, next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    pendingSave.current = () => { void saveHomeApps(accountId, next); };
+    saveTimer.current = setTimeout(() => { pendingSave.current?.(); pendingSave.current = null; }, 600);
+  }, [account]);
+  /* A save still waiting when Home unmounts goes out immediately. */
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    pendingSave.current?.();
+  }, []);
+  const togglePin = useCallback((id: string) => {
+    if (pinIds.includes(id)) commitPins(pinIds.filter((x) => x !== id));
+    else if (pinIds.length < MY_APPS_MAX) commitPins([...pinIds, id]);
+  }, [pinIds, commitPins]);
+  const movePin = useCallback((fromId: string, toId: string) => {
+    const from = pinIds.indexOf(fromId);
+    const to = pinIds.indexOf(toId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...pinIds];
+    next.splice(from, 1);
+    next.splice(to, 0, fromId);
+    commitPins(next);
+  }, [pinIds, commitPins]);
+  const movePinBy = useCallback((id: string, delta: number) => {
+    const from = pinIds.indexOf(id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= pinIds.length) return;
+    movePin(id, pinIds[to]);
+  }, [pinIds, movePin]);
+  const movePinRef = useRef(movePin);
+  useEffect(() => { movePinRef.current = movePin; }, [movePin]);
+  const myAppsGridRef = useRef<HTMLDivElement | null>(null);
+  /* Drag to reorder is its own chunk, fetched the first time Edit is tapped. */
+  useEffect(() => {
+    if (!editingApps) return;
+    let detach: (() => void) | undefined;
+    let alive = true;
+    void import("@/components/home/my-apps-reorder").then(({ attachReorder }) => {
+      const grid = myAppsGridRef.current;
+      if (!alive || !grid) return;
+      detach = attachReorder(grid, (a, b) => movePinRef.current(a, b));
+    });
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setEditingApps(false); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      alive = false;
+      detach?.();
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [editingApps]);
+
 
   /* Tier-A idle preload (evidence-based). Once the permitted set is known and
      the network/device permits, warm the few most-launched apps the user is
@@ -860,6 +1281,30 @@ export default function HomePage() {
 
 
 
+  /* One tile, three contexts: the My apps row ("mine"), the groups below
+     ("catalog") and search results (null). Edit mode only applies to the
+     first two. */
+  const renderCard = (app: AppDef, where: "mine" | "catalog" | null, pinIndex = 0) => (
+    <AppCard
+      key={app.id}
+      app={app}
+      t={t}
+      isCurrentApp={currentAppId === app.id}
+      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : OWN_TILE_NUMBER.has(app.id) ? 0 : unreadByApp[app.id] ?? 0}
+      appUnreadNoun={app.id === "todo" ? "task" : app.id === "discuss" ? "message" : "notification"}
+      dk={dk}
+      onPrefetch={prefetchApp}
+      iconPx={iconPx}
+      edit={editingApps && where ? where : null}
+      pinned={pinnedSet.has(app.id)}
+      pinFull={pinIds.length >= MY_APPS_MAX}
+      onPin={togglePin}
+      onMoveBy={movePinBy}
+      pinIndex={pinIndex}
+      pinTotal={pinIds.length}
+    />
+  );
+
   /* kx-wp-root on the div below: this root paints its OWN opaque colour, so a
      Core wallpaper — which is painted on `body` — would sit invisible behind
      it. Deliberately NOT kx-app: that class also remaps vars under Aurora, and
@@ -868,6 +1313,7 @@ export default function HomePage() {
      The comment lives here rather than above the element because a JSX comment
      before the returned root makes it a second sibling, which is a syntax
      error — the same slip that broke KpiCard across thirteen apps. */
+
   return (
     <div className={`kx-wp-root ${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
       {/* THE GROUND — Aurora only. Every other surface on this page switches
@@ -920,7 +1366,7 @@ export default function HomePage() {
         .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
-      <div className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
+      <div data-kx-home-stage="" className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         {/* min-height = card (~96px) + the orb's 27px float amplitude on
@@ -929,7 +1375,7 @@ export default function HomePage() {
         <div className="mb-4 min-h-[130px] md:min-h-[150px] flex items-center">
           <div className="flex items-stretch justify-between gap-5 md:gap-8 w-full">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-              <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} />
+              <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} reportsOn={reportsOn} />
             </div>
             <ClockWidget dk={dk} />
           </div>
@@ -983,11 +1429,21 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── Zone B: the Dashboard (owner call 2026-08-20: the FULL dashboard
+            lives on Home, in the slab style cloned from his references).
+            One request (/api/dashboard, no-store), server-side permission
+            filtering, renders nothing at all for accounts with no visible
+            widgets — the grid below is untouched for them. */}
+        {HOME_DASHBOARD_ON && <HomeDashboard />}
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
             render a calm loading skeleton or a Retry banner instead
-            of a silent empty grid. */}
+            of a silent empty grid.
+
+            `launcherRef` wraps the whole zone: its width is the grid width
+            the column count is measured from. */}
+        <div ref={launcherRef}>
         {permLoading && permittedModules.size === 0 ? (
           <AppGridSkeleton dk={dk} />
         ) : visibleRegistry.length === 0 ? (
@@ -999,50 +1455,120 @@ export default function HomePage() {
             }}
           />
         ) : isSearchOrFilter ? (
-          /* Flat grid when searching or filtering by category */
-          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
-            {filteredApps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                t={t}
-                isCurrentApp={currentAppId === app.id}
-                appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
-                appUnreadNoun={app.id === "todo" ? "task" : "message"}
-                dk={dk}
-                onPrefetch={prefetchApp}
-              />
-            ))}
+          /* Flat grid when searching or filtering by category — the same
+             size-driven columns as the launcher from 640 px up. */
+          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3`}>
+            {filteredApps.map((app) => renderCard(app, null))}
           </div>
         ) : (
-          /* Grouped by category when showing all */
-          <div className="space-y-7">
-            {groupedApps.map((group) => (
-              <div key={group.id}>
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                    {t(group.tKey, group.label)}
+          <>
+            {/* ── MY APPS (owner pick F, 23 Sep 2026) ──
+                The person's own apps first, one row on a 1440 px screen,
+                then every app by group below — the full catalogue stays
+                complete, so an app can be in both places. Edit turns the
+                row into a drag-to-reorder list and every tile below into
+                an add / remove toggle. */}
+            <section className="mb-7" aria-label={t("home.myApps", "My apps")}>
+              <div className="flex items-center gap-2.5 mb-3 min-h-7">
+                <span className={`shrink-0 text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                  {t("home.myApps", "My apps")}
+                </span>
+                <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                {editingApps && (
+                  <span className={`hidden sm:block min-w-0 truncate text-[11.5px] ${dk ? "text-white/45" : "text-black/45"}`}>
+                    {t("home.myAppsEditHint", "Drag to reorder · tap an app below to add or remove it")}
                   </span>
-                  <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
-                </div>
-                <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
-                  {group.apps.map((app) => (
-                    <AppCard
-                      key={app.id}
-                      app={app}
-                      t={t}
-                      isCurrentApp={currentAppId === app.id}
-                      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
-                      appUnreadNoun={app.id === "todo" ? "task" : "message"}
-                      dk={dk}
-                      onPrefetch={prefetchApp}
-                    />
+                )}
+                {!seedingMyApps && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingApps((v) => !v)}
+                    aria-pressed={editingApps}
+                    className={`shrink-0 h-7 max-sm:h-10 px-2.5 max-sm:px-3.5 rounded-lg text-[11.5px] font-medium transition-colors ${
+                      editingApps
+                        ? "text-[#BCD8F0] bg-[#567FB2]/20 hover:bg-[#567FB2]/30"
+                        : dk ? "text-white/55 hover:text-white hover:bg-white/[0.06]" : "text-black/55 hover:text-black hover:bg-black/[0.05]"
+                    }`}
+                  >
+                    {editingApps ? t("home.doneApps", "Done") : t("home.editApps", "Edit")}
+                  </button>
+                )}
+              </div>
+              {seedingMyApps ? (
+                <div aria-hidden className={wide ? "grid gap-3" : "grid grid-cols-3 gap-3"} style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}>
+                  {Array.from({ length: seedCount }).map((_, i) => (
+                    <div key={i} className={`aspect-square rounded-2xl border animate-pulse ${dk ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.025] border-black/[0.05]"}`} />
                   ))}
                 </div>
+              ) : myApps.length === 0 ? (
+                <div className={`rounded-2xl border border-dashed px-4 py-5 text-center text-[12px] ${dk ? "border-white/[0.1] text-white/45" : "border-black/[0.12] text-black/45"}`}>
+                  {t("home.myAppsEmpty", "Tap Edit to pin the apps you use most")}
+                </div>
+              ) : (
+                <div
+                  ref={myAppsGridRef}
+                  className={`${introMotion ? "kx-grid " : ""}grid ${wide ? "" : "grid-cols-3"} gap-3`}
+                  style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+                >
+                  {myApps.map((app, i) => renderCard(app, "mine", i))}
+                </div>
+              )}
+            </section>
+
+            {bands ? (
+              /* Every group a closed block on ONE column grid: groups in a band
+                 share the header line and the row count, so every tile lines
+                 up with the tiles above and below it. */
+              <div>
+                {bands.map((band, bi) => (
+                  <div
+                    key={bi}
+                    className="grid gap-x-3 items-start mb-7 last:mb-0"
+                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                  >
+                    {band.groups.map(({ index, span }) => {
+                      const group = groupedApps[index];
+                      return (
+                        <div key={group.id} className="min-w-0" style={{ gridColumn: `span ${span} / span ${span}` }}>
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <span className={`min-w-0 truncate text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                              {t(group.tKey, group.label)}
+                            </span>
+                            <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                          </div>
+                          <div
+                            className={`${introMotion ? "kx-grid " : ""}grid gap-3`}
+                            style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
+                          >
+                            {group.apps.map((app) => renderCard(app, "catalog"))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            ) : (
+              /* Phones: the stack of groups, three columns, as it was. */
+              <div className="space-y-7">
+                {groupedApps.map((group) => (
+                  <div key={group.id}>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                        {t(group.tKey, group.label)}
+                      </span>
+                      <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                    </div>
+                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 gap-3`}>
+                      {group.apps.map((app) => renderCard(app, "catalog"))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
+        </div>
       </div>
 
       {/* AI card animated neon border */}
@@ -1063,10 +1589,12 @@ export default function HomePage() {
            the same way the search did: the conic painted under a see-through
            fill washes the whole box blue. So the two are separate mechanisms
            now — flat tile glass on the element, and the spinning conic on a
-           masked ::before that paints ONLY the 1.5px rim. The @property
-           angle animates on the element and the pseudo inherits it. */
+           masked ::before that paints ONLY the 1.5px rim. The pseudo runs
+           the spin itself: --ai-card-angle is registered inherits:false, so
+           an angle animated on the element never reached the rim and the
+           glow sat still under Aurora. */
         .ai-card-neon {
-          animation: ai-card-spin 3s linear infinite;
+          animation: ai-card-spin 4s linear infinite;
           border: 1.5px solid transparent;
           background: ${dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)"};
           -webkit-backdrop-filter: blur(16px) saturate(150%);
@@ -1082,6 +1610,7 @@ export default function HomePage() {
           border-radius: inherit;
           padding: 1.5px;
           pointer-events: none;
+          animation: ai-card-spin 4s linear infinite;
           background: conic-gradient(
             from var(--ai-card-angle),
             rgba(86,127,178,0.75),
@@ -1098,7 +1627,7 @@ export default function HomePage() {
         }
         ` : `
         .ai-card-neon {
-          animation: ai-card-spin 3s linear infinite;
+          animation: ai-card-spin 4s linear infinite;
           border: 1.5px solid transparent;
           background-origin: border-box;
           background-clip: padding-box, border-box;
@@ -1233,11 +1762,11 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
         Loading your apps…
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
         {Array.from({ length: 14 }).map((_, i) => (
           <div
             key={i}
-            className={`aspect-[1/1.1] rounded-2xl border ${cellCls} animate-pulse`}
+            className={`aspect-square rounded-2xl border ${cellCls} animate-pulse`}
             style={{ animationDelay: `${i * 60}ms` }}
           />
         ))}
@@ -1278,20 +1807,48 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
           {/* Elected primary (R-2) — the old emerald chip predated the
               element election and matched nothing in the system. */}
           {isAuth ? (
-            /* eslint-disable-next-line @next/next/no-html-link-for-pages --
-               A FULL page load is the point. The session just failed, so the
-               client state is the thing we are trying to discard; <Link> would
-               soft-navigate and carry it straight back. */
-            <a
-              /* The root IS the sign-in screen: AdminAuth renders the username
-                 + password form in place when there is no session. This used to
-                 point at /login, a second form that asked for an EMAIL and
-                 belonged to an auth system that is switched off. */
-              href="/"
+            /* THIS BUTTON USED TO BE `<a href="/">`, AND IT COULD NOT WORK.
+               A full page load was the right instinct — the client state is
+               what we are discarding — but a reload alone leaves the REJECTED
+               COOKIE in place. The root only renders the sign-in form when
+               there is NO session cookie; with a cookie the server refuses,
+               the page decides you are signed in, renders the Hub, every API
+               call 401s, this banner reappears, and pressing the button
+               returns you to the exact same state. A closed loop with no way
+               out from inside the product.
+
+               Observed in production, not theorised: 560 responses of 401
+               across every API route in three hours, and ZERO requests to
+               /api/auth/signin in the same window — the owner pressed this
+               button repeatedly and it never once attempted a sign-in.
+
+               So it signs out FIRST. `keepalive` lets the request survive the
+               navigation, and the reload happens whether or not the POST
+               succeeds: a cleanup that can strand the user when it fails is
+               worse than the bug it fixes. */
+            <button
+              type="button"
+              onClick={async () => {
+                /* This device's push goes with the session (lib/push-client). */
+                try {
+                  const { releasePushOnSignOut } = await import("@/lib/push-client");
+                  await releasePushOnSignOut();
+                } catch { /* never blocks sign-out */ }
+                try {
+                  await fetch("/api/auth/signout", { method: "POST", keepalive: true });
+                } catch {
+                  /* Offline, blocked, mid-deploy — the reload still has to
+                     happen. Worst case the cookie survives and the user is
+                     where they already were. */
+                }
+                /* location.assign, not <Link>: a soft navigation would carry
+                   the client state we are trying to throw away. */
+                window.location.assign("/");
+              }}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Sign in again
-            </a>
+            </button>
           ) : (
             <button
               type="button"

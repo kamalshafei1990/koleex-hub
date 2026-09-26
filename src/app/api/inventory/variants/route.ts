@@ -3,6 +3,10 @@ import "server-only";
 /* ===========================================================================
    GET  /api/inventory/variants    list variants (filter: item_id, status, q)
    POST /api/inventory/variants    create a variant for an inventory item
+
+   A variant's cost follows the item's (src/lib/experience): 0 with
+   cost_hidden without the private-records switch, and such a caller does
+   not set one. Guarded by validate:finance-perf §G.
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -13,6 +17,7 @@ import {
   type CreateVariantInput,
   type VariantStatus,
 } from "@/lib/inventory/variants";
+import { canSeeCostData, hideInventoryCost, INVENTORY_COST_INPUTS } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -31,7 +36,7 @@ export async function GET(req: Request) {
       search: url.searchParams.get("q") ?? undefined,
       limit: Number(url.searchParams.get("limit")) || 200,
     });
-    return NextResponse.json({ variants });
+    return NextResponse.json({ variants: canSeeCostData(auth) ? variants : variants.map(hideInventoryCost) });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
@@ -49,6 +54,13 @@ export async function POST(req: Request) {
   }
   if (!body.variant_name?.trim()) {
     return NextResponse.json({ error: "variant_name required" }, { status: 400 });
+  }
+  const cost = canSeeCostData(auth);
+  if (!cost && INVENTORY_COST_INPUTS.some((f) => (Number(body[f]) || 0) !== 0)) {
+    return NextResponse.json(
+      { error: "Item costs are set only with «Can see private data» in Roles & Permissions.", code: "needs_private_data" },
+      { status: 403 },
+    );
   }
 
   const r = await createVariant({
@@ -69,5 +81,5 @@ export async function POST(req: Request) {
     created_by: auth.account_id,
   });
   if (!r.ok) return NextResponse.json({ error: r.error, code: r.code ?? null }, { status: 422 });
-  return NextResponse.json({ variant: r.variant });
+  return NextResponse.json({ variant: cost || !r.variant ? r.variant : hideInventoryCost(r.variant) });
 }

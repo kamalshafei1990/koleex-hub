@@ -131,7 +131,7 @@ export default function UsageGovernance({
                   <div className="flex flex-wrap gap-1">
                     {list.map((cx) => (
                       <button key={cx.id} type="button" disabled={busy} onClick={() => addRule(cx.id, k)}
-                        className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[10.5px] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)] disabled:opacity-50">
+                        className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[10.5px] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)] disabled:opacity-50">
                         {cx.name}
                       </button>
                     ))}

@@ -1,5 +1,7 @@
 "use client";
 
+import AdminAuth from "@/components/admin/AdminAuthGate";
+
 /* Dev-only harness for the AIOrb status system. NOT registered in
    APP_REGISTRY — reachable only by typing /ai-orb-lab.
 
@@ -10,6 +12,8 @@
 
 import { useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
+import DottedOrb from "@/components/ai-orb/DottedOrb";
+import { dottedLook } from "@/components/ai-orb/dotted-orb-map";
 import type { AIOrbActivity, AIOrbResult, AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import { ACTIVITY_FAMILY } from "@/components/ai-orb/ai-orb-types";
 
@@ -47,7 +51,7 @@ const FAMILY_DESC: Record<string, string> = {
   "ordered-orbit": "rim particles become ordered, brighter, clockwise",
 };
 
-export default function AiOrbLab() {
+function AiOrbLabInner() {
   const [state, setState] = useState<AIOrbState>("idle");
   const [activity, setActivity] = useState<AIOrbActivity>("none");
   const [result, setResult] = useState<AIOrbResult>("none");
@@ -115,6 +119,21 @@ export default function AiOrbLab() {
         ))}
       </div>
 
+      {/* The second style (Settings → Koleex AI → Orb): the same state,
+          drawn as dots, at the sizes the Hub actually uses. */}
+      <div className="flex items-end gap-10 mb-6">
+        {[
+          [160, "dots · lab"], [72, "dots · home"], [38, "dots · chat"], [26, "dots · launcher"],
+        ].map(([sz, lbl]) => (
+          <div key={lbl as string} className="text-center">
+            <DottedOrb state={state} activity={activity} result={result}
+              audioLevel={audio} size={sz as number} surface="dark" />
+            <p className="mt-2 text-[10px] text-white/35">{sz}px · {lbl}</p>
+          </div>
+        ))}
+        <p className="text-[10px] text-white/35 pb-5">motion: {dottedLook(state, activity, result).motion} (small: {dottedLook(state, activity, result, 38).motion})</p>
+      </div>
+
       {/* What is animating right now */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 mb-6 max-w-3xl">
         <p className="text-[10px] uppercase tracking-wider text-white/35 mb-1">current animation</p>
@@ -156,5 +175,15 @@ export default function AiOrbLab() {
         </label>
       </div>
     </div>
+  );
+}
+
+/* BEHIND THE SAME DOOR AS /ai. A dev harness with no nav link was still a
+   public, unauthenticated page in production (audit, 2026-09-11). */
+export default function AiOrbLab() {
+  return (
+    <AdminAuth>
+      <AiOrbLabInner />
+    </AdminAuth>
   );
 }

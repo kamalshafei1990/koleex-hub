@@ -28,6 +28,7 @@
 import { useState, useEffect, useRef, useId, type ReactNode } from "react";
 import Link from "next/link";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import { ErpHairline } from "@/components/ui/erp/ErpUi";
 
 /* ─── Page shell ─────────────────────────────────────────── */
@@ -62,9 +63,10 @@ export function SmartCreatePage({
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Link href={backHref} aria-label="Back"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-              <RrIcon name="arrow-left" size={16} />
+            {/* The Hub's back chip. Shared by several screens whose parent
+                differs, so it carries no label rather than a wrong one. */}
+            <Link href={backHref} aria-label="Back" className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
             </Link>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
               <RrIcon name={icon} size={16} />
@@ -440,7 +442,7 @@ export function InlineCreateModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md overflow-hidden rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] shadow-2xl">
         <header className="border-b border-white/[0.06] px-4 py-3">
           <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Add</div>
           <h3 className="text-[14px] font-semibold tracking-tight">{title}</h3>

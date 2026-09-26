@@ -17,8 +17,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_BADGE } from "@/lib/translations/contacts/badge";
+import { CT_CS } from "@/lib/translations/contacts/cs";
+import { CT_NEG } from "@/lib/translations/contacts/neg";
+import { CT_SD } from "@/lib/translations/contacts/sd";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
@@ -31,12 +35,10 @@ import WalletIcon from "@/components/icons/ui/WalletIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
-import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";
 import IdCardIcon from "@/components/icons/ui/IdCardIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
-import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import GaugeIcon from "@/components/icons/ui/GaugeIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
@@ -46,7 +48,6 @@ import {
   STRATEGIC_STATUS_LABELS,
   strategicStatusTone,
   classificationLabel,
-  CLASSIFICATION_LABELS,
   type StrategicStatus,
 } from "@/lib/suppliers/intelligence";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
@@ -71,6 +72,11 @@ import RiskSection from "./RiskSection";
 import NegotiationSection from "./NegotiationSection";
 import SourcingSection from "./SourcingSection";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
+
+/* Only the namespaces this screen reads — see contacts.ts. */
+const DICT = { ...CT_BADGE, ...CT_CS, ...CT_NEG, ...CT_SD } as const;
+
 
 type Row = Record<string, unknown>;
 
@@ -191,12 +197,11 @@ const StatusPill = ({ value }: { value: string }) =>
   );
 
 export default function SupplierDetail({ id, embedded = false, onEdit, onDelete, onBack }: { id: string; embedded?: boolean; onEdit?: () => void; onDelete?: () => void; onBack?: () => void }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(DICT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -225,8 +230,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
   const [statusDraft, setStatusDraft] = useState("");
   const [statusReason, setStatusReason] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
-  const [classOpen, setClassOpen] = useState(false);
-  const [busyClass, setBusyClass] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
   /* Executive vs Analytical mode (Section 3) + progressive disclosure of the
@@ -314,34 +317,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
       setSavingStatus(false);
     }
   }, [patchSupplier, statusDraft, statusReason, load]);
-
-  const mutateClassification = useCallback(
-    async (classification: string, action: "add" | "remove") => {
-      setBusyClass(classification);
-      setEditError(null);
-      try {
-        const r = await fetch(
-          `/api/suppliers/${id}/classifications${action === "remove" ? `?classification=${encodeURIComponent(classification)}` : ""}`,
-          {
-            method: action === "remove" ? "DELETE" : "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: action === "add" ? JSON.stringify({ classification }) : undefined,
-          },
-        );
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-        }
-        await load({ silent: true });
-      } catch (e) {
-        setEditError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBusyClass(null);
-      }
-    },
-    [id, load],
-  );
 
   const s = data?.supplier ?? {};
   const name = str(s, "company_name_en", "company_name", "display_name", "full_name") || t("sd.supplier", "Supplier");
@@ -496,9 +471,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 crumbs jump straight to Home or the Suppliers app. */}
             {!embedded && (
               <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
-                <button type="button" onClick={() => router.back()}
-                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" /> {t("sd.back", "Back")}
+                <button type="button" onClick={() => router.back()} aria-label={t("sd.back", "Back")} className={BACK_CHROME}>
+                  <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+                  <span className="hidden text-[12px] font-medium sm:inline">{t("sd.back", "Back")}</span>
                 </button>
                 <span className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
                 <button type="button" onClick={() => router.push("/")} className="transition-colors hover:text-[var(--text-primary)]">{t("sd.home", "Home")}</button>
@@ -513,9 +488,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <div className="flex items-center gap-2 min-w-0">
               {onBack ? (
                 <button type="button" onClick={() => onBack()} aria-label={t("sd.backToOverview", "Back to overview")} title={t("sd.backToOverview", "Back to overview")}
-                  className="flex items-center gap-1.5 shrink-0 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
-                  <span className="hidden sm:inline">{t("sd.overview", "Overview")}</span>
+                  className={BACK_CHROME}>
+                  <ArrowLeftIcon size={14} className="rtl:rotate-180" />
+                  <span className="hidden text-[12px] font-medium sm:inline">{t("sd.overview", "Overview")}</span>
                 </button>
               ) : null}
               <div className="inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)] p-0.5 text-[10.5px] font-medium">
@@ -766,7 +741,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first.
              Full-width opaque strip masks scrolling content behind the pill. ── */}
         <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
-        <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none">
+        {/* kx-glass, not bg-secondary: under the Aurora remap bg-secondary is
+            translucent WITHOUT frost, so scrolling content read straight
+            through the pill (same bug class the canonical .kx-ph-tabs fix
+            documents). The glass class carries the blur + low-power arms. */}
+        <nav className="kx-glass flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] px-1.5 py-1.5 scrollbar-none">
           {navItems.map((n) => {
             const active = n.target === activeLayer;
             return (
@@ -1251,7 +1230,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                       const missing = (d.checks ?? []).filter((c) => !c.met);
                       const navTo = () => {
                         const nav = hint?.nav;
-                        if (!nav || nav === "edit") { onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`); return; }
+                        if (!nav || nav === "edit") { if (onEdit) onEdit(); else router.push(`/suppliers?selected=${id}`); return; }
                         const target = READINESS_NAV_TARGET[nav];
                         const el = target ? document.getElementById(target) : null;
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1527,7 +1506,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         <Section id="sourcing">
           <SourcingSection
             supplierId={id}
-            supplierName={str(s, "company_name_en") || str(s, "display_name") || t("sd.supplier", "Supplier")}
             sourcing={data.sourcing ?? null}
             sourcingProfile={data.sourcingProfile ?? null}
             sourcingLinks={data.sourcingLinks ?? []}
@@ -1686,6 +1664,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
           <TimelineSection supplierId={id} timeline={data.timeline ?? []} onSaved={() => load({ silent: true })} />
         </Section>
 
+        {/* The reports linked to this supplier — visits, factory audits, price
+            comparisons (Reports Phase 4A). */}
+        <ReportsAboutCard type="supplier" id={id} className="scroll-mt-16 mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4" />
+
         {/* Notes */}
         {str(s, "notes") ? (
           <Section id="notes">
@@ -1808,30 +1790,6 @@ const Section = ({ id, children }: { id: string; children: React.ReactNode; noBo
     {children}
   </section>
 );
-
-/* iOS-Contacts grouped card: a titled rounded panel listing label→value rows.
-   Rows with empty values are dropped; the whole card hides if nothing to show. */
-const InfoCard = ({ icon, title, rows, children }: { icon: React.ReactNode; title: string; rows: { label: string; value?: string }[]; children?: React.ReactNode }) => {
-  const filled = rows.filter((r) => r.value && r.value.trim());
-  if (!filled.length && !children) return null;
-  return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
-        <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
-      </div>
-      <dl className="divide-y divide-[var(--border-faint)]">
-        {filled.map((r) => (
-          <div key={r.label} className="flex items-start justify-between gap-4 py-2">
-            <dt className="shrink-0 text-[12.5px] text-[var(--text-faint)]">{r.label}</dt>
-            <dd className="min-w-0 break-words text-end text-[13px] font-medium text-[var(--text-primary)]">{r.value}</dd>
-          </div>
-        ))}
-      </dl>
-      {children ? <div className="mt-2 space-y-2">{children}</div> : null}
-    </div>
-  );
-};
 
 /* Group heading — clusters the page into clear bands (Profile · Commercial ·
    Records) so a long single page still reads in an organized hierarchy. */

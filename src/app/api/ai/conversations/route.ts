@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { dbError } from "@/lib/server/ai/http/api-error";
+import { clientConversationId, insertConversation } from "@/lib/server/ai/new-conversation";
 
 /* GET  /api/ai/conversations — list caller's conversations (most-recent first)
    POST /api/ai/conversations — create a new empty conversation */
@@ -28,12 +30,12 @@ export async function GET() {
        payload on a cold start, before any grouping runs. */
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("conversations", error);
   return NextResponse.json({ conversations: data ?? [] });
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -43,34 +45,19 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     title?: string;
     project_id?: unknown;
+    id?: unknown;
   };
 
-  /* Starting a chat from inside a project drops it straight into that folder.
-     The id is verified to belong to this caller first — an unowned or unknown
-     id yields an ungrouped chat rather than a foreign-key error the user
-     would see as "failed to start chat". */
-  let projectId: string | null = null;
-  if (typeof body.project_id === "string" && body.project_id) {
-    const { data: owned } = await supabaseServer
-      .from("ai_projects")
-      .select("id")
-      .eq("id", body.project_id)
-      .eq("tenant_id", auth.tenant_id)
-      .eq("account_id", auth.account_id)
-      .maybeSingle();
-    projectId = owned?.id ?? null;
-  }
-
-  const { data, error } = await supabaseServer
-    .from("ai_conversations")
-    .insert({
-      tenant_id: auth.tenant_id,
-      account_id: auth.account_id,
-      title: body.title?.trim() || "New chat",
-      project_id: projectId,
-    })
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ conversation: data });
+  /* THE CLIENT MAY NAME THE ROW, so asking twice makes one chat (owner,
+     2026-09-26, from the phone: "couldn't start a new chat" six times while
+     six empty rows landed here). lib/server/ai/new-conversation holds the
+     rules; the first turn of /api/ai/agent uses the same ones. */
+  const made = await insertConversation(auth, {
+    id: clientConversationId(body.id),
+    title: body.title,
+    projectId: body.project_id,
+  });
+  if (made.ok) return NextResponse.json({ conversation: made.row });
+  if (made.conflict) return NextResponse.json({ error: "conflict" }, { status: 409 });
+  return dbError("conversations", made.error);
 }

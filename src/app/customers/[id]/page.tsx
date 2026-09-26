@@ -27,8 +27,10 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -57,6 +59,7 @@ import {
   type CustomerTier,
 } from "@/lib/customers-admin";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 
 /* ═══════════════════════════════════════════════════
    CONSTANTS
@@ -286,6 +289,7 @@ export default function CustomerProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("activity");
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [creatingCommercial, setCreatingCommercial] = useState(false);
   const [createError, setCreateError] = useState(false);
 
@@ -366,12 +370,9 @@ export default function CustomerProfilePage({
         {/* ── Back ── */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/customers"
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label={t("notFound.back")}
-            >
-              <ArrowLeftIcon size={16} />
+            <Link href="/customers" className={BACK_CHROME} aria-label={t("notFound.back")}>
+              <ArrowLeftIcon size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{t("nav.customers")}</span>
             </Link>
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">{t("header.title")}</h1>
           </div>
@@ -497,6 +498,7 @@ export default function CustomerProfilePage({
           })}
         </nav>
 
+        <div key={tab} className={tabMotion}>
         {/* ── Activity ── */}
         {tab === "activity" && (
           <div>
@@ -551,6 +553,9 @@ export default function CustomerProfilePage({
                 />
               </div>
             )}
+            {/* The reports linked to this customer (Reports Phase 4A) — under
+                the grid or the empty state, so it shows either way. */}
+            <ReportsAboutCard type="customer" id={id} className={`${panelCls} mt-4`} />
           </div>
         )}
 
@@ -688,6 +693,7 @@ export default function CustomerProfilePage({
           </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

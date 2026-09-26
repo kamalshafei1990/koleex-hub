@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PAYMENTS } from "@/lib/translations/finance/payments";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -18,14 +19,23 @@ import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_PAYMENTS);
   const baseCurrency = useBaseCurrency();
-  const [rows, setRows] = useState<FinancePayment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<FinancePayment> | null>(null);
   /* Phase 2.3 — review drawer + approver-permission state. */
   const [reviewPayment, setReviewPayment] = useState<FinancePayment | null>(null);
   const [canApprove, setCanApprove] = useState(false);
+  /* Bank accounts for the "paid from / received into" picker: the ledger
+     books the payment on that account's own sub-account. */
+  const [banks, setBanks] = useState<Array<{ id: string; bank_name: string; account_name: string; currency: string; is_primary: boolean; status: string }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/finance/bank-accounts", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { if (!cancelled) setBanks(((j.accounts ?? []) as typeof banks).filter((b) => b.status === "active")); })
+      .catch(() => { /* picker stays empty; the ledger falls back to the primary account */ });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/me/permitted-modules", { cache: "no-store" })
@@ -39,17 +49,17 @@ export default function FinancePayments() {
     return () => { cancelled = true; };
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/payments", { cache: "no-store" });
-      const j = (await r.json()) as { payments?: FinancePayment[] };
-      setRows(j.payments ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/payments", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:payments: ${r.status}`);
+    const j = (await r.json()) as { payments?: FinancePayment[] };
+    return j.payments ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinancePayment[]>("fin:payments", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   const kpi = useMemo(() => {
     const inComp = rows.filter((p) => p.direction === "in" && p.status === "completed").reduce((s, p) => s + (Number(p.amount) || 0), 0);
@@ -58,7 +68,7 @@ export default function FinancePayments() {
     return { inComp, outComp, pending, net: inComp - outComp };
   }, [rows]);
 
-  const startNew = (direction: FinancePayment["direction"]) => setEditing({
+  const startNew = useCallback((direction: FinancePayment["direction"]) => setEditing({
     direction,
     party_type: direction === "in" ? "customer" : "supplier",
     party_name: "",
@@ -67,7 +77,21 @@ export default function FinancePayments() {
     payment_date: new Date().toISOString().slice(0, 10),
     status: "completed",
     payment_method: "T/T",
-  });
+    bank_account_id: banks.find((b) => b.currency === baseCurrency && b.is_primary)?.id ?? banks.find((b) => b.is_primary)?.id ?? null,
+  }), [baseCurrency, banks]);
+
+  /* Deep link honoured: /finance/payments?new=1 (Data Entry hub, Smart
+     Create) opens the customer-payment form; ?new=out opens supplier. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const v = new URLSearchParams(window.location.search).get("new");
+    if (!v) return;
+    const id = window.setTimeout(() => {
+      startNew(v === "out" ? "out" : "in");
+      window.history.replaceState(null, "", window.location.pathname);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [startNew]);
 
   const save = async () => {
     if (!editing?.amount || !editing.party_name?.trim()) {
@@ -87,7 +111,7 @@ export default function FinancePayments() {
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("payments.title", "Payments")}
           subtitle={t("payments.subtitle", "Money in from customers and money out to suppliers — partial, full, pending, all in one ledger.")}
@@ -157,6 +181,12 @@ export default function FinancePayments() {
                 </Field>
                 <Field label={t("payments.field.reference", "Reference")}>
                   <input value={editing.reference_no ?? ""} onChange={(e) => setEditing({ ...editing, reference_no: e.target.value })} placeholder={t("payments.field.referencePh", "Bank ref / cheque no.")} className={INPUT} />
+                </Field>
+                <Field label={t("payments.field.bank", "Bank account")}>
+                  <select value={editing.bank_account_id ?? ""} onChange={(e) => setEditing({ ...editing, bank_account_id: e.target.value || null })} className={INPUT}>
+                    <option value="">{t("payments.field.bankAuto", "Primary for currency")}</option>
+                    {banks.map((b) => <option key={b.id} value={b.id}>{b.bank_name} · {b.account_name} ({b.currency})</option>)}
+                  </select>
                 </Field>
                 <Field label={t("payments.field.status", "Status")}>
                   <select value={editing.status ?? "completed"} onChange={(e) => setEditing({ ...editing, status: e.target.value as FinancePayment["status"] })} className={INPUT}>

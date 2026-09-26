@@ -1,54 +1,27 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   useDiscussNotifications — desktop notifications + sound hook for Discuss.
+   useDiscussNotifications — desktop toast + chime for an inbound Discuss
+   message in a channel the user is not looking at.
 
-   What this hook does:
-     · Wraps the browser Notification API so pages can raise desktop
-       toasts when a new message arrives in a channel the user isn't
-       currently looking at.
-     · Plays a short bleep sound via Web Audio on the same triggers.
-     · Respects three global toggles (persisted to localStorage so the
-       preference survives reloads):
-         - `sound`   — play/suppress the sound
-         - `desktop` — raise/suppress desktop notifications
-         - `dnd`     — global "Do Not Disturb"; when on, both sound and
-                       desktop notifications are forced off regardless of
-                       the individual toggles
-     · Respects the per-channel `muted` flag and the
-       `notification_pref` enum ("all" | "mentions" | "none") so muted
-       channels stay quiet without the caller having to filter.
+     · The chime is the shared engine's "message" category (Settings →
+       Sounds owns the tone, volume, master switch and do-not-disturb), so
+       Discuss and the bell answer to the same switches.
+     · The desktop toast uses the browser Notification API and only shows
+       while the tab is hidden — a visible tab already shows the message.
+     · Per-channel `muted` and `notification_pref` ("all" | "mentions" |
+       "none") are honoured here so the caller does not have to filter.
 
-   Why Web Audio instead of <audio>:
-     · No external asset to ship — we synthesize a two-tone chime on the
-       fly with an OscillatorNode. Keeps bundle small and avoids CORS
-       headaches on SSR.
-     · Plays inline on the first user gesture (Chrome's autoplay policy),
-       which means the very first inbound message after page load might
-       play silently until the user clicks once. That's expected and
-       matches Slack's behavior.
+   The hook used to also expose sound / desktop / DND setters and a
+   permission prompt; no screen ever rendered them (Settings → Sounds took
+   that job), so the surface is now just `notify`.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  getSoundPrefs,
-  playAppSound,
-  setSoundPrefs,
-  subscribeSoundPrefs,
-} from "@/lib/notificationSound";
-
-/* discuss:pref:sound + :dnd migrated into the shared engine (see
-   notificationSound.ts getSoundPrefs first-run migration). */
-const LS_KEY_DESKTOP = "discuss:pref:desktop";
-
-type NotificationPermissionState =
-  | "default"
-  | "granted"
-  | "denied"
-  | "unsupported";
+import { getSoundPrefs, playAppSound, subscribeSoundPrefs } from "@/lib/notificationSound";
 
 export interface NotifyInput {
-  /** Title of the desktop toast — usually "New message in #channel" */
+  /** Title of the desktop toast — usually "#channel" */
   title: string;
   /** Body of the toast — short trimmed message preview */
   body: string;
@@ -63,31 +36,10 @@ export interface NotifyInput {
   onClick?: () => void;
 }
 
-export interface DiscussNotificationState {
-  /** Current browser permission state. `unsupported` = window/Notification
-   *  is unavailable (SSR or old browser). */
-  permission: NotificationPermissionState;
-  /** Is sound enabled in user prefs? */
-  soundEnabled: boolean;
-  /** Is desktop toast enabled in user prefs? */
-  desktopEnabled: boolean;
-  /** Is global DND on? */
-  dndEnabled: boolean;
-}
-
-export interface DiscussNotificationApi extends DiscussNotificationState {
-  /** Request Notification.permission from the browser. Must be called
-   *  from a user gesture handler (button click) for Chrome. */
-  requestDesktopPermission: () => Promise<NotificationPermissionState>;
-  /** Toggle the global sound pref. */
-  setSoundEnabled: (on: boolean) => void;
-  /** Toggle the global desktop-toast pref. */
-  setDesktopEnabled: (on: boolean) => void;
-  /** Toggle the global DND pref. */
-  setDndEnabled: (on: boolean) => void;
-  /** Fire a notification — the hook will internally decide whether to
-   *  play the sound, raise the toast, or stay silent based on user
-   *  prefs + the per-channel `muted` / `notification_pref` passed in. */
+export interface DiscussNotificationApi {
+  /** Fire a notification — the hook decides whether to play the chime,
+   *  raise the toast, or stay silent based on the shared sound prefs and
+   *  the per-channel `muted` / `notification_pref` passed in. */
   notify: (
     input: NotifyInput,
     channelPrefs: {
@@ -99,86 +51,11 @@ export interface DiscussNotificationApi extends DiscussNotificationState {
   ) => void;
 }
 
-/** Read a boolean pref from localStorage with a default fallback. */
-function readBoolPref(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const v = window.localStorage.getItem(key);
-    if (v === "1") return true;
-    if (v === "0") return false;
-    return fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeBoolPref(key: string, value: boolean) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, value ? "1" : "0");
-  } catch {
-    /* Quota or privacy mode — silently ignore. */
-  }
-}
-
 export function useDiscussNotifications(): DiscussNotificationApi {
-  const [permission, setPermission] = useState<NotificationPermissionState>(
-    "default",
-  );
-  /* Sound + DND come from the SHARED sound engine (Settings → Sounds), so
-     the toggle here and the one in Settings are the same switch — before
-     this, turning sound off in Discuss silenced only Discuss's own chime
-     while the bell kept beeping. Desktop-toast pref stays Discuss-local. */
-  const [enginePrefs, setEnginePrefs] = useState(getSoundPrefs);
-  useEffect(() => subscribeSoundPrefs(setEnginePrefs), []);
-  const soundEnabled = enginePrefs.message.enabled;
-  const dndEnabled = enginePrefs.dnd;
-  const [desktopEnabled, setDesktopEnabledState] = useState<boolean>(() =>
-    readBoolPref(LS_KEY_DESKTOP, true),
-  );
-
-  /* Read the current browser permission on mount. We avoid doing this
-     on SSR because Notification is undefined there. */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (typeof Notification === "undefined") {
-      setPermission("unsupported");
-      return;
-    }
-    setPermission(Notification.permission as NotificationPermissionState);
-  }, []);
-
-  const setSoundEnabled = useCallback((on: boolean) => {
-    setSoundPrefs({ message: { enabled: on } });
-  }, []);
-
-  const setDesktopEnabled = useCallback((on: boolean) => {
-    setDesktopEnabledState(on);
-    writeBoolPref(LS_KEY_DESKTOP, on);
-  }, []);
-
-  const setDndEnabled = useCallback((on: boolean) => {
-    setSoundPrefs({ dnd: on });
-  }, []);
-
-  const requestDesktopPermission = useCallback(async () => {
-    if (typeof window === "undefined" || typeof Notification === "undefined") {
-      return "unsupported" as const;
-    }
-    try {
-      const result = await Notification.requestPermission();
-      setPermission(result as NotificationPermissionState);
-      return result as NotificationPermissionState;
-    } catch {
-      return "denied" as const;
-    }
-  }, []);
-
-  /** Message sound — the shared engine applies the user's chosen tone,
-      volume, master switch and DND, so this is just a category ping. */
-  const playChime = useCallback(() => {
-    playAppSound("message");
-  }, []);
+  /* DND comes from the SHARED sound engine (Settings → Sounds), so the one
+     switch silences Discuss and the bell alike. */
+  const [dndEnabled, setDndEnabled] = useState(() => getSoundPrefs().dnd);
+  useEffect(() => subscribeSoundPrefs((p) => setDndEnabled(p.dnd)), []);
 
   const notify = useCallback<DiscussNotificationApi["notify"]>(
     (input, channelPrefs) => {
@@ -186,74 +63,47 @@ export function useDiscussNotifications(): DiscussNotificationApi {
       if (dndEnabled) return;
       if (channelPrefs.muted) return;
 
-
-      /* Per-channel filter: if the user set this channel to "mentions"
-         only, bail unless THIS message actually mentions them. "none"
-         bails unconditionally. */
+      /* Per-channel filter: "mentions" bails unless THIS message mentions
+         the user; "none" bails unconditionally. */
       if (channelPrefs.pref === "none") return;
       if (channelPrefs.pref === "mentions" && !channelPrefs.mentionsMe) return;
 
-      /* Sound first — cheapest and most noticeable. The engine applies
-         the master/enabled/DND gates and the user's tone + volume. */
-      playChime();
+      /* Sound first — the engine applies master/enabled gates, tone and
+         volume. */
+      playAppSound("message");
 
-      /* Desktop toast requires explicit permission. */
+      /* Desktop toast: needs a granted permission and a hidden tab. */
       if (
-        desktopEnabled &&
-        permission === "granted" &&
-        typeof window !== "undefined" &&
-        typeof Notification !== "undefined" &&
-        document.visibilityState !== "visible"
-      ) {
-        try {
-          const notif = new Notification(input.title, {
-            body: input.body,
-            icon: input.icon,
-            tag: `discuss:${input.channelId}`,
-            silent: true, // we play our own chime
-          });
-          if (input.onClick) {
-            notif.onclick = (ev) => {
-              ev.preventDefault();
-              try {
-                window.focus();
-              } catch {
-                /* Some browsers reject window.focus — ignore. */
-              }
-              input.onClick?.();
-              notif.close();
-            };
-          }
-        } catch {
-          /* Notification constructor throws on iOS Safari < 16 — ignore. */
+        typeof window === "undefined" ||
+        typeof Notification === "undefined" ||
+        Notification.permission !== "granted" ||
+        document.visibilityState === "visible"
+      ) return;
+      try {
+        const notif = new Notification(input.title, {
+          body: input.body,
+          icon: input.icon,
+          tag: `discuss:${input.channelId}`,
+          silent: true, // we play our own chime
+        });
+        if (input.onClick) {
+          notif.onclick = (ev) => {
+            ev.preventDefault();
+            try {
+              window.focus();
+            } catch {
+              /* Some browsers reject window.focus — ignore. */
+            }
+            input.onClick?.();
+            notif.close();
+          };
         }
+      } catch {
+        /* Notification constructor throws on iOS Safari < 16 — ignore. */
       }
     },
-    [dndEnabled, desktopEnabled, permission, playChime],
+    [dndEnabled],
   );
 
-  return useMemo(
-    () => ({
-      permission,
-      soundEnabled,
-      desktopEnabled,
-      dndEnabled,
-      requestDesktopPermission,
-      setSoundEnabled,
-      setDesktopEnabled,
-      setDndEnabled,
-      notify,
-    }),
-    [
-      permission,
-      soundEnabled,
-      desktopEnabled,
-      dndEnabled,
-      requestDesktopPermission,
-      setSoundEnabled,
-      setDesktopEnabled,
-      setDndEnabled,
-      notify,
-    ],
-  );
+  return useMemo(() => ({ notify }), [notify]);
 }

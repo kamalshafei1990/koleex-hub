@@ -313,11 +313,6 @@ export const accountsT: Translations = {
   "acc.prefs.themeLight":            { en: "Light",                                                              zh: "浅色",                                                               ar: "فاتح" },
   "acc.prefs.emailSignature":        { en: "Email Signature",                                                    zh: "邮件签名",                                                           ar: "توقيع البريد الإلكتروني" },
   "acc.prefs.signatureHint":         { en: "Appended to outgoing emails from the Koleex Hub.",                   zh: "附加到从 Koleex Hub 发出的电子邮件中。",                                 ar: "يُلحق بالرسائل الصادرة من Koleex Hub." },
-  "acc.prefs.notifications":         { en: "Notifications",                                                      zh: "通知",                                                               ar: "الإشعارات" },
-  "acc.prefs.emailNotifications":    { en: "Email notifications",                                                zh: "邮件通知",                                                           ar: "إشعارات البريد الإلكتروني" },
-  "acc.prefs.emailNotifDesc":        { en: "Send activity and mentions to the login email.",                     zh: "将活动和提及发送到登录邮箱。",                                           ar: "إرسال النشاطات والإشارات إلى البريد الإلكتروني." },
-  "acc.prefs.inAppNotifications":    { en: "In-app notifications",                                               zh: "应用内通知",                                                          ar: "الإشعارات داخل التطبيق" },
-  "acc.prefs.inAppNotifDesc":        { en: "Show a bell indicator inside the hub.",                               zh: "在 Hub 内显示铃铛提示。",                                               ar: "عرض مؤشر الجرس داخل المنصة." },
 
   /* ── Calendar tab ── */
   "acc.cal.timezone":                { en: "Timezone",                                                           zh: "时区",                                                               ar: "المنطقة الزمنية" },
@@ -382,6 +377,28 @@ export const accountsT: Translations = {
   "acc.private.visaExpiry":          { en: "Visa Expiry Date",                                                   zh: "签证到期日",                                                          ar: "تاريخ انتهاء التأشيرة" },
 
   /* ── Security tab — Password & Sign-in ── */
+  /* ── Security tab: password reset, 2FA events, shared actions ──
+     These 15 keys rendered as RAW KEY NAMES in the UI ("acc.security.
+     changePassword" instead of "Change password"). The call sites use
+     `t("key") || "Fallback"`, which can never fire: t() returns the KEY
+     when it is missing, and a non-empty string is truthy. Owner saw the
+     raw keys on the Accounts security tab. */
+  "acc.security.changePassword":     { en: "Change password",                                                    zh: "更改密码",                                                            ar: "تغيير كلمة المرور" },
+  "acc.security.newPasswordPlaceholder": { en: "New password",                                                   zh: "新密码",                                                             ar: "كلمة المرور الجديدة" },
+  "acc.security.generate":           { en: "Generate",                                                           zh: "生成",                                                               ar: "إنشاء" },
+  "acc.security.savePassword":       { en: "Save password",                                                      zh: "保存密码",                                                            ar: "حفظ كلمة المرور" },
+  "acc.security.forceResetOnNextLogin": { en: "Require a new password at next sign-in",                          zh: "下次登录时要求设置新密码",                                              ar: "\u200Fطلب كلمة مرور جديدة عند تسجيل الدخول التالي" },
+  "acc.security.generatedTitle":     { en: "New password generated",                                             zh: "已生成新密码",                                                        ar: "تم إنشاء كلمة مرور جديدة" },
+  "acc.security.generatedNote":      { en: "Copy it now \u2014 it will not be shown again.",                      zh: "请立即复制，之后将不再显示。",                                           ar: "\u200Fانسخها الآن \u2014 لن تظهر مرة أخرى." },
+  "acc.err.passwordTooShort":        { en: "Password is too short",                                              zh: "密码太短",                                                            ar: "كلمة المرور قصيرة جدًا" },
+  "acc.msg.passwordChanged":         { en: "Password changed",                                                   zh: "密码已更改",                                                          ar: "تم تغيير كلمة المرور" },
+  "acc.event.twoFactorEnabled":      { en: "Two-factor enabled",                                                 zh: "已启用双重验证",                                                       ar: "تم تفعيل التحقق بخطوتين" },
+  "acc.event.twoFactorDisabled":     { en: "Two-factor disabled",                                                zh: "已停用双重验证",                                                       ar: "تم إيقاف التحقق بخطوتين" },
+  "common.cancel":                   { en: "Cancel",                                                             zh: "取消",                                                               ar: "إلغاء" },
+  "common.copy":                     { en: "Copy",                                                               zh: "复制",                                                               ar: "نسخ" },
+  "common.copied":                   { en: "Copied",                                                             zh: "已复制",                                                             ar: "تم النسخ" },
+  "common.done":                     { en: "Done",                                                               zh: "完成",                                                               ar: "تم" },
+
   "acc.security.passwordSignIn":     { en: "Password & Sign-in",                                                 zh: "密码和登录",                                                          ar: "كلمة المرور وتسجيل الدخول" },
   "acc.security.password":           { en: "Password",                                                           zh: "密码",                                                               ar: "كلمة المرور" },
   "acc.security.pwSet":              { en: "Set (temporary)",                                                    zh: "已设置（临时）",                                                       ar: "تم التعيين (مؤقت)" },
@@ -535,7 +552,7 @@ export const accountsT: Translations = {
   "acc.mod.Translator":            { en: "Translator",                  zh: "翻译",              ar: "المترجم" },
   "acc.mod.Database":              { en: "Database",                    zh: "数据库",             ar: "قاعدة البيانات" },
   "acc.mod.Commercial Policy":     { en: "Commercial Policy",           zh: "商务政策",           ar: "السياسة التجارية" },
-  "acc.mod.Mail":                  { en: "Mail",                        zh: "邮件",              ar: "البريد" },
+  "acc.mod.Mail":                  { en: "Notifications",               zh: "通知",              ar: "الإشعارات" },
   "acc.mod.Products":              { en: "Products",                    zh: "产品",              ar: "المنتجات" },
   "acc.mod.Products > Categories": { en: "Product categories & subcategories", zh: "产品分类与子分类", ar: "فئات المنتجات والفئات الفرعية" },
   "acc.mod.Products > Brands":     { en: "Brand management",            zh: "品牌管理",           ar: "إدارة العلامات التجارية" },

@@ -5,9 +5,9 @@
    Agreements", Odoo "Purchase Agreements". Surfaces expiry dates
    so buyers can renegotiate before lapse. */
 
-import { useEffect, useMemo, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
+import { useMemo, useState } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, supplierNames, usePurchaseList } from "../shared";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -28,29 +28,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function ContractsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Contract[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
-      const res = await fetch("/api/purchase/list?resource=contracts", { credentials: "include" });
-      const j = res.ok
-        ? ((await res.json()) as { rows?: Contract[]; suppliers?: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] })
-        : { rows: [], suppliers: [] };
-      if (cancelled) return;
-      setRows(j.rows ?? []);
-      const m = new Map<string, string>();
-      for (const x of j.suppliers ?? []) {
-        m.set(x.id, x.company_name || x.display_name || x.full_name || "—");
-      }
-      setSupplierName(m);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
+  const { data, loading } = usePurchaseList<{ rows?: Contract[]; suppliers?: SupplierRef[] }>("contracts");
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
 
   /* React-Compiler: anchor "now" once via useState so useMemo stays pure. */
   const [nowMs] = useState(() => Date.now());

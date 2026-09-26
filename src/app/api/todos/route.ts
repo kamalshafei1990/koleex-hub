@@ -1,9 +1,14 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { countOpenTodos } from "@/lib/todo-open-count";
+import { seriesPeriodOf } from "@/lib/todo-series";
+import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
+import { ASSIGN_TO_EVERYONE_DENIED, canAssignToEveryone, resolveAssigneeIds } from "@/lib/server/todo-access";
+import { readIdList, readTodoFields } from "@/lib/server/todo-input";
+import { notifyTodoAssigned, notifyTodoPeopleAdded, pingTodosChanged } from "@/lib/server/todo-notify";
 
 /* GET /api/todos
    Returns the enriched todo list (with assignees, assigner, notes) scoped
@@ -18,11 +23,27 @@ import { countOpenTodos } from "@/lib/todo-open-count";
          - appears in koleex_todo_assignees as me
          - assigned_department = my department
          - assign_to_all = true (broadcast)
-       MINUS any is_private=true unless I'm the creator or have
-       can_view_private (break-glass).
+       MINUS any is_private=true unless I'm the creator or an assignee
+       (owner, 2026-09-27) or have can_view_private (break-glass).
 
    Multi-tenancy: always filtered by auth.tenant_id.
-*/
+
+   Paging (optional, additive): ?limit=N (1–500) returns the newest N and a
+   `next_before` cursor; ?before=<created_at> continues from it. Without
+   `limit` the whole visible list is returned, as the To-do screen expects,
+   up to LIST_CAP rows (`truncated: true` says the cap was hit).
+
+   Lazy completed (optional, additive):
+     ?status=open       everything not completed, PLUS tasks completed in
+                        the last 24 hours (so a just-ticked task and its Undo
+                        still show). Paging as above, by created_at.
+     ?status=completed  completed tasks only, newest completion first;
+                        ?limit=N (default 50, max 500) and
+                        ?before=<completed_at> page it, `next_before` is the
+                        cursor for the next page.
+   No `status` behaves exactly as before. */
+
+const LIST_CAP = 3000;
 
 interface AssigneeInfo {
   account_id: string;
@@ -34,325 +55,286 @@ interface AssigneeInfo {
   position: string | null;
 }
 
+type Row = Record<string, unknown> & { id: string };
+
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "To-do");
   if (deny) return deny;
+  const params = new URL(req.url).searchParams;
 
   /* ── ?resource=openCount → the To-do tile badge ───────────────────────────
-     WHAT THE NUMBER ON AN APP ICON MEANS. It used to be "assignment
-     notifications you have not opened", which is a count of MESSAGES. Nobody
-     reads it that way: a number on the To-do icon says "this much work is on
-     you". Owner, looking at 37: "I don't know this notifications for what."
-
-     So it counts OPEN TASKS ASSIGNED TO YOU. It falls the moment a task is
-     finished, with no notification to open and nothing to dismiss, and it can
-     never drift from reality because it is derived from the tasks themselves
-     rather than from a side-effect record.
-
-     Assignees only, not observers — watching someone else's task is not your
-     workload. Two count-only queries, no rows fetched. */
-  if (new URL(req.url).searchParams.get("resource") === "openCount") {
-    /* The rule lives in lib/todo-open-count.ts — ONE definition, because this
-       was fixed here and left unfixed in /api/me/work, and the badge that
-       route feeds went on being wrong for another release. */
+     It counts OPEN TASKS ASSIGNED TO YOU — "this much work is on you" — not
+     unread assignment notifications, so it falls the moment a task is
+     finished and can never drift from the tasks themselves. Assignees only,
+     not observers. The rule lives in lib/todo-open-count.ts, shared with
+     /api/me/work and the dashboard. */
+  if (params.get("resource") === "openCount") {
     const open = await countOpenTodos(supabaseServer, auth.account_id, auth.tenant_id);
     return NextResponse.json({ ok: true, data: { open } });
   }
 
-  // Step 1: resolve the set of todo_ids the caller is an assignee of,
-  // plus the ones they observe (metadata.observers). Needed for the
-  // "shared" branch of the scope OR.
-  let assigneeTodoIds: string[] = [];
-  if (!auth.is_super_admin) {
-    let obsQuery = supabaseServer
-      .from("koleex_todos")
-      .select("id")
-      .contains("metadata", { observers: [{ account_id: auth.account_id }] });
-    if (auth.tenant_id) obsQuery = obsQuery.eq("tenant_id", auth.tenant_id);
-    const [{ data: rows }, { data: obsRows }] = await Promise.all([
-      supabaseServer
-        .from("koleex_todo_assignees")
-        .select("todo_id")
-        .eq("account_id", auth.account_id),
-      obsQuery,
-    ]);
-    assigneeTodoIds = Array.from(
-      new Set([
-        ...(rows ?? []).map((r) => (r as { todo_id: string }).todo_id),
-        ...(obsRows ?? []).map((r) => (r as { id: string }).id),
-      ]),
-    );
+  /* ── ?resource=stats → the To-do list's KPI cards ─────────────────────────
+     The list now loads only the OPEN set, so finished-work numbers come from
+     here: counts under the SAME scope rule as the list, never rows. */
+  if (params.get("resource") === "stats") return todoStats(auth, params);
+
+  const statusParam = params.get("status");
+  if (statusParam !== null && statusParam !== "open" && statusParam !== "completed") {
+    return NextResponse.json({ error: "status must be open or completed" }, { status: 400 });
+  }
+  const completedOnly = statusParam === "completed";
+  const limitParam = Number(params.get("limit"));
+  const paged = completedOnly || (Number.isInteger(limitParam) && limitParam > 0);
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : paged ? 50 : LIST_CAP;
+  const before = params.get("before");
+  if (before && !Number.isFinite(Date.parse(before))) {
+    return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
   }
 
-  // Step 2: main todos query with scope + tenant + privacy filters.
+  /* THE SCOPE, from lib/server/todo-scope.ts: one rule for this route, the
+     AI's listMyTodos and the morning brief. The ids the caller is an
+     assignee of or observes first, then the query bounded by tenant, then
+     the scope and privacy clauses. */
+  const viewer: TodoViewer = {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id,
+    department: auth.department,
+    isSuperAdmin: auth.is_super_admin,
+    canViewPrivate: auth.can_view_private,
+  };
+  const sharedIds = await sharedTodoIds(viewer);
+
+  /* The page key: completion time for the completed list, creation time
+     for everything else. */
+  const cursorCol = completedOnly ? "completed_at" : "created_at";
   let query = supabaseServer
     .from("koleex_todos")
     .select("*")
-    .order("created_at", { ascending: false });
-
-  if (auth.tenant_id) {
-    query = query.eq("tenant_id", auth.tenant_id);
+    .order(cursorCol, { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit + 1);
+  if (auth.tenant_id) query = query.eq("tenant_id", auth.tenant_id);
+  if (completedOnly) query = query.eq("completed", true).not("completed_at", "is", null);
+  else if (statusParam === "open") {
+    const justDone = new Date(Date.now() - 24 * 3600_000).toISOString();
+    query = query.or(`completed.eq.false,completed_at.gte.${justDone}`);
   }
+  if (before) query = query.lt(cursorCol, before);
+  query = applyTodoScope(query, viewer, sharedIds);
 
-  if (!auth.is_super_admin) {
-    // Build a PostgREST "or" clause for the scope match.
-    const orParts: string[] = [
-      `created_by_account_id.eq.${auth.account_id}`,
-      `assigned_by_account_id.eq.${auth.account_id}`,
-      `assign_to_all.eq.true`,
-    ];
-    if (auth.department) {
-      orParts.push(`assigned_department.eq.${auth.department}`);
-    }
-    if (assigneeTodoIds.length > 0) {
-      orParts.push(`id.in.(${assigneeTodoIds.join(",")})`);
-    }
-    query = query.or(orParts.join(","));
-
-    // Privacy: hide is_private unless I'm the creator or have break-glass.
-    if (!auth.can_view_private) {
-      query = query.or(
-        `is_private.eq.false,created_by_account_id.eq.${auth.account_id}`,
-      );
-    }
-  }
-
-  const { data: todos, error } = await query;
+  const { data, error } = await query;
   if (error) {
     console.error("[api/todos]", error.message);
-    return NextResponse.json(
-      { error: "Failed to load todos" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load todos" }, { status: 500 });
   }
-  if (!todos || todos.length === 0) {
-    return NextResponse.json({ todos: [] });
-  }
+  const all = (data ?? []) as Row[];
+  const more = all.length > limit;
+  const todos = more ? all.slice(0, limit) : all;
+  const pageInfo = paged
+    ? { next_before: more ? (todos[todos.length - 1][cursorCol] as string) : null }
+    : more ? { truncated: true } : {};
+  if (todos.length === 0) return NextResponse.json({ todos: [], ...pageInfo });
 
-  // Audit break-glass private reads.
+  /* Audit break-glass private reads — after the response; the audit row is
+     not part of the answer. */
   if (auth.can_view_private) {
-    const privateIds = (
-      todos as Array<{
-        id: string;
-        is_private?: boolean;
-        created_by_account_id?: string | null;
-      }>
-    )
-      .filter(
-        (t) => t.is_private && t.created_by_account_id !== auth.account_id,
-      )
+    const privateIds = todos
+      .filter((t) => t.is_private && t.created_by_account_id !== auth.account_id)
       .map((t) => t.id);
     if (privateIds.length > 0) {
-      void supabaseServer.from("koleex_private_access_log").insert(
-        privateIds.map((id) => ({
-          account_id: auth.account_id,
-          role_id: auth.role_id,
-          module_name: "To-do",
-          record_type: "koleex_todos",
-          record_id: id,
-          access_reason: null,
-        })),
-      );
+      after(async () => {
+        const { error: logErr } = await supabaseServer.from("koleex_private_access_log").insert(
+          privateIds.map((id) => ({
+            account_id: auth.account_id,
+            role_id: auth.role_id,
+            module_name: "To-do",
+            record_type: "koleex_todos",
+            record_id: id,
+            access_reason: null,
+          })),
+        );
+        if (logErr) console.error("[api/todos] private access log:", logErr.message);
+      });
     }
   }
 
-  const todoIds = (todos as Array<{ id: string }>).map((t) => t.id);
+  const todoIds = todos.map((t) => t.id);
 
-  // Step 3: enrichment — assignees, notes, account info resolution.
-  const [{ data: assigneeRows }, { data: noteRows }] = await Promise.all([
+  /* A recurring instance's cadence lives on its TEMPLATE, which can be
+     outside the caller's scope (created by someone else, broadcast only
+     from a later period) — those parents are read alongside the rest. */
+  const cadenceById = new Map<string, string>();
+  todos.forEach((t) => { if (t.recurrence) cadenceById.set(t.id, t.recurrence as string); });
+  const orphanParents = Array.from(new Set(
+    todos
+      .map((t) => t.recurrence_parent_id as string | null)
+      .filter((p): p is string => !!p && !cadenceById.has(p)),
+  ));
+
+  // Enrichment — assignees, notes and orphan parents in one round trip.
+  const [{ data: assigneeRows }, { data: noteRows }, { data: parents }] = await Promise.all([
     supabaseServer
       .from("koleex_todo_assignees")
-      .select("*")
+      .select("todo_id, account_id")
       .in("todo_id", todoIds),
     supabaseServer
       .from("koleex_todo_notes")
-      .select("*")
+      .select("id, todo_id, author_account_id, body, created_at, updated_at")
       .in("todo_id", todoIds)
       .order("created_at", { ascending: true }),
-  ]);
-
-  const allAccountIds = new Set<string>();
-  (todos as Array<Record<string, unknown>>).forEach((t) => {
-    const c = t.created_by_account_id as string | null;
-    const a = t.assigned_by_account_id as string | null;
-    if (c) allAccountIds.add(c);
-    if (a) allAccountIds.add(a);
-  });
-  (assigneeRows ?? []).forEach((a) =>
-    allAccountIds.add((a as { account_id: string }).account_id),
-  );
-  (noteRows ?? []).forEach((n) =>
-    allAccountIds.add((n as { author_account_id: string }).author_account_id),
-  );
-
-  const infos = await resolveAssigneeInfos(Array.from(allAccountIds));
-  const infoMap = new Map(infos.map((i) => [i.account_id, i]));
-
-  const enriched = (todos as Array<Record<string, unknown>>).map((t) => {
-    const tAssignees = (assigneeRows ?? [])
-      .filter((a) => (a as { todo_id: string }).todo_id === (t.id as string))
-      .map((a) => infoMap.get((a as { account_id: string }).account_id))
-      .filter(Boolean) as AssigneeInfo[];
-
-    const assignedBy = t.assigned_by_account_id as string | null;
-    const assigner = assignedBy
+    orphanParents.length > 0
       ? (() => {
-          const info = infoMap.get(assignedBy);
-          return info
-            ? {
-                account_id: info.account_id,
-                username: info.username,
-                full_name: info.full_name,
-                avatar_url: info.avatar_url,
-              }
-            : null;
+          let pq = supabaseServer.from("koleex_todos").select("id, recurrence").in("id", orphanParents);
+          if (auth.tenant_id) pq = pq.eq("tenant_id", auth.tenant_id);
+          return pq;
         })()
-      : null;
-
-    const tNotes = (noteRows ?? [])
-      .filter((n) => (n as { todo_id: string }).todo_id === (t.id as string))
-      .map((n) => {
-        const row = n as {
-          author_account_id: string;
-          [k: string]: unknown;
-        };
-        const auth2 = infoMap.get(row.author_account_id);
-        return {
-          ...row,
-          author_username: auth2?.username ?? "unknown",
-          author_full_name: auth2?.full_name ?? null,
-          author_avatar_url: auth2?.avatar_url ?? null,
-        };
-      });
-
-    return { ...t, assignees: tAssignees, assigner, notes: tNotes };
+      : Promise.resolve({ data: [] as Array<{ id: string; recurrence: string | null }> }),
+  ]);
+  ((parents ?? []) as Array<{ id: string; recurrence: string | null }>).forEach((p) => {
+    if (p.recurrence) cadenceById.set(p.id, p.recurrence);
   });
 
-  /* Recurring series identity.
-
-     A recurring task is stored as a TEMPLATE row (recurrence set) plus one
-     spawned row per later period (recurrence_parent_id → template, recurrence
-     null). Read raw, that reads as the same task listed several times. Tag
-     every row with the cadence of its series and the period it represents so
-     the list can badge them as distinct days of ONE repeating task instead of
-     unexplained duplicates. */
-  // Same objects, just typed loosely enough to read/write the derived fields.
-  const rows = enriched as unknown as Array<Record<string, unknown>>;
-  const cadenceById = new Map<string, string>();
-  rows.forEach((t) => {
-    const rec = t.recurrence as string | null;
-    if (rec) cadenceById.set(t.id as string, rec);
+  const assigneesByTodo = new Map<string, string[]>();
+  ((assigneeRows ?? []) as Array<{ todo_id: string; account_id: string }>).forEach((a) => {
+    const list = assigneesByTodo.get(a.todo_id);
+    if (list) list.push(a.account_id);
+    else assigneesByTodo.set(a.todo_id, [a.account_id]);
   });
-  // A parent can be outside the caller's scope (e.g. created by someone else
-  // and only broadcast from this period on) — resolve those directly.
-  const orphanParents = Array.from(
-    new Set(
-      rows
-        .map((t) => t.recurrence_parent_id as string | null)
-        .filter((p): p is string => !!p && !cadenceById.has(p)),
-    ),
-  );
-  if (orphanParents.length > 0) {
-    const { data: parents } = await supabaseServer
-      .from("koleex_todos")
-      .select("id, recurrence")
-      .in("id", orphanParents);
-    (parents ?? []).forEach((p) => {
-      const row = p as { id: string; recurrence: string | null };
-      if (row.recurrence) cadenceById.set(row.id, row.recurrence);
-    });
-  }
-  rows.forEach((t) => {
+  type NoteRow = { id: string; todo_id: string; author_account_id: string; body: string; created_at: string; updated_at: string };
+  const notesByTodo = new Map<string, NoteRow[]>();
+  ((noteRows ?? []) as NoteRow[]).forEach((n) => {
+    const list = notesByTodo.get(n.todo_id);
+    if (list) list.push(n);
+    else notesByTodo.set(n.todo_id, [n]);
+  });
+
+  const accountIds = new Set<string>();
+  todos.forEach((t) => {
+    if (t.created_by_account_id) accountIds.add(t.created_by_account_id as string);
+    if (t.assigned_by_account_id) accountIds.add(t.assigned_by_account_id as string);
+  });
+  assigneesByTodo.forEach((ids) => ids.forEach((id) => accountIds.add(id)));
+  notesByTodo.forEach((ns) => ns.forEach((n) => accountIds.add(n.author_account_id)));
+  const infoMap = await resolveAssigneeInfos(Array.from(accountIds));
+
+  const enriched = todos.map((t) => {
+    const assignedBy = t.assigned_by_account_id as string | null;
+    const assignerInfo = assignedBy ? infoMap.get(assignedBy) : undefined;
+    /* Recurring series identity: the template carries the cadence, a
+       spawned row points at it. Every row of a series is tagged with the
+       cadence and the period it represents, so the list can badge them as
+       days of ONE repeating task (lib/todo-series.ts). */
     const parent = t.recurrence_parent_id as string | null;
-    const own = t.recurrence as string | null;
-    t.series_cadence = own ?? (parent ? cadenceById.get(parent) ?? null : null);
-    if (t.series_cadence) {
-      // Instances know their period outright; the template IS its own first
-      // period, anchored the same way the spawner anchors it.
-      t.series_period =
-        (t.recurrence_spawned_for as string | null) ??
-        (t.start_date as string | null) ??
-        ((t.created_at as string | null) ?? "").slice(0, 10) ??
-        null;
-    } else {
-      t.series_period = null;
-    }
+    const cadence = (t.recurrence as string | null) ?? (parent ? cadenceById.get(parent) ?? null : null);
+    return {
+      ...t,
+      assignees: (assigneesByTodo.get(t.id) ?? [])
+        .map((id) => infoMap.get(id))
+        .filter((i): i is AssigneeInfo => !!i),
+      assigner: assignerInfo
+        ? {
+            account_id: assignerInfo.account_id,
+            username: assignerInfo.username,
+            full_name: assignerInfo.full_name,
+            avatar_url: assignerInfo.avatar_url,
+          }
+        : null,
+      notes: (notesByTodo.get(t.id) ?? []).map((n) => {
+        const author = infoMap.get(n.author_account_id);
+        return {
+          ...n,
+          author_username: author?.username ?? "unknown",
+          author_full_name: author?.full_name ?? null,
+          author_avatar_url: author?.avatar_url ?? null,
+        };
+      }),
+      series_cadence: cadence,
+      series_period: cadence
+        ? seriesPeriodOf(t as unknown as Parameters<typeof seriesPeriodOf>[0]) || null
+        : null,
+    };
   });
 
-  /* Same caching posture as /api/accounts / /api/employees — the
-     list refreshes on any write via a client-side invalidate, and
-     SWR covers the gap between expiry and background refetch. */
+  /* The list refreshes on any write via the client's ?v= write version
+     (lib/todo-list-url.ts), so a short private cache is safe. */
   return NextResponse.json(
-    { todos: enriched },
+    { todos: enriched, ...pageInfo },
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
   );
 }
 
 /* POST /api/todos — create a todo.
-   Body: { title, description?, priority?, label?, due_date?, source?,
+   Body: { title, description?, priority?, label?, status?, due_date?,
+           start_date?, remind_at?, recurrence?, recurrence_until?, source?,
            source_id?, assignee_account_ids?, assigned_department?,
-           assign_to_all?, is_private? }
+           assign_to_all?, is_private?, metadata? }
    Server enforces creator/assigner = auth.account_id and tenant_id from
    the session. Fan-out to koleex_todo_assignees + inbox_messages. */
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "To-do", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as {
-    title: string;
-    description?: string | null;
-    priority?: "high" | "medium" | "low";
-    label?: string | null;
-    due_date?: string | null;
-    start_date?: string | null;
-    remind_at?: string | null;
-    status?: "todo" | "in_progress" | "blocked" | "done";
-    recurrence?: "daily" | "weekly" | "monthly" | null;
-    recurrence_until?: string | null;
-    source?: "manual" | "crm" | "calendar";
-    source_id?: string | null;
-    assignee_account_ids?: string[];
-    assigned_department?: string | null;
-    assign_to_all?: boolean;
-    is_private?: boolean;
-    metadata?: Record<string, unknown>;
-  };
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await req.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (typeof body.title !== "string" || !body.title.trim()) {
+    return NextResponse.json({ error: "Title is required" }, { status: 400 });
+  }
+  /* Every field through the one allow-list (lib/server/todo-input.ts). The
+     database CHECKs status, priority and source; recurrence and
+     approval_state are plain text there, so this is their only guard. */
+  const read = readTodoFields(body);
+  if (!read.ok) return NextResponse.json({ error: read.error }, { status: 400 });
+  const f = read.fields;
+  const explicitIds = readIdList(body.assignee_account_ids);
+  if (explicitIds === null) {
+    return NextResponse.json({ error: "assignee_account_ids must be a list" }, { status: 400 });
+  }
 
-  const status = body.status ?? "todo";
-  const recurrence =
-    body.recurrence === "daily" || body.recurrence === "weekly" || body.recurrence === "monthly"
-      ? body.recurrence
-      : null;
+  const status = (f.status as string | undefined) ?? "todo";
+  const recurrence = (f.recurrence as string | null | undefined) ?? null;
+  const department = (f.assigned_department as string | null | undefined) ?? null;
+  const toAll = f.assign_to_all === true;
+  if (toAll && !canAssignToEveryone(auth)) {
+    return NextResponse.json({ error: ASSIGN_TO_EVERYONE_DENIED }, { status: 403 });
+  }
+  const metadata = (f.metadata as Record<string, unknown> | undefined) ?? {};
+  const nowIso = new Date().toISOString();
+
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
-      title: body.title,
-      metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
-      description: body.description ?? null,
+      title: f.title as string,
+      metadata,
+      description: (f.description as string | null | undefined) ?? null,
       // Keep completed in lockstep with the workflow stage.
       completed: status === "done",
-      completed_at: status === "done" ? new Date().toISOString() : null,
+      completed_at: status === "done" ? nowIso : null,
       status,
-      priority: body.priority ?? "medium",
-      label: body.label ?? null,
-      due_date: body.due_date ?? null,
-      start_date: body.start_date ?? null,
-      remind_at: body.remind_at ?? null,
-      // Phase C: this row becomes the recurring template. Instances are
-      // spawned by the cron and carry recurrence=null.
+      priority: (f.priority as string | undefined) ?? "medium",
+      label: (f.label as string | null | undefined) ?? null,
+      due_date: (f.due_date as string | null | undefined) ?? null,
+      start_date: (f.start_date as string | null | undefined) ?? null,
+      remind_at: (f.remind_at as string | null | undefined) ?? null,
+      // This row becomes the recurring template; the cron spawns instances.
       recurrence,
-      recurrence_until: recurrence ? body.recurrence_until ?? null : null,
+      recurrence_until: recurrence ? (f.recurrence_until as string | null | undefined) ?? null : null,
       created_by_account_id: auth.account_id,
       assigned_by_account_id: auth.account_id,
-      source: body.source ?? "manual",
-      source_id: body.source_id ?? null,
-      assigned_department: body.assigned_department ?? null,
-      assign_to_all: body.assign_to_all ?? false,
-      is_private: body.is_private ?? false,
+      source: (f.source as string | undefined) ?? "manual",
+      source_id: (f.source_id as string | null | undefined) ?? null,
+      assigned_department: department,
+      assign_to_all: toAll,
+      is_private: f.is_private === true,
       tenant_id: auth.tenant_id,
     })
     .select("*")
@@ -360,187 +342,87 @@ export async function POST(req: Request) {
 
   if (error || !todo) {
     console.error("[api/todos POST]", error?.message);
-    return NextResponse.json(
-      { error: "Failed to create todo" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create todo" }, { status: 500 });
   }
 
-  // Resolve assignee ids: explicit list + department expansion + broadcast.
-  let assigneeIds = body.assignee_account_ids ?? [];
+  const created = todo as { id: string; title: string; description: string | null; priority: string; tenant_id: string | null };
 
-  if (body.assigned_department && auth.tenant_id) {
-    const { data: emps } = await supabaseServer
-      .from("koleex_employees")
-      .select("account_id")
-      .eq("department", body.assigned_department)
-      .eq("tenant_id", auth.tenant_id)
-      .not("account_id", "is", null);
-    const deptIds = (emps ?? [])
-      .map((e) => (e as { account_id: string | null }).account_id)
-      .filter(Boolean) as string[];
-    assigneeIds = Array.from(new Set([...assigneeIds, ...deptIds]));
-  }
-
-  if (body.assign_to_all && auth.tenant_id) {
-    const { data: allAccounts } = await supabaseServer
-      .from("accounts")
-      .select("id")
-      .eq("user_type", "internal")
-      .eq("status", "active")
-      .eq("tenant_id", auth.tenant_id);
-    assigneeIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
-  }
-
-  /* INTERNAL ONLY. A task is company work, so it can only be assigned to an
-     internal Koleex account — never a customer/portal login. assign_to_all
-     already filtered on user_type; the explicit list and the department
-     expansion did not, so a portal account id posted directly (or an
-     employee row pointing at one) could land in the assignee table and then
-     show up in Top Performers. Filtered here on the SERVER so it holds
-     regardless of what the client sends. */
-  if (assigneeIds.length > 0 && auth.tenant_id) {
-    const { data: internal } = await supabaseServer
-      .from("accounts")
-      .select("id")
-      .in("id", assigneeIds)
-      .eq("user_type", "internal")
-      .eq("tenant_id", auth.tenant_id);
-    assigneeIds = (internal ?? []).map((a) => (a as { id: string }).id);
-  }
-
+  /* Assignees: the explicit list, a department's members, or everyone —
+     expanded and reduced to INTERNAL accounts in lib/server/todo-access.ts
+     (a task is company work; a customer/portal login can never hold one,
+     whatever the client posts). Written before the response: the list the
+     client refetches next must already show them. */
+  const assigneeIds = await resolveAssigneeIds({
+    explicit: explicitIds,
+    department,
+    everyone: toAll,
+    tenantId: auth.tenant_id,
+  });
   if (assigneeIds.length > 0) {
-    await supabaseServer.from("koleex_todo_assignees").insert(
-      assigneeIds.map((accountId) => ({
-        todo_id: (todo as { id: string }).id,
-        account_id: accountId,
-      })),
+    const { error: asgErr } = await supabaseServer.from("koleex_todo_assignees").insert(
+      assigneeIds.map((accountId) => ({ todo_id: created.id, account_id: accountId })),
     );
-
-    // Fan out inbox notifications to every assignee except self.
-    const recipientIds = assigneeIds.filter((id) => id !== auth.account_id);
-    if (recipientIds.length > 0) {
-      const notifs = recipientIds.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `New task: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: {
-          type: "todo_assignment",
-          todo_id: (todo as { id: string }).id,
-          priority: body.priority ?? "medium",
-        },
-      }));
-      await supabaseServer.from("inbox_messages").insert(notifs);
-    }
+    if (asgErr) console.error("[api/todos POST] assignees:", asgErr.message);
   }
 
-  // Notify @mentioned people (metadata.mentions) — excluding self and anyone
-  // already notified as an assignee, so nobody gets a double ping.
-  const mentionIds = Array.isArray((body.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions)
-    ? ((body.metadata as { mentions: Array<{ account_id?: string }> }).mentions)
-        .map((m) => m.account_id)
-        .filter(Boolean) as string[]
-    : [];
-  const alreadyNotified = new Set<string>([auth.account_id, ...assigneeIds]);
-  const mentionRecipients = Array.from(new Set(mentionIds)).filter((id) => !alreadyNotified.has(id));
-  if (mentionRecipients.length > 0) {
-    await supabaseServer.from("inbox_messages").insert(
-      mentionRecipients.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `You were mentioned: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: { type: "todo_mention", todo_id: (todo as { id: string }).id },
-      })),
-    );
-    mentionRecipients.forEach((id) => alreadyNotified.add(id));
-  }
-
-  // Notify observers (metadata.observers) — they follow the task and can
-  // update its situation, so they should know it exists from the start.
-  const observerIds = Array.isArray((body.metadata as { observers?: Array<{ account_id?: string }> } | undefined)?.observers)
-    ? ((body.metadata as { observers: Array<{ account_id?: string }> }).observers)
-        .map((o) => o.account_id)
-        .filter(Boolean) as string[]
-    : [];
-  const observerRecipients = Array.from(new Set(observerIds)).filter((id) => !alreadyNotified.has(id));
-  if (observerRecipients.length > 0) {
-    await supabaseServer.from("inbox_messages").insert(
-      observerRecipients.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `You are now an observer: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: { type: "todo_observer", todo_id: (todo as { id: string }).id },
-      })),
-    );
-  }
+  /* Notifications: assignees, then @mentions, then observers — never the
+     creator, never the same person twice. Sent after the response: a
+     department or company-wide fan-out (inbox rows + web push per person)
+     must not hold the Save button. */
+  const idsOf = (list: unknown): string[] =>
+    Array.isArray(list) ? (list.map((m) => (m as { account_id?: string })?.account_id).filter(Boolean) as string[]) : [];
+  const meta = metadata as { mentions?: unknown; observers?: unknown };
+  const notified = new Set<string>([auth.account_id, ...assigneeIds]);
+  const fresh = (ids: string[]) => {
+    const out = Array.from(new Set(ids)).filter((id) => !notified.has(id));
+    out.forEach((id) => notified.add(id));
+    return out;
+  };
+  const mentionIds = fresh(idsOf(meta.mentions));
+  const observerIds = fresh(idsOf(meta.observers));
+  after(async () => {
+    await notifyTodoAssigned(created, assigneeIds, auth.account_id);
+    await notifyTodoPeopleAdded(created, "mention", mentionIds, auth.account_id);
+    await notifyTodoPeopleAdded(created, "observer", observerIds, auth.account_id);
+    await pingTodosChanged(auth.tenant_id);
+  });
 
   return NextResponse.json({ todo });
 }
 
-/* Resolve assignee info (username, full_name, avatar, dept, position) for
-   a batch of account_ids. Mirrors resolveAssignees in todo-admin.ts. */
-async function resolveAssigneeInfos(
-  accountIds: string[],
-): Promise<AssigneeInfo[]> {
-  if (accountIds.length === 0) return [];
+/* Resolve assignee info (username, full_name, avatar, dept, position) for a
+   batch of account_ids — the account (with its person embedded) and the
+   employee record are read in parallel. */
+async function resolveAssigneeInfos(accountIds: string[]): Promise<Map<string, AssigneeInfo>> {
+  const out = new Map<string, AssigneeInfo>();
+  if (accountIds.length === 0) return out;
 
-  const { data: accounts } = await supabaseServer
-    .from("accounts")
-    .select("id, username, avatar_url, person_id")
-    .in("id", accountIds);
-
-  if (!accounts || accounts.length === 0) return [];
-
-  const personIds = (accounts as Array<{ person_id: string | null }>)
-    .map((a) => a.person_id)
-    .filter(Boolean) as string[];
-
-  const [peopleRes, empRes] = await Promise.all([
-    personIds.length > 0
-      ? supabaseServer
-          .from("people")
-          .select("id, full_name, name_alt")
-          .in("id", personIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; name_alt: string | null }> }),
+  type Person = { full_name: string | null; name_alt: string | null };
+  const [accRes, empRes] = await Promise.all([
+    supabaseServer
+      .from("accounts")
+      .select("id, username, avatar_url, person:people ( full_name, name_alt )")
+      .in("id", accountIds),
     supabaseServer
       .from("koleex_employees")
       .select("account_id, department, position")
       .in("account_id", accountIds),
   ]);
+  if (accRes.error) console.error("[api/todos] accounts:", accRes.error.message);
 
-  const personMap = new Map(
-    ((peopleRes.data ?? []) as Array<{ id: string; full_name: string | null; name_alt: string | null }>).map(
-      (p) => [p.id, p],
-    ),
-  );
   const empMap = new Map(
-    ((empRes.data ?? []) as Array<{
-      account_id: string;
-      department: string | null;
-      position: string | null;
-    }>).map((e) => [e.account_id, e]),
+    ((empRes.data ?? []) as Array<{ account_id: string; department: string | null; position: string | null }>)
+      .map((e) => [e.account_id, e]),
   );
-
-  return (
-    accounts as Array<{
-      id: string;
-      username: string;
-      avatar_url: string | null;
-      person_id: string | null;
-    }>
-  ).map((a) => {
-    const person = a.person_id ? personMap.get(a.person_id) : null;
+  ((accRes.data ?? []) as unknown as Array<{
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    person: Person | Person[] | null;
+  }>).forEach((a) => {
+    const person = Array.isArray(a.person) ? a.person[0] ?? null : a.person;
     const emp = empMap.get(a.id);
-    return {
+    out.set(a.id, {
       account_id: a.id,
       username: a.username,
       full_name: person?.full_name ?? null,
@@ -548,6 +430,99 @@ async function resolveAssigneeInfos(
       avatar_url: a.avatar_url,
       department: emp?.department ?? null,
       position: emp?.position ?? null,
-    };
+    });
   });
+  return out;
+}
+
+
+/* ── GET /api/todos?resource=stats ────────────────────────────────────────
+   { completed, completedSince, performers[] } for the list's KPI cards.
+
+   · Same scope as the list (sharedTodoIds + applyTodoScope, privacy
+     included), bounded by tenant. Open-side numbers (active, overdue, high
+     priority) are NOT here: the screen holds the whole open set already and
+     counts it with the recurring-series rule applied, which a count query
+     cannot do.
+   · ?since=<ISO> — "done this week" starts at the READER's Monday, so the
+     client sends its own local midnight; default: the last 7 days.
+   · ?view= (super admin only) — the list's audience lens: "own" (tasks I
+     created, assigned, am assigned or that go to everyone), "all", or an
+     account id. Anyone else is already limited by the scope.
+   · performers: the three assignees with the most completed tasks, counted
+     over the newest 5000 completed tasks in scope (ids only, then the
+     assignee table in chunks) — observers are never assignees. */
+type StatsAuth = Exclude<Awaited<ReturnType<typeof requireAuth>>, NextResponse>;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function todoStats(auth: StatsAuth, params: URLSearchParams) {
+  const viewer: TodoViewer = {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id,
+    department: auth.department,
+    isSuperAdmin: auth.is_super_admin,
+    canViewPrivate: auth.can_view_private,
+  };
+  const sinceParam = params.get("since");
+  const since = sinceParam && Number.isFinite(Date.parse(sinceParam))
+    ? new Date(sinceParam).toISOString()
+    : new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+  /* Super admin lens → an extra OR clause (ANDed with the rest). */
+  let lens: string | null = null;
+  const view = params.get("view") ?? "own";
+  if (auth.is_super_admin && view !== "all") {
+    const target = view === "own" ? auth.account_id : UUID.test(view) ? view : null;
+    if (!target) return NextResponse.json({ error: "Invalid view" }, { status: 400 });
+    const { data: mine } = await supabaseServer.from("koleex_todo_assignees").select("todo_id").eq("account_id", target);
+    const ids = Array.from(new Set((mine ?? []).map((r) => (r as { todo_id: string }).todo_id)));
+    const parts = [`created_by_account_id.eq.${target}`, `assigned_by_account_id.eq.${target}`];
+    if (view === "own") parts.push("assign_to_all.eq.true");
+    if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
+    lens = parts.join(",");
+  }
+
+  const sharedIds = await sharedTodoIds(viewer);
+  /* Loosely typed on purpose: the PostgREST builder's generics blow up
+     TypeScript ("excessively deep") when threaded through a helper. */
+  type Filterable = { or(f: string): Filterable; eq(c: string, v: unknown): Filterable };
+  const scoped = <Q,>(query: Q): Q => {
+    let out = (query as unknown as Filterable).eq("completed", true);
+    if (auth.tenant_id) out = out.eq("tenant_id", auth.tenant_id);
+    out = applyTodoScope(out, viewer, sharedIds);
+    return (lens ? out.or(lens) : out) as unknown as Q;
+  };
+
+  const [allRes, sinceRes, idsRes] = await Promise.all([
+    scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })),
+    scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })).gte("completed_at", since),
+    scoped(supabaseServer.from("koleex_todos").select("id")).order("completed_at", { ascending: false }).limit(5000),
+  ]);
+  if (allRes.error || sinceRes.error || idsRes.error) {
+    console.error("[api/todos stats]", allRes.error?.message ?? sinceRes.error?.message ?? idsRes.error?.message);
+    return NextResponse.json({ error: "Failed to load stats" }, { status: 500 });
+  }
+
+  const doneIds = ((idsRes.data ?? []) as Array<{ id: string }>).map((r) => r.id);
+  const perAccount = new Map<string, number>();
+  for (let i = 0; i < doneIds.length; i += 300) {
+    const { data } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("account_id")
+      .in("todo_id", doneIds.slice(i, i + 300));
+    ((data ?? []) as Array<{ account_id: string }>).forEach((a) => perAccount.set(a.account_id, (perAccount.get(a.account_id) ?? 0) + 1));
+  }
+  const top = [...perAccount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const infos = await resolveAssigneeInfos(top.map(([id]) => id));
+  const performers = top
+    .map(([id, count]) => {
+      const i = infos.get(id);
+      return i ? { account_id: id, username: i.username, full_name: i.full_name, name_alt: i.name_alt, avatar_url: i.avatar_url, department: i.department, position: i.position, count } : null;
+    })
+    .filter((p) => p !== null);
+
+  return NextResponse.json(
+    { completed: allRes.count ?? 0, completedSince: sinceRes.count ?? 0, performers },
+    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+  );
 }

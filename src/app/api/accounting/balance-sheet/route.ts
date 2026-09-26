@@ -16,6 +16,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildBalanceSheetSummary } from "@/lib/accounting/queries";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -25,6 +26,9 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const asOf = url.searchParams.get("as_of") ?? undefined;
-  const summary = await buildBalanceSheetSummary(auth.tenant_id, asOf);
-  return NextResponse.json({ balance_sheet: summary });
+  const [summary, currency] = await Promise.all([buildBalanceSheetSummary(auth.tenant_id, asOf), resolveBaseCurrency(auth.tenant_id)]);
+  /* `currency`: the ledger's (the company's base) — the totals carry no code
+     of their own, and the Reports statements page names every amount's
+     currency (Reports 6C). Additive: Finance reads `balance_sheet` only. */
+  return NextResponse.json({ balance_sheet: summary, currency });
 }

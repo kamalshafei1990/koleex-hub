@@ -37,7 +37,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
-import { PERMISSION_GROUPS, PERMISSION_MODULES, isOpenAccessModule } from "@/lib/permission-modules";
+import { PERMISSION_GROUPS, PERMISSION_MODULES, capabilityApp, isOpenAccessModule } from "@/lib/permission-modules";
 import { useTranslation } from "@/lib/i18n";
 import { rolesT } from "@/lib/translations/roles";
 import {
@@ -59,8 +59,10 @@ import AppIcon from "@/components/common/AppIcon";
 
 
 const getAppIcon = (moduleName: string) => {
+  /* A capability ("Report Templates") shows the icon of the app it belongs to. */
+  const name = capabilityApp(moduleName) ?? moduleName;
   const app = APP_REGISTRY.find((a) =>
-    a.name === moduleName || a.name.toLowerCase() === moduleName.toLowerCase(),
+    a.name === name || a.name.toLowerCase() === name.toLowerCase(),
   );
   return app?.icon || null;
 };
@@ -147,12 +149,17 @@ function RoleModal({ open, onClose, role, onSaved }: {
 
       {/* ── Advanced role flags ──
           Two orthogonal overrides that bypass the normal scope rules.
-          is_super_admin is safe-ish (still blocked from private records);
-          can_view_private is the break-glass flag — warn the user with a
-          red border + explanation since it's audit-logged. */}
+          is_super_admin bypasses every module and scope check.
+          can_view_private is the role's «private data» switch: cost prices,
+          credit terms, salaries and ID documents inside the apps the role
+          already has (src/lib/server/sensitive-columns.ts, src/lib/experience),
+          plus private to-dos within its reach (those reads are logged). It
+          stays red when on — the widest data grant a role can carry. Every word
+          in this box comes from rolesT (modal.advanced, modal.isSA*,
+          modal.canViewPrivate*); validate:roles holds them. */}
       <div className="rounded-xl border border-[var(--border-faint)] p-4 space-y-3 bg-[var(--bg-surface-subtle)]">
         <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-dim)]">
-          Advanced — scope overrides
+          {t("modal.advanced")}
         </p>
 
         <label className="flex items-start gap-3 cursor-pointer">
@@ -164,10 +171,10 @@ function RoleModal({ open, onClose, role, onSaved }: {
           />
           <div className="flex-1">
             <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
-              Super Admin
+              {t("modal.isSA")}
             </div>
             <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
-              Bypasses all data scope rules (Own / Dept / All). Sees every record except those marked Private.
+              {t("modal.isSA.help")}
             </div>
           </div>
         </label>
@@ -181,10 +188,10 @@ function RoleModal({ open, onClose, role, onSaved }: {
           />
           <div className="flex-1">
             <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
-              Break-glass: view Private records
+              {t("modal.canViewPrivate")}
             </div>
             <div className={`text-[11px] mt-0.5 ${canViewPrivate ? "text-red-300" : "text-[var(--text-dim)]"}`}>
-              Grants access to records marked Private (personal mail, notes, sensitive HR). Every read is logged to koleex_private_access_log. Grant sparingly — typically only during legal discovery.
+              {t("modal.canViewPrivate.help")}
             </div>
           </div>
         </label>
@@ -698,7 +705,7 @@ export default function RolesPage() {
   }
   if (boot && !isSA) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-10 text-center bg-[var(--bg-primary)]">
+      <div className="min-h-full flex flex-col items-center justify-center gap-3 p-10 text-center bg-[var(--bg-primary)]">
         <LockIcon className="h-10 w-10 text-[var(--text-ghost)]" />
         <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{t("gate.saOnly")}</h2>
         <p className="text-[13px] text-[var(--text-dim)] max-w-sm">{t("gate.saOnly.sub")}</p>
@@ -710,7 +717,7 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Shared header. The identity block here was a copy of it, so this

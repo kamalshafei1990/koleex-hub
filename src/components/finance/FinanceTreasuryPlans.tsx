@@ -16,12 +16,14 @@
    ========================================================================== */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_FORECAST } from "@/lib/translations/finance/forecast";
+import { FIN_TREASURYPLANS } from "@/lib/translations/finance/treasuryPlans";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
@@ -36,6 +38,10 @@ import type {
 import type { ForecastResult } from "@/lib/intelligence/treasury-forecast";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_FORECAST, ...FIN_TREASURYPLANS } as const;
+
 
 function fmtCompactUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -77,7 +83,7 @@ interface CompareResponse {
 }
 
 export default function FinanceTreasuryPlans() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const STATUS_BUCKETS: { key: TreasuryPlanStatus; label: string }[] = [
     { key: "draft",        label: t("treasuryPlans.bucket.draft", "Drafts") },
     { key: "under_review", label: t("treasuryPlans.bucket.under_review", "Under review") },
@@ -85,8 +91,6 @@ export default function FinanceTreasuryPlans() {
     { key: "archived",     label: t("treasuryPlans.bucket.archived", "Archived") },
   ];
   void STATUS_BUCKET_KEYS;
-  const [plans, setPlans] = useState<TreasuryPlan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   /* Phase S.4 — stable id-passing callback so PlanCard's memo holds. */
@@ -98,21 +102,15 @@ export default function FinanceTreasuryPlans() {
   const [compareBusy, setCompareBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/finance/treasury-plans", { cache: "no-store" });
-      const j = (await r.json().catch(() => ({}))) as { plans?: TreasuryPlan[]; error?: string };
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setPlans(j.plans ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default view. */
+  const fetchList = useCallback(async () => {
+    const r = await fetch("/api/finance/treasury-plans", { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { plans?: TreasuryPlan[]; error?: string };
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.plans ?? [];
   }, []);
-  useEffect(() => { void loadList(); }, [loadList]);
+  const { data, loading, reload: loadList } = useWarmData<TreasuryPlan[]>("fin:treasury-plans", fetchList);
+  const plans = useMemo(() => data ?? [], [data]);
 
   const loadDetail = useCallback(async (id: string) => {
     try {
@@ -204,7 +202,7 @@ export default function FinanceTreasuryPlans() {
 
   return (<>
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("treasuryPlans.title", "Treasury Plans")}
           subtitle={t("treasuryPlans.subtitle.long", "Saved forecasts under operational governance: review, approve, archive, and compare against current treasury state.")}
@@ -312,7 +310,7 @@ export default function FinanceTreasuryPlans() {
 /* Phase S.4 — memoized; parent's `openId` toggle no longer rerenders
    every card in the list. */
 const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolean; onOpen: (id: string) => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const m = plan.projected_metrics;
   const ds = daysAgo(plan.approved_at ?? plan.updated_at);
   const agoStr = ds === 0 ? t("treasuryPlans.card.today", "today") : t("treasuryPlans.card.daysAgo", "{n}d ago").replace("{n}", String(ds));
@@ -401,7 +399,7 @@ function PlanDetail({
   onArchive: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const baseCurrency = useBaseCurrency();
   const p = detail.plan;
   const m = p.projected_metrics;
@@ -640,7 +638,7 @@ function DriverList({
   items: Array<{ key?: string; party?: string; amountReporting?: number; daysFromNow?: number }>;
   tone: "positive" | "negative";
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>

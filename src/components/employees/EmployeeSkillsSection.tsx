@@ -550,7 +550,7 @@ function SkillPicker({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog" aria-modal="true" aria-label={t("hr.sk.addSkillTitle")}
       >
@@ -655,7 +655,7 @@ function PositionSkillsConfig({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog" aria-modal="true" aria-label={t("hr.sk.posReqTitle")}
       >

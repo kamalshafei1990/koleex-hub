@@ -13,7 +13,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Lockstitch | XSL | Lockstitch | **Confirmed** | stitch_type, bed_type, drive_type / +needle_count, hook_size | trimmer, AFL, backtack, puller | wovens, denim, uniforms | live code |
 | Overlock | XSO | Overlock | **Confirmed** | thread_count, diff_feed / +max_speed | trimmer, diff_feed, puller | knits, T-shirt | live |
 | Interlock (Coverstitch) | XSI | Interlock | **Needs Decision** | needle_count, top_cover / +gauge | top_cover, puller, elastic | knit hems, underwear | **Interlock vs Coverstitch naming** |
-| Flatlock (Flat Seamer) | XSF | — (new) | Proposed | needle_count, thread_count / +gauge | top_cover, puller | sportswear, underwear | new prefix |
+| Flatlock (Flat Seamer) | XSF | `flatlock-machines` | **Live (CL-0024)** | needle_count, thread_count / +gauge | top_cover, puller | sportswear, underwear | new prefix |
 | Chainstitch | XSC | Chainstitch | **Confirmed** | needle_count, feed_off_arm / +gauge | puller, folder | jeans felling | live |
 | Buttonhole | XSBH | — (new) | Proposed | buttonhole_type, automation / +length | programmable, knife | shirts | live XABH was under Automatic |
 | Eyelet Buttonhole | XSYE | — (new) | **Needs Decision** | buttonhole_type, gimp / +with_gimp | gimp, taping | jeans, jackets | proposed XSEB **collides with leather XSEB (Bag Sewing)** → use XSYE |
@@ -35,7 +35,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
 |---|---|---|---|---|---|---|
 | Programmable / CNC ("Template") Sewing | XAPT | **Resolved (CL-0012)** | working_field, head_type | stacker, laser, rotary_loader, vision | leather, bags, badges, high-mix | **DECIDED:** home = Automatic, prefix **XAPT**; retires the XSPA=Pattern-Sewing ambiguity (XSPA stays = spare Attachments). Absorbs the "Template Sewing" line below. |
-| Template Sewing | XATM | Proposed | working_field, head_count | rotary_loader, vision | high-mix parts | new |
+| Template Sewing | XATM | **Live (CL-0024)** | working_field, head_count | rotary_loader, vision | high-mix parts | new |
 | Auto Pocket Welting | XAPW | **Confirmed** | welt_type, length | flap, zipper | trousers, jackets | live |
 | Auto Patch Pocket Setter | XAPS | **Confirmed** | pocket_size, shape | creaser, label | shirts, jeans | live XAPS=Pocket Setter |
 | Auto Placket | XAPP | **Confirmed** | placket_type, length | interlining | shirts | live XAPP=Placket |
@@ -210,7 +210,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Lockstitch | XSL | XSL | Freeze | No |
 | Overlock | XSO | XSO | Freeze | No |
 | Interlock (Coverstitch) | XSI | XSI | Confirm name (Interlock/Coverstitch), keep XSI | **Yes** |
-| Flatlock | — | XSF | Approve | No |
+| Flatlock | — | XSF | Approve — **applied, live shelf (CL-0024)** | No |
 | Chainstitch | XSC | XSC | Freeze | No |
 | Buttonhole | — | XSBH | Approve | No |
 | Eyelet Buttonhole | — | XSYE | Approve (avoids XSEB clash) | **Yes** |
@@ -218,16 +218,16 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Bartack | — | XSBT | Approve | No |
 | Blind Stitch | — | XSBL | Approve | No |
 | Zigzag | — | XSZ | Approve | No |
-| Elastic Attaching | — | XSEA | Approve | No |
+| Elastic Attaching | — | XSEA | Approve — **applied, live shelf (CL-0025)** | No |
 | Waistband Attaching | — | XSWB | Approve | No |
 | Belt Loop | — | XSLP | Approve | No |
 | Smocking/Shirring | — | XSSM | Approve | No |
 | Picoting | — | XSPI | Approve (avoids XSPC clash) | **Yes** |
 | Bag Closing | — | XSBG | Approve | No |
 | Mattress Sewing | — | XSMT | Approve | No |
-| Ultrasonic Sewing | — | XSUS | Approve | No |
+| Ultrasonic Sewing | — | XSUS | Approve — **applied, live shelf (CL-0025)** | No |
 | Programmable Pattern Sewing | XSPA? | XAPT | Decide home + prefix | **Yes** |
-| Template Sewing | — | XATM | Approve | No |
+| Template Sewing | — | XATM | Approve — **applied, live shelf (CL-0024)** | No |
 | Auto Pocket Welting | XAPW | XAPW | Freeze | No |
 | Auto Patch Pocket Setter | XAPS | XAPS | Freeze | No |
 | Auto Placket | XAPP | XAPP | Freeze | No |
@@ -235,9 +235,9 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Auto Sleeve Setting | XASL | XASL | Freeze | No |
 | Auto Hemming | XAHM | XAHM | Freeze | No |
 | Auto Label Attaching | — | XALB | Approve | No |
-| Auto Belt-Loop System | — | XABL | Approve | No |
+| Auto Belt-Loop System | — | XABL | Approve — **applied, live shelf (CL-0025)** | No |
 | Auto Waistband | — | XAWB | Approve | No |
-| Auto Dart | — | XADT | Approve | No |
+| Auto Dart | — | XADT | Approve — **applied, live shelf (CL-0025)** | No |
 | Buttonhole/Button Indexer | — | XAIX | Approve | **Yes** |
 | Straight Knife | XCS | XCS | Freeze | No |
 | Round Knife | XCR | XCR | Freeze | No |
@@ -263,7 +263,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Steam Iron | XFSI | XFSI | Freeze | No |
 | Steam Boiler/Generator | XFSB | XFSB | Freeze | No |
 | Ironing Table | XFIT | XFIT | Freeze (absorb XFVT) | No |
-| Pressing Machine (Buck) | — | XFPB | Approve | No |
+| Pressing Machine (Buck) | — | XFPB | Approve — **applied, live shelf (CL-0027)** | No |
 | Collar & Cuff Press | XFCP | XFCP | Freeze | No |
 | Fusing Machine | XFFP | XFFP | Freeze | No |
 | Form Finisher | XFFF | XFFF | Freeze | No |
@@ -278,10 +278,10 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Combination Embroidery | XEC | XEC | Decide reuse (XEC retired) | **Yes** |
 | Screen Printing | XPSP | XPSP | Freeze | No |
 | DTG Printer | XPDT | XPDT | Freeze | No |
-| DTF Printer | — | XPDF | Approve | No |
+| DTF Printer | — | XPDF | Approve — **applied, live shelf (CL-0027)** | No |
 | Sublimation Printer | XPSU | XPSU | Freeze | No |
 | Conveyor Dryer/Curing | — | XPCD→? | Resolve XP/XPC overlap | **Yes** |
-| DTF Powder Shaker | — | XPPS | Approve | No |
+| DTF Powder Shaker | — | XPPS | Approve — **applied, live shelf (CL-0027)** | No |
 | Heat Press (Flat) | XPH | XPH | Freeze | No |
 | Calender/Rotary Heat Press | XPRH(dup) | XPHR | Resolve XPRH duplicate | **Yes** |
 | Needle Detector | XPCN | XPCN (→XKN if XK adopted) | Freeze pending §4.4 | **Yes** |
@@ -314,6 +314,29 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 > **Note on Packing (§4.4):** if the **XP↔XPC overlap** is resolved by renaming the Packing category to **XK**, all 11 packing prefixes shift (`XPC* → XK*`). They are therefore marked "Requires Kamal" pending that single category-level decision; if the overlap is accepted as-is, the live `XPC*` codes freeze unchanged.
 
 ---
+
+### CL-0024 additions (2026-08-20 — approved & live on creation)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| Carpet Overedging | XSRG | `carpet-overedging-machines` | Live |
+| Automatic Tape Attaching | XATA | `tape-attaching-units` | Live |
+| Automatic Pintuck | XAPK | `pintuck-sewing-units` | Live |
+| Fur Sewing (Leather family) | XSEF | `fur-sewing-machines` | Live |
+
+### CL-0026 additions (2026-08-20 — the JOOKE decision paper executed)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| Glue Dispensing | XAGD | `glue-dispensing-machines` | Live |
+| Bra Hardware (Fastening family) | XFAB | `bra-hardware-machines` | Live |
+| Garment Prep Unit | XAGP | `garment-prep-units` | Live |
+| Velcro cut-&-sew · Label pad printing | — | — | **PARKED by decision** (wait for a second source) |
+
+### CL-0027 additions (2026-08-21 — the S-KILO pair)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| UV-DTF Printer | XPUV | `uv-dtf-printers` | Live (new code) |
+| Pad Printing | XPPD | `pad-printing-machines` | Live (un-parked per its own condition) |
+| Rhinestone Shaking | — | — | **PARKED** (one source) |
 
 ## Counts
 - **Total Product Types:** 101  *(was 87; +14 from CL-0012: XFSS, XPCI, XMKP/D/S, XWIC/R/B/A, XMDS/D/C/H/N)*

@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_OPT } from "@/lib/translations/contacts/opt";
+import { CT_SCC } from "@/lib/translations/contacts/scc";
 import SuppliersHeader from "./SuppliersHeader";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import NetworkIcon from "@/components/icons/ui/NetworkIcon";
@@ -28,6 +29,10 @@ import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useSkin } from "@/lib/appearance";
 import nextDynamic from "next/dynamic";
+
+/* Only the namespaces this screen reads — see contacts.ts. */
+const DICT = { ...CT_OPT, ...CT_SCC } as const;
+
 
 /* Aurora ground — mounted only under the skin. */
 const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -89,7 +94,7 @@ function SevTag({ sev, label }: { sev: "info" | "warning" | "critical"; label: s
 
 export default function SourcingCommandCenter() {
   const aurora = useSkin() === "aurora";
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(DICT);
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
