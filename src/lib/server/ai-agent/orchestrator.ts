@@ -94,6 +94,7 @@ import {
   classifyBrandSection,
   isChoiceShapedQuestion,
   isTradeTermQuestion,
+  reportLookupTool,
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
@@ -453,6 +454,16 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const wantsTradeTerms = isTradeTermQuestion(userMessage);
   let forcedTrade = false;
 
+  /* REPORTS (6B) — the report lookup forced on the FIRST request, for the
+     trade terms' reason: measured on the owner's test, the model answered
+     "read report <id>" with the previous report's text under the new id,
+     and a list with one draft three times, from the conversation and with
+     no tool called. Only when this caller is offered that tool (the report
+     tools are internal-only), only first, only once. See reportLookupTool. */
+  const reportTool = reportLookupTool(userMessage);
+  const forcedReportTool = reportTool && tools.some((t) => t.function.name === reportTool) ? reportTool : null;
+  let forcedReport = false;
+
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     /* Stopped: no further round (see TurnInput.isCancelled). */
     if (isCancelled?.()) return { steps, finalReply: "", provider: servedLabel(turnMeta), conversationId, failed: true };
@@ -474,6 +485,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
        used to end with no answer at all; the last round now carries no tool,
        so the model writes one from what it gathered. */
     const lastRound = iter === MAX_ITERATIONS - 1 && totalToolRuns > 0;
+    /* Report lookup on the first request — see forcedReportTool. */
+    const forceReportNow = forcedReportTool !== null && !forcedReport && !forceTradeNow && totalToolRuns === 0;
+    if (forceReportNow) forcedReport = true;
     const toolChoice: OpenAiToolChoice =
       totalToolRuns >= MAX_TOOLS_PER_TURN || lastRound
         ? "none"
@@ -481,7 +495,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           ? { type: "function", function: { name: "askUser" } }
           : forceTradeNow
             ? { type: "function", function: { name: "searchTradeTerms" } }
-            : "auto";
+            : forceReportNow && forcedReportTool
+              ? { type: "function", function: { name: forcedReportTool } }
+              : "auto";
     /* REAL answer streaming (perf fix 2026-08-03): once tools have run,
        the next call is (almost always) the final answer — stream it so
        the user reads while it generates instead of waiting ~8-12s for

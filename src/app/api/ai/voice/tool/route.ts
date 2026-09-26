@@ -166,7 +166,7 @@ export async function POST(req: Request) {
         output: {
           ok: false,
           message:
-            "Not done: on a call, a task is saved only when the caller taps Confirm on the card on their screen — never by a spoken yes. " +
+            "Not done: on a call, nothing is written until the caller taps Confirm on the card on their screen — never by a spoken yes. " +
             "The preview is on their screen; tell them to tap Confirm, and do not call this again with confirm.",
         },
       },

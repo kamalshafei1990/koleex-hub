@@ -68,6 +68,11 @@ const COPY: Record<Lang, {
   cancelTask: string;
   taskSaved: string;
   taskFailed: string;
+  /* A report draft waiting for the caller's tap (Reports 6B). */
+  draftPreview: string;
+  startDraft: string;
+  draftSaved: string;
+  goesTo: string;
   due: string;
   remind: string;
   forPeople: string;
@@ -187,6 +192,10 @@ const COPY: Record<Lang, {
     cancelTask: "Cancel",
     taskSaved: "Task saved",
     taskFailed: "Could not save it. Try again.",
+    draftPreview: "New report draft",
+    startDraft: "Start draft",
+    draftSaved: "Draft started — open it in Reports",
+    goesTo: "Goes to",
     due: "Due",
     remind: "Reminder",
     forPeople: "For",
@@ -252,6 +261,10 @@ const COPY: Record<Lang, {
     cancelTask: "取消",
     taskSaved: "任务已保存",
     taskFailed: "没保存成功，再试一次。",
+    draftPreview: "新报告草稿",
+    startDraft: "开始草稿",
+    draftSaved: "草稿已创建——在“报告”中打开",
+    goesTo: "发给",
     due: "截止",
     remind: "提醒",
     forPeople: "给",
@@ -317,6 +330,10 @@ const COPY: Record<Lang, {
     cancelTask: "إلغاء",
     taskSaved: "المهمة اتحفظت",
     taskFailed: "ماتحفظتش. جرّب تاني.",
+    draftPreview: "مسودة تقرير جديدة",
+    startDraft: "ابدأ المسودة",
+    draftSaved: "المسودة اتعملت — افتحها من التقارير",
+    goesTo: "رايحة لـ",
     due: "موعدها",
     remind: "تذكير",
     forPeople: "لـ",
@@ -407,6 +424,8 @@ export type VoiceCallScreenProps = {
   onCancelWrite?: () => void;
   writeBusy?: boolean;
   writeSaved?: boolean;
+  /** Which write the last tap saved (a task, or a report draft — 6B). */
+  writeSavedTool?: string | null;
   writeError?: boolean;
   /** The handshake has taken longer than usual: the caption says so. */
   connectingSlow?: boolean;
@@ -445,6 +464,7 @@ export default function VoiceCallScreen({
   onCancelWrite,
   writeBusy = false,
   writeSaved = false,
+  writeSavedTool = null,
   writeError = false,
   connectingSlow = false,
   laneNote = null,
@@ -1011,6 +1031,19 @@ export default function VoiceCallScreen({
           <div className="max-w-[560px] mx-auto rounded-2xl border border-white/15 bg-[#111111] px-4 py-3 text-white">
             {pendingWrite ? (
               <>
+                {/* A REPORT DRAFT (6B): what it is, its period and who it goes to — the tool's preview says it in words. */}
+                {pendingWrite.tool === "startReportDraft" ? (() => {
+                  const pv = pendingWrite.preview ?? {};
+                  const goes = Array.isArray(pv.goes_to) ? (pv.goes_to as unknown[]).map(String).filter(Boolean) : [];
+                  return (
+                    <>
+                      <div className="text-[12px] uppercase tracking-wide text-[#AAAAAA]">{copy.draftPreview}</div>
+                      <div className="mt-1 text-[16px] font-semibold leading-snug" data-task-title>{[pv.type, pv.period].filter((x) => typeof x === "string" && x).join(" — ")}</div>
+                      {goes.length > 0 && <div className="mt-1 text-[12px] text-[#AAAAAA]" data-task-details>{`${copy.goesTo} ${goes.join(", ")}`}</div>}
+                    </>
+                  );
+                })() : (
+                <>
                 <div className="text-[12px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
                 <div className="mt-1 text-[16px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
                 {(() => {
@@ -1034,6 +1067,8 @@ export default function VoiceCallScreen({
                   ].filter(Boolean);
                   return bits.length > 0 ? <div className="mt-1 text-[12px] text-[#AAAAAA]" data-task-details>{bits.join(" · ")}</div> : null;
                 })()}
+                </>
+                )}
                 {writeError && <div className="mt-2 text-[12px] text-[#FF3333]">{copy.taskFailed}</div>}
                 <div className="mt-3 flex gap-2">
                   <button
@@ -1042,7 +1077,7 @@ export default function VoiceCallScreen({
                     disabled={writeBusy}
                     className="h-10 flex-1 rounded-full bg-[#0066FF] text-white text-[13px] font-semibold active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   >
-                    {copy.saveTask}
+                    {pendingWrite.tool === "startReportDraft" ? copy.startDraft : copy.saveTask}
                   </button>
                   <button
                     type="button"
@@ -1055,7 +1090,7 @@ export default function VoiceCallScreen({
                 </div>
               </>
             ) : (
-              <div className="text-[13px] font-semibold text-white" role="status" data-task-saved>✓ {copy.taskSaved}</div>
+              <div className="text-[13px] font-semibold text-white" role="status" data-task-saved>✓ {writeSavedTool === "startReportDraft" ? copy.draftSaved : copy.taskSaved}</div>
             )}
           </div>
         </div>

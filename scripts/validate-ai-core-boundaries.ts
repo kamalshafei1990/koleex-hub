@@ -32,6 +32,7 @@ import {
   isMemoryIntentQuery,
   isTradeTermQuestion,
   isChoiceShapedQuestion,
+  reportLookupTool,
 } from "../src/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "../src/lib/server/ai/core/canned-replies";
 import { conversationTitle } from "../src/lib/server/ai/conversation-title";
@@ -113,6 +114,7 @@ const DETECTORS = [
   "isMemoryIntentQuery",
   "isTradeTermQuestion",
   "isChoiceShapedQuestion",
+  "reportLookupTool",
 ];
 for (const d of DETECTORS) {
   const defRe = new RegExp(`^(export )?function ${d}\\s*\\(`, "m");
@@ -227,6 +229,48 @@ check(
     isWorkDataQuery("متنساني أبعت الفاتورة") &&
     isWorkDataQuery("明天提醒我继续整理产品数据") &&
     isWorkDataQuery("别忘了提醒我发发票"),
+);
+/* Reports 6B (2026-09-27): the owner's first test, "find the reports I
+   wrote myself this month", reached the tool-less lane and was told the
+   reports cannot be read. */
+check(
+  "work data: the Reports app's questions reach the tool lane — en / ar / zh",
+  isWorkDataQuery("Find the reports I wrote myself this month (only mine) and tell me briefly what each one says.") &&
+    isWorkDataQuery("what did the sales team report yesterday") &&
+    isWorkDataQuery("who hasn't sent their report this week") &&
+    isWorkDataQuery("start my daily report") &&
+    isWorkDataQuery("open a weekly plan for next week") &&
+    isWorkDataQuery("مين ما بعتش تقريره الأسبوع ده") &&
+    isWorkDataQuery("لخصلي تقارير فريق المبيعات") &&
+    isWorkDataQuery("谁还没交周报"),
+);
+/* Reports 6B: the owner's test got "read report <id>" answered with the
+   previous report's text and a list with one draft three times — from the
+   conversation, no tool called. The agent loop forces the lookup these name. */
+check(
+  "report lookups name their tool: an id → readReport, who owes → whoOwesReports, a list → searchReports",
+  reportLookupTool("Read report 91a0fd18-f05a-4bdf-aabb-0b6e2d694349") === "readReport" &&
+    reportLookupTool("Now list every report I can read — mine, sent to me, and my team's.") === "searchReports" &&
+    reportLookupTool("Search my reports for Zephyrine and tell me what that report says.") === "searchReports" &&
+    reportLookupTool("what did the sales team report yesterday") === "searchReports" &&
+    reportLookupTool("Who hasn't sent their reports this week?") === "whoOwesReports" &&
+    reportLookupTool("which reports are late this week") === "whoOwesReports" &&
+    reportLookupTool("مين ما بعتش تقريره الأسبوع ده") === "whoOwesReports" &&
+    reportLookupTool("لخصلي تقارير فريق المبيعات") === "searchReports" &&
+    reportLookupTool("谁还没交周报") === "whoOwesReports",
+);
+check(
+  "report lookups: starting a draft (a write the model previews) and plain talk force nothing",
+  reportLookupTool("Start my daily report for 15/01/2025.") === null &&
+    reportLookupTool("ابدأ تقريري اليومي") === null &&
+    reportLookupTool("Yes, start it.") === null &&
+    reportLookupTool("how do I write a good report") === null &&
+    reportLookupTool("list my open tasks") === null,
+);
+check(
+  "work data: writing advice about reports in general stays on the fast lane",
+  !isWorkDataQuery("how do I write a good report") &&
+    !isWorkDataQuery("what makes an executive summary clear"),
 );
 check(
   "work data: plain talk with none of that still stays on the fast lane",

@@ -61,12 +61,18 @@ const TENANT_SCOPED = new Set([
      tenant, service-role only — and every AI read ALSO names the tenant. */
   "notes",
   "note_shares",
+  /* Reports 6B: searchReports filters every read by the caller's tenant. */
+  "work_reports",
 ]);
 
 /* Tables that are SHARED by design (no tenant_id column), or are keyed by a
    parent row that was itself tenant-verified. Each entry is a reviewed
    decision — see the audit §9.2 "Cross-boundary exposure assessment". */
 const SHARED_BY_DESIGN: Record<string, string> = {
+  /* Reports 6B: readReport reads the comments of ONE report, by its id, after
+     loadForViewer found that report in the caller's tenant and allowed them
+     to read it. */
+  work_report_comments: "keyed by report_id of a report loadForViewer already found in the caller's tenant and allowed them to read",
   products: "shared catalog — no tenant_id column (tools/products.ts:6)",
   product_models: "child of products (shared catalog)",
   product_media: "child of products (shared catalog)",

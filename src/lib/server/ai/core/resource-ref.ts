@@ -36,7 +36,9 @@ export type ResourceKind =
   | "project"
   | "planning_item"
   | "calendar_event"
-  | "note";
+  | "note"
+  /* Reports 6B: a work report the caller may read, or the draft they started. */
+  | "report";
 
 export interface ResourceRef {
   kind: ResourceKind;

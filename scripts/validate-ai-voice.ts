@@ -928,9 +928,12 @@ console.log("\n── 8. What the client may know, and what it may not ──");
        with a full personalization block 36.6 KB — still well under the
        channel's 64 KB; AND TO 40 000 for roadmap D1 (createTodo's schema and
        the tasks-by-voice instructions): history-only 36.4 KB, worst case
-       38.6 KB. */
+       38.6 KB; AND TO 42 000 for Reports 6B (four report tools — their
+       descriptions trimmed first, from 4.0 KB to 2.6 KB): 38.8 KB without
+       history, 40.7 KB with a full one — still well under the channel's
+       64 KB. */
     check("the budget constant keeps the full session well inside the channel",
-      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 40_000);
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 42_000);
 
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));

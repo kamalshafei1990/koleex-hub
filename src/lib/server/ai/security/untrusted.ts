@@ -46,7 +46,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
-export type UntrustedKind = "document" | "image" | "web" | "external";
+export type UntrustedKind = "document" | "image" | "web" | "external" | "staff";
 
 /** Unguessable per-turn fence. Short enough to cost nothing, long enough that
  *  a document written earlier cannot contain it. */
@@ -59,6 +59,8 @@ const KIND_LABEL: Record<UntrustedKind, string> = {
   image: "an image the user supplied, transcribed by a reader",
   web: "a public web page",
   external: "an external service",
+  /* Reports 6B: work reports and their comments, read by a Koleex AI tool. */
+  staff: "text written by colleagues in Koleex Hub",
 };
 
 /**

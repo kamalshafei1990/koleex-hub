@@ -2,16 +2,19 @@ import "server-only";
 
 /* ---------------------------------------------------------------------------
    Reports (server) — starting a draft, in one place: the Write button
-   (POST /api/work-reports) and the drafts the system prepares on schedule
-   (5D, ./schedules.ts) write the same row with the same default readers, so
-   a prepared draft is exactly the one the writer would have started.
+   (POST /api/work-reports), the drafts the system prepares on schedule
+   (5D, ./schedules.ts) and Koleex AI's startReportDraft (6B) write the same
+   row with the same default readers, so a prepared draft is exactly the one
+   the writer would have started.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
-import { REPORT_LIMITS, normalizeSections, type ReportTemplateDef } from "@/lib/reports/templates";
-import type { TemplateSnapshot } from "@/lib/reports/custom-templates";
-import { defaultRecipients, superAdminIds } from "@/lib/server/reports/core";
+import { REPORT_LIMITS, normalizeSections, periodFor, type ReportTemplateDef } from "@/lib/reports/templates";
+import { isCustomKey, snapshotOf, type TemplateSnapshot } from "@/lib/reports/custom-templates";
+import { reportTemplate } from "@/lib/reports/catalog";
+import { canStartTemplate, defaultRecipients, superAdminIds } from "@/lib/server/reports/core";
+import { customAsTemplate, loadCustomTemplate, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 
 export interface DraftPeriod { start: string; end: string; key: string }
 
@@ -51,4 +54,58 @@ export async function insertDraft(
     if (rErr) console.error("[reports] new draft recipients:", rErr.message);
   }
   return id;
+}
+
+export type PlanOutcome =
+  | { tpl: ReportTemplateDef; snapshot: TemplateSnapshot | null; period: DraftPeriod; existing: { id: string; status: string } | null }
+  | "unknown_template" | "request_only" | "forbidden" | "hidden";
+
+export type StartOutcome =
+  | { id: string; existing: boolean; tpl: ReportTemplateDef; period: DraftPeriod }
+  | "unknown_template" | "request_only" | "forbidden" | "hidden" | "failed";
+
+/** A type by its key — a built-in, or a builder type's current version
+ *  (active only, the tenant's own) with its copy. */
+export async function draftType(tenantId: string | null, key: unknown): Promise<{ tpl: ReportTemplateDef; snapshot: TemplateSnapshot | null } | null> {
+  if (isCustomKey(key)) {
+    const row = await loadCustomTemplate(tenantId, key).catch(() => null);
+    if (!row || row.status !== "active") return null;
+    return { tpl: customAsTemplate(row), snapshot: snapshotOf(row.def, row.words, row.version) };
+  }
+  const tpl = typeof key === "string" ? reportTemplate(key) : null;
+  return tpl ? { tpl, snapshot: null } : null;
+}
+
+/** The Write button's rules, WITHOUT writing: a type this person may start
+ *  and the company did not hide, never one only an event asks for; the
+ *  period the day falls in; and the report they already have for it (the
+ *  day's, the week's or the month's opens instead of a second). Koleex AI
+ *  previews with this; startReportDraft writes with it. */
+export async function planReportDraft(auth: ServerAuthContext, o: { templateKey: unknown; date: string }): Promise<PlanOutcome> {
+  const found = await draftType(auth.tenant_id, o.templateKey);
+  if (!found) return "unknown_template";
+  const { tpl, snapshot } = found;
+  if (tpl.requestOnly) return "request_only";
+  const [allowed, hidden] = await Promise.all([
+    canStartTemplate(tpl, auth),
+    tpl.custom ? Promise.resolve([] as string[]) : loadHiddenKeys(auth.tenant_id).catch(() => [] as string[]),
+  ]);
+  if (!allowed) return "forbidden";
+  if (hidden.includes(tpl.key)) return "hidden";
+  const p = periodFor(tpl.cadence, o.date);
+  const period: DraftPeriod = { start: p.start, end: p.end, key: tpl.cadence ? p.key : p.start };
+  const existing = tpl.cadence ? await periodReport(auth, tpl.key, period.key) : null;
+  return { tpl, snapshot, period, existing };
+}
+
+/** Start the writer's report of a type for the period a day falls in (the
+ *  Write button, Koleex AI's confirmed startReportDraft). */
+export async function startReportDraft(auth: ServerAuthContext, o: { templateKey: unknown; date: string; title?: unknown }): Promise<StartOutcome> {
+  const plan = await planReportDraft(auth, o);
+  if (typeof plan === "string") return plan;
+  const { tpl, snapshot, period } = plan;
+  if (plan.existing) return { id: plan.existing.id, existing: true, tpl, period };
+  const title = tpl.customTitle && typeof o.title === "string" ? o.title.trim().slice(0, REPORT_LIMITS.title) : "";
+  const id = await insertDraft(auth, tpl, period, title, [], snapshot);
+  return id ? { id, existing: false, tpl, period } : "failed";
 }

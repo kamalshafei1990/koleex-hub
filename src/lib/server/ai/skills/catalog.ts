@@ -148,6 +148,15 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   readNote: { domain: "work", risk: "read_only" },
   createNote: { domain: "work", risk: "high_risk_write" },
 
+  /* Reports (6B): reads through the Reports app's own read rule — a report
+     only for someone who may read it, its numbers only with their own right;
+     whoOwesReports is the compliance board's scope; startReportDraft only
+     ever starts the caller's OWN empty draft (two-phase, like createNote). */
+  searchReports: { domain: "work", risk: "read_only" },
+  readReport: { domain: "work", risk: "read_only" },
+  whoOwesReports: { domain: "work", risk: "read_only" },
+  startReportDraft: { domain: "work", risk: "high_risk_write" },
+
   /* ── knowledge ─────────────────────────────────────────────────────── */
   search_knowledge: { domain: "knowledge", risk: "read_only" },
   searchTradeTerms: { domain: "knowledge", risk: "read_only" },

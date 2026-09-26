@@ -81,17 +81,21 @@ console.log("\n── 1. The allow-list is the security boundary ──");
   /* EVERY NAME MUST BE READ-ONLY. Checked against the REGISTRY rather than a
      hand-written list of bad names: a new write tool added tomorrow with a
      name nobody predicted is exactly the one that would slip through. */
-  const WRITE_PREFIX = /^(create|update|delete|complete|reassign|remember|forget|suggest|audit|calculate)/i;
+  /* "start" since Reports 6B: startReportDraft writes (the caller's own draft). */
+  const WRITE_PREFIX = /^(create|update|delete|complete|reassign|remember|forget|suggest|audit|calculate|start)/i;
   const writes = VOICE_TOOL_NAMES.filter((n) => WRITE_PREFIX.test(n));
   /* ROADMAP D1 NARROWED THIS FROM "none" TO "exactly the declared write
      list": a call now has ONE confirmation step — the caller's tap — and
      the tool route reserves the confirming phase for it. Any write that is
      not on VOICE_WRITE_TOOLS still fails here by name. */
+  /* REPORTS 6B WIDENED IT BY ONE, on the owner's pick (text AND voice):
+     startReportDraft starts the caller's OWN empty draft, two-phase, its
+     confirming phase reserved for the tap exactly like createTodo's. */
   check(
-    writes.join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && writes.join(",") === "createTodo"
-      ? "the only write on the voice list is createTodo, and it is declared as such"
+    [...writes].sort().join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && [...writes].sort().join(",") === "createTodo,startReportDraft"
+      ? "the only writes on the voice list are createTodo and startReportDraft, and they are declared as such"
       : `UNDECLARED WRITE TOOLS ON THE VOICE LIST: ${writes.filter((w) => !isVoiceWriteTool(w)).join(", ") || "(list mismatch)"}`,
-    writes.join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && writes.join(",") === "createTodo",
+    [...writes].sort().join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && [...writes].sort().join(",") === "createTodo,startReportDraft",
   );
 
   /* And the ones deliberately excluded stay excluded, by name, because each
@@ -117,7 +121,8 @@ console.log("\n── 1. The allow-list is the security boundary ──");
     /* Audit 2026-09-07: the catalogue decides — anything not read-only is a
        write here even if the list forgot it, and an unknown name is a write. */
     isVoiceWriteTool("createQuotationDraft") && isVoiceWriteTool("no-such-tool") &&
-    /"getPricingRules",[\s\S]{0,900}?"createTodo",\s*\];/.test(voiceToolsSrc) &&
+    /* 1 600 since Reports 6B put its four tools (and their note) between. */
+    /"getPricingRules",[\s\S]{0,1600}?"createTodo",\s*\];/.test(voiceToolsSrc) &&
     !((buildVoiceSessionPayload(null).compact.session as { tools?: Array<{ name: string }> }).tools ?? []).some((t) => t.name === "createTodo"));
   const toolRoute = readFileSync("src/app/api/ai/voice/tool/route.ts", "utf8");
   check("the tool route refuses a write's confirm from the model (not via tap) BEFORE dispatch, answering the model rather than erroring",

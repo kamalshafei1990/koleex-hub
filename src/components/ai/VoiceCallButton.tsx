@@ -465,6 +465,9 @@ export default function VoiceCallButton({
      card. `saved` flashes the outcome for a moment. */
   const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string; preview?: Record<string, unknown>; conversationId?: string | null } | null>(null);
   const [writeSaved, setWriteSaved] = useState(false);
+  /* Which write the last tap saved — the card says "task saved" or, for a
+     report draft (Reports 6B), "draft started". */
+  const [writeSavedTool, setWriteSavedTool] = useState<string | null>(null);
   const [writeBusy, setWriteBusy] = useState(false);
   const [writeError, setWriteError] = useState(false);
   /* WHAT THE LAST LOOKUP SHOWED. A product search on a call used to be heard
@@ -781,8 +784,10 @@ export default function VoiceCallButton({
         return;
       }
       const title = String(pending.args.title ?? "").slice(0, 200);
-      session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
+      if (pending.tool === "startReportDraft") session?.sendNote("(Screen: the caller tapped Confirm — their report draft is started; they write and send it in the Reports app. Acknowledge in a few words only if they ask.)");
+      else session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
       setPendingWrite(null);
+      setWriteSavedTool(pending.tool);
       setWriteSaved(true);
       playSound("action-done");
       if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
@@ -805,7 +810,8 @@ export default function VoiceCallButton({
     playSound("action-cancelled");
     /* The preview row simply expires on the server; the model is told so it
        does not keep asking for a confirmation that is not coming. */
-    sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
+    if (pending.tool === "startReportDraft") sessionRef.current?.sendNote("(Screen: the caller cancelled the report draft card. Nothing was started; drop it without comment.)");
+    else sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
   }, [pendingWrite]);
 
   /* THE ORDINARY END IS BEACONED TOO, with the event histogram: a call that
@@ -1821,6 +1827,7 @@ export default function VoiceCallButton({
           onCancelWrite={cancelWrite}
           writeBusy={writeBusy}
           writeSaved={writeSaved}
+          writeSavedTool={writeSavedTool}
           writeError={writeError}
           connectingSlow={connectingSlow}
           laneNote={laneNote}

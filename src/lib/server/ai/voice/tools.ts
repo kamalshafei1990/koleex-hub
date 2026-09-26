@@ -122,6 +122,15 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "getCustomerByName",
   "getCustomerByCode",
   "getPricingRules",
+  /* REPORTS (6B, owner's pick: text AND voice) — the reports the caller may
+     read, who owes one on their compliance board, and their own draft
+     started with a TAP (startReportDraft is two-phase like createTodo). Each
+     checks the Reports app's own read rule per report; report text comes
+     back fenced. */
+  "searchReports",
+  "readReport",
+  "whoOwesReports",
+  "startReportDraft",
   /* ONE WRITE, AND ONLY WITH A TAP (roadmap D1). "Save a task: follow up
      with X on Thursday" is the thing a person on a call most wants written
      down, and the one thing a call could not do. createTodo is the tool the
@@ -137,7 +146,7 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
 /** The write tools a call may reach. Each is two-phase in the registry and
  *  gated by the pending-actions ledger; on a call the confirming phase is
  *  additionally reserved for the caller's tap (tool route). */
-export const VOICE_WRITE_TOOLS: readonly string[] = ["createTodo"];
+export const VOICE_WRITE_TOOLS: readonly string[] = ["createTodo", "startReportDraft"];
 
 export function isVoiceWriteTool(name: string): boolean {
   /* THE CATALOGUE DECIDES, NOT ONLY THE LIST (audit, 2026-09-07). A write

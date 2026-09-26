@@ -377,6 +377,42 @@ export function isChoiceShapedQuestion(msg: string): boolean {
 }
 
 /* ---------------------------------------------------------------------------
+   REPORT LOOKUPS (Reports 6B, 2026-09-27) — which report tool a question
+   plainly needs, for the tool_choice force in the agent loop.
+
+   The prompt says to call the report tools every time. Measured on the
+   owner's first test, the model answered from the conversation instead,
+   twice, with no tool called: "read report <id>" came back with the
+   PREVIOUS report's text under the new id, and "list every report I can
+   read" with one draft three times. So the lookup is forced on the first
+   request, as the trade terms are:
+     · a report id in the message                → readReport
+     · who has not sent / owes / is late         → whoOwesReports
+     · list / find / search / summarise / read … → searchReports
+   Starting a draft is NOT forced — that is a write, previewed by the model
+   itself — and a report noun must appear in every case.
+   --------------------------------------------------------------------------- */
+const REPORT_ID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+const REPORT_NOUN = /\b(reports?|reported)\b|تقرير|تقارير|报告|日报|周报|月报|汇报/i;
+const REPORT_START =
+  /\b(start|begin|create|make|open)\b[^.?!]{0,30}\b(reports?|plans?)\b|ابدأ|ابدا|إبدأ|افتح|اعمل|أعمل|جهز|جهّز|أنشئ|انشئ|开始|新建|创建|起草/i;
+const REPORT_OWED =
+  /\b(who|whose)\b[^.?!]{0,40}\b(hasn'?t|has\s+not|haven'?t|have\s+not|didn'?t|did\s+not|not\s+yet|missing|owes?|late)\b|\b(missing|late|overdue|owed|unsent)\s+reports?\b|\breports?\b[^.?!]{0,20}\b(late|missing|overdue|not\s+sent)\b|مين\s*(ما|مـا|لسه|لسّه)?\s*(بعتش|بعت|سلمش|سلّمش)|ما\s*بعتش|مابعتش|مبعتش|مين\s*(متأخر|متاخر)|التقارير\s*(الناقصة|المتأخرة|المتاخرة)|谁(还)?没(交|提交|写|发)/i;
+const REPORT_FIND =
+  /\b(list|show|find|search|look\s+up|what|which|summari[sz]e|read|any|tell\s+me|give\s+me)\b|دور|دوّر|ابحث|لخص|لخّص|وريني|ورّيني|هات|اعرض|إيه|ايه|قول|اقرا|اقرأ|找|搜索|总结|列出|哪些|看看|读/i;
+
+export type ReportLookupTool = "readReport" | "whoOwesReports" | "searchReports";
+
+export function reportLookupTool(msg: string): ReportLookupTool | null {
+  const raw = msg ?? "";
+  if (!raw || !REPORT_NOUN.test(raw)) return null;
+  if (REPORT_ID.test(raw)) return "readReport";
+  if (REPORT_START.test(raw)) return null;
+  if (REPORT_OWED.test(raw)) return "whoOwesReports";
+  return REPORT_FIND.test(raw) ? "searchReports" : null;
+}
+
+/* ---------------------------------------------------------------------------
    TRADE TERMS — Incoterms and payment terms.
 
    Used twice, which is why it is a named helper rather than an inline test:
@@ -555,7 +591,7 @@ export function isBusinessDataQuery(msg: string): boolean {
 
 /* ─── Work / schedule data detector ───────────────────────────────
    Returns true when the question is about the user's OWN work data —
-   To-do / Projects / Planning / Calendar. These MUST reach the
+   To-do / Projects / Planning / Calendar / Reports. These MUST reach the
    tool-calling orchestrator (listMyTodos / listMyProjects /
    listProjectTasks / listMyPlanning / listMyCalendar). The general
    fast-path has NO tools, so any of these slipping through it makes
@@ -608,11 +644,25 @@ export function isWorkDataQuery(msg: string): boolean {
     /\b(set(\s+up)?|schedule|book|arrange|plan|make|create|add|cancel|delete|remove|move|reschedule|postpone|push\s+back|complete|finish|mark|close|reopen|assign|reassign|transfer|update|change|rename|edit)\b/;
   if (writeVerb.test(s) && workNoun.test(s)) return true;
 
-  /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي. */
-  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|تذكيرات|ذكرني|ذكّرني|تذكرني|فكرني|فكّرني|تفكرني|نبهني|نبّهني|منبه|متنساني|ما\s*تنساني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
+  /* WORK REPORTS (Reports 6B, 2026-09-27) — the Reports app's records:
+     "what did the sales team report", "who hasn't sent their report",
+     "start my daily report", "open a weekly plan". The owner's first test
+     reached the tool-less lane and was told the reports cannot be read. A
+     report noun with a personal or dated framing, or a report's own context
+     (who sent it, who owes it, whose team), or a cadence by name. Not the
+     framing above: its "do I" would send "how do I write a good report" —
+     writing advice, the fast lane's job — to the tools. */
+  const reportNoun = /\b(reports?|reported|weekly\s+plans?)\b/;
+  const reportContext =
+    /\b(my|our|mine|me|today|tomorrow|this\s+(week|month)|next\s+(week|month)|due|overdue|pending|who|whose|what\s+did|sent|send|submitted|submit|missing|late|owes?|owed|wrote|written|draft|drafts|start|read|summari[sz]e|team|staff|colleagues?|yesterday|last\s+(week|month))\b/;
+  if (reportNoun.test(s) && reportContext.test(s)) return true;
+  if (/\b(daily|weekly|monthly)\s+(report|reports|plan|plans)\b/.test(s)) return true;
 
-  /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排. */
-  if (/任务|日程|日历|会议|提醒|待办|项目|安排|别忘|不要忘|闹钟/.test(msg)) return true;
+  /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي/تقرير. */
+  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|تذكيرات|ذكرني|ذكّرني|تذكرني|فكرني|فكّرني|تفكرني|نبهني|نبّهني|منبه|متنساني|ما\s*تنساني|مشروع|مشاريع|أعمالي|اعمالي|شغلي|تقرير|تقارير/.test(msg)) return true;
+
+  /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排/报告. */
+  if (/任务|日程|日历|会议|提醒|待办|项目|安排|别忘|不要忘|闹钟|报告|日报|周报|月报|汇报/.test(msg)) return true;
 
   return false;
 }

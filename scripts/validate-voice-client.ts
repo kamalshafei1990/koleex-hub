@@ -856,7 +856,8 @@ async function main() {
     check("so the call screen stays mounted through a wobble",
       /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(src));
     check("  …and it is rendered at the document body, above every piece of app chrome",
-      /createPortal\(\s*<VoiceCallScreen[\s\S]{0,1200}?document\.body,/.test(src) && /import \{ createPortal \} from "react-dom";/.test(src));
+      /* 1 400 since Reports 6B passed one more prop (which write was saved). */
+      /createPortal\(\s*<VoiceCallScreen[\s\S]{0,1400}?document\.body,/.test(src) && /import \{ createPortal \} from "react-dom";/.test(src));
     check("and the control still ends the call rather than starting a second one",
       /onClick=\{connected \|\| busy \? hangUp/.test(src));
     /* A parent that unmutes its own speech synthesis mid-wobble talks over the

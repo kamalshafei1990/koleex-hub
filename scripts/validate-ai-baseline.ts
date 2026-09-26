@@ -105,6 +105,12 @@ check(
   'measured: the model answered "transferable letter of credit" from memory — memory still carries the ship\'s-rail rule deleted in 2010',
 );
 check(
+  "report lookups force their report tool on the first request — only when this caller is offered it (Reports 6B)",
+  /const forcedReportTool = reportTool && tools\.some\(\(t\) => t\.function\.name === reportTool\) \? reportTool : null;/.test(orch) &&
+    /forceReportNow && forcedReportTool[\s\S]{0,120}name: forcedReportTool/.test(orch),
+  'measured: "read report <id>" answered with the previous report\'s text, and a list with one draft three times — from the conversation, no tool called',
+);
+check(
   "choice-shaped questions force askUser",
   /forceAskNow[\s\S]{0,300}name: "askUser"/.test(orch),
   "measured: four numbered questions in prose instead of a tappable card",

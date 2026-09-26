@@ -182,7 +182,7 @@ export interface DigestInput {
  *  problems; a score's average; a choice's answer; a table's first rows;
  *  links' names; the numbers blocks' counts and totals; who signed.
  *  `word` names a section, a point, a column or an answer. */
-export function reportDigest(r: DigestInput, word: (key: string) => string): string {
+export function reportDigest(r: DigestInput, word: (key: string) => string, caps: { section: number; report: number } = { section: 900, report: TEAM_LIMITS.perReport }): string {
   const k = r.tpl.key;
   const name = (sid: string) => word(`tpl.${k}.s.${sid}`);
   const lines: string[] = [`### ${r.author} — ${word(`tpl.${k}.name`)} — ${r.from ? rangeLabel(r.from, r.to ?? r.from) : ""}${r.title.trim() ? ` — "${flat(r.title, 120)}"` : ""}`];
@@ -192,8 +192,8 @@ export function reportDigest(r: DigestInput, word: (key: string) => string): str
     if (!v) continue;
     let line = "";
     switch (def.kind) {
-      case "text": if (v.text?.trim()) line = flat(v.text, 900); break;
-      case "list": if (v.items?.length) line = flat(v.items.join(" · "), 900); break;
+      case "text": if (v.text?.trim()) line = flat(v.text, caps.section); break;
+      case "list": if (v.items?.length) line = flat(v.items.join(" · "), caps.section); break;
       case "checklist": {
         const points = def.points ?? [];
         const answered = points.filter((p) => v.checks?.[p.id]?.state).length;
@@ -223,7 +223,7 @@ export function reportDigest(r: DigestInput, word: (key: string) => string): str
     if (line) lines.push(`${name(def.id)}: ${line}`);
   }
   const text = lines.join("\n");
-  return text.length > TEAM_LIMITS.perReport ? `${text.slice(0, TEAM_LIMITS.perReport - 1)}…` : text;
+  return text.length > caps.report ? `${text.slice(0, caps.report - 1)}…` : text;
 }
 
 /** The reports' digests, newest first, until the material is full. */
