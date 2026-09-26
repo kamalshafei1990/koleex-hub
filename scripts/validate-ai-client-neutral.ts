@@ -153,7 +153,7 @@ console.log("\n── 3. The reference itself behaves ──");
   /* The union is closed on purpose: a client receiving an unknown kind cannot
      navigate anywhere useful, so widening it should be a decision. */
   const kinds: ResourceKind[] = [
-    "quotation", "customer", "product", "todo", "project", "planning_item", "calendar_event",
+    "quotation", "customer", "product", "todo", "project", "planning_item", "calendar_event", "note",
   ];
   const declared = readFileSync("src/lib/server/ai/core/resource-ref.ts", "utf8");
   check(

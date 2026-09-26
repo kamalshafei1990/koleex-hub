@@ -13,6 +13,13 @@ import "server-only";
                      through validateNoteInput (body_plain derived server-side).
                      Two-phase: preview first, confirm:true to create.
    Note text is the user's own content; it is returned as data.
+
+   THE TENANT, TOO (security review, 2026-09-26). A note is owned by one
+   account and shared only inside its tenant (the shares route refuses any
+   other), and the tables are service-role only — so the account keys above
+   already keep a caller inside their own tenant. Every read here ALSO names
+   the caller's tenant, as the rest of the tool layer does: defence in depth,
+   and what the tenant-isolation validator checks for.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
@@ -20,11 +27,15 @@ import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { canRead, getNoteAccess, ilikeAny, validateNoteInput } from "@/lib/notes-server";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
+import { resourceRef } from "@/lib/server/ai/core/resource-ref";
 
 const NOTES_MODULE = "Notes";
 const READ_CAP = 8000;
 
+/* The Hub's own route, which the Hub UI opens, and a client-neutral
+   ResourceRef for any other client (core/resource-ref.ts). */
 const link = (id: string) => `/notes?id=${id}`;
+const ref = (id: string) => resourceRef("note", id);
 
 /* ── searchNotes ───────────────────────────────────────────────────────── */
 
@@ -47,35 +58,36 @@ const searchNotes: ToolDef<{ q?: string; limit?: number }, Array<Record<string, 
     const raw = typeof args.q === "string" ? args.q.trim().slice(0, NOTE_LIMITS.search) : "";
     const term = raw.replace(/^#/, "").trim();
     const me = ctx.auth.account_id;
+    const tenant = ctx.auth.tenant_id;
     const COLS = "id, account_id, title, body_plain, tags, updated_at";
 
     try {
       // Own notes
-      let own = supabaseServer.from("notes").select(COLS).eq("account_id", me).is("deleted_at", null);
+      let own = supabaseServer.from("notes").select(COLS).eq("tenant_id", tenant).eq("account_id", me).is("deleted_at", null);
       if (term) own = own.or(ilikeAny(["title", "body_plain"], term));
       const ownRes = await own.order("updated_at", { ascending: false }).limit(limit);
 
       // Own notes by tag (substring match inside the tags array)
       let tagRows: Array<Record<string, unknown>> = [];
       if (term) {
-        const { data: allTags } = await supabaseServer.from("notes").select("tags").eq("account_id", me).is("deleted_at", null).limit(5000);
+        const { data: allTags } = await supabaseServer.from("notes").select("tags").eq("tenant_id", tenant).eq("account_id", me).is("deleted_at", null).limit(5000);
         const needle = term.toLowerCase();
         const matching = Array.from(new Set(
           ((allTags ?? []) as Array<{ tags: string[] | null }>).flatMap((r) => r.tags ?? []).filter((x) => x.toLowerCase().includes(needle)),
         )).slice(0, 50);
         if (matching.length) {
-          const { data } = await supabaseServer.from("notes").select(COLS).eq("account_id", me).is("deleted_at", null)
+          const { data } = await supabaseServer.from("notes").select(COLS).eq("tenant_id", tenant).eq("account_id", me).is("deleted_at", null)
             .overlaps("tags", matching).order("updated_at", { ascending: false }).limit(limit);
           tagRows = (data ?? []) as Array<Record<string, unknown>>;
         }
       }
 
       // Shared with me (live only)
-      const { data: shares } = await supabaseServer.from("note_shares").select("note_id").eq("shared_with_account_id", me);
+      const { data: shares } = await supabaseServer.from("note_shares").select("note_id").eq("tenant_id", tenant).eq("shared_with_account_id", me);
       const sharedIds = ((shares ?? []) as Array<{ note_id: string }>).map((s) => s.note_id);
       let sharedRows: Array<Record<string, unknown>> = [];
       if (sharedIds.length) {
-        let sq = supabaseServer.from("notes").select(COLS).in("id", sharedIds.slice(0, 500)).is("deleted_at", null);
+        let sq = supabaseServer.from("notes").select(COLS).eq("tenant_id", tenant).in("id", sharedIds.slice(0, 500)).is("deleted_at", null);
         if (term) sq = sq.or(ilikeAny(["title", "body_plain"], term));
         const { data } = await sq.order("updated_at", { ascending: false }).limit(limit);
         sharedRows = (data ?? []) as Array<Record<string, unknown>>;
@@ -94,6 +106,7 @@ const searchNotes: ToolDef<{ q?: string; limit?: number }, Array<Record<string, 
           updated_at: r.updated_at,
           ...(r.account_id !== me ? { shared_with_me: true } : {}),
           link: link(r.id as string),
+          resource: ref(r.id as string),
         }));
       return {
         ok: true,
@@ -128,8 +141,8 @@ const readNote: ToolDef<{ note_id?: string }, Record<string, unknown>> = {
     const access = await getNoteAccess<{ title: string; body_plain: string; tags: string[]; updated_at: string }>(
       id, ctx.auth.account_id, "title, body_plain, tags, updated_at",
     );
-    // Same answer for "does not exist" and "not yours" — never confirm existence.
-    if (!access.note || !canRead(access.role)) {
+    // Same answer for "does not exist", "not yours" and "another tenant's" — never confirm existence.
+    if (!access.note || !canRead(access.role) || access.tenantId !== ctx.auth.tenant_id) {
       return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't find that note." };
     }
     const n = access.note;
@@ -147,6 +160,7 @@ const readNote: ToolDef<{ note_id?: string }, Record<string, unknown>> = {
         in_trash: !!n.deleted_at,
         updated_at: n.updated_at,
         link: link(id),
+        resource: ref(id),
       },
       sources: [`notes(${id.slice(0, 8)}…)`],
     };
@@ -242,7 +256,7 @@ const createNote: ToolDef<
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { note_id: row.id, title: row.title, link: link(row.id) },
+      data: { note_id: row.id, title: row.title, link: link(row.id), resource: ref(row.id) },
       message: `Created the note "${row.title || "(untitled)"}".`,
       sources: ["notes(insert)"],
     };
