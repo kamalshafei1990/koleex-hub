@@ -4727,6 +4727,32 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* A web source, drawn as a small chip with the site's name (source-links.ts,
+   owner 2026-09-26). Quiet by design: the answer is the point, the chip says
+   where it came from and opens it. */
+.koleex-md a.koleex-md-source {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: baseline;
+  margin-inline: 2px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--bg-surface-subtle, rgba(255, 255, 255, 0.06));
+  color: var(--text-dim, #9aa3b2);
+  font-size: 0.78em;
+  line-height: 1.7;
+  text-decoration: none;
+  unicode-bidi: isolate;
+}
+.koleex-md a.koleex-md-source:hover {
+  color: var(--text-primary, #e8edf5);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.24));
+}
 .koleex-md .koleex-md-inline-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.92em;

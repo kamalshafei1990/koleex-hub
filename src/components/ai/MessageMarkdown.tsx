@@ -34,6 +34,7 @@ import remarkGfm from "remark-gfm";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 import { aiImage } from "@/lib/ai/image-url";
 import { blockDirection, type TextDir } from "@/lib/text-direction";
+import { sourceChipLabel, tidyBareLinks } from "@/components/ai/source-links";
 
 interface Props {
   content: string;
@@ -151,16 +152,25 @@ export default function MessageMarkdown({
           blockquote: ({ node, children, ...rest }) => <blockquote {...rest} dir={blockDir(node)}>{children}</blockquote>,
           /* `node` is the hast element react-markdown hands every
              component; it must not reach the DOM as an attribute. */
-          a: ({ node, href, children, ...rest }) => (void node, (
-            <a
-              {...rest}
-              href={href}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              {children}
-            </a>
-          )),
+          a: ({ node, href, children, ...rest }) => {
+            /* A WEB SOURCE IS A CHIP (owner, 2026-09-26: pasted addresses
+               were "not organized at all"). A bare address shows its site's
+               name; a short named web link keeps its name; the address stays
+               in the title for anyone who wants it. Hub links and long link
+               text are ordinary links. See source-links.ts. */
+            const chip = sourceChipLabel(href, hastText(node));
+            return (
+              <a
+                {...rest}
+                href={href}
+                target="_blank"
+                rel="noreferrer noopener"
+                {...(chip ? { className: "koleex-md-source", title: href, dir: "ltr" } : {})}
+              >
+                {chip ?? children}
+              </a>
+            );
+          },
           code: ({ node, className: cls, children, ...rest }) => {
             void node;
             /* Tree structure: inline code uses <code> directly; block
@@ -216,7 +226,7 @@ export default function MessageMarkdown({
           )),
         }}
       >
-        {content}
+        {tidyBareLinks(content)}
       </ReactMarkdown>
       );
     },

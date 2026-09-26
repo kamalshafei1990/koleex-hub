@@ -16,6 +16,8 @@ import { thinkingNote, THINKING_NOTE_MAX } from "../src/lib/server/ai/core/think
 import { thinkingRows, hasThinking, lookupDetail, siteOf, thoughtSeconds } from "../src/components/ai/thinking-panel-model";
 import { COPY } from "../src/components/ai/copy";
 import type { AgentStep, ThinkingRecord } from "../src/components/ai/types";
+import { siteLabel, sourceChipLabel, tidyBareLinks } from "../src/components/ai/source-links";
+import { GENERAL_SEARCH_NOTE } from "../src/lib/server/ai/core/general-search";
 import { buildThinkingRecord, parseThinkingRecord, THINKING_MAX_NOTES, THINKING_MAX_LOOKUPS } from "../src/lib/ai/thinking-record";
 
 let pass = 0;
@@ -134,7 +136,7 @@ console.log("\n── 6. The record saved with the reply (ai_messages.thinking) 
     !!rec && rec.lookups[0].detail === "top 100 global brands 2026" && rec.lookups[1].detail === "interbrand.com" &&
     rec.lookups[2].detail === null && !JSON.stringify(rec).includes("ACME") && !JSON.stringify(rec).includes("138"));
   check("a turn with no lookup and nothing said saves nothing (the column stays NULL)",
-    buildThinkingRecord({ notes: [], steps: [{ kind: "answer", text: "Hi" }], ms: 900 }) === null);
+    buildThinkingRecord({ notes: [], steps: [{ kind: "answer" }], ms: 900 }) === null);
   const many = buildThinkingRecord({
     notes: Array.from({ length: 30 }, (_, i) => ({ text: `note ${i} ` + "x".repeat(900), at: i })),
     steps: Array.from({ length: 40 }, () => ({ kind: "tool-call", tool: "search_web", payload: { query: "q" } })),
@@ -171,6 +173,31 @@ console.log("\n── 6. The record saved with the reply (ai_messages.thinking) 
     /add column if not exists thinking jsonb;/.test(mig) && !/thinking jsonb[^;]*(not null|default)/i.test(mig) &&
     /jsonb_typeof\(thinking\) = 'object' and octet_length\(thinking::text\) <= 16384/.test(mig));
   check("  …and states its reason, index, RLS, load and rollback", ["WHY.", "SHAPE.", "INDEX.", "RLS.", "LOAD.", "ROLLBACK."].every((h) => mig.includes(h)));
+}
+
+console.log("\n── 7. Web sources read as small chips, not pasted addresses (owner, 2026-09-26) ──");
+{
+  const forbes = "https://www.forbes.com/sites/justinteitelbaum/2026/05/29/the-worlds-most-valuable-soccer-teams-2026";
+  check("a site is named by its host without www", siteLabel(forbes) === "forbes.com" && siteLabel("/reports/abc") === null && siteLabel(undefined) === null);
+  check("a bare address becomes a chip with its site's name", sourceChipLabel(forbes, forbes) === "forbes.com");
+  check("a short named web link keeps its name as the chip", sourceChipLabel(forbes, "Forbes") === "Forbes");
+  check("a Hub link and a long link text stay ordinary links",
+    sourceChipLabel("/reports/abc", "Open") === null &&
+    sourceChipLabel(forbes, "the full list of the most valuable football clubs this year") === null);
+  check("an address wrapped in brackets loses the brackets, so the chip is not inside stray parentheses",
+    tidyBareLinks(`about $9.5 billion (${forbes}).`) === `about $9.5 billion  ${forbes}.`);
+  check("  …a markdown link's own (url) and code are left alone",
+    tidyBareLinks(`[Forbes](${forbes})`) === `[Forbes](${forbes})` && tidyBareLinks("`(https://a.b/c)`") === "`(https://a.b/c)`");
+  const md = readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
+  check("the answer renderer draws chips through these rules and tidies the text first",
+    /const chip = sourceChipLabel\(href, hastText\(node\)\);/.test(md) && /\{tidyBareLinks\(content\)\}/.test(md) &&
+    /className: "koleex-md-source"/.test(md) && /target="_blank"/.test(md) && /rel="noreferrer noopener"/.test(md));
+  const prompts = readFileSync("src/lib/server/ai/prompts/index.ts", "utf8");
+  const tool = readFileSync("src/lib/server/ai-agent/tools/web-search.ts", "utf8");
+  check("every prompt that asked for \"the source URL\" now asks for a short named link, never a bare address",
+    !/Cite the source URL/.test(prompts) && !/Cite the source URL/.test(tool) &&
+    /short markdown link named by its site/.test(prompts) && /short " \+\s*"markdown link named by its site/.test(tool) &&
+    /short markdown link named by its site/.test(GENERAL_SEARCH_NOTE) && /never a bare web address/.test(GENERAL_SEARCH_NOTE));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

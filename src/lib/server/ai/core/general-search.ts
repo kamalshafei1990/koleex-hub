@@ -51,7 +51,8 @@ export const GENERAL_SEARCH_NOTE =
   "use the result for what it covers and complete the rest from what you know, saying in one line which part comes from general knowledge. " +
   "When the user asked for a number of items (top 100, 20 companies), give that many: in a table, add a Source column that says \"search\" " +
   "for rows from the result and \"general knowledge — may be out of date\" for the rest. A ranking that changes over time is a reason to say " +
-  "it may be dated, never a reason to stop short. Never answer with only a link.";
+  "it may be dated, never a reason to stop short. Never answer with only a link. " +
+  "Cite a source as a short markdown link named by its site — [Forbes](https://…) — at the end of the sentence it supports, never a bare web address.";
 
 export type GeneralInvoke = (
   ctx: UserContext,

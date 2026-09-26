@@ -253,7 +253,7 @@ export const VOICE_SNIPPET_CHARS = 200;
    ! (exhibitorsearch.messefrankfurt.com)" — the model wrote the pictures'
    markdown into its spoken turn and the voice read the punctuation and the
    host out loud). The text lane's envelope carries picture URLs and a rule
-   to embed them as markdown, and asks for the source URL to be cited;
+   to embed them as markdown, and asks for sources to be cited as links;
    every one of those is wrong in a mouth. On a call the SCREEN already
    shows the pictures a lookup returns (VoiceCallButton.onToolResult reads
    them from the route's response before the model sees anything), so the

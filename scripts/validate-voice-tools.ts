@@ -964,7 +964,7 @@ console.log("\n── 6. What a call gets back from a web search is shorter ─�
     out.results.every((r) => !("url" in r) && r.source === "ex.com" && typeof r.title === "string"));
   check("  …and the note is written for speech: no links, no markdown, no picture words; one sentence about what the screen shows",
     out.usage_note.startsWith("SPOKEN ANSWER.") && /NEVER say a link, a web address, a file name, a host, markdown/.test(out.usage_note) &&
-    /screen is already showing one picture from this lookup: say one short sentence/.test(out.usage_note) && !/markdown !\[/.test(out.usage_note) && !/Cite the source URL/.test(out.usage_note));
+    /screen is already showing one picture from this lookup: say one short sentence/.test(out.usage_note) && !/markdown !\[/.test(out.usage_note) && !/Cite the source URL|markdown link named by its site/.test(out.usage_note));
   const machineOut = forVoice("search_web", { results: [{ url: "https://www.a.example/x", snippet: "s" }], usage_note: "These are public web results… NO PICTURES FOR MACHINES FROM THE WEB. … FRESHNESS: this search ran on 2026-09-11. Results carry their published dates." }) as { results: Array<{ source?: string }>; pictures_on_screen?: number; usage_note: string };
   check("  …a machine query keeps the product-tools rule, the freshness rule survives, www. is dropped from a source, and no pictures means no count",
     /Koleex product question — use searchProducts/.test(machineOut.usage_note) && /FRESHNESS: this search ran on 2026-09-11\. Results carry their published dates\./.test(machineOut.usage_note) &&

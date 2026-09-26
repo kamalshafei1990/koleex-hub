@@ -166,7 +166,7 @@ async function main() {
     const data = r.data as Record<string, unknown> | null;
     check("a search without pictures has NO images key at all", r.ok && data !== null && !("images" in data));
     check("  …and the brand note, then the freshness note — nothing about pictures",
-      (data?.usage_note as string).startsWith("These are public web results, for facts only. Never present another manufacturer's product as an option — Koleex only ever recommends Koleex machines. Cite the source URL for any figure you take from here, and say how fresh it is when a date is given. FRESHNESS: this search ran on ") &&
+      (data?.usage_note as string).startsWith("These are public web results, for facts only. Never present another manufacturer's product as an option — Koleex only ever recommends Koleex machines. Cite the source of any figure you take from here as a short markdown link named by its site — [Forbes](https://…) — at the end of the sentence it supports, never a bare web address; and say how fresh it is when a date is given. FRESHNESS: this search ran on ") &&
       !/PICTURES:/.test(String(data?.usage_note)));
   }
   {
