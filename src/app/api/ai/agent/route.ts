@@ -82,8 +82,12 @@ import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* A ceiling on a turn. Without one a hung provider call could hold the SSE
    open, keepalives hiding the failure, for as long as the platform allows
-   (audit, 2026-09-07). Two minutes covers a long tool loop. */
-export const maxDuration = 120;
+   (audit, 2026-09-07). Five minutes: two did not cover a list of a hundred
+   rows on a model that reasons before it writes — the owner's "top 100
+   brands" on Deep hit the two-minute wall twice and got "No reply was
+   received" (2026-09-26). The loop's own time budget (orchestrator
+   LOOP_ANSWER_AFTER_MS) starts the answer long before this. */
+export const maxDuration = 300;
 
 /* Conversation memory window. 6 messages (3 exchanges) turned out to be
    the reason Koleex AI felt like a question-answerer rather than a

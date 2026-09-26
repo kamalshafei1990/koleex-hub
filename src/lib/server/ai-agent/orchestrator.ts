@@ -109,6 +109,14 @@ const IDENTITY_HISTORY_TURNS = 6;
 const IDENTITY_HISTORY_CHARS = 400;
 
 const MAX_ITERATIONS = 4;
+/* THE LOOP'S TIME BUDGET (owner, 2026-09-26: "top 100 brands" on Deep got
+   "No reply was received" twice — the function hit its wall while the model
+   was still looking things up). Once lookups have run and this much of the
+   turn is gone, the next round is the answer round: no more tools, write
+   from what was gathered. A hundred-row answer from a model that reasons
+   first can take over a minute on its own, so it has to START early; the
+   route's maxDuration (300 s) is the backstop, not the plan. */
+const LOOP_ANSWER_AFTER_MS = 45_000;
 /* THE ANSWER CEILING (owner, 2026-09-26: "what is the top 100 famous brands"
    on Koleex Deep came back as the text "Running search_web(…)…"). A model
    that reasons before it writes spends its reasoning from the same budget,
@@ -493,7 +501,8 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     /* THE LAST ROUND ANSWERS. A turn whose rounds were all spent on lookups
        used to end with no answer at all; the last round now carries no tool,
        so the model writes one from what it gathered. */
-    const lastRound = iter === MAX_ITERATIONS - 1 && totalToolRuns > 0;
+    const lastRound =
+      totalToolRuns > 0 && (iter === MAX_ITERATIONS - 1 || Date.now() - tStart >= LOOP_ANSWER_AFTER_MS);
     /* Report lookup on the first request — see forcedReportTool. */
     const forceReportNow = forcedReportTool !== null && !forcedReport && !forceTradeNow && totalToolRuns === 0;
     if (forceReportNow) forcedReport = true;
