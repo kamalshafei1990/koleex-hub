@@ -76,8 +76,10 @@ function freshnessNote(searchedOn: string, recency: string | undefined): string 
 const BRAND_NOTE =
   "These are public web results, for facts only. Never present another " +
   "manufacturer's product as an option — Koleex only ever recommends Koleex " +
-  "machines. Cite the source URL for any figure you take from here, and say " +
-  "how fresh it is when a date is given.";
+  "machines. Cite the source of any figure you take from here as a short " +
+  "markdown link named by its site — [Forbes](https://…) — at the end of the " +
+  "sentence it supports, never a bare web address; and say how fresh it is " +
+  "when a date is given.";
 
 /* Repeated beside the pictures, where the model reads it, for the same
    reason BRAND_NOTE is: a rule in the data beats a rule twenty messages up. */
