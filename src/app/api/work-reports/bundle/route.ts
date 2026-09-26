@@ -18,7 +18,7 @@ import { REPORT_LIST_COLS, listPeople, loadOrgTree, requireReportsUser } from "@
 import { REPORT_TEMPLATES } from "@/lib/reports/catalog";
 import { MGMT_MODULE, OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
 import type { ReportTemplateDef } from "@/lib/reports/templates";
-import { loadMyDue } from "@/lib/server/reports/obligations";
+import { loadMyReports } from "@/lib/server/reports/obligations";
 import { TEMPLATES_MODULE, loadCustomHeads, loadHiddenKeys } from "@/lib/server/reports/custom-templates";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   const inboxSel = `${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`;
 
   /* Everything in ONE parallel wave — no await after it touches the network. */
-  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, due, custom, hidden, builder, office, projects, inventory, expenses, payroll, mgmt, contracts] = await Promise.all([
+  const [people, tree, latest, unread, review, drafts, sent, hrView, hrCreate, finance, todo, mine, custom, hidden, builder, office, projects, inventory, expenses, payroll, mgmt, contracts] = await Promise.all([
     listPeople(t),
     loadOrgTree(t),
     supabaseServer.from("work_reports").select(inboxSel).match(tm).eq("work_report_recipients.account_id", me).neq("status", "draft")
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
     requireModuleAccess(auth, "Finance"),
     requireModuleAccess(auth, "To-do"),
     /* The org tree is memoised per tenant, so this shares the read above. */
-    loadMyDue(auth).catch((e: unknown) => { console.error("[reports] due:", e instanceof Error ? e.message : e); return []; }),
+    loadMyReports(auth).catch((e: unknown) => { console.error("[reports] due:", e instanceof Error ? e.message : e); return { due: [], guide: null }; }),
     /* 4E: the builder's types and the hidden built-ins — the same wave. */
     loadCustomHeads(t, { activeOnly: true }).catch(quiet("custom templates", [])),
     loadHiddenKeys(t).catch(quiet("hidden templates", [] as string[])),
@@ -103,7 +103,9 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     me: { id: me, managerId: tree.chainOf(me)[0] ?? null, hasTeam, board: hasTeam || hrView === null, templates: builder === null },
-    due,
+    due: mine.due,
+    /* Staff readiness (26/09/2026): the first weeks' guide, for someone who owes reports. */
+    guide: mine.guide,
     counts: { unread: unread.count ?? 0, review: review.count ?? 0, drafts: drafts.count ?? 0, sentThisMonth: sent.count ?? 0 },
     latest: ((latest.data ?? []) as Row[]).map((r) => {
       const mine = r.work_report_recipients?.[0] ?? null;

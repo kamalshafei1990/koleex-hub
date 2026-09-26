@@ -44,6 +44,7 @@ import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodL
 import type { DueItem } from "@/lib/reports/obligations";
 import { CARD, TemplateIcon, tplName, type T } from "./shared";
 import { ReportRowItem } from "./ReportRowItem";
+import FirstWeekGuide from "./FirstWeekGuide";
 
 const HrLibrary = dynamic(() => import("./HrLibrary"), { ssr: false, loading: () => <div className="grid place-items-center py-10"><SpinnerIcon size={18} /></div> });
 const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
@@ -253,6 +254,9 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
   const due = bundle?.due ?? [];
   return (
     <div className="space-y-4">
+    {/* Staff readiness (26/09/2026): the first weeks' guide — with the
+        bundle, never after it (the server says whether there is one). */}
+    {bundle?.guide && <FirstWeekGuide t={t} lang={lang} guide={bundle.guide} accountId={bundle.me.id} canWrite={allowed.has("daily")} busy={!!creating} onWrite={() => onStart("daily")} />}
     {due.length > 0 && <DueCard t={t} due={due} creating={creating} onStart={onStart} />}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       {/* Each family its own card (owner, 27/09/2026: "just separate them

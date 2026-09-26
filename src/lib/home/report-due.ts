@@ -12,6 +12,8 @@
    badges use. The sentence and its words load only when something IS owed
    (report-due-line.ts, its own small chunk), so the Home bundle every
    session opens carries neither them nor anything of the Reports app.
+   Staff readiness (26/09/2026): before anything is owed, someone whose
+   reports are about to start reads that day instead (`reportsStart`).
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -32,11 +34,14 @@ export interface HomeDueItem {
 export interface HomeDueLine { text: string; href: string }
 type Build = (items: HomeDueItem[], lang: string) => HomeDueLine | null;
 
-async function readDue(): Promise<HomeDueItem[] | null> {
+/** What is owed, and — staff readiness (26/09/2026) — the day their reports
+ *  begin while it is still ahead (`reportsStart`, the same snapshot). */
+async function readDue(): Promise<{ items: HomeDueItem[]; start: string | null } | null> {
   try {
     const { cachedGet } = await import("@/lib/client-cache");
-    const work = await cachedGet<{ reportsDue?: HomeDueItem[] }>("/api/me/work", 15_000);
-    return Array.isArray(work?.reportsDue) ? work.reportsDue : null;
+    const work = await cachedGet<{ reportsDue?: HomeDueItem[]; reportsStart?: string }>("/api/me/work", 15_000);
+    if (!work) return null;
+    return { items: Array.isArray(work.reportsDue) ? work.reportsDue : [], start: typeof work.reportsStart === "string" ? work.reportsStart : null };
   } catch {
     return null;
   }
@@ -56,9 +61,12 @@ export function useReportDue(enabled: boolean, lang: string): HomeDueLine | null
     let alive = true;
     const read = () => {
       void readDue()
-        .then(async (items) => {
-          const owed = items ?? [];
-          const build = owed.length ? (await import("./report-due-line")).reportDueLine : null;
+        .then(async (got) => {
+          const owed = got?.items ?? [];
+          /* Nothing owed yet but reports about to start: that day, instead. */
+          const start = owed.length ? null : got?.start ?? null;
+          const line = owed.length || start ? await import("./report-due-line") : null;
+          const build: Build | null = !line ? null : owed.length ? line.reportDueLine : (_items, l) => line.reportStartLine(start!, l);
           if (alive) setState({ items: owed, build });
         })
         .catch(() => { if (alive) setState({ items: [], build: null }); });

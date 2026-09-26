@@ -89,4 +89,15 @@ export const reportComplianceT: Translations = {
   "launch.past": { en: "This day is today or earlier: a report whose time has passed counts as missing at once, and its manager can be told within hours.", zh: "该日期是今天或更早：已过截止时间的报告会立即算作未交，主管可能在几小时内收到通知。", ar: "اليوم ده النهارده أو قبل كده: أي تقرير ميعاده عدّى هيتحسب ناقص على طول، والمدير ممكن يتبلّغ خلال ساعات." },
   "launch.events": { en: "Reports that events ask for (leave, a customer visit, a late day) come on top — they depend on what happens.", zh: "由事件触发的报告（休假、客户拜访、迟到）另计——取决于实际发生的情况。", ar: "التقارير اللي بتطلبها الأحداث (إجازة، زيارة عميل، يوم تأخير) بتيجي زيادة — على حسب اللي يحصل." },
   "launch.nothingSent": { en: "Nothing was sent — this only shows what would happen.", zh: "没有发送任何内容——这里只显示将会发生什么。", ar: "مفيش حاجة اتبعتت — دي بس بتوريك اللي هيحصل." },
+  /* Staff readiness (26 Sep 2026): can the reminder reach each person. */
+  "ready.title.none": { en: "Ready to start?", zh: "准备好开始了吗？", ar: "جاهزين نبدأ؟" },
+  "ready.title.soon": { en: "Ready for {day}?", zh: "{day} 准备好了吗？", ar: "جاهزين ليوم {day}؟" },
+  "ready.title.now": { en: "The first two weeks", zh: "前两周", ar: "أول أسبوعين" },
+  "ready.hint": { en: "The reminder reaches someone only inside Koleex Hub or on a device with notifications on — there is no e-mail. Ask the people marked in amber to open Koleex Hub on their phone and turn notifications on.", zh: "提醒只会出现在 Koleex Hub 里，或已开启通知的设备上——不会发邮件。请提醒标为橙色的人在手机上打开 Koleex Hub 并开启通知。", ar: "التذكير بيوصل بس جوه Koleex Hub أو على جهاز الإشعارات فيه شغالة — مفيش إيميل. اطلب من اللي عليهم علامة برتقاني يفتحوا Koleex Hub على موبايلهم ويشغّلوا الإشعارات." },
+  "ready.used": { en: "Last used Koleex Hub {date}", zh: "最近使用 Koleex Hub：{date}", ar: "آخر مرة فتح Koleex Hub: {date}" },
+  "ready.usedNever": { en: "Never used Koleex Hub", zh: "从未使用 Koleex Hub", ar: "عمره ما فتح Koleex Hub" },
+  "ready.push.on": { en: "Notifications on · {n} device(s)", zh: "已开启通知 · {n} 台设备", ar: "الإشعارات شغالة · {n} جهاز" },
+  "ready.push.off": { en: "Notifications off", zh: "未开启通知", ar: "الإشعارات مقفولة" },
+  "ready.sent": { en: "First report {date}", zh: "首份报告：{date}", ar: "أول تقرير: {date}" },
+  "ready.notYet": { en: "No report yet", zh: "尚无报告", ar: "لسه ما بعتش تقرير" },
 };

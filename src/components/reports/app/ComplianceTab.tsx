@@ -23,7 +23,7 @@ import { addDays, localDayOf } from "@/lib/reports/obligations";
 import type { Cell, CellState, ObligationKey, Obliged } from "@/lib/reports/obligations";
 import {
   dmyDate, dmyTime, fetchCompliance, fetchLaunchPlan, fetchObligations, fetchSchedules, localToday, previewNudges, saveObligations, saveSchedule,
-  type ComplianceBoard, type LaunchPlan, type NudgePreview, type ObligationSetup, type ReportPerson, type ScheduleSetup as ScheduleData,
+  type ComplianceBoard, type LaunchPlan, type NudgePreview, type ObligationSetup, type ReadinessRow, type ReportPerson, type ScheduleSetup as ScheduleData,
 } from "@/lib/work-reports";
 import { reportHead } from "@/lib/reports/catalog-heads";
 import { periodFor } from "@/lib/reports/templates";
@@ -119,6 +119,9 @@ export default function ComplianceTab({ t: shared, lang }: { t: T; lang: string 
           <TrackingBanner t={t} lang={lang} canSetUp={board.canSetUp} onStarted={() => void load(day)} />
         )}
       </section>
+
+      {/* Staff readiness: a super admin's — it arrives with the board, so nothing moves. */}
+      {board?.readiness && board.readiness.length > 0 && <Readiness t={t} rows={board.readiness} trackingFrom={board.trackingFrom} />}
 
       {/* Keyed on the start date, so a start set from the banner shows here too. */}
       {setupOpen && board?.canSetUp && <Setup key={board.trackingFrom ?? "none"} t={t} lang={lang} onChanged={() => void load(day)} />}
@@ -294,6 +297,42 @@ function LaunchPlanView({ t, lang, plan }: { t: T; lang: string; plan: LaunchPla
       <p className="text-[11.5px] text-[var(--text-dim)]">{t("launch.events")}</p>
       <p className="text-[11.5px] font-medium text-[var(--text-secondary)]">{t("launch.nothingSent")}</p>
     </div>
+  );
+}
+
+/** Staff readiness (owner's pick 26/09/2026): can the reminder reach each
+ *  person — the last day they used Koleex Hub, a device with notifications
+ *  on — and have they sent a report yet. Amber is what to chase. */
+function Readiness({ t, rows, trackingFrom }: { t: T; rows: ReadinessRow[]; trackingFrom: string | null }) {
+  const today = localToday();
+  const title = !trackingFrom ? t("ready.title.none") : trackingFrom > today ? t("ready.title.soon").replace("{day}", dmyDate(trackingFrom)) : t("ready.title.now");
+  const OK = "border-emerald-500/30 bg-emerald-500/10 text-emerald-500";
+  const WARN = "border-amber-500/35 bg-amber-500/10 text-amber-500";
+  const NEUTRAL = "border-[var(--border-subtle)] text-[var(--text-dim)]";
+  const chip = (cls: string, text: string) => <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] tabular-nums ${cls}`}>{text}</span>;
+  /* Used in the last week counts as reachable in the Hub itself. */
+  const recent = (ymd: string | null) => !!ymd && ymd >= addDays(today, -7);
+  const started = !!trackingFrom && trackingFrom <= today;
+  return (
+    <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-ready">
+      <h2 id="kx-rep-ready" className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
+      <p className="mt-0.5 max-w-[80ch] text-[12px] leading-relaxed text-[var(--text-dim)]">{t("ready.hint")}</p>
+      <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+        {rows.map((r) => (
+          <li key={r.person.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+            <span className="flex min-w-0 items-center gap-2">
+              <Avatar person={r.person} size={26} />
+              <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{r.person.name}</span>
+            </span>
+            <span className="flex flex-wrap gap-1.5">
+              {chip(recent(r.lastUsed) ? OK : WARN, r.lastUsed ? t("ready.used").replace("{date}", dmyDate(r.lastUsed)) : t("ready.usedNever"))}
+              {chip(r.devices > 0 ? OK : WARN, r.devices > 0 ? t("ready.push.on").replace("{n}", String(r.devices)) : t("ready.push.off"))}
+              {chip(r.firstSent ? OK : started ? WARN : NEUTRAL, r.firstSent ? t("ready.sent").replace("{date}", dmyDate(r.firstSent)) : t("ready.notYet"))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

@@ -13,7 +13,7 @@ import type { CarryGroup } from "@/lib/reports/carry";
 import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
 import type { AiDraftRequest } from "@/lib/reports/ai-draft";
-import type { BoardRow, BoardSummary, DayOffWhy, DueItem, Obliged, PlanItem } from "@/lib/reports/obligations";
+import type { BoardRow, BoardSummary, DayOffWhy, DueItem, Obliged, PlanItem, ReportGuide } from "@/lib/reports/obligations";
 import type { ReportTask, TaskPriority } from "@/lib/reports/follow-up";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
@@ -48,6 +48,9 @@ export interface ReportsBundle {
   me: { id: string; managerId: string | null; hasTeam: boolean; board?: boolean; templates?: boolean };
   /** Phase 3A: what this person owes now. */
   due?: DueItem[];
+  /** Staff readiness (26/09/2026): what the first weeks' guide tells this
+   *  person — only for someone who owes reports, until their first one. */
+  guide?: ReportGuide | null;
   counts: { unread: number; review: number; drafts: number; sentThisMonth: number };
   latest: ReportListRow[];
   /** The built-in types this person may start (hidden ones left out — 4E). */
@@ -213,7 +216,11 @@ export interface ComplianceBoard {
   canSetUp: boolean;
   rows: Array<BoardRow & { person: ReportPerson }>;
   summary: BoardSummary;
+  /** Staff readiness (26/09/2026): a super admin's — can the reminder reach
+   *  each person, and have they sent a report yet. */
+  readiness?: ReadinessRow[] | null;
 }
+export interface ReadinessRow { person: ReportPerson; lastUsed: string | null; devices: number; firstSent: string | null }
 export interface ObligationSetup {
   trackingFrom: string | null;
   /** Phase 3B switches. */

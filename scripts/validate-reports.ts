@@ -97,6 +97,10 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §37 staff readiness — the first weeks' guide (what each person owes and
+ *      when, on their own calendar; the reminder on their device, never in
+ *      view-as), the Home greeting's "reports start" line, and the super
+ *      admin's list of who the reminder can reach; everything reads only.
  *   §36 Phase 6E — the weekly team summary: every Monday at 07:00 in the
  *      manager's own time, the week that ended, written by Koleex AI into a
  *      draft before it is made (the same prompt as "Write it"), only with
@@ -163,10 +167,10 @@ import {
   APP_RULES, APP_SOURCES, buildFeedGroups, feedSources, feedWindow, formatAppRecord, localDay, nextPeriod, recordsFor, type AppRecord, type FeedFormatter,
 } from "../src/lib/reports/app-feed";
 import {
-  OBLIGATION_KEYS, boardRow, cellOf, dailyDue, dayKind, daysOffIn, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, planWindow, summarize, weeklyDue,
+  GUIDE_DAYS, OBLIGATION_KEYS, boardRow, cellOf, clockMinus, dailyDue, dayKind, daysOffIn, deadlinesIn, defaultObliged, dueList, effectiveObliged, escalationAt, localDayOf, mondayOf, monthlyDue, nudgesDue, planWindow, reportGuide, summarize, weeklyDue, weeklyDueWeekday,
   type Clock, type PersonClock, type Sent,
 } from "../src/lib/reports/obligations";
-import { REPORT_DUE_WORDS, reportDueLine } from "../src/lib/home/report-due-line";
+import { REPORT_DUE_WORDS, reportDueLine, reportStartLine } from "../src/lib/home/report-due-line";
 import type { HomeDueItem } from "../src/lib/home/report-due";
 import { calendarT } from "../src/lib/translations/calendar";
 import { dayLanes } from "../src/lib/calendar-utils";
@@ -1196,15 +1200,15 @@ console.log("\n§14 deadlines on the calendar, and the Home greeting");
     },
     (src) => src.replace('import { useEffect, useState } from "react";', 'import { useEffect, useState } from "react";\nimport { reportDueLine } from "./report-due-line";'));
   rule("Home asks no server of its own: what is owed rides in the work snapshot the shell already fetches", HD,
-    (c) => (/cachedGet<\{ reportsDue\?: HomeDueItem\[\] \}>\("\/api\/me\/work", 15_000\)/.test(c) && !/\bfetch\(/.test(c) ? [] : ["the greeting opens a request of its own"]),
-    (src) => src.replace('const work = await cachedGet<{ reportsDue?: HomeDueItem[] }>("/api/me/work", 15_000);', 'const work = await (await fetch("/api/work-reports/due")).json() as { reportsDue?: HomeDueItem[] };'));
+    (c) => (c.includes('const work = await cachedGet<{ reportsDue?: HomeDueItem[]; reportsStart?: string }>("/api/me/work", 15_000);') && !/\bfetch\(/.test(c) ? [] : ["the greeting opens a request of its own"]),
+    (src) => src.replace('const work = await cachedGet<{ reportsDue?: HomeDueItem[]; reportsStart?: string }>("/api/me/work", 15_000);', 'const work = await (await fetch("/api/work-reports/due")).json() as { reportsDue?: HomeDueItem[]; reportsStart?: string };'));
   const MW = "src/app/api/me/work/route.ts";
   rule("the snapshot computes what is owed beside its other reads, and a failure there never fails it", MW,
-    (c) => { const a = c.indexOf("const reportsDue = loadMyDue(auth).catch("); const b = c.indexOf("await Promise.all(["); return a > 0 && b > a && /reportsDue: await reportsDue,/.test(c) ? [] : ["what is owed is computed after the rest, or can fail the snapshot"]; },
-    (src) => src.replace(/  const reportsDue = loadMyDue\(auth\)\.catch\([\s\S]*?\n  \}\);\n/, "").replace("reportsDue: await reportsDue,", "reportsDue: await loadMyDue(auth),"));
+    (c) => { const a = c.indexOf("const reports = loadMyReports(auth).catch("); const b = c.indexOf("await Promise.all(["); return a > 0 && b > a && c.includes("...(await reports.then((r) => ({") && c.includes("return { due: [], guide: null };") ? [] : ["what is owed is computed after the rest, or can fail the snapshot"]; },
+    (src) => src.replace(/  const reports = loadMyReports\(auth\)\.catch\([\s\S]*?\n  \}\);\n/, "").replace("...(await reports.then((r) => ({", "...(await loadMyReports(auth).then((r) => ({"));
   rule("before tracking starts the snapshot reads the start date and nothing else of Reports", "src/lib/server/reports/obligations.ts",
-    (c) => { const body = /export async function loadMyDue[\s\S]*?\n\}/.exec(c)?.[0] ?? ""; const a = body.indexOf("if (!trackingFrom) return [];"); const b = body.indexOf("loadOwners("); return a > 0 && b > a ? [] : ["every screen reads the person and their calendar even before tracking starts"]; },
-    (src) => src.replace("  if (!trackingFrom) return [];\n  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me) return [];", "  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me || !trackingFrom) return [];"));
+    (c) => { const body = /export async function loadMyReports[\s\S]*?\n\}/.exec(c)?.[0] ?? ""; const a = body.indexOf("if (!trackingFrom) return { due: [], guide: null };"); const b = body.indexOf("loadOwners("); return a > 0 && b > a ? [] : ["every screen reads the person and their calendar even before tracking starts"]; },
+    (src) => src.replace("  if (!trackingFrom) return { due: [], guide: null };\n  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me) return { due: [], guide: null };", "  const [me] = await loadOwners(t, new Set([auth.account_id]));\n  if (!me || !trackingFrom) return { due: [], guide: null };"));
   rule("a report sent clears the work snapshot, so Home never says it is still due", "src/lib/work-reports.ts",
     (c) => (/if \(res\.ok\) void import\("@\/lib\/client-cache"\)\.then\(\(\{ invalidateCachedGet \}\) => invalidateCachedGet\("\/api\/me\/work"\)\);/.test(c) ? [] : ["a sent report can still read as due on Home"]),
     (src) => src.replace('  if (res.ok) void import("@/lib/client-cache").then(({ invalidateCachedGet }) => invalidateCachedGet("/api/me/work"));\n', ""));
@@ -1369,7 +1373,7 @@ console.log("\n§15 reports that events ask for");
     (c) => (/report_id: \(viewingOwn \|\| !reportTemplate\(r\.template_key\)\?\.confidential \? r\.report_id : null\) \|\| \(viewingOwn \? r\.draftId : undefined\) \|\| undefined/.test(c) ? [] : ["a probation review can be linked on another person's calendar"]),
     (src) => src.replace("(viewingOwn || !reportTemplate(r.template_key)?.confidential ? r.report_id : null)", "r.report_id"));
   rule("what a person owes includes their requests even with no routine report", "src/lib/server/reports/obligations.ts",
-    (c) => (/const \[routine, asked\] = await Promise\.all\(\[loadRoutineDue\(auth, me, trackingFrom, now\), loadRequestsDue\(me\.accountId, now\)\]\);/.test(c) ? [] : ["event requests are dropped for someone with no daily"]),
+    (c) => (c.includes("const [routine, asked] = await Promise.all([loadRoutine(auth, me, trackingFrom, now), loadRequestsDue(me.accountId, now)]);") ? [] : ["event requests are dropped for someone with no daily"]),
     (src) => src.replace("loadRequestsDue(me.accountId, now)]", "Promise.resolve([] as DueItem[])]"));
   const mig = migration("supabase/migrations/20260925_reports_event_requests.sql");
   expect(/UNIQUE \(rule_key, source_key, account_id\)/.test(mig) && /ALTER TABLE work_report_requests ENABLE ROW LEVEL SECURITY/.test(mig) && !/CREATE POLICY/i.test(mig) && !/\bDROP\b/i.test(mig),
@@ -2766,7 +2770,7 @@ console.log("\n§26 each Reports screen downloads only its own words");
   const HOME = "src/components/reports/app/ReportsApp.tsx";
   type Screen = { name: string; entry: string[]; dictFrom: string[]; lazy: boolean; minus?: string };
   const SCREENS: Screen[] = [
-    { name: "the Reports home", entry: [HOME], dictFrom: [HOME], lazy: false },
+    { name: "the Reports home", entry: [HOME], dictFrom: [HOME, "src/components/reports/app/FirstWeekGuide.tsx"], lazy: false },
     { name: "its builder tab", entry: ["src/components/reports/app/TemplatesTab.tsx"], dictFrom: [HOME, "src/components/reports/app/TemplatesTab.tsx"], lazy: false, minus: HOME },
     { name: "its compliance tab", entry: ["src/components/reports/app/ComplianceTab.tsx"], dictFrom: [HOME, "src/components/reports/app/ComplianceTab.tsx"], lazy: false, minus: HOME },
     { name: "its team summary", entry: ["src/components/reports/app/TeamSummary.tsx"], dictFrom: [HOME], lazy: false, minus: HOME },
@@ -3495,6 +3499,67 @@ console.log("\n§36 the weekly team summary — every Monday, written before you
   const lack6e = ["team.weekly", "team.weekly.hint", "team.weekly.failed"].filter((k) => !(reportTeamT[k]?.en && reportTeamT[k]?.zh && reportTeamT[k]?.ar))
     .concat(["sched.none.team", "sched.none.company", "tpl.team_weekly.name", "tpl.team_weekly.desc", "tpl.team_weekly.s.summary", "tpl.team_weekly.s.notes"].filter((k) => !(reportsT[k]?.en && reportsT[k]?.zh && reportsT[k]?.ar)));
   expect(lack6e.length === 0, "its words speak en / zh / ar — the switch, the type, its sections and the line for days with nothing sent", lack6e.join(", "));
+}
+
+/* ── §37 staff readiness (26 Sep 2026) ─────────────────────────────────── */
+console.log("\n§37 staff readiness — the first weeks' guide, the Home line, who the reminder can reach");
+{
+  /* The owner's pick «جاهزية الموظفين قبل 12 أكتوبر»: 2 of the 3 people who
+     owe reports had not opened Koleex Hub in weeks, and none had a device
+     with notifications on — the reminder lives only in the bell and in push. */
+  const cn: PersonClock = { weekend: [0, 6], holidays: new Set(), leave: new Set(), tz: "Asia/Shanghai", workEnd: "18:00", from: "2026-10-12" };
+  const staff = { obliged: { daily: true, weekly: true, monthly: false }, clock: cn };
+  eq(reportGuide(staff, [], "2026-09-28T02:00:00.000Z"), { start: "2026-10-12", upcoming: true, daily: true, weekly: true, monthly: false, workEnd: "18:00", remindAt: "17:00", weeklyDay: 5 },
+    "two weeks before the start: when it starts, the daily and the weekly (Friday) by 18:00, the reminder at 17:00 — on their own calendar");
+  expect(reportGuide(staff, [], "2026-10-12T02:00:00.000Z")?.upcoming === false, "on the start day itself it says reports have started");
+  eq([reportGuide(staff, ["2026-10-12T09:00:00.000Z"], "2026-10-13T02:00:00.000Z"), reportGuide(staff, ["2026-10-09T09:00:00.000Z"], "2026-10-13T02:00:00.000Z")?.start],
+    [null, "2026-10-12"], "their first report on or after the start ends the guide; a practice report before it does not");
+  eq([reportGuide(staff, [], `2026-10-${12 + GUIDE_DAYS}T02:00:00.000Z`)?.start, reportGuide(staff, [], `2026-10-${12 + GUIDE_DAYS + 1}T02:00:00.000Z`)],
+    ["2026-10-12", null], "it stays for the first two weeks, then goes");
+  eq([reportGuide({ ...staff, obliged: { daily: false, weekly: false, monthly: false } }, [], "2026-09-28T02:00:00.000Z"), reportGuide({ ...staff, clock: { ...cn, from: null } }, [], "2026-09-28T02:00:00.000Z")],
+    [null, null], "nothing for someone who owes no report, nothing before counting is set");
+  eq([weeklyDueWeekday([0, 6]), weeklyDueWeekday([5, 6]), weeklyDueWeekday([0, 1, 2, 3, 4, 5, 6]), clockMinus("18:00", 60), clockMinus("00:30", 60)], [5, 4, null, "17:00", "23:30"],
+    "the weekly's weekday: Friday for a Saturday–Sunday weekend, Thursday for Friday–Saturday; the reminder an hour before, across midnight too");
+
+  /* The server: one read for what is owed and the guide. */
+  const OB = "src/lib/server/reports/obligations.ts";
+  rule("the guide is read from the same person, calendar and sent reports as what is owed", OB,
+    (c) => (c.includes("guide: reportGuide({ obliged, clock }, [...sent.values()].map((s) => s.at), now),") && c.includes("return { due, guide: routine.guide };") ? [] : ["the guide reads the person again, or from something else"]),
+    (src) => src.replace("guide: reportGuide({ obliged, clock }, [...sent.values()].map((s) => s.at), now),", "guide: reportGuide({ obliged, clock }, [], now),"));
+  rule("the Home snapshot names the start only while it is ahead", "src/app/api/me/work/route.ts",
+    (c) => (c.includes("...(r.guide?.upcoming ? { reportsStart: r.guide.start } : {}),") ? [] : ["the greeting announces a start that has passed"]),
+    (src) => src.replace("...(r.guide?.upcoming ? { reportsStart: r.guide.start } : {}),", "...(r.guide ? { reportsStart: r.guide.start } : {}),"));
+  expect(code(read("src/app/api/work-reports/bundle/route.ts")).includes("guide: mine.guide,"), "the Reports home receives the guide in its one bundle");
+
+  /* The guide on the Reports home. */
+  const FG = "src/components/reports/app/FirstWeekGuide.tsx";
+  rule("the guide never turns notifications on in view-as — the device would be saved for someone else", FG,
+    (c) => (c.includes('if (typeof window === "undefined" || !currentScopeKey().endsWith(":self")) return "none";') && c.includes("const r = await subscribeToPush();") ? [] : ["the guide subscribes a device during view-as"]),
+    (src) => src.replace('if (typeof window === "undefined" || !currentScopeKey().endsWith(":self")) return "none";', 'if (typeof window === "undefined") return "none";'));
+  rule("the notifications row keeps its height while this device is asked, and \"Got it\" is remembered per person and start", FG,
+    (c) => (c.includes("min-h-[52px]") && c.includes("const [push, setPush] = useState<Push>(pushNow);") && c.includes("const dismissKey = `${KEY}${accountId}:${guide.start}`;") ? [] : ["the row pops in after load, or a dismissal is forgotten"]),
+    (src) => src.replace("const [push, setPush] = useState<Push>(pushNow);", 'const [push, setPush] = useState<Push>("none");'));
+  expect(code(read("src/components/reports/app/ReportsApp.tsx")).includes("{bundle?.guide && <FirstWeekGuide t={t} lang={lang} guide={bundle.guide}"), "…shown only when the server says there is a guide, with the bundle");
+
+  /* The Home greeting: before anything is owed, the day reports begin. */
+  eq(reportStartLine("2026-10-12", "en"), { text: "Your reports start on 12/10 — see what is asked", href: "/reports" }, "the Home line names the day and opens Reports");
+  expect(["starts", "see"].every((k) => !!REPORT_DUE_WORDS[k]?.ar && !!REPORT_DUE_WORDS[k]?.zh), "…in every language");
+  rule("the start line only when nothing is owed", "src/lib/home/report-due.ts",
+    (c) => (c.includes("const start = owed.length ? null : got?.start ?? null;") ? [] : ["a start line hides what is owed"]),
+    (src) => src.replace("const start = owed.length ? null : got?.start ?? null;", "const start = got?.start ?? null;"));
+
+  /* The super admin's list of who the reminder can reach. */
+  rule("who the reminder can reach is a super admin's (the days someone used the Hub are the Activity Monitor's), before the start and its first two weeks", OB,
+    (c) => (c.includes("const readinessRead = auth.is_super_admin && readinessWindow(trackingFrom, now.slice(0, 10))") ? [] : ["anyone who sees the board sees when others used the Hub"]),
+    (src) => src.replace("const readinessRead = auth.is_super_admin && readinessWindow(trackingFrom, now.slice(0, 10))", "const readinessRead = readinessWindow(trackingFrom, now.slice(0, 10))"));
+  const RD = "src/lib/server/reports/readiness.ts";
+  rule("the readiness list only reads — usage, devices with notifications on, the first report sent", RD,
+    (c) => (!/\.(insert|update|upsert|delete)\(|notifyLite/.test(c) && c.includes('from("push_subscriptions").select("account_id").in("account_id", ids).eq("is_active", true).is("revoked_at", null)') && c.includes('from("usage_daily").select("day")') ? [] : ["the list writes, or counts revoked devices"]),
+    (src) => src.replace('.eq("is_active", true).is("revoked_at", null)', ""));
+  const lack = ["guide.title.soon", "guide.title.now", "guide.daily", "guide.weekly", "guide.monthly", "guide.remind", "guide.how", "guide.push.title", "guide.push.offer", "guide.push.turnOn", "guide.push.on", "guide.push.install", "guide.push.denied", "guide.push.desktop", "guide.push.failed", "guide.write", "guide.gotIt",
+    "ready.title.none", "ready.title.soon", "ready.title.now", "ready.hint", "ready.used", "ready.usedNever", "ready.push.on", "ready.push.off", "ready.sent", "ready.notYet"]
+    .filter((k) => { const e = reportsT[k]; const b = (x?: string) => (x?.match(/\{[a-z]+\}/g) ?? []).sort().join(); return !e?.en || !e.zh || !e.ar || b(e.en) !== b(e.zh) || b(e.en) !== b(e.ar); });
+  expect(lack.length === 0, "the guide's and the list's words speak en / zh / ar and fill the same blanks", lack.join(", "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

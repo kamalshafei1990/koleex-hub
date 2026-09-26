@@ -10,13 +10,15 @@ import "server-only";
    here, in the /api/shell batch every screen already opens, instead of
    costing Home a round trip of its own; it runs beside the rest (never
    after it), answers [] before tracking starts, and a failure there never
-   takes the snapshot down. */
+   takes the snapshot down. `reportsStart` (staff readiness, 26/09/2026):
+   the day their reports begin, while it is still ahead — the greeting's
+   line before anything is owed. */
 
 import { NextResponse } from "next/server";
 import { countOpenTodos } from "@/lib/todo-open-count";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { loadMyDue } from "@/lib/server/reports/obligations";
+import { loadMyReports } from "@/lib/server/reports/obligations";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +26,9 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  const reportsDue = loadMyDue(auth).catch((e: unknown) => {
+  const reports = loadMyReports(auth).catch((e: unknown) => {
     console.error("[api/me/work] reports due:", e instanceof Error ? e.message : e);
-    return [];
+    return { due: [], guide: null };
   });
   const [taskRes, resourceRes] = await Promise.all([
     supabaseServer
@@ -82,6 +84,10 @@ export async function GET() {
     planning,
     planningCount,
     todoCount,
-    reportsDue: await reportsDue,
+    ...(await reports.then((r) => ({
+      reportsDue: r.due,
+      /* Staff readiness: before their start, the greeting says when reports begin. */
+      ...(r.guide?.upcoming ? { reportsStart: r.guide.start } : {}),
+    }))),
   });
 }

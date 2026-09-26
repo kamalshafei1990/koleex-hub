@@ -392,3 +392,58 @@ export function daysOffIn(c: PersonClock, firstDay: string, lastDay: string): Ar
   }
   return out;
 }
+
+/* ── Staff readiness (owner's pick 26/09/2026, «جاهزية الموظفين قبل 12
+   أكتوبر») — what the "your reports start" guide tells one person: what they
+   owe and when, on their own calendar. Shown once counting is set, for the
+   first two weeks from their start, until they send their first report. */
+export const GUIDE_DAYS = 14;
+
+export interface ReportGuide {
+  /** The day counting starts for them (the tenant's, or their hire date if later). */
+  start: string;
+  /** The start is still ahead on their own calendar. */
+  upcoming: boolean;
+  daily: boolean;
+  weekly: boolean;
+  monthly: boolean;
+  /** "HH:MM" — the end of their working day, when a report falls due. */
+  workEnd: string;
+  /** "HH:MM" — when the reminder comes (REMIND_BEFORE_MIN before). */
+  remindAt: string;
+  /** The weekday (0 = Sunday) the weekly falls due in an ordinary week —
+   *  the last working day before their weekend; null with no working day. */
+  weeklyDay: number | null;
+}
+
+/** The last working weekday before the weekend, in a week read Monday to
+ *  Sunday (Friday for a Saturday–Sunday weekend, Thursday for Friday–Saturday). */
+export function weeklyDueWeekday(weekend: number[]): number | null {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const first = order.findIndex((d) => weekend.includes(d));
+  const run = first > 0 ? order.slice(0, first) : order;
+  return [...run].reverse().find((d) => !weekend.includes(d)) ?? null;
+}
+
+/** "HH:MM" minus some minutes, on a 24-hour clock. */
+export function clockMinus(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = (((h || 0) * 60 + (m || 0) - minutes) % 1440 + 1440) % 1440;
+  return `${pad(Math.floor(t / 60))}:${pad(t % 60)}`;
+}
+
+/** The guide for one person now — null when there is nothing to tell: not
+ *  counted yet, owing nothing, past the first two weeks, or they have sent a
+ *  report on or after their start (`sentAt`: the instants their reports went). */
+export function reportGuide(p: PersonFacts, sentAt: string[], now: string): ReportGuide | null {
+  const c = p.clock;
+  if (!c.from || (!p.obliged.daily && !p.obliged.weekly && !p.obliged.monthly)) return null;
+  const today = localDayOf(now, c.tz);
+  if (today > addDays(c.from, GUIDE_DAYS)) return null;
+  if (sentAt.some((at) => localDayOf(at, c.tz) >= c.from!)) return null;
+  return {
+    start: c.from, upcoming: today < c.from,
+    daily: p.obliged.daily, weekly: p.obliged.weekly, monthly: p.obliged.monthly,
+    workEnd: c.workEnd, remindAt: clockMinus(c.workEnd, REMIND_BEFORE_MIN), weeklyDay: weeklyDueWeekday(c.weekend),
+  };
+}

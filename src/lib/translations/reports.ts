@@ -7,6 +7,7 @@ import { reportPrintT } from "./report-ui/print";
 import { reportComplianceT } from "./report-ui/compliance";
 import { reportServerT } from "./report-ui/server";
 import { reportNumbersT } from "./report-ui/numbers";
+import { reportGuideT } from "./report-ui/guide";
 
 /* Reports app (Phase 1, 25 Sep 2026; phase 2 A–D; obligations 3A). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
@@ -36,4 +37,5 @@ export const reportsT: Translations = {
   ...reportComplianceT,
   ...reportServerT,
   ...reportNumbersT,
+  ...reportGuideT,
 };

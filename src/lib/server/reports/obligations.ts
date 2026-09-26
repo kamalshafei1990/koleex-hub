@@ -19,9 +19,10 @@ import { listPeople, loadOrgTree, type OrgTree, type PersonLite } from "@/lib/se
 import { loadPolicyRows, loadWorkCalendar, pickPolicy, resolveEmployeeCountries, wallClockToIso } from "@/lib/server/work-calendar";
 import { isoWeekKey } from "@/lib/reports/templates";
 import { EVENT_LIMITS, REQUEST_COLS, requestIsOwed, requestState, type RequestRow, type RequestState } from "@/lib/reports/events";
+import { loadReadiness, readinessWindow, type ReadinessRow } from "@/lib/server/reports/readiness";
 import {
-  OBLIGATION_KEYS, addDays, boardRow, deadlinesIn, dueList, effectiveObliged, mondayOf, summarize, weekDays,
-  type BoardRow, type BoardSummary, type Clock, type Deadline, type DueItem, type ObligationKey, type Obliged, type PersonClock, type Sent,
+  OBLIGATION_KEYS, addDays, boardRow, deadlinesIn, dueList, effectiveObliged, mondayOf, reportGuide, summarize, weekDays,
+  type BoardRow, type BoardSummary, type Clock, type Deadline, type DueItem, type ObligationKey, type Obliged, type PersonClock, type ReportGuide, type Sent,
 } from "@/lib/reports/obligations";
 
 export const obligationClock: Clock = (day, hhmm, tz) => wallClockToIso(day, hhmm, tz);
@@ -168,6 +169,9 @@ export interface ComplianceBoard {
   canSetUp: boolean;
   rows: BoardPersonRow[];
   summary: BoardSummary;
+  /** Staff readiness (26/09/2026): a super admin's, before counting starts
+   *  and for its first two weeks — else null. */
+  readiness: ReadinessRow[] | null;
 }
 
 export async function canSeeEveryone(auth: ServerAuthContext): Promise<boolean> {
@@ -188,12 +192,17 @@ export async function loadBoard(auth: ServerAuthContext, anyDay: string): Promis
   const owners = scope && scope.size === 0 ? [] : await loadOwners(tree, scope);
   const from = addDays(monday, -40);
   const to = addDays(monday, 60);
-  const [clocks, { sent }] = await Promise.all([
-    loadClocks(auth.tenant_id, owners, from, to, trackingFrom),
-    loadSent(owners.map((o) => o.accountId), from, to),
-  ]);
   const now = new Date().toISOString();
   const nameOf = new Map(people.map((p) => [p.id, p]));
+  /* Staff readiness: beside the week, not after it. */
+  const readinessRead = auth.is_super_admin && readinessWindow(trackingFrom, now.slice(0, 10))
+    ? loadReadiness(owners, trackingFrom, nameOf).catch((e: unknown) => { console.error("[reports] readiness:", e instanceof Error ? e.message : e); return null; })
+    : Promise.resolve(null);
+  const [clocks, { sent }, readiness] = await Promise.all([
+    loadClocks(auth.tenant_id, owners, from, to, trackingFrom),
+    loadSent(owners.map((o) => o.accountId), from, to),
+    readinessRead,
+  ]);
   const rows: BoardPersonRow[] = [];
   for (const o of owners) {
     const obliged = effectiveObliged(o, o.exceptions);
@@ -205,26 +214,31 @@ export async function loadBoard(auth: ServerAuthContext, anyDay: string): Promis
     rows.push({ ...row, person: p ?? { id: o.accountId, name: "—", nameAlt: null, avatar: null, position: null } });
   }
   rows.sort((a, b) => a.person.name.localeCompare(b.person.name));
-  return { week: { key: isoWeekKey(monday), start: monday, days }, trackingFrom, canSetUp: setUp, rows, summary: summarize(rows) };
+  return { week: { key: isoWeekKey(monday), start: monday, days }, trackingFrom, canSetUp: setUp, rows, summary: summarize(rows), readiness };
 }
 
+export interface MyReports { due: DueItem[]; guide: ReportGuide | null }
+
 /** What the viewer owes now (the Reports home's "Due from you", the Home
- *  greeting): the routine reports, then what events asked them for. */
-export async function loadMyDue(auth: ServerAuthContext, tree?: OrgTree): Promise<DueItem[]> {
+ *  greeting): the routine reports, then what events asked them for — and
+ *  (staff readiness, 26/09/2026) the guide their first two weeks show, read
+ *  from the same person and calendar. */
+export async function loadMyReports(auth: ServerAuthContext, tree?: OrgTree): Promise<MyReports> {
   const [t, trackingFrom] = await Promise.all([tree ?? loadOrgTree(auth.tenant_id), loadTrackingFrom(auth.tenant_id)]);
   /* Before tracking starts nothing is owed — the person and their calendar
      are not even read (the work snapshot asks this on every screen). */
-  if (!trackingFrom) return [];
+  if (!trackingFrom) return { due: [], guide: null };
   const [me] = await loadOwners(t, new Set([auth.account_id]));
-  if (!me) return [];
+  if (!me) return { due: [], guide: null };
   const now = new Date().toISOString();
-  const [routine, asked] = await Promise.all([loadRoutineDue(auth, me, trackingFrom, now), loadRequestsDue(me.accountId, now)]);
-  return [...routine, ...asked].sort((a, b) => (a.state !== b.state ? (a.state === "missing" ? -1 : 1) : Date.parse(a.dueAt) - Date.parse(b.dueAt)));
+  const [routine, asked] = await Promise.all([loadRoutine(auth, me, trackingFrom, now), loadRequestsDue(me.accountId, now)]);
+  const due = [...routine.due, ...asked].sort((a, b) => (a.state !== b.state ? (a.state === "missing" ? -1 : 1) : Date.parse(a.dueAt) - Date.parse(b.dueAt)));
+  return { due, guide: routine.guide };
 }
 
-async function loadRoutineDue(auth: ServerAuthContext, me: Owner, trackingFrom: string, now: string): Promise<DueItem[]> {
+async function loadRoutine(auth: ServerAuthContext, me: Owner, trackingFrom: string, now: string): Promise<MyReports> {
   const obliged = effectiveObliged(me, me.exceptions);
-  if (!obliged.daily && !obliged.weekly && !obliged.monthly) return [];
+  if (!obliged.daily && !obliged.weekly && !obliged.monthly) return { due: [], guide: null };
   const today = now.slice(0, 10);
   const from = addDays(today, -45);
   const to = addDays(today, 10);
@@ -233,9 +247,12 @@ async function loadRoutineDue(auth: ServerAuthContext, me: Owner, trackingFrom: 
     loadSent([me.accountId], from, to),
   ]);
   const clock = clocks.get(me.accountId);
-  if (!clock) return [];
+  if (!clock) return { due: [], guide: null };
   const key = (k: ObligationKey, pk: string) => `${me.accountId}|${k}|${pk}`;
-  return dueList({ obliged, clock }, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, now, obligationClock);
+  return {
+    due: dueList({ obliged, clock }, (k, pk) => sent.get(key(k, pk)) ?? null, (k, pk) => drafts.get(key(k, pk)) ?? null, now, obligationClock),
+    guide: reportGuide({ obliged, clock }, [...sent.values()].map((s) => s.at), now),
+  };
 }
 
 /** The requests events made of this person (Phase 3D) that "Due from you"

@@ -1,6 +1,7 @@
 /* ---------------------------------------------------------------------------
    Home — the greeting's "report due" sentence (Reports Phase 3C). Loaded
-   only when something is owed (see report-due.ts), with its own words: the
+   only when something is owed — or, staff readiness, when their reports are
+   about to start (see report-due.ts) — with its own words: the
    report's name carries "your" in Arabic, so each language builds the
    sentence its own way around {report}. Dates D/M, times on the viewer's
    own clock, 24-hour.
@@ -26,6 +27,9 @@ export const REPORT_DUE_WORDS: Record<string, Record<Lang, string>> = {
   write: { en: "write it now", zh: "立即填写", ar: "اكتبه الآن" },
   finish: { en: "continue it", zh: "继续填写", ar: "أكمله" },
   open: { en: "open Reports", zh: "打开报告", ar: "افتح التقارير" },
+  /* Staff readiness (26/09/2026): before their start, when reports begin. */
+  starts: { en: "Your reports start on {date}", zh: "你的报告从 {date} 开始", ar: "تبدأ تقاريرك يوم {date}" },
+  see: { en: "see what is asked", zh: "查看要求", ar: "اطّلع على المطلوب" },
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -43,6 +47,15 @@ function periodText(d: HomeDueItem): string {
   if (d.key === "daily") return dm(d.periodKey);
   if (d.key === "weekly") return `${dm(d.date)}–${dm(addDay(d.date, 6))}`;
   return `${d.periodKey.slice(5, 7)}/${d.periodKey.slice(0, 4)}`;
+}
+
+/** Staff readiness (26/09/2026): before anything is owed, the day their
+ *  reports begin — it opens the Reports home, where the guide says what and
+ *  when. */
+export function reportStartLine(start: string, lang: string): HomeDueLine {
+  const l: Lang = lang === "ar" || lang === "zh" ? lang : "en";
+  const w = (k: string) => REPORT_DUE_WORDS[k][l];
+  return { text: `${w("starts").replace("{date}", dm(start))} — ${w("see")}`, href: "/reports" };
 }
 
 /** The line and where it leads, or null when nothing is owed. One report
