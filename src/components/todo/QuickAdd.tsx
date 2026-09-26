@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import FloatLayer from "./FloatLayer";
 import dynamic from "next/dynamic";
 import type { TodoAssigneeInfo, TodoPriority } from "@/types/supabase";
 import AlignLeftIcon from "@/components/icons/ui/AlignLeftIcon";
@@ -90,6 +91,9 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
   const ownInput = useRef<HTMLInputElement | null>(null);
   const detailsRef = useRef<HTMLTextAreaElement>(null);
 
@@ -125,7 +129,9 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
   useEffect(() => {
     if (!panel && !mention) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) { setPanel(null); setMention(null); }
+      const n = e.target as Node;
+      if (rootRef.current?.contains(n) || floatRef.current?.contains(n)) return;
+      setPanel(null); setMention(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -222,8 +228,8 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
     <div ref={rootRef}
       onFocus={() => setFocused(true)}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
-      className={`kx-glass relative rounded-xl border ${panel || listOpen ? "z-40" : ""} border-[var(--border-color)] bg-[var(--bg-secondary)] focus-within:border-[var(--border-focus)] transition-colors`}>
-      <form className="flex items-center gap-2 px-3 md:px-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+      className={`kx-glass relative rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] focus-within:border-[var(--border-focus)] transition-colors`}>
+      <form ref={formRef} className="flex items-center gap-2 px-3 md:px-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <PlusIcon size={16} className="text-[var(--text-dim)] shrink-0" />
         <input ref={ownInput} value={text}
           onChange={(e) => {
@@ -247,9 +253,9 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
       </form>
 
       {listOpen && (
-        <div className="absolute start-3 md:start-10 top-11 z-30 w-[min(320px,calc(100%-1.5rem))]">
+        <FloatLayer anchor={formRef} inset={40} layerRef={floatRef} width={320}>
           <MentionList people={candidates} active={Math.min(active, candidates.length - 1)} onPick={pickPerson} onHover={setActive} t={t} />
-        </div>
+        </FloatLayer>
       )}
 
       {/* What will be saved — typed or picked, each removable. */}
@@ -298,7 +304,7 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
 
       {/* The toolbar — only once the line is in use, so the page stays calm. */}
       {engaged && (
-        <div className="relative flex items-center gap-0.5 px-2 md:px-3 pb-2 flex-wrap">
+        <div ref={barRef} className="relative flex items-center gap-0.5 px-2 md:px-3 pb-2 flex-wrap">
           <button type="button" onClick={() => toggle("assign")} aria-expanded={panel === "assign"} className={tool(people.length > 0)}>
             <AtSignIcon size={12} /> {t("quick.assign")}{people.length > 0 && ` · ${people.length}`}
           </button>
@@ -321,7 +327,7 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
           </button>
 
           {panel && (
-            <div className="absolute start-2 md:start-3 top-full -mt-1 z-30 w-[min(340px,calc(100%-1rem))]">
+            <FloatLayer anchor={barRef} inset={8} layerRef={floatRef} width={340}>
               <QuickPanel kind={panel} t={t} lang={lang} employees={employees} labels={labels}
                 people={people.map((p) => p.account_id)} onTogglePerson={togglePerson}
                 day={day} time={time}
@@ -329,10 +335,11 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
                 priority={priority} onPriority={(v) => { setPicked((p) => ({ ...p, priority: v })); setPanel(null); }}
                 label={label} onLabel={(v) => { setPicked((p) => ({ ...p, label: v })); setIgnored((prev) => new Set([...prev, "label"])); setPanel(null); }}
                 onClose={() => setPanel(null)} />
-            </div>
+            </FloatLayer>
           )}
         </div>
       )}
     </div>
   );
 }
+

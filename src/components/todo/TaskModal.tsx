@@ -41,6 +41,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import MiniAvatar from "./MiniAvatar";
+import FloatLayer from "./FloatLayer";
 import { dayKey, dueTimeOf, isoToLocalInput, localInputToIso } from "./todo-dates";
 import { dueValue } from "./quick-add-parse";
 import type { QuickDraft } from "./QuickAdd";
@@ -309,6 +310,9 @@ export default function TaskModal({ entry, initialDue, draft, employees, departm
                     </div>
                   )}
                 </div>
+                {/* Observers follow the task and may update its status; their
+                    "done" still needs the assigner's confirmation. */}
+                <TaskExtras value={extras} onChange={setExtras} employees={employees} part="observers" />
               </FormSection>
 
               {/* ── More ── */}
@@ -319,7 +323,7 @@ export default function TaskModal({ entry, initialDue, draft, employees, departm
                   t={t}
                 />
                 {showExtras ? (
-                  <TaskExtras value={extras} onChange={setExtras} employees={employees} />
+                  <TaskExtras value={extras} onChange={setExtras} employees={employees} part="rest" />
                 ) : (
                   <button type="button" onClick={() => setShowExtras(true)}
                     className="w-full h-10 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center gap-1.5">
@@ -543,14 +547,12 @@ function timeOptions(current: string): { value: string; label: string }[] {
   return out.sort((a, b) => a.value.localeCompare(b.value));
 }
 
-/* ── LabelPicker — the labels themselves, as chips, right in the form.
-   It used to be a floating list inside the form's scrolling body: it
-   covered the fields under it, was cut off by the footer on phones and
-   truncated names to half the width. Chips sit in the flow instead —
-   nothing overlaps, every name is readable, one tap picks (again clears).
-   A search box appears only once there are enough labels to need one. ── */
-const LABEL_SEARCH_FROM = 12;
-
+/* ── LabelPicker — one field, like the Project picker beside it.
+   The chips-in-the-form version was fine with four labels and a wall with
+   the company's forty-five (owner, 26/09: "the labels disturb it a lot").
+   Now: a field showing the chosen label; it opens a searchable list on
+   <body> (FloatLayer — never clipped by the form, never under a card), two
+   columns with colour dots, and "New label" at the foot. ── */
 function LabelPicker({ labels, value, onChange, t, onCreated }: {
   labels: TodoLabelRow[];
   value: string;
@@ -558,11 +560,30 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
   t: TFn;
   onCreated: (label: TodoLabelRow) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [labelError, setLabelError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+
+  const close = () => { setOpen(false); setQ(""); setCreating(false); setLabelError(""); };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const n = e.target as Node;
+      if (triggerRef.current?.contains(n) || layerRef.current?.contains(n)) return;
+      close();
+    };
+    /* Esc closes the list only, not the whole task form. */
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey, true); };
+  }, [open]);
 
   const create = async () => {
     const name = newName.trim();
@@ -576,80 +597,84 @@ function LabelPicker({ labels, value, onChange, t, onCreated }: {
     }
     onCreated(r.data);
     onChange(r.data.name);
-    setNewName(""); setCreating(false);
+    setNewName(""); close();
   };
 
+  const selected = labels.find((l) => l.name === value) ?? null;
   const needle = q.trim().toLowerCase();
   const list = needle ? labels.filter((l) => l.name.toLowerCase().includes(needle)) : labels;
-  /* A label typed on an older task that no longer exists still shows, so
-     the form never hides what the task carries. */
-  const orphan = value && !labels.some((l) => l.name === value) ? value : "";
-  const chip = "h-8 max-w-full px-3 rounded-full text-[12px] font-medium border inline-flex items-center gap-1.5 transition-colors";
 
   return (
-    <div className="space-y-2">
-      {labels.length >= LABEL_SEARCH_FROM && (
-        <div className="relative">
-          <SearchIcon size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder={t("f.label.search")} aria-label={t("f.label.search")}
-            className="w-full h-9 ps-8 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
-        </div>
+    <div className="relative">
+      <button ref={triggerRef} type="button" onClick={() => (open ? close() : setOpen(true))} aria-expanded={open} aria-haspopup="listbox"
+        className="w-full h-10 ps-3.5 pe-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] flex items-center gap-2 text-start hover:border-[var(--border-focus)] transition-colors">
+        <TagsIcon size={14} className="text-[var(--text-dim)] shrink-0" />
+        {value ? (
+          <span className="flex items-center gap-2 min-w-0 text-[var(--text-primary)]">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected?.color ?? "#94a3b8" }} />
+            <span className="truncate"><AutoTranslatedText text={value} plain /></span>
+          </span>
+        ) : (
+          <span className="text-[var(--text-dim)]">{t("f.label.choose")}</span>
+        )}
+        <AngleDownIcon size={13} className={`ms-auto shrink-0 text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {value && (
+        <button type="button" aria-label={t("common.clear")} onClick={() => onChange("")}
+          className="absolute end-8 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+          <CrossIcon size={11} />
+        </button>
       )}
-      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("f.label")}>
-        {orphan && (
-          <button type="button" role="radio" aria-checked onClick={() => onChange("")}
-            className={`${chip} bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]`}>
-            <TagsIcon size={11} className="shrink-0" />
-            <span className="truncate"><AutoTranslatedText text={orphan} plain /></span>
-            <CrossIcon size={10} className="shrink-0 opacity-60" />
-          </button>
-        )}
-        {list.map((l) => {
-          const on = l.name === value;
-          const color = l.color ?? "#94a3b8";
-          return (
-            <button key={l.id} type="button" role="radio" aria-checked={on}
-              onClick={() => onChange(on ? "" : l.name)}
-              style={on ? { borderColor: `${color}80`, backgroundColor: `${color}1f` } : undefined}
-              className={`${chip} ${on ? "text-[var(--text-primary)] font-semibold" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)]"}`}>
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-              <span className="truncate"><AutoTranslatedText text={l.name} plain /></span>
-              {on && <CrossIcon size={10} className="shrink-0 opacity-60" />}
-            </button>
-          );
-        })}
-        {needle && list.length === 0 && (
-          <span className="h-8 inline-flex items-center text-[12px] text-[var(--text-dim)]">{t("extras.noMatches")}</span>
-        )}
-        {!creating && (
-          <button type="button" onClick={() => { setCreating(true); setNewName(needle ? q.trim() : ""); }}
-            className={`${chip} border-dashed border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]`}>
-            <PlusIcon size={11} /> {t("f.label.new")}
-          </button>
-        )}
-      </div>
-      {creating && (
-        <div className="flex items-center gap-1.5">
-          <input type="text" value={newName} autoFocus
-            onChange={(ev) => { setNewName(ev.target.value); setLabelError(""); }}
-            placeholder={t("f.label.placeholder")} aria-label={t("f.label.placeholder")} maxLength={60}
-            className="flex-1 min-w-0 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
-            onKeyDown={(ev) => {
-              if (ev.key === "Enter" && !ev.nativeEvent.isComposing) { ev.preventDefault(); void create(); }
-              /* Esc closes only this box, not the whole task form. */
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setCreating(false); setLabelError(""); }
-            }} />
-          <button type="button" onClick={() => void create()} disabled={!newName.trim() || busy}
-            className="h-9 px-3.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40">
-            {busy ? <SpinnerIcon size={12} className="animate-spin" /> : t("common.add")}
-          </button>
-          <button type="button" onClick={() => { setCreating(false); setLabelError(""); }} aria-label={t("modal.cancel")}
-            className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
-            <CrossIcon size={12} />
-          </button>
-        </div>
+
+      {open && (
+        <FloatLayer anchor={triggerRef} inset={0} width={380} layerRef={layerRef}>
+          <div className="kx-glass-pop kx-pop-panel kx-pop-in p-1.5">
+            <div className="relative mb-1">
+              <SearchIcon size={13} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("f.label.search")} aria-label={t("f.label.search")}
+                className="w-full h-9 ps-8 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
+            </div>
+            <div role="listbox" aria-label={t("f.label")} className="max-h-64 overflow-y-auto grid grid-cols-2 gap-0.5 [&>*]:min-w-0">
+              {list.map((l) => {
+                const on = l.name === value;
+                return (
+                  <button key={l.id} type="button" role="option" aria-selected={on} title={l.name}
+                    onClick={() => { onChange(on ? "" : l.name); close(); }}
+                    className={`h-9 px-2.5 rounded-lg text-[12.5px] flex items-center gap-2 text-start transition-colors ${on ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"}`}>
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color ?? "#94a3b8" }} />
+                    <span className="truncate"><AutoTranslatedText text={l.name} plain /></span>
+                    {on && <CheckCircleIcon size={12} className="ms-auto shrink-0 text-[#7FA9D6]" />}
+                  </button>
+                );
+              })}
+              {list.length === 0 && (
+                <div className="col-span-2 px-3 h-9 flex items-center text-[12px] text-[var(--text-dim)]">{t("extras.noMatches")}</div>
+              )}
+            </div>
+            <div className="mt-1 pt-1.5 border-t border-[var(--border-subtle)]">
+              {creating ? (
+                <div className="flex items-center gap-1.5">
+                  <input type="text" value={newName} autoFocus maxLength={60}
+                    onChange={(e) => { setNewName(e.target.value); setLabelError(""); }}
+                    placeholder={t("f.label.placeholder")} aria-label={t("f.label.placeholder")}
+                    className="flex-1 min-w-0 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void create(); } }} />
+                  <button type="button" onClick={() => void create()} disabled={!newName.trim() || busy}
+                    className="h-9 px-3.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold shrink-0 disabled:opacity-40">
+                    {busy ? <SpinnerIcon size={12} className="animate-spin" /> : t("common.add")}
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => { setCreating(true); setNewName(needle ? q.trim() : ""); }}
+                  className="w-full h-9 px-2.5 rounded-lg text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] flex items-center gap-1.5">
+                  <PlusIcon size={12} /> {t("f.label.new")}
+                </button>
+              )}
+              {creating && labelError && <p role="alert" className="px-1 pt-1.5 text-[11px] text-red-400">{labelError}</p>}
+            </div>
+          </div>
+        </FloatLayer>
       )}
-      {creating && labelError && <p role="alert" className="text-[11px] text-red-400">{labelError}</p>}
     </div>
   );
 }

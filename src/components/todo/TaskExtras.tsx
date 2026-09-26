@@ -45,10 +45,14 @@ export default function TaskExtras({
   value,
   onChange,
   employees,
+  part = "all",
 }: {
   value: TodoMetadata;
   onChange: (next: TodoMetadata) => void;
   employees: TodoAssigneeInfo[];
+  /* The task form shows Observers under People (owner: "where is the
+     observer?") and the rest under More; other callers keep everything. */
+  part?: "all" | "observers" | "rest";
 }) {
   const { t } = useTranslation(todoT);
   const attachments = value.attachments ?? [];
@@ -177,6 +181,35 @@ export default function TaskExtras({
   const actionBtn =
     "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-inverted)]/[0.04] transition-colors disabled:opacity-50";
 
+  const observersBlock = (
+      <div>
+        <label className={lbl}>{t("extras.observers")}</label>
+        <PeoplePicker
+          icon={<EyeIcon className="h-4 w-4" />}
+          placeholder={t("extras.observerSearch")}
+          selected={observers}
+          employees={employees}
+          noMatchesLabel={t("extras.noMatches")}
+          onToggle={toggleObserver}
+        />
+        <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
+        {observers.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {observers.map((o) => (
+              <span key={o.account_id} className={chip}>
+                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
+                {o.full_name || o.username}
+                <button type="button" onClick={() => removeObserver(o.account_id)} className={chipX} aria-label={t("common.remove")}>
+                  <CrossIcon className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+  );
+  if (part === "observers") return observersBlock;
+
   return (
     <div className="space-y-4" onPaste={onPaste}>
       {/* ── Attachments ── */}
@@ -253,33 +286,7 @@ export default function TaskExtras({
         )}
       </div>
 
-      {/* ── Observers ── */}
-      <div>
-        <label className={lbl}>{t("extras.observers")}</label>
-        <PeoplePicker
-          icon={<EyeIcon className="h-4 w-4" />}
-          placeholder={t("extras.observerSearch")}
-          selected={observers}
-          employees={employees}
-          noMatchesLabel={t("extras.noMatches")}
-          onToggle={toggleObserver}
-        />
-        <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
-        {observers.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {observers.map((o) => (
-              <span key={o.account_id} className={chip}>
-                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
-                {o.full_name || o.username}
-                <button type="button" onClick={() => removeObserver(o.account_id)} className={chipX} aria-label={t("common.remove")}>
-                  <CrossIcon className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {part === "all" && observersBlock}
       {/* ── Products ── */}
       <div>
         <label className={lbl}>{t("extras.linkProducts")}</label>
