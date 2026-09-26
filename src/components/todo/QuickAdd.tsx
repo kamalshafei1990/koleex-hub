@@ -222,7 +222,7 @@ export default function QuickAdd({ t, lang, labels, employees, inputRef, onCreat
     <div ref={rootRef}
       onFocus={() => setFocused(true)}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
-      className="kx-glass relative rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] focus-within:border-[var(--border-focus)] transition-colors">
+      className={`kx-glass relative rounded-xl border ${panel || listOpen ? "z-40" : ""} border-[var(--border-color)] bg-[var(--bg-secondary)] focus-within:border-[var(--border-focus)] transition-colors`}>
       <form className="flex items-center gap-2 px-3 md:px-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <PlusIcon size={16} className="text-[var(--text-dim)] shrink-0" />
         <input ref={ownInput} value={text}

@@ -180,10 +180,13 @@ export default function TaskSheet({
   const hasLinks = atts.length > 0 || prods.length > 0 || mentions.length > 0 || !!proj || (task.source === "report" && !!task.source_id) || !!task.label;
 
   return (
-    <ScrollLockOverlay className="fixed inset-0 flex justify-end bg-black/40 backdrop-blur-sm"
+    /* A centred window, like the task form — owner: "I don't want a slide
+       window when I press the task, make it a centre popup". Full screen on
+       phones, where a floating card would only leave slivers around it. */
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside role="dialog" aria-modal="true" aria-labelledby="todo-sheet-title"
-        className="kx-app kx-glass-drawer kx-slide-in-end relative flex h-full w-full sm:max-w-[600px] flex-col border-s border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)]">
+        className="kx-app kx-glass-pop kx-pop-in relative flex w-full h-full sm:h-auto sm:max-h-[88dvh] sm:max-w-2xl flex-col overflow-hidden sm:rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl">
 
         {/* ── Header ── */}
         <header className="shrink-0 border-b border-[var(--border-subtle)] px-4 sm:px-5 pt-3 pb-3.5" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
