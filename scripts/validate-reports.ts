@@ -97,6 +97,10 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §32 Phase 6C — the number reports in the app's look: the same doors,
+ *      every amount in its own currency (never two added), the statements
+ *      reading the shapes the APIs send, the two agings Finance links to,
+ *      the house paper dealt by its budget.
  *   §31 Phase 6B — Koleex AI reads the reports (text and voice): only what
  *      the reader may read, each number with its own right, the text fenced
  *      as data; who owes a report exactly as the compliance board shows it;
@@ -159,7 +163,7 @@ import {
 } from "../src/lib/reports/attachments";
 import { NOTIFICATION_ACTIVITIES, classifyNotificationActivity } from "../src/lib/notification-activity";
 import {
-  ATTACH_SID, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, printParagraphs, widthUnits, type Measurer, type PrintPara,
+  ATTACH_SID, CONT_HEAD_PX, FIRST_HEAD_PX, FOOT_PX, LINE_PX, SHEET_PX, cutByHeight, estimateMeasurer, paginateReport, printParagraphs, widthUnits, type Measurer, type PrintPara,
 } from "../src/lib/reports/print-layout";
 import {
   BUILDER_LIMITS, ICON_CHOICES, SECTION_KINDS, UNHIDEABLE, asReportTemplate, checkTemplate, copyOfBuiltin, copyableBuiltin, hideableBuiltin,
@@ -177,6 +181,8 @@ import { serverMaterial } from "../src/lib/reports/ai-draft";
 import { reportTeamT } from "../src/lib/translations/report-team";
 import { decisionRows, followupRows, meetingRows, occasionRows, scheduleRows, timeSplitRows, visitorRows, yearlyOn, type CalendarFact } from "../src/lib/reports/office";
 import type { BoardRow } from "../src/lib/reports/obligations";
+import { COST_KINDS, OPS_KINDS, currencyOrder, dmy, fmtAmount, moneyLines, quickAsOf, quickRange } from "../src/lib/reports/numbers";
+import * as NP from "../src/lib/reports/numbers-print";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -477,10 +483,10 @@ console.log("\n§7 wiring");
     "all three tables are RLS-on with no policy (service role only, through the API)");
   expect(/search_text[\s\S]*GENERATED ALWAYS AS[\s\S]*gin_trgm_ops/.test(mig), "search reads a generated, trigram-indexed column");
   const layout = code(read("src/app/reports/layout.tsx"));
-  expect(/endsWith\("\/print"\)/.test(layout) && /"\/reports\/operational"/.test(layout) && /"\/reports\/statements"/.test(layout),
-    "the Reports layout leaves paper and the Finance number reports bare");
-  const fin = ["src/components/finance/FinanceWorkspace.tsx", "src/components/reports/StatementReports.tsx"].map((f) => code(read(f))).join("\n");
-  expect(!/href="\/reports"/.test(fin) && !/backHref="\/reports"/.test(fin) && /\/reports\/operational/.test(fin),
+  expect(/if \(pathname\.endsWith\("\/print"\)\) return <>\{children\}<\/>;/.test(layout) && !/BARE_PREFIXES|"\/reports\/operational"|"\/reports\/statements"/.test(layout),
+    "the Reports layout leaves only paper bare — the number reports wear the app's scope and ground (6C)");
+  const fin = code(read("src/components/finance/FinanceWorkspace.tsx"));
+  expect(!/href="\/reports"/.test(fin) && /\/reports\/operational/.test(fin),
     "Finance links point at /reports/operational, not the new app");
   expect(fs.existsSync(path.join(ROOT, "src/app/reports/operational/page.tsx")) && !fs.existsSync(path.join(ROOT, "src/app/reports/(app)")),
     "the Finance page moved to /reports/operational, and no route group hides the app from the budgets guard");
@@ -2743,6 +2749,9 @@ console.log("\n§26 each Reports screen downloads only its own words");
     { name: "its team summary", entry: ["src/components/reports/app/TeamSummary.tsx"], dictFrom: [HOME], lazy: false, minus: HOME },
     { name: "the report page", entry: ["src/app/reports/[id]/page.tsx", "src/components/reports/app/ReportView.tsx"], dictFrom: ["src/components/reports/app/ReportView.tsx"], lazy: true },
     { name: "its print", entry: ["src/app/reports/[id]/print/page.tsx"], dictFrom: ["src/app/reports/[id]/print/page.tsx"], lazy: true },
+    /* 6C: the number reports and their paper — the `num` words only. */
+    { name: "the number reports", entry: ["src/app/reports/operational/page.tsx", "src/app/reports/statements/page.tsx"], dictFrom: ["src/components/reports/numbers/OperationalNumbers.tsx", "src/components/reports/numbers/StatementNumbers.tsx"], lazy: true },
+    { name: "their paper", entry: ["src/app/reports/operational/print/page.tsx", "src/app/reports/statements/print/page.tsx"], dictFrom: ["src/components/reports/numbers/NumbersPrintPage.tsx"], lazy: true },
   ];
   const problems = (sc: Screen, virtual: Map<string, string> = new Map()): string[] => {
     const files = graph(sc.entry, virtual, sc.lazy);
@@ -3108,6 +3117,111 @@ console.log("\n§31 Koleex AI reads the reports — and starts a draft");
   expect(VB.includes('if (pending.tool === "startReportDraft") session?.sendNote(') && VS.includes('pendingWrite.tool === "startReportDraft"') && VS.includes("writeSavedTool"),
     "the call's card says what it will start — a report draft, not a task — and what was started");
   expect(code(read("src/lib/server/ai-agent/tool-registry.ts")).includes("...reportTools,"), "the four tools are registered");
+}
+
+/* ── §32 the number reports in the app's look (6C, 26 Sep 2026) ─────────── */
+console.log("\n§32 the number reports — same doors, one currency per figure, the house paper");
+{
+  /* An amount reads "CODE 1,234.50", one line per currency, the base first. */
+  eq([fmtAmount(1234.5), fmtAmount(-1234.5), fmtAmount(-0.001), fmtAmount(0)], ["1,234.50", "−1,234.50", "0.00", "0.00"], "an amount reads 1,234.50 — a real minus, never a -0.00");
+  eq(moneyLines({ USD: 120, CNY: 900 }, "CNY"), ["CNY 900.00", "USD 120.00"], "two currencies are two lines, the base first — never one sum");
+  eq([moneyLines({}, "CNY"), moneyLines(undefined, "USD"), moneyLines({ EUR: 0.001, CNY: 5 }, "CNY")], [["CNY 0.00"], ["USD 0.00"], ["CNY 5.00"]], "no money is a zero in the base currency; dust is no currency");
+  eq(currencyOrder("CNY", { USD: 1 }, { EUR: 2, CNY: 3 }), ["CNY", "EUR", "USD"], "currencies read base first, then by code");
+  eq([quickRange("quarter", "2026-09-26"), quickRange("lastYear", "2026-09-26"), quickAsOf("monthEnd", "2026-01-15"), quickAsOf("yearEnd", "2026-09-26")],
+    [{ from: "2026-07-01", to: "2026-09-26" }, { from: "2025-01-01", to: "2025-12-31" }, "2025-12-31", "2025-12-31"], "the quick periods: this quarter from its first day, last year whole, the end of last month across a new year");
+  eq([dmy("2026-09-26"), dmy("nope")], ["26/09/2026", "—"], "days read D/M/Y");
+
+  /* The server keeps each currency apart. */
+  const OPS = "src/lib/reports/operational.ts";
+  rule("the operational reports add a figure only to its own currency — a converted document to the base, any other to its own", OPS,
+    (c) => (c.includes("if (Number.isFinite(b) && b !== 0) return [base, b];") && c.includes("return [ccyOf(currency, base), Number(total) || 0];")
+      && (c.match(/add\(row\.amounts, ccy, amt\);/g) ?? []).length === 3 && !/totalAmount \+=/.test(c) ? [] : ["two currencies are added into one figure"]),
+    (src) => src.replace("    add(row.amounts, ccy, amt);\n    bySupplier", "    add(row.amounts, base, amt);\n    bySupplier"));
+  rule("what is still open is the document's own balance, in its own currency", OPS,
+    (c) => ((c.match(/add\(cur\.open, ccyOf\([ib]\.currency, base\), Math\.max\(0, open\)\);/g) ?? []).length === 2 ? [] : ["an open balance is filed under another currency"]),
+    (src) => src.replace("add(cur.open, ccyOf(i.currency, base), Math.max(0, open));", "add(cur.open, ccy, Math.max(0, open));"));
+  const AG = "src/lib/accounting/aging.ts";
+  rule("an aging row is one party IN ONE CURRENCY, and the totals are per currency", AG,
+    (c) => ((c.match(/const key = `\$\{[^`]+\}\|\$\{code\}`;/g) ?? []).length === 2 && c.includes("addTo(totals_by_currency[p.currency] ??= emptyTotals(), p);") ? [] : ["a customer's CNY and USD invoices are added into one row"]),
+    (src) => src.replace('const key = `${inv.customer_id ?? "—"}|${code}`;', 'const key = inv.customer_id ?? "—";'));
+  const FS = code(read("src/components/finance/FinanceStatements.tsx"));
+  expect(FS.includes("r.totals_by_currency ?? { [r.parties[0].currency]: r.totals }") && FS.includes("key={`${p.party_id ?? p.party_name ?? \"\"}|${p.currency}`}"),
+    "…and Finance's own aging panel shows the code beside each row and a total per currency");
+  const route = code(read("src/app/api/reports/operational/route.ts"));
+  const restricted = /const RESTRICTED = new Set\(\[([^\]]*)\]\)/.exec(route)?.[1].match(/"([a-z]+)"/g)?.map((x) => x.slice(1, -1)).sort() ?? [];
+  eq(restricted, [...COST_KINDS].sort(), "the page locks exactly the reports the route locks (the «private records» switch)");
+  expect(OPS_KINDS.every((k) => route.includes(`case "${k}":`)), "every report the page offers is one the route builds");
+
+  /* The statements read what the APIs send. */
+  const DATA = "src/components/reports/numbers/data.ts";
+  rule("the statements read the shapes the APIs send — { statement }, { balance_sheet }, { report } (the old page read j.pl and threw)", DATA,
+    (c) => (c.includes('(j) => (j.statement ? { tab: "pl", pl: j.statement as ProfitLoss } : null)') && c.includes("j.balance_sheet ? { tab: \"bs\", bs: j.balance_sheet as BalanceSummary")
+      && c.includes('(j) => (j.statement ? { tab: "cf", cf: j.statement as CashFlow } : null)') && c.includes("(j) => (j.report ? { tab, aging: j.report as Aging } : null)") ? [] : ["a tab reads a field the API never sends"]),
+    (src) => src.replace('(j) => (j.statement ? { tab: "pl", pl: j.statement as ProfitLoss } : null)', '(j) => (j.pl ? { tab: "pl", pl: j.pl as ProfitLoss } : null)'));
+  rule("a 403 is a lock, said as such — never an error or a guess", DATA,
+    (c) => (c.includes('if (res.status === 403) return { state: "locked" };') ? [] : ["a refused report reads as broken"]),
+    (src) => src.replace('    if (res.status === 403) return { state: "locked" };\n', ""));
+  rule("Finance's \"tap for aging\" (?tab=ar|ap) opens that aging", "src/components/reports/numbers/StatementNumbers.tsx",
+    (c) => (c.includes("if (isStatementTab(tb)) setTab(tb);") ? [] : ["the aging link lands on the profit and loss"]),
+    (src) => src.replace("      if (isStatementTab(tb)) setTab(tb);\n", ""));
+  expect(["ar", "ap"].every((x) => code(read("src/components/finance/FinanceDashboard.tsx")).includes(`href="/reports/statements?tab=${x}"`)), "…and those are the links Finance's dashboard carries");
+
+  /* The look, the words, the paper. */
+  const KIT = code(read("src/components/reports/numbers/NumbersKit.tsx"));
+  const sharedCard = /export const CARD = ("[^"]+");/.exec(code(read("src/components/reports/app/shared.tsx")))?.[1];
+  expect(!!sharedCard && KIT.includes(`export const CARD = ${sharedCard};`), "the number reports wear the Reports app's own card");
+  expect(KIT.includes('backHref="/reports?tab=library"') && KIT.includes("<TabStrip ariaLabel={label} glass={false}"), "the Hub header's back control opens the Library; the tabs are the Hub's one tab bar, without a second blur");
+  for (const f of ["src/components/reports/numbers/OperationalNumbers.tsx", "src/components/reports/numbers/StatementNumbers.tsx"]) {
+    rule("the page prints through the house recipe — the /print route in a hidden frame, never this window", f,
+      (c) => (/printPaper\(/.test(c) && !/window\.print\(/.test(c) ? [] : ["the page prints the Hub layout"]),
+      (src) => src.replace("printPaper(", "window.print(); void (").replace("import {\n  MoneyKpi", "import {\n  MoneyKpi"));
+  }
+  expect(KIT.includes('Object.assign(frame.style, { position: "fixed", left: "-10000px"') && !/visibility:\s*"hidden"/.test(KIT), "…an off-screen frame, never a hidden one");
+  const PP = code(read("src/components/reports/numbers/NumbersPrintPage.tsx"));
+  expect(PP.includes("<style>{PRINT_AND_DOC_STYLES}</style>") && PP.includes("__quotation_pdf_ready__ = true;") && PP.includes("document.title = paper.fileName;"),
+    "the paper page keeps the print contract: the house styles, the ready flag, the file name");
+  const DOC = "src/components/reports/numbers/NumbersPrintDoc.tsx";
+  rule("the paper pins every height the pagination counts", DOC,
+    (c) => (c.includes("height: rowPx(r), boxSizing: \"border-box\"") && c.includes("height: TABLE_HEAD_PX, lineHeight") && c.includes("height: COL_HEAD_PX, lineHeight")
+      && c.includes("const h = barPx(block) - BAR_GAP_PX;") ? [] : ["a row can grow past what the sheet budgeted — clipped in silence"]),
+    (src) => src.replace("height: rowPx(r), boxSizing", "minHeight: rowPx(r), boxSizing"));
+
+  /* The pagination, proved on made-up reports. */
+  eq([NP.SHEET_PX, NP.FIRST_HEAD_PX, NP.CONT_HEAD_PX, NP.FOOT_PX], [SHEET_PX, FIRST_HEAD_PX, CONT_HEAD_PX, FOOT_PX], "the number paper's sheet budgets are the written report's");
+  const line = (name: string, lines = 1): NP.PrintRow => ({ cells: [[name], Array.from({ length: lines }, (_, i) => `CNY ${i}`)] });
+  const cols: NP.PrintColumn[] = [{ label: "Name", align: "start", width: "1fr" }, { label: "Amount", align: "end", width: "1fr" }];
+  const table = (head: string, n: number, lines = 1, foot = true): NP.PrintTable => ({ kind: "table", head, cols, rows: Array.from({ length: n }, (_, i) => line(`${head}${i}`, i % 5 === 4 ? lines : 1)), foot: foot ? [line("Total", 2)] : [] });
+  const cases: Array<{ name: string; blocks: NP.PrintBlock[] }> = [
+    { name: "one short table", blocks: [table("A", 5)] },
+    { name: "a table of 300 rows", blocks: [table("A", 300)] },
+    { name: "rows of up to four currencies", blocks: [table("A", 120, 4)] },
+    { name: "statements: tables and bars", blocks: [table("R", 30), { kind: "bar", label: "Gross", lines: ["CNY 1"] }, table("E", 70), { kind: "bar", label: "Net", lines: ["CNY 1", "prev"], strong: true }] },
+    { name: "an empty table", blocks: [{ kind: "table", head: "E", cols, rows: [], empty: "Nothing" }] },
+  ];
+  /* A table whose last rows end right at a sheet's foot — the total bar must not print alone. */
+  const firstRoom = SHEET_PX - FOOT_PX - FIRST_HEAD_PX - NP.TABLE_PX;
+  cases.push({ name: "a table that fills its first sheet exactly", blocks: [table("X", Math.floor(firstRoom / NP.rowPx(line("x"))), 1)] });
+  const bad: string[] = [];
+  for (const cs of cases) {
+    const sheets = NP.paginateNumbers(cs.blocks);
+    for (const [i, sh] of sheets.entries()) if (sh.used > SHEET_PX - FOOT_PX) bad.push(`${cs.name}: sheet ${i + 1} over budget (${sh.used})`);
+    cs.blocks.forEach((b, bi) => {
+      if (b.kind === "bar") {
+        if (sheets.flatMap((sh) => sh.parts).filter((p) => p.kind === "bar" && p.block === bi).length !== 1) bad.push(`${cs.name}: a bar printed twice or never`);
+        return;
+      }
+      const parts = sheets.flatMap((sh) => sh.parts).filter((p): p is Extract<NP.SheetPart, { kind: "table" }> => p.kind === "table" && p.block === bi);
+      const printed = parts.flatMap((p) => p.rows);
+      const want = b.rows.length ? b.rows : [NP.emptyRow(b)];
+      if (JSON.stringify(printed) !== JSON.stringify(want)) bad.push(`${cs.name}: rows lost, doubled or reordered`);
+      if (parts.some((p, i) => p.cont !== (i > 0))) bad.push(`${cs.name}: a continued part is not marked, or the first is`);
+      const withFoot = parts.filter((p) => p.foot.length);
+      if ((b.foot?.length ?? 0) > 0 && (withFoot.length !== 1 || withFoot[0] !== parts[parts.length - 1])) bad.push(`${cs.name}: the total bar is not on the table's last part`);
+      if (parts.some((p) => p.rows.length === 0 && !(p.foot.length && parts.length > 1 && parts[parts.length - 2].rows.length === 1))) bad.push(`${cs.name}: a head sits alone`);
+      if (withFoot.length && withFoot[0].rows.length === 0 && want.length > 1) bad.push(`${cs.name}: the total bar printed on a sheet of its own`);
+    });
+  }
+  expect(bad.length === 0, `the paper deals ${cases.length} made-up reports: never over a sheet, every row once and in order, continued parts marked, the total with its last rows, a head never alone`, bad.join("; "));
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

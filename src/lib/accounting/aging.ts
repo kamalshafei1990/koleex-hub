@@ -40,6 +40,9 @@ function daysBetween(asOf: Date, dueIso: string | null): number {
   return Math.floor((asOf.getTime() - due.getTime()) / 86_400_000);
 }
 
+/** One party IN ONE CURRENCY (Reports 6C, 26/09/2026): a customer billed
+ *  in CNY and in USD is two rows, so a row's figures are one currency —
+ *  they were added into one number under the first invoice's code. */
 export interface AgingPartyRow {
   party_id: string | null;
   party_name: string | null;
@@ -48,20 +51,48 @@ export interface AgingPartyRow {
   buckets: Record<AgingBucket, number>;
   currency: string;
 }
+export interface AgingTotals {
+  by_bucket: Record<AgingBucket, number>;
+  total_open: number;
+  total_overdue: number;
+}
 export interface AgingReport {
   as_of: string;
   buckets: AgingBucket[];
   parties: AgingPartyRow[];
-  totals: {
-    by_bucket: Record<AgingBucket, number>;
-    total_open: number;
-    total_overdue: number;
-  };
+  /** @deprecated Summed across currencies — kept only so a screen still on
+   *  an older bundle does not break. Read `totals_by_currency`. */
+  totals: AgingTotals;
+  /** The totals per currency code — the figures to show. */
+  totals_by_currency: Record<string, AgingTotals>;
 }
 
 function emptyBuckets(): Record<AgingBucket, number> {
   return { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0 };
 }
+
+const emptyTotals = (): AgingTotals => ({ by_bucket: emptyBuckets(), total_open: 0, total_overdue: 0 });
+
+function addTo(acc: AgingTotals, p: AgingPartyRow) {
+  for (const b of BUCKETS) acc.by_bucket[b] += p.buckets[b];
+  acc.total_open    += p.total_open;
+  acc.total_overdue += p.total_overdue;
+}
+
+/** Rows biggest first (within a currency the order is exact; across
+ *  currencies it only groups), the per-currency totals, and the legacy sum. */
+function finish(asOfDate: string, partyMap: Map<string, AgingPartyRow>): AgingReport {
+  const parties = Array.from(partyMap.values()).sort((a, b) => a.currency.localeCompare(b.currency) || b.total_open - a.total_open);
+  const totals = emptyTotals();
+  const totals_by_currency: Record<string, AgingTotals> = {};
+  for (const p of parties) {
+    addTo(totals, p);
+    addTo(totals_by_currency[p.currency] ??= emptyTotals(), p);
+  }
+  return { as_of: asOfDate, buckets: BUCKETS, parties, totals, totals_by_currency };
+}
+
+const ccy = (c: string | null | undefined) => (c || "USD").trim().toUpperCase() || "USD";
 
 export async function buildArAging(tenantId: string, asOfIso?: string): Promise<AgingReport> {
   const asOf = asOfIso ? new Date(asOfIso) : new Date();
@@ -91,13 +122,14 @@ export async function buildArAging(tenantId: string, asOfIso?: string): Promise<
     if (due <= 0.0001) continue;
     const days = daysBetween(asOf, inv.due_date);
     const bucket = bucketForDays(days);
-    const key = inv.customer_id ?? "—";
+    const code = ccy(inv.currency);
+    const key = `${inv.customer_id ?? "—"}|${code}`;
     const cur = partyMap.get(key) ?? {
       party_id: inv.customer_id,
       party_name: inv.customer_id ? custMap.get(inv.customer_id) ?? null : null,
       total_open: 0, total_overdue: 0,
       buckets: emptyBuckets(),
-      currency: inv.currency || "USD",
+      currency: code,
     };
     cur.total_open    += due;
     cur.buckets[bucket] += due;
@@ -105,18 +137,7 @@ export async function buildArAging(tenantId: string, asOfIso?: string): Promise<
     partyMap.set(key, cur);
   }
 
-  const parties = Array.from(partyMap.values()).sort((a, b) => b.total_open - a.total_open);
-  const totals = parties.reduce(
-    (acc, p) => {
-      for (const b of BUCKETS) acc.by_bucket[b] += p.buckets[b];
-      acc.total_open    += p.total_open;
-      acc.total_overdue += p.total_overdue;
-      return acc;
-    },
-    { by_bucket: emptyBuckets(), total_open: 0, total_overdue: 0 },
-  );
-
-  return { as_of: asOfDate, buckets: BUCKETS, parties, totals };
+  return finish(asOfDate, partyMap);
 }
 
 export async function buildApAging(tenantId: string, asOfIso?: string): Promise<AgingReport> {
@@ -149,13 +170,14 @@ export async function buildApAging(tenantId: string, asOfIso?: string): Promise<
     if (due <= 0.0001) continue;
     const days = daysBetween(asOf, b.due_date);
     const bucket = bucketForDays(days);
-    const key = b.supplier_id;
+    const code = ccy(b.currency);
+    const key = `${b.supplier_id}|${code}`;
     const cur = partyMap.get(key) ?? {
       party_id: b.supplier_id,
       party_name: supMap.get(b.supplier_id) ?? null,
       total_open: 0, total_overdue: 0,
       buckets: emptyBuckets(),
-      currency: b.currency || "USD",
+      currency: code,
     };
     cur.total_open    += due;
     cur.buckets[bucket] += due;
@@ -163,18 +185,7 @@ export async function buildApAging(tenantId: string, asOfIso?: string): Promise<
     partyMap.set(key, cur);
   }
 
-  const parties = Array.from(partyMap.values()).sort((a, b) => b.total_open - a.total_open);
-  const totals = parties.reduce(
-    (acc, p) => {
-      for (const b of BUCKETS) acc.by_bucket[b] += p.buckets[b];
-      acc.total_open    += p.total_open;
-      acc.total_overdue += p.total_overdue;
-      return acc;
-    },
-    { by_bucket: emptyBuckets(), total_open: 0, total_overdue: 0 },
-  );
-
-  return { as_of: asOfDate, buckets: BUCKETS, parties, totals };
+  return finish(asOfDate, partyMap);
 }
 
 /* ─── Inventory valuation summary (wraps O.5) ───────────────── */

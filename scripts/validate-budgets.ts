@@ -170,6 +170,14 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      are their own chunk). */
   "reports/[id]": { chunks: 10, kbytes: 657 },
   "reports/[id]/print": { chunks: 14, kbytes: 832 },
+  /* The number reports in the Reports app's look (6C) — MEASURED 26/09/2026:
+     operational 8 chunks / 523 KB, statements 8 / 538 KB, each print route
+     11 / 687 KB (the quotation's PRINT_AND_DOC_STYLES like every house
+     document; loaded only in the page's hidden print iframe). ~5 % air. */
+  "reports/operational": { chunks: 9, kbytes: 550 },
+  "reports/statements": { chunks: 9, kbytes: 565 },
+  "reports/operational/print": { chunks: 12, kbytes: 720 },
+  "reports/statements/print": { chunks: 12, kbytes: 720 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
      Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of

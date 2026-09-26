@@ -321,7 +321,10 @@ function CashFlowPanel({ from, to }: { from: string; to: string }) {
 /* ─── AR / AP Aging ──────────────────────────────────────────── */
 
 interface AgingPartyRow { party_id: string | null; party_name: string | null; total_open: number; total_overdue: number; buckets: Record<string, number>; currency: string }
-interface AgingReport { as_of: string; buckets: string[]; parties: AgingPartyRow[]; totals: { by_bucket: Record<string, number>; total_open: number; total_overdue: number } }
+interface AgingTotals { by_bucket: Record<string, number>; total_open: number; total_overdue: number }
+/* One row per party PER CURRENCY and the totals per currency (Reports 6C):
+   two currencies are never added into one figure. */
+interface AgingReport { as_of: string; buckets: string[]; parties: AgingPartyRow[]; totals: AgingTotals; totals_by_currency?: Record<string, AgingTotals> }
 
 function AgingPanel({ title, url }: { title: string; url: string }) {
   const { t } = useTranslation(FIN_STATEMENTS);
@@ -347,8 +350,8 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
           {r.parties.length === 0 ? (
             <tr><td colSpan={r.buckets.length + 3} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">{t("statements.aging.empty", "No open balances.")}</td></tr>
           ) : r.parties.map((p) => (
-            <tr key={p.party_id ?? p.party_name ?? ""} className="border-b border-[var(--border-faint)] hover:bg-[var(--bg-secondary)]">
-              <td className="px-4 py-1.5 text-[var(--text-highlight)]">{p.party_name ?? "—"}</td>
+            <tr key={`${p.party_id ?? p.party_name ?? ""}|${p.currency}`} className="border-b border-[var(--border-faint)] hover:bg-[var(--bg-secondary)]">
+              <td className="px-4 py-1.5 text-[var(--text-highlight)]">{p.party_name ?? "—"} <span className="ms-1 font-mono text-[10.5px] text-[var(--text-dim)]">{p.currency}</span></td>
               {r.buckets.map((b) => (
                 <td key={b} className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmtMoney(p.buckets[b] ?? 0)}</td>
               ))}
@@ -359,14 +362,16 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
         </tbody>
         {r.parties.length > 0 && (
           <tfoot>
-            <tr className="border-t-2 border-white/20">
-              <td className="px-4 py-2 text-[13px] font-bold">{t("statements.aging.totals", "Totals")}</td>
-              {r.buckets.map((b) => (
-                <td key={b} className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.by_bucket[b] ?? 0)}</td>
-              ))}
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.total_open)}</td>
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-700 dark:text-rose-200">{fmtMoney(r.totals.total_overdue)}</td>
-            </tr>
+            {Object.entries(r.totals_by_currency ?? { [r.parties[0].currency]: r.totals }).map(([code, tot], i) => (
+              <tr key={code} className={i === 0 ? "border-t-2 border-white/20" : ""}>
+                <td className="px-4 py-2 text-[13px] font-bold">{t("statements.aging.totals", "Totals")} <span className="ms-1 font-mono text-[11px] font-medium text-[var(--text-dim)]">{code}</span></td>
+                {r.buckets.map((b) => (
+                  <td key={b} className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(tot.by_bucket[b] ?? 0)}</td>
+                ))}
+                <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(tot.total_open)}</td>
+                <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-700 dark:text-rose-200">{fmtMoney(tot.total_overdue)}</td>
+              </tr>
+            ))}
           </tfoot>
         )}
       </table>

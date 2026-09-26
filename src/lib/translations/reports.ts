@@ -6,6 +6,7 @@ import { reportComposerT } from "./report-ui/composer";
 import { reportPrintT } from "./report-ui/print";
 import { reportComplianceT } from "./report-ui/compliance";
 import { reportServerT } from "./report-ui/server";
+import { reportNumbersT } from "./report-ui/numbers";
 
 /* Reports app (Phase 1, 25 Sep 2026; phase 2 A–D; obligations 3A). Template strings follow
    `tpl.<key>.name|desc|s.<section>[.hint]`; validate:reports checks every
@@ -21,7 +22,7 @@ import { reportServerT } from "./report-ui/server";
    the blocks' own chunk.
 
    26 Sep 2026: the app's own words live one file per place that reads them —
-   ./report-ui/{common, home, page, composer, print, compliance, server} —
+   ./report-ui/{common, home, page, composer, print, compliance, server, numbers} —
    and each screen imports only its own: the home no longer downloads the
    report page's words, nor the page the home's. THIS UNION is for the
    server (notifications, the calendar, the AI routes); a screen importing
@@ -34,4 +35,5 @@ export const reportsT: Translations = {
   ...reportPrintT,
   ...reportComplianceT,
   ...reportServerT,
+  ...reportNumbersT,
 };
