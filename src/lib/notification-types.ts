@@ -157,7 +157,7 @@ export const NOTIFICATION_TYPES = {
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },
   membership_request:       { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "clear", key: "membership_request_id", when: "the request is approved or rejected" } },
-  support_request:          { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "gap", note: "BLOCKED: nothing in the Hub marks a sign-in help request handled — support_requests has no resolve action to clear it from" } },
+  support_request:          { app: "accounts", activity: "membership_requests", severity: "action", lifecycle: { kind: "clear", key: "support_request_id", when: "an admin marks the request handled — the notification's own button (api/support/requests/[id]/resolve)" } },
   ai_brief:                 { app: "ai", activity: null, activityNote: "OPEN: no Settings switch for the daily brief yet — lands under Other.", severity: "info", lifecycle: { kind: "supersede", key: "type" } },
   discuss_message:          { app: "discuss", activity: "discuss_messages", severity: "info", lifecycle: { kind: "push-only" } },
   test:                     { app: "settings", activity: null, activityNote: "The user's own test push (Settings → Notifications) — muting it would defeat the test.", severity: "info", lifecycle: { kind: "push-only" } },

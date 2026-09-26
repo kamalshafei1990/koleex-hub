@@ -26,6 +26,9 @@ export interface DecisionSpec {
   reasonMin: number;
   /** The route takes a note at all (overtime does not). */
   takesNote: boolean;
+  /** One action, not a verdict: "handled" closes a sign-in help request —
+   *  there is nothing to refuse. The bar shows that single button. */
+  single?: "handled";
 }
 
 export type DecideResult = { ok: true } | { ok: false; code: "forbidden" | "decided" | "reason" | "failed"; message?: string };
@@ -46,6 +49,7 @@ function target(m: unknown): { type: string; id: string } | null {
     : type === "attendance_overtime_approval_request" ? str(md.attendance_record_id)
     : type === "membership_request" ? str(md.membership_request_id) ?? str(md.request_id)
     : type === "expense_approval_request" ? str(md.expense_id)
+    : type === "support_request" ? str(md.support_request_id)
     : null;
   return id ? { type, id } : null;
 }
@@ -58,6 +62,7 @@ export function decisionOf(m: unknown): DecisionSpec | null {
     case "report_approval_request": return { rejectWord: "return", reasonRequired: true, reasonMin: 3, takesNote: true };
     case "membership_request": return { rejectWord: "reject", reasonRequired: true, reasonMin: 1, takesNote: true };
     case "expense_approval_request": return { rejectWord: "reject", reasonRequired: true, reasonMin: 3, takesNote: true };
+    case "support_request": return { rejectWord: "reject", reasonRequired: false, reasonMin: 0, takesNote: false, single: "handled" };
     case "attendance_overtime_approval_request": return { rejectWord: "reject", reasonRequired: false, reasonMin: 0, takesNote: false };
     default: return { rejectWord: "reject", reasonRequired: false, reasonMin: 0, takesNote: true };
   }
@@ -116,6 +121,10 @@ export async function decide(m: unknown, verdict: Verdict, note: string): Promis
       r = await call(`/api/approvals`, "POST", approve
         ? { entity: "expense", entityId: t.id, action: "approve", note: n || undefined }
         : { entity: "expense", entityId: t.id, action: "reject", reason: n });
+      break;
+    case "support_request":
+      if (!approve) return { ok: false, code: "failed" };
+      r = await call(`/api/support/requests/${t.id}/resolve`, "POST", {});
       break;
     default:
       return { ok: false, code: "failed" };

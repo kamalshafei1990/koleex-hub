@@ -110,13 +110,15 @@ export function DecisionBar({
           <button type="button" data-kx-keep-hover onClick={() => { setMode("approve"); setNote(""); setErr(null); }}
             className={`flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/12 font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20 ${h}`}>
             <CheckCircleIcon className="h-3 w-3" />
-            {tUi("mod.approve")}
+            {spec.single === "handled" ? tUi("dec.handled") : tUi("mod.approve")}
           </button>
-          <button type="button" data-kx-keep-hover onClick={() => { setMode("reject"); setNote(""); setErr(null); }}
-            className={`flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 font-semibold text-red-500 transition-colors hover:bg-red-500/20 ${h}`}>
-            <XCircleIcon className="h-3 w-3" />
-            {rejectLabel}
-          </button>
+          {!spec.single && (
+            <button type="button" data-kx-keep-hover onClick={() => { setMode("reject"); setNote(""); setErr(null); }}
+              className={`flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 font-semibold text-red-500 transition-colors hover:bg-red-500/20 ${h}`}>
+              <XCircleIcon className="h-3 w-3" />
+              {rejectLabel}
+            </button>
+          )}
         </div>
       ) : (
         <div className={`space-y-1.5 rounded-lg border p-2 ${mode === "approve" ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-red-500/25 bg-red-500/[0.05]"}`}>
@@ -143,7 +145,9 @@ export function DecisionBar({
                   : "border-red-500/40 bg-red-500/15 text-red-500 hover:bg-red-500/25"
               }`}>
               {mode === "approve" ? <CheckCircleIcon className="h-3 w-3" /> : <XCircleIcon className="h-3 w-3" />}
-              {mode === "approve" ? tUi("mod.confirmApprove") : spec.rejectWord === "return" ? tUi("dec.confirmReturn") : tUi("mod.confirmReject")}
+              {mode === "approve"
+                ? spec.single === "handled" ? tUi("dec.confirmHandled") : tUi("mod.confirmApprove")
+                : spec.rejectWord === "return" ? tUi("dec.confirmReturn") : tUi("mod.confirmReject")}
             </button>
           </div>
         </div>

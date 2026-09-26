@@ -57,6 +57,8 @@ export const notifUiT: Translations = {
   /* Decisions taken on the notification itself (leave, tasks, reports,
      attendance corrections, overtime, account requests). */
   "dec.return":     { en: "Send back",      zh: "退回",       ar: "إعادة" },
+  "dec.handled":    { en: "Mark handled",   zh: "标记为已处理", ar: "تم الحل" },
+  "dec.confirmHandled": { en: "Confirm — handled", zh: "确认已处理", ar: "تأكيد: تم الحل" },
   "dec.confirmReturn": { en: "Confirm send back", zh: "确认退回", ar: "تأكيد الإعادة" },
   "dec.forbidden":  { en: "You can't decide this one", zh: "你无权处理此项", ar: "لا يمكنك البتّ في هذا" },
   "dec.decided":    { en: "Already decided", zh: "已处理",     ar: "تم البتّ فيه بالفعل" },
