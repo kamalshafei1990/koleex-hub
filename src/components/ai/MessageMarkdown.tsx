@@ -57,7 +57,7 @@ function hastText(node: unknown): string {
   return (n.children ?? []).map(hastText).join("");
 }
 
-type MdLabels = { copied: string; copyCode: string; codeLabel: string; closePhoto: string };
+type MdLabels = { copied: string; copyCode: string; codeLabel: string; closePhoto: string; photo: string };
 
 function CodeBlock({
   children,
@@ -121,7 +121,7 @@ export default function MessageMarkdown({
   const closeLightbox = useCallback(() => setLightbox(null), []);
   const copy = COPY[lang] ?? COPY.en;
   const labels = useMemo<MdLabels>(
-    () => ({ copied: copy.copied, copyCode: copy.copyCode, codeLabel: copy.codeLabel, closePhoto: copy.closePhoto }),
+    () => ({ copied: copy.copied, copyCode: copy.copyCode, codeLabel: copy.codeLabel, closePhoto: copy.closePhoto, photo: copy.photo }),
     [copy],
   );
   /* PARSED ONCE PER CHANGE OF TEXT. Every streamed token used to re-run
@@ -167,7 +167,10 @@ export default function MessageMarkdown({
                 rel="noreferrer noopener"
                 {...(chip ? { className: "koleex-md-source", title: href, dir: "ltr" } : {})}
               >
-                {chip ?? children}
+                {/* The chip's words in their own span: it ellipsizes, so the
+                    link itself can take a finger-sized hit area without that
+                    area being clipped (globals.css, pointer: coarse). */}
+                {chip !== null ? <span className="koleex-md-source-text">{chip}</span> : children}
               </a>
             );
           },
@@ -217,7 +220,7 @@ export default function MessageMarkdown({
             if (!/^https:\/\//i.test(url)) return <span>{alt ?? ""}</span>;
             /* A TAP EXPANDS THE PICTURE IN PLACE (PhotoLightbox) rather than
                leaving the app for a bare file in a new tab. */
-            return <MarkdownPhoto url={url} alt={alt ?? ""} onOpen={() => setLightbox({ url, label: alt ?? "" })} />;
+            return <MarkdownPhoto url={url} alt={alt ?? ""} fallbackLabel={labels.photo} onOpen={() => setLightbox({ url, label: alt ?? "" })} />;
           },
           table: ({ node, children, ...rest }) => (void node, (
             <div className="koleex-md-table-wrap">
@@ -244,12 +247,12 @@ export default function MessageMarkdown({
    link or a host that refuses hot-linking, and the browser's broken-image
    icon inside a bordered box is the worst of both — a frame around nothing.
    The alt text is the product's or the place's name, which reads fine. */
-function MarkdownPhoto({ url, alt, onOpen }: { url: string; alt: string; onOpen: () => void
+function MarkdownPhoto({ url, alt, fallbackLabel, onOpen }: { url: string; alt: string; fallbackLabel: string; onOpen: () => void
 }) {
   const [broken, setBroken] = useState(false);
   if (broken) return <span className="koleex-md-img-fallback">{alt}</span>;
   return (
-    <button type="button" onClick={onOpen} className="koleex-md-img-link" aria-label={alt || "Photo"}>
+    <button type="button" onClick={onOpen} className="koleex-md-img-link" aria-label={alt || fallbackLabel}>
       {/* A web photo at bubble width through the AI picture proxy, a
           catalogue photo through the optimizer — never the original file:
           a phone decoding camera-sized originals in a page that also holds

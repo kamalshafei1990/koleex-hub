@@ -50,6 +50,8 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import WaveformIcon from "@/components/icons/ui/WaveformIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
@@ -358,6 +360,8 @@ export default function KoleexAiApp() {
      cancel a streaming reply mid-answer. Reset per-turn in send(). */
   const abortRef = useRef<AbortController | null>(null);
   const [sending, setSending] = useState(false);
+  /** Turns that have finished, for the screen reader's "replied" line. */
+  const [turnsDone, setTurnsDone] = useState(0);
   /* Mode separates the two AI personalities served by this page:
        · "chat"  → fast, router-driven reply via /api/ai/chat
                    (the server picks the model per lane).
@@ -1605,6 +1609,7 @@ export default function KoleexAiApp() {
         abortRef.current = null;
         sendingRef.current = false;
         setSending(false);
+        setTurnsDone((n) => n + 1);
       }
     },
     [input, activeId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation, carryTaskCard],
@@ -1826,6 +1831,14 @@ export default function KoleexAiApp() {
   /* The thread ends on the caller's own words with no reply after them:
      a failed turn, which the error banner offers to send again. */
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  /* A FINISHED REPLY IS SAID TO A SCREEN READER (review, 2026-09-26): only
+     the Thinking line announced anything, so the end of an answer was
+     silent. Once per finished turn that ended on a reply — not on opening an
+     old thread, not on a failure (the alert says that). The zero-width
+     space alternates so the same words announce again on the next turn. */
+  const replyAnnounce = turnsDone > 0 && !sending && lastMessage?.role === "assistant" && !!lastMessage.content
+    ? copy.replyReady + (turnsDone % 2 ? "\u200B" : "")
+    : "";
   const canRetryLast = !sending && lastMessage?.role === "user" && !!lastMessage.content;
 
   /** Regenerate the last assistant reply. Finds the most recent
@@ -2985,7 +2998,7 @@ export default function KoleexAiApp() {
               </div>
             )}
             {attachStatus && (
-              <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+              <div role="status" aria-live="polite" className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
                 <span className="h-3 w-3 shrink-0 motion-safe:animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
                 {attachStatus}
               </div>
@@ -3031,6 +3044,7 @@ export default function KoleexAiApp() {
                 )}
               </div>
             )}
+            <p className="sr-only" role="status" aria-live="polite" data-reply-announce>{replyAnnounce}</p>
             {/* Floating "jump to latest" — STICKY, not absolute: an
                 absolute child of a scroll container anchors to the
                 container's own box (not the visible viewport), so the
@@ -3053,7 +3067,8 @@ export default function KoleexAiApp() {
                   aria-label={copy.jumpToLatest}
                   className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
-                  ↓ {copy.latest}
+                  <ArrowDownIcon size={12} aria-hidden />
+                  {copy.latest}
                 </button>
               </div>
             )}
@@ -3161,11 +3176,17 @@ export default function KoleexAiApp() {
                              from every other assistant. */
                           <span
                             key={`${file.name}-${i}`}
-                            className="group relative inline-block h-16 w-16 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                            className="group relative inline-block h-16 w-16"
                             title={file.name}
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL; next/image cannot optimise one and would only add a loader in front of bytes we already hold */}
-                            <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                            {/* THE PICTURE CLIPS, THE BUTTON DOES NOT. The clip used to
+                                sit on the chip itself, and it cut the remove button's
+                                finger-sized hit area down to about 34px (review,
+                                2026-09-26); the picture now has its own rounded box. */}
+                            <span className="block h-full w-full overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL; next/image cannot optimise one and would only add a loader in front of bytes we already hold */}
+                              <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                            </span>
                             <button
                               type="button"
                               onClick={() => removeAttachment(i)}
@@ -3175,6 +3196,7 @@ export default function KoleexAiApp() {
                                  2026-09-11). Same rule the sidebar pin follows. */
                               className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100"
                               aria-label={copy.removeFile.replace("{name}", file.name)}
+                              data-remove-photo
                             >
                               <CrossIcon size={9} />
                             </button>
@@ -3187,7 +3209,7 @@ export default function KoleexAiApp() {
                           className="inline-flex items-center gap-1.5 max-w-[200px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[12px] text-[var(--text-primary)]"
                           title={file.name}
                         >
-                          <span aria-hidden>📎</span>
+                          <PaperclipIcon size={12} aria-hidden className="shrink-0 opacity-70" />
                           <span className="truncate">{file.name}</span>
                           <button
                             type="button"

@@ -23,6 +23,7 @@ import { textLang } from "@/lib/text-direction";
 import Link from "next/link";
 import { type Lang } from "@/lib/i18n";
 import { COPY } from "@/components/ai/copy";
+import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 
 export type TaskCardState =
   | { state: "pending" }
@@ -139,7 +140,10 @@ export default function TaskCard({
       {status.state === "failed" && <div className="mt-2 text-[12px] text-[var(--kx-ai-danger-text,#FF7A7A)]" data-task-error>{copy.taskFailed}</div>}
       {status.state === "saved" && status.todoId && (
         <Link href={`/todo?task=${encodeURIComponent(status.todoId)}`} className="mt-2 inline-block text-[13px] font-medium text-[var(--kx-ai-accent,#0066FF)] hover:underline" data-task-open>
-          {copy.openTodo} {lang === "ar" ? "←" : "→"}
+          {copy.openTodo}{" "}
+          {/* The library's arrow, turned to point along the reading direction
+              — not an arrow character typed into the text (review, 2026-09-26). */}
+          <ArrowRightIcon size={12} aria-hidden className={`inline-block align-[-1px] ${lang === "ar" ? "-scale-x-100" : ""}`} />
         </Link>
       )}
       {live && (status.state === "pending" || status.state === "saving" || status.state === "failed") && (
