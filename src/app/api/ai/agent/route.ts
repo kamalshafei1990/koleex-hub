@@ -62,6 +62,7 @@ import { featureSwitchedOff, switchedOffModels } from "@/lib/server/ai/provider/
 import { generalLaneTools, runGeneralSearchHop, GENERAL_LANE_TOOL, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
 import { READ_PAGE_TOOL_DEF, READ_PAGE_MAX_PER_ANSWER, linksInText, readPageForModel } from "@/lib/server/ai/core/read-page";
 import { thinkingNote } from "@/lib/server/ai/core/thinking-note";
+import { buildThinkingRecord, type ThinkingNote } from "@/lib/ai/thinking-record";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
@@ -463,8 +464,35 @@ export async function POST(req: Request) {
      row once it's available. */
   if (wantsStream) {
     const encoder = new TextEncoder();
-    const send = (obj: unknown) =>
-      encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+    /* THE THINKING RECORD, SAVED WITH THE REPLY (owner, 2026-09-26: keep the
+       Thinking panel). It is read off the frames this turn sends, so it holds
+       exactly what the screen was shown: each retract's note, how many
+       lookups had been announced when it was said, and when the answer began
+       (the first delta after the last lookup). lib/ai/thinking-record.ts
+       decides what of it is stored. */
+    const thinkT0 = Date.now();
+    const thinkNotes: ThinkingNote[] = [];
+    let thinkLookups = 0;
+    let thinkAnswerAt: number | null = null;
+    const trackThinking = (obj: unknown) => {
+      const f = obj as { type?: string; note?: unknown; steps?: unknown };
+      if (f?.type === "retract") {
+        if (typeof f.note === "string" && f.note) thinkNotes.push({ text: f.note, at: thinkLookups });
+        thinkAnswerAt = null;
+      } else if (f?.type === "steps" && Array.isArray(f.steps)) {
+        const n = (f.steps as AgentStep[]).filter((s) => s.kind === "tool-call").length;
+        if (n > thinkLookups) {
+          thinkLookups = n;
+          thinkAnswerAt = null;
+        }
+      } else if (f?.type === "delta" && thinkAnswerAt === null) {
+        thinkAnswerAt = Date.now();
+      }
+    };
+    const send = (obj: unknown) => {
+      trackThinking(obj);
+      return encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+    };
 
     /* STOP REACHES THE SERVER (deep check, 2026-09-24). The browser's Stop
        aborts its fetch; the stream is cancelled, and until now nothing here
@@ -1089,6 +1117,11 @@ export async function POST(req: Request) {
              the full text by now; the DB write can finish after the
              controller closes without affecting UX. */
           const finalTitle = computeTitle(conv, content);
+          const thinking = buildThinkingRecord({
+            notes: thinkNotes,
+            steps: agent.steps,
+            ms: (thinkAnswerAt ?? Date.now()) - thinkT0,
+          });
           const [assistantInsert] = await Promise.all([
             supabaseServer
               .from("ai_messages")
@@ -1098,6 +1131,9 @@ export async function POST(req: Request) {
                 role: "assistant",
                 content: agent.finalReply,
                 provider: agent.provider,
+                /* Named only when there is a record, so a turn with no
+                   thinking writes exactly the row it always did. */
+                ...(thinking ? { thinking } : {}),
               })
               .select("*")
               .single(),

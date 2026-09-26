@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import type { KoleexModelId, KoleexServingModel } from "@/lib/ai/koleex-models";
+import type { ThinkingNote, ThinkingLookup } from "@/lib/ai/thinking-record";
 
 export type MsgRole = "user" | "assistant" | "system";
 export interface AgentStep {
@@ -60,23 +61,21 @@ export interface ChatMsg {
   servedModel?: KoleexServingModel | null;
   /** The Thinking panel's record of this turn (owner, 2026-09-26): what the
    *  model said before each lookup, and how long it worked before the answer
-   *  began. Browser-only, never persisted — like `steps`, a reloaded thread
-   *  shows the answer alone. */
+   *  began. Built live in the browser; saved with the reply in
+   *  ai_messages.thinking (lib/ai/thinking-record.ts) and read back with the
+   *  thread. */
   thinking?: ThinkingRecord;
 }
-/** One note the model wrote before a lookup, and where it goes: `at` is how
- *  many lookups had been announced when it was said, so it sits before the
- *  next one in the panel. */
-export interface ThinkingNote {
-  text: string;
-  at: number;
-}
+export type { ThinkingNote, ThinkingLookup };
 export interface ThinkingRecord {
   notes: ThinkingNote[];
-  /** When the turn was sent (ms since epoch), for the live counter. */
-  startedAt: number;
+  /** When the turn was sent (ms since epoch), for the live counter. Absent
+   *  on a record read back from a saved row. */
+  startedAt?: number;
   /** Set once the answer began: how long it thought. */
   ms?: number;
+  /** The lookups as saved. A live turn has `steps` instead. */
+  lookups?: ThinkingLookup[];
 }
 export interface ConversationRow {
   id: string;
