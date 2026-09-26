@@ -35,6 +35,7 @@ import "server-only";
 import { supabaseServer } from "../../supabase-server";
 import {
   clearTodoNotifications,
+  notifyApprovalDecision,
   notifySubmittedForApproval,
   notifyTodoAssigned,
   notifyTodoPeopleAdded,
@@ -47,6 +48,7 @@ import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { resolveTaskTime, resolveTaskDay, describeWhen, parseRecurrence } from "./task-time";
 import { buildTaskDraft, dayRangeISO, idList, UNKNOWN_PERSON_MESSAGE, type Person } from "./task-draft";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "../../todo-scope";
+import { ESCALATION_MARK } from "../../todo-escalation";
 
 const TODO_MODULE = "To-do";
 
@@ -356,6 +358,8 @@ const createTodo: ToolDef<
       people = r.people;
       departments = r.departments;
     }
+    /* "Everyone" is an admin's call — the same rule the routes enforce via
+       canAssignToEveryone() (lib/server/todo-access.ts). */
     const ut = (ctx.auth.user_type ?? "").toLowerCase();
     const built = buildTaskDraft(args, { tz, people, departments, isAdmin: ctx.isSuperAdmin || ut === "admin" });
     if (!built.ok) {
@@ -513,8 +517,10 @@ const createTodo: ToolDef<
    instead of a blind flip: owners (SA / creator / assigner) change the state
    directly; a participant (assignee / observer) marking a delegated task done
    SUBMITS it for the assigner's approval — the server-enforced approval loop —
-   and done:false while pending withdraws the submission. Same "create" gate
-   as the toggle route (completing your own work is part of normal usage). */
+   and done:false while pending withdraws the submission. Same "edit" gate
+   as the toggle route (a state change is an edit), and the same conditional
+   write: a task changed since it was read answers "changed", never a
+   double submission or an undone completion. */
 const completeTodo: ToolDef<
   { task_id?: string; done?: boolean; confirm?: boolean },
   Record<string, unknown> | { preview: Record<string, unknown> }
@@ -532,7 +538,7 @@ const completeTodo: ToolDef<
     required: ["task_id"],
   },
   requiredModule: TODO_MODULE,
-  requiredAction: "create",
+  requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
     if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listMyTodos first." };
@@ -597,15 +603,20 @@ const completeTodo: ToolDef<
 
     const now = new Date().toISOString();
 
+    const changedMessage = `"${title}" was just changed by someone else — check it again with listMyTodos before retrying.`;
     if (willSubmit || willWithdraw) {
-      const { error } = await supabaseServer
+      let q = supabaseServer
         .from("koleex_todos")
         .update({ approval_state: willWithdraw ? null : "pending", updated_at: now })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("completed", false);
+      q = t.approval_state === null ? q.is("approval_state", null) : q.eq("approval_state", t.approval_state);
+      const { data: written, error } = await q.select("id");
       if (error) {
         console.error("[tool.completeTodo]", error);
         return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
       }
+      if (!written || written.length === 0) return { ok: false, permissionStatus: "allowed", data: null, message: changedMessage };
       if (willSubmit) {
         await notifySubmittedForApproval({ id: t.id, title, tenant_id: t.tenant_id, assigned_by_account_id: t.assigned_by_account_id }, acc);
       }
@@ -625,7 +636,7 @@ const completeTodo: ToolDef<
        submission approves it (stamped), and a finished task closes every
        notification that pointed at it. */
     const implicitApproval = done && t.approval_state === "pending";
-    const { error } = await supabaseServer
+    const { data: written, error } = await supabaseServer
       .from("koleex_todos")
       .update({
         completed: done,
@@ -635,12 +646,20 @@ const completeTodo: ToolDef<
         ...(implicitApproval ? { approved_by_account_id: acc, approved_at: now } : {}),
         updated_at: now,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("completed", t.completed)
+      .select("id");
     if (error) {
       console.error("[tool.completeTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
+    if (!written || written.length === 0) return { ok: false, permissionStatus: "allowed", data: null, message: changedMessage };
     if (done) await clearTodoNotifications(t.id);
+    /* Ticking a submission done confirms it — the assignees hear, as from
+       the To-do app. */
+    if (implicitApproval) {
+      await notifyApprovalDecision({ id: t.id, title, tenant_id: t.tenant_id }, acc, "approved");
+    }
     await pingTodosChanged(t.tenant_id);
     return {
       ok: true,
@@ -734,12 +753,15 @@ const updateTodo: ToolDef<
     }
     if (typeof args.start_date === "string" && args.start_date.trim()) {
       changes.start_date = isNone(args.start_date) ? null : resolveTaskDay(args.start_date, tz);
+      /* An unreadable day is a refusal, never a silent clear. */
+      if (!isNone(args.start_date) && !changes.start_date) return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that start date — give it as an ISO date (2026-09-18)." };
     }
     if (typeof args.label === "string" && args.label.trim()) {
       changes.label = isNone(args.label) ? null : args.label.trim();
     }
     if (typeof args.recurrence === "string" && args.recurrence.trim()) {
       changes.recurrence = isNone(args.recurrence) ? null : parseRecurrence(args.recurrence);
+      if (!isNone(args.recurrence) && !changes.recurrence) return { ok: false, permissionStatus: "allowed", data: null, message: "Recurrence is daily, weekly or monthly — or \"none\" to stop repeating." };
       if (changes.recurrence === null) changes.recurrence_until = null;
     }
     if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
@@ -791,6 +813,17 @@ const updateTodo: ToolDef<
 
     const patch: Record<string, unknown> = { ...changes, updated_at: new Date().toISOString() };
     if (nextObservers !== null) patch.metadata = { ...(t.metadata ?? {}), observers: nextObservers };
+    /* As PATCH /api/todos/[id]: a moved reminder rings again, and a moved
+       due date can be escalated again. */
+    if ("remind_at" in changes) patch.reminded_at = null;
+    if ("due_date" in changes && changes.due_date !== t.due_date) {
+      const base = (patch.metadata as Record<string, unknown> | undefined) ?? t.metadata;
+      if (base && ESCALATION_MARK in base) {
+        const next = { ...base };
+        delete next[ESCALATION_MARK];
+        patch.metadata = next;
+      }
+    }
     const { error } = await supabaseServer
       .from("koleex_todos")
       .update(patch)
@@ -935,15 +968,21 @@ const reassignTodo: ToolDef<
       };
     }
 
-    /* Confirmed — resync exactly like the route: wipe + insert. */
-    const { error: delErr } = await supabaseServer.from("koleex_todo_assignees").delete().eq("todo_id", id);
-    if (delErr) {
-      console.error("[tool.reassignTodo.delete]", delErr);
-      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the assignees — please try again." };
+    /* Confirmed — resync exactly like the route: the diff. Removed people
+       lose their row, new people gain one, everyone else keeps theirs. */
+    const removedIds = currentIds.filter((i) => !nextIds.includes(i));
+    const newIds = nextIds.filter((i) => !currentIds.includes(i));
+    if (removedIds.length > 0) {
+      const { error: delErr } = await supabaseServer.from("koleex_todo_assignees").delete().eq("todo_id", id).in("account_id", removedIds);
+      if (delErr) {
+        console.error("[tool.reassignTodo.delete]", delErr);
+        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the assignees — please try again." };
+      }
     }
-    if (nextIds.length > 0) {
-      const { error: insErr } = await supabaseServer.from("koleex_todo_assignees").insert(
-        nextIds.map((accountId) => ({ todo_id: id, account_id: accountId })),
+    if (newIds.length > 0) {
+      const { error: insErr } = await supabaseServer.from("koleex_todo_assignees").upsert(
+        newIds.map((accountId) => ({ todo_id: id, account_id: accountId })),
+        { onConflict: "todo_id,account_id", ignoreDuplicates: true },
       );
       if (insErr) {
         console.error("[tool.reassignTodo.insert]", insErr);

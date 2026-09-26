@@ -3,55 +3,42 @@
 /* ══════════════════════════════════════════════════════════════
    ASSIGNMENT REPORT — manager view.
    "What I asked [person] to do, over [period], and how it's going."
-   Uses only tasks the viewer assigned (assigned_by = me), so it needs
-   no extra permission: a manager already sees what they delegated.
+   Only tasks the viewer assigned (assigned_by = me), so it needs no extra
+   permission: a manager already sees what they delegated.
+
+   Paints from the list's warm snapshot (same account, same rows), so opening
+   it from the list is instant; the network answer replaces it.
    ══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useSkin } from "@/lib/appearance";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
-import { fetchTodos, fetchAssignableEmployees } from "@/lib/todo-admin";
+import { fetchAssignableEmployees } from "@/lib/todo-admin";
 import { collapseSeries } from "@/lib/todo-series";
 import { useCurrentAccountId } from "@/lib/identity";
-import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
+import { useWarm } from "@/lib/warm-cache";
+import type { TodoAssigneeInfo, TodoStatus, TodoWithRelations } from "@/types/supabase";
 import KdsSelect from "@/components/kds/Select";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
+import DatePicker from "@/components/ui/DatePicker";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import MiniAvatar from "@/components/todo/MiniAvatar";
+import { loadTodoList, todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
+import { dayKey, fmtDay, horizonRange, isOverdueDate } from "@/components/todo/todo-dates";
+import { statusOf } from "@/components/todo/todo-ui";
 
 type Period = "today" | "week" | "month" | "custom";
 
-/* Local-time period bounds. */
-function periodRange(p: Period, from: string, to: string): [Date, Date] {
-  const now = new Date();
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  if (p === "today") return [startOfDay(now), endOfDay(now)];
-  if (p === "week") {
-    const dow = (now.getDay() + 6) % 7; // Monday = 0
-    const mon = new Date(now); mon.setDate(now.getDate() - dow);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return [startOfDay(mon), endOfDay(sun)];
-  }
-  if (p === "month") {
-    return [
-      new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0),
-      new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
-    ];
-  }
-  const f = from ? startOfDay(new Date(from)) : new Date(0);
-  const t = to ? endOfDay(new Date(to)) : endOfDay(now);
-  return [f, t];
-}
-
 const STATUS_TONE: Record<TodoStatus, string> = {
   todo: "text-[var(--text-dim)] bg-[var(--bg-surface)]",
-  in_progress: "text-blue-400 bg-blue-500/10",
+  in_progress: "text-[#7FA9D6] bg-[#567FB2]/10",
   blocked: "text-red-400 bg-red-500/10",
   done: "text-green-400 bg-green-500/10",
 };
@@ -64,119 +51,116 @@ function personLabel(p: { full_name: string | null; username: string; name_alt?:
 }
 
 const isDone = (r: TodoWithRelations) => r.completed || r.status === "done";
-const dayOf = (iso: string) => iso.split("T")[0];
-/* Finished after its due day. */
-const finishedLate = (r: TodoWithRelations) =>
-  isDone(r) && !!r.due_date && !!r.completed_at && dayOf(r.completed_at) > dayOf(r.due_date);
+/* Finished after its due day (calendar days, not instants). */
+const finishedLate = (r: TodoWithRelations) => {
+  const done = dayKey(r.completed_at), due = dayKey(r.due_date);
+  return isDone(r) && !!done && !!due && done > due;
+};
 
 /* Same ground the To-do list mounts — Core never pays for the canvas. */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function TodoReportPage() {
   const { t, lang } = useTranslation(todoT);
-  /* Subscribed, not a one-shot read: this whole report is filtered by
-     "assigned by me", so rendering before the id lands showed an empty report
-     that never refilled. */
+  const aurora = useSkin() === "aurora";
+  /* Subscribed, not a one-shot read: the report is filtered by "assigned by
+     me", so rendering before the id lands would show an empty report. */
   const accountId = useCurrentAccountId();
-  const [todos, setTodos] = useState<TodoWithRelations[]>([]);
-  const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const warm = useWarm<TodoSnap>(todoWarmKey(accountId), 6 * 60 * 60 * 1000);
+  const [fresh, setFresh] = useState<{ todos: TodoWithRelations[]; people: TodoAssigneeInfo[] } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const [person, setPerson] = useState<string>(""); // "" = everyone
   const [period, setPeriod] = useState<Period>("week");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const fmtDate = (iso: string | null): string => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(lang, { month: "short", day: "numeric" });
-  };
-
-  /* One fetch. This used to re-run when a scope context resolved a beat
-     after mount — a context the fetch ignored — so every open of the report
-     downloaded the whole list and the roster twice. */
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchTodos(), fetchAssignableEmployees()]).then(([tds, ppl]) => {
-      if (!alive) return;
-      setTodos(tds);
-      setPeople(ppl);
-      setLoading(false);
-    });
+    Promise.all([loadTodoList(attempt > 0), fetchAssignableEmployees()])
+      .then(([todos, people]) => { if (alive) { setFresh({ todos, people }); setFailed(false); } })
+      .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, []);
+  }, [attempt]);
 
-  /* Tasks I assigned, to the chosen person, whose due OR created date falls
-     in the period. Dead periods of a recurring series are collapsed with the
-     same rule the list uses, so a daily task counts once, not once per day. */
+  const todos = fresh?.todos ?? warm?.todos ?? null;
+  const people = fresh?.people ?? warm?.employees ?? [];
+
+  /* Tasks I assigned, to the chosen person, whose due OR created day falls
+     in the period. Dead periods of a recurring series collapse with the same
+     rule the list uses, so a daily task counts once, not once per day. */
   const rows = useMemo(() => {
-    const [start, end] = periodRange(period, from, to);
-    const inRange = (iso: string | null) => {
-      if (!iso) return false;
-      const d = new Date(iso);
-      return !Number.isNaN(d.getTime()) && d >= start && d <= end;
-    };
+    if (!todos) return [];
+    const [start, end] = period === "custom" ? [from || "0000-01-01", to || "9999-12-31"] : horizonRange(period);
+    const inRange = (v: string | null) => { const k = dayKey(v); return !!k && k >= start && k <= end; };
     return collapseSeries(todos)
       .filter((x) => x.assigned_by_account_id === accountId)
       .filter((x) => (person ? x.assignees.some((a) => a.account_id === person) : true))
-      .filter((x) => inRange(x.due_date) || inRange(x.created_at));
+      .filter((x) => inRange(x.due_date) || inRange(x.created_at))
+      .sort((a, b) => (dayKey(a.due_date) ?? "9999").localeCompare(dayKey(b.due_date) ?? "9999"));
   }, [todos, accountId, person, period, from, to]);
 
   const stats = useMemo(() => {
-    const total = rows.length;
-    const stage = (r: TodoWithRelations): TodoStatus => (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
-    const by = (s: TodoStatus) => rows.filter((r) => stage(r) === s).length;
-    const done = rows.filter(isDone).length;
-    const today = new Date().toISOString().split("T")[0];
-    const overdue = rows.filter((r) => !r.completed && r.due_date && dayOf(r.due_date) < today).length;
+    const by = (s: TodoStatus) => rows.filter((r) => statusOf(r) === s).length;
     const dueDone = rows.filter((r) => isDone(r) && r.due_date && r.completed_at);
     const onTime = dueDone.filter((r) => !finishedLate(r)).length;
-    const onTimeRate = dueDone.length ? Math.round((onTime / dueDone.length) * 100) : null;
-    return { total, done, inProgress: by("in_progress"), blocked: by("blocked"), notStarted: by("todo"), overdue, onTimeRate };
+    return {
+      total: rows.length,
+      done: rows.filter(isDone).length,
+      inProgress: by("in_progress"),
+      blocked: by("blocked"),
+      notStarted: by("todo"),
+      overdue: rows.filter((r) => !isDone(r) && isOverdueDate(r.due_date)).length,
+      onTimeRate: dueDone.length ? Math.round((onTime / dueDone.length) * 100) : null,
+    };
+  }, [rows]);
+
+  /* Who finished the most of what I assigned, in this period. Credit is the
+     ASSIGNEE's only — observers follow a task, the work is not theirs. */
+  const performers = useMemo(() => {
+    const map = new Map<string, { info: TodoAssigneeInfo; count: number }>();
+    rows.filter(isDone).forEach((r) => {
+      const observers = new Set(((r.metadata?.observers ?? []) as { account_id?: string }[]).map((o) => o.account_id));
+      r.assignees.forEach((a) => {
+        if (observers.has(a.account_id)) return;
+        const e = map.get(a.account_id);
+        if (e) e.count++; else map.set(a.account_id, { info: a, count: 1 });
+      });
+    });
+    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 3);
   }, [rows]);
 
   const exportCsv = () => {
-    /* Column headers in the reader's language — the sheet is for them. */
+    /* Headers in the reader's language; a BOM so Excel reads 中文 / العربية
+       as UTF-8; dates as YYYY-MM-DD, which no spreadsheet misreads. */
     const head = [t("report.taskCol"), t("report.forCol"), t("f.status"), t("report.dueCol"), t("report.doneCol"), t("report.onTimeRate")];
     const lines = rows.map((r) => {
       const who = r.assignees.map((a) => a.full_name || a.username).join("; ");
-      const st = (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
       const onTime = isDone(r) && r.due_date && r.completed_at ? (finishedLate(r) ? t("row.late") : t("row.onTime")) : "";
-      return [r.title, who, t("st." + st), r.due_date ? dayOf(r.due_date) : "", r.completed_at ? dayOf(r.completed_at) : "", onTime]
+      return [r.title, who, t("st." + statusOf(r)), dayKey(r.due_date) ?? "", dayKey(r.completed_at) ?? "", onTime]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",");
     });
-    const csv = [head.join(","), ...lines].join("\n");
+    const csv = "﻿" + [head.join(","), ...lines].join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url; a.download = `todo-report-${period}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const tiles = [
     { label: t("report.assigned"), value: stats.total, color: "text-[var(--text-primary)]" },
-    { label: t("st.in_progress"), value: stats.inProgress, color: "text-blue-400" },
+    { label: t("st.in_progress"), value: stats.inProgress, color: "text-[#7FA9D6]" },
     { label: t("st.blocked"), value: stats.blocked, color: "text-red-400" },
     { label: t("kpi.completed"), value: stats.done, color: "text-green-400" },
     { label: t("kpi.overdue"), value: stats.overdue, color: "text-orange-400" },
     { label: t("report.notStarted"), value: stats.notStarted, color: "text-[var(--text-dim)]" },
-    { label: t("report.onTimeRate"), value: stats.onTimeRate === null ? "—" : `${stats.onTimeRate}%`, color: "text-violet-400" },
+    { label: t("report.onTimeRate"), value: stats.onTimeRate === null ? "—" : `${stats.onTimeRate}%`, color: "text-violet-300" },
   ];
 
-  const aurora = useSkin() === "aurora";
-  const inputCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
-
   return (
-    /* ── AURORA ──────────────────────────────────────────────────────────
-       Same conversion the To-do list carries, and for the same reason: this
-       report is a page OF that app, and it was the one screen still flat —
-       a plain dark sheet with solid cards while everything around it is
-       glass over the moving ground.
-
-       `kx-app` does the work: globals remaps the app's own tokens under that
-       scope, so the KPI cards, the table and the filter chips below turn
-       translucent together, and Core keeps the original solid values. The
-       ground mounts only under the skin; the content is lifted above it. */
+    /* Same Aurora conversion as the list: `kx-app` remaps the app's tokens,
+       the ground mounts only under the skin. */
     <div className="kx-app kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}>
       {aurora && (
@@ -185,106 +169,130 @@ export default function TodoReportPage() {
         </div>
       )}
       <div className="relative z-[1] flex flex-col min-h-0 flex-1">
-      {/* Header */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-3 pt-5 pb-1">
-            <Link href="/todo" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <BarChart3Icon size={16} />
+        <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
+            <div className="pt-5 pb-3">
+              <PageHeader title={t("report.title")} subtitle={t("report.subtitle")} backHref="/todo"
+                icon={<BarChart3Icon size={16} />} showTabs={false} />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("report.title")}</h1>
-            </div>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">{t("report.subtitle")}</p>
 
-          {/* Controls */}
-          <div className="flex flex-wrap items-center gap-2 pb-4">
-            <div className="flex items-center gap-1.5 min-w-[200px]">
-              <UsersIcon size={13} className="text-[var(--text-dim)] shrink-0" />
-              {/* The Hub's own select, not the OS one — see components/kds/Select.tsx. */}
-              <KdsSelect value={person} onChange={setPerson}
-                options={[
-                  { value: "", label: t("report.everyone") },
-                  ...people.map((p) => ({ value: p.account_id, label: personLabel(p) })),
-                ]}
-                triggerClassName="h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              {(["today", "week", "month", "custom"] as Period[]).map((p) => (
-                <button key={p} onClick={() => setPeriod(p)}
-                  className={`h-8 px-3 rounded-lg text-[12px] font-semibold border transition-all ${
-                    period === p ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                  }`}>
-                  {t("report." + p)}
-                </button>
-              ))}
-            </div>
-            {period === "custom" && (
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} title={t("filters.fromDate")} />
-                <span className="text-[var(--text-dim)]">→</span>
-                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} title={t("filters.toDate")} />
+            <div className="flex flex-wrap items-center gap-2 pb-4">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto sm:min-w-[220px]">
+                <UsersIcon size={13} className="text-[var(--text-dim)] shrink-0" />
+                <KdsSelect value={person} onChange={setPerson} wrapperClassName="flex-1 min-w-0"
+                  options={[{ value: "", label: t("report.everyone") }, ...people.map((p) => ({ value: p.account_id, label: personLabel(p) }))]}
+                  triggerClassName="h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
               </div>
-            )}
-            <button onClick={exportCsv} disabled={rows.length === 0}
-              className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-              {t("report.export")}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5">
-          {loading ? (
-            <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>
-          ) : (
-            <>
-              {/* Summary tiles */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
-                {tiles.map((c) => (
-                  <div key={c.label} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3 min-w-0">
-                    <p className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</p>
-                    <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
-                  </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none" role="group" aria-label={t("report.period")}>
+                {(["today", "week", "month", "custom"] as Period[]).map((p) => (
+                  <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p}
+                    className={`h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors whitespace-nowrap ${
+                      period === p ? "kx-seg-on border-transparent text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    }`}>
+                    {t("report." + p)}
+                  </button>
                 ))}
               </div>
-
-              {/* Task list */}
-              {rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
-                  <p className="text-[var(--text-faint)] text-sm font-medium">{t("report.empty")}</p>
-                  <p className="text-[12px] text-[var(--text-dim)]">{t("report.emptyHint")}</p>
-                </div>
-              ) : (
-                <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
-                  <div className="hidden md:grid grid-cols-[1fr_140px_120px_90px_90px] gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-                    <span>{t("report.taskCol")}</span><span>{t("report.forCol")}</span><span>{t("f.status")}</span><span>{t("report.dueCol")}</span><span>{t("report.doneCol")}</span>
-                  </div>
-                  {rows.map((r) => {
-                    const st = (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
-                    const late = finishedLate(r);
-                    return (
-                      <div key={r.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_90px_90px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface-subtle)] transition-colors">
-                        <AutoTranslatedText text={r.title} className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`} />
-                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map(personLabel).join(", ") || "—"}</span>
-                        <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
-                        <span className={`text-[11.5px] ${late ? "text-red-400" : "text-[var(--text-muted)]"}`}>{fmtDate(r.due_date)}</span>
-                        <span className="text-[11.5px] text-[var(--text-muted)]">{fmtDate(r.completed_at)}{late ? ` · ${t("row.late")}` : (r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : "")}</span>
-                      </div>
-                    );
-                  })}
+              {period === "custom" && (
+                <div className="grid grid-cols-2 gap-1.5 w-full sm:w-[300px]">
+                  <DatePicker value={from} onChange={setFrom} placeholder={t("filters.fromDate")} lang={lang} heightCls="h-9" max={to || undefined} floating />
+                  <DatePicker value={to} onChange={setTo} placeholder={t("filters.toDate")} lang={lang} heightCls="h-9" min={from || undefined} floating />
                 </div>
               )}
-            </>
-          )}
+              <button type="button" onClick={exportCsv} disabled={rows.length === 0}
+                className="ms-auto h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-opacity shadow-lg disabled:opacity-40 flex items-center gap-1.5">
+                <DownloadIcon size={13} /> {t("report.export")}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 space-y-5">
+            {failed && (
+              <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
+                <TriangleWarningIcon size={14} className="shrink-0" />
+                <span className="flex-1 min-w-0">{todos ? t("err.loadStale") : t("err.loadFailed")}</span>
+                <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold underline underline-offset-2">{t("common.retry")}</button>
+              </div>
+            )}
+
+            {!todos ? (
+              !failed && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2" aria-hidden>
+                  {Array.from({ length: 7 }, (_, i) => <div key={i} className="h-[62px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] animate-pulse" />)}
+                </div>
+              )
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 [&>*]:min-w-0">
+                  {tiles.map((c) => (
+                    <div key={c.label} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3">
+                      <p className="text-[9.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</p>
+                      <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {performers.length > 0 && (
+                  <div className="kx-glass bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AwardIcon size={14} className="text-yellow-400" />
+                      <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("kpi.topPerformers")}</span>
+                    </div>
+                    <ol className="flex items-center gap-5 flex-wrap min-w-0">
+                      {performers.map((p, i) => (
+                        <li key={p.info.account_id} className="flex items-center gap-2 min-w-0">
+                          <span className="text-[11px] font-bold text-[var(--text-ghost)] tabular-nums w-3">{i + 1}</span>
+                          <MiniAvatar info={p.info} size={28} />
+                          <span className="min-w-0">
+                            <span className="block text-[12px] font-medium text-[var(--text-primary)] truncate">{p.info.full_name || p.info.username}</span>
+                            <span className="block text-[10px] text-[var(--text-dim)]">{p.count} {t("kpi.completedWord")}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {rows.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 gap-2 text-center px-6">
+                    <p className="text-[13px] font-medium text-[var(--text-muted)]">{t("report.empty")}</p>
+                    <p className="text-[12px] text-[var(--text-dim)]">{t("report.emptyHint")}</p>
+                  </div>
+                ) : (
+                  <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
+                    <div className="hidden md:grid grid-cols-[minmax(0,1fr)_160px_110px_90px_130px] gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                      <span>{t("report.taskCol")}</span><span>{t("report.forCol")}</span><span>{t("f.status")}</span><span>{t("report.dueCol")}</span><span>{t("report.doneCol")}</span>
+                    </div>
+                    {rows.map((r) => {
+                      const st = statusOf(r);
+                      const late = finishedLate(r);
+                      const overdue = !isDone(r) && isOverdueDate(r.due_date);
+                      return (
+                        <div key={r.id} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_160px_110px_90px_130px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 [&>*]:min-w-0">
+                          <span className={`text-[13px] font-medium truncate ${isDone(r) ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
+                            <AutoTranslatedText text={r.title} plain />
+                          </span>
+                          <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map(personLabel).join(", ") || "—"}</span>
+                          <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
+                          <span className={`text-[11.5px] ${overdue || late ? "text-red-400" : "text-[var(--text-muted)]"}`}>
+                            <span className="md:hidden text-[var(--text-dim)]">{t("report.dueCol")}: </span>{fmtDay(r.due_date, lang)}
+                          </span>
+                          <span className="text-[11.5px] text-[var(--text-muted)]">
+                            <span className="md:hidden text-[var(--text-dim)]">{t("report.doneCol")}: </span>
+                            {r.completed_at ? fmtDay(r.completed_at, lang) : "—"}
+                            {late ? ` · ${t("row.late")}` : r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

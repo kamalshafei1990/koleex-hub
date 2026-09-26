@@ -223,6 +223,20 @@ export default function ProductPicker({
       .sort((a, b) => (a.image ? 0 : 1) - (b.image ? 0 : 1));
   }, [products, q, div, cat]);
 
+  /* Esc closes the picker only — captured, so the task form behind it
+     stays open. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const sel = new Set(selectedIds);
@@ -242,7 +256,7 @@ export default function ProductPicker({
               <span className="text-[11px] font-semibold text-[var(--accent)]">{selectedIds.length} {t("picker.selectedWord")}</span>
             )}
           </div>
-          <button onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)]">
+          <button type="button" onClick={onClose} aria-label={t("common.done")} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06] hover:text-[var(--text-primary)]">
             <CrossIcon className="h-4 w-4" />
           </button>
         </div>
@@ -253,6 +267,7 @@ export default function ProductPicker({
             <SearchIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
             <input
               autoFocus
+              aria-label={t("picker.search")}
               className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
               placeholder={t("picker.search")}
               value={q}
@@ -284,6 +299,7 @@ export default function ProductPicker({
                   <button
                     key={p.id}
                     type="button"
+                    aria-pressed={isSel}
                     onClick={() => onToggle({ id: p.id, name: p.name, code: p.code })}
                     className={`group relative text-start rounded-xl border overflow-hidden transition-all ${
                       isSel
@@ -294,7 +310,7 @@ export default function ProductPicker({
                     <div className="aspect-square w-full bg-white flex items-center justify-center overflow-hidden p-2">
                       {p.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
+                        <img src={p.image} alt={p.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <PackageIcon className="h-8 w-8 text-black/20" />
                       )}
@@ -326,7 +342,7 @@ export default function ProductPicker({
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between px-4 md:px-5 py-3 border-t border-[var(--border-subtle)]">
           <span className="text-[11px] text-[var(--text-ghost)]">{loading ? "" : `${filtered.length} ${t("picker.productsWord")}`}</span>
-          <button onClick={onClose} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
+          <button type="button" onClick={onClose} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
             {t("common.done")}
           </button>
         </div>

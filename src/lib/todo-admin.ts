@@ -263,9 +263,14 @@ export async function deleteTodo(id: string): Promise<boolean> {
 
 /* ── Notes ── */
 
+/* The author is the session (the server sets it); the second parameter is
+   kept only so existing callers compile. A note changes the list (and a
+   recurring period's "touched" state), so it announces itself like every
+   other write — without it the 30-second list cache showed the task without
+   its new note after a reload. */
 export async function addTodoNote(
   todoId: string,
-  authorAccountId: string,
+  _authorAccountId: string,
   body: string,
 ): Promise<TodoNoteRow | null> {
   try {
@@ -277,6 +282,7 @@ export async function addTodoNote(
     });
     if (res.ok) {
       const json = (await res.json()) as { note: TodoNoteRow | null };
+      if (json.note) await announceTodoChange();
       return json.note;
     }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
@@ -295,7 +301,7 @@ export async function deleteTodoNote(noteId: string): Promise<boolean> {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) return true;
+    if (res.ok) { await announceTodoChange(); return true; }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
       console.error("[Todos] deleteTodoNote:", res.status);
     }
@@ -399,13 +405,22 @@ export function subscribeToTodos(
   debounceMs = 400,
 ): () => void {
   let timer: number | null = null;
-  const channel = supabase
-    .channel(`todos:tenant:${tenantId}`)
-    .on("broadcast", { event: "changed" }, () => {
-      if (timer !== null) return;
-      timer = window.setTimeout(() => { timer = null; onChanged(); }, debounceMs);
-    })
-    .subscribe();
+  /* Live updates are an extra, never a requirement: if the realtime client
+     can't be built (missing env, blocked socket) the list still works on its
+     own refreshes, so a failure here must not take the page down with it. */
+  let channel: ReturnType<typeof supabase.channel>;
+  try {
+    channel = supabase
+      .channel(`todos:tenant:${tenantId}`)
+      .on("broadcast", { event: "changed" }, () => {
+        if (timer !== null) return;
+        timer = window.setTimeout(() => { timer = null; onChanged(); }, debounceMs);
+      })
+      .subscribe();
+  } catch (e) {
+    console.error("[Todos] realtime unavailable:", e);
+    return () => {};
+  }
   return () => {
     if (timer !== null) window.clearTimeout(timer);
     void supabase.removeChannel(channel);

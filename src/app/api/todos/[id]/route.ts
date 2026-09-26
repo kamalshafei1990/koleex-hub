@@ -1,14 +1,18 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import {
+  ASSIGN_TO_EVERYONE_DENIED,
+  canAssignToEveryone,
   isTodoOwner,
   loadTodoOwnership,
   todoParticipation,
 } from "@/lib/server/todo-access";
 import { internalAccountIds } from "@/lib/server/internal-accounts";
+import { readIdList, readTodoFields } from "@/lib/server/todo-input";
+import { ESCALATION_MARK } from "@/lib/server/todo-escalation";
 import {
   clearTodoNotifications,
   notifyApprovalDecision,
@@ -17,7 +21,6 @@ import {
   notifyTodoPeopleAdded,
   pingTodosChanged,
 } from "@/lib/server/todo-notify";
-import { isTodoApprovalState, isTodoPriority, isTodoRecurrence, isTodoStatus } from "@/lib/todo-enums";
 
 /* PATCH /api/todos/[id] — update fields + optionally re-sync assignees.
    DELETE /api/todos/[id] — remove the todo + assignees/notes (cascade).
@@ -31,7 +34,9 @@ import { isTodoApprovalState, isTodoPriority, isTodoRecurrence, isTodoStatus } f
        on a delegated task is converted server-side into approval_state
        "pending"; only the assigner can confirm it as truly done.
      - Everyone else: 403.
-*/
+
+   Responses: 400 invalid input · 403 not allowed · 404 not in your tenant ·
+   409 the approval state moved under you (someone decided first) · 200. */
 
 interface ObserverRef {
   account_id?: string;
@@ -39,20 +44,12 @@ interface ObserverRef {
   full_name?: string | null;
 }
 
-/* Columns the client may never set. Ownership, identity and the approval
-   audit stamps are decided here. */
-const SERVER_OWNED = [
-  "id", "tenant_id", "created_at", "created_by_account_id",
-  "approved_by_account_id", "approved_at", "reminded_at",
-  "recurrence_parent_id", "recurrence_spawned_for",
-] as const;
-
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "To-do", "edit");
   if (deny) return deny;
@@ -66,27 +63,31 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await req.json()) as {
-    updates: Record<string, unknown>;
-    newAssigneeIds?: string[];
+  let body: {
+    updates?: Record<string, unknown>;
+    newAssigneeIds?: unknown;
     /* "Send back" from a notification: the reason alone. That caller does
        not hold the task's metadata, and `metadata` replaces the whole
        column — so the server writes the reason into the task's OWN
        metadata (below) instead of trusting a partial copy. */
-    rejectionReason?: string;
+    rejectionReason?: unknown;
   };
-  let updates: Record<string, unknown> = { ...(body.updates ?? {}) };
-  for (const k of SERVER_OWNED) delete updates[k];
+  try {
+    body = (await req.json()) ?? {};
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const rawUpdates = body.updates && typeof body.updates === "object" && !Array.isArray(body.updates) ? body.updates : {};
 
   /* Participants (assignee / observer) may only move the task's situation.
      Everything else — title, dates, assignees, metadata, approval decisions —
      stays with the owner. Their "done" becomes a submission for approval. */
-  let submittedForApproval = false;
+  let input: Record<string, unknown> = rawUpdates;
   if (!isOwner) {
     const restricted: Record<string, unknown> = {};
-    if (typeof updates.status === "string") restricted.status = updates.status;
-    if ("approval_state" in updates) {
-      const a = updates.approval_state;
+    if (typeof rawUpdates.status === "string") restricted.status = rawUpdates.status;
+    if ("approval_state" in rawUpdates) {
+      const a = rawUpdates.approval_state;
       // Only the assigner decides approved / rejected.
       if (a === "pending" || a === null) restricted.approval_state = a;
     }
@@ -97,97 +98,112 @@ export async function PATCH(
       if (existing.approval_state !== "approved") restricted.approval_state = "pending";
     }
     if (Object.keys(restricted).length === 0) {
-      return NextResponse.json(
-        { error: "Only the assigner can change this" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Only the assigner can change this" }, { status: 403 });
     }
-    updates = restricted;
+    input = restricted;
   }
 
-  /* Vocabularies (lib/todo-enums.ts). The create route validated these;
-     this route let anything through, so an unknown cadence reached the
-     recurrence engine. */
-  if ("status" in updates && !isTodoStatus(updates.status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  /* The allow-list (lib/server/todo-input.ts): known columns type-checked,
+     unknown ones — ids, tenant, audit stamps, reminded_at, the recurrence
+     links — dropped. */
+  const read = readTodoFields(input);
+  if (!read.ok) return NextResponse.json({ error: read.error }, { status: 400 });
+  const updates: Record<string, unknown> = read.fields;
+  /* Turning "everyone" ON is an admin's call; turning it off, or re-saving
+     a task that already has it, is not a new broadcast. */
+  if (updates.assign_to_all === true && !existing.assign_to_all && !canAssignToEveryone(auth)) {
+    return NextResponse.json({ error: ASSIGN_TO_EVERYONE_DENIED }, { status: 403 });
   }
-  if ("priority" in updates && !isTodoPriority(updates.priority)) {
-    return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
-  }
-  if ("recurrence" in updates && updates.recurrence != null && !isTodoRecurrence(updates.recurrence)) {
-    return NextResponse.json({ error: "Invalid recurrence" }, { status: 400 });
-  }
-  if ("approval_state" in updates && updates.approval_state != null && !isTodoApprovalState(updates.approval_state)) {
-    return NextResponse.json({ error: "Invalid approval state" }, { status: 400 });
+  const newAssigneeIds = isOwner && body.newAssigneeIds !== undefined ? readIdList(body.newAssigneeIds) : undefined;
+  if (newAssigneeIds === null) {
+    return NextResponse.json({ error: "newAssigneeIds must be a list" }, { status: 400 });
   }
   if ("recurrence" in updates && updates.recurrence == null) updates.recurrence_until = null;
+
+  /* `completed` on its own is the checkbox: fold it into the status so the
+     two can never disagree. */
+  if (typeof updates.completed === "boolean" && typeof updates.status !== "string") {
+    updates.status = updates.completed ? "done" : existing.status === "done" ? "todo" : existing.status ?? "todo";
+  }
+  delete updates.completed;
 
   const nowIso = new Date().toISOString();
   updates.updated_at = nowIso;
 
-  // Keep completed/completed_at in lockstep with an explicit status change.
+  /* Keep completed/completed_at in lockstep with the status — but only when
+     the status really CHANGES. The edit form sends its status on every
+     save, and restamping completed_at each time rewrote when a finished
+     task was finished. */
   if (typeof updates.status === "string") {
     const done = updates.status === "done";
-    updates.completed = done;
-    updates.completed_at = done ? nowIso : null;
+    if (done !== existing.completed) {
+      updates.completed = done;
+      updates.completed_at = done ? nowIso : null;
+    }
   }
 
-  if (updates.approval_state === "pending" && existing.approval_state !== "pending") {
-    submittedForApproval = true;
-  }
-  const approvalDecision =
+  /* A moved reminder rings again; a moved due date can escalate again. */
+  if ("remind_at" in updates && updates.remind_at !== existing.remind_at) updates.reminded_at = null;
+  const dueMoved = "due_date" in updates && updates.due_date !== existing.due_date;
+
+  let submittedForApproval = updates.approval_state === "pending" && existing.approval_state !== "pending";
+  let approvalDecision =
     isOwner &&
     existing.approval_state === "pending" &&
     (updates.approval_state === "approved" || updates.approval_state === "rejected")
       ? (updates.approval_state as "approved" | "rejected")
       : null;
-  /* The decision is stamped HERE, whichever path took it — the client used
-     to send approved_by / approved_at itself, and the toggle route and the
-     AI tool never set them at all. */
+  /* An owner marking a PENDING submission done is confirming it — the same
+     implicit approval the toggle route stamps. */
+  if (!approvalDecision && isOwner && existing.approval_state === "pending" && updates.status === "done" && !("approval_state" in updates)) {
+    updates.approval_state = "approved";
+    approvalDecision = "approved";
+  }
   if (approvalDecision) {
+    /* The decision is stamped HERE, whichever path took it. */
     updates.approved_by_account_id = auth.account_id;
     updates.approved_at = nowIso;
+    submittedForApproval = false;
   }
 
-  if (
-    approvalDecision === "rejected" &&
-    !("metadata" in updates) &&
-    typeof body.rejectionReason === "string" &&
-    body.rejectionReason.trim()
-  ) {
+  const reason = typeof body.rejectionReason === "string" ? body.rejectionReason.trim() : "";
+  if (approvalDecision === "rejected" && !("metadata" in updates) && reason) {
     updates.metadata = {
       ...((existing.metadata as Record<string, unknown> | null) ?? {}),
-      rejection: { reason: body.rejectionReason.trim().slice(0, 2000), by: auth.account_id, at: nowIso },
+      rejection: { reason: reason.slice(0, 2000), by: auth.account_id, at: nowIso },
     };
   }
 
   /* A RETURN MUST CARRY A REASON. Sending work back without saying why just
      puts the task around the loop again, so the reason is required here and
-     not only in the dialog — the client can be bypassed. Note this rejects
-     the decision, not the task: approval_state goes to "rejected" and the
-     SAME row re-opens (completed false, status in_progress) further down.
-     A return never creates a second task. */
+     not only in the dialog — the client can be bypassed. This rejects the
+     decision, not the task: approval_state goes to "rejected" and the SAME
+     row re-opens (completed false, status in_progress) below. */
   const rejectionReason = (updates.metadata as { rejection?: { reason?: unknown } } | undefined)?.rejection?.reason;
   if (approvalDecision === "rejected" && (typeof rejectionReason !== "string" || !rejectionReason.trim())) {
-    return NextResponse.json(
-      { error: "A reason is required when returning a task" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "A reason is required when returning a task" }, { status: 400 });
   }
 
-  /* Mention/observer-notify: if this edit sets metadata, capture the prior
-     sets first so we only ping people newly added (not on every save). */
-  const nextMeta = updates.metadata as
-    | { mentions?: ObserverRef[]; observers?: ObserverRef[] }
-    | undefined;
+  /* The escalation stamp re-arms when the due date moves — dropped from
+     whichever metadata this write carries. */
+  if (dueMoved) {
+    const base = (updates.metadata as Record<string, unknown> | undefined) ?? existing.metadata;
+    if (base && ESCALATION_MARK in base) {
+      const next = { ...base };
+      delete next[ESCALATION_MARK];
+      updates.metadata = next;
+    }
+  }
+
+  /* Mention/observer-notify: capture the prior sets so we only ping people
+     newly added (not on every save). */
+  const nextMeta = updates.metadata as { mentions?: ObserverRef[]; observers?: ObserverRef[] } | undefined;
   const idsOf = (list: ObserverRef[] | undefined) =>
     Array.isArray(list) ? (list.map((m) => m.account_id).filter(Boolean) as string[]) : [];
   const priorMentionIds = idsOf(existing.metadata?.mentions);
   const priorObserverIds = idsOf(existing.metadata?.observers);
 
-  /* Returning re-opens THIS task rather than leaving it parked as done —
-     enforced server-side so the row can never be left completed while its
-     approval reads "rejected". */
+  /* Returning re-opens THIS task rather than leaving it parked as done. */
   if (updates.approval_state === "rejected") {
     updates.completed = false;
     updates.completed_at = null;
@@ -196,95 +212,101 @@ export async function PATCH(
     }
   }
 
-  const { error } = await supabaseServer
-    .from("koleex_todos")
-    .update(updates)
-    .eq("id", id);
+  /* Approval transitions are CONDITIONAL on the state read above, so two
+     managers deciding at once — or a double-tapped submit — produce one
+     decision and one notification, and the loser gets 409. */
+  let q = supabaseServer.from("koleex_todos").update(updates).eq("id", id);
+  if (approvalDecision) q = q.eq("approval_state", "pending");
+  else if (submittedForApproval) {
+    q = existing.approval_state === null ? q.is("approval_state", null) : q.eq("approval_state", existing.approval_state);
+  }
+  const { data: written, error } = await q.select("id");
   if (error) {
     console.error("[api/todos/[id] PATCH]", error.message);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
-
-  /* A FINISHED TASK MUST NOT LEAVE ITS NOTIFICATIONS UNREAD — owner, 2026-08:
-     "if one task finished or read still I can see the notification". Every
-     row that points at this task, for every recipient, whatever its type. */
-  if (updates.status === "done") await clearTodoNotifications(id);
-
-  // Approval notifications (submit → assigner; decide → assignees).
-  if (submittedForApproval) await notifySubmittedForApproval(existing, auth.account_id);
-  if (approvalDecision) {
-    await notifyApprovalDecision(
-      existing,
-      auth.account_id,
-      approvalDecision,
-      typeof rejectionReason === "string" ? rejectionReason.trim() || undefined : undefined,
-    );
+  if ((written ?? []).length === 0) {
+    return NextResponse.json({ error: "This task was just changed by someone else — reload it." }, { status: 409 });
   }
 
-  if (isOwner && body.newAssigneeIds !== undefined) {
-    /* Capture the prior assignee set BEFORE resyncing so we can notify only
-       the people who are newly added (not everyone, every edit). */
-    const { data: priorRows } = await supabaseServer
-      .from("koleex_todo_assignees")
-      .select("account_id")
-      .eq("todo_id", id);
-    const priorIds = new Set(
-      (priorRows ?? []).map((r) => (r as { account_id: string }).account_id),
-    );
+  /* A FINISHED TASK MUST NOT LEAVE ITS NOTIFICATIONS UNREAD. Awaited: the
+     client refetches the bell right after this response. */
+  if (updates.status === "done" && !existing.completed) await clearTodoNotifications(id);
 
-    /* Same INTERNAL-ONLY rule as create: reassignment must not be able to
-       hand company work to a customer/portal account. */
-    const nextAssigneeIds = await internalAccountIds(body.newAssigneeIds, auth.tenant_id);
+  /* Reassignment — the diff, not a wipe-and-rewrite: removed people lose
+     their row, new people gain one, everyone else keeps theirs (and its
+     assigned_at). The task is never momentarily assignee-less. */
+  let addedIds: string[] = [];
+  if (newAssigneeIds !== undefined) {
+    const [{ data: priorRows }, nextIds] = await Promise.all([
+      supabaseServer.from("koleex_todo_assignees").select("account_id").eq("todo_id", id),
+      /* Same INTERNAL-ONLY rule as create. */
+      internalAccountIds(newAssigneeIds, auth.tenant_id),
+    ]);
+    const prior = new Set(((priorRows ?? []) as Array<{ account_id: string }>).map((r) => r.account_id));
+    const next = new Set(nextIds);
+    const removed = Array.from(prior).filter((a) => !next.has(a));
+    addedIds = nextIds.filter((a) => !prior.has(a));
+    const [delRes, insRes] = await Promise.all([
+      removed.length > 0
+        ? supabaseServer.from("koleex_todo_assignees").delete().eq("todo_id", id).in("account_id", removed)
+        : Promise.resolve({ error: null }),
+      addedIds.length > 0
+        ? supabaseServer
+            .from("koleex_todo_assignees")
+            .upsert(addedIds.map((accountId) => ({ todo_id: id, account_id: accountId })), {
+              onConflict: "todo_id,account_id",
+              ignoreDuplicates: true,
+            })
+        : Promise.resolve({ error: null }),
+    ]);
+    if (delRes.error || insRes.error) {
+      console.error("[api/todos/[id] PATCH] assignees:", delRes.error?.message ?? insRes.error?.message);
+      return NextResponse.json({ error: "Failed to update assignees" }, { status: 500 });
+    }
+  }
 
-    await supabaseServer
-      .from("koleex_todo_assignees")
-      .delete()
-      .eq("todo_id", id);
-    if (nextAssigneeIds.length > 0) {
-      await supabaseServer.from("koleex_todo_assignees").insert(
-        nextAssigneeIds.map((accountId) => ({ todo_id: id, account_id: accountId })),
+  /* Everything below informs other people — after the response. */
+  const title = (updates.title as string | undefined) ?? existing.title;
+  const todoLike = {
+    id,
+    title,
+    description: "description" in updates ? (updates.description as string | null) : existing.description,
+    priority: (updates.priority as string | undefined) ?? existing.priority ?? "medium",
+    tenant_id: existing.tenant_id,
+  };
+  after(async () => {
+    if (submittedForApproval) await notifySubmittedForApproval({ ...existing, title }, auth.account_id);
+    if (approvalDecision) {
+      await notifyApprovalDecision(
+        todoLike,
+        auth.account_id,
+        approvalDecision,
+        typeof rejectionReason === "string" ? rejectionReason.trim() || undefined : undefined,
       );
     }
-
-    const addedIds = nextAssigneeIds.filter((aid) => !priorIds.has(aid));
-    if (addedIds.length > 0) {
-      const { data: t } = await supabaseServer
-        .from("koleex_todos")
-        .select("id, title, description, priority, tenant_id")
-        .eq("id", id)
-        .maybeSingle();
-      if (t) {
-        await notifyTodoAssigned(
-          t as { id: string; title: string | null; description: string | null; priority: string; tenant_id: string | null },
-          addedIds,
-          auth.account_id,
-        );
-      }
+    if (addedIds.length > 0) await notifyTodoAssigned(todoLike, addedIds, auth.account_id);
+    if (isOwner && nextMeta) {
+      const newly = (next: ObserverRef[] | undefined, prior: string[]) => {
+        if (!Array.isArray(next)) return [];
+        const before = new Set(prior);
+        return Array.from(new Set(idsOf(next))).filter((mid) => !before.has(mid));
+      };
+      await notifyTodoPeopleAdded(todoLike, "mention", newly(nextMeta.mentions, priorMentionIds), auth.account_id);
+      await notifyTodoPeopleAdded(todoLike, "observer", newly(nextMeta.observers, priorObserverIds), auth.account_id);
     }
-  }
+    await pingTodosChanged(existing.tenant_id ?? auth.tenant_id);
+  });
 
-  // Notify newly-added @mentions and observers (excluding self + prior).
-  if (isOwner && nextMeta) {
-    const todoLike = { id, title: existing.title, tenant_id: existing.tenant_id };
-    const newly = (next: ObserverRef[] | undefined, prior: string[]) => {
-      if (!Array.isArray(next)) return [];
-      const before = new Set(prior);
-      return Array.from(new Set(idsOf(next))).filter((mid) => !before.has(mid));
-    };
-    await notifyTodoPeopleAdded(todoLike, "mention", newly(nextMeta.mentions, priorMentionIds), auth.account_id);
-    await notifyTodoPeopleAdded(todoLike, "observer", newly(nextMeta.observers, priorObserverIds), auth.account_id);
-  }
-
-  await pingTodosChanged(existing.tenant_id ?? auth.tenant_id);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "To-do", "delete");
   if (deny) return deny;
@@ -306,8 +328,8 @@ export async function DELETE(
 
   /* The task is gone, so every notification about it is finished business —
      otherwise it keeps counting in the bell and links to a row that no
-     longer exists. Best-effort; the delete already succeeded. */
+     longer exists. Awaited: the client recounts the bell right after. */
   await clearTodoNotifications(id);
-  await pingTodosChanged(existing.tenant_id ?? auth.tenant_id);
+  after(() => pingTodosChanged(existing.tenant_id ?? auth.tenant_id));
   return NextResponse.json({ ok: true });
 }

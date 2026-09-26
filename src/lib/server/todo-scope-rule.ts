@@ -12,6 +12,15 @@ export interface TodoViewer {
   canViewPrivate: boolean;
 }
 
+/** A value inside a PostgREST filter string. A department name is free
+ *  text: a comma, parenthesis, quote or colon in it would split or break the
+ *  `or=(…)` list (a 400, i.e. an empty To-do list for everyone in "R&D,
+ *  Quality"). Plain words stay bare; anything else is double-quoted with
+ *  `"` and `\` escaped, as PostgREST reads reserved characters. */
+function filterValue(v: string): string {
+  return /^[\p{L}\p{N} _&.\-/]+$/u.test(v) ? v : `"${v.replace(/["\\]/g, "\\$&")}"`;
+}
+
 /** The PostgREST `or` clauses of the scope, or null for a super admin. Pure. */
 export function todoScopeClauses(v: TodoViewer, sharedIds: string[]): { scope: string; privacy: string | null } | null {
   if (v.isSuperAdmin) return null;
@@ -20,7 +29,7 @@ export function todoScopeClauses(v: TodoViewer, sharedIds: string[]): { scope: s
     `assigned_by_account_id.eq.${v.accountId}`,
     `assign_to_all.eq.true`,
   ];
-  if (v.department) orParts.push(`assigned_department.eq.${v.department}`);
+  if (v.department) orParts.push(`assigned_department.eq.${filterValue(v.department)}`);
   if (sharedIds.length > 0) orParts.push(`id.in.(${sharedIds.join(",")})`);
   return {
     scope: orParts.join(","),

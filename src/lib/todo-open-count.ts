@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { seriesPeriodOf } from "@/lib/todo-series";
 
 /* ⚠️ `series_cadence` AND `series_period` ARE NOT COLUMNS. They are derived by
    the list route from the real ones, and selecting them makes PostgREST fail
@@ -103,39 +104,35 @@ export async function openTodoItems(
   }
 
   const rows = (data ?? []) as OpenRow[];
+  const toItem = (r: OpenRow): OpenTodoItem =>
+    ({ id: r.id, title: r.title || "Untitled task", createdAt: r.created_at });
 
   /* Cadence lives on the TEMPLATE, so a spawned period has to read its
      parent's — and a parent can sit outside this result set (created by
      someone else, broadcast only from a later period), which is why the
-     missing ones are fetched rather than assumed absent. */
+     missing ones are fetched rather than assumed absent. Any row with a
+     cadence or a parent MAY be in a series, so the parents and the notes
+     of those candidates are read together, in one round trip. */
   const cadence = new Map<string, string>();
   rows.forEach((r) => { if (r.recurrence) cadence.set(r.id, r.recurrence); });
+  const candidates = rows.filter((r) => r.recurrence || r.recurrence_parent_id);
+  if (candidates.length === 0) return rows.filter((r) => r.status !== "done").map(toItem);
   const orphans = Array.from(new Set(
     rows.map((r) => r.recurrence_parent_id).filter((p): p is string => !!p && !cadence.has(p)),
   ));
-  if (orphans.length > 0) {
-    const { data: parents } = await db.from("koleex_todos").select("id, recurrence").in("id", orphans);
-    ((parents ?? []) as Array<{ id: string; recurrence: string | null }>)
-      .forEach((p) => { if (p.recurrence) cadence.set(p.id, p.recurrence); });
-  }
+  const [{ data: parents }, { data: noteRows }] = await Promise.all([
+    orphans.length > 0
+      ? db.from("koleex_todos").select("id, recurrence").in("id", orphans)
+      : Promise.resolve({ data: [] as Array<{ id: string; recurrence: string | null }> }),
+    db.from("koleex_todo_notes").select("todo_id").in("todo_id", candidates.map((r) => r.id)),
+  ]);
+  ((parents ?? []) as Array<{ id: string; recurrence: string | null }>)
+    .forEach((p) => { if (p.recurrence) cadence.set(p.id, p.recurrence); });
+  const hasNote = new Set(((noteRows ?? []) as Array<{ todo_id: string }>).map((n) => n.todo_id));
 
   const cadenceOf = (r: OpenRow) =>
     r.recurrence ?? (r.recurrence_parent_id ? cadence.get(r.recurrence_parent_id) ?? null : null);
-  const periodOf = (r: OpenRow) =>
-    r.recurrence_spawned_for ?? r.start_date ?? (r.created_at ?? "").slice(0, 10);
-
-  const toItem = (r: OpenRow): OpenTodoItem =>
-    ({ id: r.id, title: r.title || "Untitled task", createdAt: r.created_at });
-
-  const series = rows.filter((r) => cadenceOf(r));
-  if (series.length === 0) return rows.filter((r) => r.status !== "done").map(toItem);
-
-  /* Only asked for when a series is involved — most callers never pay it. */
-  const { data: noteRows } = await db
-    .from("koleex_todo_notes")
-    .select("todo_id")
-    .in("todo_id", series.map((r) => r.id));
-  const hasNote = new Set(((noteRows ?? []) as Array<{ todo_id: string }>).map((n) => n.todo_id));
+  const periodOf = seriesPeriodOf;
 
   const newestPerSeries = new Map<string, string>();
   for (const r of rows) {

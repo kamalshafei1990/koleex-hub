@@ -1,10 +1,15 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { loadTodoOwnership, todoParticipation } from "@/lib/server/todo-access";
-import { clearTodoNotifications, notifySubmittedForApproval, pingTodosChanged } from "@/lib/server/todo-notify";
+import {
+  clearTodoNotifications,
+  notifyApprovalDecision,
+  notifySubmittedForApproval,
+  pingTodosChanged,
+} from "@/lib/server/todo-notify";
 
 /* POST /api/todos/[id]/toggle
    Flip the completed flag.
@@ -14,26 +19,26 @@ import { clearTodoNotifications, notifySubmittedForApproval, pingTodosChanged } 
    task outright — ticking it submits it for the assigner's approval
    (approval_state = "pending"); ticking again withdraws the submission.
    This mirrors the client flow but is enforced HERE so the approval loop
-   cannot be bypassed by calling the API directly. */
+   cannot be bypassed by calling the API directly.
+
+   A flip is CONDITIONAL on the state it was computed from: a double tap, or
+   two people ticking at once, used to read the same state and both write —
+   the second "flip" undoing the first, or two approval requests. The loser
+   now gets 409 and the state the first one left. */
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  /* A state change is an EDIT. This route asked for "create", so a role
-     allowed to add tasks but not to change them could still flip any task it
-     could see. */
+  /* A state change is an EDIT, not a create. */
   const deny = await requireModuleAction(auth, "To-do", "edit");
   if (deny) return deny;
 
-  const [t, { data: row }] = await Promise.all([
-    loadTodoOwnership(id, auth.tenant_id),
-    supabaseServer.from("koleex_todos").select("completed").eq("id", id).maybeSingle(),
-  ]);
-  if (!t || !row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const completed = Boolean((row as { completed: boolean | null }).completed);
+  const t = await loadTodoOwnership(id, auth.tenant_id);
+  if (!t) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const completed = Boolean(t.completed);
 
   const { isOwner, isParticipant } = await todoParticipation(t, {
     accountId: auth.account_id,
@@ -44,20 +49,28 @@ export async function POST(
   }
 
   const now = new Date().toISOString();
+  const conflict = () =>
+    NextResponse.json({ error: "This task was just changed by someone else.", conflict: true }, { status: 409 });
 
   /* Participant path: completing = submit for approval, not done. */
   if (!isOwner && !completed && t.approval_state !== "approved") {
     const withdrawing = t.approval_state === "pending";
-    const { error } = await supabaseServer
+    let q = supabaseServer
       .from("koleex_todos")
       .update({ approval_state: withdrawing ? null : "pending", updated_at: now })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("completed", false);
+    q = t.approval_state === null ? q.is("approval_state", null) : q.eq("approval_state", t.approval_state);
+    const { data, error } = await q.select("id");
     if (error) {
       console.error("[api/todos/[id]/toggle]", error.message);
       return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
     }
-    if (!withdrawing) await notifySubmittedForApproval(t, auth.account_id);
-    await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
+    if (!data || data.length === 0) return conflict();
+    after(async () => {
+      if (!withdrawing) await notifySubmittedForApproval(t, auth.account_id);
+      await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
+    });
     return NextResponse.json({ ok: true, approval: withdrawing ? null : "pending" });
   }
 
@@ -65,7 +78,7 @@ export async function POST(
   // Owner completing a pending submission = implicit approval, stamped as
   // such; un-completing clears any stale approval state.
   const implicitApproval = completing && t.approval_state === "pending";
-  const { error } = await supabaseServer
+  const { data, error } = await supabaseServer
     .from("koleex_todos")
     .update({
       completed: completing,
@@ -76,18 +89,26 @@ export async function POST(
       ...(implicitApproval ? { approved_by_account_id: auth.account_id, approved_at: now } : {}),
       updated_at: now,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("completed", completed)
+    .select("id");
 
   if (error) {
     console.error("[api/todos/[id]/toggle]", error.message);
     return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
   }
+  if (!data || data.length === 0) return conflict();
 
   /* Completing a task closes the loop: every still-unread inbox row that
      points at it (reminders, recurring spawns, assignment notes — all
-     recipients) is finished business. Un-completing does NOT resurrect
-     them: a notification whose moment passed is history. */
+     recipients) is finished business. Awaited — the client recounts the
+     bell right after this answer. Un-completing does NOT resurrect them. */
   if (completing) await clearTodoNotifications(id);
-  await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
-  return NextResponse.json({ ok: true });
+  after(async () => {
+    /* Ticking a submission done IS confirming it — the assignees hear, as
+       they do when the assigner approves from the notification. */
+    if (implicitApproval) await notifyApprovalDecision(t, auth.account_id, "approved");
+    await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
+  });
+  return NextResponse.json({ ok: true, completed: completing });
 }

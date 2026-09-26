@@ -27,6 +27,17 @@ export interface TodoOwnership {
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
   approval_state: string | null;
+  /* The state columns the write paths compare against: toggle flips
+     `completed` conditionally on the value read here, PATCH only restamps
+     completed_at when the status really changes, re-arms a reminder when
+     remind_at moves, and re-arms the overdue escalation when due_date moves. */
+  status: string | null;
+  completed: boolean;
+  assign_to_all: boolean;
+  due_date: string | null;
+  remind_at: string | null;
+  description: string | null;
+  priority: string | null;
   metadata: { observers?: Array<{ account_id?: string }>; mentions?: Array<{ account_id?: string }>; [k: string]: unknown } | null;
 }
 
@@ -38,9 +49,12 @@ export interface TodoActor {
 /** The ownership columns, tenant-bounded. Null when the task is not in the
  *  caller's tenant — callers answer 404, never 403, so ids cannot be probed. */
 export async function loadTodoOwnership(id: string, tenantId: string | null): Promise<TodoOwnership | null> {
+  if (!isUuidLike(id)) return null;
   let q = supabaseServer
     .from("koleex_todos")
-    .select("id, tenant_id, title, created_by_account_id, assigned_by_account_id, approval_state, metadata")
+    .select(
+      "id, tenant_id, title, description, priority, status, completed, assign_to_all, due_date, remind_at, created_by_account_id, assigned_by_account_id, approval_state, metadata",
+    )
     .eq("id", id);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   const { data } = await q.maybeSingle();
@@ -57,6 +71,11 @@ export function isTodoObserver(t: Pick<TodoOwnership, "metadata">, accountId: st
   const obs = t.metadata?.observers;
   return Array.isArray(obs) && obs.some((o) => o?.account_id === accountId);
 }
+
+/** Ids here are UUIDs; anything else is a 404 without a database
+ *  round trip (and without the 22P02 cast error PostgREST would log). */
+export const isUuidLike = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 /** Has an assignee row. */
 export async function isTodoAssignee(todoId: string, accountId: string): Promise<boolean> {
@@ -85,6 +104,7 @@ export async function todoParticipation(
  *  one id. Used where a write needs "visible to me" rather than ownership
  *  (adding a note). */
 export async function canViewTodo(todoId: string, viewer: TodoViewer): Promise<boolean> {
+  if (!isUuidLike(todoId)) return false;
   const shared = await sharedTodoIds(viewer);
   let q = supabaseServer.from("koleex_todos").select("id").eq("id", todoId);
   if (viewer.tenantId) q = q.eq("tenant_id", viewer.tenantId);
@@ -101,7 +121,7 @@ export async function resolveAssigneeIds(opts: {
   everyone: boolean;
   tenantId: string | null;
 }): Promise<string[]> {
-  let ids = [...opts.explicit];
+  let ids = opts.explicit.filter(isUuidLike);
   if (opts.department && opts.tenantId) {
     const { data: emps } = await supabaseServer
       .from("koleex_employees")
@@ -122,3 +142,14 @@ export async function resolveAssigneeIds(opts: {
   }
   return internalAccountIds(ids, opts.tenantId);
 }
+
+/** "Assign to everyone" is an admin's call (owner, 2026-09-26): it puts a
+ *  task on — and notifies — every internal account in the tenant. The same
+ *  definition as the AI's createTodo (`ctx.isSuperAdmin || ut === "admin"`
+ *  in ai-agent/tools/todos.ts, pinned there by validate-ai-tasks): a super
+ *  admin, or an account whose user_type is "admin". */
+export function canAssignToEveryone(a: { is_super_admin: boolean; user_type?: string | null }): boolean {
+  return a.is_super_admin || (a.user_type ?? "").toLowerCase() === "admin";
+}
+
+export const ASSIGN_TO_EVERYONE_DENIED = "Only an admin can assign a task to everyone. Pick a department or the people instead.";

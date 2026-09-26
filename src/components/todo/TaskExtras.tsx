@@ -21,7 +21,8 @@ import type {
   TodoProductRef,
   TodoAssigneeInfo,
 } from "@/types/supabase";
-import ProductPicker from "@/components/todo/ProductPicker";
+import dynamic from "next/dynamic";
+import { attachmentHref } from "./todo-write";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
@@ -32,6 +33,10 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { fpAvatar } from "@/lib/cdn";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* The product browser pulls the catalogue, thumbnails and taxonomy — its
+   own chunk, fetched the first time it is opened. */
+const ProductPicker = dynamic(() => import("./ProductPicker"), { ssr: false });
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 const isImage = (t: string) => t.startsWith("image/");
@@ -195,16 +200,16 @@ export default function TaskExtras({
             onChange={onPickFiles}
           />
         </div>
-        {err && <p className="mt-1.5 text-[11px] text-[#FF6B6B]">{err}</p>}
+        {err && <p role="alert" className="mt-1.5 text-[11px] text-red-400">{err}</p>}
         {attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {attachments.map((a) => (
               <div key={a.path} className="relative group">
                 {isImage(a.type) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover border border-[var(--border-subtle)]" />
+                  <img src={attachmentHref(a.path)} alt={a.name} loading="lazy" decoding="async" className="h-16 w-16 rounded-lg object-cover border border-[var(--border-subtle)]" />
                 ) : (
-                  <a href={a.url} target="_blank" rel="noreferrer" className="h-16 w-28 px-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1 text-center">
+                  <a href={attachmentHref(a.path)} target="_blank" rel="noreferrer" className="h-16 w-28 px-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1 text-center">
                     <FileIcon className="h-5 w-5 text-[var(--text-dim)]" />
                     <span className="text-[9px] text-[var(--text-dim)] truncate max-w-full">{a.name}</span>
                   </a>
@@ -212,7 +217,7 @@ export default function TaskExtras({
                 <button
                   type="button"
                   onClick={() => removeAttachment(a.path)}
-                  className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-[#FF3333] text-white inline-flex items-center justify-center shadow"
+                  className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-red-500 text-white inline-flex items-center justify-center shadow"
                   aria-label={t("common.remove")}
                 >
                   <CrossIcon className="h-3 w-3" />
@@ -297,12 +302,12 @@ export default function TaskExtras({
         )}
       </div>
 
-      <ProductPicker
+      {pickerOpen && <ProductPicker
         open={pickerOpen}
         selectedIds={products.map((p) => p.id)}
         onToggle={toggleProduct}
         onClose={() => setPickerOpen(false)}
-      />
+      />}
     </div>
   );
 }
@@ -389,6 +394,8 @@ function PeoplePicker({
     <div ref={rootRef} className="relative">
       <span className="absolute start-3 top-[18px] -translate-y-1/2 text-[var(--text-dim)] pointer-events-none">{icon}</span>
       <input
+        aria-label={placeholder}
+        onKeyDown={(ev) => { if (ev.key === "Escape" && open) { ev.preventDefault(); ev.stopPropagation(); setOpen(false); setQ(""); } }}
         className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         placeholder={placeholder}
         value={q}
@@ -400,7 +407,7 @@ function PeoplePicker({
         }}
       />
       {open && (
-        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+        <div className="kx-glass-pop absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
           {list.length === 0 && (
             <div className="px-3 h-9 flex items-center text-[12px] text-[var(--text-dim)]">{noMatchesLabel}</div>
           )}
@@ -411,6 +418,7 @@ function PeoplePicker({
               <button
                 key={e.account_id}
                 type="button"
+                aria-pressed={on}
                 onClick={() => onToggle(e)}
                 className={`w-full text-start px-3 h-10 text-[12px] flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] transition-colors ${
                   on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"

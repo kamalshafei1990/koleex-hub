@@ -14,7 +14,8 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { accountTimezone } from "@/lib/server/calendar-notify";
-import { clearTodoNotifications, pingTodosChanged } from "@/lib/server/todo-notify";
+import { pingTodosChanged } from "@/lib/server/todo-notify";
+import { clearUnreadByMetaIn } from "@/lib/server/inbox-lifecycle";
 import { zonedDateKey } from "@/lib/calendar-tz";
 import type { CalendarEventCore } from "@/lib/server/calendar-access";
 
@@ -35,7 +36,7 @@ export async function syncLinkedTodo(ev: CalendarEventCore): Promise<void> {
     const due = zonedDateKey(ev.start_at, await accountTimezone(ev.account_id));
     const { error } = await supabaseServer
       .from("koleex_todos")
-      .update({ title: ev.title, description: ev.description, due_date: due })
+      .update({ title: ev.title, description: ev.description ?? null, due_date: due, updated_at: new Date().toISOString() })
       .in("id", ids);
     if (error) throw new Error(error.message);
     await pingTodosChanged(ev.tenant_id);
@@ -50,7 +51,8 @@ export async function deleteLinkedTodos(eventId: string, tenantId: string | null
     if (ids.length === 0) return;
     const { error } = await supabaseServer.from("koleex_todos").delete().in("id", ids);
     if (error) throw new Error(error.message);
-    await Promise.all(ids.map((tid) => clearTodoNotifications(tid)));
+    // Their notifications go with them — one chunked update, not one per task.
+    await clearUnreadByMetaIn({}, "todo_id", ids);
     await pingTodosChanged(tenantId);
   } catch (e) {
     console.error("[calendar-todo-bridge] cleanup:", e instanceof Error ? e.message : e);

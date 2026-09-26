@@ -20,6 +20,32 @@
 
 import type { TodoWithRelations } from "@/types/supabase";
 
+/* The business day rolls over at midnight CHINA time, not UTC. Koleex
+   operates on Asia/Shanghai (UTC+8, no DST — a fixed offset is exact), and
+   every period rule reads the clock shifted by it: the recurrence spawner,
+   the list's series_period, the open-count badge and the overdue escalation.
+   Written once here so the four cannot disagree about which day a task is. */
+export const TENANT_UTC_OFFSET_HOURS = 8;
+
+/** The tenant-local calendar day (YYYY-MM-DD) an instant falls on. */
+export function tenantDateKey(instant: Date | string): string {
+  const ms = typeof instant === "string" ? Date.parse(instant) : instant.getTime();
+  if (!Number.isFinite(ms)) return "";
+  return new Date(ms + TENANT_UTC_OFFSET_HOURS * 3600_000).toISOString().slice(0, 10);
+}
+
+/** Which period of its series a row IS: a spawned instance names it
+ *  outright; the template is its own first period — its start date, else
+ *  the tenant-local day it was created on (the spawner anchors it the same
+ *  way, so the two never disagree about "newest"). */
+export function seriesPeriodOf(r: {
+  recurrence_spawned_for: string | null;
+  start_date: string | null;
+  created_at: string | null;
+}): string {
+  return r.recurrence_spawned_for ?? r.start_date ?? (r.created_at ? tenantDateKey(r.created_at) : "");
+}
+
 export function collapseSeries(todos: TodoWithRelations[]): TodoWithRelations[] {
   const newestPerSeries = new Map<string, string>();
   todos.forEach((t) => {
