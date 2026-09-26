@@ -59,7 +59,7 @@ import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib/server/ai/provider/koleex-model-slots";
 import { featureSwitchedOff, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
-import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
+import { generalLaneTools, runGeneralSearchHop, GENERAL_LANE_TOOL, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
 import { READ_PAGE_TOOL_DEF, READ_PAGE_MAX_PER_ANSWER, linksInText, readPageForModel } from "@/lib/server/ai/core/read-page";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
@@ -621,11 +621,22 @@ export async function POST(req: Request) {
              orchestrate() is ever called, so the exclusion has to exist here
              too. Any future tool that answers everyday questions needs the
              same treatment or this lane will swallow it. */
+          /* A FACT ABOUT THE WORLD IS LOOKED UP, NOT RECALLED (dependability
+             plan A4) — on the general lane when that lane can look it up for
+             this caller, otherwise in the tool loop. Owner, 2026-09-26: "top
+             100 brands" on Deep took three and a half minutes in the loop,
+             every round a reasoning call before a word appeared. The general
+             lane makes the lookup its first call (forced, below) and streams
+             the answer from the result, so the table starts appearing as soon
+             as the model starts writing. */
+          const worldFactOnGeneral =
+            isWorldFactQuery(normalizedContent) &&
+            !isLiveInfoQuery(normalizedContent) &&
+            body.web_search !== true &&
+            generalLaneTools(ctx) !== null;
           const isLiveInfo =
             isLiveInfoQuery(normalizedContent) ||
-            /* A fact about the world outside Koleex is looked up, not
-               recalled (dependability plan A4). */
-            isWorldFactQuery(normalizedContent) ||
+            (isWorldFactQuery(normalizedContent) && !worldFactOnGeneral) ||
             /* "Draw me…" needs generate_image, which only the tool loop has. */
             isImageCreationRequest(normalizedContent) ||
             body.web_search === true;
@@ -706,7 +717,9 @@ export async function POST(req: Request) {
             fastPathKey && streamingFastLaneEnabled() && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
 
           if (canFastPath) {
-            fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
+            /* A world fact takes the general lane, the one that can look it
+               up — never the tool-less brand or small-talk prompt. */
+            fastLane = worldFactOnGeneral ? "general" : isBrand ? "brand" : isSmall ? "small" : "general";
             const analysis = analyzeIntent(normalizedContent);
             const systemPromptBase =
               fastLane === "brand"
@@ -809,7 +822,11 @@ export async function POST(req: Request) {
                      make the one lookup; brand and small talk stay tool-less. */
                   modelClass: fastLane === "small" ? ("FAST" as const) : ("GENERAL" as const),
                   stream: true,
-                  ...(laneTools ? { tools: laneTools, toolChoice: "auto" as const } : {}),
+                  /* A world fact's first call IS the lookup; anything else may
+                     look something up or answer directly. */
+                  ...(laneTools
+                    ? { tools: laneTools, toolChoice: worldFactOnGeneral ? { forceTool: GENERAL_LANE_TOOL } : ("auto" as const) }
+                    : {}),
                 },
                 { onDelta, prefer },
               );
