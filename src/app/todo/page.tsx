@@ -1090,7 +1090,14 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
                 {formatDate(task.due_date, t, lang)}
               </span>
             )}
-            {task.source !== "manual" && (
+            {/* A task made from a report (Reports 6A) opens that report —
+                the report page itself decides whether this reader may. */}
+            {task.source === "report" && task.source_id ? (
+              <Link href={`/reports/${task.source_id}`} onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded hover:underline">
+                {t("src.report")}
+              </Link>
+            ) : task.source !== "manual" && task.source !== "report" && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded">
                 {task.source === "crm" ? t("src.crm") : t("src.calendar")}
               </span>

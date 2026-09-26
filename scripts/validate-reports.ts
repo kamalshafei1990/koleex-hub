@@ -123,6 +123,7 @@ import {
 } from "../src/lib/reports/numbers-5d";
 import { COMPANY_MATERIAL, companyMaterial } from "../src/lib/reports/ai-draft";
 import { SCHEDULE_HOUR, localMinutesOf, periodToPrepare, schedulable } from "../src/lib/reports/schedules";
+import { FOLLOW_UP_LIMITS, forwardNote, forwardTargets, mayForward, reportLine, taskDue, taskPeopleAllowed, taskTitle } from "../src/lib/reports/follow-up";
 import { FAMILY_GROUPS } from "../src/lib/reports/catalog";
 import { FAMILY_GROUPS as HEAD_GROUPS, REPORT_HEADS, reportHead } from "../src/lib/reports/catalog-heads";
 import { headOf, renderReportHeads, HEADS_FILE } from "./lib/reports-heads";
@@ -350,7 +351,7 @@ console.log("\n§5 routes");
     }
   };
   walk(API);
-  expect(files.length === 19, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type, the team summary, the schedules)`);
+  expect(files.length === 21, `${files.length} report routes found (list, bundle, one report, submit, decision, comments, revise, carry, attachments, one attachment, ai, compliance, obligations, about, links search, the builder's list and one type, the team summary, the schedules, forward, tasks)`);
   const gated = (c: string) => {
     const handlers = [...c.matchAll(/export async function (GET|POST|PATCH|DELETE|PUT)\b/g)].length;
     const probs: string[] = [];
@@ -2324,7 +2325,7 @@ console.log("\n§22 the CEO office (Phase 5B)");
     (c) => (c.includes("if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];") ? [] : ["the writer's queue is frozen into the report"]),
     (src) => src.replace("      if (opts.freeze && isLiveSource(src)) return [src, { source: src, rows: [], capturedAt, live: true }];\n", ""));
   rule("a sent report's live block is read for the one opening it", `${API5}/[id]/route.ts`,
-    (c) => (c.includes('const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};') && c.includes("const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;") && c.includes("const sections = await gateForReader(row, merged, auth, isAuthor);") && /\n\s+sections, status: row\.status,/.test(c) ? [] : ["a reader sees the writer's queue, or none"]),
+    (c) => (c.includes('const sent = row.status !== "draft";') && c.includes("sent ? loadLiveData(row, auth) : Promise.resolve({} as Awaited<ReturnType<typeof loadLiveData>>),") && c.includes("const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;") && c.includes("const sections = await gateForReader(row, merged, auth, isAuthor);") && /\n\s+sections, status: row\.status,/.test(c) ? [] : ["a reader sees the writer's queue, or none"]),
     (src) => src.replace("const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;", "const merged = row.sections;"));
   rule("the live read is for the viewer, and costs nothing on a report without one", RD5,
     (c) => { const a = c.indexOf("export async function loadLiveData("); const body = c.slice(a); return a > 0 && body.includes("if (!secs.length) return {};") && body.includes("decisionRows(await loadDecisions(auth), today)") ? [] : ["every report pays for the live read"]; },
@@ -2910,6 +2911,92 @@ console.log("\n§29 the drafts the system prepares on schedule");
   expect(/CREATE TABLE IF NOT EXISTS work_report_schedules/.test(mig) && /ALTER TABLE work_report_schedules ENABLE ROW LEVEL SECURITY;/.test(mig) && /UNIQUE \(account_id, template_key\)/.test(mig)
     && !/\bDROP\b|ALTER TABLE (?!work_report_schedules)/.test(mig), "the table is additive: one new table, one row per person and type, server-only (RLS on, no policy)");
   expect(code(read("src/components/reports/app/ComplianceTab.tsx")).includes("<ScheduleSetup t={t} people={data.rows.map((r) => r.person)} />"), "the setup lives with «who must write what», in the Compliance tab");
+}
+
+/* ── §30 a report becomes work (6A, 27 Sep 2026) ───────────────────────── */
+console.log("\n§30 a report becomes work — forward it, make a task from it");
+{
+  const F = (over: Partial<Parameters<typeof mayForward>[0]> = {}) => mayForward({ status: "submitted", superseded: false, confidential: false, isAuthor: false, ...over });
+  eq([F(), F({ status: "approved" }), F({ status: "returned" })], [true, true, true], "anyone who can read a sent report may forward it");
+  eq([F({ status: "draft", isAuthor: true }), F({ superseded: true, isAuthor: true })], [false, false], "never a draft, never a version a newer one replaced");
+  eq([F({ confidential: true }), F({ confidential: true, isAuthor: true })], [false, true], "a CONFIDENTIAL report: its author only (owner's pick)");
+  const staff = new Set(["a", "b", "c", "author", "on"]);
+  eq(forwardTargets(["b", "author", "on", "x", "b", 7, "c"], { staff, authorId: "author", already: new Set(["on"]) }), ["b", "c"],
+    "a forward adds known staff only — never the author, anyone already on it, or the same person twice");
+  eq(forwardTargets(Array.from({ length: 30 }, (_, i) => `p${i}`), { staff: new Set(Array.from({ length: 30 }, (_, i) => `p${i}`)), authorId: "z", already: new Set() }).length,
+    FOLLOW_UP_LIMITS.forwardPeople, "…and at most ten at a time");
+  eq([forwardNote("  hi  "), forwardNote("   "), forwardNote(3), (forwardNote("x".repeat(900)) ?? "").length], ["hi", null, null, FOLLOW_UP_LIMITS.note], "a note is trimmed, capped, or none");
+  const readers = new Set(["author", "r1"]);
+  eq([
+    taskPeopleAllowed({ confidential: false, isAuthor: false, readers }, ["outsider"]),
+    taskPeopleAllowed({ confidential: true, isAuthor: false, readers }, ["r1"]),
+    taskPeopleAllowed({ confidential: true, isAuthor: false, readers }, ["r1", "outsider"]),
+    taskPeopleAllowed({ confidential: true, isAuthor: true, readers }, ["outsider"]),
+  ], [true, true, false, true], "a task from a confidential report goes only to its readers — unless its author makes it");
+  const secs = [{ id: "next", items: ["Call Delta", "  "] }, { id: "summary", text: "x" }];
+  eq([reportLine(secs, { section: "next", item: 0 }), reportLine(secs, { section: "next", item: 1 }), reportLine(secs, { section: "next", item: 5 }),
+    reportLine(secs, { section: "summary", item: 0 }), reportLine(secs, { section: "next", item: -1 }), reportLine(secs, { section: "next", item: 0.5 }), reportLine(secs, "next")],
+    [{ section: "next", item: 0, text: "Call Delta" }, null, null, null, null, null, null], "a task's line is a real, written item of a list section — or it is refused");
+  eq([taskDue("2026-09-30"), taskDue("2026-02-30"), taskDue("30/09/2026"), taskDue(undefined)], ["2026-09-30", null, null, null], "a due day is a real calendar day, or none");
+  eq([taskTitle("  Call   Delta\n today "), taskTitle(""), (taskTitle("y".repeat(500)) ?? "").length], ["Call Delta today", null, FOLLOW_UP_LIMITS.taskTitle], "a title is one line, trimmed and capped");
+
+  const API = "src/app/api/work-reports";
+  const FU = "src/lib/server/reports/follow-up.ts";
+  for (const [route, name] of [[`${API}/[id]/forward/route.ts`, "forward"], [`${API}/[id]/tasks/route.ts`, "tasks"]] as const) {
+    rule(`${name}: only someone who can read the report — anyone else is told it does not exist`, route,
+      (c) => (c.includes("const loaded = await loadForViewer(id, auth);") && c.includes('if (!loaded) return NextResponse.json({ error: "not_found" }, { status: 404 });')
+        && c.indexOf('if (!loaded) return NextResponse.json({ error: "not_found" }, { status: 404 });') < c.indexOf("await req.json()") ? [] : ["a stranger forwards or tasks a report they cannot read"]),
+      (src) => src.replace('  if (!loaded) return NextResponse.json({ error: "not_found" }, { status: 404 });\n', ""));
+  }
+  rule("a forward is allowed first — a confidential report by its author only", FU,
+    (c) => { const f = c.indexOf("export async function forwardReport("); const body = c.slice(f); return f > 0 && body.indexOf('if (!mayForward(forwardFacts(loaded))) return "forbidden";') > 0 && body.indexOf('if (!mayForward(forwardFacts(loaded))) return "forbidden";') < body.indexOf("addForwarded(") ? [] : ["anyone forwards a confidential report"]; },
+    (src) => src.replace('  if (!mayForward(forwardFacts(loaded))) return "forbidden";\n', ""));
+  rule("the one forwarding is never added — nor anyone already on it", FU,
+    (c) => (c.includes("already: new Set([...recipients.map((r) => r.account_id), auth.account_id]),") ? [] : ["a manager forwards the report to themselves and becomes its reader"]),
+    (src) => src.replace("already: new Set([...recipients.map((r) => r.account_id), auth.account_id]),", "already: new Set(recipients.map((r) => r.account_id)),"));
+  rule("a forwarded reader is a COPY reader — reads, comments, acknowledges; never approves or returns", FU,
+    (c) => (c.includes('ids.map((account_id) => ({ report_id: row.id, account_id, role: "cc", forwarded_by: by, forwarded_at: now, forward_note: note }))') ? [] : ["a forwarded reader can approve"]),
+    (src) => src.replace('account_id, role: "cc", forwarded_by: by', 'account_id, role: "to", forwarded_by: by'));
+  expect(code(read(`${API}/[id]/route.ts`)).includes("decide: !isAuthor && isTo && row.review_required && open && !row.superseded,"), "…the review stays with the 'To' readers the author chose");
+  rule("a new version goes to the readers its author chose — a forward was for that version", `${API}/[id]/revise/route.ts`,
+    (c) => (c.includes("const chosen = recipients.filter((r) => !r.forwarded_by);") && c.includes("chosen.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role }))") ? [] : ["forwarded readers become the author's recipients on the next version"]),
+    (src) => src.replace("const chosen = recipients.filter((r) => !r.forwarded_by);", "const chosen = recipients;"));
+  rule("a task needs the To-do create right — the same check /api/todos makes (never in view-as)", FU,
+    (c) => (c.includes('return (await requireModuleAction(auth, "To-do", "create")) === null;') && c.includes('if (row.status === "draft" || !(await mayMakeTasks(auth))) return "forbidden";') ? [] : ["anyone writes To-do tasks through a report"]),
+    (src) => src.replace('if (row.status === "draft" || !(await mayMakeTasks(auth))) return "forbidden";', 'if (row.status === "draft") return "forbidden";'));
+  rule("the confidential rule is checked before the task is written", FU,
+    (c) => { const a = c.indexOf('if (!taskPeopleAllowed({ confidential: row.confidential, isAuthor, readers }, people)) return "people_not_allowed";'); return a > 0 && a < c.indexOf('from("koleex_todos").insert(') ? [] : ["a confidential report's words go to someone who cannot read it"]; },
+    (src) => src.replace('  if (!taskPeopleAllowed({ confidential: row.confidential, isAuthor, readers }, people)) return "people_not_allowed";\n', ""));
+  rule("the task is To-do's own, written like every To-do writer writes one: internal assignees, its assignment notice, the list's ping", FU,
+    (c) => (c.includes('source: "report",') && c.includes("source_id: row.id,") && c.includes("created_by_account_id: auth.account_id,") && c.includes("assigned_by_account_id: auth.account_id,")
+      && c.includes("const assigneeIds = await resolveAssigneeIds({ explicit: people, department: null, everyone: false, tenantId: auth.tenant_id });")
+      && c.includes("await notifyTodoAssigned(created, assigneeIds, auth.account_id);") && c.includes("await pingTodosChanged(auth.tenant_id);") ? [] : ["a report's task skips To-do's own rules"]),
+    (src) => src.replace("  await pingTodosChanged(auth.tenant_id);\n", ""));
+  rule("sharing the report with an assignee IS a forward — only where this reader may forward it", FU,
+    (c) => (c.includes("if (body.share === true && mayForward(forwardFacts(loaded))) {") ? [] : ["a task carries a confidential report to anyone"]),
+    (src) => src.replace("if (body.share === true && mayForward(forwardFacts(loaded))) {", "if (body.share === true) {"));
+  rule("the report shows each reader only the tasks To-do itself shows them — its one scope rule, a count for the rest", FU,
+    (c) => (c.includes("const shared = (await sharedTodoIds(viewer)).filter((id) => taskIds.has(id));") && c.includes("await applyTodoScope(vq, viewer, shared);") && c.includes("return { tasks, count: all.length };") ? [] : ["every reader sees every task made from the report"]),
+    (src) => src.replace("await applyTodoScope(vq, viewer, shared);", "await vq;"));
+  rule("To-do itself refuses a 'report' task — only the Reports app writes one, after checking the report and its line", "src/app/api/todos/route.ts",
+    (c) => (c.includes('if (body.source !== undefined && body.source !== "manual" && body.source !== "crm" && body.source !== "calendar") {') ? [] : ["anyone posts a task 'from a report' they never read"]),
+    (src) => src.replace('if (body.source !== undefined && body.source !== "manual" && body.source !== "crm" && body.source !== "calendar") {', "if (false) {"));
+  rule("the page offers Forward and the people to pick only as the server allows", `${API}/[id]/route.ts`,
+    (c) => (c.includes("forward: mayForward({ status: row.status, superseded: row.superseded, confidential: row.confidential, isAuthor }),") && c.includes("makeTask: canTask,")
+      && c.includes("people: row.status === \"draft\" && isAuthor ? people.filter((p) => p.id !== me) : can.forward || can.makeTask ? people : undefined,") ? [] : ["every reader gets the staff list and a Forward button"]),
+    (src) => src.replace("can.forward || can.makeTask ? people : undefined,", "people,"));
+  expect(code(read("src/lib/server/reports/notify.ts")).includes('tpl: { k: "report_forwarded", p: { actor: forwarderName, title: titleOf(r) } },') && code(read("src/lib/server/reports/notify.ts")).includes('type: "report_forwarded",'),
+    "the forwarded reader is told who forwarded what, with the note — and opening the report clears it (report_id)");
+  const RV = code(read("src/components/reports/app/ReportView.tsx"));
+  const FD = code(read("src/components/reports/app/FollowUp.tsx"));
+  expect(RV.includes('void import("./FollowUp")') && !/import\s+(?!type\b)[^;]*from\s+"\.\/FollowUp"/.test(RV), "the two dialogs are their own chunk — the report page loads them when one opens");
+  expect((FD.match(/createPortal\(/g) ?? []).length === 1 && FD.includes("document.body,") && FD.includes('import Modal from "@/components/kds/Modal";'),
+    "both dialogs are the house light dialog, portalled to <body> — the reader's glass cards would trap them");
+  expect(FD.includes("window.localStorage.setItem(TODO_WRITE_VERSION_KEY, String(n));") && FD.includes("await announceTodoWrite();"), "a new task busts To-do's list cache, as every To-do write does");
+  const mig = migration("supabase/migrations/20260927_reports_tasks_forward.sql");
+  expect(/BEGIN;[\s\S]*DROP CONSTRAINT IF EXISTS koleex_todos_source_check;[\s\S]*ADD CONSTRAINT koleex_todos_source_check\s+CHECK \(source IN \('manual', 'crm', 'calendar', 'report'\)\);[\s\S]*COMMIT;/.test(mig)
+    && /ADD COLUMN IF NOT EXISTS forwarded_by uuid/.test(mig) && !/DROP (TABLE|COLUMN)|DELETE FROM|UPDATE \w+ SET|TRUNCATE/.test(mig),
+    "the database change is additive in effect: a task's source grows by one, in one transaction; three new columns");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

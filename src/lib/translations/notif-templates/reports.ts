@@ -23,6 +23,10 @@ export const reportsTpl: Translations = {
   /* A comment — the body is the comment itself. */
   "report_comment.s": { en: "{actor} commented: {title:free}", zh: "{actor} 发表了评论：{title:free}", ar: "علّق {actor}: {title:free}" },
 
+  /* Forwarded to someone who was not on it (6A) — the body is the
+     forwarder's own note. */
+  "report_forwarded.s": { en: "{actor} forwarded you a report: {title:free}", zh: "{actor} 转发给你一份报告：{title:free}", ar: "حوّل لك {actor} تقريرًا: {title:free}" },
+
   /* Reminder to the author, an hour before the deadline. */
   "report_reminder.one.s": { en: "Reminder: your {report} is due at {time}", zh: "提醒：你的 {report} 将于 {time} 截止", ar: "تذكير: موعد تسليم {report} الساعة {time}" },
   "report_reminder.one.b": {

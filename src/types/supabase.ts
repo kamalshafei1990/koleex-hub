@@ -2022,7 +2022,8 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
 
 /* ─── To-do System ───────────────────────────────────────────────────── */
 
-export type TodoSource = "manual" | "crm" | "calendar";
+/** "report": made from a line of a report (Reports 6A — source_id = the report). */
+export type TodoSource = "manual" | "crm" | "calendar" | "report";
 export type TodoPriority = "high" | "medium" | "low";
 
 /** Workflow stage for a task (Phase 2). */

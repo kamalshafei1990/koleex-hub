@@ -46,9 +46,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Could not start a new version." }, { status: 500 });
   }
   const newId = (created as { id: string }).id;
+  /* The readers its author chose — a forward (6A) was for that version. */
+  const chosen = recipients.filter((r) => !r.forwarded_by);
   const [, fileMap] = await Promise.all([
-    recipients.length
-      ? supabaseServer.from("work_report_recipients").insert(recipients.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role })))
+    chosen.length
+      ? supabaseServer.from("work_report_recipients").insert(chosen.map((r) => ({ report_id: newId, account_id: r.account_id, role: r.role })))
       : Promise.resolve(null),
     copyAttachments(row.id, newId),
     syncReportLinks(newId, row.tenant_id, null, reportLinks(row.sections)),

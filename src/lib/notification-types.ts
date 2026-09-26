@@ -105,6 +105,7 @@ export const NOTIFICATION_TYPES = {
   report_submitted:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_decided:           { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_comment:           { app: "reports", activity: "comments_activity", severity: "info", lifecycle: { kind: "supersede", key: "report_id" } },
+  report_forwarded:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_reminder:          { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "reminders", when: "each listed report is sent" } },
   report_escalation:        { app: "reports", activity: "reports_activity", severity: "warning", lifecycle: { kind: "settle", list: "escalations", when: "each missing report is sent" } },
   report_request:           { app: "reports", activity: "reports_activity", severity: "action", lifecycle: { kind: "settle", list: "requests", when: "each requested report is sent" } },

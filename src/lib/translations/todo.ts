@@ -165,6 +165,7 @@ export const todoT: Translations = {
   /* Task row */
   "src.crm":           { en: "CRM",                        zh: "CRM",                    ar: "CRM" },
   "src.calendar":      { en: "Calendar",                   zh: "日历",                   ar: "التقويم" },
+  "src.report":        { en: "From a report",              zh: "来自报告",               ar: "من تقرير" },
 
   /* Common words */
   "common.optional":   { en: "(optional)",                 zh: "（可选）",               ar: "(اختياري)" },

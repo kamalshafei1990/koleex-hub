@@ -133,4 +133,46 @@ export const reportPageT: Translations = {
   /* ── Phase 4D: a range's two days ── */
   "period.from": { en: "First day", zh: "开始日期", ar: "أول يوم" },
   "period.to": { en: "Last day", zh: "结束日期", ar: "آخر يوم" },
+
+  /* ── Phase 6A: a report becomes work — forward it, make a task ── */
+  "follow.title":    { en: "Follow up", zh: "跟进", ar: "متابعة" },
+  "follow.forward":  { en: "Forward", zh: "转发", ar: "حوّل" },
+  "follow.task":     { en: "Make a task", zh: "创建任务", ar: "اعمل مهمة" },
+  "follow.taskLine": { en: "Make a task from this line", zh: "用这一行创建任务", ar: "اعمل مهمة من السطر ده" },
+
+  "forward.title":       { en: "Forward this report", zh: "转发这份报告", ar: "حوّل التقرير ده" },
+  "forward.people":      { en: "To", zh: "发给", ar: "لمين" },
+  "forward.note":        { en: "Note (optional)", zh: "附言（可选）", ar: "ملاحظة (اختياري)" },
+  "forward.notePlaceholder": { en: "Why you are sending it…", zh: "为什么转发…", ar: "بتبعته ليه…" },
+  "forward.hint":        { en: "They can read it, comment and acknowledge it — not approve or return it.", zh: "他们可以阅读、评论和确认，但不能批准或退回。", ar: "هيقدروا يقروه ويعلّقوا ويأكدوا إنهم شافوه، بس مش هيوافقوا عليه ولا يرجّعوه." },
+  "forward.confidential": { en: "Confidential: only you, its author, can forward it.", zh: "机密报告：只有作者（你）可以转发。", ar: "تقرير سري: إنت بس اللي كتبته تقدر تحوّله." },
+  "forward.send":        { en: "Forward", zh: "转发", ar: "حوّل" },
+
+  "reader.forwarded":   { en: "Forwarded", zh: "转发给", ar: "اتحوّل لـ" },
+  "reader.forwardedBy": { en: "by {name}", zh: "由 {name} 转发", ar: "حوّله {name}" },
+
+  "task.title":       { en: "Make a task", zh: "创建任务", ar: "اعمل مهمة" },
+  "task.what":        { en: "Task", zh: "任务", ar: "المهمة" },
+  "task.for":         { en: "For", zh: "负责人", ar: "لمين" },
+  "task.due":         { en: "Due", zh: "截止日期", ar: "الميعاد" },
+  "task.priority":    { en: "Priority", zh: "优先级", ar: "الأولوية" },
+  "task.share":       { en: "Also share this report with them", zh: "同时把这份报告共享给他们", ar: "وابعتلهم التقرير كمان" },
+  "task.shareHint":   { en: "Only people who cannot read it yet get it.", zh: "只发给还不能阅读它的人。", ar: "هيوصل بس للي لسه ما يقدروش يقروه." },
+  "task.confidential": { en: "Confidential: a task goes only to someone who can already read this report.", zh: "机密报告：任务只能交给已经能阅读这份报告的人。", ar: "تقرير سري: المهمة تروح بس لحد يقدر يقرا التقرير ده." },
+  "task.create":      { en: "Create task", zh: "创建任务", ar: "اعمل المهمة" },
+  /* A task's own words, as To-do says them. */
+  "task.p.high":      { en: "High", zh: "高", ar: "مرتفعة" },
+  "task.p.medium":    { en: "Medium", zh: "中", ar: "متوسطة" },
+  "task.p.low":       { en: "Low", zh: "低", ar: "منخفضة" },
+  "task.st.todo":        { en: "To do", zh: "待办", ar: "قيد الانتظار" },
+  "task.st.in_progress": { en: "In progress", zh: "进行中", ar: "قيد التنفيذ" },
+  "task.st.blocked":     { en: "Blocked", zh: "受阻", ar: "متوقفة" },
+  "task.st.done":        { en: "Done", zh: "已完成", ar: "منجزة" },
+  "task.st.pending":     { en: "Awaiting approval", zh: "等待审批", ar: "بانتظار الموافقة" },
+
+  "tasks.title":   { en: "Tasks from this report", zh: "来自这份报告的任务", ar: "مهام من التقرير ده" },
+  "tasks.hidden":  { en: "{n} more you cannot see", zh: "另有 {n} 项你看不到", ar: "و{n} كمان مش ظاهرين ليك" },
+  "tasks.earlier": { en: "Earlier version", zh: "旧版本", ar: "نسخة أقدم" },
+  "tasks.open":    { en: "Open in To-do", zh: "在待办中打开", ar: "افتحها في To-do" },
+
 };

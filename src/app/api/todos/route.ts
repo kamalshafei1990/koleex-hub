@@ -307,6 +307,12 @@ export async function POST(req: Request) {
   if (body.recurrence != null && !isTodoRecurrence(body.recurrence)) {
     return NextResponse.json({ error: "Invalid recurrence" }, { status: 400 });
   }
+  /* A task FROM A REPORT (source 'report') is written only by the Reports
+     app (POST /api/work-reports/[id]/tasks), which checks that the report
+     can be read and that its line exists — never posted here. */
+  if (body.source !== undefined && body.source !== "manual" && body.source !== "crm" && body.source !== "calendar") {
+    return NextResponse.json({ error: "Invalid source" }, { status: 400 });
+  }
   const recurrence = body.recurrence ?? null;
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")

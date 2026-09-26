@@ -15,6 +15,10 @@ import "server-only";
           /api/files/report/<id>, which applies this same read rule.
           A report of a builder type (4E) also brings its type as it was
           started with — the sections and their words (`template`).
+          6A: who forwarded it to whom (on each recipient), the To-do tasks
+          made from it and its earlier versions — only those To-do shows
+          THIS viewer, `taskCount` for all — and whether they may forward it
+          or make a task (`can`), with the people to pick from.
    PATCH  The author edits a DRAFT: { title?, date?, dateTo?, sections?, to?,
           cc?, confidential? } — dateTo only for a trip or a visit (4D). A sent report is never edited — a new version is
           (POST …/revise).
@@ -31,7 +35,7 @@ import { REPORT_LIMITS, normalizeSections, periodFor, rangeEnd, reportLinks, typ
 import { readSnapshot, templateOf, templateWords } from "@/lib/reports/custom-templates";
 import { sectionFamilies } from "@/lib/reports/catalog";
 import { syncReportLinks } from "@/lib/server/reports/links";
-import { isUuid, listPeople, loadForViewer, requireReportsUser } from "@/lib/server/reports/core";
+import { isUuid, listPeople, loadForViewer, requireReportsUser, toClientRecipient } from "@/lib/server/reports/core";
 import { clearMyReportNotifications } from "@/lib/server/reports/notify";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 import { loadCarry } from "@/lib/server/reports/carry";
@@ -39,6 +43,8 @@ import { loadAppFeed } from "@/lib/server/reports/app-feed";
 import { gateForReader, loadLiveData, loadReportData } from "@/lib/server/reports/report-data";
 import { withBlockData } from "@/lib/reports/report-data";
 import { loadAttachmentRows, removeUnreferenced, toClientAttachment, type AttachmentRow } from "@/lib/server/reports/attachments";
+import { loadReportTasks, mayMakeTasks } from "@/lib/server/reports/follow-up";
+import { mayForward, type ReportTask } from "@/lib/reports/follow-up";
 
 export const dynamic = "force-dynamic";
 
@@ -88,8 +94,16 @@ export async function GET(req: Request, { params }: Params) {
     ? await Promise.all([loadCarry(row, auth), loadAppFeed(row, auth), loadReportData(row, auth)])
     : [undefined, undefined, undefined];
   /* 5B: a sent report's LIVE block («waiting for your decision») shows what
-     waits for THIS viewer, read now — never what the author's queue held. */
-  const live = row.status !== "draft" ? await loadLiveData(row, auth) : {};
+     waits for THIS viewer, read now — never what the author's queue held.
+     6A, in the same wave: the tasks made from it (the ones To-do shows this
+     viewer, and how many in all) and whether they may make one. */
+  const sent = row.status !== "draft";
+  const noTasks: { tasks: ReportTask[]; count: number } = { tasks: [], count: 0 };
+  const [live, taskInfo, canTask] = await Promise.all([
+    sent ? loadLiveData(row, auth) : Promise.resolve({} as Awaited<ReturnType<typeof loadLiveData>>),
+    sent ? loadReportTasks(auth, row).catch((e: unknown) => { console.error("[api/work-reports/[id]] tasks:", e instanceof Error ? e.message : e); return noTasks; }) : Promise.resolve(noTasks),
+    sent ? mayMakeTasks(auth) : Promise.resolve(false),
+  ]);
   const merged = Object.keys(live).length ? withBlockData(row.sections, live) : row.sections;
   /* 5D: an executive or control type's numbers — each only for a reader
      who holds that number's own right. */
@@ -100,6 +114,17 @@ export async function GET(req: Request, { params }: Params) {
   const snap = row.template_snapshot ? readSnapshot(row.template_snapshot) : null;
   const def = templateOf(row);
   const wordFamilies = sectionFamilies(def?.base ?? row.template_key);
+  const can = {
+    edit: isAuthor && row.status === "draft",
+    remove: isAuthor && row.status === "draft",
+    revise: isAuthor && row.status !== "draft" && !row.superseded,
+    decide: !isAuthor && isTo && row.review_required && open && !row.superseded,
+    acknowledge: !isAuthor && !!mine && !mine.acknowledged_at && row.status !== "draft",
+    comment: row.status !== "draft",
+    /* 6A: a confidential report is forwarded by its author only. */
+    forward: mayForward({ status: row.status, superseded: row.superseded, confidential: row.confidential, isAuthor }),
+    makeTask: canTask,
+  };
 
   return NextResponse.json({
     report: {
@@ -111,19 +136,18 @@ export async function GET(req: Request, { params }: Params) {
       submittedAt: row.submitted_at, decidedAt: row.decided_at, decidedBy: row.decided_by ? person(row.decided_by) : null,
       createdAt: row.created_at, updatedAt: row.updated_at,
     },
-    recipients: recipients.map((r) => ({ ...person(r.account_id), role: r.role, readAt: r.read_at, acknowledgedAt: r.acknowledged_at })),
+    recipients: recipients.map((r) => toClientRecipient(r, person)),
     comments: ((commentsRes.data ?? []) as Array<{ id: string; account_id: string; body: string; kind: string; created_at: string }>)
       .map((c) => ({ id: c.id, author: person(c.account_id), body: c.body, kind: c.kind, createdAt: c.created_at })),
     access,
-    can: {
-      edit: isAuthor && row.status === "draft",
-      remove: isAuthor && row.status === "draft",
-      revise: isAuthor && row.status !== "draft" && !row.superseded,
-      decide: !isAuthor && isTo && row.review_required && open && !row.superseded,
-      acknowledge: !isAuthor && !!mine && !mine.acknowledged_at && row.status !== "draft",
-      comment: row.status !== "draft",
-    },
-    people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : undefined,
+    /* 6A: who is looking — the forward dialog leaves them out. */
+    viewerId: me,
+    can,
+    /* The author's draft picks its readers; a reader who may forward it or
+       make a task from it picks people too (6A). */
+    people: row.status === "draft" && isAuthor ? people.filter((p) => p.id !== me) : can.forward || can.makeTask ? people : undefined,
+    tasks: sent ? taskInfo.tasks : undefined,
+    taskCount: sent ? taskInfo.count : undefined,
     carry,
     appFeed,
     blockData,

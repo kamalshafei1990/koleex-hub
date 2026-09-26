@@ -11,6 +11,7 @@ import "server-only";
      report_approval_request   → approvals (the word "approval" wins)
      report_decided            → reports_activity
      report_comment            → comments_activity
+     report_forwarded          → reports_activity (6A)
 
    The nudges (report_reminder / report_escalation, from nudges.ts) and the
    event requests (report_request, from events.ts) are ONE row about possibly
@@ -69,6 +70,22 @@ export async function notifyReportDecided(r: ReportRow, decision: "approved" | "
     type: "report_decided",
     metadata: { report_id: r.id, decision },
     tag: `report-decided-${r.id}`,
+  });
+}
+
+/** 6A: someone who can read the report forwarded it — the body is their
+ *  own note. Opening the report clears it (clearMyReportNotifications). */
+export async function notifyReportForwarded(r: ReportRow, recipientIds: string[], forwarderId: string, forwarderName: string, note: string | null): Promise<void> {
+  await notifyLite({
+    tenantId: r.tenant_id,
+    recipients: recipientIds,
+    senderId: forwarderId,
+    tpl: { k: "report_forwarded", p: { actor: forwarderName, title: titleOf(r) } },
+    body: note,
+    link: `/reports/${r.id}`,
+    type: "report_forwarded",
+    metadata: { report_id: r.id, template_key: r.template_key },
+    tag: `report-forwarded-${r.id}`,
   });
 }
 

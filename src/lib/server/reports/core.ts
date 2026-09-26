@@ -60,6 +60,11 @@ export interface RecipientRow {
   role: "to" | "cc";
   read_at: string | null;
   acknowledged_at: string | null;
+  /** 6A: a reader someone forwarded it to — who, when, and their note.
+   *  All null for a recipient its author chose. */
+  forwarded_by: string | null;
+  forwarded_at: string | null;
+  forward_note: string | null;
 }
 
 /** Reports are for Koleex staff: a customer or portal login shares the
@@ -256,9 +261,17 @@ export function listPeople(tenantId: string | null): Promise<PersonLite[]> {
 
 export async function loadRecipients(reportId: string): Promise<RecipientRow[]> {
   const { data, error } = await supabaseServer.from("work_report_recipients")
-    .select("account_id, role, read_at, acknowledged_at").eq("report_id", reportId).order("created_at", { ascending: true });
+    .select("account_id, role, read_at, acknowledged_at, forwarded_by, forwarded_at, forward_note").eq("report_id", reportId).order("created_at", { ascending: true });
   if (error) { console.error("[reports] recipients:", error.message); return []; }
   return (data ?? []) as RecipientRow[];
+}
+
+/** A recipient as the report page shows it — `person` names an account. */
+export function toClientRecipient<P extends object>(r: RecipientRow, person: (id: string) => P) {
+  return {
+    ...person(r.account_id), role: r.role, readAt: r.read_at, acknowledgedAt: r.acknowledged_at,
+    forwardedBy: r.forwarded_by ? person(r.forwarded_by) : null, forwardedAt: r.forwarded_at, forwardNote: r.forward_note,
+  };
 }
 
 export interface LoadedReport { row: ReportRow; recipients: RecipientRow[]; access: Exclude<ReportAccess, null> }

@@ -14,6 +14,7 @@ import type { ReportAttachment } from "@/lib/reports/attachments";
 import type { AppRecord } from "@/lib/reports/app-feed";
 import type { AiDraftRequest } from "@/lib/reports/ai-draft";
 import type { BoardRow, BoardSummary, DueItem, Obliged } from "@/lib/reports/obligations";
+import type { ReportTask, TaskPriority } from "@/lib/reports/follow-up";
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "returned";
 
@@ -57,7 +58,11 @@ export interface ReportsBundle {
   library: { hr: boolean; finance: boolean; tasks: boolean };
 }
 
-export interface ReportRecipient extends ReportPerson { role: "to" | "cc"; readAt: string | null; acknowledgedAt: string | null }
+export interface ReportRecipient extends ReportPerson {
+  role: "to" | "cc"; readAt: string | null; acknowledgedAt: string | null;
+  /** 6A: someone forwarded it to this reader — who, when, their note. */
+  forwardedBy?: ReportPerson | null; forwardedAt?: string | null; forwardNote?: string | null;
+}
 export interface ReportComment { id: string; author: ReportPerson; body: string; kind: "comment" | "approved" | "returned"; createdAt: string }
 
 export interface ReportDetail {
@@ -72,8 +77,16 @@ export interface ReportDetail {
   recipients: ReportRecipient[];
   comments: ReportComment[];
   access: "author" | "recipient" | "manager" | "super_admin";
-  can: { edit: boolean; remove: boolean; revise: boolean; decide: boolean; acknowledge: boolean; comment: boolean };
+  /** 6A: the account looking at it. */
+  viewerId?: string;
+  can: { edit: boolean; remove: boolean; revise: boolean; decide: boolean; acknowledge: boolean; comment: boolean; forward?: boolean; makeTask?: boolean };
+  /** The author's draft: who it may go to. A reader who may forward it or
+   *  make a task from it (6A): who they may pick. */
   people?: ReportPerson[];
+  /** 6A: the To-do tasks made from it and its earlier versions that To-do
+   *  shows this viewer — and how many there are in all. */
+  tasks?: ReportTask[];
+  taskCount?: number;
   /** The author's draft only: suggestions from their earlier reports. */
   carry?: CarryGroup[];
   /** Photos and files, in order (ids only — see reportFileUrl). */
@@ -137,6 +150,12 @@ export const decideReport = (id: string, action: "approve" | "return" | "acknowl
 export const commentOnReport = (id: string, body: string) =>
   call<{ comment: ReportComment }>(`/api/work-reports/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) });
 export const reviseReport = (id: string) => call<{ id: string; existing: boolean }>(`/api/work-reports/${id}/revise`, { method: "POST" });
+/** 6A: send it on to people who were not on it, with a note. */
+export const forwardReport = (id: string, body: { people: string[]; note?: string }) =>
+  call<{ recipients: ReportRecipient[] }>(`/api/work-reports/${id}/forward`, { method: "POST", body: JSON.stringify(body) });
+/** 6A: a To-do task from a line of it (or anything written). */
+export const makeReportTask = (id: string, body: { title: string; people: string[]; due?: string | null; priority?: TaskPriority; line?: { section: string; item: number } | null; share?: boolean }) =>
+  call<{ id: string; shared: string[] }>(`/api/work-reports/${id}/tasks`, { method: "POST", body: JSON.stringify(body) });
 /** One photo or file onto a draft, with upload progress (0..1) — an XHR,
  *  because fetch cannot report upload progress, and on a slow line "is it
  *  moving?" is the question. One more try when the connection drops (a

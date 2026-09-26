@@ -165,7 +165,9 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      the reader's hidden print iframe. 26/09/2026: 604 → 589 KB and 777 →
      748 KB once each Reports screen downloaded only its own words
      (translations/report-ui — validate:reports §26); 590 and 756 KB with
-     Phase 5D's executive and control types. */
+     Phase 5D's executive and control types; 598 and 760 KB with 6A's
+     follow-up (tasks under their lines, the tasks card; the two dialogs
+     are their own chunk). */
   "reports/[id]": { chunks: 10, kbytes: 657 },
   "reports/[id]/print": { chunks: 14, kbytes: 832 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
@@ -272,7 +274,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      616 KB once it downloaded only its own words (translations/report-ui) →
      569 KB once the descriptions became their own chunk, loaded beside the
      list behind a skeleton (validate:reports §27) → 572 KB with Phase 5D
-     (the executive and control types, the scheduled drafts' setup). */
+     (the executive and control types, the scheduled drafts' setup) → 575 KB
+     with 6A (two shared icons). */
   "reports": { chunks: 10, kbytes: 681 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },

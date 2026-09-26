@@ -24,6 +24,10 @@ export const reportCommonT: Translations = {
   "err.alreadyDecided": { en: "Someone already decided on this report.", zh: "已有人对此报告作出决定。", ar: "حد تاني خد قرار في التقرير ده خلاص." },
   "err.saveFailed": { en: "Not saved — check your connection. Your text is still here.", zh: "未保存——请检查网络连接。你的内容仍在。", ar: "ما اتحفظش — شوف النت. الكلام اللي كتبته لسه موجود." },
   "err.notInternal": { en: "Reports are for Koleex staff accounts.", zh: "报告仅供科力思员工账户使用。", ar: "التقارير لحسابات موظفين كوليكس بس." },
+  /* 6A: forwarding a report, a task from it. */
+  "err.nobody":           { en: "Pick someone who is not on this report yet.", zh: "请选择还不在这份报告上的人。", ar: "اختار حد لسه مش على التقرير." },
+  "err.tooManyReaders":   { en: "This report has as many readers as it can.", zh: "这份报告的读者已达上限。", ar: "التقرير ده وصل لأقصى عدد قرّاء." },
+  "err.peopleNotAllowed": { en: "From a confidential report, a task goes only to its readers.", zh: "机密报告的任务只能交给它的读者。", ar: "مهمة من تقرير سري تروح بس للي بيقروه." },
 
   /* ── Templates ─────────────────────────────────────────────────────── */
   "tpl.daily.name": { en: "Daily report", zh: "日报", ar: "تقرير يومي" },

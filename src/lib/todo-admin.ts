@@ -12,6 +12,9 @@
      Calendar events  → source="calendar"
      HR lifecycle     → source="manual", source_id="probation:<employee>"
      Koleex AI        → source="manual", metadata.created_via="koleex-ai"
+     Reports (6A)     → source="report", source_id=<report id> — written by
+                        POST /api/work-reports/[id]/tasks, never through here
+                        (/api/todos POST refuses that source)
      Inbox            → notification fan-out on assignment (server-side)
 
    THE BROWSER NO LONGER READS OR WRITES THESE TABLES (2026-08-09). Every

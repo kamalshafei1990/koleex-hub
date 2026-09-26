@@ -21,7 +21,9 @@
    a report written in Chinese reads in Arabic, with the original one click
    away), who it went to and who read it, the review / acknowledge actions
    the server allows THIS viewer, the photos and files (AttachmentsView),
-   and the thread.
+   and the thread. 6A: Follow up — forward it, or make a To-do task from a
+   line (or from scratch); the tasks show under their lines and in their own
+   card. The two dialogs are their own chunk (./FollowUp), loaded on open.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -45,9 +47,12 @@ import { appRulesFor, buildFeedGroups, type AppRecord } from "@/lib/reports/app-
 import { serverMaterial, toSection, writeMaterial, writingLang, type WritingLang } from "@/lib/reports/ai-draft";
 import {
   commentOnReport, decideReport, deleteDraft, dmyDate, dmyTime, fetchCarry, fetchReport, periodLabel, reviseReport, saveDraft, submitReport,
-  type ReportDetail, type ReportPerson, type ReportRecipient,
+  type ReportDetail, type ReportRecipient,
 } from "@/lib/work-reports";
 import { Avatar, Badge, CARD, FIELD, StatusChip, TemplateIcon, tplName, type T } from "./shared";
+import PeopleField from "./PeopleField";
+import type { TaskLine } from "./FollowUp";
+import type { ReportTask } from "@/lib/reports/follow-up";
 import CarryCard from "./CarryCard";
 import AttachmentsEditor from "./AttachmentsEditor";
 import AttachmentsView from "./AttachmentsView";
@@ -566,62 +571,6 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
   );
 }
 
-function PeopleField({ t, label, ids, people, nameOf, onChange, hint }: {
-  t: T; label: string; ids: string[]; people: ReportPerson[]; nameOf: Map<string, ReportPerson>;
-  onChange: (ids: string[]) => void; hint?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const matches = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return people.filter((p) => !ids.includes(p.id) && (!s || p.name.toLowerCase().includes(s) || (p.nameAlt ?? "").toLowerCase().includes(s))).slice(0, 8);
-  }, [people, ids, q]);
-  return (
-    <div>
-      <p className="mb-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {ids.map((pid) => {
-          const p = nameOf.get(pid);
-          return (
-            <span key={pid} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-0.5 ps-0.5 pe-1 text-[12px] text-[var(--text-primary)]">
-              <Avatar person={{ name: p?.name ?? "?", avatar: p?.avatar ?? null }} size={20} />
-              <span className="max-w-[140px] truncate">{p?.name ?? "—"}</span>
-              <button type="button" onClick={() => onChange(ids.filter((x) => x !== pid))} aria-label={`${label}: ${p?.name ?? ""} ×`} className="grid h-5 w-5 place-items-center rounded-full text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-                <RrIcon name="cross" size={9} />
-              </button>
-            </span>
-          );
-        })}
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border-subtle)] px-2.5 py-1 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-          <RrIcon name="plus" size={10} />{t("composer.addPeople")}
-        </button>
-      </div>
-      {hint && ids.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">{hint}</p>}
-      {open && (
-        <div className="mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("composer.searchPeople")} className={`${FIELD} h-8 py-1`} aria-label={t("composer.searchPeople")} />
-          <ul className="mt-1 max-h-56 overflow-y-auto">
-            {matches.length === 0 && <li className="px-2 py-2 text-[12px] text-[var(--text-dim)]">{t("composer.noPeople")}</li>}
-            {matches.map((p) => (
-              <li key={p.id}>
-                <button type="button" onClick={() => { onChange([...ids, p.id]); setQ(""); }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-[12.5px] hover:bg-[var(--bg-surface)]">
-                  <Avatar person={p} size={22} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[var(--text-primary)]">{p.name}</span>
-                    {p.position && <span className="block truncate text-[10.5px] text-[var(--text-dim)]">{p.position}</span>}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ── Reader ────────────────────────────────────────────────────────────── */
 
 /* The house print recipe: the /print route in an off-screen iframe (never
@@ -663,6 +612,23 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState(detail.comments);
   const [problem, setProblem] = useState<string | null>(null);
+  /* 6A: which follow-up dialog is open, and its chunk once it is here. */
+  const [follow, setFollow] = useState<{ kind: "forward" } | { kind: "task"; line: TaskLine | null } | null>(null);
+  const [followMod, setFollowMod] = useState<typeof import("./FollowUp") | null>(null);
+  const openFollow = (f: { kind: "forward" } | { kind: "task"; line: TaskLine | null }) => {
+    setFollow(f);
+    if (!followMod) void import("./FollowUp").then((m) => setFollowMod(() => m)).catch(() => { setFollow(null); setProblem(t("err.generic")); });
+  };
+  /* The tasks made from a line of THIS version, under that line. */
+  const lineTasks = useMemo(() => {
+    const m = new Map<string, ReportTask[]>();
+    for (const task of detail.tasks ?? []) {
+      if (!task.line || task.reportId !== report.id) continue;
+      const k = `${task.line.section}:${task.line.item}`;
+      m.set(k, [...(m.get(k) ?? []), task]);
+    }
+    return m;
+  }, [detail.tasks, report.id]);
 
   const act = async (action: "approve" | "return" | "acknowledge") => {
     setBusy(action); setProblem(null);
@@ -689,7 +655,10 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
   };
 
   const to = recipients.filter((r) => r.role === "to");
-  const cc = recipients.filter((r) => r.role === "cc");
+  const cc = recipients.filter((r) => r.role === "cc" && !r.forwardedBy);
+  const forwarded = recipients.filter((r) => r.role === "cc" && !!r.forwardedBy);
+  const tasks = detail.tasks ?? [];
+  const hiddenTasks = Math.max(0, (detail.taskCount ?? 0) - tasks.length);
   const hasActions = can.decide || can.acknowledge || can.revise;
   /* The photos a block shows in place (Phase 4A) are not listed again. */
   const readerBlockFiles = blockFileIds(report.sections);
@@ -751,7 +720,24 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
                 <p className="text-[13px] text-[var(--text-faint)]">{t("reader.empty")}</p>
               ) : s.kind === "list" ? (
                 <ul className="list-disc space-y-1 ps-5 text-[13.5px] leading-relaxed text-[var(--text-primary)]">
-                  {items.map((item, i) => <li key={i}><AutoTranslatedText text={item} plain /></li>)}
+                  {items.map((item, i) => {
+                    const made = lineTasks.get(`${s.id}:${i}`) ?? [];
+                    return (
+                      <li key={i}>
+                        <div className="flex items-start gap-2">
+                          <span className="min-w-0 flex-1"><AutoTranslatedText text={item} plain /></span>
+                          {can.makeTask && (
+                            <button type="button" onClick={() => openFollow({ kind: "task", line: { section: s.id, item: i, text: item } })}
+                              aria-label={t("follow.taskLine")} title={t("follow.taskLine")}
+                              className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--text-faint)] transition-colors hover:text-[var(--text-primary)]">
+                              <RrIcon name="list-check" size={12} />
+                            </button>
+                          )}
+                        </div>
+                        {made.length > 0 && <div className="mt-1 flex flex-wrap gap-1.5">{made.map((task) => <TaskChip key={task.id} t={t} lang={lang} task={task} />)}</div>}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--text-primary)]"><AutoTranslatedText text={v?.text ?? ""} block /></div>
@@ -761,6 +747,32 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
         })}
 
         <AttachmentsView t={t} attachments={(detail.attachments ?? []).filter((a) => !readerBlockFiles.has(a.id))} />
+
+        {(detail.taskCount ?? 0) > 0 && (
+          <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-tasks">
+            <h2 id="kx-rep-tasks" className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">{t("tasks.title")}</h2>
+            <ul className="space-y-0.5">
+              {tasks.map((task) => (
+                <li key={task.id}>
+                  <Link href={`/todo?task=${task.id}`} data-kx-keep-hover aria-label={`${t("tasks.open")}: ${task.title}`}
+                    className="-mx-2 flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">
+                    <TaskDot task={task} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] leading-snug text-[var(--text-primary)]"><AutoTranslatedText text={task.title} plain /></span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--text-dim)]">
+                        {task.people.length > 0 && <span>{names(task, lang)}</span>}
+                        <span>{t(`task.st.${taskState(task)}`)}</span>
+                        {task.due && <span className="tabular-nums">{dmyDate(task.due)}</span>}
+                        {task.reportId !== report.id && <span>{t("tasks.earlier")}</span>}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {hiddenTasks > 0 && <p className="mt-2 text-[11.5px] text-[var(--text-faint)]">{t("tasks.hidden").replace("{n}", String(hiddenTasks))}</p>}
+          </section>
+        )}
 
         <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-thread">
           <h2 id="kx-rep-thread" className="mb-3 text-[13px] font-semibold text-[var(--text-primary)]">{t("reader.comments")}</h2>
@@ -851,6 +863,7 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
         <div className={`${CARD} space-y-3 p-4`}>
           <RecipientList t={t} label={t("reader.to")} list={to} />
           {cc.length > 0 && <RecipientList t={t} label={t("reader.cc")} list={cc} />}
+          {forwarded.length > 0 && <RecipientList t={t} label={t("reader.forwarded")} list={forwarded} />}
           {report.decidedBy && (
             <p className="border-t border-[var(--border-subtle)] pt-3 text-[12px] text-[var(--text-dim)]">
               {report.status === "approved" ? t("reader.approvedBy") : t("reader.returnedBy")} · <span className="text-[var(--text-primary)]">{report.decidedBy.name}</span> · <span className="tabular-nums">{dmyTime(report.decidedAt)}</span>
@@ -858,10 +871,34 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
           )}
         </div>
 
+        {(can.forward || can.makeTask) && (
+          <div className={`${CARD} space-y-2 p-4`}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">{t("follow.title")}</p>
+            <div className={`grid gap-2 ${can.forward && can.makeTask ? "grid-cols-2" : "grid-cols-1"}`}>
+              {can.makeTask && (
+                <button type="button" onClick={() => openFollow({ kind: "task", line: null })}
+                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] px-2 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <RrIcon name="list-check" size={13} />{t("follow.task")}
+                </button>
+              )}
+              {can.forward && (
+                <button type="button" onClick={() => openFollow({ kind: "forward" })}
+                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] px-2 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <RrIcon name="share" size={13} />{t("follow.forward")}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <button type="button" onClick={() => printReport(report.id, lang)} className={`${CARD} flex w-full items-center justify-center gap-2 p-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}>
           <RrIcon name="print" size={14} />{t("reader.print")}
         </button>
       </aside>
+
+      {follow && followMod && (follow.kind === "forward"
+        ? <followMod.ForwardDialog t={t} detail={detail} onClose={() => setFollow(null)} onDone={onChange} />
+        : <followMod.TaskDialog t={t} lang={lang} detail={detail} line={follow.line} onClose={() => setFollow(null)} onDone={onChange} />)}
     </div>
   );
 }
@@ -872,17 +909,51 @@ function RecipientList({ t, label, list }: { t: T; label: string; list: ReportRe
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">{label}</p>
       <ul className="space-y-2">
         {list.map((r) => (
-          <li key={r.id} className="flex items-center gap-2">
+          <li key={r.id} className="flex items-start gap-2">
             <Avatar person={r} size={24} />
             <div className="min-w-0">
               <p className="truncate text-[12.5px] text-[var(--text-primary)]">{r.name}</p>
               <p className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
                 {r.acknowledgedAt ? `${t("reader.acknowledgedAt")} · ${dmyTime(r.acknowledgedAt)}` : r.readAt ? `${t("reader.readAt")} · ${dmyTime(r.readAt)}` : t("reader.notRead")}
               </p>
+              {/* 6A: who forwarded it to them, when, and their note. */}
+              {r.forwardedBy && (
+                <p className="text-[10.5px] text-[var(--text-faint)] tabular-nums">{t("reader.forwardedBy").replace("{name}", r.forwardedBy.name)}{r.forwardedAt ? ` · ${dmyTime(r.forwardedAt)}` : ""}</p>
+              )}
+              {r.forwardNote && (
+                <div className="mt-1 border-s-2 border-[var(--border-subtle)] ps-2 text-[11.5px] leading-snug text-[var(--text-secondary)]"><AutoTranslatedText text={r.forwardNote} block /></div>
+              )}
             </div>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+/* ── 6A: tasks made from the report ────────────────────────────────────── */
+
+/** A task's state as To-do shows it — waiting for its assigner's approval
+ *  before it counts as done. */
+const taskState = (task: ReportTask) => (task.approval === "pending" ? "pending" : task.status);
+const TASK_DOT: Record<ReturnType<typeof taskState>, string> = {
+  todo: "bg-[var(--text-faint)]", in_progress: "bg-[#567FB2]", blocked: "bg-red-500", pending: "bg-amber-500", done: "bg-emerald-500",
+};
+const names = (task: ReportTask, lang: string) => task.people.map((p) => p.name).join(lang === "ar" ? "، " : ", ");
+
+function TaskDot({ task, className = "mt-1.5" }: { task: ReportTask; className?: string }) {
+  return <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${TASK_DOT[taskState(task)]} ${className}`} />;
+}
+
+/** Under the line a task was made from: who it is for, where it stands. */
+function TaskChip({ t, lang, task }: { t: T; lang: string; task: ReportTask }) {
+  return (
+    <Link href={`/todo?task=${task.id}`} aria-label={`${t("tasks.open")}: ${task.title}`}
+      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-0.5 ps-1.5 pe-2 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+      <TaskDot task={task} className="" />
+      <span className="max-w-[160px] truncate">{names(task, lang) || t("follow.task")}</span>
+      <span className="text-[var(--text-dim)]">· {t(`task.st.${taskState(task)}`)}</span>
+      {task.due && <span className="tabular-nums text-[var(--text-dim)]">· {dmyDate(task.due)}</span>}
+    </Link>
   );
 }
