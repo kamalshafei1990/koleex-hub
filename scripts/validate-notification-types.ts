@@ -38,6 +38,10 @@
      N  the installed app's icon carries the bell's number: set by the Gate and
         the bell (never during view-as), cleared at sign-out, carried by every
         push as the recipient's own count and painted by the service worker
+     O  a device's push belongs to whoever is signed in: sign-out releases it
+        before the session is revoked (bounded), every signed-in open and the
+        settings card re-save an EXISTING subscription for the current account
+        — never a prompt, never a new subscription
 
    The registry is READ AS TEXT, not imported, so the mutation harness can
    hand this guard an edited copy without touching the real file (the tree is
@@ -611,6 +615,37 @@ check("the service worker paints it on every push, and keeps the halves the open
   /event\.waitUntil\(Promise\.all\(\[showPush\(payload\), badgeFromPush\(payload\)\]\)\)/.test(sw)
   && /if \(typeof payload\.unread === "number"\) parts\.inbox = payload\.unread;/.test(sw)
   && /d\.type !== "kx-icon-badge"/.test(sw));
+
+/* ── O: a device's push belongs to whoever is signed in ─────────────── */
+console.log("\nO. a device's push belongs to whoever is signed in");
+/* 26/09/2026: the owner's iPhone, enabled while signed in as another user,
+   kept receiving THAT user's notifications after he signed back in as
+   himself — the server gives a push endpoint to whoever saved it last, and
+   the settings card only asked the phone. */
+const pushClient = fileSrc("src/lib/push-client.ts");
+const fnBody = (src: string, name: string) => {
+  const i = src.indexOf(`export async function ${name}`);
+  return i < 0 ? "" : src.slice(i, src.indexOf("\n}\n", i));
+};
+const resync = fnBody(pushClient, "resyncPushSubscription");
+check("re-saving never prompts and never creates a subscription — only an existing one, permission already granted",
+  !!resync && !/requestPermission\(|pushManager\.subscribe\(/.test(resync) && /permissionState\(\) !== "granted"/.test(resync) && /getSubscription\(\)/.test(resync));
+const release = fnBody(pushClient, "releasePushOnSignOut");
+check("releasing on sign-out is bounded — it can never hold a sign-out up", /within\(unsubscribeCurrent\(\),\s*\d+\)/.test(release));
+/* Both sign-out paths release the device BEFORE the session is revoked. */
+const menu = fileSrc("src/components/layout/UserMenu.tsx");
+const menuOut = menu.slice(menu.indexOf("const handleSignOut"), menu.indexOf("}, [", menu.indexOf("const handleSignOut")));
+const home = fileSrc("src/app/page.tsx");
+const homeOut = home.lastIndexOf('fetch("/api/auth/signout"');
+const outOrder = [
+  ["UserMenu", menuOut.indexOf("releasePushOnSignOut"), menuOut.indexOf('fetch("/api/auth/signout"')],
+  ["Home (rejected session)", home.slice(Math.max(0, homeOut - 700), homeOut).indexOf("releasePushOnSignOut"), 700],
+].filter(([, rel, out]) => (rel as number) < 0 || (out as number) < 0 || (rel as number) > (out as number)).map(([n]) => n);
+check("every sign-out releases the device before it revokes the session", outOrder.length === 0, outOrder.join(", "));
+const registrar = fileSrc("src/components/pwa/ServiceWorkerRegistrar.tsx");
+const card = fileSrc("src/components/settings/tabs/NotificationsTab.tsx");
+check("every signed-in open, and the settings card, re-save the device for whoever is signed in",
+  /resyncPushSubscription\(accountId\)/.test(registrar) && /useCurrentAccountId\(\)/.test(registrar) && /resyncPushSubscription\(getCurrentAccountIdSync\(\)\)/.test(card));
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} notification-types: ${passed} passed, ${failed} failed (${entries.size} types registered)`);
 process.exit(failed === 0 ? 0 : 1);

@@ -1829,6 +1829,11 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
             <button
               type="button"
               onClick={async () => {
+                /* This device's push goes with the session (lib/push-client). */
+                try {
+                  const { releasePushOnSignOut } = await import("@/lib/push-client");
+                  await releasePushOnSignOut();
+                } catch { /* never blocks sign-out */ }
                 try {
                   await fetch("/api/auth/signout", { method: "POST", keepalive: true });
                 } catch {

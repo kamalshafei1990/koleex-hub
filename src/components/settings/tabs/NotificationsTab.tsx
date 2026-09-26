@@ -13,11 +13,11 @@ import { withDefaults } from "@/lib/access-control";
 import type { NotificationPrefs } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { SettingsCard, SwitchRow, Chevron } from "./ui";
-import { isPushSupported, isIosNeedsInstall, permissionState, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
+import { isPushSupported, isIosNeedsInstall, permissionState, resyncPushSubscription, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
 import type { QuietHoursPref } from "@/lib/access-control";
 import { inQuietHours } from "@/lib/notification-activity";
 import { fetchMyChannels, setChannelMuted } from "@/lib/discuss";
-import { useCurrentAccount } from "@/lib/identity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import type { DiscussChannelWithState } from "@/types/supabase";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -92,7 +92,11 @@ function PushEnableCard() {
         if ("serviceWorker" in navigator) {
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
-          setSubscribed(!!sub && permissionState() === "granted");
+          const on = !!sub && permissionState() === "granted";
+          setSubscribed(on);
+          /* "On" here must mean on for THIS account: re-save the device's
+             subscription for whoever is signed in (lib/push-client). */
+          if (on) void resyncPushSubscription(getCurrentAccountIdSync());
         }
       } catch { /* ignore */ }
     })();

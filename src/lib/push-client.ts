@@ -92,6 +92,58 @@ export async function subscribeToPush(deviceName?: string): Promise<{ ok: boolea
   return { ok: true };
 }
 
+/* ── Whose device is this? ─────────────────────────────────────────────────
+   The server keeps one row per push endpoint and gives it to the account
+   that last saved it. The endpoint belongs to the DEVICE, not the person —
+   so after one person signs out and another signs in, the row still named
+   the first: the second got nothing, and the first person's notifications
+   kept landing on this phone (26/09/2026: the owner's iPhone, enabled while
+   signed in as another user, stayed theirs after he signed back in as
+   himself; the settings card said "on" because it only asked the phone).
+   Two rules close it: sign-out releases the device (releasePushOnSignOut),
+   and every signed-in open re-saves an EXISTING subscription for whoever is
+   signed in now (resyncPushSubscription) — never a prompt, never a new
+   subscription; turning push on stays the user's own tap. */
+const SYNCED_KEY = "kx-push-synced";
+
+/** Resolves to the promise's value, or null once `ms` pass — for calls that
+ *  must never hold the UI (serviceWorker.ready never settles without a SW). */
+function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
+
+/** Re-save this device's existing subscription for `accountId`. Only when the
+ *  permission is already granted and a subscription already exists; one
+ *  request per (account, endpoint) pair — remembered locally. */
+export async function resyncPushSubscription(accountId: string | null): Promise<void> {
+  try {
+    if (!accountId || !VAPID_PUBLIC || !isPushSupported() || permissionState() !== "granted") return;
+    const reg = await within(navigator.serviceWorker.ready, 4000);
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (!sub) return;
+    const pair = `${accountId}|${sub.endpoint}`;
+    try { if (localStorage.getItem(SYNCED_KEY) === pair) return; } catch { /* no storage: just re-save */ }
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON(), deviceId: getDeviceId() }),
+    });
+    if (res.ok) try { localStorage.setItem(SYNCED_KEY, pair); } catch { /* ignore */ }
+  } catch { /* best effort — the next open tries again */ }
+}
+
+/** Sign-out: this device stops receiving this account's notifications. The
+ *  server row first (the session is still valid), then the subscription
+ *  itself — even if the server call fails, a dropped subscription cannot be
+ *  delivered to (the push service answers 410 and web-push retires the row).
+ *  Bounded, so it can never hold a sign-out up. */
+export async function releasePushOnSignOut(): Promise<void> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  await within(unsubscribeCurrent(), 2500);
+  try { localStorage.removeItem(SYNCED_KEY); } catch { /* ignore */ }
+}
+
 /** Unsubscribe this device locally + mark inactive on the server. */
 export async function unsubscribeCurrent(): Promise<void> {
   try {

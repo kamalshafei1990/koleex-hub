@@ -138,6 +138,13 @@ export default function UserMenu({ dk }: { dk: boolean }) {
        sign-out proceeds whether or not it answers — a cleanup that can
        strand the user when the network hiccups is worse than the bug it
        fixes. `keepalive` carries it across the navigation below. */
+    /* This device stops receiving this account's notifications — BEFORE the
+       session is revoked, so the server still knows whose row to retire
+       (lib/push-client: the next person on this phone must not get them). */
+    try {
+      const { releasePushOnSignOut } = await import("@/lib/push-client");
+      await releasePushOnSignOut();
+    } catch { /* never blocks sign-out */ }
     try {
       await fetch("/api/auth/signout", { method: "POST", keepalive: true });
     } catch {
