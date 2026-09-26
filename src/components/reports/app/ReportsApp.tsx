@@ -33,11 +33,11 @@ import { reportHomeT } from "@/lib/translations/report-ui/home";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import SharedKpiCard from "@/components/ui/KpiCard";
-import RrIcon from "@/components/ui/RrIcon";
+import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ReportsIcon from "@/components/icons/ReportsIcon";
 import { useServerList } from "@/lib/hooks/useServerList";
-import { REPORT_FAMILIES, periodFor } from "@/lib/reports/templates";
+import { REPORT_FAMILIES, periodFor, type ReportFamily } from "@/lib/reports/templates";
 import { FAMILY_GROUPS, REPORT_HEADS, reportHead } from "@/lib/reports/catalog-heads";
 import { headWords, isCustomKey } from "@/lib/reports/template-words";
 import { createReport, dmyDate, dmyTime, fetchReportsBundle, localToday, periodLabel, type ReportListRow, type ReportsBundle } from "@/lib/work-reports";
@@ -250,11 +250,15 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
     <div className="space-y-4">
     {due.length > 0 && <DueCard t={t} due={due} creating={creating} onStart={onStart} />}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-      <section className={`${CARD} p-4 sm:p-5`} aria-labelledby="kx-rep-write" aria-busy={!ready && !failed}>
-        <h2 id="kx-rep-write" className="mb-3 text-[14px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
-        {createError && <p className="mb-3 text-[12.5px] text-red-400">{createError}</p>}
-        {!ready ? (failed ? <p className="text-[12.5px] text-[var(--text-dim)]">{t("err.generic")}</p> : <WriteSkeleton />) : (
-        <div className="space-y-4">
+      {/* Each family its own card (owner, 27/09/2026: "just separate them
+          clearly" — it read as one endless section, 156 types in one card).
+          The heading names the whole column; a family card names itself,
+          with its own icon and how many of its types this person may start. */}
+      <section className="min-w-0 space-y-3" aria-labelledby="kx-rep-write" aria-busy={!ready && !failed}>
+        <h2 id="kx-rep-write" className="px-1 text-[15px] font-semibold text-[var(--text-primary)]">{t("home.write")}</h2>
+        {createError && <p className="px-1 text-[12.5px] text-red-400">{createError}</p>}
+        {!ready ? (failed ? <div className={`${CARD} p-5 text-[12.5px] text-[var(--text-dim)]`}>{t("err.generic")}</div> : <WriteSkeleton />) : (
+        <>
           {REPORT_FAMILIES.map((fam) => {
             const items = offered.filter((x) => x.family === fam);
             if (!items.length) return null;
@@ -265,12 +269,18 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
               ? [...order.map((g) => ({ g, list: items.filter((x) => x.group === g) })), { g: "", list: items.filter((x) => !x.group || !order.includes(x.group)) }].filter((p) => p.list.length)
               : [{ g: "", list: items }];
             return (
-              <div key={fam}>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">{t(`family.${fam}`)}</p>
+              <section key={fam} className={`${CARD} p-4 sm:p-5`} aria-labelledby={`kx-rep-fam-${fam}`}>
+                <div className="mb-3 flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                    <RrIcon name={FAMILY_ICON[fam]} size={15} />
+                  </span>
+                  <h3 id={`kx-rep-fam-${fam}`} className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--text-primary)]">{t(`family.${fam}`)}</h3>
+                  <span className="shrink-0 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-dim)]">{items.length}</span>
+                </div>
                 <div className="space-y-3">
                 {parts.map((part) => (
                 <div key={part.g || "rest"}>
-                {part.g && <p className="mb-1.5 text-[11.5px] font-medium text-[var(--text-faint)]">{t(`grp.${fam}.${part.g}`)}</p>}
+                {part.g && <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)]">{t(`grp.${fam}.${part.g}`)}</p>}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {part.list.map((tpl) => (
                     <button
@@ -293,14 +303,16 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
                 </div>
                 ))}
                 </div>
-              </div>
+              </section>
             );
           })}
-        </div>
+        </>
         )}
       </section>
 
-      <section className={`${CARD} p-2 sm:p-3`} aria-labelledby="kx-rep-latest">
+      {/* Its own height, and in view while the family cards scroll by — a
+          grid item stretches to its row, and the row is the whole column. */}
+      <section className={`${CARD} p-2 sm:p-3 xl:sticky xl:top-4 xl:self-start`} aria-labelledby="kx-rep-latest">
         <div className="flex items-center justify-between px-2 pt-1 pb-2">
           <h2 id="kx-rep-latest" className="text-[14px] font-semibold text-[var(--text-primary)]">{t("home.latest")}</h2>
           <button type="button" onClick={onOpenInbox} className="text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("home.viewAll")}</button>
@@ -320,28 +332,43 @@ function Home({ t, lang, bundle, ready, failed, creating, createError, onStart, 
   );
 }
 
-/** "Write a report" while the list of types is on its way: the grid's own
- *  shape — a family's heading, then cards of an icon and two lines — so the
- *  real one lands where the skeleton stood. Hidden from screen readers (the
- *  section says it is busy). */
+/** Each family's icon on its card (RrIcon, the house set). */
+const FAMILY_ICON: Record<ReportFamily, RrIconName> = {
+  work: "briefcase", team: "users", office: "building", executive: "bullseye-arrow", visits: "handshake", sales: "money",
+  marketing: "megaphone", suppliers: "box-open", quality: "badge-check", logistics: "shipping-fast", service: "tools",
+  travel: "plane-departure", memos: "document", hr: "id-badge", projects: "clipboard", inventory: "pallet", finance: "calculator",
+  compliance: "shield-check",
+};
+
+/** "Write a report" while the list of types is on its way: the real shape —
+ *  family cards, each a heading row, then cards of an icon and two lines —
+ *  so the real ones land where the skeleton stood. Hidden from screen
+ *  readers (the section says it is busy). */
 function WriteSkeleton() {
   const bar = "block rounded bg-[var(--bg-surface-subtle)] motion-safe:animate-pulse";
   return (
-    <div aria-hidden>
-      <span className={`${bar} mb-2 h-2.5 w-16`} />
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-3">
+    <>
+      {[6, 4].map((n, c) => (
+        <div key={c} aria-hidden className={`${CARD} p-4 sm:p-5`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <span className="h-8 w-8 shrink-0 rounded-lg bg-[var(--bg-surface-subtle)] motion-safe:animate-pulse" />
-            <span className="min-w-0 flex-1 space-y-1.5 pt-0.5">
-              <span className={`${bar} h-3`} style={{ width: `${58 - (i % 3) * 9}%` }} />
-              <span className={`${bar} h-2.5 w-[88%]`} />
-              <span className={`${bar} h-2.5 w-3/5`} />
-            </span>
+            <span className={`${bar} h-3.5 w-28`} />
           </div>
-        ))}
-      </div>
-    </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {Array.from({ length: n }, (_, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-3">
+                <span className="h-8 w-8 shrink-0 rounded-lg bg-[var(--bg-surface-subtle)] motion-safe:animate-pulse" />
+                <span className="min-w-0 flex-1 space-y-1.5 pt-0.5">
+                  <span className={`${bar} h-3`} style={{ width: `${58 - (i % 3) * 9}%` }} />
+                  <span className={`${bar} h-2.5 w-[88%]`} />
+                  <span className={`${bar} h-2.5 w-3/5`} />
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 

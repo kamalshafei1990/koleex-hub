@@ -2655,8 +2655,9 @@ console.log("\n§27 the home's descriptions load beside the list, behind a skele
   rule("a failed load is cards without their lines — never a skeleton for good", HOME,
     (c) => (c.includes("loadDescs().then((d) => { if (!cancelled) setDescs(d); }, () => { if (!cancelled) setDescs({}); });") ? [] : ["one lost chunk leaves the grid a skeleton forever"]),
     (src) => src.replace(", () => { if (!cancelled) setDescs({}); });", ");"));
-  rule("the skeleton is the grid's own shape, hidden from screen readers, the section marked busy", HOME,
-    (c) => (/function WriteSkeleton\(\)[\s\S]*?<div aria-hidden>[\s\S]*?grid grid-cols-1 gap-2 sm:grid-cols-2[\s\S]*?h-8 w-8 shrink-0 rounded-lg/.test(c) && c.includes('aria-busy={!ready && !failed}') ? [] : ["the skeleton does not look like what replaces it"]),
+  rule("the skeleton is the family cards' own shape (27/09: one card per family), hidden from screen readers, the section marked busy", HOME,
+    (c) => (/function WriteSkeleton\(\)[\s\S]*?aria-hidden className=\{`\$\{CARD\} p-4 sm:p-5`\}[\s\S]*?mb-3 flex items-center gap-2\.5[\s\S]*?grid grid-cols-1 gap-2 sm:grid-cols-2[\s\S]*?h-8 w-8 shrink-0 rounded-lg/.test(c)
+      && /<section key=\{fam\} className=\{`\$\{CARD\} p-4 sm:p-5`\} aria-labelledby=\{`kx-rep-fam-\$\{fam\}`\}>/.test(c) && c.includes('aria-busy={!ready && !failed}') ? [] : ["the skeleton does not look like what replaces it"]),
     (src) => src.replace(" aria-busy={!ready && !failed}", ""));
   rule("the builder carries the built-ins' descriptions itself (the home loads them after its first paint)", "src/components/reports/app/TemplatesTab.tsx",
     (c) => (c.includes("?? reportComposerT[key] ?? reportDescsT[key];") ? [] : ["the builder's list shows types without their lines until the home's chunk arrives"]),
