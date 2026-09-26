@@ -75,10 +75,18 @@ export interface ListActions<R extends ListRow> {
    needs its reason cannot be sent without one. The bar never lets a click
    or a keystroke through to the row it sits in. */
 export function DecisionBar({
-  meta, tUi, onDecided, large = false,
-}: { meta: unknown; tUi: TFn; onDecided: (verdict: Verdict) => void; large?: boolean }) {
+  meta, tUi, onDecided, large = false, look = "row", onModeChange,
+}: {
+  meta: unknown; tUi: TFn; onDecided: (verdict: Verdict) => void; large?: boolean;
+  /** "card": the pop-up card's buttons — the Hub's primary (solid inverted)
+   *  and danger (red tint) — instead of the bell row's tinted pair. */
+  look?: "row" | "card";
+  /** Told when a decision starts or is cancelled, so a card can hold its timer. */
+  onModeChange?: (deciding: boolean) => void;
+}) {
   const spec = decisionOf(meta);
-  const [mode, setMode] = useState<Verdict | null>(null);
+  const [mode, setModeState] = useState<Verdict | null>(null);
+  const setMode = (m: Verdict | null) => { setModeState(m); onModeChange?.(m !== null); };
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -87,7 +95,17 @@ export function DecisionBar({
   const rejectLabel = spec.rejectWord === "return" ? tUi("dec.return") : tUi("mod.reject");
   const needsReason = mode === "reject" && spec.reasonRequired;
   const reasonOk = !needsReason || note.trim().length >= Math.max(1, spec.reasonMin);
-  const h = large ? "h-8 px-3 text-[11.5px]" : "h-7 px-2.5 text-[11px]";
+  const h = look === "card" ? "h-[30px] px-3 text-[12px] rounded-[10px]" : large ? "h-8 px-3 text-[11.5px]" : "h-7 px-2.5 text-[11px]";
+  const card = look === "card";
+  /* The card's pair, in the Hub's own button language (kds Button): the
+     primary is the inverted solid (Aurora adds its Hub-Blue halo on hover),
+     the refusal is the danger tint. */
+  const approveCls = card
+    ? "justify-center bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:opacity-90"
+    : "rounded-lg border border-emerald-500/30 bg-emerald-500/12 font-semibold text-emerald-500 hover:bg-emerald-500/20";
+  const rejectCls = card
+    ? "justify-center border border-red-500/30 bg-red-500/15 font-medium text-red-500 hover:bg-red-500/25"
+    : "rounded-lg border border-red-500/30 bg-red-500/10 font-semibold text-red-500 hover:bg-red-500/20";
   async function confirm() {
     if (!mode) return;
     if (!reasonOk) { setErr(tUi("dec.reasonShort")); return; }
@@ -104,24 +122,24 @@ export function DecisionBar({
     );
   }
   return (
-    <div className="mt-2" onClick={stop} onKeyDown={stop}>
+    <div className={card ? "mt-2.5" : "mt-2"} onClick={stop} onKeyDown={stop}>
       {!mode ? (
         <div className="flex flex-wrap gap-1.5">
           <button type="button" data-kx-keep-hover onClick={() => { setMode("approve"); setNote(""); setErr(null); }}
-            className={`flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/12 font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20 ${h}`}>
-            <CheckCircleIcon className="h-3 w-3" />
+            className={`flex items-center gap-1.5 transition-colors ${approveCls} ${h}`}>
+            <CheckCircleIcon className={card ? "h-3.5 w-3.5" : "h-3 w-3"} />
             {spec.single === "handled" ? tUi("dec.handled") : tUi("mod.approve")}
           </button>
           {!spec.single && (
             <button type="button" data-kx-keep-hover onClick={() => { setMode("reject"); setNote(""); setErr(null); }}
-              className={`flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 font-semibold text-red-500 transition-colors hover:bg-red-500/20 ${h}`}>
-              <XCircleIcon className="h-3 w-3" />
+              className={`flex items-center gap-1.5 transition-colors ${rejectCls} ${h}`}>
+              <XCircleIcon className={card ? "h-3.5 w-3.5" : "h-3 w-3"} />
               {rejectLabel}
             </button>
           )}
         </div>
       ) : (
-        <div className={`space-y-1.5 rounded-lg border p-2 ${mode === "approve" ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-red-500/25 bg-red-500/[0.05]"}`}>
+        <div className={card ? "space-y-1.5" : `space-y-1.5 rounded-lg border p-2 ${mode === "approve" ? "border-emerald-500/25 bg-emerald-500/[0.05]" : "border-red-500/25 bg-red-500/[0.05]"}`}>
           {spec.takesNote && (
             <textarea
               value={note}
@@ -129,20 +147,22 @@ export function DecisionBar({
               rows={2}
               autoFocus
               placeholder={needsReason ? tUi("mod.reasonPh") : tUi("mod.notePh")}
-              className="w-full resize-none rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+              className={`w-full resize-none border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)] ${card ? "rounded-[10px]" : "rounded-md"}`}
             />
           )}
           {err && <p role="alert" className="text-[11px] font-medium text-red-500">{err}</p>}
           <div className="flex items-center justify-end gap-1.5">
             <button type="button" data-kx-keep-hover onClick={() => { setMode(null); setErr(null); }}
-              className={`whitespace-nowrap rounded-lg font-semibold text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)] ${h}`}>
+              className={`whitespace-nowrap text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)] ${card ? "font-medium hover:bg-[var(--bg-surface)]" : "rounded-lg font-semibold"} ${h}`}>
               {tUi("mod.cancel")}
             </button>
             <button type="button" data-kx-keep-hover onClick={() => void confirm()} disabled={busy || !reasonOk}
-              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border font-semibold transition-colors disabled:opacity-40 ${h} ${
-                mode === "approve"
-                  ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
-                  : "border-red-500/40 bg-red-500/15 text-red-500 hover:bg-red-500/25"
+              className={`flex items-center gap-1.5 whitespace-nowrap transition-colors disabled:opacity-40 ${h} ${
+                card
+                  ? mode === "approve" ? approveCls : rejectCls
+                  : `rounded-lg border font-semibold ${mode === "approve"
+                    ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
+                    : "border-red-500/40 bg-red-500/15 text-red-500 hover:bg-red-500/25"}`
               }`}>
               {mode === "approve" ? <CheckCircleIcon className="h-3 w-3" /> : <XCircleIcon className="h-3 w-3" />}
               {mode === "approve"

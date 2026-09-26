@@ -4061,15 +4061,33 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   .kx-pop-arrive, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
 }
 
-/* ── Notification card time line (components/layout/NotificationCards) ──
-   The thin Hub-Blue line under a pop-up card: how long it stays. DISPLAY
-   ONLY — the card's own timer (JS) decides when it goes, because
-   .kx-reduce-motion collapses every animation to 0.001ms: a card timed by
-   animationend would vanish the instant it arrived. Under reduced motion
-   the line is simply gone; the card still waits its full time. */
-@keyframes kx-card-time {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
+/* ── Notification card arrival (design D, owner 26/09) ──────────────────
+   The card drops out of the bell's corner on a soft spring, then its parts
+   settle in order — the app line, the person, the words, the actions — so
+   the eye reads it top to bottom as it lands. `backwards`, never `both`
+   (a kept transform makes the card a containing block). The stack's
+   reflow and the flight back into the bell are the component's own
+   (Web Animations), skipped under reduced motion. */
+@keyframes kx-ncard-in {
+  from { opacity: 0; transform: translate(10px, -18px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes kx-ncard-part {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes kx-ncard-pop {
+  from { opacity: 0; transform: scale(0.55); }
+  to   { opacity: 1; transform: none; }
+}
+.kx-ncard-in {
+  animation: kx-ncard-in 460ms cubic-bezier(0.34, 1.26, 0.5, 1) backwards;
+  transform-origin: calc(100% - 24px) -40px;
+}
+.kx-ncard-part { animation: kx-ncard-part 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.kx-ncard-pop { animation: kx-ncard-pop 420ms cubic-bezier(0.34, 1.26, 0.5, 1) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-ncard-in, .kx-ncard-part, .kx-ncard-pop { animation: none !important; }
 }
 
 /* Low-power tier: the DECORATIVE infinite loops pause (they were running

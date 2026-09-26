@@ -83,6 +83,11 @@ export const notifUiT: Translations = {
   "card.more":      { en: "+{n} more notifications", zh: "另有 {n} 条新通知", ar: "+{n} إشعارات أخرى" },
   "card.moreSub":   { en: "Open notifications", zh: "打开通知", ar: "افتح الإشعارات" },
   "card.close":     { en: "Close",          zh: "关闭",       ar: "إغلاق" },
+  "card.replyPh":   { en: "Write a reply…", zh: "写回复…",     ar: "اكتب ردًا…" },
+  "card.send":      { en: "Send",           zh: "发送",       ar: "إرسال" },
+  "card.sent":      { en: "Sent",           zh: "已发送",     ar: "تم الإرسال" },
+  "card.sendFailed": { en: "Couldn't send. Try again.", zh: "发送失败，请重试。", ar: "تعذّر الإرسال. حاول مرة أخرى." },
+  "card.openChat":  { en: "Open chat",      zh: "打开对话",   ar: "فتح المحادثة" },
 
   /* The desktop app's system notification for a burst (lib/desktop-toast). */
   "toast.many":     { en: "{n} new notifications", zh: "{n} 条新通知", ar: "إشعارات جديدة: {n}" },

@@ -345,6 +345,36 @@ export default function FloatingPanel() {
     setLoadingMsgs(false);
   }, []);
 
+  /* ── Open a conversation from a notification card (26/09/2026) ──
+     A Discuss card's "Open chat" brings this panel up on that conversation,
+     over the page the reader is on — nothing unsaved is left behind (owner:
+     "he will move to another app … and he will lose the data"). The card
+     sets `handled` only when a panel answers; otherwise it falls back to the
+     Discuss app. Never on Discuss itself, where the panel stands down. */
+  const channelsRef = useRef(channels);
+  useEffect(() => { channelsRef.current = channels; });
+  useEffect(() => {
+    if (!showDiscuss) return;
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent<{ channelId?: string; handled?: boolean }>).detail;
+      if (!d?.channelId) return;
+      d.handled = true;
+      setTab("discuss");
+      setOpen(true);
+      const known = channelsRef.current.find((c) => c.id === d.channelId);
+      if (known) { void openChannel(known); return; }
+      const aid = accountIdRef.current;
+      if (!aid) return;
+      void fetchMyChannels(aid).then((rows) => {
+        setChannels(rows);
+        const ch = rows.find((c) => c.id === d.channelId);
+        if (ch) void openChannel(ch);
+      }).catch(() => { /* the panel is open on the list — the reader picks it */ });
+    };
+    window.addEventListener("koleex:discuss-open", handler as EventListener);
+    return () => window.removeEventListener("koleex:discuss-open", handler as EventListener);
+  }, [showDiscuss, openChannel]);
+
   /* ── Realtime messages for active channel ── */
   useEffect(() => {
     if (!activeChannel) return;

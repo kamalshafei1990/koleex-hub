@@ -759,22 +759,52 @@ check("a Discuss card follows the conversation's setting, and never shows on Dis
 check("at most three cards; the rest fold into \"+N more\", which opens the bell",
   /export const CARD_MAX = 3;/.test(cardsSrc) && /cards: next\.slice\(0, CARD_MAX\), more: s\.more \+ Math\.max\(0, next\.length - CARD_MAX\)/.test(cardFn)
   && /onMore=\{\(\) => \{ setCardStack\(NO_CARDS\); setOpen\(true\); \}\}/.test(bellT));
-check("clicking opens it (marked read); ✕ or time running out only takes it off the screen",
-  /onOpen=\{\(c\) => \(c\.kind === "inbox" \? void handleInboxRowClick\(c\.row\) : handleDiscussRowClick\(c\.channelId\)\)\}/.test(bellT)
-  && /onDismiss=\{\(key\) => setCardStack\(\(s\) => \(\{ \.\.\.s, cards: s\.cards\.filter\(\(x\) => x\.key !== key\) \}\)\)\}/.test(bellT)
-  && /onClick=\{\(\) => leave\(onOpen\)\}/.test(cardsSrc) && /onClick=\{\(e\) => \{ e\.stopPropagation\(\); leave\(\); \}\}/.test(cardsSrc));
-check("the card keeps its own time (reduce motion collapses animations) and holds while pointed at or focused",
-  !/onAnimationEnd/.test(cardsSrc) && /window\.setTimeout\([\s\S]{0,120}left\.current\)/.test(cardsSrc)
+/* Design D (owner, 26/09): act on the card, on the page you are on — a
+   reply, a decision — so a message never pulls you off unsaved work. */
+check("acting happens on the card: a Discuss reply, the bell's own decision, and Open as the only way out",
+  /<DecisionBar look="card" meta=\{meta\} tUi=\{tUi\} onModeChange=\{ctl\.setBusy\}/.test(cardsSrc)
+  && /onSend=\{\(text\) => onReply\(c, text\)\}/.test(cardsSrc) && /onOpenChat=\{\(\) => onOpenChat\(c\.channelId\)\}/.test(cardsSrc)
+  && /onOpen=\{\(c\) => void handleInboxRowClick\(c\.row\)\}/.test(bellT) && /onDecided=\{\(c, v\) => listActions\.onDecided\?\.\(c\.row, v\)\}/.test(bellT)
+  && !/role="button"/.test(cardsSrc));
+const panelSrc = fileSrc("src/components/layout/FloatingPanel.tsx");
+const replyFn = bellT.slice(bellT.indexOf("async function replyInPlace"), bellT.indexOf("\n  }\n", bellT.indexOf("async function replyInPlace")));
+check("a Discuss card answers in place: the reply is sent from it, and \"Open chat\" opens the floating panel over the page",
+  /await sendDiscussMessage\(\{ channelId: c\.channelId, authorId: aid, body: text/.test(replyFn)
+  && replyFn.indexOf("if (!saved) return false;") > 0 && replyFn.indexOf("if (!saved) return false;") < replyFn.indexOf("markChannelRead(")
+  && /window\.dispatchEvent\(new CustomEvent\("koleex:discuss-open", \{ detail \}\)\);\s*if \(!detail\.handled\) handleDiscussRowClick\(channelId\);/.test(bellT)
+  && /addEventListener\("koleex:discuss-open"/.test(panelSrc) && /d\.handled = true;\s*setTab\("discuss"\);\s*setOpen\(true\);/.test(panelSrc));
+check("✕, Escape or time running out send it home into the bell, still unread; replied or decided, it slides away",
+  /onClick=\{toBell\}/.test(cardsSrc) && /if \(e\.key === "Escape"\) \{ e\.preventDefault\(\); toBell\(\); \}/.test(cardsSrc)
+  && /window\.setTimeout\(\(\) => toBellRef\.current\(\), left\.current\)/.test(cardsSrc)
+  && /const finish = \(\) => \{ cb\.current\.onGone\(\); cb\.current\.onReturned\(\); \};/.test(cardsSrc)
+  && /onGone=\{\(key\) => setCardStack\(\(s\) => \(\{ \.\.\.s, cards: s\.cards\.filter\(\(x\) => x\.key !== key\) \}\)\)\}/.test(bellT)
+  && /done: \(word\) => \{ setDoneWord\(word\); window\.setTimeout\(slideAway, 1100\); \}/.test(cardsSrc));
+check("the card keeps its own time and holds while pointed at, focused, or mid reply or decision",
+  !/onAnimationEnd/.test(cardsSrc) && /const running = !held && !busy && doneWord === null;/.test(cardsSrc)
   && /onPointerEnter=\{\(\) => setHeld\(true\)\}/.test(cardsSrc) && /onFocus=\{\(\) => setHeld\(true\)\}/.test(cardsSrc)
-  && /CARD_MS = \{ action: 12_000, other: 6_000/.test(cardsSrc) && /@keyframes kx-card-time/.test(fs.readFileSync(R("src/app/globals.css"), "utf8")));
-check("both skins: the bell panel's own material, portalled with its own kx-app scope",
-  /className=\{`kx-app kx-glass-pop kx-pop-panel kx-pop-clear /.test(cardsSrc) && /createPortal\(/.test(cardsSrc) && /document\.body,/.test(cardsSrc));
+  && /ctl\.setBusy\(e\.target\.value\.trim\(\)\.length > 0\)/.test(cardsSrc)
+  && /CARD_MS = \{ action: 12_000, other: 6_000/.test(cardsSrc));
+const globalsT = fs.readFileSync(R("src/app/globals.css"), "utf8");
+const animCalls = [...cardsSrc.matchAll(/\.animate\(/g)].length;
+check("motion — out of the bell, the stack gliding, the flight home — and none of it under reduced motion",
+  /@keyframes kx-ncard-in/.test(globalsT) && /\.kx-ncard-in, \.kx-ncard-part, \.kx-ncard-pop \{ animation: none !important; \}/.test(globalsT)
+  && /document\.documentElement\.classList\.contains\("kx-reduce-motion"\)/.test(cardsSrc) && /prefers-reduced-motion: reduce/.test(cardsSrc)
+  && animCalls === 3 && /if \(!lessMotion\(\)\) \{\s*for \(const \[k, top\] of next\)/.test(cardsSrc)
+  && /if \(!el \|\| !bell \|\| lessMotion\(\)\) \{ finish\(\); return; \}/.test(cardsSrc) && /if \(!el \|\| lessMotion\(\)\) \{ cb\.current\.onGone\(\); return; \}/.test(cardsSrc)
+  && /function nudgeBell\(\) \{\s*if \(lessMotion\(\)\) return;/.test(bellT), `${animCalls} animate() calls`);
+const blueLines = cardsSrc.split("\n").filter((l) => /#567FB2/.test(l));
+check("both skins: the bell panel's own material, portalled; Hub Blue only under Aurora — Core stays black and white",
+  /className="kx-app kx-glass-pop kx-pop-panel kx-pop-clear kx-ncard-in /.test(cardsSrc) && /createPortal\(/.test(cardsSrc) && /document\.body,/.test(cardsSrc)
+  && blueLines.length >= 3 && blueLines.every((l) => /aurora \?/.test(l)), blueLines.filter((l) => !/aurora \?/.test(l)).map((l) => l.trim().slice(0, 60)).join(" | "));
+check("the app line names the app with its own icon",
+  /app=\{\{ name: app \? tHub\(app\.tKey, app\.name\) : tHub\("notif\.title"\), icon: appId \? <AppIcon appId=\{appId\} \/>/.test(cardsSrc)
+  && /<span className="truncate font-medium text-\[var\(--text-muted\)\]">\{app\.name\}<\/span>/.test(cardsSrc));
 check("opening the panel, or another account, clears them",
   /if \(opened \|\| accountChanged\) setCardStack\(NO_CARDS\);/.test(bellT));
 const tabSrc = fileSrc("src/components/settings/tabs/NotificationsTab.tsx");
 const acSrc = fileSrc("src/lib/access-control.ts");
 const setWords = fileSrc("src/lib/translations/settings.ts");
-const missingCardWords = ["card.more", "card.moreSub", "card.close"].filter((k) => !new RegExp(`"${k.replace(".", "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(fileSrc("src/lib/translations/notif-ui.ts")))
+const missingCardWords = ["card.more", "card.moreSub", "card.close", "card.replyPh", "card.send", "card.sent", "card.sendFailed", "card.openChat"].filter((k) => !new RegExp(`"${k.replace(".", "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(fileSrc("src/lib/translations/notif-ui.ts")))
   .concat(["notif.cards", "notif.cards.sub", "notif.cards.enable", "notif.cards.enable.hint"].filter((k) => !new RegExp(`"${k.replace(/\./g, "\\.")}":\\s*\\{\\s*en: "[^"]+",\\s*zh: "[^"]+",\\s*ar: "[^"]+"`).test(setWords)));
 check("a switch in Settings → Notifications, on by default, in English, Chinese and Arabic",
   /checked=\{n\.popup_cards !== false\}/.test(tabSrc) && /patch\(\{ popup_cards: v \}\)/.test(tabSrc)

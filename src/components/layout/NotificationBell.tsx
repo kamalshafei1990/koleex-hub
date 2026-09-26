@@ -49,6 +49,7 @@ import {
   fetchMyChannels,
   isAccountStreamHealthy,
   markChannelRead,
+  sendDiscussMessage,
   subscribeToMyChannels,
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
@@ -65,7 +66,7 @@ import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActi
 import PushNudge from "@/components/layout/PushNudge";
 import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
 import { desktopToast, inboxToastText, outOfView, type Toast } from "@/lib/desktop-toast";
-import NotificationCards, { CARD_MAX, type NoticeCard } from "@/components/layout/NotificationCards";
+import NotificationCards, { CARD_MAX, lessMotion, type NoticeCard } from "@/components/layout/NotificationCards";
 import { inTab, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
@@ -213,6 +214,22 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     discussChannelsRef.current = discussChannels;
   }, [discussChannels]);
   const wrapRef = useRef<HTMLDivElement>(null);
+  /* The bell itself: where an unopened card flies home, and what swings. */
+  const bellBtnRef = useRef<HTMLButtonElement>(null);
+  const bellIconRef = useRef<HTMLSpanElement>(null);
+  const badgeRef = useRef<HTMLSpanElement>(null);
+  /** A card arrived, or an unopened one came home: the bell swings once and
+   *  its number pops. Nothing under reduced motion. */
+  function nudgeBell() {
+    if (lessMotion()) return;
+    requestAnimationFrame(() => {
+      bellIconRef.current?.animate(
+        [{ transform: "rotate(0)" }, { transform: "rotate(14deg)" }, { transform: "rotate(-11deg)" }, { transform: "rotate(6deg)" }, { transform: "rotate(0)" }],
+        { duration: 520, easing: "ease-out" },
+      );
+      badgeRef.current?.animate([{ transform: "scale(1)" }, { transform: "scale(1.35)" }, { transform: "scale(1)" }], { duration: 360, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+    });
+  }
   /* What a desktop notification needs when it is shown or clicked — the
      latest language, words and handlers. The realtime callbacks subscribe
      once per account, so they read these through a ref (synced after each
@@ -356,10 +373,11 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           const preview = c.last_message?.body?.trim() || r.t("notif.newMessage");
           const author = c.last_message?.author_username;
           const title = channelLabel(c, r.t);
+          const who = c.last_message?.author_username ?? null;
           const body = author ? `${author}: ${preview}` : preview;
           /* In front of the reader: a pop-up card. Quiet hours only silence
              the chime. Never on Discuss itself, where the message is on screen. */
-          if (!onDiscuss) r.card({ key: `discuss:${c.id}`, kind: "discuss", channelId: c.id, title, body });
+          if (!onDiscuss) r.card({ key: `discuss:${c.id}`, kind: "discuss", channelId: c.id, title, body: preview, author: who });
           /* The desktop app with its window not in front: a system
              notification (lib/desktop-toast), under the chime's rules. */
           if (!heard || !c || quietFor(c)) return;
@@ -694,6 +712,28 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     onDecided: (m) => archiveRows([m]),
   };
 
+  /* A card's actions, on the page the reader is on (NotificationCards). */
+  /** Discuss "Open chat": the floating Discuss panel opens on that
+   *  conversation over this page (FloatingPanel answers the event). Only
+   *  where no panel answers does it fall back to the Discuss app. */
+  function openChatInPlace(channelId: string) {
+    const detail = { channelId, handled: false };
+    window.dispatchEvent(new CustomEvent("koleex:discuss-open", { detail }));
+    if (!detail.handled) handleDiscussRowClick(channelId);
+  }
+  /** Discuss reply from the card. Answering is reading: the conversation
+   *  leaves the bell once the message is in. */
+  async function replyInPlace(c: Extract<NoticeCard, { kind: "discuss" }>, text: string): Promise<boolean> {
+    const aid = accountIdRef.current;
+    if (!aid) return false;
+    const clientMsgId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : undefined;
+    const saved = await sendDiscussMessage({ channelId: c.channelId, authorId: aid, body: text, kind: "text", clientMsgId }).catch(() => null);
+    if (!saved) return false;
+    setDiscussChannels((prev) => prev.map((ch) => (ch.id === c.channelId ? { ...ch, unread_count: 0, marked_unread: false } : ch)));
+    void markChannelRead(c.channelId, aid).catch(() => false).then(() => window.dispatchEvent(new CustomEvent("discuss:unread-changed")));
+    return true;
+  }
+
   /* The desktop notification's latest words and handlers (toastRef). */
   useEffect(() => {
     toastRef.current = {
@@ -711,6 +751,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           const next = [c, ...s.cards.filter((x) => x.key !== c.key)];
           return { cards: next.slice(0, CARD_MAX), more: s.more + Math.max(0, next.length - CARD_MAX) };
         });
+        nudgeBell();
       },
     };
   });
@@ -771,6 +812,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   return (
     <div ref={wrapRef} className="relative">
       <button
+        ref={bellBtnRef}
         type="button"
         aria-label={
           totalUnread > 0
@@ -786,9 +828,12 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             : "kx-hover-glow border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
         } ${open ? (dk ? "text-white bg-white/[0.06]" : "text-black bg-black/[0.06]") : ""}`}
       >
-        <BellIcon size={15} className="md:w-4 md:h-4" />
+        <span ref={bellIconRef} className="grid place-items-center" style={{ transformOrigin: "50% 15%" }}>
+          <BellIcon size={15} className="md:w-4 md:h-4" />
+        </span>
         {totalUnread > 0 && (
           <span
+            ref={badgeRef}
             aria-hidden
             className="absolute -top-1 -end-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[var(--bg-primary)]"
           >
@@ -943,10 +988,16 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           lang={lang}
           tHub={t}
           tUi={tUi}
-          onOpen={(c) => (c.kind === "inbox" ? void handleInboxRowClick(c.row) : handleDiscussRowClick(c.channelId))}
-          onDismiss={(key) => setCardStack((s) => ({ ...s, cards: s.cards.filter((x) => x.key !== key) }))}
+          aurora={aurora}
+          bellRef={bellBtnRef}
+          onOpen={(c) => void handleInboxRowClick(c.row)}
+          onOpenChat={openChatInPlace}
+          onReply={replyInPlace}
+          onDecided={(c, v) => listActions.onDecided?.(c.row, v)}
+          onGone={(key) => setCardStack((s) => ({ ...s, cards: s.cards.filter((x) => x.key !== key) }))}
+          onReturned={nudgeBell}
           onMore={() => { setCardStack(NO_CARDS); setOpen(true); }}
-          onMoreDismiss={() => setCardStack((s) => ({ ...s, more: 0 }))}
+          onMoreGone={() => setCardStack((s) => ({ ...s, more: 0 }))}
         />
       )}
     </div>
