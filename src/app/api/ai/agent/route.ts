@@ -61,6 +61,7 @@ import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib
 import { featureSwitchedOff, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
 import { generalLaneTools, runGeneralSearchHop, GENERAL_LANE_TOOL, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
 import { READ_PAGE_TOOL_DEF, READ_PAGE_MAX_PER_ANSWER, linksInText, readPageForModel } from "@/lib/server/ai/core/read-page";
+import { thinkingNote } from "@/lib/server/ai/core/thinking-note";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
@@ -88,6 +89,17 @@ import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
    received" (2026-09-26). The loop's own time budget (orchestrator
    LOOP_ANSWER_AFTER_MS) starts the answer long before this. */
 export const maxDuration = 300;
+
+/* THE RETRACT FRAME CARRIES WHAT WAS SAID (owner, 2026-09-26: "the words come
+   quickly and remove quickly"). The narration a model streamed before it
+   looked something up leaves the answer, as before; the screen now keeps it
+   in the Thinking panel instead of dropping it. core/thinking-note.ts decides
+   what of it is safe to keep. Not a route export: segment files may export
+   only their config and handlers. */
+function retractFrame(said: string): { type: "retract"; note?: string } {
+  const note = thinkingNote(said);
+  return note ? { type: "retract", note } : { type: "retract" };
+}
 
 /* Conversation memory window. 6 messages (3 exchanges) turned out to be
    the reason Koleex AI felt like a question-answerer rather than a
@@ -839,7 +851,7 @@ export async function POST(req: Request) {
                  the turn falls through to the orchestrator as any other fast
                  lane failure does. */
               if (out.ok && laneTools && out.response.toolCalls.length > 0) {
-                if (accumulated) emit(send({ type: "retract" }));
+                if (accumulated) emit(send(retractFrame(accumulated)));
                 const hop = await runGeneralSearchHop({
                   ctx,
                   conversationId: conversationId!,
@@ -868,7 +880,7 @@ export async function POST(req: Request) {
                 );
                 if (canRead && out.ok && out.response.toolCalls.length > 0) {
                   meter(out, "fast-general+search");
-                  if (accumulated) emit(send({ type: "retract" }));
+                  if (accumulated) emit(send(retractFrame(accumulated)));
                   const readHop = await runGeneralSearchHop({
                     ctx,
                     conversationId: conversationId!,
@@ -946,11 +958,14 @@ export async function POST(req: Request) {
                with end.agent.finalReply — same contract as chat. */
           } else {
             let liveDeltaCount = 0;
+            /* What streamed since the last retract — the note a retract carries. */
+            let liveText = "";
             agent = await orchestrate({
               model: chosenModel,
               dialect: wantsRewrite ? ("egyptian" as const) : null,
               onDelta: (text) => {
                 liveDeltaCount++;
+                liveText += text;
                 if (tFirst === null) tFirst = Date.now();
                 emit(send({ type: "delta", text }));
               },
@@ -960,7 +975,8 @@ export async function POST(req: Request) {
                  client clears what it showed; the real answer follows. */
               onRetract: () => {
                 liveDeltaCount = 0;
-                emit(send({ type: "retract" }));
+                emit(send(retractFrame(liveText)));
+                liveText = "";
               },
               ctx,
               history,

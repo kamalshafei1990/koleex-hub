@@ -58,6 +58,25 @@ export interface ChatMsg {
    *  when a chosen model was not the one that replied. */
   askedModel?: KoleexModelId;
   servedModel?: KoleexServingModel | null;
+  /** The Thinking panel's record of this turn (owner, 2026-09-26): what the
+   *  model said before each lookup, and how long it worked before the answer
+   *  began. Browser-only, never persisted — like `steps`, a reloaded thread
+   *  shows the answer alone. */
+  thinking?: ThinkingRecord;
+}
+/** One note the model wrote before a lookup, and where it goes: `at` is how
+ *  many lookups had been announced when it was said, so it sits before the
+ *  next one in the panel. */
+export interface ThinkingNote {
+  text: string;
+  at: number;
+}
+export interface ThinkingRecord {
+  notes: ThinkingNote[];
+  /** When the turn was sent (ms since epoch), for the live counter. */
+  startedAt: number;
+  /** Set once the answer began: how long it thought. */
+  ms?: number;
 }
 export interface ConversationRow {
   id: string;

@@ -78,6 +78,8 @@ import type {
   AgentStep,
   ChatMsg,
   ConversationRow,
+  ThinkingNote,
+  ThinkingRecord,
 } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
 /* Phase 2J — three leaf components moved to their own files. Each takes props
@@ -1379,6 +1381,15 @@ export default function KoleexAiApp() {
         let convUpdateId: string | null = null;
         let convUpdateTitle: string | null = null;
         let servedModel: ReturnType<typeof normalizeServingModel> = null;
+        /* THE THINKING PANEL (owner, 2026-09-26: the words before a lookup
+           "come quickly and remove quickly"). What the model said before each
+           lookup is kept as a note instead of dropped, and the thinking time
+           is fixed the moment the answer begins. Browser-only. */
+        const thinkStartedAt = Date.now();
+        const thinkNotes: ThinkingNote[] = [];
+        let thinkMs: number | undefined;
+        let lookupsSeen = 0;
+        const thinkingRecord = (): ThinkingRecord => ({ notes: thinkNotes.slice(), startedAt: thinkStartedAt, ms: thinkMs });
 
         const pushPatch = (patch: Partial<ChatMsg>) => {
           /* Audit P0 #1/#2 — if the user has switched to a different
@@ -1435,7 +1446,7 @@ export default function KoleexAiApp() {
                   | { type: "start" }
                   | { type: "steps"; steps: AgentStep[] }
                   | { type: "delta"; text: string }
-                  | { type: "retract" }
+                  | { type: "retract"; note?: string }
                   | {
                       type: "end";
                       agent: {
@@ -1451,8 +1462,22 @@ export default function KoleexAiApp() {
 
                 if (json.type === "steps") {
                   finalSteps = json.steps;
-                  pushPatch({ steps: json.steps });
+                  /* A NEW lookup means it is thinking again; the frame that
+                     only adds results to lookups already shown does not. */
+                  const lookups = json.steps.filter((s) => s.kind === "tool-call").length;
+                  if (lookups > lookupsSeen) {
+                    lookupsSeen = lookups;
+                    thinkMs = undefined;
+                    pushPatch({ steps: json.steps, thinking: thinkingRecord() });
+                  } else {
+                    pushPatch({ steps: json.steps });
+                  }
                 } else if (json.type === "delta") {
+                  /* The answer began after thinking: fix how long it took. */
+                  if (thinkMs === undefined && (lookupsSeen > 0 || thinkNotes.length > 0)) {
+                    thinkMs = Date.now() - thinkStartedAt;
+                    pushPatch({ thinking: thinkingRecord() });
+                  }
                   accumulated += json.text;
                   /* ONE STATE WRITE PER FRAME, not one per token. The fast
                      lane sends a frame per provider token, and each used to
@@ -1460,8 +1485,13 @@ export default function KoleexAiApp() {
                   scheduleContentFlush();
                 } else if (json.type === "retract") {
                   /* What streamed so far was narration before a lookup, not
-                     the answer; the answer follows. */
+                     the answer; the answer follows. The server sends the
+                     part that is safe to keep, and it moves into the
+                     Thinking panel instead of vanishing. */
                   accumulated = "";
+                  if (typeof json.note === "string" && json.note) thinkNotes.push({ text: json.note, at: lookupsSeen });
+                  thinkMs = undefined;
+                  pushPatch({ thinking: thinkingRecord() });
                   flushContentNow();
                 } else if (json.type === "end") {
                   flushContentNow();
@@ -1484,6 +1514,7 @@ export default function KoleexAiApp() {
            final steps (id/created_at now come from Supabase, not the
            temporary placeholder). */
         if (finalMessage) {
+          if (thinkMs === undefined && (lookupsSeen > 0 || thinkNotes.length > 0)) thinkMs = Date.now() - thinkStartedAt;
           carryTaskCard(placeholderId, finalMessage.id);
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === placeholderId);
@@ -1494,6 +1525,7 @@ export default function KoleexAiApp() {
               steps: finalSteps,
               askedModel: modelChoice,
               servedModel,
+              thinking: thinkingRecord(),
             };
             return next;
           });
