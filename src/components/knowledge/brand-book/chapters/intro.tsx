@@ -308,7 +308,7 @@ export function AtAGlance() {
             <p className="text-[30px] font-bold tracking-tight leading-tight">Industrial Garment Machinery</p>
             <p dir="rtl" lang="ar" className="text-[24px] font-bold" style={{ fontFamily: "'Helvetica Neue','Geeza Pro','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif" }}>ماكينات صناعية للملابس</p>
             <p lang="zh-Hans" className="text-[24px] font-semibold" style={{ fontFamily: "'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif" }}>工业服装机械</p>
-            <p className="font-mono text-[13px] text-[#4B5563]">QU-2026-0142 · USD 12,500.00 · 27/09/2026</p>
+            <p className="font-mono text-[13px] text-[#4B5563]">KL-QU-12349 · USD 12,500.00 · 27/09/2026</p>
           </div>
         </Stage>
         <P><B>Inter</B> for Latin text, our Arabic and Chinese families beside it, and a monospace for numbers and codes. <Ref n={50} /></P>
@@ -352,7 +352,7 @@ export function AtAGlance() {
       <Section id="details" title="Details that matter">
         <Specs rows={[
           ["Dates", "DD/MM/YYYY — 27/09/2026"],
-          ["Numbers & codes", "Monospace, tabular: QU-2026-0142 · USD 12,500.00"],
+          ["Numbers & codes", "Monospace, tabular: KL-QU-12349 · USD 12,500.00"],
           ["Documents", "The 210 × 270 mm house sheet — fits A4 and US Letter"],
           ["Contact line", <span key="c" className="font-mono text-[12.5px]">{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</span>],
         ]} />

@@ -103,7 +103,7 @@ export function Typefaces() {
       <Section id="mono" title="Numbers and codes">
         <Stage bg="#FFFFFF" h="auto" pad={24}>
           <div className="w-full space-y-1 text-[15px] text-[#0A0A0A]" style={MONO}>
-            <p>QU-2026-0142</p>
+            <p>KL-QU-12349</p>
             <p>USD 12,500.00</p>
             <p>27/09/2026</p>
           </div>

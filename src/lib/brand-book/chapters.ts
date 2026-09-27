@@ -51,8 +51,15 @@ export const BOOK_PARTS: BookPart[] = [
   { n: 10, id: "governance", from: 132, to: 140, title: { en: "Governance & Files", zh: "管理与文件", ar: "الحوكمة والملفات" } },
 ];
 
-/** Chapters with content. Phase 1: the core visual identity. */
-const READY = new Set<number>([1, 2, 3, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 136]);
+/** Chapters with content. Phase 1: the core visual identity (1–3, 36–54,
+ *  136). Phase 2: grid, graphics, icons, photography, video, motion, sound
+ *  (55–74). */
+const READY = new Set<number>([
+  1, 2, 3,
+  36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+  55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+  136,
+]);
 
 /* [number, slug, en, zh, ar] — kept as tuples so 140 rows stay readable. */
 const ROWS: ReadonlyArray<readonly [number, string, string, string, string]> = [
