@@ -575,7 +575,7 @@ export function VersionsContact() {
         <Table
           head={["Version", "Date", "What changed"]}
           rows={[
-            [<B key="a">{BOOK_VERSION.label}</B>, BOOK_VERSION.date, `The new KOLEEX Brand Guidelines: 140 chapters in 10 parts, ${ready} written so far — visual identity, digital, print and documents, product and packaging, places and events, people, partners and governance.`],
+            [<B key="a">{BOOK_VERSION.label}</B>, BOOK_VERSION.date, `The new KOLEEX Brand Guidelines: ${BOOK_CHAPTERS.length} chapters in 10 parts${ready < BOOK_CHAPTERS.length ? `, ${ready} written so far` : ""} — the story and the verbal and visual identity, digital, print and documents, product and packaging, places and events, people, partners and governance.`],
             [<B key="a">1.0</B>, "Before 2.0", <>The first brand guidelines site, 36 sections. Kept online as an archive at <a key="l" href="https://koleex-gl.netlify.app" target="_blank" rel="noreferrer" className="text-[#3E6796] underline underline-offset-2 dark:text-[#7FA9D6]">koleex-gl.netlify.app</a>; where the two differ, this book decides.</>],
           ]}
         />
