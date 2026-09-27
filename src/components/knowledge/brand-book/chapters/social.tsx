@@ -13,9 +13,9 @@ import type { ReactNode } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import OverlockMachineIcon from "@/components/icons/machine-kinds/OverlockMachineIcon";
 import {
-  B, Bullets, Chapter, Code, Example, Examples, Note, Ref, Rule, Section, Specs, Stage, Table,
+  B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { LogoTile, Wordmark } from "../marks";
+import { GroupLockup, LogoTile, Wordmark } from "../marks";
 import { Avatar, INK, MachineShot, Phone, Post, PostBody } from "../mockups";
 import { SILVER } from "@/lib/brand-book/tokens";
 
@@ -122,13 +122,50 @@ export function SocialProfiles() {
 
 /* ── 80 · Post Templates ───────────────────────────────────────────────── */
 
+/** Event photo post (owner, 27/09/2026): a dark band top and bottom so
+ *  the header and the footer always read; no KOLEEX edge on photo posts. */
+function EventPhotoPost({ w = 230 }: { w?: number }) {
+  const u = w / 230;
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-md" style={{ width: w, aspectRatio: "4 / 5", background: "#C7C7CC" }}>
+      <div className="absolute rounded-full bg-[#8E8E93]" style={{ left: 70 * u, top: 88 * u, width: 40 * u, height: 40 * u }} />
+      <div className="absolute rounded-t-[30px] bg-[#636366]" style={{ left: 54 * u, top: 132 * u, width: 72 * u, height: 170 * u }} />
+      <div className="absolute rounded-full bg-[#AEAEB2]" style={{ left: 140 * u, top: 100 * u, width: 36 * u, height: 36 * u }} />
+      <div className="absolute rounded-t-[30px] bg-[#8E8E93]" style={{ left: 126 * u, top: 140 * u, width: 66 * u, height: 160 * u }} />
+      <div className="absolute inset-x-0 top-0 bg-black/45" style={{ height: "16%" }} />
+      <div className="absolute inset-x-0 bottom-0 bg-black/45" style={{ height: "12%" }} />
+      <div className="absolute flex items-center gap-1.5 text-white" style={{ left: 12 * u, top: 14 * u, fontSize: 8 * u }}>
+        <Wordmark color="#FFFFFF" width={52 * u} /><span className="h-[10px] w-px bg-white/70" /><span className="font-semibold">CISMA 2025</span><span className="h-[10px] w-px bg-white/70" /><span className="font-light">DAY 2</span>
+      </div>
+      <div className="absolute inset-x-0 flex items-center justify-between text-white" style={{ bottom: 9 * u, paddingLeft: 12 * u, paddingRight: 12 * u, fontSize: 7 * u }}>
+        <span className="flex gap-1">{[0, 1, 2, 3, 4].map((i) => <span key={i} className="block rounded-full bg-white/85" style={{ width: 7 * u, height: 7 * u }} />)}</span>
+        <span>{KOLEEX_COMPANY.web}</span>
+      </div>
+    </div>
+  );
+}
+
+/** The Bento board: a fair announced in five black tiles. */
+function BentoBoard() {
+  const tile = "rounded-[10px] bg-black text-white p-2.5";
+  return (
+    <div className="grid w-full max-w-[520px] gap-1.5 rounded-[12px] bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.1)]" style={{ gridTemplateColumns: "1fr 2fr 1fr", gridTemplateRows: "110px 110px" }}>
+      <div className={`${tile} row-span-2 flex flex-col gap-2`}><Wordmark color="#FFFFFF" width={60} /><p className="text-[13px] font-bold">Invitation</p><div className="space-y-1">{[0, 1, 2, 3].map((i) => <div key={i} className="h-[2px] rounded bg-[#636366]" />)}</div></div>
+      <div className={`${tile} flex flex-col justify-between`}><div className="flex justify-center"><GroupLockup color="#FFFFFF" width={130} /></div><p className="text-[11px] font-bold leading-tight">24–27 September 2025<br /><span className="font-light">Shanghai</span></p></div>
+      <div className={`${tile} flex items-end justify-center`}><MachineShot w={80} label={false} logo={false} /></div>
+      <div className={`${tile} flex flex-col justify-center`}><p className="text-[9px] text-[#98989D]">Booth</p><p className="mt-1 self-start rounded-[6px] border-2 border-white px-1.5 text-[18px] font-bold leading-tight">W5-C42</p></div>
+      <div className={`${tile} col-span-1 flex items-end`}><p className="text-[10px] font-bold leading-tight">From Design<br /><span className="font-light">to Intelligence</span></p></div>
+    </div>
+  );
+}
+
 const TEMPLATES: Array<{ kind: string; label: string; title: ReactNode; dark: boolean; image?: boolean }> = [
-  { kind: "Product", label: "Overlock · Series", title: <>Four threads.<br />One pass.</>, dark: true },
-  { kind: "Detail / feature", label: "Detail", title: <>Direct drive.<br />No belt, no noise.</>, dark: false },
-  { kind: "Tip / how-to", label: "Tip", title: <>Clean the feed dog<br />every week.</>, dark: true },
-  { kind: "Behind the scenes", label: "Inspection", title: <>Every machine is<br />tested before it ships.</>, dark: true },
-  { kind: "Event", label: "CISMA · Shanghai", title: <>Meet us at<br />booth 000.</>, dark: true, image: false },
-  { kind: "Occasion", label: "Eid al-Fitr", title: <>Eid Mubarak<br />from all of us.</>, dark: false, image: false },
+  { kind: "Product", label: "Overlock · Series", title: <>Four threads.<br /><span className="font-light">One pass.</span></>, dark: true },
+  { kind: "Detail / feature", label: "Detail", title: <>Direct drive.<br /><span className="font-light">No belt, no noise.</span></>, dark: false },
+  { kind: "Tip / how-to", label: "Tip", title: <>Clean the feed dog<br /><span className="font-light">every week.</span></>, dark: true },
+  { kind: "Behind the scenes", label: "Inspection", title: <>Every machine is<br /><span className="font-light">tested before it ships.</span></>, dark: true },
+  { kind: "Event", label: "CISMA · Shanghai", title: <>Meet us at<br /><span className="font-light">booth 000.</span></>, dark: true, image: false },
+  { kind: "Occasion", label: "Eid al-Fitr", title: <>Eid Mubarak<br /><span className="font-light">from all of us.</span></>, dark: false, image: false },
 ];
 
 export function PostTemplates() {
@@ -137,13 +174,16 @@ export function PostTemplates() {
       n={80}
       lead={
         <p>
-          Every KOLEEX post is built on the same four parts: the logo top-left, a small label, one clear
-          headline and one image. The content changes; the grammar does not.
+          Every KOLEEX post is built on the same parts: the KOLEEX edge, the logo top-left, a small label, a
+          two-line headline and one image. The content changes; the grammar does not.
         </p>
       }
       toc={[
         { id: "anatomy", title: "Anatomy of a post" },
         { id: "types", title: "Post types" },
+        { id: "event-photos", title: "Event photo posts" },
+        { id: "bento", title: "The Bento board" },
+        { id: "travel", title: "Travel posts" },
         { id: "captions", title: "Captions" },
         { id: "rhythm", title: "Rhythm and languages" },
       ]}
@@ -151,19 +191,22 @@ export function PostTemplates() {
       <Section id="anatomy" title="Anatomy of a post">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center gap-6">
-            <Post w={230}><PostBody label="Overlock · Series" title={<>Four threads.<br />One pass.</>} /></Post>
+            <Post w={230}><PostBody label="Overlock · Series" title={<>Four threads.<br /><span className="font-light">One pass.</span></>} /></Post>
             <ol className="space-y-2 text-[12px] text-[#1D1D1F]">
-              <li><B>1 · Logo</B> — top-left, the same place on every post</li>
-              <li><B>2 · Label</B> — category or context, small capitals, gray</li>
-              <li><B>3 · Headline</B> — six words or fewer, Inter SemiBold, white or silver on black</li>
-              <li><B>4 · Image</B> — the machine, our own photograph (ch. 63)</li>
+              <li><B>1 · Edge</B> — the KOLEEX edge down the left side (ch. 57)</li>
+              <li><B>2 · Logo</B> — top-left; top-right when the image needs the left side</li>
+              <li><B>3 · Label</B> — category or context, small capitals, gray</li>
+              <li><B>4 · Headline</B> — the two-line headline: Bold, then Light (ch. 51)</li>
+              <li><B>5 · Image</B> — the machine, our own photograph (ch. 63)</li>
             </ol>
           </div>
         </Stage>
         <Specs rows={[
           ["Feed size", "1080 × 1350 px (4:5); 1080 × 1080 where a platform needs square"],
           ["Margins", "72 px on every side (ch. 55)"],
-          ["Logo", "200–240 px wide, top-left, the same place on every post"],
+          ["Logo", "200–240 px wide, top-left (or top-right), the same place across a series"],
+          ["Edge", "11 px wide on a 1080 px post, full height, the opposite colour of the ground"],
+          ["Occasions", "One white 3D object — the crescent, the tree (ch. 57)"],
           ["Text on the image", "20% of the area at most — the caption carries the detail"],
         ]} />
       </Section>
@@ -178,6 +221,48 @@ export function PostTemplates() {
           ))}
         </div>
         <Note>Hiring posts follow <Ref n={125} />; customer stories need the customer’s written permission (<Ref n={131} />).</Note>
+      </Section>
+
+      <Section id="event-photos" title="Event photo posts">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="flex flex-wrap items-center gap-6">
+            <EventPhotoPost />
+            <ol className="space-y-2 text-[12px] text-[#1D1D1F]">
+              <li><B>Header</B> — KOLEEX | the event | DAY n, top-left</li>
+              <li><B>Photo</B> — our own photo from the booth, the same preset for the whole series</li>
+              <li><B>Bands</B> — a dark band at the top and the bottom, so the header and footer always read</li>
+              <li><B>Footer</B> — social icons on the left, the website on the right, the same on every post</li>
+            </ol>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Bands", "Black at 45%, about 16% of the height at the top and 12% at the bottom"],
+          ["Edge", "No KOLEEX edge on photo posts"],
+          ["People", <>Visitors’ badges unreadable, no close-up faces without consent, no competitors’ booths (<Ref n={68} />)</>],
+        ]} />
+      </Section>
+
+      <Section id="bento" title="The Bento board">
+        <P>A fair is announced on one board of black tiles on white — each tile one fact: the invitation, the dates, a machine, the booth number, the line.</P>
+        <Stage bg="#F5F5F7" h="auto" pad={24}><BentoBoard /></Stage>
+        <Specs rows={[
+          ["Tiles", "Five, black, corners about 24 px, 8 px apart, on white"],
+          ["Booth number", "The largest text on the board, in an outlined box"],
+          ["Event logo", "In its own colours, on a white tab — never directly on black (ch. 44)"],
+          ["Edge", "No KOLEEX edge on the Bento board"],
+        ]} />
+      </Section>
+
+      <Section id="travel" title="Travel posts">
+        <Examples cols={2}>
+          <Example tone="do" caption="White only; the city and the date." bg="#F5F5F7" h={190}>
+            <Post w={140}><PostBody label="Next destination" title={<>Dhaka<br /><span className="font-light">January 2026</span></>} image={false} /></Post>
+          </Example>
+          <Example tone="dont" caption="Flag colours, or the name of the customer we will visit." bg="#F5F5F7" h={190}>
+            <Post w={140}><PostBody label="Next destination" title={<>Dhaka – <span style={{ color: "#16A34A" }}>Bangladesh</span></>} image={false} /></Post>
+          </Example>
+        </Examples>
+        <P>An upcoming visit may be announced before it happens — the city and the date only, never the customers we will meet.</P>
       </Section>
 
       <Section id="captions" title="Captions">

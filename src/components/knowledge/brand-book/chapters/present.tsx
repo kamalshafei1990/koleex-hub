@@ -10,7 +10,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table,
 } from "../kit";
-import { Wordmark } from "../marks";
+import { GroupLockup, Wordmark } from "../marks";
 import { BusinessCard, Lines, MachineShot, Post, PostBody, Slide, Strips } from "../mockups";
 import { SILVER } from "@/lib/brand-book/tokens";
 
@@ -143,6 +143,39 @@ export function Presentations() {
 
 /* ── 91 · Business Cards ───────────────────────────────────────────────── */
 
+/** The management card (owner, 27/09/2026): a black-and-white portrait
+ *  with the X stroke behind it; the horizontal lockup and a white QR strip
+ *  on the back. Drawn 90 × 54 mm at `w` px wide. */
+function PortraitCard({ side, w = 300 }: { side: "front" | "back"; w?: number }) {
+  const h = (w * 54) / 90;
+  const u = w / 300;
+  if (side === "back") {
+    return (
+      <div className="relative flex shrink-0 overflow-hidden rounded-[6px] bg-black" style={{ width: w, height: h, boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>
+        <div className="flex flex-1 items-center justify-center"><GroupLockup color="#FFFFFF" width={180 * u} horizontal /></div>
+        <div className="flex w-[20%] flex-col items-center justify-center gap-3 bg-white">
+          {[0, 1].map((i) => <span key={i} className="block rounded-[2px]" style={{ width: 34 * u, height: 34 * u, background: "repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0 / 8px 8px" }} />)}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-[6px] bg-black text-white" style={{ width: w, height: h, boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>
+      <div className="absolute top-0 bg-white" style={{ left: 22 * u, width: 22 * u, height: "78%", transform: "skewX(42deg)", transformOrigin: "top left" }} />
+      <div className="absolute bottom-0 rounded-t-full bg-[#48484A]" style={{ left: 48 * u, width: 100 * u, height: 70 * u }} />
+      <div className="absolute rounded-full bg-[#8E8E93]" style={{ left: 74 * u, top: 34 * u, width: 48 * u, height: 48 * u }} />
+      <div className="absolute" style={{ right: 16 * u, top: 14 * u }}><Wordmark color="#FFFFFF" width={70 * u} /></div>
+      <div className="absolute space-y-[2px] text-[#F5F5F7]" style={{ left: 172 * u, top: 50 * u, fontSize: 6.5 * u, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>
+        <p>+86 130 7380 0720</p><p>name@koleexgroup.com</p><p>{KOLEEX_COMPANY.web}</p>
+      </div>
+      <div className="absolute flex items-baseline gap-2" style={{ left: 16 * u, bottom: 12 * u }}>
+        <span className="font-semibold" style={{ fontSize: 17 * u }}>Full Name</span>
+        <span className="font-light text-[#D1D1D6]" style={{ fontSize: 8 * u }}>Job Title</span>
+      </div>
+    </div>
+  );
+}
+
 export function BusinessCards() {
   return (
     <Chapter
@@ -156,6 +189,7 @@ export function BusinessCards() {
       toc={[
         { id: "card", title: "The card" },
         { id: "card-specs", title: "Specifications" },
+        { id: "portrait-card", title: "The management card" },
         { id: "content", title: "What goes on the back" },
         { id: "card-donts", title: "What never to do" },
       ]}
@@ -183,12 +217,29 @@ export function BusinessCards() {
         ]} />
       </Section>
 
+      <Section id="portrait-card" title="The management card">
+        <P>Managers carry a second card: their portrait in black and white, with the X stroke behind it (<Ref n={57} />). Everyone else carries the card above.</P>
+        <Stage bg="#F5F5F7" h="auto" pad={28}>
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <div className="space-y-2 text-center"><PortraitCard side="front" /><p className="text-[11px] text-[#6E6E73]">Front</p></div>
+            <div className="space-y-2 text-center"><PortraitCard side="back" /><p className="text-[11px] text-[#6E6E73]">Back — the horizontal lockup and the QR strip</p></div>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Who", "The Founder & CEO and the management team"],
+          ["Portrait", "Black and white, the team portrait of ch. 66"],
+          ["Front", "Logo top-right; contacts on the right; the name large at the bottom, the title Light beside it"],
+          ["Back", "The horizontal lockup (ch. 43); QR codes on a white strip so every phone reads them"],
+          ["Never", "Italics, a dot or slash inside the name, labels such as “Add:” or “Mob:”"],
+        ]} />
+      </Section>
+
       <Section id="content" title="What goes on the back">
         <Table
           head={["Line", "Rule"]}
           rows={[
-            ["Name", "As in the passport, in Latin letters"],
-            ["Title", "The real job title, in English"],
+            ["Name", "As in the passport, in Latin letters — given name first: Wei Zhang"],
+            ["Title", "The real job title, in English, upright — never italic"],
             ["Mobile / WhatsApp", "International format: +86 130 7380 0720"],
             ["Email", "name@koleexgroup.com"],
             ["Website", KOLEEX_COMPANY.web],

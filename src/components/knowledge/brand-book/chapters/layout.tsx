@@ -4,9 +4,11 @@
 
    Owner decisions (27/09/2026): generous space; corners 20–28 px; a
    centered hero with the headline on top and the machine below; no Hub
-   line and no peak — the kit is type, space, silver and the machine. */
+   line and no peak. After the review of the real KOLEEX work (27/09/2026)
+   the kit also has five brand elements: the KOLEEX edge, the light line,
+   the X stroke, the dots and white 3D objects for occasions. */
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { SILVER } from "@/lib/brand-book/tokens";
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
@@ -201,13 +203,13 @@ export function SpacingShapes() {
           ["Hairline", "1 px on screen · 0.25 pt in print — dividers and table rules only"],
           ["On white", "Mist #D2D2D7"],
           ["On black", "#38383A"],
-          ["Never", "Decorative lines, underlines under headlines, dashed or double lines"],
+          ["Never", "Underlines under headlines, dashed or double lines. The one drawn line the brand owns is the light line (ch. 57)"],
         ]} />
       </Section>
 
       <Section id="shapes" title="Shapes">
         <Rule why="Geometry reads as engineering. Blobs, waves and splashes read as a different kind of company.">
-          Rounded rectangles, circles for avatars and status dots — nothing else.
+          Rounded rectangles, circles for avatars and status dots — and the brand elements of <Ref n={57} />. Nothing else.
         </Rule>
         <Note>The slow wave behind the Koleex Hub interface belongs to the Hub’s Aurora skin only (<Ref n={77} />).</Note>
       </Section>
@@ -229,15 +231,64 @@ export function SpacingShapes() {
   );
 }
 
+/** A 4:5 post showing the KOLEEX edge (1% of the width, full height). */
+function EdgePost({ light = false, tab = false }: { light?: boolean; tab?: boolean }) {
+  const bg = light ? "#FFFFFF" : "#000000";
+  const fg = light ? "#000000" : "#FFFFFF";
+  return (
+    <div className="relative overflow-hidden rounded-[4px] ring-1 ring-black/10" style={{ width: 136, height: 170, background: bg }}>
+      <div className="absolute left-0 top-0" style={{ width: tab ? 3 : 2, height: tab ? 44 : "100%", background: fg }} />
+      <div className="absolute left-[12px] top-[12px]"><Wordmark color={fg} width={44} /></div>
+      <p className="absolute left-[12px] top-[40px] text-[11px] font-bold leading-tight" style={{ color: fg }}>XSL-L9</p>
+      <p className="absolute left-[12px] top-[54px] text-[9px] font-light leading-tight" style={{ color: fg }}>Double-stepper lockstitch</p>
+      <div className="absolute inset-x-[12px] bottom-[12px]"><MachineShot w="100%" dark={!light} label={false} logo={false} /></div>
+    </div>
+  );
+}
+
+/** The KOLEEX dots: one even grid; `wave` keeps only a band of it. */
+function DotField({ wave = false }: { wave?: boolean }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg viewBox="0 0 280 150" style={{ width: 260 }} aria-hidden>
+      <defs>
+        <pattern id={`dots-${id}`} width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="4.5" cy="4.5" r="1.4" fill="#FFFFFF" /></pattern>
+        <clipPath id={`clip-${id}`}>
+          {wave
+            ? <path d="M0 96 C 60 60, 120 140, 180 92 S 280 66, 280 66 L280 150 L0 150 Z" />
+            : <path d="M28 30 L90 26 L100 44 L80 60 L66 78 L50 70 L36 52 Z M72 84 L92 88 L90 112 L80 136 L72 120 Z M128 30 L150 28 L156 44 L140 50 L128 44 Z M132 56 L162 56 L168 76 L156 110 L144 112 L136 84 Z M158 26 L236 24 L250 44 L232 62 L206 66 L190 58 L170 50 Z M220 100 L248 98 L252 116 L228 120 Z" />}
+        </clipPath>
+      </defs>
+      <rect width="280" height="150" fill={`url(#dots-${id})`} clipPath={`url(#clip-${id})`} opacity={wave ? 0.6 : 0.45} />
+    </svg>
+  );
+}
+
+/** A white occasion object in soft 3D — the Ramadan crescent. */
+function Crescent() {
+  return (
+    <svg viewBox="0 0 120 120" style={{ width: 110 }} aria-hidden>
+      <path d="M72 18a44 44 0 1 0 26 76a37 37 0 1 1-26-76z" fill="#F2F2F7" />
+      <path d="M72 18a44 44 0 0 0-41 51a42 42 0 0 1 31-46z" fill="#C7C7CC" />
+      <path d="M98 94a44 44 0 0 1-48 8a40 40 0 0 0 44-12z" fill="#AEAEB2" />
+    </svg>
+  );
+}
+
 /* ── 57 · Graphic Elements ─────────────────────────────────────────────── */
 
 export function GraphicElements() {
   return (
     <Chapter
       n={57}
-      lead={<p>KOLEEX adds nothing for decoration. The whole kit is four things: type, space, silver and the machine.</p>}
+      lead={<p>KOLEEX adds nothing for decoration. The kit is type, space, silver and the machine — and five elements of its own, each with one job.</p>}
       toc={[
         { id: "kit", title: "The kit" },
+        { id: "edge", title: "The KOLEEX edge" },
+        { id: "light-line", title: "The light line" },
+        { id: "x-stroke", title: "The X stroke" },
+        { id: "dots", title: "The dots" },
+        { id: "objects", title: "Occasion objects" },
         { id: "numbers", title: "Big numbers" },
         { id: "labels", title: "Labels" },
         { id: "ge-donts", title: "What never to do" },
@@ -257,8 +308,104 @@ export function GraphicElements() {
             [<B key="a">Space</B>, "Makes everything look precise and premium"],
             [<B key="a">Silver</B>, "The one premium touch — headlines on black, the machine, metal (ch. 46)"],
             [<B key="a">The machine</B>, "Always the hero — our own studio photographs (ch. 63)"],
+            [<B key="a">The five brand elements</B>, "The edge, the light line, the X stroke, the dots, occasion objects — below"],
           ]}
         />
+      </Section>
+
+      <Section id="edge" title="The KOLEEX edge">
+        <P>A thin strip down the left side of every designed post, story, ad and poster. It is the first thing that marks a piece as ours, before the logo is read.</P>
+        <Examples cols={3}>
+          <Example tone="do" caption="On black: a white edge." bg="#F5F5F7" h={210}>
+            <EdgePost />
+          </Example>
+          <Example tone="do" caption="On white: a black edge." bg="#F5F5F7" h={210}>
+            <EdgePost light />
+          </Example>
+          <Example tone="dont" caption="A short tab, or the edge on a photo post." bg="#F5F5F7" h={210}>
+            <EdgePost tab />
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Width", "1% of the design's width — 11 px on a 1080 px post"],
+          ["Length", "The full height of the design"],
+          ["Colour", "The opposite of the ground: white on black, black on white"],
+          ["Where", "Designed posts, stories, ads and posters — product, occasion, announcement"],
+          ["Not on", "Photo posts from events (they have the dark band and footer, ch. 80) and the Bento board"],
+        ]} />
+      </Section>
+
+      <Section id="light-line" title="The light line">
+        <P>One continuous line of light, sweeping through the layout — the line of the booth, the VIP card and the invitation. It may be used on any piece.</P>
+        <Stage bg="#000000" h={220} pad={0}>
+          <svg viewBox="0 0 640 220" className="h-full w-full" aria-hidden>
+            <path d="M-10 180 C 140 180, 170 70, 330 66 S 540 130, 650 40" fill="none" stroke="#FFFFFF" strokeOpacity="0.14" strokeWidth="10" />
+            <path d="M-10 180 C 140 180, 170 70, 330 66 S 540 130, 650 40" fill="none" stroke="#FFFFFF" strokeWidth="2" />
+          </svg>
+        </Stage>
+        <Specs rows={[
+          ["Number", "One line per layout"],
+          ["Colour", "White on black, black on white — never coloured"],
+          ["Shape", "One smooth curve that enters and leaves the frame"],
+          ["Never", "Across the logo or across text; several lines; a line under a headline"],
+        ]} />
+      </Section>
+
+      <Section id="x-stroke" title="The X stroke">
+        <P>One stroke of the X in the logo, drawn large behind a portrait or across a cover. It is the only shape taken from the logo.</P>
+        <Examples cols={2}>
+          <Example tone="do" caption="Behind a portrait: the management business card." bg="#000000" h={200}>
+            <div className="relative h-[150px] w-[260px]">
+              <div className="absolute top-0 h-[150px] w-[26px] origin-top-left bg-white" style={{ transform: "skewX(42deg)", left: 40 }} />
+              <div className="absolute bottom-0 left-[60px] h-[92px] w-[110px] rounded-t-[55px] bg-[#48484A]" />
+              <div className="absolute left-[88px] top-[22px] h-[50px] w-[50px] rounded-full bg-[#8E8E93]" />
+            </div>
+          </Example>
+          <Example tone="do" caption="Across a cover." bg="#000000" h={200}>
+            <div className="relative h-[150px] w-[112px] overflow-hidden rounded-[4px] ring-1 ring-white/15">
+              <div className="absolute top-0 h-[190px] w-[22px] origin-top-left bg-white" style={{ transform: "skewX(42deg)", left: 18 }} />
+              <div className="absolute bottom-4 left-3"><Wordmark color="#FFFFFF" width={44} /></div>
+            </div>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Angle", "The angle of the X's stroke in the logo — never rotated to another angle"],
+          ["Number", "One stroke per layout"],
+          ["Where", "The portrait business card (ch. 91) and covers"],
+          ["Never", "The peak triangle or any other piece cut from the logo"],
+        ]} />
+      </Section>
+
+      <Section id="dots" title="The dots">
+        <P>An even grid of small dots — the world map on the office glass, the wave on a start screen.</P>
+        <Examples cols={2}>
+          <Example tone="do" caption="The wave: screens and start pages." bg="#000000" h={180}><DotField wave /></Example>
+          <Example tone="do" caption="The world map: glass, walls, global content." bg="#000000" h={180}><DotField /></Example>
+        </Examples>
+        <Specs rows={[
+          ["Grid", "One even grid; every dot the same size"],
+          ["Colour", "White or grey on black; grey on white glass — never coloured"],
+          ["World map", "Offices, glass partitions (safety marking) and global content"],
+          ["Wave", "Screens: start pages, presentations, the website"],
+        ]} />
+      </Section>
+
+      <Section id="objects" title="Occasion objects">
+        <P>Occasions and announcements are marked by one white object, shown in 3D on black — the crescent for Ramadan, the tree for Christmas, the triangle for a warning.</P>
+        <Examples cols={3}>
+          <Example tone="do" caption="Ramadan: the crescent." bg="#000000" h={170}><Crescent /></Example>
+          <Example tone="dont" caption="Coloured symbols, flags or clip art." bg="#000000" h={170}>
+            <div className="flex items-center gap-2"><span className="h-10 w-10 rounded-full" style={{ background: "#F59E0B" }} /><span className="text-[26px] font-black text-[#16A34A]">★</span></div>
+          </Example>
+          <Example tone="dont" caption="Line drawings of symbols and landmarks." bg="#000000" h={170}>
+            <svg viewBox="0 0 120 90" style={{ width: 110 }} aria-hidden><g fill="none" stroke="#FFFFFF" strokeWidth="1.4"><path d="M10 80h100" /><path d="M24 80v-30h22v30" /><path d="M24 50a11 11 0 0 1 22 0" /><path d="M60 80v-56h10v56" /><path d="M57 24h16l-8-14z" /><path d="M82 80v-22h16v22" /></g></svg>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Object", "One, white, in soft 3D light on black"],
+          ["Size", "Up to half the height of the layout; never behind the logo"],
+          ["Colour", "White and greys only — travel posts too, never flag colours"],
+        ]} />
       </Section>
 
       <Section id="numbers" title="Big numbers">
@@ -288,10 +435,10 @@ export function GraphicElements() {
 
       <Section id="ge-donts" title="What never to do">
         <Examples cols={3}>
-          <Example tone="dont" caption="Decorative lines and underlines." bg="#000000" h={150}>
+          <Example tone="dont" caption="Underlines and decorative rules." bg="#000000" h={150}>
             <div className="text-center"><p className="text-[20px] font-semibold text-white">Quiet power.</p><span className="mx-auto mt-2 block h-[2px] w-16" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }} /></div>
           </Example>
-          <Example tone="dont" caption="Triangles, patterns or shapes cut from the logo." bg="#000000" h={150}>
+          <Example tone="dont" caption="The peak triangle or other shapes cut from the logo." bg="#000000" h={150}>
             <svg viewBox="0 0 81.19 36.31" style={{ width: 120 }} aria-hidden><path d="M40.59,0 L81.19,36.31 H0 Z" fill="#48484A" /></svg>
           </Example>
           <Example tone="dont" caption="Stickers, bursts and badges." bg="#000000" h={150}>

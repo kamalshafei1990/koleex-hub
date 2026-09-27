@@ -56,15 +56,18 @@ export function Post({ w = 200, ratio = "4 / 5", bg = INK, children, style }: { 
   );
 }
 
-/** The KOLEEX post grammar: the logo top-left, small label, big headline,
- *  image area (owner, 27/09/2026: the logo sits top-left in marketing). */
-export function PostBody({ label, title, dark = true, image = true, foot }: { label: string; title: ReactNode; dark?: boolean; image?: boolean; foot?: ReactNode }) {
+/** The KOLEEX post grammar: the KOLEEX edge, the logo top-left, small
+ *  label, big headline, image area (owner, 27/09/2026: the logo sits
+ *  top-left in marketing; designed posts carry the edge — 1% of the width,
+ *  full height, the opposite colour of the ground). */
+export function PostBody({ label, title, dark = true, image = true, foot, edge = true }: { label: string; title: ReactNode; dark?: boolean; image?: boolean; foot?: ReactNode; edge?: boolean }) {
   const fg = dark ? "#FFFFFF" : INK;
   return (
     <div className="absolute inset-0 flex flex-col p-[8%]">
+      {edge && <div className="absolute inset-y-0 left-0" style={{ width: "1%", minWidth: 1.5, background: fg }} />}
       <Wordmark color={dark ? "#FFFFFF" : "#000000"} width="34%" />
       <p className="mt-[9%] text-[6.5px] font-semibold uppercase tracking-[0.2em]" style={{ color: dark ? "#98989D" : "#6E6E73" }}>{label}</p>
-      <p className="mt-1.5 text-[13px] font-semibold leading-[1.15]" style={{ color: fg }}>{title}</p>
+      <p className="mt-1.5 text-[13px] font-bold leading-[1.15]" style={{ color: fg }}>{title}</p>
       {image ? <div className="mt-2.5 flex flex-1 items-center justify-center"><MachineShot w="88%" dark={dark} label={false} /></div> : <div className="flex-1" />}
       {foot && <div className="mt-2.5 flex items-center justify-end">{foot}</div>}
     </div>

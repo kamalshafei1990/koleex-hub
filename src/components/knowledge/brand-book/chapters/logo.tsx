@@ -350,8 +350,8 @@ export function SizePlacement() {
             ["House document (210 × 270 mm)", "45 mm", "Top-left; document title top-right"],
             ["Business card (90 × 54 mm)", "40 mm front · 25 mm back", "Centered on the front; top-left on the back"],
             ["Presentation (1920 × 1080 px)", "480 px cover · 200 px content slides", "Centered on the cover; top-left on content slides"],
-            ["Social post (1080 × 1350 px)", "200–240 px", "Top-left, the same on every post"],
-            ["Story / reel cover (1080 × 1920 px)", "240 px", "Top-left, at least 250 px below the top edge"],
+            ["Social post (1080 × 1350 px)", "200–240 px", "Top-left; top-right when the image needs the left side"],
+            ["Story / reel cover (1080 × 1920 px)", "240 px", "Top-left (or top-right), at least 250 px below the top edge"],
             ["Website header", "120–140 px", "Top-left (top-right in Arabic)"],
             ["Email signature", "120 px", "Above the contact lines"],
             ["Roll-up banner (850 × 2000 mm)", "500 mm", "Top, centered"],
@@ -363,21 +363,17 @@ export function SizePlacement() {
 
       <Section id="placement" title="Where the logo goes">
         <Rule why="A logo that always appears in the same place is recognised before it is read.">
-          The logo sits <B>top-left</B> — on documents, posts, ads and posters — or <B>centered</B> on covers,
-          business cards, signs and packaging fronts. It never floats in the middle of a side or squeezes into
-          a far corner.
+          The logo sits <B>top-left</B> on documents, posts, stories, ads and posters — <B>top-right</B> when the
+          image needs the left side. Covers take it <B>centered</B>, or in the <B>calm area of the image</B>,
+          aligned to a grid column. Business cards, signs and packaging fronts: centered. On a post it is never
+          centered, never at the bottom, and never squeezed into a far corner.
         </Rule>
-        <Examples cols={4}>
+        <Examples cols={3}>
           <Example tone="do" caption="Document: top-left." bg="#F5F5F7" h={200}>
             <MiniPage w={120} h={154}>
               <div className="absolute left-3 top-3"><Wordmark color="#000000" width={40} /></div>
               <div className="absolute right-3 top-3 text-[6px] font-bold tracking-wider">QUOTATION</div>
               <div className="absolute left-3 top-12 w-[96px]"><Lines n={5} w="100%" /></div>
-            </MiniPage>
-          </Example>
-          <Example tone="do" caption="Cover: centered." bg="#F5F5F7" h={200}>
-            <MiniPage w={120} h={154} bg="#000000">
-              <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={64} /></div>
             </MiniPage>
           </Example>
           <Example tone="do" caption="Post, ad, poster: top-left." bg="#F5F5F7" h={200}>
@@ -388,10 +384,29 @@ export function SizePlacement() {
               <div className="absolute inset-x-3 bottom-3"><MachineShot w="100%" label={false} logo={false} /></div>
             </MiniPage>
           </Example>
-          <Example tone="dont" caption="Floating mid-side, squeezed at the edge." bg="#F5F5F7" h={200}>
-            <MiniPage w={120} h={154}>
-              <div className="absolute right-0.5 top-[70px]"><Wordmark color="#000000" width={40} /></div>
-              <div className="absolute left-3 top-4 w-[96px]"><Lines n={6} w="100%" /></div>
+          <Example tone="do" caption="Top-right, when the image needs the left side." bg="#F5F5F7" h={200}>
+            <MiniPage w={124} h={155} bg="#000000">
+              <div className="absolute inset-y-0 left-0 w-[58%]"><div className="absolute bottom-0 left-3 h-[70%] w-[80%] rounded-t-[40px] bg-[#3A3A3C]" /><div className="absolute left-[26px] top-[34px] h-[30px] w-[30px] rounded-full bg-[#636366]" /></div>
+              <div className="absolute right-3 top-3"><Wordmark color="#FFFFFF" width={36} /></div>
+              <div className="absolute right-3 top-[70px] text-right text-[9px] font-semibold leading-tight text-white">Built for Change<br /><span className="font-light">Powered by Vision</span></div>
+            </MiniPage>
+          </Example>
+          <Example tone="do" caption="Plain cover: centered." bg="#F5F5F7" h={200}>
+            <MiniPage w={120} h={154} bg="#000000">
+              <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={64} /></div>
+            </MiniPage>
+          </Example>
+          <Example tone="do" caption="Cover with an image: in its calm area, on a grid column." bg="#F5F5F7" h={200}>
+            <MiniPage w={154} h={109} bg="#000000">
+              <div className="absolute -bottom-6 -left-6 h-[90px] w-[90px] rounded-full" style={{ boxShadow: "inset 0 0 0 10px #2C2C2E" }} />
+              <div className="absolute -bottom-10 left-6 h-[110px] w-[110px] rounded-full" style={{ boxShadow: "inset 0 0 0 7px #1C1C1E" }} />
+              <div className="absolute right-4 top-[38px]"><Wordmark color="#FFFFFF" width={58} /></div>
+            </MiniPage>
+          </Example>
+          <Example tone="dont" caption="A post: centered, at the bottom, or squeezed at the edge." bg="#F5F5F7" h={200}>
+            <MiniPage w={124} h={155} bg="#000000">
+              <div className="absolute left-3 top-4 text-[11px] font-semibold leading-tight text-white">Four threads.<br />One pass.</div>
+              <div className="absolute bottom-2 right-0.5"><Wordmark color="#FFFFFF" width={36} /></div>
             </MiniPage>
           </Example>
         </Examples>

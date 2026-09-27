@@ -268,6 +268,7 @@ export function AtAGlance() {
           ["Group name", "KOLEEX International Group"],
           ["Legal name", <span key="en" className="font-mono text-[13px]">{KOLEEX_COMPANY.en}</span>],
           ["Descriptor", "Industrial Garment Machinery"],
+          ["Lockup line", "KOLEEX INTERNATIONAL GROUP — under the logo, light, the logo's width (ch. 43)"],
           ["Tagline", <span key="t">{KOLEEX_COMPANY.tagline} <span className="text-[var(--text-dim)]">— a new one is being chosen (<Ref n={20} />)</span></span>],
           ["Voice", "Confident, precise, modern (ch. 22)"],
         ]} />

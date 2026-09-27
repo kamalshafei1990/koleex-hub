@@ -39,7 +39,7 @@ function Pin({ n, x, y }: { n: number; x: string; y: string }) {
 function Nameplate({ ce = true }: { ce?: boolean }) {
   const rows: Array<[string, string]> = [
     ["Model", "Model name"],
-    ["Serial no.", "KX-2609-00123"],
+    ["Serial no.", "KL2609N0001"],
     ["Voltage", "220 V ~ 50/60 Hz"],
     ["Power", "550 W"],
     ["Year", "2026"],
@@ -98,6 +98,26 @@ function Carton({ w = 280, tone = "black", children }: { w?: number; tone?: Cart
 
 /* ── 107 · Machine Branding ────────────────────────────────────────────── */
 
+/** An automatic unit (cabinet, gantry, sewing head) with its three logos. */
+function AutoUnit() {
+  return (
+    <div className="relative" style={{ width: 460, height: 210 }}>
+      <div className="absolute rounded-[3px] bg-white ring-1 ring-[#C7C7CC]" style={{ left: 40, top: 96, width: 270, height: 100 }} />
+      <div className="absolute rounded-[3px] bg-white ring-1 ring-[#C7C7CC]" style={{ left: 310, top: 126, width: 110, height: 70 }} />
+      <div className="absolute rounded-[2px] bg-[#E5E5EA] ring-1 ring-[#C7C7CC]" style={{ left: 30, top: 88, width: 400, height: 9 }} />
+      <div className="absolute rounded-[3px] bg-[#3A3A3C]" style={{ left: 90, top: 38, width: 210, height: 18 }} />
+      <div className="absolute bg-[#C7C7CC]" style={{ left: 288, top: 18, width: 12, height: 70 }} />
+      <div className="absolute rounded-[6px] bg-white ring-1 ring-[#C7C7CC]" style={{ left: 340, top: 52, width: 62, height: 36 }} />
+      <div className="absolute" style={{ left: 152, top: 43 }}><Wordmark color="#FFFFFF" width={88} /></div>
+      <div className="absolute" style={{ left: 54, top: 108 }}><Wordmark color="#000000" width={96} /></div>
+      <div className="absolute" style={{ left: 347, top: 66 }}><Wordmark color="#000000" width={48} /></div>
+      <Pin n={1} x="6%" y="54%" />
+      <Pin n={2} x="92%" y="22%" />
+      <Pin n={3} x="16%" y="14%" />
+    </div>
+  );
+}
+
 export function MachineBranding() {
   return (
     <Chapter
@@ -113,6 +133,7 @@ export function MachineBranding() {
         { id: "where", title: "Where the brand goes" },
         { id: "specs", title: "Specifications" },
         { id: "bodies", title: "The KOLEEX white" },
+        { id: "automatic", title: "Automatic machines" },
         { id: "never", title: "What never to do" },
       ]}
     >
@@ -148,9 +169,10 @@ export function MachineBranding() {
       <Section id="specs" title="Specifications">
         <Specs rows={[
           ["Logo width on the arm", "60–90 mm, by the size of the head; never below 20 mm (ch. 38)"],
-          ["Body color", "White — every KOLEEX machine (proposal: RAL 9016 traffic white, confirmed on a painted sample)"],
+          ["Body color", "White, matte, with a fine texture — every KOLEEX machine (proposal: RAL 9016 traffic white, confirmed on a painted sample)"],
+          ["Other parts", "Motor cover, panel and thread guides: the supplier's standard grey — the brand rule is the white body"],
           ["Logo color", "Black on the white body — one flat color"],
-          ["Method", "Pad print or screen print on the casting; a durable decal only where printing is not possible"],
+          ["Method", "Printed black on the arm (pad or screen print) — the default. A raised black badge with the white logo only where the surface is curved, small or textured"],
           ["Durability test", "Rub 20 times with a cloth soaked in sewing-machine oil: the logo must not fade, smear or lift"],
           ["Model name", "Inter SemiBold, capitals, in the same color as the logo, 4–6 mm tall"],
           ["Motor, control box, table", "The KOLEEX logo — or nothing; never a third-party brand facing the operator"],
@@ -171,6 +193,22 @@ export function MachineBranding() {
             <MachineShot w={260} dark={false} label={false} body="graphite" />
           </Example>
         </Examples>
+      </Section>
+
+      <Section id="automatic" title="Automatic machines">
+        <P>An automatic unit — a cabinet, a gantry and a sewing head — carries three logos at most, each where it is seen from a different distance.</P>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <AutoUnit />
+        </Stage>
+        <Table
+          head={["#", "Place", "How"]}
+          rows={[
+            ["1", <B key="a">Cabinet front</B>, "Black logo, large — the first thing seen from the aisle"],
+            ["2", <B key="a">Sewing head</B>, "Black logo on the head, as on a single machine"],
+            ["3", <B key="a">Gantry cover</B>, "White logo on the dark cover, about 60% of its length — seen from far away at a fair"],
+            ["—", <B key="a">Table top</B>, "No logo: the fabric covers it and the work wears it away"],
+          ]}
+        />
       </Section>
 
       <Section id="never" title="What never to do">
@@ -232,14 +270,15 @@ export function Nameplates() {
             [<B key="a">Serial no.</B>, "Unique for every machine, never reused"],
             [<B key="a">Electrical data</B>, "Voltage, frequency and power, exactly as tested"],
             [<B key="a">Year</B>, "The year the machine was completed"],
-            [<B key="a">Company</B>, "The legal name and city: KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD., Taizhou, Zhejiang, China"],
+            [<B key="a">Company</B>, "The legal name and city: KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD., Taizhou, Zhejiang, China"],
             [<B key="a">Origin</B>, "MADE IN CHINA"],
             [<B key="a">Marks</B>, <>CE and other marks only when that model is certified (<Ref n={133} />)</>],
           ]}
         />
-        <Note tone="warn">
-          The serial number format shown here (<span style={MONO}>KX-2609-00123</span> = KX · year and month of
-          completion · running number) is a proposal. It is used only after the owner approves it.
+        <Note>
+          The serial number: <span style={MONO}>KL2609N0001</span> — KL · the year and month of completion
+          (2609) · N · a four-digit running number. It is written exactly the same on the plate, the barcode
+          label and every paper: capitals, no spaces.
         </Note>
       </Section>
 
@@ -253,7 +292,7 @@ export function Nameplates() {
             <Wordmark color="#000000" width={52} />
             <div className="min-w-0 flex-1">
               <Barcode w={150} h={22} />
-              <p className="mt-0.5 text-[8px] tracking-[0.08em]" style={MONO}>KX-2609-00123</p>
+              <p className="mt-0.5 text-[8px] tracking-[0.08em]" style={MONO}>KL2609N0001</p>
             </div>
           </div>
         </Stage>
@@ -409,7 +448,7 @@ export function Cartons() {
           <Example tone="do" caption="Short side: the shipping marks (ch. 111)." bg="#F5F5F7" h={220}>
             <div className="relative overflow-hidden rounded-[3px] p-3 text-[#F5F5F7]" style={{ width: 170, aspectRatio: "40 / 40", background: "#1D1D1F", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)" }}>
               <div className="space-y-[1px] text-[9px] font-bold leading-tight" style={MONO}>
-                <p>ABC</p><p>ALEXANDRIA</p><p>KL-IN-12349</p><p>C/NO. 3/12</p><p>MADE IN CHINA</p>
+                <p>CUSTOMER NAME</p><p>ALEXANDRIA</p><p>KL-IN-12349</p><p>MADE IN CHINA</p>
               </div>
             </div>
           </Example>
@@ -486,7 +525,7 @@ export function ShippingMarks() {
         <Table
           head={["Mark", "Content", "Example"]}
           rows={[
-            [<B key="a">Main mark</B>, "Customer code · port of destination · invoice number · carton n/N", <span key="b" style={MONO}>ABC · ALEXANDRIA · KL-IN-12349 · C/NO. 3/12</span>],
+            [<B key="a">Main mark</B>, "Customer name · port of destination · invoice number", <span key="b" style={MONO}>CUSTOMER NAME · ALEXANDRIA · KL-IN-12349</span>],
             [<B key="a">Side mark</B>, "Description · quantity · N.W. · G.W. · dimensions", <span key="b" style={MONO}>MACHINE HEAD · 1 SET · 38.0 KG · 45.5 KG · 62×32×58 CM</span>],
             [<B key="a">Origin</B>, "Country of origin", <span key="b" style={MONO}>MADE IN CHINA</span>],
             [<B key="a">Handling</B>, "ISO 780 symbols", "This way up, keep dry, fragile"],
@@ -500,16 +539,16 @@ export function ShippingMarks() {
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between border-b-2 border-[#000000] pb-1.5">
                 <Wordmark color="#000000" width={58} />
-                <span className="text-[16px] font-black leading-none" style={MONO}>3/12</span>
+                <span className="text-[8px] font-bold leading-none" style={MONO}>KL-IN-12349</span>
               </div>
               <div className="mt-2 space-y-1 text-[7.5px]" style={MONO}>
-                {[["TO", "ABC · ALEXANDRIA"], ["INVOICE", "KL-IN-12349"], ["ITEM", "MACHINE HEAD × 1"], ["N.W. / G.W.", "38.0 / 45.5 KG"], ["SIZE", "62 × 32 × 58 CM"]].map(([k, v]) => (
+                {[["TO", "CUSTOMER NAME"], ["PORT", "ALEXANDRIA, EGYPT"], ["ITEM", "MACHINE HEAD × 1"], ["N.W. / G.W.", "38.0 / 45.5 KG"], ["SIZE", "62 × 32 × 58 CM"]].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-2"><span className="text-[#6E6E73]">{k}</span><span className="font-semibold">{v}</span></div>
                 ))}
               </div>
               <div className="mt-auto">
                 <Barcode w={170} h={26} />
-                <div className="mt-1 flex items-center justify-between text-[6.5px] font-bold"><span>MADE IN CHINA</span><span style={MONO}>KX-2609-00123</span></div>
+                <div className="mt-1 flex items-center justify-between text-[6.5px] font-bold"><span>MADE IN CHINA</span><span style={MONO}>KL2609N0001</span></div>
               </div>
             </div>
           </div>
@@ -522,11 +561,20 @@ export function ShippingMarks() {
       </Section>
 
       <Section id="mark-rules" title="Rules">
-        <Rule why="A carton passes through dozens of hands. Our customer list is confidential; a code is enough for the warehouse.">
-          The customer is shown as a short code — never the customer’s full name.
+        <Rule why="Marks typed by hand drift from the packing list — a wrong weight or port stops a shipment at customs.">
+          Every mark and label is printed from the packing list in Koleex Hub, from one template — never typed
+          again by hand.
         </Rule>
+        <Examples cols={2}>
+          <Example tone="do" caption="The crate mark: the black block with the white logo, the customer and the country." bg="#D8B98C" h={170}>
+            <div className="flex overflow-hidden rounded-[2px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ width: 230, height: 90 }}>
+              <div className="flex w-[46%] items-center justify-center bg-black"><Wordmark color="#FFFFFF" width={78} /></div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-1 text-[#1D1D1F]"><span className="text-[9px]">Customer Name</span><span className="text-[13px] font-bold">Egypt</span></div>
+            </div>
+          </Example>
+        </Examples>
         <Bullets items={[
-          <>Carton numbers, weights and sizes are the same as on the packing list (<Ref n={96} />).</>,
+          <>Weights and sizes are the same as on the packing list (<Ref n={96} />).</>,
           "Marks in English, capitals, on two opposite sides of every carton.",
           "The supplier’s name, address or codes never appear on marks or labels.",
         ]} />

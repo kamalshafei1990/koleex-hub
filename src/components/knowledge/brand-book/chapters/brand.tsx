@@ -360,6 +360,7 @@ export function BrandArchitecture() {
             [<B key="a">Master brand</B>, "KOLEEX", "The logo; “KOLEEX” in text"],
             [<B key="a">Product type</B>, "Overlock machine", "Plain words, never a brand name"],
             [<B key="a">Series</B>, "KOLEEX XSO-7800", "Only when two or more models share it (ch. 17)"],
+            [<B key="a">Named series</B>, "KOLEEX | NEXO", "An approved series name with its own mark and colours — NEXO, the LS lockstitch series"],
             [<B key="a">Model</B>, "KOLEEX XSO-7800-4", "The model code from Koleex Hub"],
             [<B key="a">Software</B>, "Koleex Hub", "Its own mark (ch. 42)"],
           ]}
@@ -368,11 +369,13 @@ export function BrandArchitecture() {
 
       <Section id="arch-rules" title="Rules">
         <Rule why="Every product that carries the KOLEEX name first adds to one brand. A product with its own name builds a brand we then have to pay for twice.">
-          KOLEEX comes first: “KOLEEX XSO-7800-4”, never “XSO-7800-4 by KOLEEX”. No product gets a brand name of
-          its own.
+          KOLEEX comes first: “KOLEEX XSO-7800-4”, never “XSO-7800-4 by KOLEEX”. A product gets a name of its own
+          only as an approved series — today, NEXO.
         </Rule>
         <Bullets items={[
-          "New sub-brands are not created without the Founder & CEO’s approval.",
+          "New sub-brands and series names are not created without the Founder & CEO’s approval.",
+          <>A named series is always shown after KOLEEX, in the context header: <B>KOLEEX | NEXO</B> (<Ref n={43} />).</>,
+          "A named series keeps its own colours. KOLEEX next to it stays black or white — the series colour never touches the KOLEEX logo.",
           "Koleex Hub is the one product with its own mark, because it is software and has its own interface.",
           <>Group companies keep their names; they are endorsed, never merged into KOLEEX (<Ref n={8} />).</>,
         ]} />
@@ -424,7 +427,7 @@ export function ProductNaming() {
         <Table
           head={["Part", "What it is", "Examples"]}
           rows={[
-            [<B key="a">Type</B>, "The product type, from the coding system", <span key="b" className="font-mono">XSL lockstitch · XSO overlock · XSI interlock · XSC chainstitch</span>],
+            [<B key="a">Type</B>, "The product type, from the coding system", <span key="b" className="font-mono">XSL lockstitch · XSO overlock · XSI interlock · XSC chainstitch · XA automatic systems</span>],
             [<B key="a">Series</B>, "A platform shared by two or more models", <span key="b" className="font-mono">XSO-7800</span>],
             [<B key="a">Model</B>, "The buyable model — its series plus feature tokens", <span key="b" className="font-mono">XSO-7800-4 · XSL-L9 · XSL-L9-T</span>],
           ]}

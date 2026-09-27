@@ -93,6 +93,11 @@ export function ColorPalette() {
         <Rule why="If green also decorates a banner, it can no longer mean “approved”.">
           Status colors appear only to show a state — approved, pending, error. Never as decoration.
         </Rule>
+        <Specs rows={[
+          ["Official warnings", "The headline and the warning object in Red #DC2626 — never a brighter red"],
+          ["Emergency lines", "An emergency address or number in Amber #D97706 — never a bright yellow"],
+          ["Sub-brands", "A named series such as NEXO keeps its own colours; they never touch the KOLEEX logo (ch. 16)"],
+        ]} />
       </Section>
 
       <Section id="color-files" title="Files">
@@ -435,7 +440,7 @@ export function Contrast() {
           ["Screens — smallest text", "12 px"],
           ["Print — body text", "9 pt"],
           ["Print — smallest text (legal lines)", "6.5 pt"],
-          ["Signs", "Letter height ≥ 25 mm per 10 m of reading distance"],
+          ["Signs", "Letter height about 25 mm for every 3 m of reading distance (ch. 39)"],
         ]} />
       </Section>
     </Chapter>

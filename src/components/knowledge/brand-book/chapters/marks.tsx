@@ -8,7 +8,7 @@ import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
   B, Bullets, Chapter, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { HubMark, HUB_MARK_FILES, LogoTile, Wordmark } from "../marks";
+import { GroupLockup, HubMark, HUB_MARK_FILES, LogoTile, Wordmark } from "../marks";
 
 /* ── 41 · The Logo in Small Spaces ────────────────────────────────────── */
 
@@ -224,8 +224,8 @@ export function HubMarkChapter() {
 
 /* ── 43 · Lockups ──────────────────────────────────────────────────────── */
 
-function Descriptor({ children, color = "#6E6E73", size = 9 }: { children: ReactNode; color?: string; size?: number }) {
-  return <span className="block font-semibold uppercase" style={{ color, fontSize: size, letterSpacing: "0.22em", lineHeight: 1 }}>{children}</span>;
+function Descriptor({ children, color = "#000000", size = 9 }: { children: ReactNode; color?: string; size?: number }) {
+  return <span className="block font-light uppercase" style={{ color, fontSize: size, letterSpacing: "0.3em", lineHeight: 1 }}>{children}</span>;
 }
 
 export function Lockups() {
@@ -234,52 +234,94 @@ export function Lockups() {
       n={43}
       lead={
         <p>
-          A lockup is the logo with a fixed line of text — the descriptor, the tagline, the legal name or a
+          A lockup is the logo with a fixed line of text — the group name, the tagline, the legal name or a
           region. It is built once, in exact proportions, and used as a single unit.
         </p>
       }
       toc={[
-        { id: "descriptor", title: "Logo + descriptor" },
+        { id: "descriptor", title: "The group lockup" },
+        { id: "horizontal", title: "The horizontal lockup" },
+        { id: "context", title: "The context header" },
         { id: "tagline", title: "Logo + tagline" },
         { id: "document", title: "The document lockup" },
         { id: "region", title: "Logo + region or company" },
         { id: "lockup-donts", title: "What never to do" },
       ]}
     >
-      <Section id="descriptor" title="Logo + descriptor">
+      <Section id="descriptor" title="The group lockup">
+        <P>
+          The logo with <B>KOLEEX INTERNATIONAL GROUP</B> under it — the lockup on the booth, the hanging banner, the
+          invitation, the cup and the VIP card. The line is light and spaced out to exactly the width of the logo,
+          in the logo’s own colour.
+        </P>
         <Examples cols={2}>
-          <Example tone="do" caption="Stacked: descriptor under the logo, aligned to the K." bg="#FFFFFF" h={170}>
-            <div className="flex flex-col items-start" style={{ gap: 14 }}>
-              <Wordmark color="#000000" width={260} />
-              <Descriptor>Industrial Garment Machinery</Descriptor>
-            </div>
+          <Example tone="do" caption="Stacked, on white: black logo, black line." bg="#FFFFFF" h={190}>
+            <GroupLockup color="#000000" width={280} />
           </Example>
-          <Example tone="do" caption="Horizontal: separated by a hairline, x apart." bg="#000000" h={170}>
-            <div className="flex items-center" style={{ gap: 18 }}>
-              <Wordmark color="#FFFFFF" width={170} />
-              <span className="h-[26px] w-px bg-[#6E6E73]" />
-              <Descriptor color="#98989D">Industrial<br />Garment Machinery</Descriptor>
-            </div>
+          <Example tone="do" caption="Stacked, on black: white logo, white line." bg="#000000" h={190}>
+            <GroupLockup color="#FFFFFF" width={280} />
           </Example>
         </Examples>
         <Specs rows={[
-          ["Text", "INDUSTRIAL GARMENT MACHINERY — the approved descriptor, in English"],
-          ["Typeface", "Inter SemiBold, all capitals, letter-spacing +0.22 em"],
-          ["Size", "Capital height = 0.30 x"],
-          ["Gap (stacked)", "0.5 x below the logo, left edge on the K"],
-          ["Color", "Gray #6E6E73 on light · #98989D on dark"],
-          ["Width", "Never wider than the logo"],
+          ["Text", "KOLEEX INTERNATIONAL GROUP — always in English, always in capitals"],
+          ["Typeface", "Inter Light (300), spaced so the line is exactly as wide as the logo"],
+          ["Size", "Capital height about 0.2 × the logo's height"],
+          ["Gap", "About 0.3 × the logo's height between the logo and the line"],
+          ["Colour", "The logo's colour: white on black, black on white — never grey"],
+          ["Smallest size", "Logo 40 mm wide in print, 160 px on screen. Smaller: the logo alone, without the line"],
+        ]} />
+        <Rule why="Four different versions of this line were found on real KOLEEX pieces — light, regular, bold and stacked — because each supplier typed it again.">
+          The line is never typed again. It comes from the lockup file, with the logo, as one piece.
+        </Rule>
+      </Section>
+
+      <Section id="horizontal" title="The horizontal lockup">
+        <P>For wide, short spaces — the back of the business card, the e-mail signature, a document header — the name sits beside the logo, after a hairline, on three lines.</P>
+        <Examples cols={2}>
+          <Example tone="do" caption="On black: the back of the business card." bg="#000000" h={150}>
+            <GroupLockup color="#FFFFFF" width={300} horizontal />
+          </Example>
+          <Example tone="do" caption="On white: e-mail signatures and headers." bg="#FFFFFF" h={150}>
+            <GroupLockup color="#000000" width={300} horizontal />
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Hairline", "The height of the three lines, in the logo's colour"],
+          ["Text", "KOLEEX / INTERNATIONAL / GROUP — Inter Light, three lines about 1.5 × the logo's height, centered on it"],
+          ["When", "Only where the stacked lockup would be too tall. Everywhere else, the stacked one"],
+        ]} />
+      </Section>
+
+      <Section id="context" title="The context header">
+        <P>The logo, a hairline, then where you are: a product category, an event and its day, a named series, a partner. It opens posts, posters and event photos.</P>
+        <Stage bg="#000000" h="auto" pad={28}>
+          <div className="flex w-full flex-col gap-4 text-white">
+            {[["Lockstitch Sewing Machine"], ["CISMA 2025", "DAY 2"], ["NEXO"], ["Official Announcement"]].map((parts) => (
+              <div key={parts.join()} className="flex items-center gap-3">
+                <Wordmark color="#FFFFFF" width={96} />
+                {parts.map((t, i) => (
+                  <span key={t} className="flex items-center gap-3"><span className="h-[16px] w-px bg-white/70" /><span className={`text-[14px] ${i === 0 ? "font-normal" : "font-light"}`}>{t}</span></span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Hairline", "The height of the logo's capitals, in the logo's colour, x apart on both sides"],
+          ["Text", "Inter Regular, about 0.9 × the logo's height; a second part (the day) in Light"],
+          ["Parts", "Two after the logo at most: KOLEEX | CISMA 2025 | DAY 2"],
+          ["A partner's logo", "Follows ch. 44 — equal weight, its own colours"],
         ]} />
       </Section>
 
       <Section id="tagline" title="Logo + tagline">
-        <Example tone="do" caption="The tagline follows the same system as the descriptor." bg="#FFFFFF" h={160}>
+        <Example tone="do" caption="The tagline follows the same system as the group line." bg="#FFFFFF" h={160}>
           <div className="flex flex-col items-start" style={{ gap: 14 }}>
             <Wordmark color="#000000" width={260} />
             <Descriptor>{KOLEEX_COMPANY.tagline}</Descriptor>
           </div>
         </Example>
-        <Note>The current tagline is <B>{KOLEEX_COMPANY.tagline}</B> A new tagline is being prepared (<Ref n={20} />); when it is approved, this lockup changes with it. Never use the descriptor and the tagline together.</Note>
+        <Note>The current tagline is <B>{KOLEEX_COMPANY.tagline}</B> A new tagline is being prepared (<Ref n={20} />); when it is approved, this lockup changes with it. Never use the group line and the tagline together.</Note>
       </Section>
 
       <Section id="document" title="The document lockup">
@@ -303,7 +345,7 @@ export function Lockups() {
       </Section>
 
       <Section id="region" title="Logo + region or company">
-        <Example tone="do" caption="A region or group company in the same system as the descriptor, after a hairline." bg="#FFFFFF" h={150}>
+        <Example tone="do" caption="A region or group company in the same system, after a hairline." bg="#FFFFFF" h={150}>
           <div className="flex items-center" style={{ gap: 18 }}>
             <Wordmark color="#000000" width={200} />
             <span className="h-[28px] w-px bg-[#98989D]" />
@@ -314,9 +356,12 @@ export function Lockups() {
       </Section>
 
       <Section id="lockup-donts" title="What never to do">
-        <Examples cols={3}>
+        <Examples cols={2}>
           <Example tone="dont" caption="Text larger or bolder than the logo." h={140}>
             <div className="flex flex-col items-start gap-1"><Wordmark color="#000000" width={150} /><span className="text-[22px] font-black">MACHINERY</span></div>
+          </Example>
+          <Example tone="dont" caption="The line typed again — bold, and not the logo's width." h={140}>
+            <div className="flex flex-col items-start gap-2"><Wordmark color="#000000" width={170} /><span className="text-[10px] font-bold">KOLEEX INTERNATIONAL GROUP</span></div>
           </Example>
           <Example tone="dont" caption="Another typeface or a script." h={140}>
             <div className="flex flex-col items-start gap-2"><Wordmark color="#000000" width={170} /><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 15 }}>Shaping the future</span></div>
@@ -372,6 +417,7 @@ export function CoBranding() {
           ["Size", "Equal visual weight: the partner logo is optically as large as ours, never larger"],
           ["Separation", "A hairline divider, with x of space on each side"],
           ["Colors", "Each logo in its own approved version; ours stays black or white"],
+          ["A coloured logo on black", "On a white panel or tab — never straight on the black (the Bento board, ch. 80)"],
           ["Maximum", "Three logos in one lockup — beyond that, use a logo wall"],
         ]} />
       </Section>

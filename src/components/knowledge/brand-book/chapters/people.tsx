@@ -22,16 +22,23 @@ const FOUNDER_PHOTO = "/brand/book/founder-kamal-shafei.webp";
 /* ── Drawings ──────────────────────────────────────────────────────────── */
 
 /** A polo shirt, front view (designed at 200 × 200). The logo sits on the
- *  wearer's left chest — the viewer's right. */
-function Polo({ color = INK, ink = "#FFFFFF", logo = "chest" }: { color?: string; ink?: string; logo?: "chest" | "center" | "none" }) {
+ *  wearer's left chest — the viewer's right. `trim` draws the two approved
+ *  designs (owner, 27/09/2026): white collar and cuffs with shoulder
+ *  piping (A) or with a white placket (B). */
+function Polo({ color = INK, ink = "#FFFFFF", logo = "chest", trim = "none" }: { color?: string; ink?: string; logo?: "chest" | "center" | "none"; trim?: "piping" | "placket" | "none" }) {
   const line = color === "#FFFFFF" ? "#D1D1D6" : "rgba(255,255,255,0.18)";
+  const t = color === "#FFFFFF" ? INK : "#FFFFFF";
   return (
     <div className="relative" style={{ width: 200, height: 200 }}>
       <svg viewBox="0 0 200 200" width={200} height={200} className="absolute inset-0" aria-hidden>
         <path d="M60 30 L84 20 Q100 30 116 20 L140 30 L176 56 L160 82 L145 72 L145 186 L55 186 L55 72 L40 82 L24 56 Z" fill={color} stroke={line} strokeWidth="1.5" strokeLinejoin="round" />
         <path d="M84 20 L100 44 L116 20" fill="none" stroke={line} strokeWidth="1.5" />
         <path d="M100 44 L100 70" stroke={line} strokeWidth="1.5" />
-        <circle cx="100" cy="53" r="1.6" fill={line} /><circle cx="100" cy="63" r="1.6" fill={line} />
+        {trim === "placket" && <rect x="95" y="42" width="10" height="30" fill={t} />}
+        {trim !== "none" && <path d="M84 20 L100 44 L116 20 Q100 30 84 20 Z M84 20 L76 34 L96 40 Z M116 20 L124 34 L104 40 Z" fill={t} />}
+        {trim === "piping" && <path d="M80 24 L30 62 M120 24 L170 62" stroke={t} strokeWidth="2.2" />}
+        {trim !== "none" && <path d="M24 56 L40 82 M176 56 L160 82" stroke={t} strokeWidth="5" />}
+        <circle cx="100" cy="53" r="1.6" fill={trim === "placket" ? color : line} /><circle cx="100" cy="63" r="1.6" fill={trim === "placket" ? color : line} />
       </svg>
       {logo === "chest" && <div className="absolute" style={{ left: 114, top: 66 }}><Wordmark color={ink} width={30} /></div>}
       {logo === "center" && <div className="absolute" style={{ left: 60, top: 96 }}><Wordmark color="#EAB308" width={80} /></div>}
@@ -56,32 +63,35 @@ export function Uniforms() {
       n={122}
       lead={
         <p>
-          A uniform tells a customer who to ask. Ours is simple and well made: black, the white logo on the
-          chest, nothing else. It looks the same at CISMA, in a customer’s factory and in our office.
+          A uniform tells a customer who to ask. Ours is simple and well made: black, white trims, the white
+          logo on the chest. It looks the same at CISMA, in a customer’s factory and in our office.
         </p>
       }
       toc={[
         { id: "set", title: "The set" },
         { id: "placement", title: "Logo placement" },
+        { id: "lanyard", title: "The lanyard" },
         { id: "uniform-never", title: "What never to do" },
       ]}
     >
       <Section id="set" title="The set">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-end justify-center gap-4">
-            <Item label="Polo — everyone"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
+            <Item label="Polo A — piping"><Scaled w={92} base={200} h={200}><Polo trim="piping" /></Scaled></Item>
+            <Item label="Polo B — placket"><Scaled w={92} base={200} h={200}><Polo trim="placket" /></Scaled></Item>
             <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
           </div>
         </Stage>
         <Table
           head={["Who", "Garment", "Colors"]}
           rows={[
-            ["Sales, office, exhibitions, visits", "Piqué polo", "Black, white logo"],
+            ["Sales, office, exhibitions, visits", "Piqué polo — design A (shoulder piping) or B (white placket)", "Black body; white collar, cuffs, trims and logo"],
             ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Black, white logo"],
             ["Cold weather", "Soft-shell jacket", "Black, white logo"],
-            ["Second version", "Polo or shirt", "White, black logo — hot days and white rooms (ch. 47)"],
+            ["Second version", "Polo or shirt", "White, black trims and logo — hot days and white rooms (ch. 47)"],
           ]}
         />
+        <Note>The polo is set. Shirts, jackets and technicians’ workwear are designed next, in the same black-and-white language.</Note>
       </Section>
 
       <Section id="placement" title="Logo placement">
@@ -94,10 +104,24 @@ export function Uniforms() {
         <Note>In the warehouse, high-visibility vests and safety wear come first. The logo may be printed on the back of a vest, black on yellow; it never covers the reflective strips.</Note>
       </Section>
 
+      <Section id="lanyard" title="The lanyard">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <svg viewBox="0 0 220 130" style={{ width: 220 }} aria-hidden>
+            <path d="M60 0 L100 100 M160 0 L120 100" stroke="#000000" strokeWidth="16" />
+            <rect x="90" y="96" width="40" height="30" rx="3" fill="#FFFFFF" stroke="#AEAEB2" />
+          </svg>
+        </Stage>
+        <Specs rows={[
+          ["Strap", "Black, 20 mm, the white logo repeated along it"],
+          ["Who", "Everyone — in the office, at visits and at fairs, instead of the fair’s own lanyard"],
+          ["Badge", "A clear holder with the staff ID card"],
+        ]} />
+      </Section>
+
       <Section id="uniform-never" title="What never to do">
         <Examples cols={2}>
           <Example tone="do" caption="One logo, on the chest, one color." bg="#F5F5F7" h={200}>
-            <Scaled w={160} base={200} h={200}><Polo /></Scaled>
+            <Scaled w={160} base={200} h={200}><Polo trim="piping" /></Scaled>
           </Example>
           <Example tone="dont" caption="Gold thread, a big logo in the middle, a colored shirt." bg="#F5F5F7" h={200}>
             <Scaled w={160} base={200} h={200}><Polo color="#1D4ED8" logo="center" /></Scaled>
@@ -167,7 +191,13 @@ export function Merchandise() {
             ["Notebook, A5, black", "Blind or white foil deboss", "Logo 40 mm, bottom center"],
             ["Pen, black metal", "Laser engraving", "The full logo along the barrel, 30 mm"],
             ["Tote bag, black cotton", "Screen print, white", "Logo 120–150 mm"],
-            ["Mug, black ceramic (matte)", "Ceramic print, white", "Logo 60 mm, on the side facing the drinker’s right hand"],
+            ["Mug, black ceramic (matte), white inside", "Ceramic print, white", "The group lockup, 60 mm, on both sides"],
+            ["Paper bag — fairs", "Black art paper, black rope handles, white print", "The group lockup, centered"],
+            ["Paper bag — VIP", "Black art paper, black ribbon handles, white foil", "The group lockup, centered; the website small at the bottom"],
+            ["Backpack, black", "Embroidery or heat transfer, white", "Logo 60–80 mm, on the upper front"],
+            ["Tool bag, black nylon — technicians", "Screen print, white", "The group lockup, large, on the front — from the lockup file"],
+            ["Carry-on case, black hard shell", "UV print with a clear coat, or a black engraved badge", "The group lockup, upper center"],
+            ["Ashtray, black metal — our offices only", "Laser engraving, the metal’s tone", "The group lockup; never given as a gift"],
             ["Cap, black cotton", "Embroidery, white", "The full logo, 50–60 mm on the front"],
             ["Tape measure, seam ripper, thread snips", "Pad print", "The full logo along the longest flat side — tools for the people who use our machines"],
           ]}
@@ -180,6 +210,7 @@ export function Merchandise() {
           "No slogans, website lists or social icons on gifts.",
           "Sample first: every item is approved on a physical sample before an order (ch. 134).",
           "Gifts follow the law and the customer’s own rules; never cash or cash-like gifts.",
+          "Tobacco items are never a KOLEEX gift.",
         ]} />
       </Section>
     </Chapter>

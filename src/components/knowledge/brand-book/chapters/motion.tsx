@@ -17,7 +17,7 @@ import PauseIcon from "@/components/icons/ui/PauseIcon";
 import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { Wordmark } from "../marks";
+import { Wordmark, GroupLockup } from "../marks";
 import { MachineShot } from "../mockups";
 import { SILVER } from "@/lib/brand-book/tokens";
 
@@ -217,14 +217,13 @@ export function VideoKit() {
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <Frame w={340}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-              <Wordmark color="#FFFFFF" width={150} />
-              <span className="text-[8px] font-semibold tracking-[0.2em] text-[#98989D]">INDUSTRIAL GARMENT MACHINERY</span>
+              <GroupLockup color="#FFFFFF" width={150} />
               <span className="mt-2 font-mono text-[9px] text-[#D1D1D6]">www.koleexgroup.com</span>
             </div>
           </Frame>
         </Stage>
         <Specs rows={[
-          ["Content", "Logo, descriptor (or tagline), one contact: the website or WhatsApp"],
+          ["Content", "The group lockup (ch. 43), one contact: the website or WhatsApp"],
           ["Background", "Black #000000"],
           ["Sound", "The KOLEEX melody, outro version"],
           ["Never", "A list of every social account, phone numbers in several countries"],

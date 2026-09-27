@@ -138,6 +138,7 @@ export function TypeScale() {
         { id: "screen", title: "Screen scale" },
         { id: "print", title: "Print scale" },
         { id: "setting", title: "Setting text" },
+        { id: "two-line", title: "The two-line headline" },
         { id: "type-donts", title: "What never to do" },
       ]}
     >
@@ -173,11 +174,29 @@ export function TypeScale() {
 
       <Section id="setting" title="Setting text">
         <Specs rows={[
-          ["Headlines", "Short — three to six words, SemiBold, tight tracking, balanced lines"],
+          ["Headlines", "Short — three to six words, SemiBold, tight tracking, balanced lines — or the two-line headline below"],
           ["Alignment", "Centered for heroes and short statements; start-aligned for everything longer"],
           ["Line length", "45–70 characters"],
-          ["Weights per piece", "Two: SemiBold for headlines, Regular for text"],
+          ["Weights per piece", "SemiBold or Bold for headlines, Light only for the second line of a two-line headline, Regular for text"],
           ["Labels", "Sentence case in Gray — no letter-spaced capitals"],
+        ]} />
+      </Section>
+
+      <Section id="two-line" title="The two-line headline">
+        <P>The headline KOLEEX uses most: a Bold line that names the thing, and a Light line under it that says what it does.</P>
+        <Examples cols={2}>
+          <Example tone="do" caption="Product: the model code Bold, the name Light." bg="#000000" h={170}>
+            <div className="text-white"><p className="text-[40px] font-bold leading-none tracking-[-0.02em]">XSL-L9</p><p className="mt-2 text-[24px] font-light leading-tight">Double-Stepper Lockstitch</p></div>
+          </Example>
+          <Example tone="do" caption="Message: a Bold line, a Light line." bg="#000000" h={170}>
+            <div className="text-white"><p className="text-[30px] font-bold leading-tight tracking-[-0.02em]">Built for Change</p><p className="text-[30px] font-light leading-tight tracking-[-0.01em]">Powered by Vision</p></div>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["First line", "Inter Bold (700) — the model code, or the claim"],
+          ["Second line", "Inter Light (300) — the same size, or about 60% of it under a model code"],
+          ["Case", "Model codes in capitals; everything else in the case it is written in"],
+          ["Never", "A closing square or dot after the line; a third line"],
         ]} />
       </Section>
 

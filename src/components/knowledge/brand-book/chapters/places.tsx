@@ -16,7 +16,7 @@ import AutomaticMachineIcon from "@/components/icons/machine-kinds/AutomaticMach
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { HubMark, Wordmark } from "../marks";
+import { HubMark, Wordmark, GroupLockup } from "../marks";
 import { INK, MachineShot, QrBox, Scaled, Slide } from "../mockups";
 import { SILVER } from "@/lib/brand-book/tokens";
 
@@ -195,6 +195,7 @@ export function ExhibitionKit() {
       }
       toc={[
         { id: "rollup", title: "Roll-up and table cover" },
+        { id: "entrance-banner", title: "The hanging banner" },
         { id: "kit-list", title: "The kit list" },
         { id: "badges", title: "Badges and lanyards" },
       ]}
@@ -215,6 +216,40 @@ export function ExhibitionKit() {
           ["Roll-up", "850 × 2000 mm, dark-led; logo 500 mm wide at the top; the lower 200 mm stays empty (hidden by tables and legs)"],
           ["Table cover", "Black fitted cover to the floor, white logo centered on the front, 400–500 mm wide"],
           ["Material", "Matte, non-reflective fabric or film — photographs well under hall lights"],
+        ]} />
+      </Section>
+
+      <Section id="entrance-banner" title="The hanging banner">
+        <Rule why="A banner over the hall entrance is read from the floor, eight metres below, by people walking past. Its only job is to send them to the booth.">
+          A hanging banner carries four things: the logo, the booth number — large — one line, and the way to
+          the hall. No QR codes, no paragraphs.
+        </Rule>
+        <Examples cols={2}>
+          <Example tone="do" caption="Logo, booth number, one line, the direction." bg="#D1D1D6" h={230}>
+            <div className="relative overflow-hidden rounded-[2px] bg-black text-white" style={{ width: 130, height: 190 }}>
+              <div className="absolute inset-y-0 left-0 w-[2px] bg-white" />
+              <div className="absolute left-[12px] top-[12px]"><Wordmark color="#FFFFFF" width={74} /></div>
+              <p className="absolute left-[12px] top-[62px] text-[7px] text-[#98989D]">Booth</p>
+              <p className="absolute left-[12px] top-[72px] text-[24px] font-bold leading-none">W5-C42</p>
+              <p className="absolute left-[12px] top-[104px] text-[10px] font-bold leading-tight">Built for Change</p>
+              <p className="absolute bottom-[14px] left-[12px] text-[10px]">Hall W5 →</p>
+            </div>
+          </Example>
+          <Example tone="dont" caption="QR codes, a paragraph and a small booth number." bg="#D1D1D6" h={230}>
+            <div className="relative overflow-hidden rounded-[2px] bg-[#2C2F36] text-white" style={{ width: 130, height: 190 }}>
+              <div className="absolute left-[10px] top-[10px]"><Wordmark color="#FFFFFF" width={60} /></div>
+              <p className="absolute left-[10px] top-[30px] rounded-[2px] border border-white px-1 text-[6px]">W5-C42</p>
+              <div className="absolute left-[10px] right-[10px] top-[96px] space-y-[3px]">{[0, 1, 2, 3].map((i) => <div key={i} className="h-[2px] rounded bg-[#8E8E93]" />)}</div>
+              <div className="absolute bottom-[10px] right-[10px] flex gap-1">{[0, 1].map((i) => <span key={i} className="h-5 w-5 bg-white" />)}</div>
+            </div>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Content", "Logo · booth number (the largest text) · one line · hall and direction"],
+          ["Letter size", "About 25 mm for every 3 m of reading distance (ch. 39)"],
+          ["Material", "Blockout fabric — daylight behind it turns a thin black fabric grey"],
+          ["Black", "Rich black C60 M40 Y40 K100 (ch. 48)"],
+          ["Never", "QR codes or small text above head height"],
         ]} />
       </Section>
 
@@ -251,7 +286,7 @@ export function ExhibitionKit() {
           </div>
         </Stage>
         <Bullets items={[
-          "Black lanyard with the white logo repeated; badge 86 × 120 mm.",
+          "Black lanyard with the white logo repeated — worn instead of the fair’s own lanyard (ch. 122); badge 86 × 120 mm.",
           "Name large enough to read from 2 m; the languages the person speaks under the title.",
           "No personal phone numbers on badges.",
         ]} />
@@ -361,6 +396,7 @@ export function OfficeSignage() {
         { id: "entrance", title: "Entrance and reception" },
         { id: "rooms", title: "Room signs" },
         { id: "glass", title: "Glass" },
+        { id: "flags", title: "Flags" },
         { id: "office-specs", title: "Specifications" },
       ]}
     >
@@ -416,8 +452,30 @@ export function OfficeSignage() {
       <Section id="glass" title="Glass">
         <P>
           Glass doors and walls carry a frosted band at eye height (about 1400–1600 mm) so no one walks into
-          them. The band may carry the logo once, frosted — never a colored print.
+          them. The band is the KOLEEX dots — the dotted world map (<Ref n={57} />) — and may carry the logo
+          once, frosted. Never a colored print.
         </P>
+      </Section>
+
+      <Section id="flags" title="Flags">
+        <Examples cols={2}>
+          <Example tone="do" caption="A vertical flag: the logo reads level while it hangs." bg="#F5F5F7" h={200}>
+            <div className="relative" style={{ width: 90, height: 170 }}>
+              <div className="absolute left-[10px] top-0 h-full w-[3px] bg-[#8E8E93]" />
+              <div className="absolute left-[13px] top-[6px] bg-black" style={{ width: 56, height: 120 }}><div className="absolute left-[8px] top-[18px]"><Wordmark color="#FFFFFF" width={40} /></div></div>
+            </div>
+          </Example>
+          <Example tone="dont" caption="A landscape flag hanging down: the logo turns on its side." bg="#F5F5F7" h={200}>
+            <div className="relative" style={{ width: 90, height: 170 }}>
+              <div className="absolute left-[10px] top-0 h-full w-[3px] bg-[#8E8E93]" />
+              <div className="absolute left-[13px] top-[6px] bg-black" style={{ width: 50, height: 120 }}><div className="absolute left-[27px] top-[40px] origin-top-left rotate-90"><Wordmark color="#FFFFFF" width={60} /></div></div>
+            </div>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Indoor flags", "Vertical (portrait), black, the white logo level near the top"],
+          ["Why", "A landscape flag on an indoor pole hangs down, and the logo turns on its side (ch. 40)"],
+        ]} />
       </Section>
 
       <Section id="office-specs" title="Specifications">
@@ -425,6 +483,7 @@ export function OfficeSignage() {
           ["Offices", "Black walls where people meet us (reception, meeting rooms), like the showroom; work areas may stay light. White is the second version (ch. 47)"],
           ["Entrance plate", "Black acrylic or black anodized aluminum, logo and names engraved or printed white; about 600 × 360 mm"],
           ["Reception logo", "3D letters, white on the black wall, halo-lit (ch. 39); 1000–1600 mm wide"],
+          ["On a white wall", "Black letters — black acrylic or black anodized, never grey — with the group line of ch. 43"],
           ["Room signs", "150 × 60 mm, white acrylic, black print, fixed at 1500 mm to the center"],
           ["Lit signs", "Halo-lit letters, white light only (ch. 39)"],
         ]} />
@@ -586,8 +645,7 @@ function Van({ wrong = false }: { wrong?: boolean }) {
         </div>
       ) : (
         <div className="absolute left-[30px] top-[48px] flex flex-col gap-2">
-          <Wordmark color="#FFFFFF" width={130} />
-          <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
+          <GroupLockup color="#FFFFFF" width={130} />
           <p className="text-[7px] text-[#F5F5F7]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>{KOLEEX_COMPANY.web}</p>
         </div>
       )}
@@ -612,7 +670,7 @@ export function Vehicles() {
     >
       <Section id="livery" title="The livery">
         <Examples cols={2}>
-          <Example tone="do" caption="Black body; the white logo, descriptor, website." bg="#F5F5F7" h={180}>
+          <Example tone="do" caption="Black body; the white group lockup and the website." bg="#F5F5F7" h={180}>
             <Scaled w={260} base={320} h={150}><Van /></Scaled>
           </Example>
           <Example tone="dont" caption="Colors, slogans, a list of services and phone numbers." bg="#F5F5F7" h={180}>
@@ -622,7 +680,7 @@ export function Vehicles() {
         <Specs rows={[
           ["Vehicle color", "Black — factory black paint, or a matte black wrap where the vehicle is not black"],
           ["Logo", "Both sides, 900–1200 mm wide on a van; the back doors 500 mm"],
-          ["Text", "The descriptor and the website only"],
+          ["Text", "The group lockup (ch. 43) and the website only"],
           ["Material", "Cut matte white vinyl"],
           ["Second version", "White body, black logo — for hot climates, or where the local fleet is white (ch. 47)"],
         ]} />

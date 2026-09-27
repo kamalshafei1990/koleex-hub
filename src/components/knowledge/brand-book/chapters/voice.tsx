@@ -103,6 +103,9 @@ export function NameUsage() {
 
 /* ── 19 · Legal Names & Trademarks ─────────────────────────────────────── */
 
+/** The formal English name (owner, 27/09/2026) — formal documents only. */
+const LEGAL_EN = "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD.";
+
 export function LegalNames() {
   return (
     <Chapter
@@ -118,9 +121,9 @@ export function LegalNames() {
         <Table
           head={["Name", "Use it on"]}
           rows={[
-            [<span key="a" className="font-mono text-[12.5px]">{KOLEEX_COMPANY.en}</span>, "Contracts, invoices, customs and bank documents, official letters — exactly as registered"],
+            [<span key="a" className="font-mono text-[12.5px]">{LEGAL_EN}</span>, "Formal documents only — contracts, invoices, customs and bank documents, official letters"],
             [<span key="a" lang="zh-Hans" style={ZH_FONT}>{KOLEEX_COMPANY.zh}</span>, "Chinese contracts, invoices, seals and government forms"],
-            [<B key="a">KOLEEX International Group</B>, "Company profile, LinkedIn, press, partner material"],
+            [<B key="a">KOLEEX International Group</B>, "The everyday name — company profile, LinkedIn, press, partner material, e-mails"],
             [<B key="a">KOLEEX</B>, "Machines, marketing, social media, signs — everywhere else"],
           ]}
         />
@@ -145,6 +148,7 @@ export function LegalNames() {
 
       <Section id="tm" title="Trademarks">
         <Bullets items={[
+          <>The KOLEEX trademark: registration No. <span className="font-mono">74343050</span>.</>,
           <>® only where KOLEEX is registered, once, at the first mention (<Ref n={132} />).</>,
           "The list of registrations is kept by management. Ask before using ® in a new market.",
           "Never register a domain, company name or social account containing KOLEEX without the Founder & CEO’s approval.",

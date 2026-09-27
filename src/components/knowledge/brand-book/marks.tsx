@@ -13,7 +13,7 @@
    --------------------------------------------------------------------------- */
 
 import type { CSSProperties } from "react";
-import KoleexLogo from "@/components/layout/KoleexLogo";
+import KoleexLogo, { KoleexLogoPaths } from "@/components/layout/KoleexLogo";
 
 /** Give it a width OR a height (px, %, mm…); the ratio is locked to the file. */
 export function Wordmark({ color = "#000000", width, height, className = "", style }: {
@@ -31,6 +31,43 @@ export function Wordmark({ color = "#000000", width, height, className = "", sty
       style={{ color, width, height, aspectRatio: "719.83 / 107.57", ...style }}
     >
       <KoleexLogo className="block h-full w-full" />
+    </span>
+  );
+}
+
+const LOCKUP_FONT = "var(--font-inter), Inter, 'Helvetica Neue', Arial, sans-serif";
+
+/** The group lockup (owner, 27/09/2026): the logo with KOLEEX INTERNATIONAL
+ *  GROUP under it — Inter Light, spaced out to exactly the logo's width, in
+ *  the logo's own colour. `horizontal` is the wide form: logo | hairline |
+ *  the name on three lines (card backs, e-mail signatures, headers). */
+export function GroupLockup({ color = "#000000", width, horizontal = false, style }: {
+  color?: string;
+  width?: number | string;
+  horizontal?: boolean;
+  style?: CSSProperties;
+}) {
+  if (horizontal) {
+    return (
+      <span role="img" aria-label="KOLEEX International Group" className="inline-block shrink-0" style={{ color, width, aspectRatio: "1190 / 160", ...style }}>
+        <svg viewBox="0 0 1190 160" className="block h-full w-full" fill="currentColor" aria-hidden="true">
+          <svg x="0" y="26" width="720" height="108" viewBox="0 0 719.83 107.57"><KoleexLogoPaths /></svg>
+          <rect x="786" y="0" width="3" height="160" />
+          <text fontFamily={LOCKUP_FONT} fontWeight={300} fontSize={40} letterSpacing={1}>
+            <tspan x="846" y="42">KOLEEX</tspan>
+            <tspan x="846" y="99">INTERNATIONAL</tspan>
+            <tspan x="846" y="156">GROUP</tspan>
+          </text>
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span role="img" aria-label="KOLEEX International Group" className="inline-block shrink-0" style={{ color, width, aspectRatio: "720 / 166", ...style }}>
+      <svg viewBox="0 0 720 166" className="block h-full w-full" fill="currentColor" aria-hidden="true">
+        <svg x="0" y="0" width="720" height="108" viewBox="0 0 719.83 107.57"><KoleexLogoPaths /></svg>
+        <text x="0" y="160" fontFamily={LOCKUP_FONT} fontWeight={300} fontSize={30} textLength={720} lengthAdjust="spacing">KOLEEX INTERNATIONAL GROUP</text>
+      </svg>
     </span>
   );
 }

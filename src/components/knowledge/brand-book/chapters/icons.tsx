@@ -103,6 +103,7 @@ export function Icons() {
         { id: "style", title: "The style" },
         { id: "library", title: "The Visual Library" },
         { id: "sizes", title: "Sizes" },
+        { id: "areas", title: "The business-area set" },
         { id: "icon-color", title: "Color" },
         { id: "icon-donts", title: "What never to do" },
       ]}
@@ -148,6 +149,28 @@ export function Icons() {
             ["48 px and up", "Category tiles, catalog openers, signs"],
           ]}
         />
+      </Section>
+
+      <Section id="areas" title="The business-area set">
+        <P>Six icons stand for what KOLEEX covers. They appear together — on covers, the company profile and the website — each in a rounded frame.</P>
+        <Table
+          head={["Area", "Icon"]}
+          rows={[
+            [<B key="a">Sewing</B>, "The sewing machine"],
+            [<B key="a">Garments</B>, "The T-shirt"],
+            [<B key="a">Cutting</B>, "The scissors"],
+            [<B key="a">Pressing and finishing</B>, "The iron"],
+            [<B key="a">Pattern and sampling</B>, "The dress form"],
+            [<B key="a">Parts and accessories</B>, "The needle and thread"],
+          ]}
+        />
+        <Specs rows={[
+          ["One set", "The same stroke, the same 24 × 24 grid and the same optical size — a detailed icon is simplified to match the others"],
+          ["Frame", "A rounded square, corner 28% of its side, a 1 px line in the icon's colour; the icon fills about 60% of it"],
+          ["Order", "Always the order above, in one row"],
+          ["Colour", "White on black, black on white — one colour"],
+        ]} />
+        <Note>The six icons on the current cover differ in stroke and size. They are redrawn as one set and added to the Visual Library.</Note>
       </Section>
 
       <Section id="icon-color" title="Color">

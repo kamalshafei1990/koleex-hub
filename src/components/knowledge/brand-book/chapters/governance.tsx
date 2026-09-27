@@ -41,9 +41,10 @@ export function LegalClaims() {
     >
       <Section id="names" title="Names and trademark symbols">
         <Specs rows={[
-          ["Legal name (English)", KOLEEX_COMPANY.en],
+          ["Legal name (English)", "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD." + " — formal documents only"],
           ["Legal name (Chinese)", KOLEEX_COMPANY.zh],
-          ["Trading name", "KOLEEX International Group"],
+          ["Trading name", "KOLEEX International Group — the everyday name"],
+          ["Trademark", "KOLEEX, registration No. 74343050"],
           ["In running text", "KOLEEX — always in capitals; the logo is never typed (ch. 36)"],
         ]} />
         <Rule why="Marking an unregistered name as registered is illegal in China and counts as misleading advertising in many other markets.">
@@ -460,6 +461,7 @@ function Checklist({ items }: { items: string[] }) {
 const LISTS: Array<[string, string[]]> = [
   ["Every piece", [
     "The logo is the master file, one flat color, with its clear space (ch. 36–40)",
+    "The group line is the lockup file — never typed again (ch. 43)",
     "Colors are from the palette; silver as the premium touch, Hub Blue on links and buttons only (ch. 45–47)",
     "The piece is in its black or its white version — not half and half (ch. 47)",
     "Type is Inter (or the Arabic and Chinese faces) on the type scale (ch. 50–51)",
@@ -470,8 +472,9 @@ const LISTS: Array<[string, string[]]> = [
     "File named by the rules (ch. 135) and approved (ch. 134)",
   ]],
   ["Social post", [
-    "Made from a post template; the logo top-left, the same on every post (ch. 38, 80)",
-    "Headline six words or fewer; caption hook under 80 characters",
+    "Made from a post template: the KOLEEX edge, the logo top-left (or top-right), the same across a series (ch. 38, 57, 80)",
+    "The two-line headline, six words or fewer; caption hook under 80 characters (ch. 51)",
+    "Event photos: the dark bands, the header and the fixed footer (ch. 80)",
     "Right size for the platform (ch. 81–88)",
     "Three to five hashtags; one clear next step",
     "Tagged people and companies agreed to be tagged",
@@ -484,7 +487,8 @@ const LISTS: Array<[string, string[]]> = [
   ]],
   ["Machine shipment", [
     "White body; the black logo on the arm, straight, durable (ch. 107)",
-    "Black engraved nameplate with the right model, serial, voltage and year (ch. 108)",
+    "Black engraved nameplate with the right model, serial (KL2609N0001 form, the same on the barcode), voltage and year (ch. 108)",
+    "Automatic units: three logos at most, none on the table top (ch. 107)",
     "Safety labels in English and the market’s language (ch. 109)",
     "The model’s own carton (kraft, white or black); marks and labels match the packing list (ch. 110–111)",
     "No supplier name, code or logo anywhere (ch. 130)",
