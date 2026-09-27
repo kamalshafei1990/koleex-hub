@@ -235,6 +235,55 @@ export function MachineBranding() {
 
 /* ── 108 · Nameplates & Serial Labels ──────────────────────────────────── */
 
+/** Service stickers on the machine (60 × 40 mm; the QR one is round). */
+function ServiceSticker({ kind }: { kind: "white" | "black" | "qr" }) {
+  if (kind === "qr") {
+    return (
+      <div className="flex h-[112px] w-[112px] flex-col items-center justify-center gap-1.5 rounded-full bg-black text-white">
+        <Wordmark color="#FFFFFF" width={54} />
+        <QrBox size={30} />
+        <span className="text-[7px] font-semibold">Service &amp; parts</span>
+        <span className="text-[6px] text-[#AEAEB2]" style={MONO}>KL2609N0001</span>
+      </div>
+    );
+  }
+  const black = kind === "black";
+  return (
+    <div className="overflow-hidden rounded-[6px]" style={{ width: 168, height: 112, background: black ? "#000000" : "#FFFFFF", boxShadow: black ? "none" : "0 0 0 1px rgba(0,0,0,0.12)" }}>
+      <div className="flex items-center justify-between px-3 py-2" style={{ background: "#000000" }}>
+        <Wordmark color="#FFFFFF" width={54} /><span className="text-[7px] font-semibold tracking-[0.1em] text-white">SERVICE</span>
+      </div>
+      <div className="space-y-3 px-3 pt-2">
+        {["Last service", "Next service", "Technician"].map((l) => (
+          <div key={l} className="flex items-end gap-2 text-[7px]" style={{ color: black ? "#AEAEB2" : "#6E6E73" }}>
+            <span className="w-[52px] shrink-0">{l}</span><span className="h-px flex-1" style={{ background: black ? "#636366" : "#C7C7CC" }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The technician's service report on the house sheet. */
+function ServiceReport() {
+  return (
+    <div className="w-[240px] rounded bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "210 / 270" }}>
+      <div className="flex items-center justify-between"><Wordmark color="#000000" width={56} /><span className="text-[8px] font-bold tracking-[0.06em]">SERVICE REPORT</span></div>
+      <div className="mt-2 h-[8px] rounded-[2px] bg-[#0A0A0A]" />
+      <div className="mt-2 grid grid-cols-4 overflow-hidden rounded-[3px] text-[4.5px] text-[#6E6E73] ring-1 ring-[#E5E5EA]">
+        {["Report no.", "Date", "Customer", "Machine · serial"].map((l) => <span key={l} className="border-l border-[#E5E5EA] px-1 py-1.5 first:border-l-0">{l}</span>)}
+      </div>
+      {[["Problem reported", 16], ["Work done", 26]].map(([l, h]) => (
+        <div key={l as string} className="mt-2"><p className="text-[5px] font-semibold">{l}</p><div className="mt-0.5 rounded-[2px] bg-[#F2F2F7]" style={{ height: h as number }} /></div>
+      ))}
+      <p className="mt-2 text-[5px] font-semibold">Parts used</p>
+      <div className="mt-0.5 h-[7px] bg-[#0A0A0A]" /><div className="mt-px h-[6px] bg-[#F2F2F7]" /><div className="mt-px h-[6px] bg-[#F2F2F7]" />
+      <p className="mt-2 text-[5px] font-semibold">Time on site · next service</p><div className="mt-0.5 h-[10px] rounded-[2px] bg-[#F2F2F7]" />
+      <div className="mt-5 grid grid-cols-2 gap-3 text-[4.5px] text-[#6E6E73]"><div className="border-t border-[#C7C7CC] pt-0.5">Technician</div><div className="border-t border-[#C7C7CC] pt-0.5">Customer — work accepted</div></div>
+    </div>
+  );
+}
+
 export function Nameplates() {
   return (
     <Chapter
@@ -250,6 +299,7 @@ export function Nameplates() {
         { id: "plate", title: "The nameplate" },
         { id: "contents", title: "What it says" },
         { id: "serial", title: "The serial label" },
+        { id: "service-stickers", title: "Service stickers" },
         { id: "plate-specs", title: "Specifications" },
       ]}
     >
@@ -297,6 +347,20 @@ export function Nameplates() {
             </div>
           </div>
         </Stage>
+      </Section>
+
+      <Section id="service-stickers" title="Service stickers">
+        <Examples cols={3}>
+          <Example tone="do" caption="The service sticker: white, a black band — any pen writes on it." bg="#F5F5F7" h={170}><ServiceSticker kind="white" /></Example>
+          <Example tone="do" caption="On black machines: the black version (a white marker)." bg="#F5F5F7" h={170}><ServiceSticker kind="black" /></Example>
+          <Example tone="do" caption="On every machine: the round QR — scan to ask for service or parts." bg="#F5F5F7" h={170}><ServiceSticker kind="qr" /></Example>
+        </Examples>
+        <Specs rows={[
+          ["Service sticker", "60 × 40 mm matte polyester, beside the nameplate; the technician writes the dates by hand"],
+          ["Black version", "Only on black special-edition machines, with a white paint marker"],
+          ["QR sticker", "40 mm round, on the operator side of the head; it carries the serial and opens a service request for that machine"],
+          ["QR", "The KOLEEX QR code (ch. 104): black on white, the logo in the middle, tested before printing"],
+        ]} />
       </Section>
 
       <Section id="plate-specs" title="Specifications">
@@ -657,6 +721,7 @@ export function Manuals() {
       toc={[
         { id: "manual", title: "The manual" },
         { id: "warranty", title: "The warranty card" },
+        { id: "service-report", title: "The service report" },
         { id: "manual-specs", title: "Specifications" },
       ]}
     >
@@ -728,6 +793,17 @@ export function Manuals() {
           The warranty terms printed on the card are the terms in the sales contract — word for word. The card
           never promises more than the contract does (<Ref n={95} />).
         </P>
+      </Section>
+
+      <Section id="service-report" title="The service report">
+        <Stage bg="#F5F5F7" h="auto" pad={24}><ServiceReport /></Stage>
+        <Specs rows={[
+          ["Sheet", "The house sheet, 210 × 270 mm, like every KOLEEX document (ch. 94)"],
+          ["Filled in", "Koleex Hub, on the technician's phone or tablet; the customer signs on the screen and receives the PDF by WhatsApp or e-mail"],
+          ["Paper", "A printed blank for places without a connection — photographed into the Hub the same day"],
+          ["Contents", "Report no., date, customer, machine and serial; the problem, the work done, parts used, time on site, the next service; two signatures"],
+        ]} />
+        <Note>The Hub form for this report is built separately; until then the printed blank is used.</Note>
       </Section>
 
       <Section id="manual-specs" title="Specifications">

@@ -183,6 +183,63 @@ export function ExhibitionBooth() {
 
 /* ── 115 · Exhibition Kit ──────────────────────────────────────────────── */
 
+/** A photo backdrop (3 × 2.4 m), drawn at 240 × 190. */
+function Backdrop({ kind }: { kind: "solo" | "partner" | "press" }) {
+  const rows = [0, 1, 2, 3, 4];
+  const cols = [0, 1, 2];
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-[4px] bg-black" style={{ width: 240, height: 190 }}>
+      {kind !== "press" && rows.map((r) => cols.map((c) => {
+        const partner = kind === "partner" && (r + c) % 2 === 1;
+        const left = 10 + c * 80 + (r % 2 ? 40 : 0);
+        const top = 10 + r * 38;
+        return partner
+          ? <span key={`${r}-${c}`} className="absolute flex items-center justify-center rounded-[2px] border border-dashed border-[#8E8E93] text-[5px] font-semibold tracking-[0.1em] text-[#8E8E93]" style={{ left, top, width: 44, height: 10 }}>PARTNER</span>
+          : <span key={`${r}-${c}`} className="absolute" style={{ left, top }}><Wordmark color="#FFFFFF" width={44} /></span>;
+      }))}
+      {kind === "partner" && (
+        <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-black px-8 py-6">
+          <Wordmark color="#FFFFFF" width={60} /><span className="h-[14px] w-px bg-white" /><span className="flex h-[12px] w-[44px] items-center justify-center rounded-[2px] border border-dashed border-[#8E8E93] text-[5px] font-semibold text-[#8E8E93]">PARTNER</span>
+        </div>
+      )}
+      {kind === "press" && (
+        <>
+          <svg viewBox="0 0 240 190" className="absolute inset-0 h-full w-full" aria-hidden>
+            <path d="M-10 150 C 60 150, 80 70, 140 68 S 220 110, 250 40" fill="none" stroke="#FFFFFF" strokeOpacity="0.14" strokeWidth="8" />
+            <path d="M-10 150 C 60 150, 80 70, 140 68 S 220 110, 250 40" fill="none" stroke="#FFFFFF" strokeWidth="1.6" />
+          </svg>
+          <div className="absolute left-1/2 top-[18%] -translate-x-1/2"><GroupLockup color="#FFFFFF" width={120} /></div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The stage: with a screen (the default) or a printed wall. */
+function StageSet({ screen }: { screen: boolean }) {
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-[4px] bg-[#1C1C1E]" style={{ width: 280, height: 160 }}>
+      {screen ? (
+        <>
+          <div className="absolute flex items-center justify-center bg-black" style={{ left: 16, top: 12, width: 44, height: 104 }}><Wordmark color="#FFFFFF" width={36} /></div>
+          <div className="absolute flex items-center justify-center bg-black" style={{ right: 16, top: 12, width: 44, height: 104 }}><Wordmark color="#FFFFFF" width={36} /></div>
+          <div className="absolute bg-[#0A0A0A] ring-1 ring-[#3A3A3C]" style={{ left: 72, top: 12, width: 136, height: 82 }}>
+            <div className="flex items-center gap-1 px-2 pt-2"><Wordmark color="#FFFFFF" width={30} /><span className="h-[7px] w-px bg-white" /><span className="text-[5px] text-white">Event name</span></div>
+            <p className="px-2 pt-4 text-[10px] font-bold text-white">Slide</p>
+          </div>
+        </>
+      ) : (
+        <div className="absolute bg-black" style={{ left: 16, top: 12, width: 248, height: 104 }}>
+          <svg viewBox="0 0 248 104" className="absolute inset-0 h-full w-full" aria-hidden><path d="M0 92 C 70 92, 100 64, 150 66 S 220 84, 248 58" fill="none" stroke="#FFFFFF" strokeWidth="1.2" /></svg>
+          <div className="absolute left-1/2 top-[16%] -translate-x-1/2"><GroupLockup color="#FFFFFF" width={96} /></div>
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-[#2C2C2E]" style={{ height: 44 }} />
+      <div className="absolute flex items-start justify-center bg-black pt-3 ring-1 ring-[#3A3A3C]" style={{ left: 164, top: 96, width: 32, height: 46 }}><Wordmark color="#FFFFFF" width={24} /></div>
+    </div>
+  );
+}
+
 export function ExhibitionKit() {
   return (
     <Chapter
@@ -196,6 +253,7 @@ export function ExhibitionKit() {
       toc={[
         { id: "rollup", title: "Roll-up and table cover" },
         { id: "entrance-banner", title: "The hanging banner" },
+        { id: "backdrop", title: "The photo backdrop" },
         { id: "kit-list", title: "The kit list" },
         { id: "badges", title: "Badges and lanyards" },
       ]}
@@ -250,6 +308,21 @@ export function ExhibitionKit() {
           ["Material", "Blockout fabric — daylight behind it turns a thin black fabric grey"],
           ["Black", "Rich black C60 M40 Y40 K100 (ch. 48)"],
           ["Never", "QR codes or small text above head height"],
+        ]} />
+      </Section>
+
+      <Section id="backdrop" title="The photo backdrop">
+        <P>The wall people stand in front of for photos. Three versions, chosen by the occasion.</P>
+        <Examples cols={3}>
+          <Example tone="do" caption="Our own events: KOLEEX alone, a staggered grid." bg="#F5F5F7" h={200}><Scaled w={170} base={240} h={190}><Backdrop kind="solo" /></Scaled></Example>
+          <Example tone="do" caption="With a partner: alternating logos, the co-brand lockup in the middle." bg="#F5F5F7" h={200}><Scaled w={170} base={240} h={190}><Backdrop kind="partner" /></Scaled></Example>
+          <Example tone="do" caption="Press and speakers: one big lockup and the light line." bg="#F5F5F7" h={200}><Scaled w={170} base={240} h={190}><Backdrop kind="press" /></Scaled></Example>
+        </Examples>
+        <Specs rows={[
+          ["Size", "3 × 2.4 m, matte fabric — no shine under flash"],
+          ["Grid", "Logos about 300 mm wide, staggered, so every head-and-shoulders photo holds one whole logo"],
+          ["Partner", "Equal weight, its own colours on a white tile if needed (ch. 44)"],
+          ["Press wall", "The group lockup at head height and above, never behind a face"],
         ]} />
       </Section>
 
@@ -712,6 +785,7 @@ export function EventsTraining() {
       }
       toc={[
         { id: "pieces", title: "The pieces" },
+        { id: "stage", title: "Stage and lectern" },
         { id: "consent", title: "Photos and consent" },
         { id: "event-rules", title: "Rules" },
       ]}
@@ -747,6 +821,19 @@ export function EventsTraining() {
             ["Photos and posts", <Ref key="a" n={68} />],
           ]}
         />
+      </Section>
+
+      <Section id="stage" title="Stage and lectern">
+        <Examples cols={2}>
+          <Example tone="do" caption="With a screen (the usual case): the context header on the screen, logo panels on both sides." bg="#F5F5F7" h={200}><Scaled w={240} base={280} h={160}><StageSet screen /></Scaled></Example>
+          <Example tone="do" caption="Without a screen: a black wall, the lockup high and centered, the light line." bg="#F5F5F7" h={200}><Scaled w={240} base={280} h={160}><StageSet screen={false} /></Scaled></Example>
+        </Examples>
+        <Specs rows={[
+          ["Screen", "Every slide opens with the context header: KOLEEX | the event (ch. 43, 90)"],
+          ["Side panels", "Black, the white logo at eye height and above — seen in every photo of the speaker"],
+          ["Lectern", "Black, the white logo on the front, about 300 mm wide, high enough to clear the microphone"],
+          ["Never", "The logo on the floor, on the stage skirt, or behind the speaker's head"],
+        ]} />
       </Section>
 
       <Section id="consent" title="Photos and consent">

@@ -55,6 +55,42 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** The staff ID card, 86 × 124 mm (owner, 28/09/2026): a black front with
+ *  the portrait on dark; the back is the owner's own design. */
+function StaffCard({ side, light = false }: { side: "front" | "back"; light?: boolean }) {
+  const w = 124;
+  const h = (w * 124) / 86;
+  if (side === "back") {
+    return (
+      <div className="relative overflow-hidden rounded-[6px] bg-black" style={{ width: w, height: h }}>
+        <div className="absolute left-1/2 top-[38%] -translate-x-1/2"><Wordmark color="#FFFFFF" width={90} /></div>
+        <div className="absolute bottom-[10%] left-[9%] flex items-center gap-1.5">
+          <QrTile /><QrTile />
+          <span className="mx-1 h-[22px] w-px bg-white" />
+          <span className="text-[4.5px] font-light leading-[1.5] tracking-[0.2em] text-white">KOLEEX<br />INTERNATIONAL<br />GROUP</span>
+        </div>
+      </div>
+    );
+  }
+  const fg = light ? "#000000" : "#FFFFFF";
+  return (
+    <div className="relative overflow-hidden rounded-[6px]" style={{ width: w, height: h, background: light ? "#FFFFFF" : "#000000", boxShadow: light ? "0 0 0 1px rgba(0,0,0,0.12)" : "none" }}>
+      <div className="absolute left-[9%] top-[6%]"><Wordmark color={fg} width={46} /></div>
+      <div className="absolute left-[9%] right-[9%] top-[16%] overflow-hidden" style={{ height: "46%", background: light ? "#E5E5EA" : "#1C1C1E" }}>
+        <div className="absolute bottom-0 left-1/2 h-[45%] w-[56%] -translate-x-1/2 rounded-t-full bg-[#636366]" />
+        <div className="absolute left-1/2 top-[22%] h-[30%] w-[26%] -translate-x-1/2 rounded-full bg-[#8E8E93]" />
+      </div>
+      <p className="absolute left-[9%] top-[66%] text-[10px] font-bold" style={{ color: fg }}>Full Name</p>
+      <p className="absolute left-[9%] top-[73%] text-[7px] font-light" style={{ color: fg }}>Sales Engineer</p>
+      <p className="absolute bottom-[6%] left-[9%] text-[6px] text-[#8E8E93]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>KX-0042 · Sales</p>
+    </div>
+  );
+}
+
+function QrTile() {
+  return <span className="inline-block h-[20px] w-[20px] bg-white" style={{ backgroundImage: "repeating-conic-gradient(#000 0 25%, #fff 0 50%)", backgroundSize: "5px 5px", boxShadow: "0 0 0 2px #FFFFFF" }} />;
+}
+
 /* ── 122 · Uniforms ────────────────────────────────────────────────────── */
 
 export function Uniforms() {
@@ -70,7 +106,7 @@ export function Uniforms() {
       toc={[
         { id: "set", title: "The set" },
         { id: "placement", title: "Logo placement" },
-        { id: "lanyard", title: "The lanyard" },
+        { id: "lanyard", title: "The lanyard and the staff card" },
         { id: "uniform-never", title: "What never to do" },
       ]}
     >
@@ -104,7 +140,7 @@ export function Uniforms() {
         <Note>In the warehouse, high-visibility vests and safety wear come first. The logo may be printed on the back of a vest, black on yellow; it never covers the reflective strips.</Note>
       </Section>
 
-      <Section id="lanyard" title="The lanyard">
+      <Section id="lanyard" title="The lanyard and the staff card">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <svg viewBox="0 0 220 130" style={{ width: 220 }} aria-hidden>
             <path d="M60 0 L100 100 M160 0 L120 100" stroke="#000000" strokeWidth="16" />
@@ -115,6 +151,23 @@ export function Uniforms() {
           ["Strap", "Black, 20 mm, the white logo repeated along it"],
           ["Who", "Everyone — in the office, at visits and at fairs, instead of the fair’s own lanyard"],
           ["Badge", "A clear holder with the staff ID card"],
+        ]} />
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="flex flex-wrap items-end justify-center gap-5">
+            {([["Front", "front", false], ["Back — the current design", "back", false], ["Second version", "front", true]] as Array<[string, "front" | "back", boolean]>).map(([label, side, light]) => (
+              <figure key={label} className="flex flex-col items-center gap-2">
+                <Scaled w={120} base={124} h={180}><StaffCard side={side} light={light} /></Scaled>
+                <figcaption className="text-[11px] font-medium text-[#6E6E73]">{label}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Size", "86 × 124 mm, portrait, on the lanyard"],
+          ["Front", "Black: the logo top-left; the portrait in black and white on dark (ch. 66); the name Bold, the title Light; staff number and department"],
+          ["Back", "Black: the logo centered; the QR codes (ch. 104) and the horizontal lockup (ch. 43) at the bottom"],
+          ["Second version", "White front, black type (ch. 47)"],
+          ["Never", "A personal phone number, a home address, or a coloured band per department"],
         ]} />
       </Section>
 

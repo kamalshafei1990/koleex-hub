@@ -102,6 +102,7 @@ export function Presentations() {
         { id: "types", title: "The six slides" },
         { id: "specs", title: "Specifications" },
         { id: "slide-rules", title: "Rules" },
+        { id: "video-calls", title: "Video calls" },
       ]}
     >
       <Section id="types" title="The six slides">
@@ -137,7 +138,38 @@ export function Presentations() {
           "Client and partner logos only with their permission (ch. 44).",
         ]} />
       </Section>
+
+      <Section id="video-calls" title="Video calls">
+        <Examples cols={2}>
+          <Example tone="do" caption="The background: black, the light line, the lockup top-right." bg="#F5F5F7" h={210}><CallFrame /></Example>
+          <Example tone="do" caption="Second version, for bright rooms: light grey." bg="#F5F5F7" h={210}><CallFrame light /></Example>
+        </Examples>
+        <Specs rows={[
+          ["Size", "1920 × 1080 px, PNG"],
+          ["The lockup", "Top-right, about a fifth of the width — a head in the middle of the frame never covers it"],
+          ["Mirror", "Your own preview may show the logo reversed; the people you call see it the right way round"],
+          ["Never", "A room photo from the internet, a blurred office that is not ours, or several logos"],
+        ]} />
+      </Section>
     </Chapter>
+  );
+}
+
+/** A video-call frame: the background, a person in the middle, the lockup
+ *  top-right where a head never covers it. */
+function CallFrame({ light = false }: { light?: boolean }) {
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-[8px]" style={{ width: 300, aspectRatio: "16 / 9", background: light ? "#F5F5F7" : "#000000", boxShadow: light ? "0 0 0 1px rgba(0,0,0,0.1)" : "none" }}>
+      {!light && (
+        <svg viewBox="0 0 320 180" className="absolute inset-0 h-full w-full" aria-hidden>
+          <path d="M-10 150 C 80 150, 110 90, 190 88 S 300 120, 330 70" fill="none" stroke="#FFFFFF" strokeOpacity="0.12" strokeWidth="8" />
+          <path d="M-10 150 C 80 150, 110 90, 190 88 S 300 120, 330 70" fill="none" stroke="#FFFFFF" strokeWidth="1.3" />
+        </svg>
+      )}
+      <div className="absolute right-[5%] top-[8%]"><GroupLockup color={light ? "#000000" : "#FFFFFF"} width={70} /></div>
+      <div className="absolute bottom-0 left-1/2 h-[40%] w-[30%] -translate-x-1/2 rounded-t-full bg-[#636366]" />
+      <div className="absolute left-1/2 top-[34%] h-[24%] w-[14%] -translate-x-1/2 rounded-full bg-[#8E8E93]" />
+    </div>
   );
 }
 
@@ -275,6 +307,7 @@ export function Letterhead() {
       toc={[
         { id: "letter", title: "The letterhead" },
         { id: "envelopes", title: "Envelopes" },
+        { id: "folder", title: "The presentation folder" },
       ]}
     >
       <Section id="letter" title="The letterhead">
@@ -325,6 +358,31 @@ export function Letterhead() {
           ["Second version", "Black outside, white liner (ch. 47)"],
         ]} />
       </Section>
+
+      <Section id="folder" title="The presentation folder">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="flex flex-wrap items-end justify-center gap-6">
+            <div className="space-y-2 text-center">
+              <div className="flex items-center justify-center rounded-[3px] bg-black" style={{ width: 150, height: 206 }}><GroupLockup color="#FFFFFF" width={96} /></div>
+              <p className="text-[11px] text-[#6E6E73]">Outside</p>
+            </div>
+            <div className="space-y-2 text-center">
+              <div className="relative overflow-hidden rounded-[3px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ width: 150, height: 206 }}>
+                <div className="absolute inset-x-0 bottom-0 h-[42%] border-t border-[#D2D2D7] bg-[#FAFAFC]" />
+                <div className="absolute bottom-[26%] left-[12%] flex h-[34px] w-[56px] items-center justify-center bg-black"><Wordmark color="#FFFFFF" width={40} /></div>
+              </div>
+              <p className="text-[11px] text-[#6E6E73]">Inside — pocket and card slot</p>
+            </div>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Size", "A4 folder, 220 × 310 mm closed, a 100 mm pocket with a business-card slot"],
+          ["Outside", "Black soft-touch board, 350 g/m²; the group lockup (ch. 43) centered in white foil"],
+          ["Inside", "White, uncoated — nothing printed but the pocket"],
+          ["Back", "The website, small, bottom center"],
+          ["Second version", "White outside, the lockup in black foil (ch. 47)"],
+        ]} />
+      </Section>
     </Chapter>
   );
 }
@@ -354,6 +412,7 @@ export function EmailSignature() {
       toc={[
         { id: "signature", title: "The signature" },
         { id: "sig-rules", title: "Rules" },
+        { id: "event-banner", title: "The event banner" },
         { id: "sig-code", title: "Copy it" },
       ]}
     >
@@ -373,8 +432,29 @@ export function EmailSignature() {
           "Name and title in English; add the name in your own script on a second line if you wish.",
           "One phone number, in international format, marked WhatsApp if it is.",
           "The logo as an image, 120 px wide, from our own domain.",
-          "No quotes, banners, animated images, social icon rows or legal disclaimers longer than one line.",
+          "No quotes, animated images, social icon rows or legal disclaimers longer than one line.",
+          "No banner — except the event banner below, while there is something to announce.",
           "Replies and forwards use a short version: name, title, phone.",
+        ]} />
+      </Section>
+
+      <Section id="event-banner" title="The event banner">
+        <Stage bg="#FFFFFF" h="auto" pad={24}>
+          <div className="w-full max-w-[420px]">
+            <p className="text-[12px] font-bold text-[#1D1D1F]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>Full Name</p>
+            <p className="mb-2 text-[11px] text-[#6E6E73]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>Job Title · KOLEEX</p>
+            <div className="relative overflow-hidden rounded-[4px] bg-black px-5 py-3 text-white" style={{ aspectRatio: "600 / 120" }}>
+              <div className="absolute inset-y-0 left-0 w-[1%] bg-white" />
+              <div className="flex items-center gap-2"><Wordmark color="#FFFFFF" width={70} /><span className="h-[12px] w-px bg-white/80" /><span className="text-[11px]">CISMA 2025</span></div>
+              <p className="mt-2 text-[13px]"><span className="font-bold">Booth W5-C42</span><span className="ms-3 font-light">24–27 September 2025</span></p>
+            </div>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["When", "Only from the day an event or launch is announced to its last day — then removed"],
+          ["Size", "600 × 120 px PNG, from our own domain, under the signature"],
+          ["Content", "The context header (ch. 43) and one line: booth and dates, or the launch"],
+          ["Never", "A permanent banner, a slogan banner, or more than one banner"],
         ]} />
       </Section>
 
