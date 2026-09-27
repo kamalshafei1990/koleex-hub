@@ -1460,6 +1460,7 @@ export default function Quotations() {
     await downloadDocXlsx(fileBase, {
       docTitle: XL("title.invoice"),
       number: q.invoiceNo || q.id,
+      madeAt: q.createdAt,
       metaStrip: [
         [XL("meta.date").toUpperCase(), q.date || ""],
         [XL("meta.invoiceNo").toUpperCase(), q.invoiceNo || ""],

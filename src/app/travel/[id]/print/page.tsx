@@ -28,7 +28,7 @@ import type { InvitationLetter, InvitationSettings } from "@/lib/invitations/typ
  *
  *  Standing rule from the owner: "logo" always means the Koleex logo. The Hub
  *  mark is the internal software's badge; a letter that goes to a consulate
- *  represents KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., Ltd., and putting
+ *  represents the company (its registered name, lib/legal-name), and putting
  *  the software's badge on it signs with the wrong identity. The first version
  *  of this file did exactly that.
  *

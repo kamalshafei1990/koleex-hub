@@ -17,6 +17,7 @@ import {
 import { Wordmark } from "../marks";
 import { Strips } from "../mockups";
 import { BOOK_CHAPTERS, BOOK_VERSION } from "@/lib/brand-book/chapters";
+import { LEGAL_NAME_EN } from "@/lib/legal-name";
 
 const MONO = { fontFamily: "ui-monospace,'SF Mono',Menlo,Consolas,monospace" } as const;
 
@@ -41,7 +42,7 @@ export function LegalClaims() {
     >
       <Section id="names" title="Names and trademark symbols">
         <Specs rows={[
-          ["Legal name (English)", "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD." + " — formal documents only"],
+          ["Legal name (English)", `${LEGAL_NAME_EN} — formal documents only, from 01/10/2026`],
           ["Legal name (Chinese)", KOLEEX_COMPANY.zh],
           ["Trading name", "KOLEEX International Group — the everyday name"],
           ["Trademark", "KOLEEX, registration No. 74343050"],

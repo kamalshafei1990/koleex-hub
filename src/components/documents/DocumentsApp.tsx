@@ -106,6 +106,8 @@ function DocEditor({
     const doc = { ...(initial.doc as unknown as Quotation) };
     // Backfill the minted number onto the sheet if the payload predates it.
     if (!doc.invoiceNo && initial.doc_no) doc.invoiceNo = initial.doc_no;
+    // The sheet prints the legal name in force when it was created.
+    if (!doc.createdAt) doc.createdAt = initial.created_at;
     return doc;
   });
   const [docId, setDocId] = useState<string | null>(initial?.id ?? null);
@@ -259,6 +261,7 @@ function DocEditor({
     await downloadDocXlsx(fileBase, {
       docTitle,
       number: q.invoiceNo || "draft",
+      madeAt: q.createdAt,
       metaStrip: [
         ["DATE", q.date || ""],
         [noLabel, q.invoiceNo || ""],

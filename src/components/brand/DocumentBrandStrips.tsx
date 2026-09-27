@@ -1,8 +1,13 @@
 /* The black company line and the grey tagline that open every Koleex
    document. One definition, so the quotation, the invoice and the sales
-   contract present the same company the same way. */
+   contract present the same company the same way. The formal English name
+   and its history live in lib/legal-name: a document prints the name that
+   was in force when it was made. */
+import { LEGAL_NAME_EN, legalNameEn } from "@/lib/legal-name";
+
 export const KOLEEX_COMPANY = {
-  en: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
+  /** Today's formal name. A saved document uses legalNameEn(its createdAt). */
+  en: LEGAL_NAME_EN,
   zh: "科莱恪斯国际商业管理（台州）有限公司",
   tagline: "SHAPING THE FUTURE.",
   address:
@@ -21,9 +26,12 @@ export const KOLEEX_COMPANY = {
 export default function DocumentBrandStrips({
   black = "#0A0A0A",
   surface = "#F5F5F5",
+  madeAt,
 }: {
   black?: string;
   surface?: string;
+  /** When the document was created — it keeps the legal name of that day. */
+  madeAt?: string | Date | null;
 }) {
   return (
     /* Both strips share one rounded container so the radius shows only on
@@ -43,7 +51,7 @@ export default function DocumentBrandStrips({
           letterSpacing: "0.04em",
         }}
       >
-        <span style={{ color: "#fff" }}>{KOLEEX_COMPANY.en}</span>
+        <span style={{ color: "#fff" }}>{legalNameEn(madeAt)}</span>
         <span style={{ color: "#fff" }}>{KOLEEX_COMPANY.zh}</span>
       </div>
       <div

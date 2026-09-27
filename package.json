@@ -161,6 +161,7 @@
     "validate:budgets": "tsx scripts/validate-budgets.ts",
     "db:apply": "tsx scripts/apply-migration.ts",
     "validate:invitations": "tsx scripts/validate-invitations.ts",
+    "validate:legal-name": "tsx scripts/validate-legal-name.ts",
     "budgets": "tsx scripts/validate-budgets.ts --report",
     "validate:mobile-width": "tsx scripts/validate-mobile-width.ts",
     "validate:ai-plan-claims": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-plan-claims.ts",

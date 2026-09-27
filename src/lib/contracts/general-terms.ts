@@ -28,6 +28,8 @@
    Nothing here has been reviewed by a lawyer.
    --------------------------------------------------------------------------- */
 
+import { legalNameEn } from "@/lib/legal-name";
+
 export const TERMS_VERSION = "1.0";
 
 /** What an article can see about the deal it is being drawn for. */
@@ -71,7 +73,7 @@ export const GENERAL_ARTICLES: ContractArticle[] = [
     key: "definitions",
     title: "Definitions",
     body: () =>
-      `"Seller" means Koleex International Corporation Taizhou Co., Ltd. "Buyer" means the party named as Buyer in this Contract. "Goods" means the equipment, parts and accessories described in the Commercial Schedule. "Contract" means this document together with the Commercial Schedule and any annex or amendment signed by both parties. "Incoterms® 2020" means the international commercial terms published by the International Chamber of Commerce.`,
+      `"Seller" means ${legalNameEn()} "Buyer" means the party named as Buyer in this Contract. "Goods" means the equipment, parts and accessories described in the Commercial Schedule. "Contract" means this document together with the Commercial Schedule and any annex or amendment signed by both parties. "Incoterms® 2020" means the international commercial terms published by the International Chamber of Commerce.`,
   },
   {
     key: "documents",

@@ -33,6 +33,7 @@ import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/Document
    than redrawn so all three documents seal identically. */
 import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import type { ContractTerms, InvoiceLite, ScheduleItem, SnapshotShape } from "./types";
+import { legalNameEn } from "@/lib/legal-name";
 
 /* The same tokens the quotation and invoice use. */
 const T = {
@@ -430,6 +431,10 @@ function ContractA4Inner(props: ContractA4Props) {
   const total = frozen?.total ?? props.total ?? props.invoice?.total ?? 0;
   const invoiceNo = frozen?.schedule.invoiceNo ?? props.invoice?.inv_no ?? null;
   const contractDate = frozen?.contractDate ?? props.contractDate;
+  /* The seller's legal name as it stood when the contract was signed — a
+     signed contract never changes, even when the company's name does. A
+     draft prints today's name. */
+  const sellerName = legalNameEn(frozen?.frozenAt);
 
   /* Six fixed Key Terms rows, plus Documents when there are any — counted
      the same way the JSX below renders them, so the cost cannot drift from
@@ -498,7 +503,7 @@ function ContractA4Inner(props: ContractA4Props) {
       </div>
 
       {/* ── (b + c) Brand strips ── */}
-      <DocumentBrandStrips black={T.black} surface={T.surface} />
+      <DocumentBrandStrips black={T.black} surface={T.surface} madeAt={frozen?.frozenAt} />
 
       {/* A document says on its face what it is. A superseded contract must
           never be stamped "DRAFT": it is executed history, and printing it as
@@ -542,7 +547,7 @@ function ContractA4Inner(props: ContractA4Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
         <PartyCard
           label="Seller"
-          name={KOLEEX_COMPANY.en}
+          name={sellerName}
           address={KOLEEX_COMPANY.address}
           fields={[
             /* The same four rows, in the same order, that the quotation and
@@ -739,7 +744,7 @@ function ContractA4Inner(props: ContractA4Props) {
               >
                 <SignBlock
                   role="For and on behalf of the SELLER"
-                  party={KOLEEX_COMPANY.en}
+                  party={sellerName}
                   seal={
                     /* The seal is a FIXED 40mm square — the legal diameter of
                        a Chinese company chop. Without flex:0 0 40mm the

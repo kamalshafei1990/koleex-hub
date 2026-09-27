@@ -31,6 +31,7 @@ import { CHINA_PORTS, PORTS_BY_COUNTRY, PORT_COUNTRIES, COUNTRY_FLAG } from "@/l
 import { PortCombobox } from "@/components/documents/PortCombobox";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
+import { legalNameEn } from "@/lib/legal-name";
 
 const T = {
   black: "#0A0A0A",
@@ -55,8 +56,9 @@ function MetaStripCell({ label, isFirst, isLast, children }: { label: string; is
 }
 const labelSpan: React.CSSProperties = { color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" };
 
+/* The English name is not here: a packing list prints the legal name in
+   force on the day it was created (lib/legal-name). */
 const COMPANY = {
-  name: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
   nameZh: "科莱恪斯国际商业管理（台州）有限公司",
   address:
     "ROOM 206, BUILDING 88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA",
@@ -193,6 +195,7 @@ export default function PackingListDoc({
   onChanged: () => void;
 }) {
   const { t } = useTranslation(documentsT);
+  const legalName = legalNameEn(initial?.created_at);
   const seed = (initial?.doc ?? {}) as { rows?: PackingRow[]; meta?: PackingMeta };
   const [rows, setRowsState] = useState<PackingRow[]>(() =>
     seed.rows && seed.rows.length ? seed.rows.map((r) => ({ ...blankRow(), ...r })) : Array.from({ length: 8 }, blankRow),
@@ -397,6 +400,7 @@ export default function PackingListDoc({
     await downloadDocXlsx(fileBase, {
       docTitle: "PACKING LIST",
       number: meta.invoiceNo || "draft",
+      madeAt: initial?.created_at,
       metaStrip: [
         ["DATE", meta.date || ""],
         ["INVOICE NO", meta.invoiceNo || ""],
@@ -544,7 +548,7 @@ export default function PackingListDoc({
             {/* Brand strips */}
             <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
               <div style={{ background: T.black, color: "#fff", padding: "7px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, fontWeight: 600, letterSpacing: "0.04em" }}>
-                <span>{COMPANY.name}</span>
+                <span>{legalName}</span>
                 <span>{COMPANY.nameZh}</span>
               </div>
               <div style={{ background: T.surface, color: "#333", padding: "5px 16px", textAlign: "center", fontSize: 9, fontWeight: 600, letterSpacing: "0.18em" }}>
@@ -608,7 +612,7 @@ export default function PackingListDoc({
               <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>From</div>
                 <div style={{ padding: "10px 14px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4, letterSpacing: "0.01em" }}>{COMPANY.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4, letterSpacing: "0.01em" }}>{legalName}</div>
                   <div style={{ fontSize: 10, lineHeight: 1.5, color: T.inkSoft, marginBottom: 8 }}>{COMPANY.address}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "55px 1fr", rowGap: 3, columnGap: 8, fontSize: 10 }}>
                     <span style={labelSpan}>Phone</span><span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{COMPANY.tel}</span>

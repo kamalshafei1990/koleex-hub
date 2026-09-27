@@ -20,6 +20,7 @@ import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/Document
 import { EMPLOYMENT_CONTRACT } from "@/lib/translations/employment-contract";
 import type { Lang } from "@/lib/i18n";
 import type { EmploymentContractData } from "@/app/api/hr/contract/[employeeId]/route";
+import { legalNameEn } from "@/lib/legal-name";
 
 const T = { black: "#0A0A0A", ink: "#1A1A1A", soft: "#4B5563", ghost: "#9CA3AF", border: "#E5E7EB", surface: "#F5F5F5", mono: "ui-monospace, SFMono-Regular, Menlo, monospace" } as const;
 
@@ -130,7 +131,7 @@ export default function EmploymentContractDoc({ data, lang }: { data: Employment
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ background: T.black, color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", padding: "7px 14px" }}>{c.employer}</div>
                   <div style={{ padding: "10px 14px", fontSize: 10.5, lineHeight: 1.5, color: T.soft }}>
-                    <div style={{ fontWeight: 700, color: T.black }}>{KOLEEX_COMPANY.en}</div>
+                    <div style={{ fontWeight: 700, color: T.black }}>{legalNameEn()}</div>
                     <div>{KOLEEX_COMPANY.zh}</div>
                     <div>{KOLEEX_COMPANY.address}</div>
                     <div>{KOLEEX_COMPANY.tel} · {KOLEEX_COMPANY.email}</div>

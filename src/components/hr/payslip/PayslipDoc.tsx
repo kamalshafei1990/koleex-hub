@@ -16,6 +16,7 @@
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import type { PayslipBreakdown } from "@/lib/server/payroll-run";
+import { legalNameEn } from "@/lib/legal-name";
 
 const T = { black: "#0A0A0A", ink: "#1A1A1A", soft: "#4B5563", ghost: "#9CA3AF", border: "#E5E7EB", surface: "#F5F5F5", mono: "ui-monospace, SFMono-Regular, Menlo, monospace" } as const;
 
@@ -99,7 +100,7 @@ export default function PayslipDoc({ slip }: { slip: PayslipDocData }) {
         <KoleexWordmark />
         <div style={{ fontSize: 22, fontWeight: 800, color: T.black, letterSpacing: "0.08em" }}>PAYSLIP</div>
       </div>
-      <DocumentBrandStrips />
+      <DocumentBrandStrips madeAt={slip.periodEnd} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
         <Meta label="Pay period" value={`${fmtD(slip.periodStart)} — ${fmtD(slip.periodEnd)}`} first />
@@ -120,7 +121,7 @@ export default function PayslipDoc({ slip }: { slip: PayslipDocData }) {
         <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{ background: T.black, color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", padding: "7px 14px" }}>Employer</div>
           <div style={{ padding: "10px 14px", fontSize: 10.5, lineHeight: 1.5, color: T.soft }}>
-            <div style={{ fontWeight: 700, color: T.black }}>{KOLEEX_COMPANY.en}</div>
+            <div style={{ fontWeight: 700, color: T.black }}>{legalNameEn(slip.periodEnd)}</div>
             <div>{KOLEEX_COMPANY.address}</div>
           </div>
         </div>

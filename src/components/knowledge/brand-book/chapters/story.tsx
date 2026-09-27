@@ -28,6 +28,7 @@ import {
   B, Bullets, Chapter, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { LEGAL_NAME_EN } from "@/lib/legal-name";
 
 /* ── Shared facts ──────────────────────────────────────────────────────── */
 
@@ -47,7 +48,7 @@ const MILESTONES: Array<{ year: string; title: string; text: string; key?: boole
   { year: "2017", title: "Taizhou", text: "Headquarters move to Taizhou, Zhejiang — the heart of China’s sewing-machine industry.", key: true },
   { year: "2019", title: "A group", text: "KOLEEX International Group is formed." },
   { year: "2023", title: "70+ countries", text: "KOLEEX machines work in more than 70 countries." },
-  { year: "2024", title: "The Taizhou company", text: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD. is registered on 14/03/2024." },
+  { year: "2024", title: "The Taizhou company", text: `${LEGAL_NAME_EN} is registered on 14/03/2024.` },
 ];
 
 /* ── 04 · Our Story ────────────────────────────────────────────────────── */

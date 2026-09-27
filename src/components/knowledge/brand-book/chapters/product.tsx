@@ -18,6 +18,7 @@ import {
 } from "../kit";
 import { Wordmark } from "../marks";
 import { Barcode, INK, Lines, MachineShot, QrBox, Scaled } from "../mockups";
+import { LEGAL_NAME_EN } from "@/lib/legal-name";
 
 const MONO = { fontFamily: "ui-monospace,'SF Mono',Menlo,Consolas,monospace" } as const;
 
@@ -270,7 +271,7 @@ export function Nameplates() {
             [<B key="a">Serial no.</B>, "Unique for every machine, never reused"],
             [<B key="a">Electrical data</B>, "Voltage, frequency and power, exactly as tested"],
             [<B key="a">Year</B>, "The year the machine was completed"],
-            [<B key="a">Company</B>, "The legal name and city: KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD., Taizhou, Zhejiang, China"],
+            [<B key="a">Company</B>, `The legal name and city: ${LEGAL_NAME_EN}, Taizhou, Zhejiang, China`],
             [<B key="a">Origin</B>, "MADE IN CHINA"],
             [<B key="a">Marks</B>, <>CE and other marks only when that model is certified (<Ref n={133} />)</>],
           ]}

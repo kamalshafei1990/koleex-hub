@@ -36,6 +36,7 @@ import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+import { BANK_BENEFICIARY_NAME, legalNameEn } from "@/lib/legal-name";
 import { checkTradeDocument } from "@/lib/contracts/contradictions";
 import BoldIcon from "@/components/icons/ui/BoldIcon";
 import ItalicIcon from "@/components/icons/ui/ItalicIcon";
@@ -1447,7 +1448,7 @@ export default function QuotationA4Preview({
             grouped header block (matches the rest of the document's
             rounded language).
             ═══════════════════════════════════════════════════════════════ */}
-        <DocumentBrandStrips black={T.black} surface={T.surface} />
+        <DocumentBrandStrips black={T.black} surface={T.surface} madeAt={current.createdAt} />
 
         {/* ═══════════════════════════════════════════════════════════════
             (d) Meta strip ABOVE the From / Quotation-To party row.
@@ -1559,7 +1560,7 @@ export default function QuotationA4Preview({
                   letterSpacing: "0.01em",
                 }}
               >
-                KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.
+                {legalNameEn(current.createdAt)}
               </div>
               <div
                 style={{
@@ -3078,7 +3079,7 @@ export default function QuotationA4Preview({
                       match the account records letter-for-letter). */}
                   <BankRow label={current.docLang === "zh" ? "开户银行 / Beneficiary Bank" : "Beneficiary Bank"} value="AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH" />
                   <BankRow label={current.docLang === "zh" ? "SWIFT 代码" : "SWIFT Code"} value="ABOCCNBJ110" mono />
-                  <BankRow label={current.docLang === "zh" ? "收款人名称 / Beneficiary Name" : "Beneficiary Name"} value="KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD." />
+                  <BankRow label={current.docLang === "zh" ? "收款人名称 / Beneficiary Name" : "Beneficiary Name"} value={BANK_BENEFICIARY_NAME} />
                   <BankRow label={current.docLang === "zh" ? "收款账号 / A\u002FC No." : "Beneficiary A/C No."} value="19905814040007205" mono />
                   <BankRow label={current.docLang === "zh" ? "银行地址 / Bank Address" : "Bank Address"} value="100 JIANGJIN ROAD, SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG, CHINA" />
                   <BankRow

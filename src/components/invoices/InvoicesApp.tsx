@@ -468,6 +468,7 @@ function InvoiceDetailView({
     await downloadDocXlsx(fileBase, {
       docTitle: "COMMERCIAL INVOICE",
       number: inv.inv_no || inv.id,
+      madeAt: inv.created_at,
       metaStrip: [
         ["DATE", inv.issue_date || ""],
         ["INVOICE NO", inv.inv_no || ""],

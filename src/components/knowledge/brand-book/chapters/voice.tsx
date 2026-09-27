@@ -16,6 +16,7 @@ import {
   AR_FONT, B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table, ZH_FONT,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { LEGAL_NAME_EN } from "@/lib/legal-name";
 
 
 /** A sample of writing on a white card — what the reader actually sees. */
@@ -103,8 +104,6 @@ export function NameUsage() {
 
 /* ── 19 · Legal Names & Trademarks ─────────────────────────────────────── */
 
-/** The formal English name (owner, 27/09/2026) — formal documents only. */
-const LEGAL_EN = "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD.";
 
 export function LegalNames() {
   return (
@@ -121,7 +120,7 @@ export function LegalNames() {
         <Table
           head={["Name", "Use it on"]}
           rows={[
-            [<span key="a" className="font-mono text-[12.5px]">{LEGAL_EN}</span>, "Formal documents only — contracts, invoices, customs and bank documents, official letters"],
+            [<span key="a" className="font-mono text-[12.5px]">{LEGAL_NAME_EN}</span>, "Formal documents only — contracts, invoices, customs and bank documents, official letters"],
             [<span key="a" lang="zh-Hans" style={ZH_FONT}>{KOLEEX_COMPANY.zh}</span>, "Chinese contracts, invoices, seals and government forms"],
             [<B key="a">KOLEEX International Group</B>, "The everyday name — company profile, LinkedIn, press, partner material, e-mails"],
             [<B key="a">KOLEEX</B>, "Machines, marketing, social media, signs — everywhere else"],

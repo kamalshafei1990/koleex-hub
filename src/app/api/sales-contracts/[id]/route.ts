@@ -25,6 +25,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { notifyContractStatus, settleContractDeleted } from "@/lib/server/commerce-notify";
 import { articlesFor, TERMS_VERSION, type ContractContext } from "@/lib/contracts/general-terms";
+import { legalNameEn } from "@/lib/legal-name";
 
 /* Contracts is its own permission module, not a rider on Invoices.
 
@@ -156,8 +157,9 @@ function buildSnapshot(args: {
     currency: contract.currency,
     total: contract.total,
 
+    /* The legal name in force at the moment of signing (lib/legal-name). */
     seller: {
-      name: "Koleex International Corporation Taizhou Co., Ltd.",
+      name: legalNameEn(),
     },
     /* The buyer as the INVOICE states them at this instant, not the copy
        taken when the contract was first drafted. A contract drafted before
