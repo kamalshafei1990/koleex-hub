@@ -22,6 +22,7 @@ import "server-only";
    callers can gate cheaply without loading the package. */
 import type WebPush from "web-push";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { activityAllowed, classifyNotificationActivity, hushedNow } from "@/lib/notification-activity";
 import type { NotifTpl } from "@/lib/notification-templates";
 import type { Lang } from "@/lib/i18n";
@@ -199,14 +200,14 @@ export async function sendPushToAccounts(
     const who = [...new Set(subs.map((s) => s.account_id))];
     let readOk = true;
     for (let i = 0; i < who.length && readOk; i += 100) {
-      const { data: un, error } = await supabaseServer
+      const { data: un, error } = await allRows(supabaseServer
         .from("inbox_messages")
         .select("recipient_account_id")
         .in("recipient_account_id", who.slice(i, i + 100))
         .is("read_at", null)
         .is("archived_at", null)
         .is("snoozed_until", null)
-        .limit(5000);
+        .order("id"), "unread counts");
       if (error) { readOk = false; unreadOf.clear(); break; }
       for (const r of (un ?? []) as Array<{ recipient_account_id: string }>) {
         unreadOf.set(r.recipient_account_id, (unreadOf.get(r.recipient_account_id) ?? 0) + 1);

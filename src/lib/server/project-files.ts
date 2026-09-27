@@ -11,6 +11,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 
 export const ATTACHMENT_BUCKET = "project-attachments";
 
@@ -28,20 +29,21 @@ export async function removeTaskAttachmentFiles(paths: string[]): Promise<void> 
 
 /** Every attachment path under a project's tasks — call before deleting it. */
 export async function collectProjectAttachmentPaths(tenantId: string, projectId: string): Promise<string[]> {
-  const { data: tasks } = await supabaseServer
+  const { data: tasks } = await allRows(supabaseServer
     .from("project_tasks")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("project_id", projectId)
-    .limit(5000);
+    .order("id"), "project tasks");
   const ids = (tasks ?? []).map((t) => (t as { id: string }).id);
   const paths: string[] = [];
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await supabaseServer
+    const { data } = await allRows(supabaseServer
       .from("project_task_attachments")
       .select("file_path")
       .eq("tenant_id", tenantId)
-      .in("task_id", ids.slice(i, i + 200));
+      .in("task_id", ids.slice(i, i + 200))
+      .order("id"), "task attachments");
     for (const r of data ?? []) paths.push((r as { file_path: string }).file_path);
   }
   return paths;

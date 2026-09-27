@@ -24,6 +24,7 @@ import { coerceProductArrayColumns } from "@/lib/product-array-columns";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
 import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
@@ -98,7 +99,9 @@ export async function GET(req: Request) {
        no window), fetching two slug columns and nothing else. Those bytes never
        leave the datacenter; the browser receives only the aggregated numbers, a
        few hundred bytes. Page 1 only — the numbers do not change as you scroll,
-       and re-counting per page would pay for the whole match set every page. */
+       and re-counting per page would pay for the whole match set every page.
+       Read in pages (lib/server/all-rows): alone, the API stops a read at
+       1000 rows — past 1000 products the counts would come up short again. */
     const GROUP_SCAN_MAX = 50_000;
     const buildGroupCountsQuery = () => {
       if (listReq.page !== 1) return null;
@@ -107,8 +110,7 @@ export async function GET(req: Request) {
         .select("category_slug, subcategory_slug")
         .eq("tenant_id", auth.tenant_id);
       if (!canSeeSecrets) gq = gq.eq("status", "active");
-      return applyServerList(gq, listReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
-        .range(0, GROUP_SCAN_MAX - 1);
+      return applyServerList(gq, listReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false });
     };
 
     const { data, error: pagedError, count } = await pq;
@@ -157,7 +159,8 @@ export async function GET(req: Request) {
           .order("order", { ascending: true })
           .then((r) => r)
       : null;
-    const groupsPromise = buildGroupCountsQuery()?.then((r) => r) ?? null;
+    const groupsQuery = buildGroupCountsQuery();
+    const groupsPromise = groupsQuery ? allRows(groupsQuery.order("id"), "group counts", GROUP_SCAN_MAX) : null;
     /* FACETS FOR THE CATEGORY RAIL (owner, 22 Sep 2026). The rail's cards
        FILTER by category, so they must keep showing every category of the
        match set — with its count — while one of them is selected. The group
@@ -176,9 +179,8 @@ export async function GET(req: Request) {
             .select("category_slug, subcategory_slug")
             .eq("tenant_id", auth.tenant_id);
           if (!canSeeSecrets) fq = fq.eq("status", "active");
-          return applyServerList(fq, facetReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
-            .range(0, GROUP_SCAN_MAX - 1)
-            .then((r) => r);
+          return allRows(applyServerList(fq, facetReq, PRODUCTS_LIST_CONFIG, reach.terms, { window: false })
+            .order("id"), "facets", GROUP_SCAN_MAX);
         })()
       : null;
     /* DIVISIONS WITH PRODUCTS — the whole tenant, NOT the match set. The
@@ -197,7 +199,7 @@ export async function GET(req: Request) {
             .select("division_slug")
             .eq("tenant_id", auth.tenant_id);
           if (!canSeeSecrets) dq = dq.eq("status", "active");
-          return dq.range(0, GROUP_SCAN_MAX - 1).then((r) => r);
+          return allRows(dq.order("id"), "divisions", GROUP_SCAN_MAX);
         })()
       : null;
 

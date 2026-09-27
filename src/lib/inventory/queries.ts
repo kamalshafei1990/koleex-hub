@@ -10,6 +10,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type {
   BalanceWithRefs,
   ColorToken,
@@ -236,11 +237,11 @@ export async function buildMovementHistory(opts: {
  *  balances as the dashboard counts them. An item never stocked has no
  *  balance, so it is not listed. */
 export async function lowStockItemIds(tenantId: string): Promise<string[]> {
-  const { data, error } = await supabaseServer
+  const { data, error } = await allRows(supabaseServer
     .from("inventory_stock_balances")
     .select("inventory_item_id, qty_on_hand, inventory_items!inner(reorder_point, min_stock, track_stock, deleted_at)")
     .eq("tenant_id", tenantId)
-    .limit(10000);
+    .order("id"), "stock balances");
   if (error) throw new Error(error.message);
   type Limits = { reorder_point: number | null; min_stock: number | null; track_stock: boolean | null; deleted_at: string | null };
   const rows = (data ?? []) as unknown as Array<{ inventory_item_id: string; qty_on_hand: number; inventory_items: Limits | Limits[] | null }>;
@@ -656,13 +657,13 @@ export async function buildInventoryOperatorSummary(
     ),
     /* intel: last 30d movements for fastest + busiest warehouse */
     safe(
-      supabaseServer
+      allRows(supabaseServer
         .from("inventory_stock_movements")
         .select("inventory_item_id, warehouse_id, movement_date")
         .eq("tenant_id", tenantId)
         .eq("status", "posted")
         .gte("movement_date", thirtyDaysAgo.slice(0, 10))
-        .limit(2000)
+        .order("id"), "recent movements")
         .then((r) => r.data ?? []),
       [] as Array<{ inventory_item_id: string; warehouse_id: string; movement_date: string }>,
     ),

@@ -45,6 +45,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAccess, requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { canApproveFinance, canSeeCostData } from "@/lib/experience";
 import { COST_SENSITIVE_KINDS, listPending } from "@/lib/approvals";
@@ -239,7 +240,7 @@ export async function loadCalendarFacts(auth: ServerAuthContext, from: string, t
   const base = (id: string) => id.split("~")[0];
   const guests = new Map<string, number>();
   for (const part of chunks(Array.from(new Set(real.map((e) => base(e.id)))))) {
-    for (const a of rows<{ event_id: string }>(await supabaseServer.from("koleex_calendar_event_attendees").select("event_id").in("event_id", part).neq("status", "declined").limit(5000), "guests")) {
+    for (const a of rows<{ event_id: string }>(await allRows(supabaseServer.from("koleex_calendar_event_attendees").select("event_id").in("event_id", part).neq("status", "declined").order("id")), "guests")) {
       guests.set(a.event_id, (guests.get(a.event_id) ?? 0) + 1);
     }
   }

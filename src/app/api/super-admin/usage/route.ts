@@ -17,6 +17,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { getServerAuth } from "@/lib/server/auth";
 
 const GAP_MS = 15 * 60 * 1000;
@@ -37,18 +38,21 @@ export async function GET() {
   const d30 = dayStr(new Date(now.getTime() - 29 * 86400_000));
 
   const [usageRes, eventsRes, accountsRes] = await Promise.all([
-    supabaseServer
+    allRows(supabaseServer
       .from("usage_daily")
       .select("account_id, day, active_seconds")
-      .gte("day", d30),
-    /* Events for the estimate window. 30 days × current volume is ~5k rows —
-       trivial; if this ever grows, aggregate server-side instead. */
-    supabaseServer
+      .gte("day", d30)
+      .order("id"), "usage days"),
+    /* Events for the estimate window: ~5.5k rows in 30 days (27/09/2026).
+       Read in pages: a plain read stops at the API's 1000 rows, which kept
+       only the first days of the window. If this grows much, total it in
+       the database instead. */
+    allRows(supabaseServer
       .from("activity_events")
       .select("account_id, created_at")
       .gte("created_at", `${d30}T00:00:00Z`)
       .order("created_at", { ascending: true })
-      .limit(50_000),
+      .order("id"), "usage events"),
     supabaseServer
       .from("accounts")
       .select("id, username, avatar_url, person:people ( full_name )")

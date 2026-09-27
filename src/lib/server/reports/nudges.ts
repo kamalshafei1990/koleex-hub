@@ -26,6 +26,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { listPeople, loadOrgTree, superAdminIds } from "@/lib/server/reports/core";
 import { escalationRecipients, loadClocks, loadOwners, loadSent, loadSettings, obligationClock } from "@/lib/server/reports/obligations";
@@ -107,9 +108,9 @@ async function runTenant(tenantId: string, now: string, opts: { dryRun?: boolean
   if (settings.reminders || settings.escalations) {
     let rq = supabaseServer.from("work_report_requests").select(`${REQUEST_COLS}, account_id`)
       .eq("tenant_id", tenantId).eq("status", "open").is("sent_at", null)
-      .gte("due_at", new Date(Date.parse(now) - 4 * 86_400_000).toISOString()).lte("due_at", new Date(Date.parse(now) + 2 * 3_600_000).toISOString()).limit(2000);
+      .gte("due_at", new Date(Date.parse(now) - 4 * 86_400_000).toISOString()).lte("due_at", new Date(Date.parse(now) + 2 * 3_600_000).toISOString());
     if (opts.onlyAuthors) rq = rq.in("account_id", Array.from(opts.onlyAuthors));
-    const { data: reqs, error: reqErr } = await rq;
+    const { data: reqs, error: reqErr } = await allRows(rq.order("id"), "open requests");
     if (reqErr) console.error("[reports.nudges] requests:", reqErr.message);
     for (const r of ((reqs ?? []) as Array<RequestRow & { account_id: string }>)) {
       const clockOf = clocks.get(r.account_id);

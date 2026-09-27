@@ -20,6 +20,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { canSeeCostData } from "@/lib/experience";
 import type { ReportDataRow } from "@/lib/reports/templates";
@@ -66,10 +67,10 @@ export async function stockData(src: StockSource, x: StockCtx): Promise<Answer> 
   const { start: from, end: to } = x;
 
   if (src === "stock_count" || src === "low_stock") {
-    let q = supabaseServer.from("inventory_stock_balances").select("id, inventory_item_id, warehouse_id, qty_on_hand").limit(2000);
+    let q = supabaseServer.from("inventory_stock_balances").select("id, inventory_item_id, warehouse_id, qty_on_hand");
     if (x.auth.tenant_id) q = q.eq("tenant_id", x.auth.tenant_id);
     if (wid) q = q.eq("warehouse_id", wid);
-    const bals = listOf<{ id: string; inventory_item_id: string; warehouse_id: string; qty_on_hand: unknown }>(await q, "stock balances");
+    const bals = listOf<{ id: string; inventory_item_id: string; warehouse_id: string; qty_on_hand: unknown }>(await allRows(q.order("id")), "stock balances");
     const its = await items(x.auth, bals.map((b) => b.inventory_item_id));
     if (src === "low_stock") {
       return { rows: bals.flatMap((b) => {
@@ -85,9 +86,9 @@ export async function stockData(src: StockSource, x: StockCtx): Promise<Answer> 
     const cost = canSeeCostData(x.auth);
     const value = new Map<string, { avg: number | null; currency: string | null }>();
     if (cost && bals.length) {
-      let vq = supabaseServer.from("inventory_valuation").select("inventory_item_id, average_cost, currency").eq("warehouse_id", wid!).limit(2000);
+      let vq = supabaseServer.from("inventory_valuation").select("inventory_item_id, average_cost, currency").eq("warehouse_id", wid!);
       if (x.auth.tenant_id) vq = vq.eq("tenant_id", x.auth.tenant_id);
-      for (const v of listOf<{ inventory_item_id: string; average_cost: unknown; currency: string | null }>(await vq, "valuation")) value.set(v.inventory_item_id, { avg: num(v.average_cost), currency: v.currency });
+      for (const v of listOf<{ inventory_item_id: string; average_cost: unknown; currency: string | null }>(await allRows(vq.order("id")), "valuation")) value.set(v.inventory_item_id, { avg: num(v.average_cost), currency: v.currency });
     }
     const rows = bals.map((b) => {
       const it = its.get(b.inventory_item_id);

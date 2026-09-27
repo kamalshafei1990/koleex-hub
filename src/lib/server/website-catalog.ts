@@ -16,6 +16,7 @@ import "server-only";
    validate:website-bridge pins every one of these.
    --------------------------------------------------------------------------- */
 
+import { allRowsOrThrow } from "@/lib/server/all-rows";
 import { inChunks } from "@/lib/server/in-chunks";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { websiteTenantId } from "@/lib/server/website-bridge";
@@ -73,21 +74,6 @@ export interface WebsiteProductQuery {
   pageSize?: number;
 }
 
-/* The API hands back at most 1000 rows a read and says nothing about the
-   rest (measured 27/09/2026: limit(10000) on a 3,806-row table → 1000 rows).
-   A read that must see every row pages through them in a stable order. */
-const API_PAGE = 1000;
-async function allRows<T>(label: string, read: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += API_PAGE) {
-    const { data, error } = await read(from, from + API_PAGE - 1);
-    if (error) throw new Error(`website ${label}: ${error.message}`);
-    const rows = (data as T[] | null) ?? [];
-    out.push(...rows);
-    if (rows.length < API_PAGE) return out;
-  }
-}
-
 /** Letters, digits, spaces and dashes in any script — nothing PostgREST
  *  reads as a wildcard or a separator. */
 const searchTerm = (q: string | null | undefined): string =>
@@ -119,25 +105,21 @@ type Hit = { id: string; product_name: string; featured: boolean | null };
    products that match, inside the filters, in list order. */
 async function searchHits(tenantId: string, words: string[], query: WebsiteProductQuery): Promise<Hit[]> {
   const filters = filterPairs(query);
+  let own = supabaseServer.from("products").select("id, product_name, featured")
+    .eq("tenant_id", tenantId).eq("status", "active").eq("visible", true);
+  for (const [c, v] of filters) own = own.eq(c, v);
+  let models = supabaseServer.from("product_models").select("product_id")
+    .eq("visible", true).or("status.is.null,status.neq.discontinued");
+  let texts = supabaseServer.from("product_translations").select("product_id");
+  for (const w of words) {
+    own = own.ilike("search_text", `%${w}%`);
+    models = models.ilike("search_text", `%${w}%`);
+    texts = texts.ilike("search_text", `%${w}%`);
+  }
   const [direct, viaModels, viaTexts] = await Promise.all([
-    allRows<Hit>("search", (from, to) => {
-      let q = supabaseServer.from("products").select("id, product_name, featured")
-        .eq("tenant_id", tenantId).eq("status", "active").eq("visible", true);
-      for (const [c, v] of filters) q = q.eq(c, v);
-      for (const w of words) q = q.ilike("search_text", `%${w}%`);
-      return q.order("id").range(from, to);
-    }),
-    allRows<{ product_id: string }>("search models", (from, to) => {
-      let q = supabaseServer.from("product_models").select("product_id")
-        .eq("visible", true).or("status.is.null,status.neq.discontinued");
-      for (const w of words) q = q.ilike("search_text", `%${w}%`);
-      return q.order("id").range(from, to);
-    }),
-    allRows<{ product_id: string }>("search translations", (from, to) => {
-      let q = supabaseServer.from("product_translations").select("product_id");
-      for (const w of words) q = q.ilike("search_text", `%${w}%`);
-      return q.order("id").range(from, to);
-    }),
+    allRowsOrThrow<Hit>("website search", own.order("id")),
+    allRowsOrThrow<{ product_id: string }>("website search models", models.order("id")),
+    allRowsOrThrow<{ product_id: string }>("website search translations", texts.order("id")),
   ]);
   /* A model or translation match must still be this company's, active,
      visible and inside the filters. Checked in chunks, so a broad search
@@ -208,9 +190,9 @@ async function productCards(rows: ProductRow[]): Promise<WebsiteProductCard[]> {
   type TextRow = { product_id: string; locale: string; product_name: string | null; tagline: string | null; excerpt: string | null };
   type ModelRow = { product_id: string; primary_model: string | null; model_name: string | null; tagline: string | null; visible: boolean | null; status: string | null };
   const [media, texts, models] = await Promise.all([
-    allRows<MediaRow>("media", (from, to) => supabaseServer.from("product_media").select('product_id, url, type, "order"').in("product_id", ids).in("type", ["main_image", "gallery"]).order("order", { ascending: true }).order("id").range(from, to)),
-    allRows<TextRow>("translations", (from, to) => supabaseServer.from("product_translations").select("product_id, locale, product_name, tagline, excerpt").in("product_id", ids).order("id").range(from, to)),
-    allRows<ModelRow>("models", (from, to) => supabaseServer.from("product_models").select('product_id, primary_model, model_name, tagline, visible, status, "order"').in("product_id", ids).order("order", { ascending: true }).order("id").range(from, to)),
+    allRowsOrThrow<MediaRow>("website media", supabaseServer.from("product_media").select('product_id, url, type, "order"').in("product_id", ids).in("type", ["main_image", "gallery"]).order("order", { ascending: true }).order("id")),
+    allRowsOrThrow<TextRow>("website translations", supabaseServer.from("product_translations").select("product_id, locale, product_name, tagline, excerpt").in("product_id", ids).order("id")),
+    allRowsOrThrow<ModelRow>("website models", supabaseServer.from("product_models").select('product_id, primary_model, model_name, tagline, visible, status, "order"').in("product_id", ids).order("order", { ascending: true }).order("id")),
   ]);
 
   const imageOf = new Map<string, string>();
@@ -284,11 +266,11 @@ export async function websiteTaxonomy(): Promise<WebsiteDivision[]> {
   const [divs, cats, subs, prods] = await Promise.all([
     supabaseServer.from("divisions").select('id, slug, name, name_zh, name_ar, tagline, description, "order"').order("order", { ascending: true }),
     supabaseServer.from("categories").select('id, division_id, slug, name, name_zh, name_ar, description, "order"').order("order", { ascending: true }),
-    allRows<SubRow>("subcategories", (from, to) => supabaseServer.from("subcategories").select('id, category_id, slug, code, name, name_zh, name_ar, description, "order"').order("order", { ascending: true }).order("id").range(from, to)),
+    allRowsOrThrow<SubRow>("website subcategories", supabaseServer.from("subcategories").select('id, category_id, slug, code, name, name_zh, name_ar, description, "order"').order("order", { ascending: true }).order("id")),
     /* Every product the website shows, counted — paged, so the counts stay
        right past the API's 1000-row read. */
     tenantId
-      ? allRows<TallyRow>("taxonomy", (from, to) => supabaseServer.from("products").select("id, division_slug, category_slug, subcategory_slug").eq("tenant_id", tenantId).eq("status", "active").eq("visible", true).order("id").range(from, to))
+      ? allRowsOrThrow<TallyRow>("website taxonomy", supabaseServer.from("products").select("id, division_slug, category_slug, subcategory_slug").eq("tenant_id", tenantId).eq("status", "active").eq("visible", true).order("id"))
       : Promise.resolve([] as TallyRow[]),
   ]);
   if (divs.error || cats.error) throw new Error(`website taxonomy: ${(divs.error ?? cats.error)?.message}`);

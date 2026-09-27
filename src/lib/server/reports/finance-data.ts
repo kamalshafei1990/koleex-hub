@@ -23,6 +23,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { canSeeBankAndProfit, requireFinanceNumbers } from "@/lib/experience";
 import { buildCashFlow, buildProfitLoss } from "@/lib/accounting/statements";
@@ -59,9 +60,11 @@ export async function financeData(src: FinanceSource, x: FinanceCtx, sh: Finance
   switch (src) {
     case "expense_categories": case "company_expenses": {
       let q = supabaseServer.from("finance_expenses").select("id, title, category_id, expense_date, amount, currency, approval_status")
-        .neq("approval_status", "rejected").gte("expense_date", from).lte("expense_date", to).order("expense_date", { ascending: true }).limit(src === "company_expenses" ? 101 : 5000);
+        .neq("approval_status", "rejected").gte("expense_date", from).lte("expense_date", to).order("expense_date", { ascending: true });
       if (tenant) q = q.eq("tenant_id", tenant);
-      const list = listOf<{ id: string; title: string | null; category_id: string | null; expense_date: string | null; amount: unknown; currency: string | null; approval_status: string | null }>(await q, "expenses");
+      /* The list shows 100 (101 tells it there are more); the category totals
+         need every expense of the period, read in pages. */
+      const list = listOf<{ id: string; title: string | null; category_id: string | null; expense_date: string | null; amount: unknown; currency: string | null; approval_status: string | null }>(await (src === "company_expenses" ? q.limit(101) : allRows(q.order("id"), "expenses")), "expenses");
       const catIds = Array.from(new Set(list.map((e) => e.category_id).filter((c): c is string => !!c)));
       const cats = catIds.length ? new Map(listOf<{ id: string; name: string | null }>(await supabaseServer.from("finance_expense_categories").select("id, name").in("id", catIds.slice(0, 500)), "expense categories").map((c) => [c.id, c.name ?? ""])) : new Map<string, string>();
       if (src === "company_expenses") {
@@ -96,10 +99,10 @@ export async function financeData(src: FinanceSource, x: FinanceCtx, sh: Finance
     case "ar_aging": case "ap_aging": {
       /* ⚠️ The status columns are ENUMS: only real values in the filter. */
       let q = src === "ar_aging"
-        ? supabaseServer.from("invoices").select("due_date, balance, currency").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0).limit(5000)
-        : supabaseServer.from("vendor_bills").select("due_date, balance, currency").not("status", "in", "(draft,cancelled,paid)").gt("balance", 0).limit(5000);
+        ? supabaseServer.from("invoices").select("due_date, balance, currency").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0)
+        : supabaseServer.from("vendor_bills").select("due_date, balance, currency").not("status", "in", "(draft,cancelled,paid)").gt("balance", 0);
       if (tenant) q = q.eq("tenant_id", tenant);
-      const list = listOf<{ due_date: string | null; balance: unknown; currency: string | null }>(await q, src === "ar_aging" ? "receivables" : "payables");
+      const list = listOf<{ due_date: string | null; balance: unknown; currency: string | null }>(await allRows(q.order("id")), src === "ar_aging" ? "receivables" : "payables");
       return { rows: agingRows(list.map((r) => ({ due: day(r.due_date), balance: Number(r.balance) || 0, currency: (r.currency || "").toUpperCase() })), today) };
     }
     case "month_close": {

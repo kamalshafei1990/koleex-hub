@@ -11,6 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { SUMMARY_HEADINGS, isSummaryMessage } from "@/lib/server/ai/voice/summary";
@@ -26,7 +27,8 @@ import {
 export const dynamic = "force-dynamic";
 
 /** Row caps per query: far above a month of this tenant's traffic, and a
- *  ceiling so a report can never become a table dump. */
+ *  ceiling so a report can never become a table dump. Read in pages
+ *  (lib/server/all-rows): alone, the API stops every read at 1000 rows. */
 const ROW_CAP = 20_000;
 
 export async function GET(req: Request) {
@@ -44,12 +46,12 @@ export async function GET(req: Request) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
 
   const [messages, conversations, toolCalls, spoken] = await Promise.all([
-    supabaseServer.from("ai_messages").select("created_at, role, source").eq("tenant_id", auth.tenant_id).gte("created_at", since).limit(ROW_CAP),
-    supabaseServer.from("ai_conversations").select("created_at, account_id").eq("tenant_id", auth.tenant_id).gte("created_at", since).limit(ROW_CAP),
-    supabaseServer.from("ai_tool_calls").select("created_at, tool_name, ok, account_id").eq("tenant_id", auth.tenant_id).gte("created_at", since).limit(ROW_CAP),
+    allRows(supabaseServer.from("ai_messages").select("created_at, role, source").eq("tenant_id", auth.tenant_id).gte("created_at", since).order("id"), "ai messages", ROW_CAP),
+    allRows(supabaseServer.from("ai_conversations").select("created_at, account_id").eq("tenant_id", auth.tenant_id).gte("created_at", since).order("id"), "ai conversations", ROW_CAP),
+    allRows(supabaseServer.from("ai_tool_calls").select("created_at, tool_name, ok, account_id").eq("tenant_id", auth.tenant_id).gte("created_at", since).order("id"), "ai tool calls", ROW_CAP),
     /* Calls are counted by their summaries; the text is read here only to
        recognise the heading and is not returned. */
-    supabaseServer
+    allRows(supabaseServer
       .from("ai_messages")
       .select("created_at, content")
       .eq("tenant_id", auth.tenant_id)
@@ -57,7 +59,7 @@ export async function GET(req: Request) {
       .eq("source", "voice")
       .or(Object.values(SUMMARY_HEADINGS).map((h) => `content.ilike.%${h}%`).join(","))
       .gte("created_at", since)
-      .limit(ROW_CAP),
+      .order("id"), "voice summaries", ROW_CAP),
   ]);
   const failed = [messages, conversations, toolCalls, spoken].find((r) => r.error);
   if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 500 });

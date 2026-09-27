@@ -30,6 +30,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { allDayKeys, safeTimeZone, zonedDateKey } from "@/lib/calendar-tz";
 import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
 import { loadExceptions } from "@/lib/server/calendar-exceptions";
@@ -114,7 +115,7 @@ export async function checkPlanningConflicts(
   const exclude = new Set([...(opts.excludeIds ?? []), ...live.map(({ c }) => c.id).filter((x): x is string => !!x)]);
 
   const [itemsRes, resRes] = await Promise.all([
-    supabaseServer
+    allRows(supabaseServer
       .from("planning_items")
       .select("id, title, type, resource_id, start_at, end_at")
       .eq("tenant_id", tenantId)
@@ -122,7 +123,7 @@ export async function checkPlanningConflicts(
       .neq("status", "cancelled")
       .lt("start_at", maxEnd)
       .gt("end_at", minStart)
-      .limit(5000),
+      .order("id"), "planning items"),
     supabaseServer
       .from("planning_resources")
       .select("id, name, type, account_id")

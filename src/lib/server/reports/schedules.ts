@@ -31,6 +31,8 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { inChunks } from "@/lib/server/in-chunks";
+import { allRows } from "@/lib/server/all-rows";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { canStartTemplate } from "@/lib/server/reports/core";
 import { reportTemplate } from "@/lib/reports/catalog";
@@ -107,7 +109,8 @@ async function typeOf(tenantId: string | null, key: string): Promise<{ tpl: Repo
 async function zonesOf(accountIds: string[]): Promise<Map<string, string>> {
   const [policies, emps] = await Promise.all([
     loadPolicyRows(),
-    supabaseServer.from("koleex_employees").select("id, account_id").in("account_id", accountIds.slice(0, SCHEDULE_LIMITS.perTenant)),
+    /* In chunks: a few hundred ids in one URL fail before they reach the database. */
+    inChunks<{ id: string; account_id: string }>(accountIds, (chunk) => supabaseServer.from("koleex_employees").select("id, account_id").in("account_id", chunk)),
   ]);
   const empOf = new Map(((emps.data ?? []) as Array<{ id: string; account_id: string }>).map((e) => [e.account_id, e.id]));
   const countries = await resolveEmployeeCountries([...empOf.values()]);
@@ -122,9 +125,11 @@ export interface ScheduleRun { checked: number; prepared: Array<{ accountId: str
  *  writes into a draft (6E) must be done — the job's own end. */
 export async function runReportSchedules(opts: { now?: Date; dryRun?: boolean; tenantId?: string | null; deadline?: number; summaryBy?: number } = {}): Promise<ScheduleRun> {
   const nowIso = (opts.now ?? new Date()).toISOString();
-  let q = supabaseServer.from("work_report_schedules").select("id, tenant_id, account_id, template_key, active, last_period, last_report_id").eq("active", true).limit(SCHEDULE_LIMITS.perTenant * 4);
+  let q = supabaseServer.from("work_report_schedules").select("id, tenant_id, account_id, template_key, active, last_period, last_report_id").eq("active", true);
   if (opts.tenantId) q = q.eq("tenant_id", opts.tenantId);
-  const { data, error } = await q;
+  /* Every active schedule of every company, in pages: a plain read stops at
+     the API's 1000 rows (500 per company fills that with two). */
+  const { data, error } = await allRows(q.order("id"), "schedules");
   if (error) throw new Error(`schedules: ${error.message}`);
   const rows = (data ?? []) as Sched[];
   const out: ScheduleRun = { checked: rows.length, prepared: [], waiting: 0, skipped: 0 };

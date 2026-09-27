@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { assertProjectAccess, involvedProjectsOr, memberProjectIds, orLikeTerm, projectPermissionFlags, UUID_RE } from "@/lib/server/project-access";
 import { isMissingColumn, validateProjectFields, withoutPendingColumns } from "@/lib/server/project-validate";
@@ -55,12 +56,12 @@ async function taskCounts(tenantId: string, projectIds: string[]): Promise<Map<s
     return out;
   }
   const today = new Date().toISOString().slice(0, 10);
-  const { data: rows } = await supabaseServer
+  const { data: rows } = await allRows(supabaseServer
     .from("project_tasks")
     .select("project_id, status, parent_task_id, due_date")
     .eq("tenant_id", tenantId)
     .in("project_id", projectIds)
-    .limit(20000);
+    .order("id"), "task counts");
   for (const r of (rows ?? []) as { project_id: string; status: string; parent_task_id: string | null; due_date: string | null }[]) {
     const c = out.get(r.project_id) ?? { ...ZERO };
     if (r.status === "open") {

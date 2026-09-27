@@ -24,6 +24,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
 import { listPeople } from "@/lib/server/reports/core";
 import { MGMT_MODULE, type ControlSource } from "@/lib/reports/report-data";
@@ -50,10 +51,10 @@ type Acct = { id: string; username: string | null; role_id: string | null; is_su
 type Perm = { can_view: boolean | null; can_create: boolean | null };
 
 async function accountsOf(auth: ServerAuthContext, activeOnly: boolean): Promise<Acct[]> {
-  let q = supabaseServer.from("accounts").select("id, username, role_id, is_super_admin, status, two_factor_enabled, last_login_at").limit(2000);
+  let q = supabaseServer.from("accounts").select("id, username, role_id, is_super_admin, status, two_factor_enabled, last_login_at");
   if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
   if (activeOnly) q = q.eq("status", "active");
-  return listOf<Acct>(await q, "accounts");
+  return listOf<Acct>(await allRows(q.order("id")), "accounts");
 }
 
 async function accessFacts(auth: ServerAuthContext): Promise<AccountFacts[]> {
@@ -62,10 +63,10 @@ async function accessFacts(auth: ServerAuthContext): Promise<AccountFacts[]> {
   const roleIds = Array.from(new Set(accts.map((a) => a.role_id).filter((r): r is string => !!r)));
   const [roles, perms, overrides] = await Promise.all([
     roleIds.length ? supabaseServer.from("roles").select("id, name, is_super_admin, can_view_private").in("id", roleIds).then((r) => listOf<{ id: string; name: string | null; is_super_admin: boolean | null; can_view_private: boolean | null }>(r, "roles")) : Promise.resolve([]),
-    roleIds.length ? supabaseServer.from("koleex_permissions").select("role_id, module_name, can_view, can_create").in("role_id", roleIds).limit(10000).then((r) => listOf<Perm & { role_id: string; module_name: string }>(r, "role rights")) : Promise.resolve([]),
+    roleIds.length ? allRows(supabaseServer.from("koleex_permissions").select("role_id, module_name, can_view, can_create").in("role_id", roleIds).order("id")).then((r) => listOf<Perm & { role_id: string; module_name: string }>(r, "role rights")) : Promise.resolve([]),
     (async () => {
       const all: Array<Perm & { account_id: string; module_key: string }> = [];
-      for (const part of chunks(accts.map((a) => a.id))) all.push(...listOf<Perm & { account_id: string; module_key: string }>(await supabaseServer.from("account_permission_overrides").select("account_id, module_key, can_view, can_create").in("account_id", part).limit(10000), "account rights"));
+      for (const part of chunks(accts.map((a) => a.id))) all.push(...listOf<Perm & { account_id: string; module_key: string }>(await allRows(supabaseServer.from("account_permission_overrides").select("account_id, module_key, can_view, can_create").in("account_id", part).order("id")), "account rights"));
       return all;
     })(),
   ]);
@@ -114,11 +115,11 @@ export async function controlData(src: ControlSource, x: ControlCtx): Promise<An
       const usage = new Map<string, { seconds: number; days: number; last: string | null }>();
       const signIns = new Map<string, number>();
       for (const part of chunks(ids)) {
-        let uq = supabaseServer.from("usage_daily").select("account_id, day, active_seconds").in("account_id", part).gte("day", from).lte("day", to).limit(10000);
+        let uq = supabaseServer.from("usage_daily").select("account_id, day, active_seconds").in("account_id", part).gte("day", from).lte("day", to);
         let lq = supabaseServer.from("activity_events").select("account_id").in("account_id", part).eq("event_type", "login")
-          .gte("created_at", `${from}T00:00:00Z`).lt("created_at", `${nextDay(to)}T00:00:00Z`).limit(10000);
+          .gte("created_at", `${from}T00:00:00Z`).lt("created_at", `${nextDay(to)}T00:00:00Z`);
         if (tenant) { uq = uq.eq("tenant_id", tenant); lq = lq.eq("tenant_id", tenant); }
-        const [us, ls] = await Promise.all([uq, lq]);
+        const [us, ls] = await Promise.all([allRows(uq.order("id")), allRows(lq.order("id"))]);
         for (const u of listOf<{ account_id: string; day: string; active_seconds: number | null }>(us, "usage")) {
           const e = usage.get(u.account_id) ?? { seconds: 0, days: 0, last: null };
           const secs = Number(u.active_seconds) || 0;
@@ -138,9 +139,9 @@ export async function controlData(src: ControlSource, x: ControlCtx): Promise<An
       type C = { id: string; contract_no: string | null; order_id: string | null; invoice_id: string | null; basis: string | null; lead: string | null; warranty: string | null; company: string | null; buyer: string | null };
       let q = supabaseServer.from("sales_contracts")
         .select("id, contract_no, order_id, invoice_id, basis:terms->>leadTimeBasis, lead:terms->>leadTimeDays, warranty:terms->>warrantyMonths, company:terms->buyer->>company, buyer:terms->buyer->>name")
-        .eq("status", "signed").limit(2000);
+        .eq("status", "signed");
       if (tenant) q = q.eq("tenant_id", tenant);
-      const list = listOf<C>(await q, "contracts");
+      const list = listOf<C>(await allRows(q.order("id")), "contracts");
       /* What each lead time counts from: the order's day, the invoice's first payment. */
       const orderIds = Array.from(new Set(list.map((c) => c.order_id).filter((v): v is string => !!v)));
       const invoiceIds = Array.from(new Set(list.map((c) => c.invoice_id).filter((v): v is string => !!v)));

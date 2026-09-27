@@ -23,6 +23,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
+import { allRows } from "../../all-rows";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { canRead, getNoteAccess, ilikeAny, validateNoteInput } from "@/lib/notes-server";
@@ -70,7 +71,7 @@ const searchNotes: ToolDef<{ q?: string; limit?: number }, Array<Record<string, 
       // Own notes by tag (substring match inside the tags array)
       let tagRows: Array<Record<string, unknown>> = [];
       if (term) {
-        const { data: allTags } = await supabaseServer.from("notes").select("tags").eq("tenant_id", tenant).eq("account_id", me).is("deleted_at", null).limit(5000);
+        const { data: allTags } = await allRows(supabaseServer.from("notes").select("tags").eq("tenant_id", tenant).eq("account_id", me).is("deleted_at", null).order("id"), "note tags");
         const needle = term.toLowerCase();
         const matching = Array.from(new Set(
           ((allTags ?? []) as Array<{ tags: string[] | null }>).flatMap((r) => r.tags ?? []).filter((x) => x.toLowerCase().includes(needle)),

@@ -47,6 +47,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import {
   serializeDiscussMessageForClient,
@@ -73,12 +74,12 @@ function sigOf(ch: { name: string | null; description: string | null; archived_a
 async function memberSigs(ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (ids.length === 0) return out;
-  const { data } = await supabaseServer
+  const { data } = await allRows(supabaseServer
     .from(MEMBERS)
     .select("channel_id, account_id, role")
     .in("channel_id", ids)
     .is("left_at", null)
-    .limit(10_000);
+    .order("id"), "channel members");
   const by = new Map<string, string[]>();
   for (const r of (data ?? []) as Array<{ channel_id: string; account_id: string; role: string | null }>) {
     const list = by.get(r.channel_id) ?? [];

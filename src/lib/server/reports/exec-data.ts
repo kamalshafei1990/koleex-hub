@@ -23,6 +23,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAccess, requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { requireFinanceNumbers } from "@/lib/experience";
 import { lowStockItemIds } from "@/lib/inventory/queries";
@@ -72,9 +73,9 @@ export function execShared(auth: ServerAuthContext, x: { start: string; end: str
       for (const part of chunks(ids)) {
         let q = supabaseServer.from("work_reports").select("author_account_id")
           .in("author_account_id", part).neq("status", "draft").eq("superseded", false)
-          .gte("submitted_at", `${x.start}T00:00:00Z`).lt("submitted_at", `${nextDay(x.end)}T00:00:00Z`).limit(5000);
+          .gte("submitted_at", `${x.start}T00:00:00Z`).lt("submitted_at", `${nextDay(x.end)}T00:00:00Z`);
         if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
-        for (const r of listOf<{ author_account_id: string }>(await q, "reports sent")) out.set(r.author_account_id, (out.get(r.author_account_id) ?? 0) + 1);
+        for (const r of listOf<{ author_account_id: string }>(await allRows(q.order("id")), "reports sent")) out.set(r.author_account_id, (out.get(r.author_account_id) ?? 0) + 1);
       }
       return out;
     }),
@@ -110,11 +111,11 @@ export async function execData(src: ExecSource, x: ExecCtx, sh: ExecShared, noDe
     case "exec_sales": {
       if ((await requireModuleAccess(auth, "Invoices")) !== null) return "denied";
       /* ⚠️ quotations.status and invoices.status are ENUMS: only real values. */
-      let qq = supabaseServer.from("quotations").select("currency, total").not("status", "in", "(draft,cancelled)").gte("issue_date", from).lte("issue_date", to).limit(5000);
-      let oq = supabaseServer.from("orders").select("currency, total").neq("status", "cancelled").gte("created_at", `${from}T00:00:00Z`).lt("created_at", `${nextDay(to)}T00:00:00Z`).limit(5000);
-      let iq = supabaseServer.from("invoices").select("currency, total").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gte("issue_date", from).lte("issue_date", to).limit(5000);
+      let qq = supabaseServer.from("quotations").select("currency, total").not("status", "in", "(draft,cancelled)").gte("issue_date", from).lte("issue_date", to);
+      let oq = supabaseServer.from("orders").select("currency, total").neq("status", "cancelled").gte("created_at", `${from}T00:00:00Z`).lt("created_at", `${nextDay(to)}T00:00:00Z`);
+      let iq = supabaseServer.from("invoices").select("currency, total").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gte("issue_date", from).lte("issue_date", to);
       if (tenant) { qq = qq.eq("tenant_id", tenant); oq = oq.eq("tenant_id", tenant); iq = iq.eq("tenant_id", tenant); }
-      const [qs, os, is] = await Promise.all([qq, oq, iq]);
+      const [qs, os, is] = await Promise.all([allRows(qq.order("id")), allRows(oq.order("id")), allRows(iq.order("id"))]);
       type D = { currency: string | null; total: unknown };
       const docs: SaleDoc[] = [
         ...listOf<D>(qs, "quotations").map((d) => ({ metric: "quotations_sent" as const, currency: d.currency, amount: d.total as number })),
@@ -125,10 +126,10 @@ export async function execData(src: ExecSource, x: ExecCtx, sh: ExecShared, noDe
     }
     case "exec_collections": {
       if ((await requireFinanceNumbers(auth)) !== null) return "denied";
-      let pq = supabaseServer.from("invoice_payments").select("currency, amount").gte("received_at", from).lte("received_at", to).limit(5000);
-      let oq = supabaseServer.from("invoices").select("currency, balance, due_date").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0).limit(5000);
+      let pq = supabaseServer.from("invoice_payments").select("currency, amount").gte("received_at", from).lte("received_at", to);
+      let oq = supabaseServer.from("invoices").select("currency, balance, due_date").not("status", "in", "(draft,void,cancelled)").is("cancelled_at", null).gt("balance", 0);
       if (tenant) { pq = pq.eq("tenant_id", tenant); oq = oq.eq("tenant_id", tenant); }
-      const [ps, os] = await Promise.all([pq, oq]);
+      const [ps, os] = await Promise.all([allRows(pq.order("id")), allRows(oq.order("id"))]);
       const open = listOf<{ currency: string | null; balance: unknown; due_date: string | null }>(os, "invoices owed");
       return { rows: moneyRows(listOf<{ currency: string | null; amount: unknown }>(ps, "payments").map((p) => ({ currency: p.currency, amount: p.amount as number })),
         open.map((i) => ({ currency: i.currency, balance: i.balance as number, due: i.due_date ? i.due_date.slice(0, 10) : null })), today) };
@@ -136,9 +137,9 @@ export async function execData(src: ExecSource, x: ExecCtx, sh: ExecShared, noDe
     case "exec_stock": {
       if ((await requireModuleAccess(auth, "Inventory")) !== null) return "denied";
       let mq = supabaseServer.from("inventory_stock_movements").select("direction, movement_type")
-        .neq("status", "voided").is("deleted_at", null).gte("movement_date", from).lte("movement_date", to).limit(10000);
+        .neq("status", "voided").is("deleted_at", null).gte("movement_date", from).lte("movement_date", to);
       if (tenant) mq = mq.eq("tenant_id", tenant);
-      const [low, moves] = await Promise.all([tenant ? lowStockItemIds(tenant) : Promise.resolve([] as string[]), mq]);
+      const [low, moves] = await Promise.all([tenant ? lowStockItemIds(tenant) : Promise.resolve([] as string[]), allRows(mq.order("id"))]);
       const list = listOf<{ direction: string | null; movement_type: string | null }>(moves, "stock movements");
       return { rows: stockRows({
         low: low.length,

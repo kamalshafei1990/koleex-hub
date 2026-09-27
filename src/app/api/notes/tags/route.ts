@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 /* GET /api/notes/tags — the caller's tags with live-note counts, for the
@@ -15,14 +16,14 @@ export async function GET() {
   const deny = await requireModuleAccess(auth, "Notes");
   if (deny) return deny;
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await allRows(supabaseServer
     .from("notes")
     .select("tags")
     .eq("account_id", auth.account_id)
     .is("deleted_at", null)
     .not("tags", "eq", "{}")
     .order("updated_at", { ascending: false })
-    .limit(5000);
+    .order("id"), "note tags");
   if (error) {
     console.error("[api/notes/tags]", error.message);
     return NextResponse.json({ error: "Failed to load tags" }, { status: 500 });

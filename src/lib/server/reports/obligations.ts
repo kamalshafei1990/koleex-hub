@@ -14,6 +14,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { listPeople, loadOrgTree, type OrgTree, type PersonLite } from "@/lib/server/reports/core";
 import { loadPolicyRows, loadWorkCalendar, pickPolicy, resolveEmployeeCountries, wallClockToIso } from "@/lib/server/work-calendar";
@@ -142,10 +143,10 @@ export async function loadSent(authorIds: string[], from: string, to: string): P
   const sent = new Map<string, Sent>();
   const drafts = new Map<string, Sent>();
   if (!authorIds.length) return { sent, drafts };
-  const { data, error } = await supabaseServer.from("work_reports")
+  const { data, error } = await allRows(supabaseServer.from("work_reports")
     .select("id, author_account_id, template_key, period_key, status, submitted_at, superseded, confidential")
     .in("author_account_id", authorIds).in("template_key", OBLIGATION_KEYS)
-    .gte("period_start", from).lte("period_start", to).limit(5000);
+    .gte("period_start", from).lte("period_start", to).order("id"), "reports sent");
   if (error) { console.error("[reports] obligations sent:", error.message); return { sent, drafts }; }
   for (const r of (data ?? []) as SentRow[]) {
     if (!r.period_key) continue;

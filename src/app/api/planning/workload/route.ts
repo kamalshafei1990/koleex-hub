@@ -19,6 +19,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { callerResourceIds, planningReadScopeOr, PLANNING_ERR } from "@/lib/server/planning-access";
 import { isPlanningUuid } from "@/lib/planning-validate";
@@ -112,7 +113,7 @@ export async function GET(req: Request) {
       return fail("scope", e instanceof Error ? e.message : String(e));
     }
   }
-  const { data: items, error: itErr } = await iq.limit(5000);
+  const { data: items, error: itErr } = await allRows(iq.order("id"), "workload items");
   if (itErr) return fail("items", itErr.message);
 
   for (const it of (items ?? []) as Array<{ resource_id: string; start_at: string; end_at: string; allocated_hours: number | null }>) {

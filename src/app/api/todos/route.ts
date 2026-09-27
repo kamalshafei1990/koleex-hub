@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { countOpenTodos } from "@/lib/todo-open-count";
 import { seriesPeriodOf } from "@/lib/todo-series";
@@ -450,7 +451,7 @@ async function resolveAssigneeInfos(accountIds: string[]): Promise<Map<string, A
      created, assigned, am assigned or that go to everyone), "all", or an
      account id. Anyone else is already limited by the scope.
    · performers: the three assignees with the most completed tasks, counted
-     over the newest 5000 completed tasks in scope (ids only, then the
+     over every completed task in scope (ids only, read in pages, then the
      assignee table in chunks) — observers are never assignees. */
 type StatsAuth = Exclude<Awaited<ReturnType<typeof requireAuth>>, NextResponse>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -496,7 +497,7 @@ async function todoStats(auth: StatsAuth, params: URLSearchParams) {
   const [allRes, sinceRes, idsRes] = await Promise.all([
     scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })),
     scoped(supabaseServer.from("koleex_todos").select("id", { count: "exact", head: true })).gte("completed_at", since),
-    scoped(supabaseServer.from("koleex_todos").select("id")).order("completed_at", { ascending: false }).limit(5000),
+    allRows(scoped(supabaseServer.from("koleex_todos").select("id")).order("completed_at", { ascending: false }).order("id"), "done to-dos"),
   ]);
   if (allRes.error || sinceRes.error || idsRes.error) {
     console.error("[api/todos stats]", allRes.error?.message ?? sinceRes.error?.message ?? idsRes.error?.message);

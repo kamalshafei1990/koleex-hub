@@ -14,6 +14,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows, type Rangeable } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import {
   resolveCallerTier, visibleTiers, computeReadiness, computeSourcingScore, certIsTrusted,
@@ -43,27 +44,33 @@ export async function GET() {
   const tiers = visibleTiers(tier);
 
   const suppliers = await safe(() =>
-    supabaseServer.from("contacts")
+    allRows(supabaseServer.from("contacts")
       .select("id, display_name, company_name_en, country, strategic_status, is_active, lead_time, moq")
-      .eq("tenant_id", tid).eq("contact_type", "supplier").limit(2000));
+      .eq("tenant_id", tid).eq("contact_type", "supplier").order("id"), "suppliers"));
   const ids = suppliers.map((s) => String(s.id));
   if (ids.length === 0) {
     return NextResponse.json({ overview: computeOperationalHealth([]), categories: [], concentration: [], dependencies: [], recommendations: [], suppliers: [], callerTier: tier });
   }
 
-  const inIds = <T,>(q: T) => (q as { in: (c: string, v: string[]) => T }).in("supplier_id", ids);
+  /* Every row of this company's, in pages (the API alone stops at 1000
+     rows), kept for the suppliers above. The supplier filter runs here, not
+     in the URL: a few hundred ids in one `.in()` fail before they reach the
+     database, and safe() would turn that into an empty overview. */
+  const idSet = new Set(ids);
+  const ofSuppliers = async (q: Rangeable, label: string) =>
+    (await safe(() => allRows(q, label))).filter((r) => idSet.has(String(r.supplier_id)));
   const [risk, neg, src, links, media, contactPersons, classifications, pos, receipts, bills, factory] = await Promise.all([
-    safe(() => inIds(supabaseServer.from("supplier_risk_profile").select("supplier_id, risk_level, trust_level, dependency_level, backup_supplier_exists").eq("tenant_id", tid))),
-    safe(() => inIds(supabaseServer.from("supplier_negotiation_intel").select("supplier_id, negotiation_score").eq("tenant_id", tid))),
-    safe(() => inIds(supabaseServer.from("supplier_sourcing_profile").select("supplier_id, sourcing_score_override, sourcing_priority").eq("tenant_id", tid))),
-    safe(() => inIds(supabaseServer.from("supplier_product_links").select("supplier_id, product_id, sourcing_role, lead_time_days, products(product_name, category_slug)").eq("tenant_id", tid).limit(5000))),
-    safe(() => inIds(supabaseServer.from("supplier_media").select("supplier_id, media_class, category, verified_at, expiry_date, lifecycle_status").eq("tenant_id", tid).is("deleted_at", null).limit(5000))),
-    safe(() => inIds(supabaseServer.from("supplier_contact_persons").select("supplier_id, wechat_id, wecom_id, whatsapp, telegram, mobile, preferred_channel, preferred_language").eq("tenant_id", tid).eq("is_active", true).limit(5000))),
-    safe(() => inIds(supabaseServer.from("supplier_classifications").select("supplier_id").eq("tenant_id", tid).limit(5000))),
-    safe(() => inIds(supabaseServer.from("purchase_orders").select("supplier_id").eq("tenant_id", tid).limit(20000))),
-    safe(() => inIds(supabaseServer.from("purchase_receipts").select("supplier_id").eq("tenant_id", tid).limit(20000))),
-    safe(() => inIds(supabaseServer.from("vendor_bills").select("supplier_id").eq("tenant_id", tid).limit(20000))),
-    safe(() => inIds(supabaseServer.from("supplier_factory_profile").select("*").eq("tenant_id", tid).limit(2000))),
+    ofSuppliers(supabaseServer.from("supplier_risk_profile").select("supplier_id, risk_level, trust_level, dependency_level, backup_supplier_exists").eq("tenant_id", tid).order("id"), "risk profiles"),
+    ofSuppliers(supabaseServer.from("supplier_negotiation_intel").select("supplier_id, negotiation_score").eq("tenant_id", tid).order("id"), "negotiation intel"),
+    ofSuppliers(supabaseServer.from("supplier_sourcing_profile").select("supplier_id, sourcing_score_override, sourcing_priority").eq("tenant_id", tid).order("id"), "sourcing profiles"),
+    ofSuppliers(supabaseServer.from("supplier_product_links").select("supplier_id, product_id, sourcing_role, lead_time_days, products(product_name, category_slug)").eq("tenant_id", tid).order("id"), "product links"),
+    ofSuppliers(supabaseServer.from("supplier_media").select("supplier_id, media_class, category, verified_at, expiry_date, lifecycle_status").eq("tenant_id", tid).is("deleted_at", null).order("id"), "supplier media"),
+    ofSuppliers(supabaseServer.from("supplier_contact_persons").select("supplier_id, wechat_id, wecom_id, whatsapp, telegram, mobile, preferred_channel, preferred_language").eq("tenant_id", tid).eq("is_active", true).order("id"), "contact persons"),
+    ofSuppliers(supabaseServer.from("supplier_classifications").select("supplier_id").eq("tenant_id", tid).order("id"), "classifications"),
+    ofSuppliers(supabaseServer.from("purchase_orders").select("supplier_id").eq("tenant_id", tid).order("id"), "purchase orders"),
+    ofSuppliers(supabaseServer.from("purchase_receipts").select("supplier_id").eq("tenant_id", tid).order("id"), "purchase receipts"),
+    ofSuppliers(supabaseServer.from("vendor_bills").select("supplier_id").eq("tenant_id", tid).order("id"), "vendor bills"),
+    ofSuppliers(supabaseServer.from("supplier_factory_profile").select("*").eq("tenant_id", tid).order("id"), "factory profiles"),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);

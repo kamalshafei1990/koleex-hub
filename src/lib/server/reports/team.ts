@@ -20,6 +20,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { buildAttendanceSheet } from "@/lib/server/attendance-sheet";
 import { listPeople, loadOrgTree, type PersonLite } from "@/lib/server/reports/core";
@@ -127,11 +128,11 @@ export async function teamWorkload(auth: ServerAuthContext, ids: string[], from:
   const items = new Map<string, WorkItem[]>(ids.map((id) => [id, []]));
   const push = (id: string, it: WorkItem) => items.get(id)?.push(it);
   for (const part of chunks(ids)) {
-    let tq = supabaseServer.from("project_tasks").select("assignee_account_id, status, due_date, closed_at, updated_at").in("assignee_account_id", part).limit(3000);
+    let tq = supabaseServer.from("project_tasks").select("assignee_account_id, status, due_date, closed_at, updated_at").in("assignee_account_id", part);
     if (auth.tenant_id) tq = tq.eq("tenant_id", auth.tenant_id);
     const [tasks, assigned] = await Promise.all([
-      tq,
-      supabaseServer.from("koleex_todo_assignees").select("todo_id, account_id").in("account_id", part).limit(5000),
+      allRows(tq.order("id"), "assigned tasks"),
+      allRows(supabaseServer.from("koleex_todo_assignees").select("todo_id, account_id").in("account_id", part).order("id"), "assigned to-dos"),
     ]);
     if (tasks.error) throw new Error(tasks.error.message);
     if (assigned.error) throw new Error(assigned.error.message);

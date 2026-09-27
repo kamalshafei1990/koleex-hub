@@ -38,6 +38,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { addAccountsToProjectChannel, removeAccountFromProjectChannel } from "@/lib/server/discuss-project-channel";
 import type { MemberRole } from "@/lib/server/project-access";
 
@@ -229,13 +230,13 @@ async function stillReachingPairs(tenantId: string, pairs: ProjectSeat[], countM
       .select("id, manager_account_id, created_by_account_id")
       .eq("tenant_id", tenantId)
       .in("id", pids),
-    supabaseServer
+    allRows(supabaseServer
       .from("project_tasks")
       .select("project_id, assignee_account_id")
       .eq("tenant_id", tenantId)
       .in("project_id", pids)
       .in("assignee_account_id", aids)
-      .limit(20000),
+      .order("id"), "assigned tasks"),
     countMembership
       ? supabaseServer
           .from("project_members")
@@ -286,10 +287,10 @@ async function pruneAutoMemberships(tenantId: string, pairs: ProjectSeat[]): Pro
 
   const [projs, assigned, created] = await Promise.all([
     supabaseServer.from("projects").select("id, manager_account_id, created_by_account_id").eq("tenant_id", tenantId).in("id", pids),
-    supabaseServer.from("project_tasks").select("project_id, assignee_account_id")
-      .eq("tenant_id", tenantId).in("project_id", pids).in("assignee_account_id", aids).limit(20000),
-    supabaseServer.from("project_tasks").select("project_id, created_by_account_id")
-      .eq("tenant_id", tenantId).in("project_id", pids).in("created_by_account_id", aids).limit(20000),
+    allRows(supabaseServer.from("project_tasks").select("project_id, assignee_account_id")
+      .eq("tenant_id", tenantId).in("project_id", pids).in("assignee_account_id", aids).order("id"), "assigned tasks"),
+    allRows(supabaseServer.from("project_tasks").select("project_id, created_by_account_id")
+      .eq("tenant_id", tenantId).in("project_id", pids).in("created_by_account_id", aids).order("id"), "created tasks"),
   ]);
   if (projs.error || assigned.error || created.error) return; /* never a spurious removal */
   const managerOf = new Map<string, string | null>();
@@ -413,12 +414,12 @@ export async function projectMemberCounts(tenantId: string, projectIds: string[]
     for (const r of data as { project_id: string; member_count: number }[]) out.set(r.project_id, r.member_count);
     return out;
   }
-  const { data: rows, error: selErr } = await supabaseServer
+  const { data: rows, error: selErr } = await allRows(supabaseServer
     .from("project_members")
     .select("project_id")
     .eq("tenant_id", tenantId)
     .in("project_id", projectIds)
-    .limit(50000);
+    .order("id"), "member counts");
   if (selErr) return out;
   for (const r of (rows ?? []) as { project_id: string }[]) out.set(r.project_id, (out.get(r.project_id) ?? 0) + 1);
   return out;

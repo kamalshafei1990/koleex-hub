@@ -86,18 +86,21 @@ const idFn = between(catalog, "export async function websiteProductId", "export 
 check("a product page is the host company's, active and visible", /\.eq\("tenant_id", tenantId\)/.test(idFn) && /\.eq\("status", "active"\)/.test(idFn) && /\.eq\("visible", true\)/.test(idFn));
 const taxFn = between(catalog, "export async function websiteTaxonomy", "export async function listWebsitePages");
 check("taxonomy counts only what the website shows", /\.eq\("status", "active"\)\.eq\("visible", true\)/.test(taxFn));
-check("taxonomy counts every product, paged (not the first 1000)", /allRows<TallyRow>\("taxonomy"/.test(taxFn) && !/\.limit\(\d+\)/.test(taxFn));
+check("taxonomy counts every product, paged (not the first 1000)", /allRowsOrThrow<TallyRow>\("website taxonomy"/.test(taxFn) && !/\.limit\(\d+\)/.test(taxFn));
 check("search text is stripped of PostgREST wildcards and separators", /replace\(\/\[\^\\p\{L\}\\p\{N\}\\s-\]\/gu/.test(catalog));
 const searchFn = between(catalog, "async function searchHits", "export async function listWebsiteProducts");
 check("search matches every word on its own, in the product, its models and its translations",
-  (searchFn.match(/for \(const w of words\) q = q\.ilike\("search_text", `%\$\{w\}%`\)/g) ?? []).length === 3
+  new Set((/for \(const w of words\) \{\n([\s\S]*?)\n  \}/.exec(searchFn)?.[1] ?? "").match(/(\w+) = \1\.ilike\("search_text", `%\$\{w\}%`\)/g) ?? []).size === 3
   && /from\("products"\)/.test(searchFn) && /from\("product_models"\)/.test(searchFn) && /from\("product_translations"\)/.test(searchFn));
 check("a search hit is the host company's, active and visible — direct or via a model/translation",
   (searchFn.match(/\.eq\("tenant_id", tenantId\)\.eq\("status", "active"\)\.eq\("visible", true\)/g) ?? []).length === 2);
 check("model/translation hits are checked in chunks (no URL of thousands of ids)", /inChunks<Hit>\(extra,/.test(searchFn));
 check("a hidden or discontinued model never makes a product findable", /\.eq\("visible", true\)\.or\("status\.is\.null,status\.neq\.discontinued"\)/.test(searchFn));
 check("the website never reads a supplier table (a supplier's name or code finds nothing)", !/from\("(product_suppliers|contacts|suppliers|supplier_[a-z_]+)"\)/.test(catalog));
-check("reads that must see every row page past the API's 1000-row cap", /const API_PAGE = 1000;/.test(catalog) && /if \(rows\.length < API_PAGE\) return out;/.test(catalog));
+const allRowsSrc = code("src/lib/server/all-rows.ts");
+check("reads that must see every row page past the API's 1000-row cap (lib/server/all-rows)",
+  /import \{ allRowsOrThrow \} from "@\/lib\/server\/all-rows";/.test(catalog) && !/const API_PAGE/.test(catalog)
+  && /export const API_PAGE = 1000;/.test(allRowsSrc) && /if \(rows\.length < size\) return \{ data: out, error: null \};/.test(allRowsSrc));
 check("the last-line scrub drops price, cost, supplier, MOQ, HS code, FOB and tenant keys",
   /const INTERNAL_KEY = \/\(price\|cost\|supplier\|moq\|margin\|hs_\?code\|fob\|tenant\)\/i;/.test(catalog));
 const detailRoute = code(join(ROUTES, "products/[slug]/route.ts"));

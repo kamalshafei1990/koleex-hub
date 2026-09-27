@@ -13,6 +13,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAccess, type ServerAuthContext } from "@/lib/server/auth";
 import { involvedProjectsOr } from "@/lib/server/project-access";
 import { listPeople } from "@/lib/server/reports/core";
@@ -62,9 +63,9 @@ export function projectShared(auth: ServerAuthContext): ProjectShared {
     const ids = (await projects()).map((p) => p.id);
     const out: Task[] = [];
     for (const part of chunks(ids)) {
-      let q = supabaseServer.from("project_tasks").select("id, project_id, parent_task_id, title, status, priority, assignee_account_id, due_date, closed_at, blocked_by_task_ids").in("project_id", part).limit(5000);
+      let q = supabaseServer.from("project_tasks").select("id, project_id, parent_task_id, title, status, priority, assignee_account_id, due_date, closed_at, blocked_by_task_ids").in("project_id", part);
       if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
-      out.push(...listOf<Task>(await q, "project tasks"));
+      out.push(...listOf<Task>(await allRows(q.order("id")), "project tasks"));
     }
     return out;
   });
@@ -72,9 +73,9 @@ export function projectShared(auth: ServerAuthContext): ProjectShared {
     const ids = (await projects()).map((p) => p.id);
     const out: Array<{ project_id: string; account_id: string | null; minutes: number; entry_date: string | null }> = [];
     for (const part of chunks(ids)) {
-      let q = supabaseServer.from("project_time_entries").select("project_id, account_id, minutes, entry_date").in("project_id", part).limit(10000);
+      let q = supabaseServer.from("project_time_entries").select("project_id, account_id, minutes, entry_date").in("project_id", part);
       if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
-      out.push(...listOf<typeof out[number]>(await q, "time entries"));
+      out.push(...listOf<typeof out[number]>(await allRows(q.order("id")), "time entries"));
     }
     return out;
   });

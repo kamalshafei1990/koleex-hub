@@ -28,6 +28,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { notifyLite } from "@/lib/server/notify-lite";
 import { listPeople, loadOrgTree } from "@/lib/server/reports/core";
 import { loadClocks, loadOwners, obligationClock, type Owner } from "@/lib/server/reports/obligations";
@@ -143,10 +144,10 @@ async function runTenant(tenantId: string, trackingFrom: string, now: string, op
     const keep = new Set(planned.map((p) => `${p.rule}|${p.sourceKey}|${p.accountId}`));
     /* A candidate dropped only for its timing (too late to ask) still exists. */
     for (const c of candidates) keep.add(`${c.rule}|${c.sourceKey}|${c.accountId}`);
-    const { data: open } = await supabaseServer.from("work_report_requests")
+    const { data: open } = await allRows(supabaseServer.from("work_report_requests")
       .select("id, account_id, rule_key, source_key, event_day")
       .eq("tenant_id", tenantId).eq("status", "open").is("sent_at", null)
-      .in("rule_key", Array.from(scanned)).gte("event_day", addDays(today, -EVENT_LIMITS.lookbackDays)).limit(2000);
+      .in("rule_key", Array.from(scanned)).gte("event_day", addDays(today, -EVENT_LIMITS.lookbackDays)).order("id"), "open event requests");
     const gone = ((open ?? []) as Array<{ id: string; account_id: string; rule_key: EventRuleKey; source_key: string; event_day: string }>)
       .filter((r) => (!opts.onlyAccounts || opts.onlyAccounts.has(r.account_id)) && !keep.has(`${r.rule_key}|${r.source_key}|${r.account_id}`))
       .filter((r) => inWindow(r.rule_key, String(r.event_day).slice(0, 10), today));

@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { NOTE_LIMITS } from "@/lib/notes-policy";
 import { ilikeAny, isUuid, ownsFolder, validateNoteInput } from "@/lib/notes-server";
@@ -150,12 +151,12 @@ export async function GET(req: Request) {
      a second query by array overlap (PostgREST cannot substring-match
      inside an array). Both run in parallel with the main list. */
   const tagQuery = search
-    ? supabaseServer
+    ? allRows(supabaseServer
         .from("notes")
         .select("tags")
         .eq("account_id", auth.account_id)
         .not("tags", "eq", "{}")
-        .limit(5000)
+        .order("id"), "note tags")
         .then(async ({ data }) => {
           const matching = tagsMatching((data ?? []) as Array<{ tags: string[] }>, rawSearch ?? "");
           if (!matching.length) return [] as Array<Record<string, unknown>>;

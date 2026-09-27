@@ -24,6 +24,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireModuleAction, type ServerAuthContext } from "@/lib/server/auth";
 import { canViewPrivate } from "@/lib/server/sensitive-columns";
 import { buildAttendanceSheet } from "@/lib/server/attendance-sheet";
@@ -187,7 +188,7 @@ export async function hrData(src: HrSource, x: HrCtx, sh: HrShared): Promise<Ans
         await supabaseServer.from("hr_job_postings").select("id, title, department_id, status, closes_at").in("status", ["open", "paused"]).order("created_at", { ascending: false }).limit(101), "job postings");
       if (!posts.length) return { rows: [] };
       const [apps, depts] = await Promise.all([
-        supabaseServer.from("hr_applicants").select("job_posting_id, stage").in("job_posting_id", posts.map((p) => p.id)).limit(5000).then((r) => listOf<{ job_posting_id: string; stage: string | null }>(r, "applicants")),
+        allRows(supabaseServer.from("hr_applicants").select("job_posting_id, stage").in("job_posting_id", posts.map((p) => p.id)).order("id")).then((r) => listOf<{ job_posting_id: string; stage: string | null }>(r, "applicants")),
         deptNames(x.auth),
       ]);
       return { rows: posts.map((p) => {
@@ -349,8 +350,8 @@ export async function hrData(src: HrSource, x: HrCtx, sh: HrShared): Promise<Ans
       if (x.auth.tenant_id) sq = sq.or(`tenant_id.eq.${x.auth.tenant_id},tenant_id.is.null`);
       const [skills, assessed, reqs] = await Promise.all([
         sq.then((r) => listOf<{ id: string; name: string }>(r, "skills")),
-        (async () => { const all: Array<{ employee_id: string; skill_id: string; employee_score: number | null }> = []; for (const part of chunks(ids)) all.push(...listOf<typeof all[number]>(await supabaseServer.from("employee_skill_assessments").select("employee_id, skill_id, employee_score").in("employee_id", part), "skill assessments")); return all; })(),
-        supabaseServer.from("position_skill_requirements").select("position_id, skill_id, required_score").limit(5000).then((r) => listOf<{ position_id: string; skill_id: string; required_score: number | null }>(r, "position skills")),
+        (async () => { const all: Array<{ employee_id: string; skill_id: string; employee_score: number | null }> = []; for (const part of chunks(ids)) all.push(...listOf<typeof all[number]>(await allRows(supabaseServer.from("employee_skill_assessments").select("employee_id, skill_id, employee_score").in("employee_id", part).order("id")), "skill assessments")); return all; })(),
+        allRows(supabaseServer.from("position_skill_requirements").select("position_id, skill_id, required_score").order("id")).then((r) => listOf<{ position_id: string; skill_id: string; required_score: number | null }>(r, "position skills")),
       ]);
       const reqOf = new Map(reqs.map((r) => [`${r.position_id}|${r.skill_id}`, r.required_score]));
       const requiredBy = new Map<string, number>();
@@ -450,7 +451,7 @@ export async function hrData(src: HrSource, x: HrCtx, sh: HrShared): Promise<Ans
     }
     case "missing_files": {
       const docCount = new Map<string, number>();
-      for (const part of chunks(ids)) for (const d of listOf<{ employee_id: string }>(await supabaseServer.from("hr_documents").select("employee_id").in("employee_id", part).limit(5000), "HR documents")) docCount.set(d.employee_id, (docCount.get(d.employee_id) ?? 0) + 1);
+      for (const part of chunks(ids)) for (const d of listOf<{ employee_id: string }>(await allRows(supabaseServer.from("hr_documents").select("employee_id").in("employee_id", part).order("id")), "HR documents")) docCount.set(d.employee_id, (docCount.get(d.employee_id) ?? 0) + 1);
       return { rows: [...people].sort(byName).map((p) => {
         const r = p.row;
         const gaps = fileGaps({
@@ -468,7 +469,7 @@ export async function hrData(src: HrSource, x: HrCtx, sh: HrShared): Promise<Ans
       let absent = 0, late = 0, leave = 0, ot = 0;
       for (const list of days.values()) { const d = personDays(list, from, to); absent += d.absent; late += d.late; leave += d.leave; ot += d.approvedH; }
       const posts = listOf<{ id: string }>(await supabaseServer.from("hr_job_postings").select("id").eq("status", "open").limit(500), "job postings");
-      const apps = posts.length ? listOf<{ stage: string | null }>(await supabaseServer.from("hr_applicants").select("stage").in("job_posting_id", posts.map((p) => p.id)).limit(5000), "applicants").filter((a) => a.stage !== "rejected" && a.stage !== "hired").length : 0;
+      const apps = posts.length ? listOf<{ stage: string | null }>(await allRows(supabaseServer.from("hr_applicants").select("stage").in("job_posting_id", posts.map((p) => p.id)).order("id")), "applicants").filter((a) => a.stage !== "rejected" && a.stage !== "hired").length : 0;
       return { rows: hrKpiRows({
         headcount: all.filter((s) => ACTIVE.includes(s.status)).length, hires: Number(turnover.hires ?? 0), leavers: Number(turnover.leavers ?? 0), turnover: Number(turnover.rate ?? 0),
         absentDays: absent, lateDays: late, leaveDays: leave, overtimeHours: ot, openJobs: posts.length, applicants: apps,
@@ -483,9 +484,9 @@ async function explanations(x: HrCtx, people: Staff[], from: string, to: string)
   const out = new Map<string, number>();
   for (const part of chunks(Array.from(byAccount.keys()))) {
     let q = supabaseServer.from("work_reports").select("author_account_id").eq("template_key", "attendance_note").neq("status", "draft").eq("superseded", false)
-      .in("author_account_id", part).lte("period_start", to).gte("period_end", from).limit(2000);
+      .in("author_account_id", part).lte("period_start", to).gte("period_end", from);
     if (x.auth.tenant_id) q = q.eq("tenant_id", x.auth.tenant_id);
-    for (const r of listOf<{ author_account_id: string }>(await q, "attendance notes")) {
+    for (const r of listOf<{ author_account_id: string }>(await allRows(q.order("id")), "attendance notes")) {
       const emp = byAccount.get(r.author_account_id);
       if (emp) out.set(emp, (out.get(emp) ?? 0) + 1);
     }

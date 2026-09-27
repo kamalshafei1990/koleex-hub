@@ -21,6 +21,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { callerResourceIds, type PlanningCaller } from "@/lib/server/planning-access";
 import { notifyPlanningPublishedBatch } from "@/lib/server/planning-notify";
 import { shiftDaysInZone } from "@/lib/planning-recurrence";
@@ -85,7 +86,7 @@ export async function copyLastWeek(caller: PlanningCaller, scope: WeekScope, pre
   const sourceStart = shiftDaysInZone(targetStart, -7, scope.tz);
   const targetEnd = shiftDaysInZone(targetStart, 7, scope.tz);
 
-  const { data: src, error } = await supabaseServer
+  const { data: src, error } = await allRows(supabaseServer
     .from("planning_items")
     .select(COPY_COLS)
     .eq("tenant_id", caller.tenant_id)
@@ -93,21 +94,21 @@ export async function copyLastWeek(caller: PlanningCaller, scope: WeekScope, pre
     .gte("start_at", sourceStart)
     .lt("start_at", targetStart)
     .order("start_at", { ascending: true })
-    .limit(2000);
+    .order("id"), "last week");
   if (error) throw new Error(error.message);
 
   const allowed = await writableFilter(caller, scope);
   const source = ((src ?? []) as Row[]).filter(allowed);
   if (source.length === 0) return { count: 0, skipped: 0, created: [] };
 
-  const { data: tgt, error: tErr } = await supabaseServer
+  const { data: tgt, error: tErr } = await allRows(supabaseServer
     .from("planning_items")
     .select("resource_id, start_at, end_at, type, title")
     .eq("tenant_id", caller.tenant_id)
     .neq("status", "cancelled")
     .gte("start_at", targetStart)
     .lt("start_at", targetEnd)
-    .limit(5000);
+    .order("id"), "target week");
   if (tErr) throw new Error(tErr.message);
   const taken = new Set(((tgt ?? []) as Row[]).map(dupKey));
 
@@ -165,14 +166,14 @@ export async function publishWeek(
 ): Promise<PublishWeekResult> {
   const start = new Date(ms(scope.weekStart)).toISOString();
   const end = shiftDaysInZone(start, 7, scope.tz);
-  const { data, error } = await supabaseServer
+  const { data, error } = await allRows(supabaseServer
     .from("planning_items")
     .select("id, resource_id, created_by_account_id, resource:resource_id ( account_id )")
     .eq("tenant_id", caller.tenant_id)
     .eq("status", "draft")
     .gte("end_at", start)
     .lt("start_at", end)
-    .limit(2000);
+    .order("id"), "draft week");
   if (error) throw new Error(error.message);
 
   const allowed = await writableFilter(caller, scope);
