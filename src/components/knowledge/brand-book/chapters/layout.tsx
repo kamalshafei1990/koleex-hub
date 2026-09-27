@@ -206,7 +206,7 @@ export function SpacingShapes() {
           Rectangles with our radii, circles for avatars and status dots, straight lines. No blobs, waves,
           splashes, brush strokes or hand-drawn shapes.
         </Rule>
-        <Note>The slow wave behind the Koleex Hub interface is part of the Hub&apos;s Aurora skin only (<Ref n={77} />). It is never used on company material.</Note>
+        <Note>The slow wave behind the Koleex Hub interface is part of the Hub’s Aurora skin only (<Ref n={77} />). It is never used on company material.</Note>
       </Section>
 
       <Section id="depth" title="Depth">

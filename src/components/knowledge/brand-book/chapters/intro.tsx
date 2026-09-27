@@ -57,7 +57,7 @@ export function Welcome() {
             <P>Use it. Question it. And when something is missing, tell us — the book grows with the company.</P>
             <div className="pt-2">
               <p className="text-[15px] font-semibold text-[var(--text-primary)]">Kamal Shafei</p>
-              <p className="text-[13px] text-[var(--text-dim)]">Founder &amp; CEO, KOLEEX International Group</p>
+              <p className="text-[13px] text-[var(--text-dim)]">Founder & CEO, KOLEEX International Group</p>
             </div>
           </div>
         </div>
@@ -202,7 +202,7 @@ export function HowToUse() {
           head={["Sign", "Meaning"]}
           rows={[
             [<span key="s" className="rounded-full px-2 py-[1px] text-[11px] font-semibold text-white" style={{ background: "#059669" }}>Do</span>, "The correct way. Copy it."],
-            [<span key="s" className="rounded-full px-2 py-[1px] text-[11px] font-semibold text-white" style={{ background: "#DC2626" }}>Don&apos;t</span>, "A mistake. Never publish anything that looks like this."],
+            [<span key="s" className="rounded-full px-2 py-[1px] text-[11px] font-semibold text-white" style={{ background: "#DC2626" }}>Don’t</span>, "A mistake. Never publish anything that looks like this."],
             [<B key="s">x</B>, "The height of the logo — the unit every logo measurement is made from."],
             [<span key="s" className="text-[var(--text-ghost)]">Soon</span>, "In the contents: a chapter that is planned but not written yet."],
             [<span key="s" className="font-mono">DD/MM/YYYY</span>, "Every date in this book, and in everything KOLEEX publishes."],
@@ -344,7 +344,7 @@ export function AtAGlance() {
         <Bullets items={[
           <><B>Our own photographs</B> of our own machines, factories, teams and events.</>,
           <><B>Flat 2D graphics.</B> No 3D renders, no bevels, no metallic effects.</>,
-          <><B>No stock photos</B> presented as KOLEEX, and never another company&apos;s products as ours.</>,
+          <><B>No stock photos</B> presented as KOLEEX, and never another company’s products as ours.</>,
           <>AI images only for abstract backgrounds — never for machines or people. <Ref n={69} /></>,
         ]} />
       </Section>

@@ -96,8 +96,8 @@ export function PhotoPrinciples() {
           works, of people who agreed to be photographed.
         </Rule>
         <Bullets items={[
-          <><B>No stock photos</B> of offices, cities, handshakes or &quot;teams&quot; presented as KOLEEX.</>,
-          <><B>No supplier or catalog photos</B>, and no photos showing another brand&apos;s product or logo.</>,
+          <><B>No stock photos</B> of offices, cities, handshakes or “teams” presented as KOLEEX.</>,
+          <><B>No supplier or catalog photos</B>, and no photos showing another brand’s product or logo.</>,
           <><B>No photos found online</B>, whatever the source says about licences.</>,
           <>If we do not have the right photograph yet, we use a clean layout without one — or a machine icon (<Ref n={59} />) — until we shoot it.</>,
         ]} />
@@ -215,7 +215,7 @@ export function StudioPhoto() {
       <Section id="as-sold" title="Photograph machines as sold">
         <Rule why="The photo is a promise: it must show exactly what the customer will receive.">
           Machines are photographed exactly as sold, with their KOLEEX branding. A machine that carries
-          another brand is not photographed for KOLEEX material — and another brand&apos;s logo is never
+          another brand is not photographed for KOLEEX material — and another brand’s logo is never
           edited out to make it look like ours.
         </Rule>
       </Section>
@@ -267,7 +267,7 @@ export function MobilePhoto() {
       n={65}
       lead={
         <p>
-          Most KOLEEX photographs are taken on a phone — at the warehouse, in a factory, at a customer&apos;s
+          Most KOLEEX photographs are taken on a phone — at the warehouse, in a factory, at a customer’s
           workshop. A phone can take a catalog-quality photo when the protocol below is followed exactly.
         </p>
       }
@@ -359,8 +359,8 @@ export function PeoplePhoto() {
     >
       <Section id="consent" title="Consent first">
         <Rule why="A photograph of a person is their personal data. Publishing it without permission can break the law in China, Egypt and the Gulf — and it breaks trust everywhere.">
-          Nobody appears in KOLEEX material without their written permission. Customers&apos; staff appear
-          only with the customer&apos;s permission too. Children never.
+          Nobody appears in KOLEEX material without their written permission. Customers’ staff appear
+          only with the customer’s permission too. Children never.
         </Rule>
       </Section>
 
@@ -429,7 +429,7 @@ export function FactoryPhoto() {
       <Section id="honest" title="Honest labels">
         <Rule why="Customers make decisions on what they believe about our production. Presenting a partner's factory as our own is a false claim.">
           A photograph of a factory says whose factory it is. Our own facilities are shown as ours; a partner
-          factory is never presented as KOLEEX&apos;s own.
+          factory is never presented as KOLEEX’s own.
         </Rule>
       </Section>
 

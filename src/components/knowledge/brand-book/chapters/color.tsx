@@ -88,7 +88,7 @@ export function ColorPalette() {
             [<Code key="a">Multi-color category palettes</Code>, "Charts, diagrams, section colors", <span key="b">Black, greys and the Hub Blue family (<Ref n={61} />)</span>],
           ]}
         />
-        <Note>Inside the Hub&apos;s Core interface, sliders and progress bars keep their functional blue <Code>#0066FF</Code>. It is an interface control color, never a marketing or print color.</Note>
+        <Note>Inside the Hub’s Core interface, sliders and progress bars keep their functional blue <Code>#0066FF</Code>. It is an interface control color, never a marketing or print color.</Note>
       </Section>
 
       <Section id="color-files" title="Files">
@@ -106,7 +106,7 @@ export function HubBlue() {
       n={46}
       lead={
         <p>
-          Hub Blue is the blue of the &quot;hub&quot; in the Koleex Hub mark — a cool, steady steel blue that moves
+          Hub Blue is the blue of the “hub” in the Koleex Hub mark — a cool, steady steel blue that moves
           to a pale ice. It became the third KOLEEX brand color on 31/07/2026, and it is used across
           everything: the Hub, marketing and print.
         </p>
@@ -155,7 +155,7 @@ export function HubBlue() {
             ]} />
           </div>
         </div>
-        <P>The gradient is the Hub&apos;s signature. Use it small: a line, a bar, a highlight, an icon, the &quot;hub&quot; script — never a full background behind text or behind the logo.</P>
+        <P>The gradient is the Hub’s signature. Use it small: a line, a bar, a highlight, an icon, the “hub” script — never a full background behind text or behind the logo.</P>
       </Section>
 
       <Section id="where" title="Where Hub Blue goes">

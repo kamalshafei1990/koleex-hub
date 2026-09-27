@@ -268,7 +268,7 @@ export function Construction() {
           <>Align the logo by the <B>straight left edge of the K</B> to the same margin as the text and images below it.</>,
           <>When the logo sits beside text, align its <B>baseline</B> with the text baseline.</>,
           <>In centered layouts, center the logo on its full width — the X peak needs no optical correction.</>,
-          <>Next to a headline, the logo height is never smaller than the headline&apos;s capital height.</>,
+          <>Next to a headline, the logo height is never smaller than the headline’s capital height.</>,
         ]} />
       </Section>
     </Chapter>
@@ -540,7 +540,7 @@ export function Backgrounds() {
       <Section id="materials" title="On materials">
         <Rule why="Effects imitate materials badly and age fast. A flat, one-color logo is right on every material.">
           On any material the logo is one flat color at full strength: black, white — or, when it is
-          engraved or etched, the material&apos;s own tone. No metallic effects, bevels, shadows or 3D.
+          engraved or etched, the material’s own tone. No metallic effects, bevels, shadows or 3D.
         </Rule>
         <Table
           head={["Material", "Method", "Logo color", "Minimum width"]}
@@ -643,7 +643,7 @@ export function Misuse() {
       lead={
         <p>
           Every mistake on this page has already happened somewhere. The logo is changed in none of these
-          ways — not for a special occasion, not for a single post, not because a layout &quot;needs it&quot;.
+          ways — not for a special occasion, not for a single post, not because a layout “needs it”.
         </p>
       }
       toc={[

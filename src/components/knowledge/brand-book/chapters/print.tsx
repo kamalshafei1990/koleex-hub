@@ -1,0 +1,325 @@
+"use client";
+
+/* Chapters 102–106: company profile, catalogs, brochures & flyers, spec
+   sheets, posters. */
+
+import type { ReactNode } from "react";
+import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+import OverlockMachineIcon from "@/components/icons/machine-kinds/OverlockMachineIcon";
+import FlatBedMachineIcon from "@/components/icons/machine-kinds/FlatBedMachineIcon";
+import CoverstitchIcon from "@/components/icons/machine-kinds/CoverstitchIcon";
+import {
+  B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
+} from "../kit";
+import { Wordmark } from "../marks";
+import { HUB_LINE, INK, Lines, Strips } from "../mockups";
+import { Peak } from "./layout";
+
+function Page({ w = 150, dark = false, ratio = "210 / 270", children }: { w?: number; dark?: boolean; ratio?: string; children: ReactNode }) {
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded-[3px]" style={{ width: w, aspectRatio: ratio, background: dark ? INK : "#FFFFFF", color: dark ? "#FFFFFF" : INK, boxShadow: dark ? "0 0 0 1px rgba(255,255,255,0.12)" : "0 0 0 1px rgba(0,0,0,0.12)" }}>
+      {children}
+    </div>
+  );
+}
+
+function Spread({ children }: { children: ReactNode }) {
+  return <div className="flex shrink-0 overflow-hidden rounded-[3px] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">{children}</div>;
+}
+
+/* ── 102 · Company Profile ─────────────────────────────────────────────── */
+
+export function CompanyProfile() {
+  return (
+    <Chapter
+      n={102}
+      lead={
+        <p>
+          The company profile introduces KOLEEX to partners who do not know us yet. Its story is strong —
+          a family business since 1955, three generations, KOLEEX since 2012 — so the profile lets the facts
+          and our own photographs speak, with nothing borrowed.
+        </p>
+      }
+      toc={[
+        { id: "layout", title: "Layout" },
+        { id: "contents", title: "Contents" },
+        { id: "evidence", title: "Evidence rules" },
+      ]}
+    >
+      <Section id="layout" title="Layout">
+        <Stage bg="#F5F5F5" h="auto" pad={24}>
+          <div className="flex flex-wrap items-center justify-center gap-5">
+            <Page w={200} dark ratio="16 / 10">
+              <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width="40%" /></div>
+              <p className="absolute bottom-3 left-4 text-[7px]">KOLEEX International Group<br /><span className="text-[#9CA3AF]">Company Profile</span></p>
+            </Page>
+            <Spread>
+              <Page w={150} dark ratio="8 / 10"><div className="absolute inset-3 rounded-sm bg-[#1A1A1A]" /><span className="absolute bottom-2 left-3 rounded bg-black/50 px-1 text-[5px] tracking-[0.14em] text-white">OWN PHOTO</span></Page>
+              <Page w={150} ratio="8 / 10"><div className="absolute left-4 top-[30%] right-4"><p className="text-[13px] font-bold leading-tight">Our story</p><div className="mt-2"><Lines n={5} /></div></div><p className="absolute bottom-2 left-4 text-[5px] text-[#9CA3AF]">History / Since 1955</p><p className="absolute bottom-2 right-3 text-[5px] text-[#9CA3AF]">04</p></Page>
+            </Spread>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Format", "Landscape, 16:10 — as PDF for screens, and printed as a booklet"],
+          ["Spreads", "Photograph on one page, title and text on the other"],
+          ["Every page", "Logo top-left; section and page name bottom-left; page number bottom-right"],
+          ["Style", "Core: black, white, one Hub line — no multi-color diagrams, no neon, no 3D"],
+        ]} />
+      </Section>
+
+      <Section id="contents" title="Contents">
+        <Table
+          head={["Section", "What it holds"]}
+          rows={[
+            [<B key="a">Message from the founder</B>, "Signed, with the founder's portrait"],
+            [<B key="a">Our story</B>, "1955 Cairo → three generations → KOLEEX 2012 → Taizhou 2017, with our own archive photos"],
+            [<B key="a">What we do</B>, "Machines by category (with machine icons) and services"],
+            [<B key="a">Quality</B>, "How we inspect, test and pack — photographed in our own facilities"],
+            [<B key="a">Where we are</B>, "Only real, current offices and agents"],
+            [<B key="a">Values and vision</B>, "In a few words"],
+            [<B key="a">Contact</B>, "One address, one phone, one email, the website, QR codes"],
+          ]}
+        />
+      </Section>
+
+      <Section id="evidence" title="Evidence rules">
+        <Rule why="A profile is read by people deciding whether to trust us. One number or logo that turns out not to be true undoes every page.">
+          Everything in the profile is true and checkable: our own photographs, real numbers with their
+          source, and other companies’ logos only with their written permission.
+        </Rule>
+        <Bullets items={[
+          "No stock photos of offices, people, cities or handshakes (ch. 63).",
+          "Customer and partner logos only with written permission; supplier names never (ch. 44).",
+          "Every number — countries, years, machines sold — with a source we can show.",
+          <>Leadership shown only as real people in their real roles (<Ref n={66} />).</>,
+        ]} />
+      </Section>
+    </Chapter>
+  );
+}
+
+/* ── 103 · Catalogs ────────────────────────────────────────────────────── */
+
+export function Catalogs() {
+  return (
+    <Chapter
+      n={103}
+      lead={
+        <p>
+          The catalog lets a customer see every machine we offer and ask for the right one. It is built on
+          the house sheet, organised by machine category, and it never shows a price.
+        </p>
+      }
+      toc={[
+        { id: "structure", title: "Structure" },
+        { id: "pages", title: "Pages" },
+        { id: "catalog-rules", title: "Rules" },
+      ]}
+    >
+      <Section id="structure" title="Structure">
+        <Bullets items={[
+          "Cover — logo, \"Product Catalog\", year, the Hub line.",
+          "Contents — categories with their machine icons and page numbers.",
+          "A category opener for each machine kind, then one page (or spread) per machine.",
+          "Services, contact, QR code to the website — at the back.",
+        ]} />
+      </Section>
+
+      <Section id="pages" title="Pages">
+        <Stage bg="#F5F5F5" h="auto" pad={24}>
+          <div className="flex flex-wrap items-start justify-center gap-5">
+            <Page w={160} dark>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="54%" /><p className="text-[6px] tracking-[0.24em] text-[#9CA3AF]">PRODUCT CATALOG 2026</p></div>
+              <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_LINE }} />
+            </Page>
+            <Page w={160}>
+              <div className="absolute inset-4 flex flex-col">
+                <OverlockMachineIcon size={34} />
+                <p className="mt-3 text-[15px] font-bold">Overlock</p>
+                <p className="text-[6px] text-[#4B5563]">Edge trimming and overedge stitching</p>
+                <div className="mt-auto flex items-center justify-between text-[5px] text-[#9CA3AF]"><Wordmark color="#000000" width={30} /><span>12</span></div>
+              </div>
+            </Page>
+            <Page w={160}>
+              <div className="absolute inset-3 flex flex-col">
+                <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]"><OverlockMachineIcon size={8} />Overlock</span><span className="text-[5px] text-[#9CA3AF]">13</span></div>
+                <div className="mt-2 flex h-[42%] items-center justify-center rounded bg-[#F5F5F5]"><OverlockMachineIcon size={40} /></div>
+                <p className="mt-2 text-[10px] font-bold">Model name</p>
+                <div className="mt-1 space-y-[2px] text-[5.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
+                <div className="mt-auto overflow-hidden rounded-[2px] border border-[#E5E7EB] text-[5px]">
+                  {[["Max speed", "— SPM"], ["Needles", "—"], ["Motor", "—"]].map(([k, v]) => <div key={k} className="flex justify-between border-b border-[#E5E7EB] px-1 py-[1px] last:border-0"><span>{k}</span><span className="font-mono">{v}</span></div>)}
+                </div>
+              </div>
+            </Page>
+          </div>
+        </Stage>
+      </Section>
+
+      <Section id="catalog-rules" title="Rules">
+        <Bullets items={[
+          <><B>No prices</B> — not in print, not in the PDF (owner rule). Prices go in quotations.</>,
+          "KOLEEX machines only — never a supplier's catalog with our logo added, never a supplier's name or code.",
+          "Specifications exactly as in Koleex Hub's product data; blank is better than a guess.",
+          "Our own photographs on white (ch. 64); where we have none yet, the machine icon — never a borrowed photo.",
+          "Light-led pages for easy reading and office printing (ch. 47); dark only for cover and openers if wished.",
+        ]} />
+        <Note>The catalog’s product pages can be generated from Koleex Hub, so the catalog and the website always say the same thing.</Note>
+      </Section>
+    </Chapter>
+  );
+}
+
+/* ── 104 · Brochures & Flyers ──────────────────────────────────────────── */
+
+export function Brochures() {
+  return (
+    <Chapter
+      n={104}
+      lead={<p>Brochures and flyers are handed out at exhibitions and visits. They say one thing each, quickly, and send the reader to the website or WhatsApp.</p>}
+      toc={[
+        { id: "formats", title: "Formats" },
+        { id: "flyer", title: "The flyer" },
+      ]}
+    >
+      <Section id="formats" title="Formats">
+        <Table
+          head={["Piece", "Size", "Use"]}
+          rows={[
+            ["Tri-fold brochure", "A4 folded to 99 × 210 mm", "Company overview or one machine category"],
+            ["Flyer", "A5 148 × 210 mm, both sides", "One machine, one service or one event"],
+            ["Leaflet for WhatsApp", "1080 × 1350 px PDF or image", "The flyer's digital twin"],
+          ]}
+        />
+      </Section>
+
+      <Section id="flyer" title="The flyer">
+        <Examples cols={2}>
+          <Example tone="do" caption="Front: one machine, one line, the logo." bg="#F5F5F5" h={260}>
+            <Page w={160} ratio="148 / 210" dark>
+              <div className="absolute inset-3 flex flex-col">
+                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Coverstitch</p>
+                <p className="mt-1 text-[12px] font-bold leading-tight">Flat seams for knitwear.</p>
+                <div className="my-2 flex flex-1 items-center justify-center rounded bg-[#1A1A1A]"><CoverstitchIcon size={40} /></div>
+                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={40} /><span className="h-[2px] w-8" style={{ background: HUB_LINE }} /></div>
+              </div>
+            </Page>
+          </Example>
+          <Example tone="do" caption="Back: key points, contact, QR — light-led." bg="#F5F5F5" h={260}>
+            <Page w={160} ratio="148 / 210">
+              <div className="absolute inset-3 flex flex-col text-[5.5px]">
+                <p className="text-[9px] font-bold">Why this machine</p>
+                <div className="mt-1 space-y-[3px]">{["Point one", "Point two", "Point three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
+                <div className="mt-auto flex items-end justify-between">
+                  <div className="space-y-[1px] font-mono text-[4.5px]"><p>{KOLEEX_COMPANY.web}</p><p>{KOLEEX_COMPANY.email}</p></div>
+                  <div className="h-8 w-8 rounded-sm" style={{ background: "repeating-conic-gradient(#0A0A0A 0 25%, #FFFFFF 0 50%) 0 0 / 6px 6px" }} />
+                </div>
+              </div>
+            </Page>
+          </Example>
+        </Examples>
+        <Specs rows={[
+          ["Print", "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a"],
+          ["Paper", "Matte coated 170–250 g/m²"],
+          ["QR code", "At least 20 × 20 mm, black on white, tested before printing"],
+        ]} />
+      </Section>
+    </Chapter>
+  );
+}
+
+/* ── 105 · Spec Sheets ─────────────────────────────────────────────────── */
+
+export function SpecSheets() {
+  return (
+    <Chapter
+      n={105}
+      lead={<p>A spec sheet is one page about one machine: what it is, what it does, its exact specifications. Customers compare them side by side, so every spec sheet is built the same way.</p>}
+      toc={[
+        { id: "sheet", title: "The spec sheet" },
+        { id: "spec-rules", title: "Rules" },
+      ]}
+    >
+      <Section id="sheet" title="The spec sheet">
+        <Stage bg="#F5F5F5" h="auto" pad={24}>
+          <Page w={260}>
+            <div className="absolute inset-3.5 flex flex-col">
+              <div className="flex items-center justify-between"><Wordmark color="#000000" width={60} /><span className="text-[7px] font-bold tracking-[0.08em]">SPEC SHEET</span></div>
+              <Strips />
+              <div className="mt-2 grid grid-cols-[1fr_1fr] gap-2">
+                <div className="flex aspect-square items-center justify-center rounded bg-[#F5F5F5]"><FlatBedMachineIcon size={56} /></div>
+                <div className="flex flex-col">
+                  <span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]"><FlatBedMachineIcon size={8} />Flat bed</span>
+                  <p className="mt-1 text-[10px] font-bold">Model name</p>
+                  <div className="mt-1 space-y-[2px] text-[5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
+                </div>
+              </div>
+              <div className="mt-2 overflow-hidden rounded-[2px] border border-[#E5E7EB] text-[5px]">
+                <div className="bg-[#0A0A0A] px-1 py-[1.5px] text-[4.5px] font-semibold uppercase tracking-[0.08em] text-white">Specifications</div>
+                {[["Stitch type", "—"], ["Max speed", "— SPM"], ["Stitch length", "— mm"], ["Presser foot lift", "— mm"], ["Motor", "—"], ["Voltage", "220 V · 50/60 Hz"], ["Net weight", "— kg"]].map(([k, v]) => <div key={k} className="flex justify-between border-t border-[#E5E7EB] px-1 py-[1.5px]"><span>{k}</span><span className="font-mono">{v}</span></div>)}
+              </div>
+              <div className="mt-auto flex items-end justify-between text-[4.5px] text-[#9CA3AF]"><span>{KOLEEX_COMPANY.web}</span><span>Specifications may change. 27/09/2026</span></div>
+            </div>
+          </Page>
+        </Stage>
+      </Section>
+
+      <Section id="spec-rules" title="Rules">
+        <Bullets items={[
+          "One machine per sheet, on the house sheet, light-led.",
+          "Specifications from Koleex Hub's product data — the same values as the website; a dash where a value is not confirmed.",
+          "Units always stated; decimals consistent; dates DD/MM/YYYY.",
+          "A \"Specifications may change\" line with the date of the sheet.",
+          <>Certification marks only if that exact model holds them (<Ref n={133} />).</>,
+        ]} />
+      </Section>
+    </Chapter>
+  );
+}
+
+/* ── 106 · Posters ─────────────────────────────────────────────────────── */
+
+export function Posters() {
+  return (
+    <Chapter
+      n={106}
+      lead={<p>A poster is seen from across a room or a hall. It has one message, one image and the logo — and it is readable in three seconds.</p>}
+      toc={[
+        { id: "poster", title: "The poster" },
+        { id: "poster-specs", title: "Specifications" },
+      ]}
+    >
+      <Section id="poster" title="The poster">
+        <Examples cols={2}>
+          <Example tone="do" caption="Dark-led, one message, logo at the foot." bg="#F5F5F5" h={300}>
+            <Page w={180} ratio="420 / 594" dark>
+              <div className="absolute inset-4 flex flex-col">
+                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Spreading</p>
+                <p className="mt-1 text-[18px] font-bold leading-[1.05]">Lay it flat.<br />Cut it right.</p>
+                <div className="my-3 flex-1 rounded bg-[#1A1A1A]" />
+                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={60} /><span className="h-[2px] w-10" style={{ background: HUB_LINE }} /></div>
+              </div>
+            </Page>
+          </Example>
+          <Example tone="dont" caption="Many messages, small type, every product at once." bg="#F5F5F5" h={300}>
+            <Page w={180} ratio="420 / 594">
+              <div className="absolute inset-3 grid grid-cols-3 content-start gap-1">
+                {Array.from({ length: 12 }).map((_, i) => <div key={i} className="h-10 rounded-sm bg-[#E5E7EB]" />)}
+                <p className="col-span-3 mt-1 text-[5px] leading-tight">All our machines, all our services, all our offices, all our phone numbers and every social account in one place…</p>
+              </div>
+            </Page>
+          </Example>
+        </Examples>
+      </Section>
+
+      <Section id="poster-specs" title="Specifications">
+        <Specs rows={[
+          ["Sizes", "A2 420 × 594 mm · A1 594 × 841 mm · A0 841 × 1189 mm"],
+          ["Headline", "Readable from 5 m: at least 60 mm tall letters on A1"],
+          ["Grid", "6 columns, 30 mm margins on A2 (ch. 55)"],
+          ["Print", "CMYK, 3–5 mm bleed, images at 150 dpi at full size, rich black for large dark areas (ch. 48)"],
+        ]} />
+        <P>Exhibition graphics — booth walls, roll-ups, fascia — are in Part 7 (<Ref n={114} />).</P>
+      </Section>
+    </Chapter>
+  );
+}

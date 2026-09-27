@@ -51,7 +51,7 @@ export function Typefaces() {
         <Stage bg="#FFFFFF" h="auto" pad={28}>
           <div className="w-full text-[#0A0A0A]">
             <p className="text-[96px] font-bold leading-none tracking-tight">Aa</p>
-            <p className="mt-4 text-[20px] leading-8 tracking-tight">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br />abcdefghijklmnopqrstuvwxyz<br />0123456789 &amp; % € $ ¥ — ( ) · / @</p>
+            <p className="mt-4 text-[20px] leading-8 tracking-tight">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br />abcdefghijklmnopqrstuvwxyz<br />0123456789 & % € $ ¥ — ( ) · / @</p>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[18px]">
               <span className="font-normal">Regular 400</span>
               <span className="font-medium">Medium 500</span>
@@ -116,7 +116,7 @@ export function Typefaces() {
       </Section>
 
       <Section id="office" title="In Word, PowerPoint and email">
-        <P>When Inter is not installed — on a customer&apos;s computer, in an email — the text falls back to fonts every computer has:</P>
+        <P>When Inter is not installed — on a customer’s computer, in an email — the text falls back to fonts every computer has:</P>
         <Table
           head={["Script", "Fallback font"]}
           rows={[
@@ -134,7 +134,7 @@ export function Typefaces() {
           <><B>Precise and neutral</B> — Inter was drawn for screens and reads the same on a phone, a spec sheet and a sign.</>,
           <><B>One family everywhere</B> — the same typeface already runs Koleex Hub, so documents, software and marketing match.</>,
           <><B>Free</B> — anyone making KOLEEX material, anywhere in the world, can use it legally at no cost.</>,
-          <><B>Ready for our languages</B> — the Arabic and Chinese families are the ones our customers&apos; and staff&apos;s devices already have.</>,
+          <><B>Ready for our languages</B> — the Arabic and Chinese families are the ones our customers’ and staff’s devices already have.</>,
         ]} />
         <Note>Earlier KOLEEX material named Helvetica Neue as the main typeface. It is replaced by Inter.</Note>
       </Section>

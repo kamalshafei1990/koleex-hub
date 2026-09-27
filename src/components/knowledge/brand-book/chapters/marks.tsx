@@ -136,7 +136,7 @@ export function HubMarkChapter() {
       lead={
         <p>
           Koleex Hub is our own platform — the system the whole company runs on, and that customers and
-          partners use too. It carries the KOLEEX logo with a handwritten &quot;hub&quot; in the Hub Blue gradient.
+          partners use too. It carries the KOLEEX logo with a handwritten “hub” in the Hub Blue gradient.
           It is a product mark: it belongs to the software and to what we say about it.
         </p>
       }
@@ -417,7 +417,7 @@ export function CoBranding() {
             <span className="text-[10px] tracking-[0.2em] text-[#4B5563]">A KOLEEX INTERNATIONAL GROUP COMPANY</span>
           </div>
         </Stage>
-        <P>The full system for the group&apos;s companies and brands is in <Ref n={16} />.</P>
+        <P>The full system for the group’s companies and brands is in <Ref n={16} />.</P>
       </Section>
 
       <Section id="certifications" title="Certification marks">

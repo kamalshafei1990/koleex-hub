@@ -113,7 +113,7 @@ export function Video() {
               <p className="absolute bottom-[26%] left-[8%] right-[16%] text-[9px] font-bold leading-tight text-white">Four threads. One pass.</p>
             </div>
             <div className="space-y-2 text-[12px] text-[var(--text-secondary)]">
-              <p><span className="inline-block h-3 w-3 rounded-sm bg-[#DC2626]/50 align-middle" /> Covered by the app&apos;s buttons and captions</p>
+              <p><span className="inline-block h-3 w-3 rounded-sm bg-[#DC2626]/50 align-middle" /> Covered by the app’s buttons and captions</p>
               <p>Top 250 px · bottom 420 px · left 72 px · right 150 px (at 1080 × 1920)</p>
               <p>Logo, titles and subtitles stay inside the clear area.</p>
             </div>
@@ -123,7 +123,7 @@ export function Video() {
 
       <Section id="music" title="Music">
         <Bullets items={[
-          <><B>Licensed music only</B> — from the platform&apos;s own library or bought with a licence that covers our use. Never popular songs.</>,
+          <><B>Licensed music only</B> — from the platform’s own library or bought with a licence that covers our use. Never popular songs.</>,
           "Instrumental, calm and modern; sits 15–20 dB below any voice.",
           "Videos for religious occasions use no music, or only very calm instrumental music.",
           <>The sound rules for the Hub and the logo are in <Ref n={74} />.</>,
@@ -238,7 +238,7 @@ export function VideoKit() {
           <Example tone="dont" caption="Arrows, red circles, shocked faces, long titles." bg="#F5F5F5" h={180}>
             <Frame w={240} bg="#DC2626">
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-2 text-center">
-                <p className="text-[13px] font-black text-[#FDE047]">YOU WON&apos;T BELIEVE THIS MACHINE!!!</p>
+                <p className="text-[13px] font-black text-[#FDE047]">YOU WON’T BELIEVE THIS MACHINE!!!</p>
                 <span className="text-[26px]">😱➡️</span>
               </div>
             </Frame>
@@ -531,7 +531,7 @@ export function Sound() {
         <Bullets items={[
           <><B>One family.</B> Soft, glassy tones on one scale, so every sound belongs to KOLEEX.</>,
           <><B>Short.</B> Under half a second for interface cues.</>,
-          <><B>Quiet.</B> Never startling; always under the user&apos;s control — every sound can be turned off.</>,
+          <><B>Quiet.</B> Never startling; always under the user’s control — every sound can be turned off.</>,
           <><B>Meaningful.</B> A sound always matches an event; the same event always makes the same sound.</>,
         ]} />
       </Section>
@@ -567,7 +567,7 @@ export function Sound() {
       </Section>
 
       <Section id="sonic-logo" title="The sonic logo">
-        <P>A short sound for the logo sting (<Ref n={73} />) — one to two seconds, from the same glass family — is planned. Until it is approved, the sting plays silently or over the video&apos;s own music.</P>
+        <P>A short sound for the logo sting (<Ref n={73} />) — one to two seconds, from the same glass family — is planned. Until it is approved, the sting plays silently or over the video’s own music.</P>
       </Section>
     </Chapter>
   );

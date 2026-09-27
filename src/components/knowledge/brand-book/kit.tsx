@@ -320,6 +320,11 @@ export function Stage({ bg = "#FFFFFF", h = 180, pad = 24, border, children, sty
         /* An artboard sets its own ink too, so a sample with no colour of
            its own never inherits the reader's (white text on a white board). */
         color: light ? "#0A0A0A" : "#FFFFFF",
+        /* …and re-points the reader's text tokens, so kit parts used inside
+           an artboard (B, Code, notes) take the board's ink, not the page's. */
+        ...(light
+          ? { "--text-primary": "#0A0A0A", "--text-secondary": "#4B5563", "--text-dim": "#4B5563" }
+          : { "--text-primary": "#FFFFFF", "--text-secondary": "rgba(255,255,255,0.72)", "--text-dim": "#9CA3AF" }),
         minHeight: h === "auto" ? undefined : h,
         padding: pad,
         boxShadow: border === false ? undefined : light ? "inset 0 0 0 1px rgba(0,0,0,0.08)" : "inset 0 0 0 1px rgba(255,255,255,0.16)",
