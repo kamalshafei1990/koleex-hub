@@ -75,7 +75,9 @@ export class MetaError extends Error {
 
 type GraphError = { error?: { message?: string; code?: number } };
 
-async function graphGet<T>(url: URL | string, token?: string): Promise<T> {
+/** One Graph API read. The token goes in the Authorization header, never
+ *  in the URL. Shared with lib/server/marketing/meta-feed. */
+export async function metaGet<T>(url: URL | string, token?: string): Promise<T> {
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     cache: "no-store",
@@ -86,7 +88,7 @@ async function graphGet<T>(url: URL | string, token?: string): Promise<T> {
   return body;
 }
 
-const graphUrl = (path: string, params: Record<string, string> = {}): URL => {
+export const metaGraphUrl = (path: string, params: Record<string, string> = {}): URL => {
   const url = new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   return url;
@@ -94,7 +96,7 @@ const graphUrl = (path: string, params: Record<string, string> = {}): URL => {
 
 /** The login's code → a short-lived user token. */
 export async function exchangeCode(cfg: MetaAppConfig, code: string): Promise<string> {
-  const body = await graphGet<{ access_token?: string }>(graphUrl("oauth/access_token", {
+  const body = await metaGet<{ access_token?: string }>(metaGraphUrl("oauth/access_token", {
     client_id: cfg.appId,
     client_secret: cfg.appSecret,
     redirect_uri: META_REDIRECT_URI,
@@ -107,7 +109,7 @@ export async function exchangeCode(cfg: MetaAppConfig, code: string): Promise<st
 /** A short-lived user token → a long-lived one, so the Page tokens read with
  *  it do not expire. */
 export async function longLivedUserToken(cfg: MetaAppConfig, shortToken: string): Promise<string> {
-  const body = await graphGet<{ access_token?: string }>(graphUrl("oauth/access_token", {
+  const body = await metaGet<{ access_token?: string }>(metaGraphUrl("oauth/access_token", {
     grant_type: "fb_exchange_token",
     client_id: cfg.appId,
     client_secret: cfg.appSecret,
@@ -130,12 +132,12 @@ export interface MetaPage {
  *  its linked Instagram business account. Follows paging (at most 500). */
 export async function managedPages(userToken: string): Promise<MetaPage[]> {
   const pages: MetaPage[] = [];
-  let next: string | null = graphUrl("me/accounts", {
+  let next: string | null = metaGraphUrl("me/accounts", {
     fields: "id,name,access_token,link,picture{url},instagram_business_account{id,username,name,profile_picture_url}",
     limit: "100",
   }).toString();
   for (let i = 0; next && i < 5; i++) {
-    const body: { data?: MetaPage[]; paging?: { next?: string } } = await graphGet(next, userToken);
+    const body: { data?: MetaPage[]; paging?: { next?: string } } = await metaGet(next, userToken);
     pages.push(...(body.data ?? []).filter((p) => p.id && p.access_token));
     next = body.paging?.next ?? null;
   }
@@ -144,6 +146,6 @@ export async function managedPages(userToken: string): Promise<MetaPage[]> {
 
 /** The permissions the person actually granted. */
 export async function grantedScopes(userToken: string): Promise<string[]> {
-  const body = await graphGet<{ data?: Array<{ permission: string; status: string }> }>(graphUrl("me/permissions"), userToken);
+  const body = await metaGet<{ data?: Array<{ permission: string; status: string }> }>(metaGraphUrl("me/permissions"), userToken);
   return (body.data ?? []).filter((p) => p.status === "granted").map((p) => p.permission);
 }

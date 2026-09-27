@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   ConnectedAccounts — the accounts of one marketing space, added and removed
+   ConnectedAccounts — the Accounts tab of a marketing space: its accounts, added and removed
    by the people who run it (owner, 27/09/2026: "connect any social media
    account by myself, add or remove freely — Koleex accounts too, the Odoo
    way"). Social Marketing renders it for 'company'; CEO Brand for 'ceo'.
@@ -18,15 +18,13 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
+import MarketingHeader from "@/components/marketing/MarketingHeader";
 import Button from "@/components/kds/Button";
 import StatusPill from "@/components/kds/StatusPill";
 import EmptyState from "@/components/kds/EmptyState";
 import Modal from "@/components/kds/Modal";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
-import Share2Icon from "@/components/icons/ui/Share2Icon";
-import CrownIcon from "@/components/icons/ui/CrownIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import {
   CONNECT_RESULTS, PLATFORM_FLOW, PLATFORM_ORDER,
@@ -34,10 +32,6 @@ import {
 } from "@/lib/marketing/spaces";
 
 const T: Translations = {
-  "title.company":    { en: "Social Marketing", zh: "社交媒体营销", ar: "التسويق عبر السوشيال ميديا" },
-  "title.ceo":        { en: "CEO Brand", zh: "CEO 个人品牌", ar: "براند المدير التنفيذي" },
-  "sub.company":      { en: "Connect and manage the social accounts you publish to", zh: "连接并管理您要发布内容的社交账号", ar: "اربط وأدِر حسابات السوشيال ميديا التي تنشر عليها" },
-  "sub.ceo":          { en: "The CEO's own social accounts", zh: "CEO 本人的社交账号", ar: "حسابات السوشيال ميديا الخاصة بالمدير التنفيذي" },
   "accounts.title":   { en: "Connected accounts", zh: "已连接的账号", ar: "الحسابات المربوطة" },
   "accounts.empty":   { en: "No account yet", zh: "还没有账号", ar: "لا توجد حسابات بعد" },
   "accounts.emptyHint": { en: "Add the accounts you publish to: Koleex's, or any other you manage.", zh: "添加您要发布内容的账号：Koleex 的账号，或您管理的任何其他账号。", ar: "أضف الحسابات التي تنشر عليها: حسابات كولكس أو أي حساب آخر تديره." },
@@ -99,14 +93,13 @@ const T: Translations = {
   "loadError":        { en: "Could not load the connected accounts.", zh: "无法加载已连接的账号。", ar: "تعذّر تحميل الحسابات المربوطة." },
   "retry":            { en: "Try again", zh: "重试", ar: "إعادة المحاولة" },
   "dismiss":          { en: "Dismiss", zh: "关闭", ar: "إغلاق" },
-  "result.ok":        { en: "Added {n} accounts.", zh: "已添加 {n} 个账号。", ar: "تمت إضافة {n} حساب." },
+  "result.ok":        { en: "Added {n} accounts. Their posts are coming into the Feed now.", zh: "已添加 {n} 个账号。其帖子正在进入动态。", ar: "تمت إضافة {n} حساب. منشوراتها في طريقها إلى الـFeed الآن." },
   "result.cancelled": { en: "Signing in was cancelled in Facebook's window.", zh: "已在 Facebook 窗口中取消登录。", ar: "أُلغي تسجيل الدخول من نافذة Facebook." },
   "result.expired":   { en: "Signing in took too long or the page was reloaded. Try again.", zh: "登录超时或页面已刷新，请重试。", ar: "استغرق تسجيل الدخول وقتًا طويلًا أو أُعيد تحميل الصفحة. حاول مرة أخرى." },
   "result.failed":    { en: "Facebook did not finish adding the accounts. Try again; if it happens again, check the Meta app settings.", zh: "Facebook 未能完成账号添加。请重试；如仍失败，请检查 Meta 应用设置。", ar: "لم يُكمل Facebook إضافة الحسابات. حاول مرة أخرى، وإذا تكرر راجع إعدادات تطبيق Meta." },
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
   "next.title":       { en: "Coming next, on these accounts", zh: "接下来将基于这些账号推出", ar: "القادم على هذه الحسابات" },
-  "next.feed":        { en: "Feed: every post with its numbers, including the earlier ones", zh: "动态：每条帖子及其数据，包括以往的帖子", ar: "الـFeed: كل منشور بأرقامه، ومنها المنشورات السابقة" },
   "next.composer":    { en: "One post for several accounts, with captions from Koleex AI", zh: "一次发布到多个账号，并由 Koleex AI 撰写文案", ar: "منشور واحد لعدة حسابات، بتعليقات من Koleex AI" },
   "next.calendar":    { en: "Calendar and scheduling", zh: "日历与定时发布", ar: "التقويم وجدولة النشر" },
   "next.approval":    { en: "Approval by the CEO or the marketing manager before publishing", zh: "发布前由 CEO 或营销经理审批", ar: "موافقة المدير التنفيذي أو مدير التسويق قبل النشر" },
@@ -229,7 +222,6 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     }
   };
 
-  const titleIcon = space === "ceo" ? <CrownIcon size={16} /> : <Share2Icon size={16} />;
   const setupRows: Array<{ key: keyof MarketingSetup; label: string; note?: string }> = [
     { key: "tokenKey", label: t("setup.tokenKey") },
     { key: "meta", label: t("setup.meta") },
@@ -240,13 +232,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      <PageHeader
-        title={t(`title.${space}`)}
-        subtitle={t(`sub.${space}`)}
-        icon={titleIcon}
-        backHref="/"
-        showTabs={false}
-      />
+      <MarketingHeader space={space} />
 
       {result && (
         <div
@@ -361,7 +347,6 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("next.title")}</h2>
             <ul className="mt-3 flex list-disc flex-col gap-2 ps-5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-              <li>{t("next.feed")}</li>
               <li>{t("next.composer")}</li>
               <li>{t("next.calendar")}</li>
               <li>{t("next.approval")}</li>

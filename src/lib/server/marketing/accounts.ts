@@ -11,11 +11,11 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
-import { encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
+import { decryptToken, encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
 import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
 import { MANUAL_PLATFORMS, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
 
-const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, updated_at";
+const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, audience, updated_at";
 
 export async function listAccounts(tenantId: string, space: MarketingSpace): Promise<MarketingAccountView[]> {
   const { data, error } = await supabaseServer
@@ -32,6 +32,53 @@ export async function listAccounts(tenantId: string, space: MarketingSpace): Pro
   return (data ?? []) as MarketingAccountView[];
 }
 
+/** An account as the Feed sees it: the screen's columns plus when its last
+ *  sync STARTED (kept in sync_state), so the Feed can tell which accounts
+ *  to refresh. Never the access key, never the paging cursor. */
+export type FeedAccount = MarketingAccountView & { last_attempt_at: string | null };
+
+type FeedAccountRow = MarketingAccountView & { sync_state: Record<string, unknown> | null };
+const FEED_ACCOUNT_COLUMNS = `${VIEW_COLUMNS}, sync_state`;
+
+function toFeedAccount({ sync_state, ...view }: FeedAccountRow): FeedAccount {
+  const at = sync_state?.last_attempt_at;
+  return { ...view, last_attempt_at: typeof at === "string" ? at : null };
+}
+
+/** The Feed's accounts — the ones read by API (an account shared by hand has
+ *  no posts to read) — and how many of the space's accounts are shared by
+ *  hand. */
+export async function listFeedAccounts(tenantId: string, space: MarketingSpace): Promise<{ accounts: FeedAccount[]; manual: number }> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select(FEED_ACCOUNT_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .eq("space", space)
+    .neq("status", "disconnected")
+    .order("platform", { ascending: true })
+    .order("name", { ascending: true })
+    .limit(200);
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  const rows = (data ?? []) as unknown as FeedAccountRow[];
+  const accounts = rows.filter((r) => r.connection === "api").map(toFeedAccount);
+  return { accounts, manual: rows.length - accounts.length };
+}
+
+/** One Feed account; null when it is not this tenant's, is shared by hand,
+ *  or was removed. */
+export async function feedAccount(tenantId: string, id: string): Promise<FeedAccount | null> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select(FEED_ACCOUNT_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  const row = data as unknown as FeedAccountRow | null;
+  if (!row || row.connection !== "api" || row.status === "disconnected") return null;
+  return toFeedAccount(row);
+}
+
 /** Which server settings are in place, as booleans — what the connect card
  *  needs to explain itself. Never the values. */
 export function marketingSetup(): MarketingSetup {
@@ -45,14 +92,14 @@ export function marketingSetup(): MarketingSetup {
 /** Save the Pages (and their Instagram business accounts) a person chose in
  *  the Facebook login. An account already connected is refreshed in place —
  *  its new key replaces the old one — so reconnecting never duplicates it.
- *  Returns how many accounts were saved. */
+ *  Returns the saved accounts' ids, so their first sync can start. */
 export async function saveMetaAccounts(input: {
   tenantId: string;
   space: MarketingSpace;
   connectedBy: string;
   pages: MetaPage[];
   scopes: string[];
-}): Promise<number> {
+}): Promise<string[]> {
   const now = new Date().toISOString();
   type Row = Record<string, unknown> & { platform: "facebook" | "instagram"; external_id: string };
   const rows: Row[] = [];
@@ -92,7 +139,7 @@ export async function saveMetaAccounts(input: {
       });
     }
   }
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) return [];
 
   const { data: existing, error: readErr } = await inChunks<{ id: string; platform: string; external_id: string }>(
     rows.map((r) => r.external_id),
@@ -107,17 +154,89 @@ export async function saveMetaAccounts(input: {
   const idOf = new Map((existing ?? []).map((e) => [`${e.platform}|${e.external_id}`, e.id]));
 
   const fresh = rows.filter((r) => !idOf.has(`${r.platform}|${r.external_id}`));
+  const ids: string[] = [];
   for (const r of rows) {
     const id = idOf.get(`${r.platform}|${r.external_id}`);
     if (!id) continue;
     const { error } = await supabaseServer.from("marketing_accounts").update(r).eq("id", id);
     if (error) throw new Error(`marketing accounts: ${error.message}`);
+    ids.push(id);
   }
   if (fresh.length) {
-    const { error } = await supabaseServer.from("marketing_accounts").insert(fresh);
+    const { data, error } = await supabaseServer.from("marketing_accounts").insert(fresh).select("id");
     if (error) throw new Error(`marketing accounts: ${error.message}`);
+    ids.push(...((data ?? []) as Array<{ id: string }>).map((d) => d.id));
   }
-  return rows.length;
+  return ids;
+}
+
+/** What the sync needs about an account, with its access key DECRYPTED.
+ *  For the server's sync and publishing code only; never returned by a
+ *  route. token is null for accounts shared by hand or removed. */
+export interface AccountForSync {
+  id: string;
+  tenant_id: string;
+  space: MarketingSpace;
+  platform: MarketingPlatform;
+  connection: "api" | "assisted";
+  external_id: string | null;
+  handle: string | null;
+  status: MarketingAccountView["status"];
+  last_synced_at: string | null;
+  sync_state: Record<string, unknown>;
+  /** The row's version: a sync claims the account only if it is unchanged. */
+  updated_at: string;
+  token: string | null;
+}
+
+export async function loadAccountForSync(tenantId: string, id: string): Promise<AccountForSync | null> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select("id, tenant_id, space, platform, connection, external_id, handle, status, last_synced_at, sync_state, updated_at, token_encrypted")
+    .eq("tenant_id", tenantId)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data) return null;
+  const { token_encrypted, ...rest } = data as Omit<AccountForSync, "token"> & { token_encrypted: string | null };
+  return { ...rest, sync_state: rest.sync_state ?? {}, token: token_encrypted ? decryptToken(token_encrypted) : null };
+}
+
+/** Mark a sync as started — unless another one started since this account
+ *  was read (updated_at is the row's version, so two Feeds opening at once
+ *  run ONE sync). true = this caller runs it. */
+export async function claimSync(a: AccountForSync): Promise<boolean> {
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, last_attempt_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
+}
+
+/** After a sync: the account's status, audience and where the history
+ *  import stopped. */
+export async function recordSync(id: string, patch: {
+  status: "connected" | "expired" | "error";
+  last_error: string | null;
+  audience?: number | null;
+  sync_state?: Record<string, unknown>;
+  synced: boolean;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const row: Record<string, unknown> = { status: patch.status, last_error: patch.last_error, updated_at: now };
+  if (patch.audience !== undefined) row.audience = patch.audience;
+  if (patch.sync_state) row.sync_state = patch.sync_state;
+  if (patch.synced) row.last_synced_at = now;
+  const { error } = await supabaseServer.from("marketing_accounts").update(row).eq("id", id);
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
 }
 
 /** Add an account on a platform with no posting API (WeChat, WhatsApp,

@@ -15,10 +15,16 @@ export const SPACE_MODULE: Record<MarketingSpace, string> = {
   ceo: "CEO Brand",
 };
 
-/** The app page each space returns to after connecting an account. */
-export const SPACE_ROUTE: Record<MarketingSpace, string> = {
+/** Each space's Feed — the app's home. */
+export const SPACE_HOME: Record<MarketingSpace, string> = {
   company: "/social-marketing",
   ceo: "/ceo-brand",
+};
+
+/** The accounts page each space returns to after connecting an account. */
+export const SPACE_ROUTE: Record<MarketingSpace, string> = {
+  company: "/social-marketing/accounts",
+  ceo: "/ceo-brand/accounts",
 };
 
 export const asSpace = (v: string | null | undefined): MarketingSpace => (v === "ceo" ? "ceo" : "company");
@@ -65,6 +71,8 @@ export interface MarketingAccountView {
   status: "connected" | "expired" | "revoked" | "error" | "disconnected";
   last_error: string | null;
   last_synced_at: string | null;
+  /** Followers now, refreshed on every sync; null until the first one. */
+  audience: number | null;
   updated_at: string;
 }
 

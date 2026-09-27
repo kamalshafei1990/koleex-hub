@@ -11,6 +11,13 @@
        Meta;
      · the redirect URI is the one the owner's Meta setup checklist registers;
      · every route is gated: "view" to read, "edit" to connect or disconnect.
+   The Feed (27/09/2026) adds:
+     · its routes read with "view" on the space the ACCOUNT belongs to, and
+       answer without a key; a refresh claims the account before it calls
+       Meta, merges numbers instead of replacing them, and marks an expired
+       key "expired";
+     · the screen never slides sideways (no horizontal scroller), sends no
+       referrer to Meta's picture servers, and speaks en/zh/ar.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -40,6 +47,13 @@ const START = "src/app/api/marketing/connect/meta/start/route.ts";
 const CALLBACK = "src/app/api/marketing/connect/meta/callback/route.ts";
 const LIST = "src/app/api/marketing/accounts/route.ts";
 const DISCONNECT = "src/app/api/marketing/accounts/[id]/disconnect/route.ts";
+const META_FEED = "src/lib/server/marketing/meta-feed.ts";
+const SYNC = "src/lib/server/marketing/sync.ts";
+const FEED = "src/lib/server/marketing/feed.ts";
+const FEED_ROUTE = "src/app/api/marketing/feed/route.ts";
+const SYNC_ROUTE = "src/app/api/marketing/accounts/[id]/sync/route.ts";
+const POST_ROUTE = "src/app/api/marketing/posts/[id]/route.ts";
+const FEED_SCREEN = "src/components/marketing/SocialFeed.tsx";
 
 /* ── 1. The key store ── */
 console.log("\n1. Access keys are encrypted with their own key");
@@ -65,7 +79,13 @@ const screens = sources.filter((f) => (f.startsWith("src/components/") || /\/pag
 check(`no screen imports the server's marketing code${screens.length ? ` — ${screens.join(", ")}` : ""}`, screens.length === 0);
 const cb = code(CALLBACK);
 const logs = cb.match(/console\.[a-z]+\([^;]*\);/g) ?? [];
-check("the callback logs Meta's error only — never the code or a token", logs.length === 1 && !/\b(code|short|long|pages|cfg)\b(?![^`]*\?)/.test(logs[0].replace(/e\.code/g, "")));
+/* What a log may print: Meta's error code line (meta) and the error's
+   message. Anything else interpolated, or passed as another argument, fails. */
+const LOGGABLE = new Set(["meta", "e instanceof Error ? e.message : String(e)"]);
+const printed = logs.flatMap((l) => [...l.matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1].trim()));
+check(`the callback logs errors only — never the code or a token${printed.some((p) => !LOGGABLE.has(p)) ? ` — prints: ${printed.filter((p) => !LOGGABLE.has(p)).join(", ")}` : ""}`,
+  logs.length >= 1 && printed.every((p) => LOGGABLE.has(p)) && logs.every((l) => !/,/.test(l.replace(/`[^`]*`/g, "``"))) &&
+  /const meta = e instanceof MetaError \? `meta code \$\{e\.code \?\? "\?"\}: ` : "";/.test(cb));
 
 /* ── 3. The connect flow ── */
 console.log("\n3. Connect: state and permission before anything is exchanged");
@@ -114,14 +134,83 @@ check("adding by hand: a signed-in POST with 'edit' on the space, before anythin
 /* ── 5. The screen ── */
 console.log("\n5. The screen");
 check("Social Marketing's segment carries the Aurora scope", /<AuroraShell>\{children\}<\/AuroraShell>/.test(code("src/app/social-marketing/layout.tsx")));
-check("the page is behind AuthGate", /<AuthGate>[\s\S]*<ConnectedAccounts space="company" \/>[\s\S]*<\/AuthGate>/.test(code("src/app/social-marketing/page.tsx")));
-const screen = readFileSync("src/components/marketing/ConnectedAccounts.tsx", "utf8");
-const dict = screen.slice(screen.indexOf("const T: Translations = {"), screen.indexOf("\n};\n", screen.indexOf("const T: Translations = {")));
-const allKeys = [...dict.matchAll(/^\s*"([a-zA-Z.]+)":\s*\{/gm)].length;
-const entries = [...dict.matchAll(/^\s*"([a-zA-Z.]+)":\s*\{ en: "([^"]+)", zh: "([^"]+)", ar: "([^"]+)" \},?$/gm)];
-check(`every string is in English, Chinese and Arabic (${entries.length} of ${allKeys})`, allKeys >= 40 && entries.length === allKeys);
+check("the Feed page is behind AuthGate", /<AuthGate>[\s\S]*<SocialFeed space="company" \/>[\s\S]*<\/AuthGate>/.test(code("src/app/social-marketing/page.tsx")));
+check("the Accounts page is behind AuthGate, where the Facebook sign-in returns",
+  /<AuthGate>[\s\S]*<ConnectedAccounts space="company" \/>[\s\S]*<\/AuthGate>/.test(code("src/app/social-marketing/accounts/page.tsx")) &&
+  /company: "\/social-marketing\/accounts",/.test(code("src/lib/marketing/spaces.ts")));
+/* Every entry of a screen's dictionary carries all three languages. */
+function dictionary(file: string, min: number) {
+  const src = readFileSync(file, "utf8");
+  const start = src.indexOf("const T: Translations = {");
+  const dict = start < 0 ? "" : src.slice(start, src.indexOf("\n};\n", start));
+  const allKeys = [...dict.matchAll(/^\s*"([a-zA-Z.]+)":\s*\{/gm)].length;
+  const entries = [...dict.matchAll(/^\s*"([a-zA-Z.]+)":\s*\{ en: "([^"]+)", zh: "([^"]+)", ar: "([^"]+)" \},?$/gm)];
+  check(`${file.split("/").pop()}: every string in English, Chinese and Arabic (${entries.length} of ${allKeys})`, allKeys >= min && entries.length === allKeys);
+}
+dictionary("src/components/marketing/ConnectedAccounts.tsx", 40);
+dictionary("src/components/marketing/MarketingHeader.tsx", 6);
+dictionary(FEED_SCREEN, 40);
 const nav = code("src/lib/navigation.ts");
-check("Social Marketing is live for super admins only until the Feed ships", /\{ id: "social-marketing",[^}]*active: true,\s*superAdminOnly: true \}/.test(nav));
+check("Social Marketing is live for super admins only until the owner opens it", /\{ id: "social-marketing",[^}]*active: true,\s*superAdminOnly: true \}/.test(nav));
+
+/* ── 6. The Feed ── */
+console.log("\n6. The Feed");
+const mf = code(META_FEED);
+check("meta-feed: every Graph call goes through metaGet with the token in the header — never in a URL",
+  /from "@\/lib\/server\/marketing\/meta"/.test(mf) && !/access_token/.test(mf) && !/\bfetch\(/.test(mf) &&
+  (mf.match(/await metaGet</g) ?? []).length === (mf.match(/, token\)/g) ?? []).length);
+const sy = code(SYNC);
+const syncFn = sy.slice(sy.indexOf("export async function syncAccount"), sy.indexOf("export async function syncAccounts"));
+check("sync: the account is claimed before the first call to Meta",
+  syncFn.indexOf("await claimSync(a)") > -1 && syncFn.indexOf("await claimSync(a)") < syncFn.search(/adapter\.(audience|page|insights|comments|media)\(/));
+check("sync: a stale run is skipped (10 min; Refresh: 1 min)",
+  /export const SYNC_STALE_MS = 10 \* 60_000;/.test(sy) && /export const SYNC_MIN_GAP_MS = 60_000;/.test(sy) &&
+  /opts\.force \? SYNC_MIN_GAP_MS : SYNC_STALE_MS/.test(syncFn));
+check("sync: a post's numbers are merged with the stored ones, never replaced",
+  /metrics: \{ \.\.\.\(prev\.get\(p\.external_id\) \?\? \{\}\), \.\.\.p\.metrics \}/.test(sy) && /row\.metrics = \{ \.\.\.row\.metrics, \.\.\.insights \}/.test(sy));
+check("sync: an expired key (Meta 190) marks the account expired", /const expired = e instanceof MetaError && e\.code === 190;/.test(syncFn) && /status: expired \? "expired" : "error"/.test(syncFn));
+check("sync: views and comments are extras — their refusal never fails the posts",
+  /extra\(adapter\.insights\(/.test(syncFn) && /extra\(adapter\.comments\(/.test(syncFn));
+check("claimSync: only when the row is unchanged since it was read (one run at a time)",
+  /\.eq\("updated_at", a\.updated_at\)/.test(acc.slice(acc.indexOf("export async function claimSync"), acc.indexOf("export async function recordSync"))));
+const feedCols = /const FEED_ACCOUNT_COLUMNS = `\$\{VIEW_COLUMNS\}, sync_state`;/.test(acc);
+const toFeed = acc.slice(acc.indexOf("function toFeedAccount"), acc.indexOf("export async function listFeedAccounts"));
+check("the Feed's accounts: the screen's columns + sync_state, and only its start time leaves the server",
+  feedCols && /\{ sync_state, \.\.\.view \}/.test(toFeed) && /return \{ \.\.\.view, last_attempt_at: typeof at === "string" \? at : null \};/.test(toFeed));
+const fd = code(FEED);
+check("feed reads never touch keys", !/token|loadAccountForSync|decryptToken/.test(fd));
+/* Each read, up to the next one, must end in a limit or a single row. */
+const feedReads = fd.split(/(?=\.from\("marketing_)/).slice(1);
+const unbounded = feedReads.filter((r) => !/\.(limit|maybeSingle|single)\(/.test(r)).map((r) => /\.from\("([a-z_]+)"\)/.exec(r)?.[1]);
+check(`feed: every read is bounded (${feedReads.length} reads${unbounded.length ? ` — unbounded: ${unbounded.join(", ")}` : ""})`, feedReads.length >= 5 && unbounded.length === 0);
+const fr = code(FEED_ROUTE);
+check("feed route: 'view' on the space before the Feed is read", fr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') > -1 && fr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') < fr.indexOf("loadFeed("));
+const frAcc = fr.slice(fr.indexOf("accountSpace(auth.tenant_id, accountId)"));
+check("feed route: with an account, 'view' on the ACCOUNT's space before its posts are read",
+  fr.indexOf("accountSpace(auth.tenant_id, accountId)") > -1 &&
+  frAcc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') > -1 &&
+  frAcc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') < Math.min(frAcc.indexOf("loadMorePosts("), frAcc.indexOf("loadColumn(")));
+const sr = code(SYNC_ROUTE);
+check("refresh route: signed-in POST, 'view' on the ACCOUNT's space, then the refresh — 60s at most",
+  /requireAuth\(req\)/.test(sr) && sr.indexOf("accountSpace(auth.tenant_id, id)") > -1 &&
+  sr.indexOf("accountSpace(auth.tenant_id, id)") < sr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') &&
+  sr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') < sr.indexOf("syncAccount(") &&
+  /export const maxDuration = 60;/.test(sr));
+check("refresh route: answers the outcome only — never Meta's raw answer", !/NextResponse\.json\(out\)/.test(sr) && !/out\.error/.test(sr));
+const pr = code(POST_ROUTE);
+check("post route: 'view' on the space of the post's account before it is refreshed or read",
+  pr.indexOf("postAccountId(auth.tenant_id, id)") > -1 && pr.indexOf("accountSpace(auth.tenant_id, accountId)") > pr.indexOf("postAccountId(auth.tenant_id, id)") &&
+  pr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') > pr.indexOf("accountSpace(auth.tenant_id, accountId)") &&
+  pr.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "view")') < Math.min(pr.indexOf("refreshPost("), pr.indexOf("loadPostDetail(")));
+check("callback: the first refresh starts after the answer (after()), for the accounts just saved",
+  /after\(\(\) => syncAccounts\(tenantId, saved\)/.test(cb) && /back\("ok", `&accounts=\$\{saved\.length\}`\)/.test(cb) && /export const maxDuration = 60;/.test(cb));
+const fs = code(FEED_SCREEN);
+check("Feed screen: never slides sideways (no horizontal scroller)", !/overflow-x-(auto|scroll)/.test(fs) && !/snap-x/.test(fs));
+const imgs = fs.match(/<img\b[^>]*>/g) ?? [];
+check(`Feed screen: every picture sends no referrer to Meta (${imgs.length} <img>)`, imgs.length >= 4 && imgs.every((i) => /referrerPolicy="no-referrer"/.test(i)));
+check("Feed screen: dates are D/M/Y (lib/marketing/format)", /from "@\/lib\/marketing\/format"/.test(fs) && !/toLocale(Date)?String\(/.test(fs));
+check("Feed screen: side-by-side columns are chosen in CSS by the number of accounts",
+  /2: \{ chips: "@\[36rem\]:hidden", others: "@max-\[36rem\]:hidden", grid: "@\[36rem\]:grid-cols-2" \}/.test(fs));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

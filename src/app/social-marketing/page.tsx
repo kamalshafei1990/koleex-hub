@@ -1,16 +1,16 @@
 "use client";
 
-/* Social Marketing — phase 1, first screen (27/09/2026): connecting Koleex's
-   Facebook Page and Instagram account. The Feed, composer, calendar and
-   approvals build on these connected accounts next. */
+/* Social Marketing — the Feed (phase 1, 27/09/2026): a column for each
+   connected Facebook Page and Instagram account, with its posts and their
+   numbers. The accounts themselves are managed on the Accounts tab. */
 
 import AuthGate from "@/components/admin/AuthGate";
-import ConnectedAccounts from "@/components/marketing/ConnectedAccounts";
+import SocialFeed from "@/components/marketing/SocialFeed";
 
 export default function SocialMarketingPage() {
   return (
     <AuthGate>
-      <ConnectedAccounts space="company" />
+      <SocialFeed space="company" />
     </AuthGate>
   );
 }

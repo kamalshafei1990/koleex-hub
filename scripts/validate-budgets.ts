@@ -300,10 +300,14 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      be — 3,806 ports live in Postgres and are searched server-side, which is
      the whole reason they are not a TS literal. */
   "shipping": { chunks: 10, kbytes: 581 },
-  /* Measured 9 chunks / 526 KB on the day it shipped (27/09/2026, the first
-     screen: connecting Facebook & Instagram), +12% headroom. Almost all of it
-     is the shared baseline; the Feed and composer will need their own look. */
-  "social-marketing": { chunks: 10, kbytes: 590 },
+  /* The Feed (27/09/2026): measured 9 chunks / 552 KB, +12% headroom. Its
+     own code is one ~62 KB chunk (the Feed, its post window, the header);
+     BrandGlyph's 30 KB is shared with the other screens that show platform
+     logos; the rest is the shared baseline. */
+  "social-marketing": { chunks: 10, kbytes: 618 },
+  /* The Accounts tab, split from the Feed the same day: measured 9 chunks /
+     536 KB, +12% headroom. */
+  "social-marketing/accounts": { chunks: 10, kbytes: 600 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
