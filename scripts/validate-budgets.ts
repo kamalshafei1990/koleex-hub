@@ -300,6 +300,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      be — 3,806 ports live in Postgres and are searched server-side, which is
      the whole reason they are not a TS literal. */
   "shipping": { chunks: 10, kbytes: 581 },
+  /* Measured 9 chunks / 526 KB on the day it shipped (27/09/2026, the first
+     screen: connecting Facebook & Instagram), +12% headroom. Almost all of it
+     is the shared baseline; the Feed and composer will need their own look. */
+  "social-marketing": { chunks: 10, kbytes: 590 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

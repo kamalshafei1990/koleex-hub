@@ -273,7 +273,10 @@ export const APP_REGISTRY: AppDef[] = [
      in the Visual Library when it goes live. */
   { id: "marketing",        tKey: "app.marketing",        name: "Marketing",         icon: MarketingIcon, route: "/marketing",        active: false },
   { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
-  { id: "social-marketing", tKey: "app.social-marketing", name: "Social Marketing",  icon: Share2Icon,    route: "/social-marketing", active: false },
+  /* First screen shipped (connecting Facebook & Instagram); super admins only
+     until the Feed and the composer land — then drop superAdminOnly and grant
+     it from Roles (the marketing manager first). */
+  { id: "social-marketing", tKey: "app.social-marketing", name: "Social Marketing",  icon: Share2Icon,    route: "/social-marketing", active: true,  superAdminOnly: true },
   { id: "ceo-brand",        tKey: "app.ceo-brand",        name: "CEO Brand",         icon: CrownIcon,     route: "/ceo-brand",        active: false },
   { id: "email-marketing",  tKey: "app.email-marketing",  name: "Email Marketing",   icon: MailOpenIcon,  route: "/email-marketing",  active: false },
   { id: "sms-whatsapp",     tKey: "app.sms-whatsapp",     name: "SMS & WhatsApp",    icon: MessageSquareIcon, route: "/sms-whatsapp", active: false },

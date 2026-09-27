@@ -96,6 +96,7 @@
     "validate:reports": "tsx scripts/validate-reports.ts",
     "validate:website-bridge": "tsx scripts/validate-website-bridge.ts",
     "validate:read-limits": "tsx scripts/validate-read-limits.ts",
+    "validate:marketing": "tsx scripts/validate-marketing.ts",
     "reports:heads": "tsx scripts/reports-heads.ts",
     "validate:perf": "NODE_OPTIONS=--conditions=react-server tsx scripts/perf.ts",
     "validate:accounting": "NODE_OPTIONS=--conditions=react-server tsx scripts/accounting.ts",
