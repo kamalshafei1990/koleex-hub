@@ -13,18 +13,15 @@
 import type { ReactNode } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
-  B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table,
+  AR_FONT, B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table, ZH_FONT,
 } from "../kit";
 import { Wordmark } from "../marks";
-import { HUB_LINE } from "../mockups";
 
-const AR_FONT = { fontFamily: "'Helvetica Neue','Geeza Pro','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif" } as const;
-const ZH_FONT = { fontFamily: "'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif" } as const;
 
 /** A sample of writing on a white card — what the reader actually sees. */
 function Sample({ children, rtl = false }: { children: ReactNode; rtl?: boolean }) {
   return (
-    <div dir={rtl ? "rtl" : "ltr"} className="w-full max-w-[420px] space-y-1.5 text-start text-[13px] leading-6 text-[#0A0A0A]" style={rtl ? AR_FONT : undefined}>
+    <div dir={rtl ? "rtl" : "ltr"} className="w-full max-w-[420px] space-y-1.5 text-start text-[13px] leading-6 text-[#1D1D1F]" style={rtl ? AR_FONT : undefined}>
       {children}
     </div>
   );
@@ -183,10 +180,10 @@ export function Tagline() {
       ]}
     >
       <Section id="current" title="The tagline in use">
-        <Stage bg="#0A0A0A" h="auto" pad={32}>
+        <Stage bg="#000000" h="auto" pad={32}>
           <div className="flex flex-col items-center gap-3 text-center">
             <Wordmark color="#FFFFFF" width={170} />
-            <p className="text-[12px] font-semibold tracking-[0.3em] text-[#D1D5DB]">{KOLEEX_COMPANY.tagline}</p>
+            <p className="text-[12px] font-semibold tracking-[0.3em] text-[#D1D1D6]">{KOLEEX_COMPANY.tagline}</p>
           </div>
         </Stage>
         <Table
@@ -241,7 +238,7 @@ export function Descriptor() {
         <Stage bg="#FFFFFF" h="auto" pad={32}>
           <div className="flex flex-col items-start gap-3">
             <Wordmark color="#000000" width={220} />
-            <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#4B5563]">Industrial Garment Machinery</span>
+            <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#6E6E73]">Industrial Garment Machinery</span>
           </div>
         </Stage>
         <Table
@@ -332,7 +329,7 @@ function Meter({ n }: { n: number }) {
   return (
     <span className="inline-flex gap-1" aria-label={`${n} of 5`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className="h-2 w-4 rounded-full" style={{ background: i < n ? "#567FB2" : "var(--bg-surface)" }} />
+        <span key={i} className="h-2 w-4 rounded-full" style={{ background: i < n ? "var(--text-primary)" : "var(--bg-surface-hover)" }} />
       ))}
     </span>
   );
@@ -403,7 +400,7 @@ export function ToneBySituation() {
                 <p className="text-[15px] font-semibold text-[var(--text-primary)]">{x.s}</p>
                 <p className="mt-0.5 text-[12.5px] text-[var(--text-dim)]">{x.aim}</p>
               </div>
-              <p className="rounded-xl bg-white px-4 py-3 text-[13.5px] leading-6 text-[#0A0A0A]" style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" }}>{x.text}</p>
+              <p className="rounded-xl bg-white px-4 py-3 text-[13.5px] leading-6 text-[#1D1D1F]" style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" }}>{x.text}</p>
             </div>
           ))}
         </div>
@@ -457,7 +454,7 @@ export function WritingStyle() {
             <p className="text-[16px] font-bold">Clean edges on every seam</p>
             <p>The XSO-7800-4 is a 4-thread overlock for knitwear and light wovens. It runs at up to 6,000 stitches per minute (SPM) and trims as it sews — so seams come off the machine finished.</p>
             <p>We deliver it set up, train your operators and keep genuine parts in stock.</p>
-            <span className="block h-[2px] w-12" style={{ background: HUB_LINE }} />
+            
           </Sample>
         </Stage>
       </Section>

@@ -11,8 +11,7 @@ import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
-import { BusinessCard, HUB_LINE, Lines, Post, PostBody, Slide, Strips } from "../mockups";
-import { Peak } from "./layout";
+import { BusinessCard, Lines, Post, PostBody, Slide, Strips } from "../mockups";
 
 /* ── 89 · Digital Advertising ──────────────────────────────────────────── */
 
@@ -47,10 +46,10 @@ export function DigitalAds() {
 
       <Section id="anatomy" title="An ad, built right">
         <Examples cols={2}>
-          <Example tone="do" caption="One message, one machine, one action, the logo." bg="#F5F5F5" h={290}>
-            <Post w={200}><PostBody label="Overlock" title={<>Four threads.<br />One pass.</>} foot={<span className="rounded bg-white px-1.5 py-0.5 text-[6.5px] font-semibold text-[#0A0A0A]">Request a quotation</span>} /></Post>
+          <Example tone="do" caption="One message, one machine, one action, the logo." bg="#F5F5F7" h={290}>
+            <Post w={200}><PostBody label="Overlock" title={<>Four threads.<br />One pass.</>} foot={<span className="rounded bg-white px-1.5 py-0.5 text-[6.5px] font-semibold text-[#1D1D1F]">Request a quotation</span>} /></Post>
           </Example>
-          <Example tone="dont" caption="Many messages, prices, red bursts, no logo." bg="#F5F5F5" h={290}>
+          <Example tone="dont" caption="Many messages, prices, red bursts, no logo." bg="#F5F5F7" h={290}>
             <Post w={200} bg="#DC2626">
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-3 text-center text-white">
                 <p className="text-[16px] font-black text-[#FDE047]">MEGA SALE!!!</p>
@@ -104,12 +103,12 @@ export function Presentations() {
     >
       <Section id="types" title="The six slides">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="46%" /><p className="text-[8px] tracking-[0.2em] text-[#9CA3AF]">COMPANY PRESENTATION · 2026</p></div><div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_LINE }} /></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>1 · Cover</B> — logo centered on Ink, title, year</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute bottom-[18%] left-[7%]"><p className="text-[7px] tracking-[0.2em] text-[#7FA9D6]">02</p><p className="text-[16px] font-bold">Our machines</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>2 · Section</B> — number and title, bottom-left</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute left-[7%] top-[26%] w-[40%]"><p className="text-[11px] font-bold">Inspected before shipping</p><div className="mt-2"><Lines n={4} /></div></div><div className="absolute bottom-[10%] right-[6%] top-[10%] w-[40%] rounded bg-[#F5F5F5]" /></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>3 · Content</B> — title, short text, one image</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="46%" /><p className="text-[8px] tracking-[0.2em] text-[#98989D]">COMPANY PRESENTATION · 2026</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>1 · Cover</B> — logo centered on Ink, title, year</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute bottom-[18%] left-[7%]"><p className="text-[7px] tracking-[0.2em] text-[#98989D]">02</p><p className="text-[16px] font-bold">Our machines</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>2 · Section</B> — number and title, bottom-left</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute left-[7%] top-[26%] w-[40%]"><p className="text-[11px] font-bold">Inspected before shipping</p><div className="mt-2"><Lines n={4} /></div></div><div className="absolute bottom-[10%] right-[6%] top-[10%] w-[40%] rounded bg-[#F5F5F7]" /></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>3 · Content</B> — title, short text, one image</figcaption></figure>
           <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] bottom-[14%] flex items-end gap-3">{[40, 58, 51, 74].map((v, i) => <div key={i} className="flex-1 rounded-t" style={{ height: v * 0.8, background: i === 3 ? "#3E6796" : "#BCD8F0" }} />)}</div><p className="absolute left-[7%] top-[24%] text-[11px] font-bold">One chart, one message</p></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>4 · Data</B> — one chart, the message as the title</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] top-[30%] grid grid-cols-3 gap-2">{["Selected", "Checked", "Delivered"].map((t) => <div key={t} className="rounded-md border border-[#E5E7EB] p-2"><Peak size={8} color="#567FB2" /><p className="mt-1 text-[8px] font-semibold">{t}</p><div className="mt-1"><Lines n={2} /></div></div>)}</div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>5 · Three points</B> — three short cards</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="36%" /><p className="font-mono text-[7px] text-[#9CA3AF]">{KOLEEX_COMPANY.web} · {KOLEEX_COMPANY.email}</p></div><div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_LINE }} /></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>6 · Close</B> — logo and one way to reach us</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] top-[30%] grid grid-cols-3 gap-2">{["Selected", "Checked", "Delivered"].map((t) => <div key={t} className="rounded-md border border-[#D2D2D7] p-2"><p className="mt-1 text-[8px] font-semibold">{t}</p><div className="mt-1"><Lines n={2} /></div></div>)}</div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>5 · Three points</B> — three short cards</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="36%" /><p className="font-mono text-[7px] text-[#98989D]">{KOLEEX_COMPANY.web} · {KOLEEX_COMPANY.email}</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>6 · Close</B> — logo and one way to reach us</figcaption></figure>
         </div>
       </Section>
 
@@ -158,10 +157,10 @@ export function BusinessCards() {
       ]}
     >
       <Section id="card" title="The card">
-        <Stage bg="#F5F5F5" h="auto" pad={28}>
+        <Stage bg="#F5F5F7" h="auto" pad={28}>
           <div className="flex flex-wrap items-center justify-center gap-6">
-            <div className="space-y-2 text-center"><BusinessCard side="front" w={300} /><p className="text-[11px] text-[#4B5563]">Front</p></div>
-            <div className="space-y-2 text-center"><BusinessCard side="back" w={300} /><p className="text-[11px] text-[#4B5563]">Back</p></div>
+            <div className="space-y-2 text-center"><BusinessCard side="front" w={300} /><p className="text-[11px] text-[#6E6E73]">Front</p></div>
+            <div className="space-y-2 text-center"><BusinessCard side="back" w={300} /><p className="text-[11px] text-[#6E6E73]">Back</p></div>
           </div>
         </Stage>
       </Section>
@@ -170,7 +169,7 @@ export function BusinessCards() {
         <Specs rows={[
           ["Size", "90 × 54 mm (owner decision), 3 mm bleed on every side, 4 mm safe margin"],
           ["Paper", "Uncoated or soft-touch matte board, 400–450 g/m²"],
-          ["Front", "Ink #0A0A0A (rich black), logo white knock-out 40 mm wide, centered; Hub line at the foot"],
+          ["Front", "Black #000000 (rich black), logo white knock-out 40 mm wide, centered"],
           ["Back", "White; logo black 25 mm, top-left; name Inter Bold 9 pt; title 7 pt; contacts 6.5 pt monospace"],
           ["Finish", "No foil, no emboss, no spot gloss — flat print, like the brand"],
           ["Language", "English only (owner decision)"],
@@ -221,13 +220,13 @@ export function Letterhead() {
       ]}
     >
       <Section id="letter" title="The letterhead">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="w-[260px] overflow-hidden rounded bg-white p-3.5 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "210 / 270" }}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="w-[260px] overflow-hidden rounded bg-white p-3.5 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "210 / 270" }}>
             <Wordmark color="#000000" width={64} />
             <Strips />
             <div className="mt-4 space-y-1 text-[5px]"><p className="font-mono">27/09/2026</p><p>To: Customer name · Company · City</p><p className="pt-1 font-semibold">Subject: …</p></div>
             <div className="mt-3"><Lines n={9} /></div>
-            <div className="mt-4 text-[5px]"><p>Kind regards,</p><div className="mt-3 h-3 w-16 border-b border-[#0A0A0A]" /><p className="mt-0.5 font-semibold">Full Name</p><p className="text-[#4B5563]">Job Title</p></div>
+            <div className="mt-4 text-[5px]"><p>Kind regards,</p><div className="mt-3 h-3 w-16 border-b border-[#000000]" /><p className="mt-0.5 font-semibold">Full Name</p><p className="text-[#6E6E73]">Job Title</p></div>
           </div>
         </Stage>
         <Specs rows={[
@@ -241,11 +240,11 @@ export function Letterhead() {
       </Section>
 
       <Section id="envelopes" title="Envelopes">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="relative h-[110px] w-[220px] rounded-sm bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
             <div className="absolute left-3 top-3"><Wordmark color="#000000" width={46} /></div>
-            <p className="absolute left-3 top-[30px] w-[120px] text-[4.5px] leading-snug text-[#4B5563]">{KOLEEX_COMPANY.en}</p>
-            <div className="absolute bottom-5 left-[52%] space-y-1"><div className="h-[2.5px] w-20 rounded bg-[#E5E7EB]" /><div className="h-[2.5px] w-16 rounded bg-[#E5E7EB]" /><div className="h-[2.5px] w-12 rounded bg-[#E5E7EB]" /></div>
+            <p className="absolute left-3 top-[30px] w-[120px] text-[4.5px] leading-snug text-[#6E6E73]">{KOLEEX_COMPANY.en}</p>
+            <div className="absolute bottom-5 left-[52%] space-y-1"><div className="h-[2.5px] w-20 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-16 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-12 rounded bg-[#D2D2D7]" /></div>
           </div>
         </Stage>
         <Specs rows={[
@@ -263,10 +262,10 @@ export function Letterhead() {
 /* Served by Koleex Hub from our own domain — reachable from mainland China. */
 const SIGNATURE_LOGO = "https://hub.koleexgroup.com/brand/kit/koleex-logo-black-1000.png";
 
-const SIGNATURE_HTML = `<table cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;color:#0A0A0A;font-size:13px;line-height:1.5">
-  <tr><td style="padding-bottom:8px"><strong>Full Name</strong><br><span style="color:#4B5563">Job Title · KOLEEX</span></td></tr>
+const SIGNATURE_HTML = `<table cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;color:#000000;font-size:13px;line-height:1.5">
+  <tr><td style="padding-bottom:8px"><strong>Full Name</strong><br><span style="color:#6E6E73">Job Title · KOLEEX</span></td></tr>
   <tr><td style="padding-bottom:8px"><img src="${SIGNATURE_LOGO}" width="120" alt="KOLEEX" style="display:block"></td></tr>
-  <tr><td style="color:#4B5563;font-size:12px">M ${KOLEEX_COMPANY.mobile} (WhatsApp)<br>${KOLEEX_COMPANY.email} · ${KOLEEX_COMPANY.web}</td></tr>
+  <tr><td style="color:#6E6E73;font-size:12px">M ${KOLEEX_COMPANY.mobile} (WhatsApp)<br>${KOLEEX_COMPANY.email} · ${KOLEEX_COMPANY.web}</td></tr>
 </table>`;
 
 export function EmailSignature() {
@@ -288,11 +287,11 @@ export function EmailSignature() {
     >
       <Section id="signature" title="The signature">
         <Stage bg="#FFFFFF" h="auto" pad={24}>
-          <div className="w-full max-w-[360px] text-[13px] leading-[1.5] text-[#0A0A0A]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-            <p className="text-[#4B5563]">Kind regards,</p>
-            <div className="mt-3"><p className="font-bold">Full Name</p><p className="text-[#4B5563]">Job Title · KOLEEX</p></div>
+          <div className="w-full max-w-[360px] text-[13px] leading-[1.5] text-[#1D1D1F]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+            <p className="text-[#6E6E73]">Kind regards,</p>
+            <div className="mt-3"><p className="font-bold">Full Name</p><p className="text-[#6E6E73]">Job Title · KOLEEX</p></div>
             <div className="mt-2"><Wordmark color="#000000" width={120} /></div>
-            <div className="mt-2 text-[12px] text-[#4B5563]"><p>M {KOLEEX_COMPANY.mobile} (WhatsApp)</p><p>{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</p></div>
+            <div className="mt-2 text-[12px] text-[#6E6E73]"><p>M {KOLEEX_COMPANY.mobile} (WhatsApp)</p><p>{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</p></div>
           </div>
         </Stage>
       </Section>

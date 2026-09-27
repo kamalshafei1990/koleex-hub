@@ -28,7 +28,6 @@ import {
   B, Bullets, Chapter, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
-import { HUB_LINE } from "../mockups";
 
 /* ── Shared facts ──────────────────────────────────────────────────────── */
 
@@ -149,7 +148,7 @@ export function Timeline() {
               <span className="pt-3 text-end font-mono text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{m.year}</span>
               <span className="relative flex justify-center">
                 <span className="absolute inset-y-0 w-px bg-[var(--border-subtle)]" style={i === 0 ? { top: 18 } : i === MILESTONES.length - 1 ? { bottom: "calc(100% - 18px)" } : undefined} />
-                <span className="relative mt-[14px] h-2.5 w-2.5 rounded-full" style={{ background: m.key ? "#567FB2" : "var(--text-dim)", boxShadow: "0 0 0 3px var(--bg-primary, #0A0A0A)" }} />
+                <span className="relative mt-[14px] h-2.5 w-2.5 rounded-full" style={{ background: m.key ? "var(--text-primary)" : "var(--text-ghost)", boxShadow: "0 0 0 3px var(--bg-primary, #000000)" }} />
               </span>
               <div className="pb-4 pt-2">
                 <p className="text-[15px] font-semibold text-[var(--text-primary)]">{m.title}</p>
@@ -161,22 +160,22 @@ export function Timeline() {
       </Section>
 
       <Section id="timeline-use" title="Using the timeline">
-        <Stage bg="#0A0A0A" h="auto" pad={28}>
+        <Stage bg="#000000" h="auto" pad={28}>
           <div className="w-full max-w-[560px]">
-            <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={70} /><span className="text-[8px] tracking-[0.2em] text-[#9CA3AF]">OUR STORY</span></div>
+            <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={70} /><span className="text-[8px] tracking-[0.2em] text-[#98989D]">OUR STORY</span></div>
             <div className="relative mt-8">
-              <div className="absolute inset-x-0 top-[5px] h-px bg-[#2E2E2E]" />
+              <div className="absolute inset-x-0 top-[5px] h-px bg-[#38383A]" />
               <div className="relative grid grid-cols-4 gap-2">
                 {MILESTONES.filter((m) => m.key || m.year === "2023").map((m) => (
                   <div key={m.year}>
-                    <span className="block h-[11px] w-[11px] rounded-full" style={{ background: m.key ? "#7FA9D6" : "#4B5563" }} />
+                    <span className="block h-[11px] w-[11px] rounded-full" style={{ background: m.key ? "#FFFFFF" : "#48484A" }} />
                     <p className="mt-2 font-mono text-[12px] font-semibold text-white">{m.year}</p>
-                    <p className="text-[9.5px] leading-snug text-[#9CA3AF]">{m.title}</p>
+                    <p className="text-[9.5px] leading-snug text-[#98989D]">{m.title}</p>
                   </div>
                 ))}
               </div>
             </div>
-            <span className="mt-8 block h-[2px] w-16" style={{ background: HUB_LINE }} />
+            
           </div>
         </Stage>
         <Bullets items={[
@@ -386,11 +385,11 @@ export function MissionVision() {
       ]}
     >
       <Section id="mission" title="Mission">
-        <Stage bg="#0A0A0A" h="auto" pad={32}>
+        <Stage bg="#000000" h="auto" pad={32}>
           <div className="w-full max-w-[520px]">
-            <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#7FA9D6]">Mission</p>
+            <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#98989D]">Mission</p>
             <p className="mt-2 text-[22px] font-bold leading-[1.2] text-white">To equip garment factories with precise machines, complete lines and the know-how to keep them producing.</p>
-            <span className="mt-4 block h-[2px] w-16" style={{ background: HUB_LINE }} />
+            
           </div>
         </Stage>
       </Section>
@@ -398,9 +397,9 @@ export function MissionVision() {
       <Section id="vision" title="Vision">
         <Stage bg="#FFFFFF" h="auto" pad={32}>
           <div className="w-full max-w-[520px]">
-            <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#3E6796]">Vision</p>
-            <p className="mt-2 text-[22px] font-bold leading-[1.2] text-[#0A0A0A]">To be the first name garment factories trust, in every market we serve.</p>
-            <span className="mt-4 block h-[2px] w-16" style={{ background: HUB_LINE }} />
+            <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#6E6E73]">Vision</p>
+            <p className="mt-2 text-[22px] font-bold leading-[1.2] text-[#1D1D1F]">To be the first name garment factories trust, in every market we serve.</p>
+            
           </div>
         </Stage>
       </Section>

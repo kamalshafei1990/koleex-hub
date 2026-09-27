@@ -1,21 +1,41 @@
 "use client";
 
-/* Chapters 45–49: color palette, Hub Blue, usage & proportions, print &
-   materials, contrast. Every HEX comes from lib/brand-book/tokens; every RGB,
-   CMYK and contrast figure on these pages is computed from it. */
+/* Chapters 45–49: the colour palette, silver & Hub Blue, colour usage &
+   proportions, colour for print & materials, contrast & legibility.
+
+   The palette the owner approved on 27/09/2026 (Apple direction): black and
+   white carry every piece; four neutrals; SILVER as the premium material
+   (one smooth, slightly shiny gradient — never the logo); HUB BLUE for
+   links and buttons only; status colours only for a state. Proportions:
+   black or white 60 · neutrals 28 · silver 8 · Hub Blue 4. */
 
 import {
-  BRAND_COLORS, HUB_GRADIENT, cmykText, color, contrast, grade, ratioText, rgbText,
+  BRAND_COLORS, PROPORTIONS, SILVER, cmykText, contrast, grade, ratioText, rgbText,
 } from "@/lib/brand-book/tokens";
 import {
   B, Bullets, Chapter, Code, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Swatch, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { MachineShot } from "../mockups";
 
-const COLOR_FILES = [
-  { label: "Brand colors — CSS variables", href: "/brand/kit/koleex-colors.css", format: "CSS", note: "For websites and apps." },
-  { label: "Brand colors — JSON", href: "/brand/kit/koleex-colors.json", format: "JSON", note: "HEX, RGB and CMYK starting values for every color." },
+const FILES = [
+  { label: "Brand colors — CSS variables", href: "/brand/kit/koleex-colors.css", format: "CSS", note: "For websites and apps, with the silver gradient." },
+  { label: "Brand colors — JSON", href: "/brand/kit/koleex-colors.json", format: "JSON", note: "HEX, RGB and CMYK starting values, silver and proportions." },
 ];
+
+const PROP_FILL: Record<string, string> = { base: "#000000", neutral: "#F5F5F7", silver: SILVER.css, hub: "#567FB2" };
+
+/** A silver headline on black — the premium signature. */
+function SilverWords({ children, size = 40 }: { children: string; size?: number }) {
+  return (
+    <span
+      className="font-semibold tracking-[-0.03em]"
+      style={{ fontSize: size, lineHeight: 1.05, backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}
+    >
+      {children}
+    </span>
+  );
+}
 
 /* ── 45 · Color Palette ────────────────────────────────────────────────── */
 
@@ -24,284 +44,214 @@ export function ColorPalette() {
   return (
     <Chapter
       n={45}
-      lead={
-        <p>
-          KOLEEX is black and white first. Hub Blue is the one brand color beside them — the accent that
-          makes a KOLEEX layout recognisable. Greys organise, and three status colors appear only when
-          something has a state.
-        </p>
-      }
+      lead={<p>Black and white carry the brand. Silver makes it premium. Hub Blue makes it act. Nothing else.</p>}
       toc={[
-        { id: "hierarchy", title: "The hierarchy" },
-        { id: "core", title: "Core: black and white" },
-        { id: "hub", title: "Hub Blue" },
+        { id: "system", title: "The system" },
+        { id: "core", title: "Black and white" },
         { id: "neutrals", title: "Neutrals" },
+        { id: "silver", title: "Silver" },
+        { id: "hub", title: "Hub Blue" },
         { id: "status", title: "Status colors" },
-        { id: "retired", title: "Colors we no longer use" },
         { id: "color-files", title: "Files" },
       ]}
     >
-      <Section id="hierarchy" title="The hierarchy">
-        <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
-          <div className="grid grid-cols-[2fr_2fr_1fr]" style={{ height: 120 }}>
-            <div className="flex items-end p-4" style={{ background: "#000000" }}><span className="text-[12px] font-semibold text-white">1 · Black</span></div>
-            <div className="flex items-end p-4" style={{ background: "#FFFFFF" }}><span className="text-[12px] font-semibold text-black">2 · White</span></div>
-            <div className="flex items-end p-4" style={{ background: HUB_GRADIENT.css }}><span className="text-[12px] font-semibold text-white">3 · Hub Blue</span></div>
-          </div>
+      <Section id="system" title="The system">
+        <div className="grid grid-cols-2 overflow-hidden rounded-[28px] ring-1 ring-black/5 md:grid-cols-4 dark:ring-white/15" style={{ minHeight: 220 }}>
+          <div className="flex items-end bg-black p-5"><span className="text-[15px] font-semibold text-white">Black</span></div>
+          <div className="flex items-end bg-white p-5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"><span className="text-[15px] font-semibold text-[#1D1D1F]">White</span></div>
+          <div className="flex items-end p-5" style={{ background: SILVER.css }}><span className="text-[15px] font-semibold text-[#1D1D1F]">Silver</span></div>
+          <div className="flex items-end p-5" style={{ background: "#567FB2" }}><span className="text-[15px] font-semibold text-white">Hub Blue</span></div>
         </div>
-        <Rule why="A restrained palette is what makes the blue — and the product — stand out. Every extra color competes with both.">
-          Black → white → Hub Blue. No other color carries the brand. Greys organise the page; status colors
-          show states. Nothing else is added.
-        </Rule>
+        <Specs rows={[
+          ["Black and white", "The ground of every piece and the only colors of the logo"],
+          ["Neutrals", "Graphite, Gray, Mist, Cloud — text, lines and quiet panels"],
+          ["Silver", "The premium material — headlines on black, the machine, nameplates"],
+          ["Hub Blue", "Links and buttons. Never decoration"],
+          ["Status", "Green, amber, red — only to show a state"],
+        ]} />
       </Section>
 
-      <Section id="core" title="Core: black and white">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{group("core").map((c) => <Swatch key={c.id} c={c} big />)}</div>
-        <Note><B>Black and Ink:</B> the logo is pure black #000000. Large dark surfaces use Ink #0A0A0A — a softer black that prints and displays more evenly.</Note>
-      </Section>
-
-      <Section id="hub" title="Hub Blue">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{group("hub").map((c) => <Swatch key={c.id} c={c} />)}</div>
-        <P>The family, its gradient and where it may be used are in <Ref n={46} />.</P>
+      <Section id="core" title="Black and white">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{group("core").map((c) => <Swatch key={c.id} c={c} big />)}</div>
       </Section>
 
       <Section id="neutrals" title="Neutrals">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">{group("neutral").map((c) => <Swatch key={c.id} c={c} />)}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{group("neutral").map((c) => <Swatch key={c.id} c={c} />)}</div>
+      </Section>
+
+      <Section id="silver" title="Silver">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{group("silver").map((c) => <Swatch key={c.id} c={c} big />)}</div>
+        <P>Silver is one smooth gradient with a single soft highlight — never banded, never wavy. Full rules: <Ref n={46} />.</P>
+      </Section>
+
+      <Section id="hub" title="Hub Blue">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{group("hub").map((c) => <Swatch key={c.id} c={c} />)}</div>
       </Section>
 
       <Section id="status" title="Status colors">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{group("status").map((c) => <Swatch key={c.id} c={c} />)}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">{group("status").map((c) => <Swatch key={c.id} c={c} />)}</div>
         <Rule why="If green also decorates a banner, it can no longer mean “approved”.">
-          Status colors appear only to show a state — approved, pending, error — in the Hub, in documents
-          and in charts. They are never decoration.
+          Status colors appear only to show a state — approved, pending, error. Never as decoration.
         </Rule>
-      </Section>
-
-      <Section id="retired" title="Colors we no longer use">
-        <P>Earlier KOLEEX material used a different accent system. These colors are retired — replace them when you meet them:</P>
-        <Table
-          head={["Retired", "Was used for", "Use instead"]}
-          rows={[
-            [<Code key="a">#0071E3 · #007AFF</Code>, "Accent blue, links, buttons", <span key="b">Hub Blue Deep <Code>#3E6796</Code> on white · Sky <Code>#7FA9D6</Code> on dark</span>],
-            [<Code key="a">#86868B</Code>, "Secondary text", <span key="b">Slate <Code>#4B5563</Code> (passes contrast on white)</span>],
-            [<Code key="a">#34C759 · #FF9500 · #FF3B30</Code>, "Status", <span key="b">Status Green, Amber and Red from this palette</span>],
-            [<Code key="a">Multi-color category palettes</Code>, "Charts, diagrams, section colors", <span key="b">Black, greys and the Hub Blue family (<Ref n={61} />)</span>],
-          ]}
-        />
-        <Note>Inside the Hub’s Core interface, sliders and progress bars keep their functional blue <Code>#0066FF</Code>. It is an interface control color, never a marketing or print color.</Note>
       </Section>
 
       <Section id="color-files" title="Files">
-        <Downloads items={COLOR_FILES} />
+        <Downloads items={FILES} />
       </Section>
     </Chapter>
   );
 }
 
-/* ── 46 · Hub Blue ─────────────────────────────────────────────────────── */
+/* ── 46 · Silver & Hub Blue ────────────────────────────────────────────── */
 
-export function HubBlue() {
+export function SilverHubBlue() {
   return (
     <Chapter
       n={46}
-      lead={
-        <p>
-          Hub Blue is the blue of the “hub” in the Koleex Hub mark — a cool, steady steel blue that moves
-          to a pale ice. It became the third KOLEEX brand color on 31/07/2026, and it is used across
-          everything: the Hub, marketing and print.
-        </p>
-      }
+      lead={<p>Two colors beyond black and white, each with one job. Silver is the material. Hub Blue is the action.</p>}
       toc={[
-        { id: "family", title: "The family" },
-        { id: "gradient", title: "The Hub gradient" },
-        { id: "where", title: "Where Hub Blue goes" },
-        { id: "how-much", title: "How much" },
-        { id: "blue-donts", title: "What never to do" },
+        { id: "silver-gradient", title: "The silver gradient" },
+        { id: "silver-where", title: "Where silver goes" },
+        { id: "silver-never", title: "Silver — never" },
+        { id: "blue-job", title: "Hub Blue’s one job" },
+        { id: "blue-never", title: "Hub Blue — never" },
       ]}
     >
-      <Section id="family" title="The family">
-        <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
-          <div className="grid grid-cols-4" style={{ height: 150 }}>
-            {["deep", "steel", "sky", "ice"].map((id) => {
-              const c = color(id);
-              const onDark = id === "deep" || id === "steel";
-              return (
-                <div key={id} className="flex flex-col justify-end p-3" style={{ background: c.hex }}>
-                  <span className="text-[12px] font-semibold" style={{ color: onDark ? "#FFFFFF" : "#0A0A0A" }}>{c.name.replace("Hub Blue ", "")}</span>
-                  <span className="font-mono text-[11px]" style={{ color: onDark ? "#FFFFFF" : "#0A0A0A" }}>{c.hex}</span>
-                </div>
-              );
-            })}
+      <Section id="silver-gradient" title="The silver gradient">
+        <Stage bg="#000000" h="auto" pad={48}>
+          <div className="flex w-full flex-col items-center gap-8 text-center">
+            <SilverWords size={56}>Stitch. Perfected.</SilverWords>
+            <div className="h-[72px] w-full max-w-[520px] rounded-[18px]" style={{ background: SILVER.css }} />
           </div>
-        </div>
-        <Table
-          head={["Tone", "HEX", "RGB", "CMYK (starting value)", "Main job"]}
-          rows={["deep", "steel", "sky", "ice"].map((id) => {
-            const c = color(id);
-            return [<B key="n">{c.name}</B>, <Code key="h">{c.hex}</Code>, rgbText(c.hex), cmykText(c.hex), c.role];
-          })}
-        />
+        </Stage>
+        <Specs rows={[
+          ["Stops", <span key="s" className="font-mono text-[13px]">{SILVER.stops.join(" → ")}</span>],
+          ["Surfaces", <Code key="c">{SILVER.css}</Code>],
+          ["Headlines on black", <Code key="t">{SILVER.cssText}</Code>],
+          ["Print", `${SILVER.pantone} · ${SILVER.foil}`],
+        ]} />
       </Section>
 
-      <Section id="gradient" title="The Hub gradient">
-        <div className="grid grid-cols-1 md:grid-cols-[160px_minmax(0,1fr)] gap-4">
-          <div className="h-[200px] rounded-2xl" style={{ background: HUB_GRADIENT.css }} />
-          <div className="space-y-4">
-            <Specs rows={[
-              ["From", <span key="f"><Code>{HUB_GRADIENT.from}</Code> Steel</span>],
-              ["To", <span key="t"><Code>{HUB_GRADIENT.to}</Code> Ice</span>],
-              ["Direction", "Top to bottom (vertical) — the canonical form. Left to right for thin horizontal bars."],
-              ["CSS", <Code key="c">{HUB_GRADIENT.css}</Code>],
-            ]} />
-          </div>
-        </div>
-        <P>The gradient is the Hub’s signature. Use it small: a line, a bar, a highlight, an icon, the “hub” script — never a full background behind text or behind the logo.</P>
-      </Section>
-
-      <Section id="where" title="Where Hub Blue goes">
+      <Section id="silver-where" title="Where silver goes">
         <Examples cols={3}>
-          <Example tone="do" caption="Links and key words on white — in Deep." bg="#FFFFFF" h={150}>
-            <p className="max-w-[220px] text-[13px] leading-6 text-[#1A1A1A]">Download the <span className="font-semibold text-[#3E6796] underline underline-offset-2">full specification</span> for the direct-drive lockstitch.</p>
-          </Example>
-          <Example tone="do" caption="A thin gradient line that finishes a layout." bg="#0A0A0A" h={150} pad={0}>
-            <div className="relative flex h-[150px] w-full items-center justify-center">
-              <Wordmark color="#FFFFFF" width={140} />
-              <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_GRADIENT.cssHorizontal }} />
-            </div>
-          </Example>
-          <Example tone="do" caption="Accents on dark — in Sky." bg="#0A0A0A" h={150}>
-            <div className="text-white">
-              <p className="text-[9px] tracking-[0.2em] text-[#7FA9D6]">NEW · OVERLOCK</p>
-              <p className="mt-1 text-[18px] font-bold leading-tight">Four threads.<br />One pass.</p>
-            </div>
-          </Example>
-          <Example tone="do" caption="Charts: the family in order, darkest first." bg="#FFFFFF" h={150}>
-            <div className="flex h-[96px] items-end gap-2">
-              {[["#3E6796", 90], ["#567FB2", 70], ["#7FA9D6", 52], ["#BCD8F0", 34], ["#E5E7EB", 22]].map(([c, h]) => (
-                <div key={c as string} className="w-7 rounded-t" style={{ background: c as string, height: h as number }} />
-              ))}
-            </div>
-          </Example>
-          <Example tone="do" caption="A quiet Ice panel behind dark text." bg="#FFFFFF" h={150}>
-            <div className="rounded-xl bg-[#BCD8F0] px-4 py-3 text-[12.5px] font-medium text-[#0A0A0A]">Technical support in English, 中文 and العربية</div>
-          </Example>
-          <Example tone="do" caption="Interactive elements and AI features in the Hub." bg="#0A0A0A" h={150}>
-            <span className="rounded-full px-4 py-2 text-[12px] font-semibold text-white" style={{ background: HUB_GRADIENT.cssHorizontal }}>Ask Koleex AI</span>
+          <Example tone="do" caption="Big headlines on black." bg="#000000" h={170}><SilverWords size={30}>Quiet power.</SilverWords></Example>
+          <Example tone="do" caption="The machine itself — its finish in every photo." bg="#000000" h={170}><MachineShot w={210} label={false} /></Example>
+          <Example tone="do" caption="Nameplates and premium print, as real metal or foil." bg="#F5F5F7" h={170}>
+            <div className="flex h-[88px] w-[160px] items-center justify-center rounded-[12px]" style={{ background: SILVER.css, boxShadow: "inset 0 0 0 1px #AEAEB2" }}><Wordmark color="#1D1D1F" width={96} /></div>
           </Example>
         </Examples>
       </Section>
 
-      <Section id="how-much" title="How much">
-        <Rule why="Used sparingly, the blue marks what matters. Used everywhere, it marks nothing.">
-          Hub Blue is a touch: about <B>5%</B> of a layout, never more than 10%. It is never a flood — no
-          full blue backgrounds, no blue logo.
+      <Section id="silver-never" title="Silver — never">
+        <Rule why="The logo is black or white, always. Silver is the material around it — the moment the logo turns silver, it becomes decoration.">
+          The logo is never silver. Not on screen, not in foil, not engraved to look like silver.
         </Rule>
-        <div className="flex h-5 overflow-hidden rounded-full border border-[var(--border-subtle)]">
-          <div style={{ flex: 55, background: "#FFFFFF" }} />
-          <div style={{ flex: 40, background: "#0A0A0A" }} />
-          <div style={{ flex: 5, background: "#567FB2" }} />
-        </div>
-        <P>Typical balance: 55% white · 40% black and greys · 5% Hub Blue. Dark-led pieces swap the first two. See <Ref n={47} />.</P>
+        <Examples cols={3}>
+          <Example tone="dont" caption="A silver logo." bg="#000000" h={140}>
+            <span className="block" style={{ width: 150 }}><span className="block h-[22px] w-full" style={{ background: SILVER.css, WebkitMaskImage: "url(/brand/koleex-logo-white.svg)", maskImage: "url(/brand/koleex-logo-white.svg)", WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }} /></span>
+          </Example>
+          <Example tone="dont" caption="Banded, wavy or brushed metal." bg="#000000" h={140}>
+            <div className="h-[56px] w-[150px] rounded-[14px]" style={{ background: "linear-gradient(135deg,#8E8E93 0%,#E8E8ED 22%,#FFFFFF 40%,#AEAEB2 58%,#F2F2F5 76%,#8E8E93 100%)" }} />
+          </Example>
+          <Example tone="dont" caption="Silver on white — it disappears." bg="#FFFFFF" h={140}><SilverWords size={28}>Quiet power.</SilverWords></Example>
+        </Examples>
       </Section>
 
-      <Section id="blue-donts" title="What never to do">
-        <Examples cols={3}>
-          <Example tone="dont" caption="A full blue background." bg="#567FB2" h={140}>
-            <p className="text-[18px] font-bold text-white">New series</p>
-          </Example>
-          <Example tone="dont" caption="Blue body text or blue paragraphs." bg="#FFFFFF" h={140}>
-            <p className="max-w-[220px] text-[12px] leading-5 text-[#567FB2]">Our machines are tested before shipping and supported in your language by our technical team.</p>
-          </Example>
-          <Example tone="dont" caption="Other blues next to Hub Blue." bg="#FFFFFF" h={140}>
-            <div className="flex gap-2">{["#567FB2", "#0071E3", "#1E90FF", "#00A3E0"].map((c) => <div key={c} className="h-14 w-10 rounded" style={{ background: c }} />)}</div>
-          </Example>
-        </Examples>
+      <Section id="blue-job" title="Hub Blue’s one job">
+        <Stage bg="#FFFFFF" h="auto" pad={40}>
+          <div className="flex flex-col items-center gap-5 text-center text-[#1D1D1F]">
+            <p className="text-[32px] font-semibold tracking-[-0.025em]">The XSO-7800-4.</p>
+            <div className="flex items-center gap-6">
+              <span className="inline-flex h-10 items-center rounded-full px-5 text-[15px] font-medium text-white" style={{ background: "#567FB2" }}>Get a quote</span>
+              <span className="text-[15px] font-medium" style={{ color: "#3E6796" }}>Learn more ›</span>
+            </div>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Filled button", "Steel #567FB2, white text"],
+          ["Links on white", "Deep #3E6796"],
+          ["Links on black", "Sky #7FA9D6"],
+          ["Pressed or selected", "Ice #BCD8F0 behind dark text"],
+        ]} />
+      </Section>
+
+      <Section id="blue-never" title="Hub Blue — never">
+        <Bullets items={[
+          "On the logo, and never as the background behind it.",
+          "As a decorative line, frame, label, icon color or chart color.",
+          "As a large field — a blue banner, a blue slide, a blue wall.",
+          <>The Hub gradient belongs to the Koleex Hub mark and interface only (<Ref n={42} />).</>,
+        ]} />
       </Section>
     </Chapter>
   );
 }
 
-/* ── 47 · Usage & Proportions ──────────────────────────────────────────── */
-
-function Poster({ dark }: { dark: boolean }) {
-  const fg = dark ? "#FFFFFF" : "#0A0A0A";
-  return (
-    <div className="relative flex h-[250px] w-[200px] flex-col justify-between overflow-hidden rounded-md p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ background: dark ? "#0A0A0A" : "#FFFFFF" }}>
-      <p className="text-[8px] tracking-[0.2em]" style={{ color: dark ? "#7FA9D6" : "#3E6796" }}>SPREADING · NEW</p>
-      <div className="flex-1 my-3 rounded" style={{ background: dark ? "#1A1A1A" : "#F5F5F5" }} />
-      <p className="text-[15px] font-bold leading-tight" style={{ color: fg }}>Lay it flat.<br />Cut it right.</p>
-      <div className="mt-3 flex items-center justify-between">
-        <Wordmark color={dark ? "#FFFFFF" : "#000000"} width={60} />
-        <div className="h-[2px] w-10" style={{ background: HUB_GRADIENT.cssHorizontal }} />
-      </div>
-    </div>
-  );
-}
+/* ── 47 · Color Usage & Proportions ────────────────────────────────────── */
 
 export function ColorUsage() {
   return (
     <Chapter
       n={47}
-      lead={
-        <p>
-          The same palette makes two kinds of layout: light-led for things people read and file, dark-led
-          for things people see from a distance or scroll past. Both keep the blue to a touch.
-        </p>
-      }
+      lead={<p>Most of every piece is black or white. The rest is quiet gray — and a small amount of silver and blue, exactly where they do their job.</p>}
       toc={[
-        { id: "two-modes", title: "Light-led and dark-led" },
-        { id: "which", title: "Which one, where" },
         { id: "proportions", title: "Proportions" },
+        { id: "dark-light", title: "Black first, then white" },
+        { id: "which", title: "Which one, where" },
         { id: "usage-donts", title: "What never to do" },
       ]}
     >
-      <Section id="two-modes" title="Light-led and dark-led">
-        <Examples cols={2}>
-          <Example tone="do" caption={<><B>Light-led.</B> White ground, black type, a line of Hub Blue.</>} bg="#F5F5F5" h={290}><Poster dark={false} /></Example>
-          <Example tone="do" caption={<><B>Dark-led.</B> Ink ground, white type, Sky accents.</>} bg="#E5E7EB" h={290}><Poster dark /></Example>
-        </Examples>
-      </Section>
-
-      <Section id="which" title="Which one, where">
-        <Table
-          head={["Light-led (white ground)", "Dark-led (Ink ground)"]}
-          rows={[
-            ["Business documents: quotations, invoices, contracts, packing lists", "Social media posts and stories"],
-            ["Catalogs, spec sheets, manuals, price information", "Posters, exhibition walls, roll-ups"],
-            ["Letterhead, business card backs, email", "Covers: catalog, company profile, presentations"],
-            ["Website content pages", "Video intros and outros, website heroes"],
-          ]}
-        />
-        <Note>Anything customers print on an office printer stays light-led — a black flood wastes toner and turns grey.</Note>
-      </Section>
-
       <Section id="proportions" title="Proportions">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            ["Light-led", [["#FFFFFF", 55], ["#0A0A0A", 25], ["#E5E7EB", 15], ["#567FB2", 5]]],
-            ["Dark-led", [["#0A0A0A", 55], ["#FFFFFF", 25], ["#1A1A1A", 15], ["#7FA9D6", 5]]],
-          ].map(([name, parts]) => (
-            <div key={name as string} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
-              <p className="text-[13.5px] font-semibold text-[var(--text-primary)]">{name as string}</p>
-              <div className="mt-3 flex h-6 overflow-hidden rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.1)]">
-                {(parts as Array<[string, number]>).map(([c, f]) => <div key={c} style={{ flex: f, background: c }} />)}
-              </div>
-              <p className="mt-2 font-mono text-[11.5px] text-[var(--text-dim)]">{(parts as Array<[string, number]>).map(([c, f]) => `${f}% ${c}`).join(" · ")}</p>
+        <div className="overflow-hidden rounded-[28px]">
+          <div className="flex h-[120px]">
+            {PROPORTIONS.map((p) => (
+              <div key={p.id} style={{ flex: p.pct, background: PROP_FILL[p.id], boxShadow: p.id === "neutral" ? "inset 0 0 0 1px rgba(0,0,0,0.06)" : undefined }} />
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {PROPORTIONS.map((p) => (
+            <div key={p.id}>
+              <p className="text-[34px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{p.pct}%</p>
+              <p className="text-[14px] text-[var(--text-dim)]">{p.label}</p>
             </div>
           ))}
         </div>
       </Section>
 
+      <Section id="dark-light" title="Black first, then white">
+        <Examples cols={2}>
+          <Example tone="do" caption="Black — heroes, ads, launches, social, booths." bg="#000000" h={220}>
+            <div className="flex flex-col items-center gap-3 text-center"><SilverWords size={30}>Stitch. Perfected.</SilverWords><MachineShot w={180} label={false} /></div>
+          </Example>
+          <Example tone="do" caption="White — catalogs, the website, documents, anything printed in the office." bg="#FFFFFF" h={220}>
+            <div className="flex flex-col items-center gap-3 text-center text-[#1D1D1F]"><p className="text-[26px] font-semibold tracking-[-0.02em]">The lineup.</p><MachineShot w={180} dark={false} label={false} /></div>
+          </Example>
+        </Examples>
+      </Section>
+
+      <Section id="which" title="Which one, where">
+        <Table
+          head={["Piece", "Ground", "Silver", "Hub Blue"]}
+          rows={[
+            ["Website hero, ads, launch posts", "Black", "Headline, machine", "Links and buttons"],
+            ["Catalog, spec sheet, website pages", "White", "Machine finish", "Links only"],
+            ["Business documents", "White", "—", "—"],
+            ["Booth, roll-up, fascia", "Black", "Headline", "—"],
+            ["Business card", "Black front, white back", "—", "—"],
+            ["Nameplate", "Silver metal", "The plate itself", "—"],
+          ]}
+        />
+      </Section>
+
       <Section id="usage-donts" title="What never to do">
         <Examples cols={3}>
-          <Example tone="dont" caption="Many colors for decoration." bg="#FFFFFF" h={140}>
-            <div className="grid grid-cols-3 gap-1.5">{["#E07A5F", "#81B29A", "#F2CC8F", "#9B8BC4", "#56A3C8", "#C86B98"].map((c) => <div key={c} className="h-8 w-14 rounded" style={{ background: c }} />)}</div>
-          </Example>
+          <Example tone="dont" caption="A blue background." bg="#567FB2" h={140}><Wordmark color="#FFFFFF" width={130} /></Example>
           <Example tone="dont" caption="Status colors as decoration." bg="#FFFFFF" h={140}>
-            <p className="text-[18px] font-bold"><span className="text-[#059669]">Quality</span> <span className="text-[#D97706]">you</span> <span className="text-[#DC2626]">trust</span></p>
+            <p className="text-[18px] font-semibold"><span className="text-[#059669]">Quality</span> <span className="text-[#D97706]">you</span> <span className="text-[#DC2626]">trust</span></p>
           </Example>
-          <Example tone="dont" caption="Gradients other than the Hub gradient." bg="#FFFFFF" h={140}>
-            <div className="h-16 w-40 rounded-xl" style={{ background: "linear-gradient(135deg,#7C3AED,#EC4899,#F59E0B)" }} />
+          <Example tone="dont" caption="Any other gradient or color." bg="#FFFFFF" h={140}>
+            <div className="h-16 w-40 rounded-[16px]" style={{ background: "linear-gradient(135deg,#7C3AED,#EC4899,#F59E0B)" }} />
           </Example>
         </Examples>
       </Section>
@@ -312,18 +262,14 @@ export function ColorUsage() {
 /* ── 48 · Color for Print & Materials ──────────────────────────────────── */
 
 export function ColorPrint() {
-  const printable = BRAND_COLORS.filter((c) => c.group !== "status");
+  const printable = BRAND_COLORS.filter((c) => c.group !== "status" && c.group !== "hub");
   return (
     <Chapter
       n={48}
-      lead={
-        <p>
-          Screens mix light; printers mix ink. The same HEX value looks different on coated paper, on
-          uncoated paper and on fabric — so print colors are matched on a physical proof, every time.
-        </p>
-      }
+      lead={<p>Screens mix light; printers mix ink. Every print color — and every silver — is matched on a physical proof before a job runs.</p>}
       toc={[
         { id: "values", title: "Print values" },
+        { id: "silver-print", title: "Silver in print" },
         { id: "black", title: "Printing black" },
         { id: "proof", title: "The proof rule" },
         { id: "materials-color", title: "Materials" },
@@ -333,45 +279,52 @@ export function ColorPrint() {
         <Table
           head={["Color", "HEX", "RGB", "CMYK — starting value"]}
           rows={printable.map((c) => [
-            <span key="n" className="flex items-center gap-2"><span className="h-4 w-4 shrink-0 rounded shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ background: c.hex }} />{c.name}</span>,
+            <span key="n" className="flex items-center gap-2"><span className="h-4 w-4 shrink-0 rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ background: c.id === "silver" ? SILVER.css : c.hex }} />{c.name}</span>,
             <Code key="h">{c.hex}</Code>,
             rgbText(c.hex),
-            cmykText(c.hex),
+            c.id === "silver" ? SILVER.pantone : cmykText(c.hex),
           ])}
         />
-        <Note tone="warn">CMYK values here are calculated from the screen colors. They are a starting point for the printer, not a finished recipe: the final values are the ones that match the approved proof. Pantone references will be added once they are matched on press.</Note>
+        <Note tone="warn">CMYK values are calculated from the screen colors — a starting point for the printer, not a finished recipe. Hub Blue is for screens; printed pieces are black, white and silver.</Note>
+      </Section>
+
+      <Section id="silver-print" title="Silver in print">
+        <Specs rows={[
+          ["Paper and card", `${SILVER.foil} — never silver ink simulated with gray`],
+          ["When foil is not possible", `${SILVER.pantone} as a spot color`],
+          ["Metal", "The metal’s own finish: anodised or brushed aluminum"],
+          ["Signs", "Silver acrylic or aluminum composite — never gray vinyl"],
+        ]} />
       </Section>
 
       <Section id="black" title="Printing black">
         <Specs rows={[
           ["Logo and text", "K100 only (C0 M0 Y0 K100) — sharp edges, no registration shift"],
           ["Large black areas", "Rich black C60 M40 Y40 K100 — deep and even"],
-          ["Never", "Rich black on small text or thin lines; registration blur shows"],
           ["White logo on black", "A knock-out (unprinted paper), never white ink on black ink"],
         ]} />
       </Section>
 
       <Section id="proof" title="The proof rule">
-        <Rule why="Paper, ink and press change the color. The only color that counts is the one on the real material.">
-          No KOLEEX print job, sign or garment runs without a physical proof approved against the brand
-          colors. Screen previews and PDFs are not proofs.
+        <Rule why="Paper, ink, foil and press change the color. The only color that counts is the one on the real material.">
+          No KOLEEX print job, sign or garment runs without a physical proof approved against the brand colors.
         </Rule>
         <Bullets items={[
-          "Ask the printer for a hard proof on the final paper or material.",
+          "Ask for a hard proof on the final paper or material — with the real foil.",
           "Check it in daylight next to an approved KOLEEX sample.",
-          "Record the approved values (and the printer) for the next run.",
+          "Record the approved values and the printer for the next run.",
         ]} />
       </Section>
 
       <Section id="materials-color" title="Materials">
         <Table
-          head={["Material", "Black", "White", "Hub Blue"]}
+          head={["Material", "Black", "White", "Silver"]}
           rows={[
-            ["Coated paper", "K100 / rich black for areas", "Paper white", "CMYK starting value, proofed"],
-            ["Uncoated paper", "K100", "Paper white", "Proofed — uncoated paper dulls blues"],
-            ["Embroidery thread", "Black thread", "White thread", "Thread matched to an approved swatch"],
-            ["Vinyl and signs", "Matte black vinyl", "White vinyl", "Vinyl matched to an approved swatch"],
-            ["Screens", "#000000 / #0A0A0A", "#FFFFFF", "sRGB values from chapter 45"],
+            ["Coated paper", "K100 / rich black for areas", "Paper white", "Silver foil"],
+            ["Uncoated paper", "K100", "Paper white", "Silver foil, tested first"],
+            ["Embroidery thread", "Black thread", "White thread", "—"],
+            ["Vinyl and signs", "Matte black vinyl", "White vinyl", "Silver acrylic or aluminum"],
+            ["Metal", "Black print", "White print", "The metal’s own finish"],
           ]}
         />
       </Section>
@@ -382,37 +335,29 @@ export function ColorPrint() {
 /* ── 49 · Contrast & Legibility ────────────────────────────────────────── */
 
 const PAIRS: Array<[string, string, string]> = [
-  ["#000000", "#FFFFFF", "Black on White"],
-  ["#1A1A1A", "#FFFFFF", "Graphite on White"],
-  ["#4B5563", "#FFFFFF", "Slate on White"],
-  ["#9CA3AF", "#FFFFFF", "Silver on White"],
-  ["#3E6796", "#FFFFFF", "Deep on White"],
-  ["#567FB2", "#FFFFFF", "Steel on White"],
-  ["#FFFFFF", "#0A0A0A", "White on Ink"],
-  ["#9CA3AF", "#0A0A0A", "Silver on Ink"],
-  ["#7FA9D6", "#0A0A0A", "Sky on Ink"],
-  ["#FFFFFF", "#3E6796", "White on Deep"],
-  ["#FFFFFF", "#567FB2", "White on Steel"],
-  ["#0A0A0A", "#BCD8F0", "Ink on Ice"],
+  ["#1D1D1F", "#FFFFFF", "Graphite on White"],
+  ["#6E6E73", "#FFFFFF", "Gray on White"],
+  ["#1D1D1F", "#F5F5F7", "Graphite on Cloud"],
+  ["#3E6796", "#FFFFFF", "Deep on White (links)"],
+  ["#FFFFFF", "#567FB2", "White on Steel (buttons)"],
+  ["#F5F5F7", "#000000", "Cloud on Black"],
+  ["#98989D", "#000000", "Gray on Black"],
+  ["#C7C7CC", "#000000", "Silver on Black"],
+  ["#7FA9D6", "#000000", "Sky on Black (links)"],
+  ["#AEAEB2", "#FFFFFF", "Silver on White"],
 ];
 
 function suitableFor(ratio: number): string {
   if (ratio >= 4.5) return "Any text";
-  if (ratio >= 3) return "Large text (24 px+ / 18 pt+) and graphics only";
-  return "Decoration and hairlines only — never text";
+  if (ratio >= 3) return "Large text (24 px+) and graphics only";
+  return "Never for text";
 }
 
 export function Contrast() {
   return (
     <Chapter
       n={49}
-      lead={
-        <p>
-          Our readers use phones in bright workshops, print quotations on office printers and read signs
-          across exhibition halls. Every text-and-background pair below has been measured; use the ones that
-          pass for the job.
-        </p>
-      }
+      lead={<p>Our readers use phones in bright workshops and read signs across exhibition halls. Every pair below is measured — use the ones that pass for the job.</p>}
       toc={[
         { id: "standard", title: "The standard" },
         { id: "pairs", title: "Measured pairs" },
@@ -421,32 +366,26 @@ export function Contrast() {
     >
       <Section id="standard" title="The standard">
         <Rule why="4.5 : 1 is the international accessibility standard (WCAG AA). It is also simply what people can read in poor light.">
-          Text has a contrast of at least <B>4.5 : 1</B> with its background. Large text (24 px / 18 pt and
-          above) and graphics need at least <B>3 : 1</B>.
+          Text needs at least <B>4.5 : 1</B> against its background. Large text and graphics need <B>3 : 1</B>.
         </Rule>
       </Section>
 
       <Section id="pairs" title="Measured pairs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PAIRS.map(([fg, bg, name]) => {
             const r = contrast(fg, bg);
             const g = grade(r);
             return (
-              <div key={name} className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-                <Stage bg={bg} h={96} pad={16} style={{ borderRadius: 0 }}>
-                  <p className="text-[17px] font-semibold" style={{ color: fg }}>Lockstitch 5,000 SPM</p>
+              <div key={name} className="overflow-hidden rounded-[24px] bg-[var(--bg-secondary)]">
+                <Stage bg={bg} h={104} pad={16} style={{ borderRadius: 0 }}>
+                  <p className="text-[19px] font-semibold tracking-[-0.01em]" style={{ color: fg }}>Lockstitch 5,000 SPM</p>
                 </Stage>
-                <div className="px-4 py-3">
+                <div className="px-5 py-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">{name}</p>
-                    <span
-                      className="rounded-full px-2 py-[1px] font-mono text-[11px] font-semibold text-white"
-                      style={{ background: g === "Fail" ? "#DC2626" : g === "AA Large" ? "#D97706" : "#059669" }}
-                    >
-                      {ratioText(r)}
-                    </span>
+                    <p className="text-[14px] font-semibold text-[var(--text-primary)]">{name}</p>
+                    <span className="font-mono text-[13px] font-semibold" style={{ color: g === "Fail" ? "#DC2626" : g === "AA Large" ? "#D97706" : "#059669" }}>{ratioText(r)}</span>
                   </div>
-                  <p className="mt-1 text-[12px] text-[var(--text-dim)]">{suitableFor(r)}</p>
+                  <p className="mt-1 text-[13px] text-[var(--text-dim)]">{suitableFor(r)}</p>
                 </div>
               </div>
             );
@@ -456,13 +395,12 @@ export function Contrast() {
 
       <Section id="sizes" title="Minimum text sizes">
         <Specs rows={[
-          ["Screens — body text", "14 px (16 px on phones for long reading)"],
-          ["Screens — smallest text", "12 px, weight 400 or heavier"],
+          ["Screens — body text", "17 px (the type scale, ch. 51)"],
+          ["Screens — smallest text", "12 px"],
           ["Print — body text", "9 pt"],
-          ["Print — smallest text (legal lines, footnotes)", "6.5 pt, weight 400 or heavier"],
+          ["Print — smallest text (legal lines)", "6.5 pt"],
           ["Signs", "Letter height ≥ 25 mm per 10 m of reading distance"],
         ]} />
-        <Note>Light weights (300 and below) are never used for text under 24 px — they break up in print and on low-quality screens.</Note>
       </Section>
     </Chapter>
   );

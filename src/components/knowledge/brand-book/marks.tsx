@@ -3,9 +3,9 @@
 
    The wordmark is NEVER redrawn here: `Wordmark` is components/layout/
    KoleexLogo, the Hub's one inline copy of the official file, coloured with
-   currentColor. The K monogram is the first path of that same file — the K
-   of the wordmark, cut out by its own viewBox, not a new drawing (owner,
-   27/09/2026: "yes, design the K").
+   currentColor. There is no K monogram any more (owner, 27/09/2026: "don't
+   put K but put the full Koleex logo in a suitable size and position") —
+   LogoTile fits the whole logo into avatars, app icons and favicons.
 
    The Koleex Hub mark is a raster lockup (the "hub" script is a drawn
    gradient, not a font), so it is shown from the live files in
@@ -15,10 +15,6 @@
 import type { CSSProperties } from "react";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 
-/** The official K path, verbatim from koleex-logo-black.svg (path 1). */
-export const K_PATH =
-  "M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z";
-export const K_VIEWBOX = "0 0 116.59 107.57";
 /** Give it a width OR a height (px, %, mm…); the ratio is locked to the file. */
 export function Wordmark({ color = "#000000", width, height, className = "", style }: {
   color?: string;
@@ -39,24 +35,14 @@ export function Wordmark({ color = "#000000", width, height, className = "", sty
   );
 }
 
-export function Monogram({ color = "#000000", className = "", style }: {
-  color?: string;
-  className?: string;
-  style?: CSSProperties;
-}) {
-  return (
-    <svg viewBox={K_VIEWBOX} className={className} style={style} role="img" aria-label="KOLEEX K monogram">
-      <path fill={color} d={K_PATH} />
-    </svg>
-  );
-}
-
-/** The K on a square tile — the avatar / favicon form. */
-export function MonogramTile({ dark = true, size = 96, radius = 0.22, border = false }: {
+/** The FULL logo on a tile — the avatar, app-icon and favicon form. There
+ *  is no separate monogram (owner, 27/09/2026): small spaces use the whole
+ *  logo, fitted to 70% of the tile's width. */
+export function LogoTile({ dark = true, size = 96, round = false, border = false }: {
   dark?: boolean;
   size?: number;
-  /** Corner radius as a share of the tile side. 0 = square (the file form). */
-  radius?: number;
+  /** A circle (profile pictures) instead of a rounded square (app icons). */
+  round?: boolean;
   border?: boolean;
 }) {
   return (
@@ -65,14 +51,14 @@ export function MonogramTile({ dark = true, size = 96, radius = 0.22, border = f
       style={{
         width: size,
         height: size,
-        borderRadius: size * radius,
-        background: dark ? "#0A0A0A" : "#FFFFFF",
+        borderRadius: round ? "50%" : size * 0.22,
+        background: dark ? "#000000" : "#FFFFFF",
         /* A hairline on both: the dark tile would vanish on a dark page,
            the light one on a light page. */
-        boxShadow: dark ? "inset 0 0 0 1px rgba(255,255,255,0.16)" : border ? "inset 0 0 0 1px #E5E7EB" : "inset 0 0 0 1px rgba(0,0,0,0.08)",
+        boxShadow: dark ? "inset 0 0 0 1px rgba(255,255,255,0.16)" : border ? "inset 0 0 0 1px #D2D2D7" : "inset 0 0 0 1px rgba(0,0,0,0.08)",
       }}
     >
-      <Monogram color={dark ? "#FFFFFF" : "#000000"} style={{ width: size * 0.46 }} />
+      <Wordmark color={dark ? "#FFFFFF" : "#000000"} width={size * 0.7} />
     </span>
   );
 }

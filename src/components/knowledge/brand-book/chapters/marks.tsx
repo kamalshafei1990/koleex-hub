@@ -1,126 +1,111 @@
 "use client";
 
-/* Chapters 41–44: the K monogram, the Koleex Hub mark & app icon, lockups,
-   and the logo next to other logos. */
+/* Chapters 41–44: the logo in small spaces (there is no monogram), the
+   Koleex Hub mark & app icon, lockups, and the logo next to other logos. */
 
 import type { ReactNode } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
   B, Bullets, Chapter, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { HubMark, HUB_MARK_FILES, Monogram, MonogramTile, Wordmark } from "../marks";
+import { HubMark, HUB_MARK_FILES, LogoTile, Wordmark } from "../marks";
 
-/* ── 41 · The K Monogram ───────────────────────────────────────────────── */
+/* ── 41 · The Logo in Small Spaces ────────────────────────────────────── */
 
-export function KMonogram() {
+export function SmallSpaces() {
   return (
     <Chapter
       n={41}
       lead={
         <p>
-          The K monogram is the first letter of the logo, taken exactly as it is drawn there. It stands in
-          for the full logo where the full logo cannot be read — a profile picture, a browser tab, a small
-          stamp — and nowhere else.
+          KOLEEX has one mark: the logo. There is no separate monogram. Where the space is small — a profile
+          picture, an app icon, the browser tab — the whole logo is fitted in, white on black.
         </p>
       }
       toc={[
-        { id: "the-k", title: "The K" },
-        { id: "when", title: "When to use it — and when not" },
-        { id: "tile", title: "The tile" },
+        { id: "rule", title: "The rule" },
+        { id: "tiles", title: "The tile" },
         { id: "sizes", title: "Sizes" },
-        { id: "k-donts", title: "What never to do" },
-        { id: "k-files", title: "Files" },
+        { id: "small-items", title: "Small objects" },
+        { id: "small-never", title: "What never to do" },
+        { id: "small-files", title: "Files" },
       ]}
     >
-      <Section id="the-k" title="The K">
-        <Examples cols={2}>
-          <Example caption="The K, as it appears in the logo…" bg="#FFFFFF" h={200}>
-            <div className="flex flex-col items-start gap-4">
-              <Wordmark color="#000000" width={300} />
-              <div className="h-[2px] w-[49px] rounded" style={{ background: "#567FB2" }} />
-            </div>
-          </Example>
-          <Example caption="…is the monogram. Same shape, same proportions, nothing added." bg="#FFFFFF" h={200}>
-            <Monogram color="#000000" style={{ height: 110 }} />
-          </Example>
-        </Examples>
-        <Rule why="A second, different symbol would split the brand's recognition in two. The K is recognisable because it is already in every logo.">
-          The monogram is the K of the logo, unchanged. It is never redrawn, re-proportioned or combined
-          with other letters.
+      <Section id="rule" title="The rule">
+        <Rule why="One mark is remembered faster than two. Every time someone sees the full name, the brand is built — a letter on its own builds nothing.">
+          Small spaces use the full logo, fitted to 70% of the width and centered. Never a single letter, never an
+          abbreviation.
         </Rule>
       </Section>
 
-      <Section id="when" title="When to use it — and when not">
-        <Table
-          head={["Use the K monogram", "Use the full logo"]}
-          rows={[
-            ["Profile pictures: WhatsApp, WeChat, Facebook, Instagram, LinkedIn, TikTok, Douyin, YouTube, X", "Every document, catalog, brochure, poster and sign"],
-            ["Website favicon and browser tab", "Website header, email signature, presentations"],
-            ["Small embroidery: cuff, collar, cap side", "Chest and back embroidery on uniforms"],
-            ["Small parts, tools and accessories, below the logo's minimum size", "Machine heads, nameplates, cartons"],
-            ["Stamps and seals for internal use", "Anywhere the full logo fits at its minimum size"],
-          ]}
-        />
-        <Note tone="warn">The K is not the company seal. Official company chops (公章) follow Chinese law and are never replaced or decorated with the K.</Note>
-      </Section>
-
-      <Section id="tile" title="The tile">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex flex-col items-center gap-2"><MonogramTile size={128} /><span className="text-[12px] text-[var(--text-dim)]">Primary — dark tile</span></div>
-          <div className="flex flex-col items-center gap-2"><MonogramTile size={128} dark={false} border /><span className="text-[12px] text-[var(--text-dim)]">Alternative — light tile</span></div>
-          <div className="flex flex-col items-center gap-2">
-            <span className="flex h-[128px] w-[128px] items-center justify-center overflow-hidden rounded-full bg-[#0A0A0A] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]"><Monogram color="#FFFFFF" style={{ width: 59 }} /></span>
-            <span className="text-[12px] text-[var(--text-dim)]">As a platform shows it (circle)</span>
+      <Section id="tiles" title="The tile">
+        <Stage bg="#F5F5F7" h="auto" pad={40}>
+          <div className="flex flex-wrap items-end justify-center gap-10">
+            <div className="flex flex-col items-center gap-3"><LogoTile size={140} round /><span className="text-[13px] text-[#6E6E73]">Profile picture — circle</span></div>
+            <div className="flex flex-col items-center gap-3"><LogoTile size={140} /><span className="text-[13px] text-[#6E6E73]">App icon — rounded square</span></div>
+            <div className="flex flex-col items-center gap-3"><LogoTile size={140} dark={false} border /><span className="text-[13px] text-[#6E6E73]">On dark grounds only</span></div>
           </div>
-        </div>
+        </Stage>
         <Specs rows={[
-          ["Tile", "Square, 1 : 1. Files are square — each platform applies its own circle or rounded mask"],
-          ["K width", "46% of the tile width, centered"],
-          ["Primary colors", "White K on Ink #0A0A0A"],
-          ["Alternative colors", "Black K on White #FFFFFF — for light profile pages and print"],
-          ["Corner radius (our own tiles)", "22% of the tile side"],
+          ["Primary", "White logo on black #000000"],
+          ["Alternative", "Black logo on white — only where the tile sits on a dark ground"],
+          ["Logo width", "70% of the tile, centered on both axes"],
+          ["Shape", "The platform decides: circle for profiles, rounded square for app icons. The file itself is square."],
         ]} />
       </Section>
 
       <Section id="sizes" title="Sizes">
-        <Stage bg="#FFFFFF" h="auto" pad={24}>
-          <div className="flex flex-wrap items-end gap-6">
-            {[96, 64, 48, 32, 16].map((s) => (
-              <div key={s} className="flex flex-col items-center gap-2">
-                <MonogramTile size={s} radius={0.22} />
-                <span className="font-mono text-[10.5px] text-[#4B5563]">{s} px</span>
-              </div>
+        <Stage bg="#FFFFFF" h="auto" pad={32}>
+          <div className="flex flex-wrap items-end justify-center gap-8">
+            {[128, 64, 40, 24].map((s) => (
+              <div key={s} className="flex flex-col items-center gap-2"><LogoTile size={s} round /><span className="font-mono text-[12px] text-[#6E6E73]">{s} px</span></div>
             ))}
           </div>
         </Stage>
-        <Specs rows={[
-          ["Screen minimum", "16 px (favicon)"],
-          ["Print minimum", "5 mm"],
-          ["Embroidery minimum", "12 mm"],
-          ["Profile picture upload", "1024 × 1024 px (the platform downsizes)"],
-        ]} />
+        <P>
+          The logo reads clearly from 40 px. At the smallest sizes — the browser tab at 16 px, a notification icon —
+          it becomes a recognisable shape rather than readable letters; that is expected, and it is still the full
+          logo (owner decision, 27/09/2026).
+        </P>
       </Section>
 
-      <Section id="k-donts" title="What never to do">
-        <Examples cols={4}>
-          <Example tone="dont" caption="Colored or in Hub Blue." h={130}><Monogram color="#567FB2" style={{ height: 70 }} /></Example>
-          <Example tone="dont" caption="Rotated." h={130}><Monogram color="#000000" style={{ height: 70, transform: "rotate(-15deg)" }} /></Example>
-          <Example tone="dont" caption="Next to the full logo — say it once." h={130}>
-            <div className="flex items-center gap-3"><Monogram color="#000000" style={{ height: 30 }} /><Wordmark color="#000000" width={110} /></div>
+      <Section id="small-items" title="Small objects">
+        <Examples cols={2}>
+          <Example tone="do" caption="Pens, tools, small parts: the full logo along the long side." bg="#F5F5F7" h={170}>
+            <div className="flex flex-col items-center gap-5">
+              <div className="flex h-[16px] w-[220px] items-center rounded-full bg-[#1D1D1F] ps-5"><Wordmark color="#FFFFFF" width={70} /></div>
+              <div className="flex h-[44px] w-[150px] items-center justify-center rounded-[10px] bg-[#D1D1D6]"><Wordmark color="#1D1D1F" width={100} /></div>
+            </div>
           </Example>
-          <Example tone="dont" caption="Combined with other letters or words." h={130}>
-            <div className="flex items-center gap-1"><Monogram color="#000000" style={{ height: 50 }} /><span className="text-[40px] font-bold leading-none">X</span></div>
+          <Example tone="do" caption="When even that is too small, leave the logo off — the packaging carries it." bg="#F5F5F7" h={170}>
+            <div className="flex items-center gap-4">
+              <div className="h-[30px] w-[30px] rounded-full bg-[#AEAEB2]" />
+              <span className="text-[13px] text-[#6E6E73]">A 6 mm part: no mark</span>
+            </div>
           </Example>
         </Examples>
       </Section>
 
-      <Section id="k-files" title="Files">
+      <Section id="small-never" title="What never to do">
+        <Examples cols={3}>
+          <Example tone="dont" caption="A single letter as the mark." h={140}>
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] bg-black text-[36px] font-bold text-white">K</div>
+          </Example>
+          <Example tone="dont" caption="The logo squeezed to fill the tile." h={140}>
+            <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-[16px] bg-black"><Wordmark color="#FFFFFF" width={92} style={{ transform: "scaleY(2.4)" }} /></div>
+          </Example>
+          <Example tone="dont" caption="Silver, blue or any color on the logo." h={140}>
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] bg-black"><Wordmark color="#567FB2" width={50} /></div>
+          </Example>
+        </Examples>
+      </Section>
+
+      <Section id="small-files" title="Files">
         <Downloads items={[
-          { label: "K monogram — black", href: "/brand/kit/koleex-k-black.svg", format: "SVG" },
-          { label: "K monogram — white", href: "/brand/kit/koleex-k-white.svg", format: "SVG" },
-          { label: "K tile — dark (profile pictures)", href: "/brand/kit/koleex-k-tile-dark-1024.png", format: "PNG 1024" },
-          { label: "K tile — light", href: "/brand/kit/koleex-k-tile-light-1024.png", format: "PNG 1024" },
-          { label: "K tile — dark, vector", href: "/brand/kit/koleex-k-tile-dark.svg", format: "SVG" },
+          { label: "Avatar — white on black, 1024 px", href: "/brand/kit/koleex-avatar-dark-1024.png", format: "PNG", note: "Profile pictures on every platform" },
+          { label: "Avatar — white on black, 512 px", href: "/brand/kit/koleex-avatar-dark-512.png", format: "PNG" },
+          { label: "Avatar — black on white, 1024 px", href: "/brand/kit/koleex-avatar-light-1024.png", format: "PNG" },
+          { label: "Avatar — vector", href: "/brand/kit/koleex-avatar-dark.svg", format: "SVG" },
         ]} />
       </Section>
     </Chapter>
@@ -150,7 +135,7 @@ export function HubMarkChapter() {
       ]}
     >
       <Section id="hub-mark" title="The Koleex Hub mark">
-        <Stage bg="#0A0A0A" h={220}><HubMark variant="for-dark" style={{ width: "64%" }} /></Stage>
+        <Stage bg="#000000" h={220}><HubMark variant="for-dark" style={{ width: "64%" }} /></Stage>
         <Specs rows={[
           ["Construction", "The official KOLEEX logo, unaltered, followed by the \"hub\" script"],
           ["The script", "A rounded monoline \"hub\", colored with the Hub gradient #567FB2 → #BCD8F0"],
@@ -160,11 +145,11 @@ export function HubMarkChapter() {
 
       <Section id="hub-versions" title="Versions">
         <Examples cols={2}>
-          <Example tone="do" caption="Horizontal — for dark backgrounds." bg="#0A0A0A" h={150}><HubMark variant="for-dark" style={{ width: "72%" }} /></Example>
+          <Example tone="do" caption="Horizontal — for dark backgrounds." bg="#000000" h={150}><HubMark variant="for-dark" style={{ width: "72%" }} /></Example>
           <Example tone="do" caption="Horizontal — for light backgrounds." bg="#FFFFFF" h={150}><HubMark variant="for-light" style={{ width: "72%" }} /></Example>
-          <Example tone="do" caption="Stacked — for dark backgrounds." bg="#0A0A0A" h={200}><HubMark variant="for-dark" stacked style={{ width: "46%" }} /></Example>
+          <Example tone="do" caption="Stacked — for dark backgrounds." bg="#000000" h={200}><HubMark variant="for-dark" stacked style={{ width: "46%" }} /></Example>
           <Example tone="do" caption="Stacked — for light backgrounds." bg="#FFFFFF" h={200}><HubMark variant="for-light" stacked style={{ width: "46%" }} /></Example>
-          <Example tone="do" caption="One color — when the gradient cannot be reproduced (engraving, one-color print), on dark." bg="#0A0A0A" h={140}><HubMark variant="mono-dark" style={{ width: "72%" }} /></Example>
+          <Example tone="do" caption="One color — when the gradient cannot be reproduced (engraving, one-color print), on dark." bg="#000000" h={140}><HubMark variant="mono-dark" style={{ width: "72%" }} /></Example>
           <Example tone="do" caption="One color, on light." bg="#FFFFFF" h={140}><HubMark variant="mono-light" style={{ width: "72%" }} /></Example>
         </Examples>
       </Section>
@@ -179,7 +164,7 @@ export function HubMarkChapter() {
           <img src="/icon-512.png" alt="" width={40} height={40} className="h-10 w-10 rounded-[9px]" aria-hidden />
         </div>
         <Specs rows={[
-          ["Artwork", "The stacked Koleex Hub mark on Ink #0A0A0A"],
+          ["Artwork", "The stacked Koleex Hub mark on Black #000000"],
           ["Size in the tile", "72% of the tile width (62% for the maskable Android icon)"],
           ["Position", "The whole group centered, then moved down by 10.6% of its height — so it looks centered"],
           ["Browser tab (favicon)", "The \"hub\" script alone"],
@@ -203,10 +188,10 @@ export function HubMarkChapter() {
 
       <Section id="hub-donts" title="What never to do">
         <Examples cols={3}>
-          <Example tone="dont" caption={'"Hub" typed in a font next to the logo.'} bg="#0A0A0A" h={130}>
+          <Example tone="dont" caption={'"Hub" typed in a font next to the logo.'} bg="#000000" h={130}>
             <div className="flex items-baseline gap-2"><Wordmark color="#FFFFFF" width={130} /><span className="text-[22px] font-semibold text-[#7FA9D6]">Hub</span></div>
           </Example>
-          <Example tone="dont" caption="The script recolored or separated from the logo." bg="#0A0A0A" h={130}>
+          <Example tone="dont" caption="The script recolored or separated from the logo." bg="#000000" h={130}>
             <div className="flex items-end gap-10">
               <Wordmark color="#FFFFFF" width={110} />
               {/* eslint-disable-next-line @next/next/no-img-element -- the live script file, shown to illustrate a misuse */}
@@ -239,7 +224,7 @@ export function HubMarkChapter() {
 
 /* ── 43 · Lockups ──────────────────────────────────────────────────────── */
 
-function Descriptor({ children, color = "#4B5563", size = 9 }: { children: ReactNode; color?: string; size?: number }) {
+function Descriptor({ children, color = "#6E6E73", size = 9 }: { children: ReactNode; color?: string; size?: number }) {
   return <span className="block font-semibold uppercase" style={{ color, fontSize: size, letterSpacing: "0.22em", lineHeight: 1 }}>{children}</span>;
 }
 
@@ -269,11 +254,11 @@ export function Lockups() {
               <Descriptor>Industrial Garment Machinery</Descriptor>
             </div>
           </Example>
-          <Example tone="do" caption="Horizontal: separated by a hairline, x apart." bg="#0A0A0A" h={170}>
+          <Example tone="do" caption="Horizontal: separated by a hairline, x apart." bg="#000000" h={170}>
             <div className="flex items-center" style={{ gap: 18 }}>
               <Wordmark color="#FFFFFF" width={170} />
-              <span className="h-[26px] w-px bg-[#4B5563]" />
-              <Descriptor color="#9CA3AF">Industrial<br />Garment Machinery</Descriptor>
+              <span className="h-[26px] w-px bg-[#6E6E73]" />
+              <Descriptor color="#98989D">Industrial<br />Garment Machinery</Descriptor>
             </div>
           </Example>
         </Examples>
@@ -282,7 +267,7 @@ export function Lockups() {
           ["Typeface", "Inter SemiBold, all capitals, letter-spacing +0.22 em"],
           ["Size", "Capital height = 0.30 x"],
           ["Gap (stacked)", "0.5 x below the logo, left edge on the K"],
-          ["Color", "Slate #4B5563 on light · Silver #9CA3AF on dark"],
+          ["Color", "Gray #6E6E73 on light · #98989D on dark"],
           ["Width", "Never wider than the logo"],
         ]} />
       </Section>
@@ -303,14 +288,14 @@ export function Lockups() {
           <div className="w-full max-w-[560px]">
             <div className="flex items-center justify-between">
               <Wordmark color="#000000" width={150} />
-              <span className="text-[18px] font-bold tracking-[0.06em] text-[#0A0A0A]">QUOTATION</span>
+              <span className="text-[18px] font-bold tracking-[0.06em] text-[#1D1D1F]">QUOTATION</span>
             </div>
             <div className="mt-5 overflow-hidden rounded-xl">
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0A0A0A] px-4 py-2 text-[10.5px] text-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-[#000000] px-4 py-2 text-[10.5px] text-white">
                 <span className="font-semibold tracking-[0.04em]">{KOLEEX_COMPANY.en}</span>
                 <span lang="zh-Hans">{KOLEEX_COMPANY.zh}</span>
               </div>
-              <div className="bg-[#F5F5F5] px-4 py-1.5 text-[10px] font-semibold tracking-[0.3em] text-[#4B5563]">{KOLEEX_COMPANY.tagline}</div>
+              <div className="bg-[#F5F5F7] px-4 py-1.5 text-[10px] font-semibold tracking-[0.3em] text-[#6E6E73]">{KOLEEX_COMPANY.tagline}</div>
             </div>
           </div>
         </Stage>
@@ -321,8 +306,8 @@ export function Lockups() {
         <Example tone="do" caption="A region or group company in the same system as the descriptor, after a hairline." bg="#FFFFFF" h={150}>
           <div className="flex items-center" style={{ gap: 18 }}>
             <Wordmark color="#000000" width={200} />
-            <span className="h-[28px] w-px bg-[#9CA3AF]" />
-            <Descriptor size={12} color="#0A0A0A">China</Descriptor>
+            <span className="h-[28px] w-px bg-[#98989D]" />
+            <Descriptor size={12} color="#000000">China</Descriptor>
           </div>
         </Example>
         <P>How group companies are named and shown is set out in <Ref n={16} />.</P>
@@ -349,7 +334,7 @@ export function Lockups() {
 
 function PartnerBox({ label = "PARTNER LOGO", w = 110 }: { label?: string; w?: number }) {
   return (
-    <span className="flex items-center justify-center rounded-md border border-dashed border-[#9CA3AF] text-[9px] font-semibold tracking-[0.14em] text-[#4B5563]" style={{ width: w, height: 34 }}>
+    <span className="flex items-center justify-center rounded-md border border-dashed border-[#98989D] text-[9px] font-semibold tracking-[0.14em] text-[#6E6E73]" style={{ width: w, height: 34 }}>
       {label}
     </span>
   );
@@ -378,7 +363,7 @@ export function CoBranding() {
         <Stage bg="#FFFFFF" h="auto" pad={28}>
           <div className="flex items-center" style={{ gap: 28 }}>
             <Wordmark color="#000000" width={170} />
-            <span className="h-9 w-px bg-[#9CA3AF]" />
+            <span className="h-9 w-px bg-[#98989D]" />
             <PartnerBox />
           </div>
         </Stage>
@@ -393,11 +378,11 @@ export function CoBranding() {
 
       <Section id="events" title="Events and partners">
         <Examples cols={2}>
-          <Example tone="do" caption="Equal, divided, KOLEEX first." bg="#0A0A0A" h={140}>
+          <Example tone="do" caption="Equal, divided, KOLEEX first." bg="#000000" h={140}>
             <div className="flex items-center gap-6">
               <Wordmark color="#FFFFFF" width={140} />
-              <span className="h-8 w-px bg-[#4B5563]" />
-              <span className="flex h-[34px] w-[110px] items-center justify-center rounded-md border border-dashed border-[#4B5563] text-[9px] font-semibold tracking-[0.14em] text-[#9CA3AF]">ORGANIZER</span>
+              <span className="h-8 w-px bg-[#6E6E73]" />
+              <span className="flex h-[34px] w-[110px] items-center justify-center rounded-md border border-dashed border-[#6E6E73] text-[9px] font-semibold tracking-[0.14em] text-[#98989D]">ORGANIZER</span>
             </div>
           </Example>
           <Example tone="dont" caption="The partner logo larger than ours, or placed first." bg="#FFFFFF" h={140}>
@@ -414,7 +399,7 @@ export function CoBranding() {
         <Stage bg="#FFFFFF" h="auto" pad={24}>
           <div className="flex flex-col items-center gap-3">
             <PartnerBox label="GROUP COMPANY LOGO" w={180} />
-            <span className="text-[10px] tracking-[0.2em] text-[#4B5563]">A KOLEEX INTERNATIONAL GROUP COMPANY</span>
+            <span className="text-[10px] tracking-[0.2em] text-[#6E6E73]">A KOLEEX INTERNATIONAL GROUP COMPANY</span>
           </div>
         </Stage>
         <P>The full system for the group’s companies and brands is in <Ref n={16} />.</P>

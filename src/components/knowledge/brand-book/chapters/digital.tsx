@@ -11,8 +11,8 @@ import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { HubMark, Wordmark } from "../marks";
-import { Browser, HUB_LINE } from "../mockups";
-import { Peak } from "./layout";
+import { Browser } from "../mockups";
+import { HUB_GRADIENT } from "@/lib/brand-book/tokens";
 
 /* ── 75 · Website ──────────────────────────────────────────────────────── */
 
@@ -53,24 +53,24 @@ export function Website() {
       </Section>
 
       <Section id="header" title="Header and home">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <Browser>
-            <div className="flex items-center gap-4 border-b border-[#E5E7EB] px-4 py-2.5">
+            <div className="flex items-center gap-4 border-b border-[#D2D2D7] px-4 py-2.5">
               <Wordmark color="#000000" width={72} />
-              <nav className="flex flex-1 gap-3 text-[9px] text-[#4B5563]"><span>Machines</span><span>Services</span><span>About</span><span>News</span><span>Contact</span></nav>
-              <span className="text-[8.5px] text-[#4B5563]">EN · 中文 · عربي</span>
-              <span className="rounded-md bg-[#0A0A0A] px-2 py-1 text-[8.5px] font-semibold text-white">Request a quotation</span>
+              <nav className="flex flex-1 gap-3 text-[9px] text-[#6E6E73]"><span>Machines</span><span>Services</span><span>About</span><span>News</span><span>Contact</span></nav>
+              <span className="text-[8.5px] text-[#6E6E73]">EN · 中文 · عربي</span>
+              <span className="rounded-md bg-[#000000] px-2 py-1 text-[8.5px] font-semibold text-white">Request a quotation</span>
             </div>
-            <div className="relative bg-[#0A0A0A] px-6 py-8 text-white">
-              <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Industrial Garment Machinery</p>
+            <div className="relative bg-[#000000] px-6 py-8 text-white">
+              <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
               <p className="mt-1.5 max-w-[260px] text-[20px] font-bold leading-tight">Machines for garment factories — selected, checked, delivered.</p>
-              <div className="mt-3 flex gap-2"><span className="rounded-md bg-white px-2 py-1 text-[8.5px] font-semibold text-[#0A0A0A]">See the machines</span><span className="rounded-md border border-white/40 px-2 py-1 text-[8.5px]">Chat on WhatsApp</span></div>
-              <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_LINE }} />
+              <div className="mt-3 flex gap-2"><span className="rounded-md bg-white px-2 py-1 text-[8.5px] font-semibold text-[#1D1D1F]">See the machines</span><span className="rounded-md border border-white/40 px-2 py-1 text-[8.5px]">Chat on WhatsApp</span></div>
+              
             </div>
             <div className="grid grid-cols-3 gap-2 p-4">
               {[["Flat bed", FlatBedMachineIcon], ["Overlock", OverlockMachineIcon], ["Coverstitch", CoverstitchIcon]].map(([n, I]) => {
                 const Icon = I as typeof FlatBedMachineIcon;
-                return <div key={n as string} className="flex items-center gap-2 rounded-lg border border-[#E5E7EB] px-2.5 py-2 text-[9px] font-semibold"><Icon size={16} />{n as string}</div>;
+                return <div key={n as string} className="flex items-center gap-2 rounded-lg border border-[#D2D2D7] px-2.5 py-2 text-[9px] font-semibold"><Icon size={16} />{n as string}</div>;
               })}
             </div>
           </Browser>
@@ -78,15 +78,15 @@ export function Website() {
       </Section>
 
       <Section id="product-page" title="The machine page">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <Browser url="www.koleexgroup.com/en/machines/overlock">
             <div className="grid grid-cols-[1fr_1.1fr] gap-4 p-4">
-              <div className="flex aspect-square items-center justify-center rounded-lg bg-[#F5F5F5]"><OverlockMachineIcon size={60} /></div>
+              <div className="flex aspect-square items-center justify-center rounded-lg bg-[#F5F5F7]"><OverlockMachineIcon size={60} /></div>
               <div className="space-y-2">
-                <span className="inline-flex items-center gap-1 rounded-md border border-[#E5E7EB] px-1.5 py-0.5 text-[7.5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]"><OverlockMachineIcon size={10} />Overlock</span>
+                <span className="inline-flex items-center gap-1 rounded-md border border-[#D2D2D7] px-1.5 py-0.5 text-[7.5px] font-semibold uppercase tracking-[0.12em] text-[#6E6E73]"><OverlockMachineIcon size={10} />Overlock</span>
                 <p className="text-[15px] font-bold leading-tight">Model name</p>
-                <div className="space-y-1 text-[8.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1.5"><Peak size={7} color="#567FB2" />{f}</p>)}</div>
-                <div className="flex gap-1.5 pt-1"><span className="rounded-md bg-[#0A0A0A] px-2 py-1 text-[8px] font-semibold text-white">Request a quotation</span><span className="rounded-md border border-[#0A0A0A] px-2 py-1 text-[8px] font-semibold">WhatsApp</span></div>
+                <div className="space-y-1 text-[8.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1.5">{f}</p>)}</div>
+                <div className="flex gap-1.5 pt-1"><span className="rounded-md bg-[#000000] px-2 py-1 text-[8px] font-semibold text-white">Request a quotation</span><span className="rounded-md border border-[#000000] px-2 py-1 text-[8px] font-semibold">WhatsApp</span></div>
                 <p className="text-[8px] text-[#3E6796] underline">Download the spec sheet (PDF)</p>
               </div>
             </div>
@@ -127,14 +127,14 @@ export function Website() {
 /* ── UI control mockups ────────────────────────────────────────────────── */
 
 function CoreControls({ dark }: { dark: boolean }) {
-  const fg = dark ? "#FFFFFF" : "#0A0A0A";
+  const fg = dark ? "#FFFFFF" : "#000000";
   const surf = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)";
   const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
   const dim = dark ? "rgba(255,255,255,0.70)" : "rgba(0,0,0,0.82)";
   return (
-    <div className="w-full space-y-3 rounded-xl p-4" style={{ background: dark ? "#0A0A0A" : "#FFFFFF", color: fg, boxShadow: `0 0 0 1px ${border}` }}>
+    <div className="w-full space-y-3 rounded-xl p-4" style={{ background: dark ? "#000000" : "#FFFFFF", color: fg, boxShadow: `0 0 0 1px ${border}` }}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-lg px-3 py-1.5 text-[11px] font-semibold" style={{ background: fg, color: dark ? "#0A0A0A" : "#FFFFFF" }}>Save</span>
+        <span className="rounded-lg px-3 py-1.5 text-[11px] font-semibold" style={{ background: fg, color: dark ? "#000000" : "#FFFFFF" }}>Save</span>
         <span className="rounded-lg px-3 py-1.5 text-[11px] font-medium" style={{ background: surf, boxShadow: `inset 0 0 0 1px ${border}` }}>Cancel</span>
         <span className="text-[11px]" style={{ color: dark ? "#7FA9D6" : "#3E6796" }}>View details</span>
       </div>
@@ -144,7 +144,7 @@ function CoreControls({ dark }: { dark: boolean }) {
         <span className="relative h-1.5 flex-1 rounded-full" style={{ background: border }}><span className="absolute inset-y-0 left-0 w-3/5 rounded-full" style={{ background: "#0066FF" }} /><span className="absolute -top-[5px] h-4 w-4 rounded-full bg-white shadow" style={{ left: "calc(60% - 8px)" }} /></span>
       </div>
       <div className="flex gap-1 rounded-lg p-1 text-[10.5px]" style={{ background: surf }}>
-        <span className="rounded-md px-2 py-1 font-semibold" style={{ background: fg, color: dark ? "#0A0A0A" : "#FFFFFF" }}>Details</span><span className="px-2 py-1" style={{ color: dim }}>Specs</span><span className="px-2 py-1" style={{ color: dim }}>Files</span>
+        <span className="rounded-md px-2 py-1 font-semibold" style={{ background: fg, color: dark ? "#000000" : "#FFFFFF" }}>Details</span><span className="px-2 py-1" style={{ color: dim }}>Specs</span><span className="px-2 py-1" style={{ color: dim }}>Files</span>
       </div>
     </div>
   );
@@ -153,16 +153,16 @@ function CoreControls({ dark }: { dark: boolean }) {
 function AuroraControls() {
   const glass: CSSProperties = { background: "rgba(255,255,255,0.07)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" };
   return (
-    <div className="relative w-full overflow-hidden rounded-xl p-4 text-white" style={{ minHeight: 220, background: "radial-gradient(140% 60% at 10% 100%, rgba(62,103,150,0.95), transparent 62%), radial-gradient(120% 55% at 100% 0%, rgba(86,127,178,0.75), transparent 60%), radial-gradient(80% 40% at 60% 55%, rgba(127,169,214,0.35), transparent 70%), #0A0A0A" }}>
+    <div className="relative w-full overflow-hidden rounded-xl p-4 text-white" style={{ minHeight: 220, background: "radial-gradient(140% 60% at 10% 100%, rgba(62,103,150,0.95), transparent 62%), radial-gradient(120% 55% at 100% 0%, rgba(86,127,178,0.75), transparent 60%), radial-gradient(80% 40% at 60% 55%, rgba(127,169,214,0.35), transparent 70%), #000000" }}>
       <div className="relative space-y-3 rounded-2xl p-3" style={glass}>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-[#0A0A0A]" style={{ boxShadow: "0 0 0 3px rgba(86,127,178,0.35), 0 0 18px rgba(127,169,214,0.45)" }}>Save</span>
+          <span className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1D1D1F]" style={{ boxShadow: "0 0 0 3px rgba(86,127,178,0.35), 0 0 18px rgba(127,169,214,0.45)" }}>Save</span>
           <span className="rounded-lg px-3 py-1.5 text-[11px]" style={glass}>Cancel</span>
           <span className="rounded-lg px-3 py-1.5 text-[11px]" style={{ background: "rgba(86,127,178,0.10)", boxShadow: "inset 0 0 0 1px #567FB2" }}>Selected</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="relative inline-block h-5 w-9 rounded-full" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }}><span className="absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white" /></span>
-          <span className="relative h-1.5 flex-1 rounded-full bg-white/10"><span className="absolute inset-y-0 left-0 w-3/5 rounded-full" style={{ background: HUB_LINE }} /><span className="absolute -top-[5px] h-4 w-4 rounded-full bg-white" style={{ left: "calc(60% - 8px)" }} /></span>
+          <span className="relative h-1.5 flex-1 rounded-full bg-white/10"><span className="absolute inset-y-0 left-0 w-3/5 rounded-full" style={{ background: HUB_GRADIENT.cssHorizontal }} /><span className="absolute -top-[5px] h-4 w-4 rounded-full bg-white" style={{ left: "calc(60% - 8px)" }} /></span>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(10,10,10,0.6)", boxShadow: "0 0 0 1px rgba(127,169,214,0.6), 0 0 16px rgba(86,127,178,0.6)" }}>✦ Ask Koleex AI</span>
       </div>
@@ -199,7 +199,7 @@ export function HubCore() {
         <Table
           head={["Token", "Dark", "Light"]}
           rows={[
-            ["Background", "#0A0A0A", "#FFFFFF"],
+            ["Background", "#000000", "#FFFFFF"],
             ["Surface", "White 5%", "Black 4%"],
             ["Border", "White 8%", "Black 8%"],
             ["Text", "White · 70% secondary", "Black · 82% secondary"],
@@ -268,10 +268,10 @@ export function HubAurora() {
           print, packaging, signage and brand marketing are always Core.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="A screenshot of the Hub in an announcement about the Hub." bg="#0A0A0A" h={150}>
+          <Example tone="do" caption="A screenshot of the Hub in an announcement about the Hub." bg="#000000" h={150}>
             <HubMark variant="for-dark" style={{ width: 170 }} />
           </Example>
-          <Example tone="dont" caption="Glass, glow and the wave on a quotation or a catalog." bg="#F5F5F5" h={150}>
+          <Example tone="dont" caption="Glass, glow and the wave on a quotation or a catalog." bg="#F5F5F7" h={150}>
             <div className="flex h-[110px] w-[90px] items-start justify-center rounded bg-white p-2" style={{ boxShadow: "0 0 0 1px rgba(0,0,0,0.1), 0 0 22px rgba(86,127,178,0.8)" }}>
               <Wordmark color="#000000" width={50} />
             </div>
@@ -302,21 +302,21 @@ export function Email() {
       ]}
     >
       <Section id="newsletter" title="The newsletter">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
-          <div className="w-[300px] overflow-hidden rounded-md bg-white text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
-            <div className="flex items-center justify-between px-4 py-3"><Wordmark color="#000000" width={70} /><span className="text-[7.5px] text-[#4B5563]">September 2026</span></div>
-            <div className="relative bg-[#0A0A0A] px-4 py-6 text-white">
-              <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">New · Spreading</p>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
+          <div className="w-[300px] overflow-hidden rounded-md bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+            <div className="flex items-center justify-between px-4 py-3"><Wordmark color="#000000" width={70} /><span className="text-[7.5px] text-[#6E6E73]">September 2026</span></div>
+            <div className="relative bg-[#000000] px-4 py-6 text-white">
+              <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">New · Spreading</p>
               <p className="mt-1 text-[14px] font-bold leading-tight">Lay it flat.<br />Cut it right.</p>
-              <div className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: HUB_LINE }} />
+              
             </div>
             <div className="space-y-2 px-4 py-3">
-              <div className="h-[3px] w-full rounded bg-[#E5E7EB]" /><div className="h-[3px] w-5/6 rounded bg-[#E5E7EB]" />
-              <span className="inline-block rounded-md bg-[#0A0A0A] px-2 py-1 text-[8px] font-semibold text-white">See the machine</span>
-              <div className="grid grid-cols-2 gap-2 pt-1">{[0, 1].map((i) => <div key={i} className="h-14 rounded bg-[#F5F5F5]" />)}</div>
+              <div className="h-[3px] w-full rounded bg-[#D2D2D7]" /><div className="h-[3px] w-5/6 rounded bg-[#D2D2D7]" />
+              <span className="inline-block rounded-md bg-[#000000] px-2 py-1 text-[8px] font-semibold text-white">See the machine</span>
+              <div className="grid grid-cols-2 gap-2 pt-1">{[0, 1].map((i) => <div key={i} className="h-14 rounded bg-[#F5F5F7]" />)}</div>
             </div>
-            <div className="space-y-0.5 bg-[#F5F5F5] px-4 py-3 text-[6px] leading-snug text-[#4B5563]">
-              <p className="font-semibold text-[#0A0A0A]">{KOLEEX_COMPANY.en}</p>
+            <div className="space-y-0.5 bg-[#F5F5F7] px-4 py-3 text-[6px] leading-snug text-[#6E6E73]">
+              <p className="font-semibold text-[#1D1D1F]">{KOLEEX_COMPANY.en}</p>
               <p lang="zh-Hans">{KOLEEX_COMPANY.zh}</p>
               <p>{KOLEEX_COMPANY.web} · {KOLEEX_COMPANY.email}</p>
               <p className="underline">Unsubscribe</p>

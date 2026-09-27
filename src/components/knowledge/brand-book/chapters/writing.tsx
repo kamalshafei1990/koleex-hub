@@ -13,12 +13,10 @@
 import type { ReactNode } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
-  B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
+  AR_FONT, B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table, ZH_FONT,
 } from "../kit";
-import { HUB_LINE, INK } from "../mockups";
+import { INK } from "../mockups";
 
-const AR_FONT = { fontFamily: "'Helvetica Neue','Geeza Pro','Noto Naskh Arabic','Segoe UI',Tahoma,sans-serif" } as const;
-const ZH_FONT = { fontFamily: "'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif" } as const;
 
 function Ar({ children }: { children: ReactNode }) {
   return <span lang="ar" dir="rtl" className="block text-start" style={AR_FONT}>{children}</span>;
@@ -40,7 +38,7 @@ function Copy({ lang, label, children }: { lang: "en" | "ar" | "zh"; label: stri
       <div
         lang={lang === "zh" ? "zh-Hans" : lang}
         dir={rtl ? "rtl" : "ltr"}
-        className="flex-1 bg-white px-4 py-3 text-start text-[14px] leading-7 text-[#0A0A0A]"
+        className="flex-1 bg-white px-4 py-3 text-start text-[14px] leading-7 text-[#1D1D1F]"
         style={rtl ? AR_FONT : lang === "zh" ? ZH_FONT : undefined}
       >
         {children}
@@ -143,10 +141,10 @@ export function WritingEnglish() {
       <Section id="en-examples" title="Before and after">
         <Examples cols={2}>
           <Example tone="dont" caption="Idioms a translator will get wrong." bg="#FFFFFF" h="auto" pad={20}>
-            <p className="w-full text-[13.5px] leading-6 text-[#0A0A0A]">This bad boy is a total game changer that will knock your production out of the park.</p>
+            <p className="w-full text-[13.5px] leading-6 text-[#1D1D1F]">This bad boy is a total game changer that will knock your production out of the park.</p>
           </Example>
           <Example tone="do" caption="Plain words any reader and any translator understands." bg="#FFFFFF" h="auto" pad={20}>
-            <p className="w-full text-[13.5px] leading-6 text-[#0A0A0A]">This machine trims and sews in one step, so each operator finishes more pieces per hour.</p>
+            <p className="w-full text-[13.5px] leading-6 text-[#1D1D1F]">This machine trims and sews in one step, so each operator finishes more pieces per hour.</p>
           </Example>
         </Examples>
       </Section>
@@ -265,10 +263,10 @@ export function WritingChinese() {
       <Section id="zh-examples" title="Examples">
         <Examples cols={2}>
           <Example tone="do" caption="Facts, a benefit, polite form." bg="#FFFFFF" h="auto" pad={20}>
-            <p lang="zh-Hans" className="w-full text-[14px] leading-7 text-[#0A0A0A]" style={ZH_FONT}>XSO-7800-4 四线包缝机，转速可达 6,000 针/分钟。整机安装调试到位，并为您的员工提供操作培训。</p>
+            <p lang="zh-Hans" className="w-full text-[14px] leading-7 text-[#1D1D1F]" style={ZH_FONT}>XSO-7800-4 四线包缝机，转速可达 6,000 针/分钟。整机安装调试到位，并为您的员工提供操作培训。</p>
           </Example>
           <Example tone="dont" caption="Absolute words, exclamation marks — illegal and off-brand." bg="#FFFFFF" h="auto" pad={20}>
-            <p lang="zh-Hans" className="w-full text-[14px] leading-7 text-[#0A0A0A]" style={ZH_FONT}>全球最好的缝纫机！国家级品质！第一品牌！</p>
+            <p lang="zh-Hans" className="w-full text-[14px] leading-7 text-[#1D1D1F]" style={ZH_FONT}>全球最好的缝纫机！国家级品质！第一品牌！</p>
           </Example>
         </Examples>
       </Section>
@@ -358,21 +356,21 @@ export function KeyMessages() {
       ]}
     >
       <Section id="house" title="The message house">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="w-full max-w-[620px] text-[#0A0A0A]">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="w-full max-w-[620px] text-[#1D1D1F]">
             <div className="rounded-t-[10px] px-4 py-4 text-center text-white" style={{ background: INK }}>
-              <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#7FA9D6]">The promise</p>
+              <p className="text-[8px] font-semibold uppercase tracking-[0.24em] text-[#98989D]">The promise</p>
               <p className="mt-1 text-[15px] font-bold leading-snug">Precise machines. Honest advice. People who stand behind what they sell.</p>
             </div>
-            <div className="grid grid-cols-5 gap-1 bg-[#E5E7EB] p-1">
+            <div className="grid grid-cols-5 gap-1 bg-[#D2D2D7] p-1">
               {MESSAGES.map(([m], i) => (
                 <div key={m} className="flex min-h-[96px] flex-col justify-between rounded-[4px] bg-white p-2">
-                  <span className="font-mono text-[9px] text-[#9CA3AF]">0{i + 1}</span>
+                  <span className="font-mono text-[9px] text-[#98989D]">0{i + 1}</span>
                   <p className="text-[10px] font-semibold leading-tight">{m}</p>
                 </div>
               ))}
             </div>
-            <div className="rounded-b-[10px] bg-white px-4 py-2 text-center text-[9px] uppercase tracking-[0.2em] text-[#4B5563]" style={{ boxShadow: "inset 0 0 0 1px #E5E7EB" }}>
+            <div className="rounded-b-[10px] bg-white px-4 py-2 text-center text-[9px] uppercase tracking-[0.2em] text-[#6E6E73]" style={{ boxShadow: "inset 0 0 0 1px #D2D2D7" }}>
               Proof: our history · our standard · our range · our service · our base
             </div>
           </div>
@@ -462,21 +460,21 @@ export function ProductDescriptions() {
 
       <Section id="pd-example" title="An example">
         <Stage bg="#FFFFFF" h="auto" pad={24}>
-          <div className="w-full max-w-[460px] text-[#0A0A0A]">
+          <div className="w-full max-w-[460px] text-[#1D1D1F]">
             <p className="text-[18px] font-bold">KOLEEX <span className="font-mono">XSO-7800-4</span></p>
-            <p className="text-[13px] text-[#4B5563]">4-thread overlock for knitwear and light wovens.</p>
+            <p className="text-[13px] text-[#6E6E73]">4-thread overlock for knitwear and light wovens.</p>
             <ul className="mt-3 space-y-1 text-[13px]">
               <li>— Trims and sews in one pass: seams come off finished.</li>
               <li>— Direct-drive motor: quiet, and less power per shift.</li>
               <li>— Set up and handed over with your operators trained.</li>
             </ul>
-            <div className="mt-3 overflow-hidden rounded-[6px] border border-[#E5E7EB] text-[12px]">
+            <div className="mt-3 overflow-hidden rounded-[6px] border border-[#D2D2D7] text-[12px]">
               {[["Stitch type", "4-thread overlock"], ["Speed", "up to 6,000 SPM"], ["Stitch length", "— mm"], ["Supplied as", "Head only or complete set"]].map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-[#E5E7EB] px-3 py-1.5 last:border-0"><span className="text-[#4B5563]">{k}</span><span className="font-mono">{v}</span></div>
+                <div key={k} className="flex justify-between border-b border-[#D2D2D7] px-3 py-1.5 last:border-0"><span className="text-[#6E6E73]">{k}</span><span className="font-mono">{v}</span></div>
               ))}
             </div>
             <p className="mt-3 text-[13px] font-semibold">Ask for a quotation on WhatsApp →</p>
-            <span className="mt-3 block h-[2px] w-12" style={{ background: HUB_LINE }} />
+            
           </div>
         </Stage>
         <Note>Figures in examples illustrate the style. Real figures always come from Koleex Hub; a dash stands where a value is not confirmed.</Note>

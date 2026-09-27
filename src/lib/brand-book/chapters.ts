@@ -28,6 +28,8 @@ export interface BookPart {
   title: BookText;
   from: number;
   to: number;
+  /** One line on what the part holds (English, like the chapter bodies). */
+  blurb: string;
 }
 
 export interface BookChapter {
@@ -39,16 +41,16 @@ export interface BookChapter {
 }
 
 export const BOOK_PARTS: BookPart[] = [
-  { n: 1, id: "foundation", from: 1, to: 17, title: { en: "Foundation", zh: "品牌基础", ar: "الأساس" } },
-  { n: 2, id: "verbal", from: 18, to: 35, title: { en: "Verbal Identity", zh: "语言识别", ar: "الهوية اللفظية" } },
-  { n: 3, id: "visual", from: 36, to: 74, title: { en: "Visual Identity", zh: "视觉识别", ar: "الهوية البصرية" } },
-  { n: 4, id: "digital", from: 75, to: 90, title: { en: "Digital", zh: "数字媒体", ar: "الديجيتال" } },
-  { n: 5, id: "print", from: 91, to: 106, title: { en: "Print & Documents", zh: "印刷品与文件", ar: "المطبوعات والمستندات" } },
-  { n: 6, id: "product", from: 107, to: 113, title: { en: "Product & Packaging", zh: "产品与包装", ar: "المنتج والتغليف" } },
-  { n: 7, id: "places", from: 114, to: 121, title: { en: "Places & Events", zh: "空间与活动", ar: "الأماكن والفعاليات" } },
-  { n: 8, id: "people", from: 122, to: 127, title: { en: "People", zh: "人员", ar: "الناس" } },
-  { n: 9, id: "partners", from: 128, to: 131, title: { en: "Partners", zh: "合作伙伴", ar: "الشركاء" } },
-  { n: 10, id: "governance", from: 132, to: 140, title: { en: "Governance & Files", zh: "管理与文件", ar: "الحوكمة والملفات" } },
+  { n: 1, id: "foundation", from: 1, to: 17, title: { en: "Foundation", zh: "品牌基础", ar: "الأساس" }, blurb: "Story, mission, values, positioning, personality, brand architecture" },
+  { n: 2, id: "verbal", from: 18, to: 35, title: { en: "Verbal Identity", zh: "语言识别", ar: "الهوية اللفظية" }, blurb: "The name, tagline, voice, writing in three languages, key messages, glossary" },
+  { n: 3, id: "visual", from: 36, to: 74, title: { en: "Visual Identity", zh: "视觉识别", ar: "الهوية البصرية" }, blurb: "Logo, Hub mark, color and silver, typography, layout, icons, photography, video, motion, the KOLEEX melody" },
+  { n: 4, id: "digital", from: 75, to: 90, title: { en: "Digital", zh: "数字媒体", ar: "الديجيتال" }, blurb: "Website, the Hub interface, email, every social platform, ads, presentations" },
+  { n: 5, id: "print", from: 91, to: 106, title: { en: "Print & Documents", zh: "印刷品与文件", ar: "المطبوعات والمستندات" }, blurb: "Business cards, letterhead, every business document, catalogs, brochures, posters" },
+  { n: 6, id: "product", from: 107, to: 113, title: { en: "Product & Packaging", zh: "产品与包装", ar: "المنتج والتغليف" }, blurb: "Machine branding, nameplates, labels, cartons, shipping marks, manuals" },
+  { n: 7, id: "places", from: 114, to: 121, title: { en: "Places & Events", zh: "空间与活动", ar: "الأماكن والفعاليات" }, blurb: "Exhibition booths, CISMA, offices, showroom, warehouse, vehicles, events" },
+  { n: 8, id: "people", from: 122, to: 127, title: { en: "People", zh: "人员", ar: "الناس" }, blurb: "Uniforms, merchandise, seasonal gifts, hiring, staff and founder on social media" },
+  { n: 9, id: "partners", from: 128, to: 131, title: { en: "Partners", zh: "合作伙伴", ar: "الشركاء" }, blurb: "Agents and distributors, dealer signage, suppliers, testimonials" },
+  { n: 10, id: "governance", from: 132, to: 140, title: { en: "Governance & Files", zh: "管理与文件", ar: "الحوكمة والملفات" }, blurb: "Legal and claims, certification marks, approvals, file naming, downloads, templates" },
 ];
 
 /** Chapters with content. Phase 1: the core visual identity (1–3, 36–54,
@@ -114,12 +116,12 @@ const ROWS: ReadonlyArray<readonly [number, string, string, string, string]> = [
   [38, "logo-size-placement", "Logo Size & Placement", "标志尺寸与位置", "حجم الشعار ومكانه"],
   [39, "logo-backgrounds", "Logo on Backgrounds & Materials", "标志的背景与材质", "الشعار على الخلفيات والخامات"],
   [40, "logo-misuse", "Logo Misuse", "标志误用", "الاستخدامات الخاطئة للشعار"],
-  [41, "k-monogram", "The K Monogram", "K 字标", "علامة K"],
+  [41, "logo-small-spaces", "The Logo in Small Spaces", "小尺寸标志", "الشعار في المساحات الصغيرة"],
   [42, "hub-mark", "Koleex Hub Mark & App Icon", "Koleex Hub 标志与应用图标", "شعار Koleex Hub وأيقونة التطبيق"],
   [43, "lockups", "Lockups", "组合标志", "التركيبات"],
   [44, "co-branding", "The Logo with Other Logos", "联合品牌", "الشعار مع شعارات أخرى"],
   [45, "color-palette", "Color Palette", "色彩体系", "لوحة الألوان"],
-  [46, "hub-blue", "Hub Blue", "Hub 蓝", "أزرق Hub"],
+  [46, "silver-hub-blue", "Silver & Hub Blue", "银色与 Hub 蓝", "الفضي وأزرق Hub"],
   [47, "color-usage", "Color Usage & Proportions", "色彩使用与比例", "استخدام الألوان ونسبها"],
   [48, "color-print", "Color for Print & Materials", "印刷与材质用色", "الألوان للطباعة والخامات"],
   [49, "contrast", "Contrast & Legibility", "对比度与易读性", "التباين وسهولة القراءة"],
@@ -133,7 +135,7 @@ const ROWS: ReadonlyArray<readonly [number, string, string, string, string]> = [
   [57, "graphic-elements", "Graphic Elements", "图形元素", "العناصر الجرافيكية"],
   [58, "icons", "Icons", "图标", "الأيقونات"],
   [59, "machine-icons", "Machine Icons", "机器图标", "أيقونات الماكينات"],
-  [60, "illustration", "Technical Drawings & Illustration", "技术图纸与插图", "الرسوم الفنية والتوضيحية"],
+  [60, "photo-callouts", "Product Photos & Callouts", "产品照片与标注", "صور المنتج والتعليقات"],
   [61, "infographics", "Infographics & Charts", "信息图与图表", "الإنفوجرافيك والرسوم البيانية"],
   [62, "tables-numbers", "Tables & Numbers", "表格与数字", "الجداول والأرقام"],
   [63, "photo-principles", "Photography Principles", "摄影原则", "مبادئ التصوير"],
@@ -230,7 +232,7 @@ export const BOOK_CHAPTERS: BookChapter[] = ROWS.map(([n, slug, en, zh, ar]) => 
   ready: READY.has(n),
 }));
 
-export const BOOK_VERSION = { label: "2.0", date: "27/09/2026" } as const;
+export const BOOK_VERSION = { label: "3.0", date: "27/09/2026" } as const;
 
 export const BOOK_BASE = "/knowledge/brand-guidelines";
 

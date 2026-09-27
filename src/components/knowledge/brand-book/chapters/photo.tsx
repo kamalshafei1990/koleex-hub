@@ -5,7 +5,9 @@
 
    Owner decisions (27/09/2026): our own photographs only; people with their
    consent; AI images for abstract backgrounds only; photos are often taken
-   on a phone, so the phone protocol must be exact.
+   on a phone, so the phone protocol must be exact. Apple direction: product
+   on PURE BLACK first (dramatic top light) and PURE WHITE second (soft,
+   even light); close-ups; people and factories in cool, muted colour.
 
    There is no KOLEEX photo library yet, so the examples here are drawn
    scenes (flat 2D, clearly schematic) rather than borrowed photographs —
@@ -17,9 +19,10 @@ import FlatBedMachineIcon from "@/components/icons/machine-kinds/FlatBedMachineI
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
+import { MachineShot } from "../mockups";
 
 /** A schematic photograph: a frame, a ground, a machine — and whatever is wrong with it. */
-function Scene({ bg = "#FFFFFF", floor = "#F5F5F5", tilt = 0, scale = 1, clutter = false, backlight = false, children }: {
+function Scene({ bg = "#FFFFFF", floor = "#F5F5F7", tilt = 0, scale = 1, clutter = false, backlight = false, children }: {
   bg?: string; floor?: string; tilt?: number; scale?: number; clutter?: boolean; backlight?: boolean; children?: ReactNode;
 }) {
   return (
@@ -30,11 +33,11 @@ function Scene({ bg = "#FFFFFF", floor = "#F5F5F5", tilt = 0, scale = 1, clutter
         <>
           <div className="absolute bottom-6 left-2 h-12 w-10 rounded-sm bg-[#D97706]/70" />
           <div className="absolute bottom-8 left-10 h-8 w-12 rounded-sm bg-[#92400E]/60" />
-          <div className="absolute bottom-5 right-3 h-16 w-8 rounded-sm bg-[#4B5563]" />
+          <div className="absolute bottom-5 right-3 h-16 w-8 rounded-sm bg-[#6E6E73]" />
           <div className="absolute right-12 top-3 h-6 w-16 rounded-sm bg-[#DC2626]/60" />
         </>
       )}
-      <div className="absolute left-1/2 top-[52%]" style={{ transform: `translate(-50%,-50%) rotate(${tilt}deg) scale(${scale})`, color: backlight ? "#4B5563" : "#0A0A0A" }}>
+      <div className="absolute left-1/2 top-[52%]" style={{ transform: `translate(-50%,-50%) rotate(${tilt}deg) scale(${scale})`, color: backlight ? "#6E6E73" : "#000000" }}>
         <FlatBedMachineIcon size={86} />
       </div>
       {children}
@@ -46,7 +49,7 @@ function Scene({ bg = "#FFFFFF", floor = "#F5F5F5", tilt = 0, scale = 1, clutter
 /** A labelled placeholder for a kind of image we never publish. */
 function Placeholder({ label }: { label: string }) {
   return (
-    <div className="flex h-[150px] w-[210px] items-center justify-center rounded-md border border-dashed border-[#9CA3AF] bg-[#F5F5F5] px-3 text-center text-[10px] font-semibold tracking-[0.14em] text-[#4B5563]">
+    <div className="flex h-[150px] w-[210px] items-center justify-center rounded-md border border-dashed border-[#98989D] bg-[#F5F5F7] px-3 text-center text-[10px] font-semibold tracking-[0.14em] text-[#6E6E73]">
       {label}
     </div>
   );
@@ -60,12 +63,12 @@ export function PhotoPrinciples() {
       n={63}
       lead={
         <p>
-          Our photographs show real KOLEEX machines, people and places — as they are, well lit and
-          uncluttered. They are the proof behind every word we say, so they must be ours and they must be
-          true.
+          The machine is the hero. Our photographs show real KOLEEX machines — on pure black, lit like a
+          product launch, or on pure white for the catalog. They must be ours, and they must be true.
         </p>
       }
       toc={[
+        { id: "hero", title: "The machine is the hero" },
         { id: "five", title: "Five principles" },
         { id: "own-only", title: "Our own photographs only" },
         { id: "subjects", title: "What we photograph" },
@@ -73,18 +76,26 @@ export function PhotoPrinciples() {
         { id: "photo-donts", title: "What never to publish" },
       ]}
     >
+      <Section id="hero" title="The machine is the hero">
+        <Examples cols={2}>
+          <Example tone="do" caption="First: pure black, one light from above — heroes, ads, launches." bg="#000000" h={260}><MachineShot w={300} /></Example>
+          <Example tone="do" caption="Second: pure white, soft even light — catalog, website, spec sheets." bg="#FFFFFF" h={260}><MachineShot w={300} dark={false} /></Example>
+        </Examples>
+        <Note>Until the studio shoot, the book shows the machine as a silver shape. Every place it appears is a place for a real KOLEEX photograph.</Note>
+      </Section>
+
       <Section id="five" title="Five principles">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             ["Real", "Our machines, our people, our places. Never stock, never borrowed."],
             ["Honest", "What you see is what the customer receives. No edit changes the product."],
-            ["Clean", "One subject, a plain background, nothing that distracts."],
+            ["Clean", "One subject on pure black or pure white. Nothing else in the frame."],
             ["Precise", "Sharp, level, true color. Details visible."],
-            ["Consistent", "Same light, same angles, same backgrounds across a series."],
+            ["Consistent", "Same light, same angles, same background across a series."],
           ].map(([t, d]) => (
-            <div key={t} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
-              <p className="text-[16px] font-bold text-[var(--text-primary)]">{t}</p>
-              <p className="mt-1.5 text-[13.5px] leading-6 text-[var(--text-secondary)]">{d}</p>
+            <div key={t} className="rounded-[24px] bg-[var(--bg-secondary)] p-6">
+              <p className="text-[19px] font-semibold tracking-[-0.015em] text-[var(--text-primary)]">{t}</p>
+              <p className="mt-1.5 text-[15px] leading-[1.5] text-[var(--text-secondary)]">{d}</p>
             </div>
           ))}
         </div>
@@ -99,7 +110,7 @@ export function PhotoPrinciples() {
           <><B>No stock photos</B> of offices, cities, handshakes or “teams” presented as KOLEEX.</>,
           <><B>No supplier or catalog photos</B>, and no photos showing another brand’s product or logo.</>,
           <><B>No photos found online</B>, whatever the source says about licences.</>,
-          <>If we do not have the right photograph yet, we use a clean layout without one — or a machine icon (<Ref n={59} />) — until we shoot it.</>,
+          <>If we do not have the right photograph yet, we use a clean layout without one until we shoot it — never a borrowed one.</>,
         ]} />
       </Section>
 
@@ -119,18 +130,19 @@ export function PhotoPrinciples() {
 
       <Section id="look" title="The KOLEEX look">
         <Specs rows={[
-          ["Light", "Soft and even — daylight or large soft lights. No hard shadows, no colored light"],
-          ["Color", "Neutral and true: white balance 5000–5600 K. No filters or color grading"],
-          ["Backgrounds", "White or light grey for products; clean, real workplaces for context"],
-          ["Framing", "The subject fills 70–80% of the frame; the camera is level"],
-          ["Mood", "Calm and precise — the machine is the hero, not the effects"],
+          ["Product background", "Pure black #000000 first; pure white #FFFFFF second. Never grey paper, never a room"],
+          ["Light on black", "One large soft light from above and slightly behind — the silver finish glows, the edges fall into black"],
+          ["Light on white", "Soft and even — two large softboxes; a short contact shadow only"],
+          ["Close-ups", "Needle, stitch, control panel, nameplate — macro, shallow depth"],
+          ["People and factories", "Real color graded cool and calm: slightly lower saturation, clean whites, no warm cast"],
+          ["Framing", "The subject centered with generous space around it; the camera level"],
         ]} />
       </Section>
 
       <Section id="photo-donts" title="What never to publish">
         <Examples cols={3}>
           <Example tone="dont" caption="Stock images presented as KOLEEX." h={180}><Placeholder label="STOCK: CITY SKYLINE / HANDSHAKE" /></Example>
-          <Example tone="dont" caption="A machine among boxes and clutter." h={180}><Scene clutter bg="#E5E7EB" floor="#9CA3AF" /></Example>
+          <Example tone="dont" caption="A machine among boxes and clutter." h={180}><Scene clutter bg="#D2D2D7" floor="#98989D" /></Example>
           <Example tone="dont" caption="Another brand's product or logo." h={180}><Placeholder label="OTHER BRAND'S MACHINE" /></Example>
         </Examples>
       </Section>
@@ -143,15 +155,15 @@ export function PhotoPrinciples() {
 function StudioPlan() {
   return (
     <svg viewBox="0 0 420 260" className="h-auto w-full max-w-[460px]" role="img" aria-label="Studio lighting plan seen from above">
-      <path d="M40 30 H380 V120 Q210 150 40 120 Z" fill="#F5F5F5" stroke="#E5E7EB" />
-      <text x="210" y="24" textAnchor="middle" fontSize="11" fill="#4B5563" fontFamily="Inter, sans-serif">White seamless background</text>
-      <g transform="translate(174 58) scale(3)" color="#0A0A0A"><FlatBedMachineIcon size={24} /></g>
-      <rect x="40" y="150" width="70" height="26" rx="4" fill="#BCD8F0" stroke="#567FB2" transform="rotate(-35 75 163)" />
-      <text x="58" y="205" fontSize="10.5" fill="#3E6796" fontFamily="Inter, sans-serif">Key light 45°</text>
-      <rect x="310" y="150" width="70" height="26" rx="4" fill="#BCD8F0" stroke="#567FB2" transform="rotate(35 345 163)" />
-      <text x="318" y="205" fontSize="10.5" fill="#3E6796" fontFamily="Inter, sans-serif">Fill light 45°</text>
-      <g transform="translate(198 212)" color="#0A0A0A"><CameraIcon size={24} /></g>
-      <text x="210" y="252" textAnchor="middle" fontSize="10.5" fill="#0A0A0A" fontFamily="Inter, sans-serif">Camera on tripod, at machine-head height</text>
+      <path d="M40 30 H380 V120 Q210 150 40 120 Z" fill="#F5F5F7" stroke="#D2D2D7" />
+      <text x="210" y="24" textAnchor="middle" fontSize="11" fill="#6E6E73" fontFamily="Inter, sans-serif">White seamless background</text>
+      <g transform="translate(174 58) scale(3)" color="#000000"><FlatBedMachineIcon size={24} /></g>
+      <rect x="40" y="150" width="70" height="26" rx="4" fill="#E8E8ED" stroke="#8E8E93" transform="rotate(-35 75 163)" />
+      <text x="58" y="205" fontSize="10.5" fill="#6E6E73" fontFamily="Inter, sans-serif">Key light 45°</text>
+      <rect x="310" y="150" width="70" height="26" rx="4" fill="#E8E8ED" stroke="#8E8E93" transform="rotate(35 345 163)" />
+      <text x="318" y="205" fontSize="10.5" fill="#6E6E73" fontFamily="Inter, sans-serif">Fill light 45°</text>
+      <g transform="translate(198 212)" color="#000000"><CameraIcon size={24} /></g>
+      <text x="210" y="252" textAnchor="middle" fontSize="10.5" fill="#000000" fontFamily="Inter, sans-serif">Camera on tripod, at machine-head height</text>
     </svg>
   );
 }
@@ -178,9 +190,10 @@ export function StudioPhoto() {
       <Section id="setup" title="The setup">
         <Stage bg="#FFFFFF" h="auto" pad={20}><StudioPlan /></Stage>
         <Specs rows={[
-          ["Background", "White seamless paper, or light grey #F5F5F5 for white machines"],
-          ["Lights", "Two large softboxes at 45° front-left and front-right; a top light for the machine head if needed"],
-          ["Shadows", "Soft, short contact shadow only"],
+          ["Background — hero set", "Black seamless paper or velvet, pure black in the file (#000000)"],
+          ["Light — hero set", "One large softbox or strip light above and slightly behind; black flags at the sides"],
+          ["Background — catalog set", "White seamless paper, pure white in the file (#FFFFFF)"],
+          ["Light — catalog set", "Two large softboxes at 45°, front-left and front-right; soft contact shadow only"],
           ["Machine", "Cleaned, dust-free, threaded if the shot shows sewing; protective film removed"],
         ]} />
       </Section>
@@ -242,8 +255,8 @@ function EightAngles() {
   const labels = ["Front 0°", "45°", "Side 90°", "135°", "Back 180°", "225°", "Side 270°", "315°"];
   return (
     <svg viewBox="0 0 420 300" className="h-auto w-full max-w-[460px]" role="img" aria-label="Eight camera positions around a machine, seen from above">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E5E7EB" strokeDasharray="4 4" />
-      <g transform={`translate(${cx - 36} ${cy - 36}) scale(3)`} color="#0A0A0A"><FlatBedMachineIcon size={24} /></g>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#D2D2D7" strokeDasharray="4 4" />
+      <g transform={`translate(${cx - 36} ${cy - 36}) scale(3)`} color="#000000"><FlatBedMachineIcon size={24} /></g>
       {labels.map((l, i) => {
         const a = (Math.PI / 2) + (i * Math.PI) / 4;
         const x = cx + r * Math.cos(a);
@@ -251,9 +264,9 @@ function EightAngles() {
         const main = i === 0 || i === 1 || i === 7;
         return (
           <g key={l}>
-            <circle cx={x} cy={y} r="13" fill={main ? "#3E6796" : "#FFFFFF"} stroke="#3E6796" strokeWidth="1.5" />
-            <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={main ? "#FFFFFF" : "#3E6796"} fontFamily="Inter, sans-serif">{i + 1}</text>
-            <text x={x + (Math.cos(a) >= 0 ? 18 : -18)} y={y + 4} textAnchor={Math.cos(a) >= 0 ? "start" : "end"} fontSize="10.5" fill="#4B5563" fontFamily="Inter, sans-serif">{l}</text>
+            <circle cx={x} cy={y} r="13" fill={main ? "#1D1D1F" : "#FFFFFF"} stroke="#1D1D1F" strokeWidth="1.5" />
+            <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={main ? "#FFFFFF" : "#1D1D1F"} fontFamily="Inter, sans-serif">{i + 1}</text>
+            <text x={x + (Math.cos(a) >= 0 ? 18 : -18)} y={y + 4} textAnchor={Math.cos(a) >= 0 ? "start" : "end"} fontSize="10.5" fill="#6E6E73" fontFamily="Inter, sans-serif">{l}</text>
           </g>
         );
       })}
@@ -293,7 +306,7 @@ export function MobilePhoto() {
 
       <Section id="place" title="Set up the place">
         <Bullets items={[
-          <><B>Background:</B> a plain white or light-grey wall, or a 2 × 3 m white paper roll or cloth behind and under the machine.</>,
+          <><B>Background:</B> a 2 × 3 m white paper roll or cloth behind and under the machine — or black velvet for the black set. Never a room, never a grey wall.</>,
           <><B>Clear the area:</B> no boxes, tools, bags, cables or other brands in the frame. Clean the floor.</>,
           <><B>Light:</B> daylight from a large window beside the machine, or outdoors in the shade. No direct sun, no mixed colored lights.</>,
           <><B>Machine:</B> clean, covers on, protective film off, KOLEEX nameplate visible.</>,
@@ -318,7 +331,7 @@ export function MobilePhoto() {
             "Sent as original files, not screenshots or compressed chat images",
           ].map((t) => (
             <div key={t} className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5 text-[13px] text-[var(--text-secondary)]">
-              <span className="mt-[2px] h-3.5 w-3.5 shrink-0 rounded border border-[#567FB2]" aria-hidden />{t}
+              <span className="mt-[2px] h-3.5 w-3.5 shrink-0 rounded border border-[#98989D]" aria-hidden />{t}
             </div>
           ))}
         </div>
@@ -327,10 +340,10 @@ export function MobilePhoto() {
 
       <Section id="mobile-examples" title="Right and wrong">
         <Examples cols={2}>
-          <Example tone="do" caption="Level, centered, plain background, soft light." bg="#F5F5F5" h={180}><Scene /></Example>
-          <Example tone="dont" caption="Clutter and other products in the frame." bg="#F5F5F5" h={180}><Scene clutter bg="#E5E7EB" floor="#9CA3AF" /></Example>
-          <Example tone="dont" caption="Tilted, taken with the wide lens." bg="#F5F5F5" h={180}><Scene tilt={-9} scale={1.25} /></Example>
-          <Example tone="dont" caption="Shot against a bright window — the machine goes dark." bg="#F5F5F5" h={180}><Scene backlight bg="#E5E7EB" /></Example>
+          <Example tone="do" caption="Level, centered, plain background, soft light." bg="#F5F5F7" h={180}><Scene /></Example>
+          <Example tone="dont" caption="Clutter and other products in the frame." bg="#F5F5F7" h={180}><Scene clutter bg="#D2D2D7" floor="#98989D" /></Example>
+          <Example tone="dont" caption="Tilted, taken with the wide lens." bg="#F5F5F7" h={180}><Scene tilt={-9} scale={1.25} /></Example>
+          <Example tone="dont" caption="Shot against a bright window — the machine goes dark." bg="#F5F5F7" h={180}><Scene backlight bg="#D2D2D7" /></Example>
         </Examples>
       </Section>
     </Chapter>
@@ -366,23 +379,23 @@ export function PeoplePhoto() {
 
       <Section id="portraits" title="Team portraits">
         <Examples cols={2}>
-          <Example tone="do" caption="Plain light background, soft side light, shoulders up, level eyes." bg="#F5F5F5" h={200}>
-            <div className="flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md bg-[#E5E7EB] shadow-[0_0_0_1px_rgba(0,0,0,0.1)]">
-              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full bg-[#4B5563]" /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1A1A1A]" /></div>
+          <Example tone="do" caption="Plain light background, soft side light, shoulders up, level eyes." bg="#F5F5F7" h={200}>
+            <div className="flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md bg-[#D2D2D7] shadow-[0_0_0_1px_rgba(0,0,0,0.1)]">
+              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full bg-[#6E6E73]" /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1D1D1F]" /></div>
             </div>
           </Example>
-          <Example tone="dont" caption="Busy background, harsh flash, cropped at an angle." bg="#F5F5F5" h={200}>
-            <div className="relative flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md shadow-[0_0_0_1px_rgba(0,0,0,0.1)]" style={{ background: "repeating-linear-gradient(90deg,#D97706 0 10px,#4B5563 10px 22px)", transform: "rotate(-6deg)" }}>
-              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full bg-[#F5F5F5]" /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1A1A1A]" /></div>
+          <Example tone="dont" caption="Busy background, harsh flash, cropped at an angle." bg="#F5F5F7" h={200}>
+            <div className="relative flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md shadow-[0_0_0_1px_rgba(0,0,0,0.1)]" style={{ background: "repeating-linear-gradient(90deg,#D97706 0 10px,#6E6E73 10px 22px)", transform: "rotate(-6deg)" }}>
+              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full bg-[#F5F5F7]" /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1D1D1F]" /></div>
             </div>
           </Example>
         </Examples>
         <Specs rows={[
-          ["Background", "Plain white or light grey wall"],
-          ["Light", "Soft window light from the side; no flash"],
+          ["Background", "Plain white wall, or black for the founder and leadership portraits"],
+          ["Light", "Soft side light; no flash"],
           ["Crop", "Shoulders up, 4 : 5, eyes on the upper third"],
           ["Clothes", "KOLEEX uniform or plain dark clothing; no large logos"],
-          ["Color", "Shot in color. A whole series may be shown in black and white — never mixed on one page"],
+          ["Color", "Cool and muted — lower saturation, clean skin tones. A series may be black and white — never mixed on one page"],
           ["File", "2000 × 2500 px JPEG, sRGB"],
         ]} />
       </Section>
@@ -548,7 +561,8 @@ export function ImageEditing() {
           "Exposure, contrast and white balance.",
           "Cropping, straightening and perspective correction.",
           "Removing dust, scratches on the backdrop, stray threads.",
-          "Cleaning the background to pure white or light grey.",
+          "Cleaning the background to pure black or pure white.",
+          "The cool, muted grade on people and factory photos — the same preset for a whole series.",
           "Noise reduction and upscaling of our own photographs, when the result is still a true photograph.",
         ]} />
       </Section>

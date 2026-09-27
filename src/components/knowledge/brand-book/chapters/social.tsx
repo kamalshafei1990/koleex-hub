@@ -15,9 +15,8 @@ import OverlockMachineIcon from "@/components/icons/machine-kinds/OverlockMachin
 import {
   B, Bullets, Chapter, Code, Example, Examples, Note, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { MonogramTile, Wordmark } from "../marks";
-import { Avatar, HUB_LINE, INK, Phone, Post, PostBody } from "../mockups";
-import { Peak } from "./layout";
+import { LogoTile, Wordmark } from "../marks";
+import { Avatar, INK, Phone, Post, PostBody } from "../mockups";
 
 /* ── Shared ────────────────────────────────────────────────────────────── */
 
@@ -27,12 +26,12 @@ function SizeTable({ rows }: { rows: Array<[string, string, string?]> }) {
 
 function ProfileHeader({ name = "KOLEEX", handle = "@koleexgroup", bio }: { name?: string; handle?: string; bio: ReactNode }) {
   return (
-    <div className="px-3 pt-3 text-[#0A0A0A]">
+    <div className="px-3 pt-3 text-[#1D1D1F]">
       <div className="flex items-center gap-3">
         <Avatar size={44} />
         <div className="min-w-0">
           <p className="text-[10px] font-bold">{name}</p>
-          <p className="text-[8px] text-[#4B5563]">{handle}</p>
+          <p className="text-[8px] text-[#6E6E73]">{handle}</p>
         </div>
       </div>
       <div className="mt-2 text-[7.5px] leading-snug">{bio}</div>
@@ -62,10 +61,10 @@ export function SocialProfiles() {
     >
       <Section id="identity" title="One identity everywhere">
         <div className="flex flex-wrap items-start gap-6">
-          <Phone><ProfileHeader bio={BIO_EN} /><div className="mt-3 grid grid-cols-3 gap-[2px] px-[2px]">{Array.from({ length: 9 }).map((_, i) => <div key={i} className="aspect-[4/5]" style={{ background: i % 3 === 1 ? "#F5F5F5" : INK }} />)}</div></Phone>
+          <Phone><ProfileHeader bio={BIO_EN} /><div className="mt-3 grid grid-cols-3 gap-[2px] px-[2px]">{Array.from({ length: 9 }).map((_, i) => <div key={i} className="aspect-[4/5]" style={{ background: i % 3 === 1 ? "#F5F5F7" : INK }} />)}</div></Phone>
           <div className="min-w-[240px] flex-1">
             <Specs rows={[
-              ["Profile picture", "The K tile — white K on Ink (ch. 41), uploaded at 1024 × 1024"],
+              ["Profile picture", "The logo tile — the full white logo on black (ch. 41), uploaded at 1024 × 1024"],
               ["Name", "KOLEEX — for a regional account: KOLEEX Egypt, KOLEEX China"],
               ["Handle", "@koleexgroup wherever it is available; never variants with numbers or underscores"],
               ["Link", "The website in the reader's language, or the WhatsApp link"],
@@ -89,9 +88,9 @@ export function SocialProfiles() {
 
       <Section id="profile-donts" title="What never to do">
         <Bullets items={[
-          "The full wordmark squeezed into a round profile picture — it becomes unreadable (use the K).",
+          "The logo squeezed, stretched or cropped to fill the circle — it sits at 70% of the width, whole.",
           "A different picture or name on each platform.",
-          "Personal staff accounts named \"KOLEEX\" or using the K as their picture.",
+          "Personal staff accounts named \"KOLEEX\" or using the logo as their picture.",
           "Hashtag lists, emoji rows or phone numbers in the name field.",
         ]} />
       </Section>
@@ -117,7 +116,7 @@ export function PostTemplates() {
       lead={
         <p>
           Every KOLEEX post is built on the same four parts: a small label, one clear headline, one image, and
-          the logo with the Hub line. The content changes; the grammar does not.
+          the logo. The content changes; the grammar does not.
         </p>
       }
       toc={[
@@ -128,14 +127,14 @@ export function PostTemplates() {
       ]}
     >
       <Section id="anatomy" title="Anatomy of a post">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center gap-6">
             <Post w={230}><PostBody label="Overlock · Series" title={<>Four threads.<br />One pass.</>} /></Post>
-            <ol className="space-y-2 text-[12px] text-[#0A0A0A]">
+            <ol className="space-y-2 text-[12px] text-[#1D1D1F]">
               <li><B>1 · Label</B> — category or context, 11–12 px capitals, Sky on dark / Deep on light</li>
               <li><B>2 · Headline</B> — six words or fewer, Inter Bold</li>
               <li><B>3 · Image</B> — our own photograph (ch. 63) or a clean graphic</li>
-              <li><B>4 · Signature</B> — logo at the start, Hub line at the end</li>
+              <li><B>4 · Signature</B> — the logo at the end</li>
             </ol>
           </div>
         </Stage>
@@ -165,7 +164,7 @@ export function PostTemplates() {
           hashtags.
         </Rule>
         <Stage bg="#FFFFFF" h="auto" pad={20}>
-          <div className="w-full max-w-[420px] space-y-2 text-[12.5px] leading-6 text-[#0A0A0A]">
+          <div className="w-full max-w-[420px] space-y-2 text-[12.5px] leading-6 text-[#1D1D1F]">
             <p><B>Quality starts before the first cut.</B></p>
             <p>Our spreading machines lay every layer flat and even, so the cutting room works faster and wastes less fabric.</p>
             <p>Ask us for the spec sheet on WhatsApp.</p>
@@ -226,7 +225,7 @@ export function Facebook() {
     <PlatformChapter
       n={81}
       lead="Facebook is where many of our Arabic-speaking customers follow KOLEEX. The page is our shop window in the Middle East and North Africa."
-      sizes={[["Profile picture", "1024 × 1024", "The K tile"], ["Cover", "1640 × 624", "Keep text and logo in the central 820 × 312 — phones crop the sides"], ["Feed post", "1080 × 1350", "4:5"], ["Event cover", "1920 × 1005"], ["Story / Reel", "1080 × 1920", "Safe areas: ch. 70"]]}
+      sizes={[["Profile picture", "1024 × 1024", "The logo tile"], ["Cover", "1640 × 624", "Keep text and logo in the central 820 × 312 — phones crop the sides"], ["Feed post", "1080 × 1350", "4:5"], ["Event cover", "1920 × 1005"], ["Story / Reel", "1080 × 1920", "Safe areas: ch. 70"]]}
       profile={[["Page name", "KOLEEX"], ["About", "The short description (ch. 79), Arabic and English"], ["Buttons", "\"WhatsApp\" as the main button"], ["Replies", "Messages answered within one working day"]]}
       content={["Product posts and short machine videos", "Exhibitions and events, with dates DD/MM/YYYY", "Occasions: Ramadan, Eid al-Fitr, Eid al-Adha, national days of our markets", "Captions in Arabic first, English below — or one post per language"]}
     />
@@ -242,7 +241,7 @@ export function Instagram() {
       profile={[["Handle", "@koleexgroup"], ["Bio", "Short description + one link"], ["Highlights", "Machines · Services · Events · Contact — each with its icon"], ["Link", "The website or WhatsApp"]]}
       content={["Alternate dark-led and light-led posts so the grid breathes", "Reels of machines running — the most watched format", "Stories for events, day-to-day work and quick tips"]}
       extra={
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <div className="flex flex-wrap items-start gap-6">
             <div className="grid w-[240px] grid-cols-3 gap-[3px]">
               {Array.from({ length: 9 }).map((_, i) => (
@@ -251,7 +250,7 @@ export function Instagram() {
                 </Post>
               ))}
             </div>
-            <p className="max-w-[260px] text-[12px] leading-5 text-[#4B5563]">The grid alternates dark and light tiles and keeps the logo in the same corner — at a glance it reads as one brand.</p>
+            <p className="max-w-[260px] text-[12px] leading-5 text-[#6E6E73]">The grid alternates dark and light tiles and keeps the logo in the same corner — at a glance it reads as one brand.</p>
           </div>
         </Stage>
       }
@@ -264,7 +263,7 @@ export function LinkedIn() {
     <PlatformChapter
       n={83}
       lead="LinkedIn is where distributors, large factories, partners and future colleagues check who we are. The tone is the most formal of our channels."
-      sizes={[["Logo", "400 × 400", "The K tile"], ["Cover", "1128 × 191", "Logo and descriptor centered; phones crop the sides"], ["Post image", "1200 × 627 or 1080 × 1350"], ["Document (carousel)", "1080 × 1350 pages, PDF", "Our house style, 10 pages at most"]]}
+      sizes={[["Logo", "400 × 400", "The logo tile"], ["Cover", "1128 × 191", "Logo and descriptor centered; phones crop the sides"], ["Post image", "1200 × 627 or 1080 × 1350"], ["Document (carousel)", "1080 × 1350 pages, PDF", "Our house style, 10 pages at most"]]}
       profile={[["Page name", "KOLEEX International Group"], ["Tagline", "Industrial Garment Machinery"], ["Industry", "Industrial Machinery Manufacturing"], ["About", "The 100-word company description (ch. 32)"]]}
       content={["Company news, exhibitions, new partnerships (with permission)", "Knowledge: how to choose a machine, how we inspect", "Hiring (ch. 125) — and staff sharing, not re-posting word for word (ch. 126)", "English; no hashtag lists, no emoji"]}
     />
@@ -276,7 +275,7 @@ export function TikTokDouyin() {
     <PlatformChapter
       n={84}
       lead="Short vertical video: a machine running, a tip, a moment from the factory. TikTok reaches our international audience; Douyin (抖音) is its separate Chinese twin, with its own account and content in Chinese."
-      sizes={[["Video", "1080 × 1920", "9:16, 15–60 s"], ["Cover", "1080 × 1920", "Title in the upper middle"], ["Profile picture", "1024 × 1024", "The K tile"], ["Safe areas", "Top 250 · bottom 420 · right 150 px", "Ch. 70"]]}
+      sizes={[["Video", "1080 × 1920", "9:16, 15–60 s"], ["Cover", "1080 × 1920", "Title in the upper middle"], ["Profile picture", "1024 × 1024", "The logo tile"], ["Safe areas", "Top 250 · bottom 420 · right 150 px", "Ch. 70"]]}
       profile={[["TikTok", "@koleexgroup, English and Arabic"], ["Douyin", "An enterprise account under our Taizhou company, in Chinese"], ["Link", "Website or WhatsApp (TikTok) · WeChat (Douyin)"]]}
       content={["The machine is the star: real sound of the machine, subtitles, logo in the first or last second", "Music only from the platform's own licensed library", "Never re-upload a TikTok to Douyin (or back) with the other app's watermark — export clean from the edit", "Chinese content follows Chinese advertising rules: no \"best\", \"first\", \"top\" (ch. 29)"]}
     />
@@ -300,7 +299,7 @@ export function XPlatform() {
     <PlatformChapter
       n={86}
       lead="X is a secondary channel: news, exhibitions and links to our articles, in English."
-      sizes={[["Profile picture", "400 × 400", "The K tile"], ["Header", "1500 × 500", "Logo and descriptor centered"], ["Post image", "1600 × 900", "16:9"]]}
+      sizes={[["Profile picture", "400 × 400", "The logo tile"], ["Header", "1500 × 500", "Logo and descriptor centered"], ["Post image", "1600 × 900", "16:9"]]}
       profile={[["Name", "KOLEEX"], ["Handle", "@koleexgroup"], ["Bio", "Short description + website"]]}
       content={["Short news with one image or video", "Event updates during exhibitions", "Replies within one working day; no arguments in public"]}
     />
@@ -312,18 +311,18 @@ export function WeChat() {
     <PlatformChapter
       n={87}
       lead="WeChat (微信) is how our Chinese customers, suppliers and colleagues reach us — the official account for articles, Channels (视频号) for video, and staff Moments (朋友圈) for everyday presence."
-      sizes={[["Account avatar", "1024 × 1024", "The K tile"], ["Article cover", "900 × 383", "2.35:1 — shown cropped to a square in shares: keep the subject centered"], ["Article second image", "500 × 500"], ["Channels video", "1080 × 1260 or 1080 × 1920", "6:7 or 9:16"]]}
+      sizes={[["Account avatar", "1024 × 1024", "The logo tile"], ["Article cover", "900 × 383", "2.35:1 — shown cropped to a square in shares: keep the subject centered"], ["Article second image", "500 × 500"], ["Channels video", "1080 × 1260 or 1080 × 1920", "6:7 or 9:16"]]}
       profile={[["Official account name", "KOLEEX"], ["Verified company", <span key="c" lang="zh-Hans">科莱恪斯国际商业管理（台州）有限公司</span>], ["Introduction", "The Chinese short description (ch. 79)"], ["Menu", "产品 · 服务 · 联系我们"]]}
-      content={["Articles: Chinese, 15–16 px body text, 1.75 line height, Hub Blue for links and small headings only", "Every article ends with the logo, the QR code of the account and one contact", "Moments by staff: the approved templates, no edited logos, no price lists (ch. 126)"]}
+      content={["Articles: Chinese, 15–16 px body text, 1.75 line height, Hub Blue for links only", "Every article ends with the logo, the QR code of the account and one contact", "Moments by staff: the approved templates, no edited logos, no price lists (ch. 126)"]}
       extra={
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <Phone>
-            <div className="h-full bg-white text-[#0A0A0A]">
-              <div className="flex h-[38%] items-center justify-center bg-[#0A0A0A]"><Wordmark color="#FFFFFF" width="46%" /></div>
+            <div className="h-full bg-white text-[#1D1D1F]">
+              <div className="flex h-[38%] items-center justify-center bg-[#000000]"><Wordmark color="#FFFFFF" width="46%" /></div>
               <div className="space-y-1.5 p-3">
                 <p lang="zh-Hans" className="text-[10px] font-bold">拉布机：让每一层都平整</p>
-                <p className="text-[7px] text-[#4B5563]">KOLEEX · 27/09/2026</p>
-                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[3px] rounded bg-[#E5E7EB]" style={{ width: i === 5 ? "60%" : "100%" }} />)}
+                <p className="text-[7px] text-[#6E6E73]">KOLEEX · 27/09/2026</p>
+                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[3px] rounded bg-[#D2D2D7]" style={{ width: i === 5 ? "60%" : "100%" }} />)}
               </div>
             </div>
           </Phone>
@@ -338,7 +337,7 @@ export function WhatsApp() {
     <PlatformChapter
       n={88}
       lead="WhatsApp Business is where most conversations with our customers actually happen. It is a brand channel too: the profile, the catalog and every standard reply follow this book."
-      sizes={[["Profile photo", "1024 × 1024", "The K tile"], ["Catalog image", "1080 × 1080", "Our own photo on white"], ["Status", "1080 × 1920", "Like a story"]]}
+      sizes={[["Profile photo", "1024 × 1024", "The logo tile"], ["Catalog image", "1080 × 1080", "Our own photo on white"], ["Status", "1080 × 1920", "Like a story"]]}
       profile={[["Numbers", "One Egyptian and one Chinese business number (owner decision)"], ["Business name", "KOLEEX Egypt · KOLEEX China"], ["Description", "The short description in Arabic (Egypt) or English (China)"], ["Hours", "Working hours of that office, in its time zone"], ["Website", KOLEEX_COMPANY.web]]}
       content={["Catalog: our own photos, the machine name and a short description — never prices", "Greeting and away messages from the approved text below", "Quick replies for the common questions: spec sheet, delivery, spare parts, location", "Broadcasts only to customers who agreed to receive them"]}
       extra={
@@ -353,17 +352,17 @@ export function WhatsApp() {
             ]}
           />
           <Examples cols={2}>
-            <Example tone="do" caption="Catalog item: own photo, name, one line — no price." bg="#F5F5F5" h={170}>
-              <div className="flex w-[220px] items-center gap-3 rounded-xl bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_#E5E7EB]">
-                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#F5F5F5]"><OverlockMachineIcon size={30} /></div>
-                <div><p className="text-[11px] font-semibold">Overlock machine</p><p className="text-[9px] text-[#4B5563]">4-thread · direct drive</p><p className="mt-1 flex items-center gap-1 text-[8.5px] text-[#3E6796]"><Peak size={7} color="#567FB2" />Ask for the spec sheet</p></div>
+            <Example tone="do" caption="Catalog item: own photo, name, one line — no price." bg="#F5F5F7" h={170}>
+              <div className="flex w-[220px] items-center gap-3 rounded-xl bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_#D2D2D7]">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#F5F5F7]"><OverlockMachineIcon size={30} /></div>
+                <div><p className="text-[11px] font-semibold">Overlock machine</p><p className="text-[9px] text-[#6E6E73]">4-thread · direct drive</p><p className="mt-1 flex items-center gap-1 text-[8.5px] text-[#3E6796]">Ask for the spec sheet</p></div>
               </div>
             </Example>
-            <Example tone="dont" caption="Price lists, forwarded supplier catalogs, emoji walls." bg="#F5F5F5" h={170}>
-              <div className="w-[220px] rounded-xl bg-[#DCF8C6] p-3 text-[10px] text-[#0A0A0A]">🔥🔥 BEST PRICE 🔥🔥<br />Model 123 — USD ???<br />Forwarded: supplier_catalog.pdf</div>
+            <Example tone="dont" caption="Price lists, forwarded supplier catalogs, emoji walls." bg="#F5F5F7" h={170}>
+              <div className="w-[220px] rounded-xl bg-[#DCF8C6] p-3 text-[10px] text-[#1D1D1F]">🔥🔥 BEST PRICE 🔥🔥<br />Model 123 — USD ???<br />Forwarded: supplier_catalog.pdf</div>
             </Example>
           </Examples>
-          <div className="flex items-center gap-3"><MonogramTile size={40} /><span className="h-[2px] w-16" style={{ background: HUB_LINE }} /><span className="text-[12px] text-[var(--text-dim)]">The same K tile on every number.</span></div>
+          <div className="flex items-center gap-3"><LogoTile size={40} round /><span className="text-[13px] text-[var(--text-dim)]">The same logo picture on every number.</span></div>
         </div>
       }
     />

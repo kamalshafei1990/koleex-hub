@@ -7,13 +7,12 @@ import type { ReactNode } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import OverlockMachineIcon from "@/components/icons/machine-kinds/OverlockMachineIcon";
 import FlatBedMachineIcon from "@/components/icons/machine-kinds/FlatBedMachineIcon";
-import CoverstitchIcon from "@/components/icons/machine-kinds/CoverstitchIcon";
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
-import { HUB_LINE, INK, Lines, Strips } from "../mockups";
-import { Peak } from "./layout";
+import { INK, Lines, MachineShot, Strips } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 function Page({ w = 150, dark = false, ratio = "210 / 270", children }: { w?: number; dark?: boolean; ratio?: string; children: ReactNode }) {
   return (
@@ -47,15 +46,15 @@ export function CompanyProfile() {
       ]}
     >
       <Section id="layout" title="Layout">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-5">
             <Page w={200} dark ratio="16 / 10">
               <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width="40%" /></div>
-              <p className="absolute bottom-3 left-4 text-[7px]">KOLEEX International Group<br /><span className="text-[#9CA3AF]">Company Profile</span></p>
+              <p className="absolute bottom-3 left-4 text-[7px]">KOLEEX International Group<br /><span className="text-[#98989D]">Company Profile</span></p>
             </Page>
             <Spread>
-              <Page w={150} dark ratio="8 / 10"><div className="absolute inset-3 rounded-sm bg-[#1A1A1A]" /><span className="absolute bottom-2 left-3 rounded bg-black/50 px-1 text-[5px] tracking-[0.14em] text-white">OWN PHOTO</span></Page>
-              <Page w={150} ratio="8 / 10"><div className="absolute left-4 top-[30%] right-4"><p className="text-[13px] font-bold leading-tight">Our story</p><div className="mt-2"><Lines n={5} /></div></div><p className="absolute bottom-2 left-4 text-[5px] text-[#9CA3AF]">History / Since 1955</p><p className="absolute bottom-2 right-3 text-[5px] text-[#9CA3AF]">04</p></Page>
+              <Page w={150} dark ratio="8 / 10"><div className="absolute inset-3 rounded-sm bg-[#1D1D1F]" /><span className="absolute bottom-2 left-3 rounded bg-black/50 px-1 text-[5px] tracking-[0.14em] text-white">OWN PHOTO</span></Page>
+              <Page w={150} ratio="8 / 10"><div className="absolute left-4 top-[30%] right-4"><p className="text-[13px] font-bold leading-tight">Our story</p><div className="mt-2"><Lines n={5} /></div></div><p className="absolute bottom-2 left-4 text-[5px] text-[#98989D]">History / Since 1955</p><p className="absolute bottom-2 right-3 text-[5px] text-[#98989D]">04</p></Page>
             </Spread>
           </div>
         </Stage>
@@ -63,7 +62,7 @@ export function CompanyProfile() {
           ["Format", "Landscape, 16:10 — as PDF for screens, and printed as a booklet"],
           ["Spreads", "Photograph on one page, title and text on the other"],
           ["Every page", "Logo top-left; section and page name bottom-left; page number bottom-right"],
-          ["Style", "Core: black, white, one Hub line — no multi-color diagrams, no neon, no 3D"],
+          ["Style", "Black, white and silver — photos with numbered callouts, no drawings, no neon, no 3D"],
         ]} />
       </Section>
 
@@ -118,7 +117,7 @@ export function Catalogs() {
     >
       <Section id="structure" title="Structure">
         <Bullets items={[
-          "Cover — logo, \"Product Catalog\", year, the Hub line.",
+          "Cover — the machine on black, the logo, \"Product Catalog\", the year.",
           "Contents — categories with their machine icons and page numbers.",
           "A category opener for each machine kind, then one page (or spread) per machine.",
           "Services, contact, QR code to the website — at the back.",
@@ -126,28 +125,31 @@ export function Catalogs() {
       </Section>
 
       <Section id="pages" title="Pages">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-start justify-center gap-5">
             <Page w={160} dark>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="54%" /><p className="text-[6px] tracking-[0.24em] text-[#9CA3AF]">PRODUCT CATALOG 2026</p></div>
-              <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: HUB_LINE }} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                <p className="text-[12px] font-semibold tracking-[-0.02em]" style={{ background: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Product Catalog</p>
+                <MachineShot w="86%" label={false} logo={false} />
+                <div className="flex flex-col items-center gap-1"><Wordmark color="#FFFFFF" width={54} /><p className="text-[5px] tracking-[0.2em] text-[#98989D]">2026</p></div>
+              </div>
             </Page>
             <Page w={160}>
               <div className="absolute inset-4 flex flex-col">
                 <OverlockMachineIcon size={34} />
                 <p className="mt-3 text-[15px] font-bold">Overlock</p>
-                <p className="text-[6px] text-[#4B5563]">Edge trimming and overedge stitching</p>
-                <div className="mt-auto flex items-center justify-between text-[5px] text-[#9CA3AF]"><Wordmark color="#000000" width={30} /><span>12</span></div>
+                <p className="text-[6px] text-[#6E6E73]">Edge trimming and overedge stitching</p>
+                <div className="mt-auto flex items-center justify-between text-[5px] text-[#98989D]"><Wordmark color="#000000" width={30} /><span>12</span></div>
               </div>
             </Page>
             <Page w={160}>
               <div className="absolute inset-3 flex flex-col">
-                <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]"><OverlockMachineIcon size={8} />Overlock</span><span className="text-[5px] text-[#9CA3AF]">13</span></div>
-                <div className="mt-2 flex h-[42%] items-center justify-center rounded bg-[#F5F5F5]"><OverlockMachineIcon size={40} /></div>
+                <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#6E6E73]"><OverlockMachineIcon size={8} />Overlock</span><span className="text-[5px] text-[#98989D]">13</span></div>
+                <div className="mt-2 flex h-[42%] items-center justify-center rounded-[6px] bg-[#FFFFFF] px-2"><MachineShot w="92%" dark={false} label={false} /></div>
                 <p className="mt-2 text-[10px] font-bold">Model name</p>
-                <div className="mt-1 space-y-[2px] text-[5.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
-                <div className="mt-auto overflow-hidden rounded-[2px] border border-[#E5E7EB] text-[5px]">
-                  {[["Max speed", "— SPM"], ["Needles", "—"], ["Motor", "—"]].map(([k, v]) => <div key={k} className="flex justify-between border-b border-[#E5E7EB] px-1 py-[1px] last:border-0"><span>{k}</span><span className="font-mono">{v}</span></div>)}
+                <div className="mt-1 space-y-[2px] text-[5.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1">{f}</p>)}</div>
+                <div className="mt-auto overflow-hidden rounded-[2px] border border-[#D2D2D7] text-[5px]">
+                  {[["Max speed", "— SPM"], ["Needles", "—"], ["Motor", "—"]].map(([k, v]) => <div key={k} className="flex justify-between border-b border-[#D2D2D7] px-1 py-[1px] last:border-0"><span>{k}</span><span className="font-mono">{v}</span></div>)}
                 </div>
               </div>
             </Page>
@@ -160,7 +162,7 @@ export function Catalogs() {
           <><B>No prices</B> — not in print, not in the PDF (owner rule). Prices go in quotations.</>,
           "KOLEEX machines only — never a supplier's catalog with our logo added, never a supplier's name or code.",
           "Specifications exactly as in Koleex Hub's product data; blank is better than a guess.",
-          "Our own photographs on white (ch. 64); where we have none yet, the machine icon — never a borrowed photo.",
+          "Our own photographs — the hero on black, product pages on white (ch. 64); never a borrowed photo or a drawing.",
           "Light-led pages for easy reading and office printing (ch. 47); dark only for cover and openers if wished.",
         ]} />
         <Note>The catalog’s product pages can be generated from Koleex Hub, so the catalog and the website always say the same thing.</Note>
@@ -194,24 +196,24 @@ export function Brochures() {
 
       <Section id="flyer" title="The flyer">
         <Examples cols={2}>
-          <Example tone="do" caption="Front: one machine, one line, the logo." bg="#F5F5F5" h={260}>
+          <Example tone="do" caption="Front: one machine, one line, the logo." bg="#F5F5F7" h={260}>
             <Page w={160} ratio="148 / 210" dark>
               <div className="absolute inset-3 flex flex-col">
-                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Coverstitch</p>
-                <p className="mt-1 text-[12px] font-bold leading-tight">Flat seams for knitwear.</p>
-                <div className="my-2 flex flex-1 items-center justify-center rounded bg-[#1A1A1A]"><CoverstitchIcon size={40} /></div>
-                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={40} /><span className="h-[2px] w-8" style={{ background: HUB_LINE }} /></div>
+                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Coverstitch</p>
+                <p className="mt-1 text-[12px] font-semibold leading-tight tracking-[-0.02em]">Flat seams for knitwear.</p>
+                <div className="my-2 flex flex-1 items-center justify-center"><MachineShot w="92%" label={false} /></div>
+                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={40} /></div>
               </div>
             </Page>
           </Example>
-          <Example tone="do" caption="Back: key points, contact, QR — light-led." bg="#F5F5F5" h={260}>
+          <Example tone="do" caption="Back: key points, contact, QR — light-led." bg="#F5F5F7" h={260}>
             <Page w={160} ratio="148 / 210">
               <div className="absolute inset-3 flex flex-col text-[5.5px]">
                 <p className="text-[9px] font-bold">Why this machine</p>
-                <div className="mt-1 space-y-[3px]">{["Point one", "Point two", "Point three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
+                <div className="mt-1 space-y-[3px]">{["Point one", "Point two", "Point three"].map((f) => <p key={f} className="flex items-center gap-1">{f}</p>)}</div>
                 <div className="mt-auto flex items-end justify-between">
                   <div className="space-y-[1px] font-mono text-[4.5px]"><p>{KOLEEX_COMPANY.web}</p><p>{KOLEEX_COMPANY.email}</p></div>
-                  <div className="h-8 w-8 rounded-sm" style={{ background: "repeating-conic-gradient(#0A0A0A 0 25%, #FFFFFF 0 50%) 0 0 / 6px 6px" }} />
+                  <div className="h-8 w-8 rounded-sm" style={{ background: "repeating-conic-gradient(#000000 0 25%, #FFFFFF 0 50%) 0 0 / 6px 6px" }} />
                 </div>
               </div>
             </Page>
@@ -240,24 +242,24 @@ export function SpecSheets() {
       ]}
     >
       <Section id="sheet" title="The spec sheet">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <Page w={260}>
             <div className="absolute inset-3.5 flex flex-col">
               <div className="flex items-center justify-between"><Wordmark color="#000000" width={60} /><span className="text-[7px] font-bold tracking-[0.08em]">SPEC SHEET</span></div>
               <Strips />
               <div className="mt-2 grid grid-cols-[1fr_1fr] gap-2">
-                <div className="flex aspect-square items-center justify-center rounded bg-[#F5F5F5]"><FlatBedMachineIcon size={56} /></div>
+                <div className="flex aspect-square items-center justify-center rounded-[6px] bg-[#FFFFFF] px-1.5 ring-1 ring-[#F5F5F7]"><MachineShot w="96%" dark={false} label={false} /></div>
                 <div className="flex flex-col">
-                  <span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]"><FlatBedMachineIcon size={8} />Flat bed</span>
+                  <span className="inline-flex items-center gap-1 text-[5px] font-semibold uppercase tracking-[0.12em] text-[#6E6E73]"><FlatBedMachineIcon size={8} />Flat bed</span>
                   <p className="mt-1 text-[10px] font-bold">Model name</p>
-                  <div className="mt-1 space-y-[2px] text-[5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1"><Peak size={5} color="#567FB2" />{f}</p>)}</div>
+                  <div className="mt-1 space-y-[2px] text-[5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1">{f}</p>)}</div>
                 </div>
               </div>
-              <div className="mt-2 overflow-hidden rounded-[2px] border border-[#E5E7EB] text-[5px]">
-                <div className="bg-[#0A0A0A] px-1 py-[1.5px] text-[4.5px] font-semibold uppercase tracking-[0.08em] text-white">Specifications</div>
-                {[["Stitch type", "—"], ["Max speed", "— SPM"], ["Stitch length", "— mm"], ["Presser foot lift", "— mm"], ["Motor", "—"], ["Voltage", "220 V · 50/60 Hz"], ["Net weight", "— kg"]].map(([k, v]) => <div key={k} className="flex justify-between border-t border-[#E5E7EB] px-1 py-[1.5px]"><span>{k}</span><span className="font-mono">{v}</span></div>)}
+              <div className="mt-2 overflow-hidden rounded-[2px] border border-[#D2D2D7] text-[5px]">
+                <div className="bg-[#000000] px-1 py-[1.5px] text-[4.5px] font-semibold uppercase tracking-[0.08em] text-white">Specifications</div>
+                {[["Stitch type", "—"], ["Max speed", "— SPM"], ["Stitch length", "— mm"], ["Presser foot lift", "— mm"], ["Motor", "—"], ["Voltage", "220 V · 50/60 Hz"], ["Net weight", "— kg"]].map(([k, v]) => <div key={k} className="flex justify-between border-t border-[#D2D2D7] px-1 py-[1.5px]"><span>{k}</span><span className="font-mono">{v}</span></div>)}
               </div>
-              <div className="mt-auto flex items-end justify-between text-[4.5px] text-[#9CA3AF]"><span>{KOLEEX_COMPANY.web}</span><span>Specifications may change. 27/09/2026</span></div>
+              <div className="mt-auto flex items-end justify-between text-[4.5px] text-[#98989D]"><span>{KOLEEX_COMPANY.web}</span><span>Specifications may change. 27/09/2026</span></div>
             </div>
           </Page>
         </Stage>
@@ -290,20 +292,20 @@ export function Posters() {
     >
       <Section id="poster" title="The poster">
         <Examples cols={2}>
-          <Example tone="do" caption="Dark-led, one message, logo at the foot." bg="#F5F5F5" h={300}>
+          <Example tone="do" caption="Black, one message in silver, the machine, the logo." bg="#F5F5F7" h={300}>
             <Page w={180} ratio="420 / 594" dark>
               <div className="absolute inset-4 flex flex-col">
-                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Spreading</p>
-                <p className="mt-1 text-[18px] font-bold leading-[1.05]">Lay it flat.<br />Cut it right.</p>
-                <div className="my-3 flex-1 rounded bg-[#1A1A1A]" />
-                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={60} /><span className="h-[2px] w-10" style={{ background: HUB_LINE }} /></div>
+                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Spreading</p>
+                <p className="mt-1 text-[18px] font-semibold leading-[1.05] tracking-[-0.03em]" style={{ background: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Lay it flat.<br />Cut it right.</p>
+                <div className="my-3 flex flex-1 items-center justify-center"><MachineShot w="96%" label={false} /></div>
+                <div className="flex items-center justify-center"><Wordmark color="#FFFFFF" width={60} /></div>
               </div>
             </Page>
           </Example>
-          <Example tone="dont" caption="Many messages, small type, every product at once." bg="#F5F5F5" h={300}>
+          <Example tone="dont" caption="Many messages, small type, every product at once." bg="#F5F5F7" h={300}>
             <Page w={180} ratio="420 / 594">
               <div className="absolute inset-3 grid grid-cols-3 content-start gap-1">
-                {Array.from({ length: 12 }).map((_, i) => <div key={i} className="h-10 rounded-sm bg-[#E5E7EB]" />)}
+                {Array.from({ length: 12 }).map((_, i) => <div key={i} className="h-10 rounded-sm bg-[#D2D2D7]" />)}
                 <p className="col-span-3 mt-1 text-[5px] leading-tight">All our machines, all our services, all our offices, all our phone numbers and every social account in one place…</p>
               </div>
             </Page>

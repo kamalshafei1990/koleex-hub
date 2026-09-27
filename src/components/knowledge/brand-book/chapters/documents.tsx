@@ -19,7 +19,7 @@ import { Wordmark } from "../marks";
 import { ItemsTable, Lines, Meta, Parties, Sheet, SignatureBlock, Strips } from "../mockups";
 
 function Sheets({ children }: { children: ReactNode }) {
-  return <Stage bg="#F5F5F5" h="auto" pad={24}><div className="flex flex-wrap items-start justify-center gap-6">{children}</div></Stage>;
+  return <Stage bg="#F5F5F7" h="auto" pad={24}><div className="flex flex-wrap items-start justify-center gap-6">{children}</div></Stage>;
 }
 
 const SELLER: [string, string[]] = ["Seller", [KOLEEX_COMPANY.en, "Taizhou, Zhejiang, China", KOLEEX_COMPANY.email]];
@@ -54,7 +54,7 @@ export function SalesDocuments() {
           ["Blocks", "12 px corners, hairline borders, black uppercase labels over white values"],
           ["Tables", "Black head, hairline rows, numbers right-aligned in monospace, black total bar (ch. 62)"],
           ["Footer", "\"Page N of M\" on every sheet; later sheets repeat a compact header"],
-          ["Colors", "Ink #0A0A0A, Graphite #1A1A1A, Slate #4B5563, Silver #9CA3AF, Mist #E5E7EB, Cloud #F5F5F5 — no Hub Blue on documents"],
+          ["Colors", "Black #000000, Graphite #1D1D1F, Gray #6E6E73, Mist #D2D2D7, Cloud #F5F5F7 — no Hub Blue on documents"],
         ]} />
       </Section>
 
@@ -128,13 +128,13 @@ export function Contracts() {
             <Meta items={[["Contract no.", "KL-CN-12349"], ["Date", "27/09/2026"], ["Place", "Taizhou"], ["Currency", "USD"]]} />
             <Parties left={SELLER} right={BUYER} />
             <Lines n={10} />
-            <div className="flex justify-end"><div className="rounded-[3px] border border-[#0A0A0A] px-2 py-1 text-[4px] uppercase tracking-[0.08em]">Initials · Seller / Buyer</div></div>
+            <div className="flex justify-end"><div className="rounded-[3px] border border-[#000000] px-2 py-1 text-[4px] uppercase tracking-[0.08em]">Initials · Seller / Buyer</div></div>
           </Sheet>
           <Sheet w={260} title="SALES CONTRACT" page="Page 3 of 3">
             <Lines n={6} />
             <Meta cols={2} items={[["Governing law", "As agreed"], ["Disputes", "As agreed"]]} />
             <SignatureBlock />
-            <div className="flex justify-end"><div className="rounded-[3px] border border-[#0A0A0A] px-2 py-1 text-[4px] uppercase tracking-[0.08em]">Initials · Seller / Buyer</div></div>
+            <div className="flex justify-end"><div className="rounded-[3px] border border-[#000000] px-2 py-1 text-[4px] uppercase tracking-[0.08em]">Initials · Seller / Buyer</div></div>
           </Sheet>
         </Sheets>
       </Section>
@@ -298,13 +298,13 @@ export function Certificates() {
       ]}
     >
       <Section id="certificate" title="The certificate">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="relative w-[340px] overflow-hidden rounded bg-white p-5 text-center text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "297 / 210" }}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="relative w-[340px] overflow-hidden rounded bg-white p-5 text-center text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "297 / 210" }}>
             <div className="flex justify-center"><Wordmark color="#000000" width={70} /></div>
-            <p className="mt-4 text-[7px] font-semibold uppercase tracking-[0.3em] text-[#4B5563]">Certificate of Training</p>
+            <p className="mt-4 text-[7px] font-semibold uppercase tracking-[0.3em] text-[#6E6E73]">Certificate of Training</p>
             <p className="mt-2 text-[15px] font-bold">Full Name</p>
-            <p className="mt-1 text-[6.5px] text-[#4B5563]">has completed the operation and maintenance training for overlock machines</p>
-            <div className="mt-4 flex justify-center gap-8 text-[5.5px]"><div><div className="h-3 w-16 border-b border-[#0A0A0A]" /><p className="mt-0.5">Trainer</p></div><div><p className="font-mono">27/09/2026</p><p className="mt-0.5 text-[#4B5563]">Date</p></div><div><p className="font-mono">KL-TC-0001</p><p className="mt-0.5 text-[#4B5563]">Certificate no.</p></div></div>
+            <p className="mt-1 text-[6.5px] text-[#6E6E73]">has completed the operation and maintenance training for overlock machines</p>
+            <div className="mt-4 flex justify-center gap-8 text-[5.5px]"><div><div className="h-3 w-16 border-b border-[#000000]" /><p className="mt-0.5">Trainer</p></div><div><p className="font-mono">27/09/2026</p><p className="mt-0.5 text-[#6E6E73]">Date</p></div><div><p className="font-mono">KL-TC-0001</p><p className="mt-0.5 text-[#6E6E73]">Certificate no.</p></div></div>
             <div className="absolute inset-x-0 bottom-0"><Strips /></div>
           </div>
         </Stage>
@@ -391,14 +391,13 @@ export function HrDocuments() {
       </Section>
 
       <Section id="badge" title="The ID badge">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="flex h-[200px] w-[127px] flex-col items-center overflow-hidden rounded-lg bg-white text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
-            <div className="flex h-12 w-full items-center justify-center bg-[#0A0A0A]"><Wordmark color="#FFFFFF" width={64} /></div>
-            <div className="mt-3 h-16 w-14 rounded bg-[#E5E7EB]" />
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="flex h-[200px] w-[127px] flex-col items-center overflow-hidden rounded-lg bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+            <div className="flex h-12 w-full items-center justify-center bg-[#000000]"><Wordmark color="#FFFFFF" width={64} /></div>
+            <div className="mt-3 h-16 w-14 rounded bg-[#D2D2D7]" />
             <p className="mt-2 text-[9px] font-bold">Full Name</p>
-            <p className="text-[7px] text-[#4B5563]">Job Title</p>
-            <p className="mt-auto mb-2 font-mono text-[6px] text-[#4B5563]">ID 0001</p>
-            <div className="h-[3px] w-full" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }} />
+            <p className="text-[7px] text-[#6E6E73]">Job Title</p>
+            <p className="mt-auto mb-2 font-mono text-[6px] text-[#6E6E73]">ID 0001</p>
           </div>
         </Stage>
         <Specs rows={[

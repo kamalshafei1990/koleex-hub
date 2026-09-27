@@ -13,8 +13,8 @@ import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { Monogram, Wordmark } from "../marks";
-import { Avatar, HUB_LINE, INK, Phone, Post, Scaled } from "../mockups";
+import { Wordmark } from "../marks";
+import { Avatar, INK, Phone, Post, Scaled } from "../mockups";
 
 const FOUNDER_PHOTO = "/brand/book/founder-kamal-shafei.webp";
 
@@ -23,7 +23,7 @@ const FOUNDER_PHOTO = "/brand/book/founder-kamal-shafei.webp";
 /** A polo shirt, front view (designed at 200 × 200). The logo sits on the
  *  wearer's left chest — the viewer's right. */
 function Polo({ color = INK, ink = "#FFFFFF", logo = "chest" }: { color?: string; ink?: string; logo?: "chest" | "center" | "none" }) {
-  const line = color === "#FFFFFF" ? "#C9CED6" : "rgba(255,255,255,0.18)";
+  const line = color === "#FFFFFF" ? "#D1D1D6" : "rgba(255,255,255,0.18)";
   return (
     <div className="relative" style={{ width: 200, height: 200 }}>
       <svg viewBox="0 0 200 200" width={200} height={200} className="absolute inset-0" aria-hidden>
@@ -42,7 +42,7 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
   return (
     <figure className="flex flex-col items-center gap-2">
       <div className="flex h-[92px] items-center justify-center">{children}</div>
-      <figcaption className="text-[11px] font-medium text-[#4B5563]">{label}</figcaption>
+      <figcaption className="text-[11px] font-medium text-[#6E6E73]">{label}</figcaption>
     </figure>
   );
 }
@@ -66,11 +66,11 @@ export function Uniforms() {
       ]}
     >
       <Section id="set" title="The set">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-end justify-center gap-4">
             <Item label="Polo — sales, fairs"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
             <Item label="Polo — office, visits"><Scaled w={92} base={200} h={200}><Polo color="#FFFFFF" ink="#000000" /></Scaled></Item>
-            <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo color="#2E2E2E" /></Scaled></Item>
+            <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo color="#38383A" /></Scaled></Item>
           </div>
         </Stage>
         <Table
@@ -78,7 +78,7 @@ export function Uniforms() {
           rows={[
             ["Sales, exhibitions", "Piqué polo", "Black, white logo"],
             ["Office, customer visits", "Polo or oxford shirt", "White, black logo"],
-            ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Graphite #2E2E2E, white logo"],
+            ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Graphite #38383A, white logo"],
             ["Cold weather", "Soft-shell jacket", "Black, white logo"],
           ]}
         />
@@ -88,7 +88,7 @@ export function Uniforms() {
         <Specs rows={[
           ["Chest", "Wearer’s left, 70–80 mm wide, 180–200 mm below the shoulder seam"],
           ["Back (jackets, fair polos)", "Optional: logo 200–250 mm wide, 100 mm below the collar"],
-          ["Sleeve, collar, cap side", "K monogram, 12–20 mm (ch. 41)"],
+          ["Sleeve, cap", "The full logo, 40–50 mm wide — or nothing"],
           ["Method", "Embroidery, one thread color — screen print or DTF only on technical fabrics (ch. 39)"],
         ]} />
         <Note>In the warehouse, high-visibility vests and safety wear come first. The logo may be printed on the back of a vest, black on yellow; it never covers the reflective strips.</Note>
@@ -96,10 +96,10 @@ export function Uniforms() {
 
       <Section id="uniform-never" title="What never to do">
         <Examples cols={2}>
-          <Example tone="do" caption="One logo, on the chest, one color." bg="#F5F5F5" h={200}>
+          <Example tone="do" caption="One logo, on the chest, one color." bg="#F5F5F7" h={200}>
             <Scaled w={160} base={200} h={200}><Polo /></Scaled>
           </Example>
-          <Example tone="dont" caption="Gold thread, a big logo in the middle, a colored shirt." bg="#F5F5F5" h={200}>
+          <Example tone="dont" caption="Gold thread, a big logo in the middle, a colored shirt." bg="#F5F5F7" h={200}>
             <Scaled w={160} base={200} h={200}><Polo color="#1D4ED8" logo="center" /></Scaled>
           </Example>
         </Examples>
@@ -131,15 +131,15 @@ export function Merchandise() {
       ]}
     >
       <Section id="items" title="Approved items">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="flex flex-wrap items-end justify-center gap-6 text-[#0A0A0A]">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="flex flex-wrap items-end justify-center gap-6 text-[#1D1D1F]">
             <Item label="Notebook A5">
-              <div className="relative h-[84px] w-[62px] rounded-[3px] bg-[#0A0A0A]" style={{ boxShadow: "inset -3px 0 0 #2E2E2E" }}>
+              <div className="relative h-[84px] w-[62px] rounded-[3px] bg-[#000000]" style={{ boxShadow: "inset -3px 0 0 #38383A" }}>
                 <div className="absolute inset-x-0 bottom-3 flex justify-center"><Wordmark color="#FFFFFF" width={34} /></div>
               </div>
             </Item>
             <Item label="Pen">
-              <div className="flex h-[84px] items-center"><div className="relative h-[70px] w-[8px] rounded-full bg-[#0A0A0A]"><span className="absolute left-1/2 top-3 -translate-x-1/2 text-white"><Monogram color="#FFFFFF" style={{ width: 4 }} /></span></div></div>
+              <div className="flex h-[84px] items-center"><div className="relative flex h-[8px] w-[84px] items-center rounded-full bg-[#000000] ps-3"><Wordmark color="#FFFFFF" width={30} /></div></div>
             </Item>
             <Item label="Tote bag">
               <div className="relative flex h-[84px] w-[72px] items-end">
@@ -149,14 +149,14 @@ export function Merchandise() {
             </Item>
             <Item label="Mug">
               <div className="relative flex h-[84px] items-end">
-                <div className="flex h-[58px] w-[50px] items-center justify-center rounded-b-[8px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D5DB" }}><Wordmark color="#000000" width={34} /></div>
-                <div className="mb-3 h-7 w-4 rounded-r-full border-[3px] border-l-0 border-[#D1D5DB]" />
+                <div className="flex h-[58px] w-[50px] items-center justify-center rounded-b-[8px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }}><Wordmark color="#000000" width={34} /></div>
+                <div className="mb-3 h-7 w-4 rounded-r-full border-[3px] border-l-0 border-[#D1D1D6]" />
               </div>
             </Item>
             <Item label="Cap">
               <div className="relative flex h-[84px] items-end">
-                <div className="relative h-[40px] w-[64px] rounded-t-full bg-[#0A0A0A]"><div className="absolute left-1/2 top-3 -translate-x-1/2"><Monogram color="#FFFFFF" style={{ width: 10 }} /></div></div>
-                <div className="h-[6px] w-[26px] rounded-r-full bg-[#1A1A1A]" />
+                <div className="relative flex h-[40px] w-[64px] items-center justify-center rounded-t-full bg-[#000000] pt-2"><Wordmark color="#FFFFFF" width={34} /></div>
+                <div className="h-[6px] w-[26px] rounded-r-full bg-[#1D1D1F]" />
               </div>
             </Item>
           </div>
@@ -165,18 +165,18 @@ export function Merchandise() {
           head={["Item", "Method", "Mark"]}
           rows={[
             ["Notebook, A5, black", "Blind or white foil deboss", "Logo 40 mm, bottom center"],
-            ["Pen, black metal", "Laser engraving", "K monogram — the pen is below the logo’s minimum"],
+            ["Pen, black metal", "Laser engraving", "The full logo along the barrel, 30 mm"],
             ["Tote bag, natural cotton", "Screen print, black", "Logo 120–150 mm"],
             ["Mug, white ceramic", "Ceramic print, black", "Logo 60 mm, on the side facing the drinker’s right hand"],
-            ["Cap, black cotton", "Embroidery, white", "K monogram 30–40 mm on the front"],
-            ["Tape measure, seam ripper, thread snips", "Pad print", "K monogram — tools for the people who use our machines"],
+            ["Cap, black cotton", "Embroidery, white", "The full logo, 50–60 mm on the front"],
+            ["Tape measure, seam ripper, thread snips", "Pad print", "The full logo along the longest flat side — tools for the people who use our machines"],
           ]}
         />
       </Section>
 
       <Section id="merch-rules" title="Rules">
         <Bullets items={[
-          "One color, the logo or the K — never both on one item.",
+          "One color, one logo per item.",
           "No slogans, website lists or social icons on gifts.",
           "Sample first: every item is approved on a physical sample before an order (ch. 134).",
           "Gifts follow the law and the customer’s own rules; never cash or cash-like gifts.",
@@ -190,10 +190,10 @@ export function Merchandise() {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="flex w-[150px] flex-col items-center justify-between rounded-[3px] bg-white p-3 text-center text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "105 / 148" }}>
+    <div className="flex w-[150px] flex-col items-center justify-between rounded-[3px] bg-white p-3 text-center text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "105 / 148" }}>
       <Wordmark color="#000000" width={52} />
       <div className="space-y-1">{children}</div>
-      <span className="block h-[2px] w-10" style={{ background: HUB_LINE }} />
+      
     </div>
   );
 }
@@ -230,19 +230,19 @@ export function SeasonalGifts() {
       </Section>
 
       <Section id="cards" title="The cards">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-5">
             <Card>
               <p dir="rtl" lang="ar" className="text-[16px] font-bold">عيد مبارك</p>
-              <p className="text-[7px] text-[#4B5563]">Eid Mubarak from all of us at KOLEEX</p>
+              <p className="text-[7px] text-[#6E6E73]">Eid Mubarak from all of us at KOLEEX</p>
             </Card>
             <Card>
               <p lang="zh-Hans" className="text-[16px] font-bold">新春快乐</p>
-              <p className="text-[7px] text-[#4B5563]">Happy Spring Festival</p>
+              <p className="text-[7px] text-[#6E6E73]">Happy Spring Festival</p>
             </Card>
             <Card>
               <p className="text-[14px] font-bold">Happy New Year</p>
-              <p className="text-[7px] text-[#4B5563]">Thank you for a year of work together</p>
+              <p className="text-[7px] text-[#6E6E73]">Thank you for a year of work together</p>
             </Card>
           </div>
         </Stage>
@@ -258,10 +258,10 @@ export function SeasonalGifts() {
           The season’s colors belong to the gift; the KOLEEX card stays black and white.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="Traditional gift (a mooncake box, a red envelope) with the KOLEEX card." bg="#F5F5F5" h={170}>
+          <Example tone="do" caption="Traditional gift (a mooncake box, a red envelope) with the KOLEEX card." bg="#F5F5F7" h={170}>
             <div className="flex items-end gap-3">
               <div className="h-[80px] w-[80px] rounded-[4px]" style={{ background: "#B91C1C", boxShadow: "inset 0 0 0 4px #EAB308" }} />
-              <div className="flex h-[96px] w-[68px] flex-col items-center justify-center gap-2 rounded-[2px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]"><Wordmark color="#000000" width={40} /><span className="block h-[2px] w-6" style={{ background: HUB_LINE }} /></div>
+              <div className="flex h-[96px] w-[68px] flex-col items-center justify-center gap-2 rounded-[2px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]"><Wordmark color="#000000" width={40} /></div>
             </div>
           </Example>
           <Example tone="dont" caption="The logo recolored gold or red for the season." bg="#B91C1C" h={170}>
@@ -292,18 +292,18 @@ export function EmployerBrand() {
       ]}
     >
       <Section id="job-post" title="The job post">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <Post w={220} bg={INK}>
             <div className="absolute inset-0 flex flex-col p-[8%] text-white">
-              <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">We’re hiring · Taizhou</p>
+              <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">We’re hiring · Taizhou</p>
               <p className="mt-1.5 text-[15px] font-bold leading-[1.1]">Sales Engineer,<br />Middle East</p>
-              <div className="mt-3 space-y-1 text-[7px] text-[#D1D5DB]">
+              <div className="mt-3 space-y-1 text-[7px] text-[#D1D1D6]">
                 <p>Advise garment factories on the right machines</p>
                 <p>Arabic and English · industry experience</p>
                 <p>Based in Taizhou, travel to the region</p>
               </div>
               <p className="mt-auto text-[7px] font-semibold">Apply on {KOLEEX_COMPANY.web}</p>
-              <div className="mt-2 flex items-center justify-between"><Wordmark color="#FFFFFF" width="34%" /><span className="h-[2px] w-[22%]" style={{ background: HUB_LINE }} /></div>
+              <div className="mt-2 flex items-center justify-between"><Wordmark color="#FFFFFF" width="34%" /></div>
             </div>
           </Post>
         </Stage>
@@ -379,23 +379,23 @@ export function StaffSocial() {
       </Section>
 
       <Section id="profiles" title="Your work profile">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-6">
             <Phone w={170}>
-              <div className="flex flex-col items-center px-3 pt-4 text-center text-[#0A0A0A]">
-                <span className="h-12 w-12 rounded-full bg-[#D1D5DB]" />
+              <div className="flex flex-col items-center px-3 pt-4 text-center text-[#1D1D1F]">
+                <span className="h-12 w-12 rounded-full bg-[#D1D1D6]" />
                 <p className="mt-2 text-[10px] font-bold">Full Name</p>
-                <p className="text-[7px] text-[#4B5563]">Sales Engineer · KOLEEX</p>
+                <p className="text-[7px] text-[#6E6E73]">Sales Engineer · KOLEEX</p>
                 <div className="mt-3 w-full space-y-1 text-start text-[6.5px]">
-                  <div className="rounded-[4px] bg-[#F5F5F5] px-2 py-1"><p className="text-[#4B5563]">About</p><p>Industrial garment machinery · EN / <span lang="ar">عربي</span></p></div>
-                  <div className="rounded-[4px] bg-[#F5F5F5] px-2 py-1"><p className="text-[#4B5563]">Website</p><p>{KOLEEX_COMPANY.web}</p></div>
+                  <div className="rounded-[4px] bg-[#F5F5F7] px-2 py-1"><p className="text-[#6E6E73]">About</p><p>Industrial garment machinery · EN / <span lang="ar">عربي</span></p></div>
+                  <div className="rounded-[4px] bg-[#F5F5F7] px-2 py-1"><p className="text-[#6E6E73]">Website</p><p>{KOLEEX_COMPANY.web}</p></div>
                 </div>
               </div>
             </Phone>
           </div>
         </Stage>
         <Specs rows={[
-          ["Photo", "A real, recent photo of you — not the logo, not the K"],
+          ["Photo", "A real, recent photo of you — not the logo"],
           ["Name", "Your real name"],
           ["Title", "Your real job title and “KOLEEX” or “KOLEEX International Group”"],
           ["Link", "The official website"],
@@ -460,20 +460,20 @@ export function FounderBrand() {
       </Section>
 
       <Section id="founder-post" title="A post">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="w-[280px] rounded-[8px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="w-[280px] rounded-[8px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- the same portrait, as an avatar */}
               <img src={FOUNDER_PHOTO} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover grayscale" loading="lazy" />
-              <div className="min-w-0"><p className="text-[9px] font-bold">Kamal Shafei</p><p className="text-[7px] text-[#4B5563]">Founder & CEO, KOLEEX International Group</p></div>
+              <div className="min-w-0"><p className="text-[9px] font-bold">Kamal Shafei</p><p className="text-[7px] text-[#6E6E73]">Founder & CEO, KOLEEX International Group</p></div>
             </div>
             <p className="mt-2 text-[8.5px] leading-[1.45]">
               My grandfather opened his shop in Cairo in 1955. What he taught still decides how we work: sell the
               machine the customer needs, not the one on the shelf. Back from four factory visits this week —
               every one of them asked the same question about speed versus stitch quality. Here is what I told them.
             </p>
-            <div className="mt-2 h-[90px] rounded-[4px] bg-[#E5E7EB]" />
-            <div className="mt-2 flex items-center gap-1.5"><Avatar size={14} /><span className="text-[7px] text-[#4B5563]">KOLEEX International Group</span></div>
+            <div className="mt-2 h-[90px] rounded-[4px] bg-[#D2D2D7]" />
+            <div className="mt-2 flex items-center gap-1.5"><Avatar size={14} /><span className="text-[7px] text-[#6E6E73]">KOLEEX International Group</span></div>
           </div>
         </Stage>
         <Note>This post is an example written to show the voice — not a published post. His posts are his own; when one announces something for the company, the official accounts publish it first and he shares it.</Note>

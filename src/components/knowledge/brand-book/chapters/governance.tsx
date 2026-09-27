@@ -156,12 +156,12 @@ export function CertificationMarks() {
       <Section id="band" title="Showing them">
         <Examples cols={2}>
           <Example tone="do" caption="A band at the foot of the page, apart from the logo, in plain words." bg="#FFFFFF" h={200}>
-            <div className="w-[260px] rounded-[3px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+            <div className="w-[260px] rounded-[3px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
               <div className="flex items-center justify-between"><Wordmark color="#000000" width={62} /><span className="text-[7px] font-bold tracking-[0.08em]">COMPANY PROFILE</span></div>
               <Strips />
-              <div className="mt-8 flex items-center gap-2 border-t border-[#E5E7EB] pt-2">
-                <span className="flex h-7 w-10 items-center justify-center rounded-[2px] border border-dashed border-[#9CA3AF] text-[5px] font-semibold text-[#4B5563]">CB MARK</span>
-                <p className="text-[6.5px] leading-tight text-[#4B5563]">Quality management system certified to ISO 9001 · Certificate no. — · Certification body —</p>
+              <div className="mt-8 flex items-center gap-2 border-t border-[#D2D2D7] pt-2">
+                <span className="flex h-7 w-10 items-center justify-center rounded-[2px] border border-dashed border-[#98989D] text-[5px] font-semibold text-[#6E6E73]">CB MARK</span>
+                <p className="text-[6.5px] leading-tight text-[#6E6E73]">Quality management system certified to ISO 9001 · Certificate no. — · Certification body —</p>
               </div>
             </div>
           </Example>
@@ -273,15 +273,15 @@ export function FileNaming() {
       ]}
     >
       <Section id="formula" title="The formula">
-        <Stage bg="#0A0A0A" h="auto" pad={24}>
+        <Stage bg="#000000" h="auto" pad={24}>
           <div className="flex flex-wrap items-start justify-center gap-1">
             {FORMULA.map(([seg, hint], i) => (
               <div key={seg} className="flex items-start gap-1">
                 <div className="flex flex-col items-center">
-                  <span className="rounded-[6px] px-2 py-1 text-[13px] font-semibold" style={{ ...MONO, background: i === 0 ? "#FFFFFF" : "#1A1A1A", color: i === 0 ? "#0A0A0A" : "#FFFFFF", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)" }}>{seg}</span>
-                  <span className="mt-1 text-[10px] text-[#9CA3AF]">{hint}</span>
+                  <span className="rounded-[6px] px-2 py-1 text-[13px] font-semibold" style={{ ...MONO, background: i === 0 ? "#FFFFFF" : "#1D1D1F", color: i === 0 ? "#000000" : "#FFFFFF", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)" }}>{seg}</span>
+                  <span className="mt-1 text-[10px] text-[#98989D]">{hint}</span>
                 </div>
-                <span className="pt-1 text-[13px] text-[#7FA9D6]" style={MONO}>{i < FORMULA.length - 1 ? "-" : ".ext"}</span>
+                <span className="pt-1 text-[13px] text-[#6E6E73]" style={MONO}>{i < FORMULA.length - 1 ? "-" : ".ext"}</span>
               </div>
             ))}
           </div>
@@ -317,7 +317,7 @@ export function FileNaming() {
 
       <Section id="folders" title="Folders">
         <Stage bg="#FFFFFF" h="auto" pad={24}>
-          <pre className="text-[12px] leading-6 text-[#0A0A0A]" style={MONO}>{`KOLEEX-Brand/
+          <pre className="text-[12px] leading-6 text-[#1D1D1F]" style={MONO}>{`KOLEEX-Brand/
 ├── 01-Logo/
 ├── 02-Colors-Fonts/
 ├── 03-Templates/
@@ -341,7 +341,7 @@ type Status = "ready" | "hub" | "made" | "coming";
 
 const STATUS: Record<Status, { label: string; bg: string; fg: string }> = {
   ready: { label: "Available", bg: "rgba(16,185,129,0.14)", fg: "#059669" },
-  hub: { label: "In Koleex Hub", bg: "rgba(86,127,178,0.16)", fg: "#3E6796" },
+  hub: { label: "In Koleex Hub", bg: "var(--bg-surface-hover)", fg: "var(--text-primary)" },
   made: { label: "Made on request", bg: "var(--bg-surface)", fg: "var(--text-secondary)" },
   coming: { label: "Coming", bg: "var(--bg-surface)", fg: "var(--text-dim)" },
 };
@@ -352,7 +352,7 @@ function Pill({ s }: { s: Status }) {
 }
 
 const TEMPLATES: Array<[string, Status, number]> = [
-  ["Logo pack, K monogram, Hub mark", "ready", 136],
+  ["Logo pack, logo tiles, Hub mark", "ready", 136],
   ["Brand colors (CSS, JSON)", "ready", 136],
   ["Email signature (HTML)", "ready", 93],
   ["Quotation, proforma and commercial invoice", "hub", 94],
@@ -460,7 +460,7 @@ function Checklist({ items }: { items: string[] }) {
 const LISTS: Array<[string, string[]]> = [
   ["Every piece", [
     "The logo is the master file, one flat color, with its clear space (ch. 36–40)",
-    "Colors are from the palette; Hub Blue only as a touch (ch. 45–47)",
+    "Colors are from the palette; silver as the premium touch, Hub Blue on links and buttons only (ch. 45–47)",
     "Type is Inter (or the Arabic and Chinese faces) on the type scale (ch. 50–51)",
     "No prices, costs, supplier names, customer names or unannounced plans",
     "Every number and claim has a source (ch. 132)",
@@ -515,7 +515,7 @@ export function Checklists() {
 
 const FAQ: Array<[string, ReactNode]> = [
   ["Can I change the logo’s color to match a design?", <>No. The logo is black or white — nothing else (<Ref n={39} />).</>],
-  ["The logo is too small to read here. What do I do?", <>Use the K monogram below the logo’s minimum size (<Ref n={41} />).</>],
+  ["The logo is too small to read here. What do I do?", <>Give it more space, use the logo tile, or leave it off — there is no smaller mark (<Ref n={41} />).</>],
   ["Can I use a photo I found online?", <>No. Only our own photos, or licensed ones approved by the Marketing Manager (<Ref n={63} />).</>],
   ["Can I use AI to make images?", <>Only abstract backgrounds — never people, machines or places presented as real (<Ref n={69} />).</>],
   ["When do I use Aurora and when Core?", <>Aurora is Koleex Hub only. Everything else — print, posts, signs, documents — is Core (<Ref n={77} />).</>],
@@ -575,16 +575,17 @@ export function VersionsContact() {
         <Table
           head={["Version", "Date", "What changed"]}
           rows={[
-            [<B key="a">{BOOK_VERSION.label}</B>, BOOK_VERSION.date, `The new KOLEEX Brand Guidelines: ${BOOK_CHAPTERS.length} chapters in 10 parts${ready < BOOK_CHAPTERS.length ? `, ${ready} written so far` : ""} — the story and the verbal and visual identity, digital, print and documents, product and packaging, places and events, people, partners and governance.`],
-            [<B key="a">1.0</B>, "Before 2.0", <>The first brand guidelines site, 36 sections. Kept online as an archive at <a key="l" href="https://koleex-gl.netlify.app" target="_blank" rel="noreferrer" className="text-[#3E6796] underline underline-offset-2 dark:text-[#7FA9D6]">koleex-gl.netlify.app</a>; where the two differ, this book decides.</>],
+            [<B key="a">{BOOK_VERSION.label}</B>, BOOK_VERSION.date, "The Apple-style identity, approved by the Founder & CEO: black and white first, one silver gradient, Hub Blue only for links and buttons, the full logo everywhere (no monogram), Inter / Noto Sans Arabic / Noto Sans SC, photographs instead of drawings, the Focus logo animation and the KOLEEX melody."],
+            [<B key="a">2.0</B>, "27/09/2026", `The new KOLEEX Brand Guidelines: ${BOOK_CHAPTERS.length} chapters in 10 parts${ready < BOOK_CHAPTERS.length ? `, ${ready} written so far` : ""} — the story and the verbal and visual identity, digital, print and documents, product and packaging, places and events, people, partners and governance.`],
+            [<B key="a">1.0</B>, "Before 2.0", <>The first brand guidelines site, 36 sections. Kept online as an archive at <a key="l" href="https://koleex-gl.netlify.app" target="_blank" rel="noreferrer" className="text-[var(--bk-link)] underline underline-offset-2">koleex-gl.netlify.app</a>; where the two differ, this book decides.</>],
           ]}
         />
       </Section>
 
       <Section id="how-changes" title="How the book changes">
         <Bullets items={[
-          <><B>2.x</B> — new chapters, clearer examples and corrections. They apply from the day they are published.</>,
-          <><B>3.0</B> — a change to a core rule (logo, colors, type). Announced to every team and partner first.</>,
+          <><B>3.x</B> — new chapters, clearer examples and corrections. They apply from the day they are published.</>,
+          <><B>4.0</B> — a change to a core rule (logo, colors, type). Announced to every team and partner first.</>,
           "Changes are approved by the Founder & CEO (ch. 134).",
           "Printed or downloaded copies go out of date; this page is always the current one.",
         ]} />

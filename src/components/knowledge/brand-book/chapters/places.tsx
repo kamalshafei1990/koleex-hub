@@ -4,7 +4,7 @@
    office signage, showroom, warehouse & factory signage, vehicles, events
    & training days.
 
-   Places are Core, always: black, white, one Hub line. Aurora appears only
+   Places are Core, always: black, white and silver. Aurora appears only
    on a screen that shows Koleex Hub itself (ch. 77). */
 
 import type { ReactNode } from "react";
@@ -16,8 +16,8 @@ import AutomaticMachineIcon from "@/components/icons/machine-kinds/AutomaticMach
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { HubMark, Monogram, Wordmark } from "../marks";
-import { HUB_LINE, INK, QrBox, Scaled, Slide } from "../mockups";
+import { HubMark, Wordmark } from "../marks";
+import { INK, QrBox, Scaled, Slide } from "../mockups";
 
 /* ── Drawings ──────────────────────────────────────────────────────────── */
 
@@ -25,8 +25,8 @@ import { HUB_LINE, INK, QrBox, Scaled, Slide } from "../mockups";
 function Plinth({ icon, left, w = 70 }: { icon: ReactNode; left: number; w?: number }) {
   return (
     <div className="absolute bottom-[14px] flex flex-col items-center" style={{ left, width: w }}>
-      <div className="text-[#0A0A0A]">{icon}</div>
-      <div className="mt-[2px] h-[42px] w-full rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D5DB" }} />
+      <div className="text-[#1D1D1F]">{icon}</div>
+      <div className="mt-[2px] h-[42px] w-full rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }} />
     </div>
   );
 }
@@ -34,7 +34,7 @@ function Plinth({ icon, left, w = 70 }: { icon: ReactNode; left: number; w?: num
 /** A 3 × 3 m shell-scheme booth, front elevation, designed at 360 × 240. */
 function Booth({ wrong = false }: { wrong?: boolean }) {
   return (
-    <div className="relative overflow-hidden" style={{ width: 360, height: 240, background: "#E5E7EB" }}>
+    <div className="relative overflow-hidden" style={{ width: 360, height: 240, background: "#D2D2D7" }}>
       {/* fascia */}
       <div className="absolute inset-x-0 top-0 flex h-[30px] items-center justify-center" style={{ background: wrong ? "#FFFFFF" : INK }}>
         {wrong
@@ -45,26 +45,26 @@ function Booth({ wrong = false }: { wrong?: boolean }) {
       <div className="absolute inset-x-[10px] top-[30px] bottom-[14px]" style={{ background: wrong ? "linear-gradient(135deg,#F97316,#8B5CF6)" : INK }}>
         {!wrong && (
           <div className="absolute left-[22px] top-[26px]">
-            <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Industrial Garment Machinery</p>
+            <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
             <p className="mt-1 text-[18px] font-bold leading-[1.05] text-white">Precise machines.<br />Honest advice.</p>
-            <span className="mt-2 block h-[2px] w-16" style={{ background: HUB_LINE }} />
+            
           </div>
         )}
         {wrong && <p className="absolute left-[16px] top-[18px] text-[9px] font-bold text-white">BEST PRICES!!! ALL MACHINES · SPARE PARTS · SERVICE · CALL NOW</p>}
         {/* screen */}
-        <div className="absolute right-[20px] top-[22px] flex h-[62px] w-[100px] items-center justify-center rounded-[3px] bg-[#1A1A1A]" style={{ boxShadow: "inset 0 0 0 2px #2E2E2E" }}>
+        <div className="absolute right-[20px] top-[22px] flex h-[62px] w-[100px] items-center justify-center rounded-[3px] bg-[#1D1D1F]" style={{ boxShadow: "inset 0 0 0 2px #38383A" }}>
           <HubMark variant="for-dark" style={{ width: 64 }} />
         </div>
       </div>
       {/* side walls */}
-      <div className="absolute bottom-[14px] left-0 top-[30px] w-[10px] bg-[#D1D5DB]" />
-      <div className="absolute bottom-[14px] right-0 top-[30px] w-[10px] bg-[#D1D5DB]" />
+      <div className="absolute bottom-[14px] left-0 top-[30px] w-[10px] bg-[#D1D1D6]" />
+      <div className="absolute bottom-[14px] right-0 top-[30px] w-[10px] bg-[#D1D1D6]" />
       {/* floor */}
-      <div className="absolute inset-x-0 bottom-0 h-[14px] bg-[#9CA3AF]" />
+      <div className="absolute inset-x-0 bottom-0 h-[14px] bg-[#98989D]" />
       <Plinth left={30} icon={<FlatBedMachineIcon size={40} style={{ color: "#FFFFFF" }} />} />
       <Plinth left={116} icon={<OverlockMachineIcon size={40} style={{ color: "#FFFFFF" }} />} />
       {/* counter */}
-      <div className="absolute bottom-[14px] right-[26px] flex h-[62px] w-[110px] items-center justify-center rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D5DB" }}>
+      <div className="absolute bottom-[14px] right-[26px] flex h-[62px] w-[110px] items-center justify-center rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }}>
         {wrong ? <span className="text-[7px] font-bold text-[#DC2626]">brochures · prices · flyers</span> : <Wordmark color="#000000" width={64} />}
       </div>
     </div>
@@ -78,13 +78,13 @@ function RollUp({ w = 96 }: { w?: number }) {
       <div className="relative overflow-hidden rounded-[2px]" style={{ width: w, aspectRatio: "850 / 2000", background: INK, boxShadow: "0 0 0 1px rgba(255,255,255,0.12)" }}>
         <div className="absolute inset-x-0 top-[8%] flex justify-center"><Wordmark color="#FFFFFF" width="60%" /></div>
         <div className="absolute inset-x-[10%] top-[26%]">
-          <p className="text-[5px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Overlock</p>
+          <p className="text-[5px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Overlock</p>
           <p className="mt-[2px] text-[9px] font-bold leading-[1.1] text-white">Clean edges.<br />Every time.</p>
         </div>
-        <div className="absolute inset-x-[10%] top-[46%] bottom-[22%] rounded-[2px] bg-[#1A1A1A]" />
-        <p className="absolute inset-x-0 bottom-[10%] text-center text-[5px] text-[#9CA3AF]">{KOLEEX_COMPANY.web}</p>
-        <div className="absolute inset-x-0 bottom-[6%] h-[2px]" style={{ background: HUB_LINE }} />
-        <div className="absolute inset-x-0 bottom-0 h-[5%] bg-[#2E2E2E]" />
+        <div className="absolute inset-x-[10%] top-[46%] bottom-[22%] rounded-[2px] bg-[#1D1D1F]" />
+        <p className="absolute inset-x-0 bottom-[10%] text-center text-[5px] text-[#98989D]">{KOLEEX_COMPANY.web}</p>
+        
+        <div className="absolute inset-x-0 bottom-0 h-[5%] bg-[#38383A]" />
       </div>
     </div>
   );
@@ -123,12 +123,12 @@ export function ExhibitionBooth() {
         <Rule why="A calm booth in a loud hall is the one people notice — and it looks like the machines: precise.">
           One logo, one message, real machines on white plinths. Everything else is space.
         </Rule>
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <Scaled w={300} base={360} h={240}><Booth /></Scaled>
         </Stage>
         <Specs rows={[
           ["Fascia", "Our logo panel replaces the organizer’s lettering wherever the rules allow; logo height at most 60% of the fascia (ch. 38)"],
-          ["Back wall", "Black, one headline, the descriptor as a label, the Hub line"],
+          ["Back wall", "Black, one headline in silver or white, the machine lit from above"],
           ["Machines", "Real machines, running, on white plinths 750–800 mm high, 1–2 per 9 m²"],
           ["Screen", "Koleex Hub or product video — this is where Aurora may appear (ch. 77)"],
           ["Light", "Neutral white 4000 K on the machines; no colored lighting"],
@@ -161,10 +161,10 @@ export function ExhibitionBooth() {
 
       <Section id="booth-never" title="What never to do">
         <Examples cols={2}>
-          <Example tone="do" caption="Black wall, one message, machines to touch." bg="#F5F5F5" h={220}>
+          <Example tone="do" caption="Black wall, one message, machines to touch." bg="#F5F5F7" h={220}>
             <Scaled w={250} base={360} h={240}><Booth /></Scaled>
           </Example>
-          <Example tone="dont" caption="Organizer lettering, gradients, prices and every message at once." bg="#F5F5F5" h={220}>
+          <Example tone="dont" caption="Organizer lettering, gradients, prices and every message at once." bg="#F5F5F7" h={220}>
             <Scaled w={250} base={360} h={240}><Booth wrong /></Scaled>
           </Example>
         </Examples>
@@ -198,14 +198,14 @@ export function ExhibitionKit() {
       ]}
     >
       <Section id="rollup" title="Roll-up and table cover">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-end justify-center gap-8">
             <RollUp w={96} />
             <div className="flex flex-col items-center">
               <div className="relative w-[200px] overflow-hidden rounded-t-[2px]" style={{ height: 70, background: INK }}>
                 <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={80} /></div>
               </div>
-              <div className="flex w-[200px] justify-between"><span className="h-3 w-1 bg-[#9CA3AF]" /><span className="h-3 w-1 bg-[#9CA3AF]" /></div>
+              <div className="flex w-[200px] justify-between"><span className="h-3 w-1 bg-[#98989D]" /><span className="h-3 w-1 bg-[#98989D]" /></div>
             </div>
           </div>
         </Stage>
@@ -235,15 +235,15 @@ export function ExhibitionKit() {
       </Section>
 
       <Section id="badges" title="Badges and lanyards">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-col items-center">
-            <div className="h-10 w-[14px] rounded-t-sm bg-[#0A0A0A]" />
-            <div className="w-[120px] overflow-hidden rounded-[4px] bg-white text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "86 / 120" }}>
-              <div className="flex h-[26%] items-center justify-center bg-[#0A0A0A]"><Wordmark color="#FFFFFF" width={56} /></div>
+            <div className="h-10 w-[14px] rounded-t-sm bg-[#000000]" />
+            <div className="w-[120px] overflow-hidden rounded-[4px] bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "86 / 120" }}>
+              <div className="flex h-[26%] items-center justify-center bg-[#000000]"><Wordmark color="#FFFFFF" width={56} /></div>
               <div className="px-2 pt-3 text-center">
                 <p className="text-[11px] font-bold">Full Name</p>
-                <p className="text-[7px] text-[#4B5563]">Sales Engineer</p>
-                <p className="mt-2 text-[6.5px] tracking-[0.12em] text-[#4B5563]">EN · <span lang="ar">العربية</span> · <span lang="zh-Hans">中文</span></p>
+                <p className="text-[7px] text-[#6E6E73]">Sales Engineer</p>
+                <p className="mt-2 text-[6.5px] tracking-[0.12em] text-[#6E6E73]">EN · <span lang="ar">العربية</span> · <span lang="zh-Hans">中文</span></p>
               </div>
             </div>
           </div>
@@ -291,7 +291,7 @@ export function CismaPlaybook() {
           {CISMA_STEPS.map(([when, what, items], i) => (
             <div key={when} className="grid grid-cols-[28px_minmax(0,1fr)] gap-3">
               <div className="flex flex-col items-center">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: i === 3 ? "#3E6796" : "#1A1A1A", boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>{i + 1}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: i === 3 ? "#F5F5F7" : "#1D1D1F", color: i === 3 ? "#000000" : "#FFFFFF", boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>{i + 1}</span>
                 {i < CISMA_STEPS.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--border-subtle)]" />}
               </div>
               <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
@@ -364,18 +364,18 @@ export function OfficeSignage() {
     >
       <Section id="entrance" title="Entrance and reception">
         <Examples cols={2}>
-          <Example tone="do" caption="Entrance plate, Taizhou: logo, legal names in English and Chinese." bg="#D1D5DB" h={200}>
+          <Example tone="do" caption="Entrance plate, Taizhou: logo, legal names in English and Chinese." bg="#D1D1D6" h={200}>
             <Sign w={220} h={130} dark>
               <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center">
                 <Wordmark color="#FFFFFF" width={110} />
-                <p className="text-[5.5px] font-semibold tracking-[0.04em] text-[#D1D5DB]">{KOLEEX_COMPANY.en}</p>
-                <p lang="zh-Hans" className="text-[7px] text-[#D1D5DB]">{KOLEEX_COMPANY.zh}</p>
+                <p className="text-[5.5px] font-semibold tracking-[0.04em] text-[#D1D1D6]">{KOLEEX_COMPANY.en}</p>
+                <p lang="zh-Hans" className="text-[7px] text-[#D1D1D6]">{KOLEEX_COMPANY.zh}</p>
               </div>
             </Sign>
           </Example>
           <Example tone="do" caption="Reception wall: the logo alone, cut from the material." bg="#FFFFFF" h={200}>
-            <div className="flex h-[130px] w-[240px] items-center justify-center rounded-[2px]" style={{ background: "#F5F5F5", boxShadow: "inset 0 0 0 1px #E5E7EB" }}>
-              <div style={{ filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.12))" }}><Wordmark color="#0A0A0A" width={140} /></div>
+            <div className="flex h-[130px] w-[240px] items-center justify-center rounded-[2px]" style={{ background: "#F5F5F7", boxShadow: "inset 0 0 0 1px #D2D2D7" }}>
+              <div style={{ filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.12))" }}><Wordmark color="#000000" width={140} /></div>
             </div>
           </Example>
         </Examples>
@@ -386,27 +386,27 @@ export function OfficeSignage() {
       </Section>
 
       <Section id="rooms" title="Room signs">
-        <Stage bg="#E5E7EB" h="auto" pad={24}>
+        <Stage bg="#D2D2D7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Sign w={150} h={60}>
               <div className="flex h-full flex-col justify-center px-3">
                 <p className="text-[11px] font-bold">Meeting Room 1</p>
-                <p lang="zh-Hans" className="text-[8px] text-[#4B5563]">会议室 1</p>
+                <p lang="zh-Hans" className="text-[8px] text-[#6E6E73]">会议室 1</p>
               </div>
-              <span className="absolute bottom-0 left-0 h-[2px] w-10" style={{ background: HUB_LINE }} />
+              
             </Sign>
             <Sign w={150} h={60}>
               <div className="flex h-full flex-col justify-center px-3">
                 <p className="text-[11px] font-bold">Meeting Room 1</p>
-                <p dir="rtl" lang="ar" className="text-[9px] text-[#4B5563]">غرفة الاجتماعات ١</p>
+                <p dir="rtl" lang="ar" className="text-[9px] text-[#6E6E73]">غرفة الاجتماعات ١</p>
               </div>
-              <span className="absolute bottom-0 left-0 h-[2px] w-10" style={{ background: HUB_LINE }} />
+              
             </Sign>
           </div>
         </Stage>
         <Bullets items={[
           "English first, then the local language: Chinese in China, Arabic in Egypt.",
-          "White plate, black Inter Bold; a short Hub line is the only color.",
+          "White plate, black Inter SemiBold — no color.",
           "Pictograms from the icon set (ch. 58) — never clip art.",
         ]} />
       </Section>
@@ -414,7 +414,7 @@ export function OfficeSignage() {
       <Section id="glass" title="Glass">
         <P>
           Glass doors and walls carry a frosted band at eye height (about 1400–1600 mm) so no one walks into
-          them. The band may carry the K monogram repeated, or the logo once, frosted — never a colored print.
+          them. The band may carry the logo once, frosted — never a colored print.
         </P>
       </Section>
 
@@ -455,35 +455,35 @@ export function Showroom() {
       ]}
     >
       <Section id="plan" title="The plan">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
-          <div className="grid w-[280px] grid-cols-2 gap-2 rounded-[4px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <div className="grid w-[280px] grid-cols-2 gap-2 rounded-[4px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
             {zones.map(([name, icon]) => (
-              <div key={name} className="flex flex-col items-center justify-center gap-1 rounded-[3px] border border-[#E5E7EB] py-3">
+              <div key={name} className="flex flex-col items-center justify-center gap-1 rounded-[3px] border border-[#D2D2D7] py-3">
                 {icon}
                 <span className="text-[8px] font-semibold uppercase tracking-[0.1em]">{name}</span>
               </div>
             ))}
-            <div className="col-span-2 flex items-center justify-between rounded-[3px] bg-[#0A0A0A] px-3 py-2 text-white">
+            <div className="col-span-2 flex items-center justify-between rounded-[3px] bg-[#000000] px-3 py-2 text-white">
               <span className="text-[8px] font-semibold uppercase tracking-[0.1em]">Meeting table · Koleex Hub</span>
-              <Monogram color="#FFFFFF" style={{ width: 10 }} />
+              <Wordmark color="#FFFFFF" width={40} />
             </div>
           </div>
         </Stage>
       </Section>
 
       <Section id="spec-card" title="The spec card">
-        <Stage bg="#E5E7EB" h="auto" pad={24}>
-          <div className="w-[160px] rounded-[3px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "148 / 210" }}>
+        <Stage bg="#D2D2D7" h="auto" pad={24}>
+          <div className="w-[160px] rounded-[3px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "148 / 210" }}>
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between"><Wordmark color="#000000" width={46} /><OverlockMachineIcon size={14} /></div>
               <p className="mt-3 text-[11px] font-bold">Model name</p>
-              <p className="text-[6.5px] text-[#4B5563]">Overlock · 4-thread</p>
-              <div className="mt-2 overflow-hidden rounded-[2px] border border-[#E5E7EB] text-[6px]">
+              <p className="text-[6.5px] text-[#6E6E73]">Overlock · 4-thread</p>
+              <div className="mt-2 overflow-hidden rounded-[2px] border border-[#D2D2D7] text-[6px]">
                 {[["Max speed", "— SPM"], ["Stitch width", "— mm"], ["Motor", "—"]].map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-[#E5E7EB] px-1 py-[2px] last:border-0"><span>{k}</span><span className="font-mono">{v}</span></div>
+                  <div key={k} className="flex justify-between border-b border-[#D2D2D7] px-1 py-[2px] last:border-0"><span>{k}</span><span className="font-mono">{v}</span></div>
                 ))}
               </div>
-              <div className="mt-auto flex items-end justify-between"><span className="text-[5.5px] text-[#4B5563]">Scan for the full page</span><QrBox size={26} /></div>
+              <div className="mt-auto flex items-end justify-between"><span className="text-[5.5px] text-[#6E6E73]">Scan for the full page</span><QrBox size={26} /></div>
             </div>
           </div>
         </Stage>
@@ -521,19 +521,19 @@ export function WarehouseSignage() {
       ]}
     >
       <Section id="zones-signs" title="Zone and rack signs">
-        <Stage bg="#D1D5DB" h="auto" pad={24}>
+        <Stage bg="#D1D1D6" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Sign w={130} h={150} dark>
               <div className="flex h-full flex-col items-center justify-center">
                 <p className="text-[64px] font-black leading-none">A</p>
                 <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em]">Machine heads</p>
-                <p lang="zh-Hans" className="text-[9px] text-[#9CA3AF]">机头</p>
+                <p lang="zh-Hans" className="text-[9px] text-[#98989D]">机头</p>
               </div>
             </Sign>
             <Sign w={130} h={50}>
               <div className="flex h-full items-center justify-between px-3">
                 <span className="text-[20px] font-black" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>A-03-2</span>
-                <span className="inline-block h-7 w-7" style={{ background: "repeating-linear-gradient(90deg,#0A0A0A 0 1px,transparent 1px 3px)" }} />
+                <span className="inline-block h-7 w-7" style={{ background: "repeating-linear-gradient(90deg,#000000 0 1px,transparent 1px 3px)" }} />
               </div>
             </Sign>
           </div>
@@ -569,11 +569,11 @@ export function WarehouseSignage() {
 function Van({ wrong = false }: { wrong?: boolean }) {
   return (
     <div className="relative" style={{ width: 320, height: 150 }}>
-      <div className="absolute left-[10px] top-[24px] h-[96px] w-[230px] rounded-[10px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #C9CED6" }} />
-      <div className="absolute left-[236px] top-[46px] h-[74px] w-[74px] rounded-r-[26px] rounded-tl-[6px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #C9CED6" }} />
-      <div className="absolute left-[252px] top-[54px] h-[26px] w-[40px] rounded-r-[14px] rounded-tl-[3px] bg-[#9CA3AF]" />
+      <div className="absolute left-[10px] top-[24px] h-[96px] w-[230px] rounded-[10px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #D1D1D6" }} />
+      <div className="absolute left-[236px] top-[46px] h-[74px] w-[74px] rounded-r-[26px] rounded-tl-[6px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #D1D1D6" }} />
+      <div className="absolute left-[252px] top-[54px] h-[26px] w-[40px] rounded-r-[14px] rounded-tl-[3px] bg-[#98989D]" />
       {[52, 250].map((l) => (
-        <div key={l} className="absolute top-[106px] h-[36px] w-[36px] rounded-full bg-[#1A1A1A]" style={{ left: l, boxShadow: "inset 0 0 0 9px #1A1A1A, inset 0 0 0 14px #9CA3AF" }} />
+        <div key={l} className="absolute top-[106px] h-[36px] w-[36px] rounded-full bg-[#1D1D1F]" style={{ left: l, boxShadow: "inset 0 0 0 9px #1D1D1F, inset 0 0 0 14px #98989D" }} />
       ))}
       {wrong ? (
         <div className="absolute left-[24px] top-[36px] w-[200px] -rotate-3 space-y-0.5">
@@ -584,8 +584,8 @@ function Van({ wrong = false }: { wrong?: boolean }) {
       ) : (
         <div className="absolute left-[30px] top-[48px] flex flex-col gap-2">
           <Wordmark color="#000000" width={130} />
-          <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#4B5563]">Industrial Garment Machinery</p>
-          <p className="text-[7px] text-[#0A0A0A]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>{KOLEEX_COMPANY.web}</p>
+          <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#6E6E73]">Industrial Garment Machinery</p>
+          <p className="text-[7px] text-[#1D1D1F]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>{KOLEEX_COMPANY.web}</p>
         </div>
       )}
     </div>
@@ -609,10 +609,10 @@ export function Vehicles() {
     >
       <Section id="livery" title="The livery">
         <Examples cols={2}>
-          <Example tone="do" caption="White body; logo, descriptor, website." bg="#F5F5F5" h={180}>
+          <Example tone="do" caption="White body; logo, descriptor, website." bg="#F5F5F7" h={180}>
             <Scaled w={260} base={320} h={150}><Van /></Scaled>
           </Example>
-          <Example tone="dont" caption="Colors, slogans, a list of services and phone numbers." bg="#F5F5F5" h={180}>
+          <Example tone="dont" caption="Colors, slogans, a list of services and phone numbers." bg="#F5F5F7" h={180}>
             <Scaled w={260} base={320} h={150}><Van wrong /></Scaled>
           </Example>
         </Examples>
@@ -655,21 +655,21 @@ export function EventsTraining() {
       ]}
     >
       <Section id="pieces" title="The pieces">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-5">
             <Slide w={240} dark>
               <div className="absolute inset-0 flex flex-col p-4">
                 <Wordmark color="#FFFFFF" width={54} />
-                <p className="mt-auto text-[6px] font-semibold uppercase tracking-[0.2em] text-[#7FA9D6]">Training day · Overlock</p>
+                <p className="mt-auto text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Training day · Overlock</p>
                 <p className="mt-1 text-[14px] font-bold leading-tight">Setup, threading<br />and daily care</p>
-                <span className="mt-2 block h-[2px] w-14" style={{ background: HUB_LINE }} />
+                
               </div>
             </Slide>
-            <div className="w-[150px] rounded-[3px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
-              <p className="text-[7px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">Agenda</p>
+            <div className="w-[150px] rounded-[3px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+              <p className="text-[7px] font-semibold uppercase tracking-[0.14em] text-[#6E6E73]">Agenda</p>
               <div className="mt-1.5 space-y-1 text-[7px]">
                 {[["09:30", "Welcome"], ["10:00", "Setup and threading"], ["12:00", "Lunch"], ["13:00", "Practice on the machines"], ["15:30", "Certificates"]].map(([t, l]) => (
-                  <div key={t} className="flex gap-2"><span className="w-8 shrink-0 font-mono text-[#4B5563]">{t}</span><span>{l}</span></div>
+                  <div key={t} className="flex gap-2"><span className="w-8 shrink-0 font-mono text-[#6E6E73]">{t}</span><span>{l}</span></div>
                 ))}
               </div>
             </div>
@@ -692,12 +692,12 @@ export function EventsTraining() {
           Tell every guest that photos are taken, and photograph only those who agree. Anyone who says no is
           never in a published photo.
         </Rule>
-        <Stage bg="#E5E7EB" h="auto" pad={24}>
+        <Stage bg="#D2D2D7" h="auto" pad={24}>
           <Sign w={200} h={110}>
             <div className="flex h-full flex-col justify-center gap-1 px-4">
-              <Monogram color="#000000" style={{ width: 12 }} />
-              <p className="text-[10px] font-bold">Photos are taken at this event.</p>
-              <p className="text-[7px] text-[#4B5563]">If you prefer not to appear, tell our team — we will not photograph you.</p>
+              <Wordmark color="#000000" width={46} />
+              <p className="mt-1 text-[10px] font-bold">Photos are taken at this event.</p>
+              <p className="text-[7px] text-[#6E6E73]">If you prefer not to appear, tell our team — we will not photograph you.</p>
             </div>
           </Sign>
         </Stage>

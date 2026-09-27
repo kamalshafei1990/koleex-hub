@@ -2,9 +2,14 @@
 
 /* Chapters 70–74: video, the video kit, motion, logo animation, sound.
 
-   The motion values are the Hub's own tokens (globals.css --kx-dur-* and
-   --kx-ease-*), and the sounds are the Hub's own files under public/sounds —
-   the book plays the real thing. Every demo respects prefers-reduced-motion. */
+   Owner decisions (27/09/2026): brand films are SLOW and PREMIUM (a slow
+   orbit around the machine, close-ups, one word on screen); the logo
+   animation is "Focus" (from a soft blur to sharp, 1.8 s); music depends on
+   the video style; the KOLEEX melody is M4 — D E G A → D.
+
+   The interface motion values are the Hub's own tokens (globals.css
+   --kx-dur-* and --kx-ease-*), and the Hub sounds are its own files under
+   public/sounds. Every demo respects prefers-reduced-motion. */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import PlayIcon from "@/components/icons/ui/PlayIcon";
@@ -13,6 +18,8 @@ import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { MachineShot } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -26,11 +33,11 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-function Frame({ ratio = "16/9", w = 240, bg = "#0A0A0A", children, label }: { ratio?: string; w?: number; bg?: string; children?: ReactNode; label?: string }) {
+function Frame({ ratio = "16/9", w = 240, bg = "#000000", children, label }: { ratio?: string; w?: number; bg?: string; children?: ReactNode; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="relative overflow-hidden rounded-md shadow-[0_0_0_1px_rgba(255,255,255,0.12)]" style={{ width: w, aspectRatio: ratio, background: bg }}>{children}</div>
-      {label && <span className="font-mono text-[10px] text-[#4B5563]">{label}</span>}
+      {label && <span className="font-mono text-[11px] text-[#6E6E73]">{label}</span>}
     </div>
   );
 }
@@ -43,11 +50,12 @@ export function Video() {
       n={70}
       lead={
         <p>
-          Video shows what a photograph cannot: a machine running, a seam forming, a technician at work.
-          KOLEEX videos are short, steady, subtitled — and, like our photographs, always real.
+          Video shows what a photograph cannot: a machine running, a seam forming. KOLEEX films are slow,
+          quiet and premium — the machine turning on black, one word at a time.
         </p>
       }
       toc={[
+        { id: "film", title: "The KOLEEX film" },
         { id: "kinds", title: "Kinds of video" },
         { id: "shooting", title: "Shooting" },
         { id: "formats", title: "Formats" },
@@ -56,6 +64,28 @@ export function Video() {
         { id: "video-donts", title: "What never to do" },
       ]}
     >
+      <Section id="film" title="The KOLEEX film">
+        <Stage bg="#000000" h="auto" pad={40}>
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
+            {[["1", "The machine on black, turning slowly"], ["2", "A close-up: the needle, the stitch"], ["3", "One word on screen — then the logo"]].map(([n, t]) => (
+              <div key={n} className="flex flex-col items-center gap-3 text-center">
+                <div className="flex aspect-video w-full items-center justify-center rounded-[14px] bg-[#000000] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+                  {n === "1" ? <MachineShot w="70%" label={false} /> : n === "2" ? <span className="text-[11px] text-[#6E6E73]">Macro close-up</span> : <span className="text-[26px] font-semibold tracking-[-0.03em]" style={{ backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Precise.</span>}
+                </div>
+                <p className="text-[13px] text-[#98989D]">{t}</p>
+              </div>
+            ))}
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Camera", "Slow — a smooth orbit or push-in on a slider or gimbal; never handheld, never fast"],
+          ["Shots", "Long holds of 3–6 s; cuts on the beat, short fades"],
+          ["Set", "The machine on pure black, one top light (ch. 64)"],
+          ["Words", "One to three words on screen at a time, Inter SemiBold, silver or white"],
+          ["End", "The logo animation and the KOLEEX melody (ch. 73, 74)"],
+        ]} />
+      </Section>
+
       <Section id="kinds" title="Kinds of video">
         <Table
           head={["Video", "Length", "Main format"]}
@@ -83,7 +113,7 @@ export function Video() {
       </Section>
 
       <Section id="formats" title="Formats">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <div className="flex flex-wrap items-end justify-center gap-6">
             <Frame ratio="16/9" w={220} label="16:9 · 1920×1080" />
             <Frame ratio="1/1" w={124} label="1:1 · 1080×1080" />
@@ -102,9 +132,9 @@ export function Video() {
       </Section>
 
       <Section id="safe" title="Safe areas for vertical video">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
           <div className="flex items-center gap-8">
-            <div className="relative overflow-hidden rounded-md bg-[#0A0A0A]" style={{ width: 150, aspectRatio: "9/16" }}>
+            <div className="relative overflow-hidden rounded-md bg-[#000000]" style={{ width: 150, aspectRatio: "9/16" }}>
               <div className="absolute inset-x-0 top-0 bg-[#DC2626]/35" style={{ height: `${(250 / 1920) * 100}%` }} />
               <div className="absolute inset-x-0 bottom-0 bg-[#DC2626]/35" style={{ height: `${(420 / 1920) * 100}%` }} />
               <div className="absolute inset-y-0 left-0 bg-[#DC2626]/35" style={{ width: `${(72 / 1080) * 100}%` }} />
@@ -121,12 +151,22 @@ export function Video() {
         </Stage>
       </Section>
 
-      <Section id="music" title="Music">
+      <Section id="music" title="Music — by video style">
+        <Table
+          head={["Video", "Music"]}
+          rows={[
+            [<B key="a">Product film</B>, "Calm electronic, with the machine’s stitch rhythm inside it"],
+            [<B key="a">Factory and process</B>, "The machine’s own sound — little or no music"],
+            [<B key="a">Launch, fair, big moment</B>, "Cinematic — deep hits and a rising pad"],
+            [<B key="a">How-to and tutorial</B>, "Very quiet background music, or none"],
+            [<B key="a">Founder and customer stories</B>, "Soft piano or none — the voice leads"],
+            [<B key="a">Religious occasions</B>, "No music, or very calm instrumental only"],
+          ]}
+        />
         <Bullets items={[
-          <><B>Licensed music only</B> — from the platform’s own library or bought with a licence that covers our use. Never popular songs.</>,
-          "Instrumental, calm and modern; sits 15–20 dB below any voice.",
-          "Videos for religious occasions use no music, or only very calm instrumental music.",
-          <>The sound rules for the Hub and the logo are in <Ref n={74} />.</>,
+          <><B>Licensed music only</B> — never popular songs.</>,
+          "Music sits 15–20 dB below any voice.",
+          <>Every film ends with the KOLEEX melody (<Ref n={74} />).</>,
         ]} />
       </Section>
 
@@ -163,53 +203,53 @@ export function VideoKit() {
       ]}
     >
       <Section id="intro" title="Intro — 2 to 3 seconds">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Frame label="0.0 s — Ink"><span /></Frame>
-            <Frame label="0.6 s — logo revealed"><div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={110} /></div></Frame>
-            <Frame label="1.4 s — Hub line"><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width={110} /><div className="h-[2px] w-[110px]" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }} /></div></Frame>
+            <Frame label="0.0 s — black"><span /></Frame>
+            <Frame label="0.3–2.1 s — the logo comes into focus"><div className="absolute inset-0 flex items-center justify-center" style={{ filter: "blur(3px)", opacity: 0.6 }}><Wordmark color="#FFFFFF" width={110} /></div></Frame>
+            <Frame label="2.1 s — sharp, hold"><div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={110} /></div></Frame>
           </div>
         </Stage>
-        <P>The logo movement is the standard sting in <Ref n={73} />. Cut to the first shot after 2–3 seconds.</P>
+        <P>The logo movement is Focus (<Ref n={73} />), with the short melody (<Ref n={74} />). Cut to the first shot after 2–3 seconds.</P>
       </Section>
 
       <Section id="outro" title="Outro — 3 to 4 seconds">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
-          <Frame w={320}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
+          <Frame w={340}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
               <Wordmark color="#FFFFFF" width={150} />
-              <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-[#9CA3AF]">Industrial Garment Machinery</span>
-              <span className="mt-2 font-mono text-[8px] text-[#7FA9D6]">www.koleexgroup.com</span>
+              <span className="text-[8px] font-semibold tracking-[0.2em] text-[#98989D]">INDUSTRIAL GARMENT MACHINERY</span>
+              <span className="mt-2 font-mono text-[9px] text-[#D1D1D6]">www.koleexgroup.com</span>
             </div>
           </Frame>
         </Stage>
         <Specs rows={[
-          ["Content", "Logo, descriptor (or tagline), one contact: website or WhatsApp"],
-          ["Background", "Ink #0A0A0A"],
-          ["Never", "A list of every social account, phone numbers in several countries, or music louder than the rest of the video"],
+          ["Content", "Logo, descriptor (or tagline), one contact: the website or WhatsApp"],
+          ["Background", "Black #000000"],
+          ["Sound", "The KOLEEX melody, outro version"],
+          ["Never", "A list of every social account, phone numbers in several countries"],
         ]} />
       </Section>
 
       <Section id="lower-thirds" title="Name titles">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
-          <Frame w={340} bg="#4B5563">
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
+          <Frame w={340} bg="#3A3A3C">
             <div className="absolute bottom-[12%] left-[6%]">
               <p className="text-[11px] font-semibold text-white">Full Name</p>
-              <p className="text-[8px] text-[#E5E7EB]">Technical Engineer · KOLEEX</p>
-              <div className="mt-1 h-[2px] w-10" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }} />
+              <p className="text-[8px] text-[#D1D1D6]">Technical Engineer · KOLEEX</p>
             </div>
           </Frame>
         </Stage>
         <Specs rows={[
           ["Position", "Bottom-left (bottom-right in Arabic), inside the safe area"],
           ["Type", "Name: Inter SemiBold · Title: Inter Regular, 70% size"],
-          ["On screen", "4–5 seconds, fade in and out (160 ms)"],
+          ["On screen", "4–5 seconds, a slow fade in and out (400 ms)"],
         ]} />
       </Section>
 
       <Section id="subtitles" title="Subtitles">
-        <Stage bg="#F5F5F5" h="auto" pad={20}>
-          <Frame w={340} bg="#4B5563">
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
+          <Frame w={340} bg="#3A3A3C">
             <div className="absolute inset-x-0 bottom-[10%] flex justify-center">
               <span className="rounded bg-black/60 px-2 py-1 text-center text-[10px] font-semibold leading-tight text-white">Every machine is tested before it ships.</span>
             </div>
@@ -227,7 +267,7 @@ export function VideoKit() {
 
       <Section id="thumbnail" title="Thumbnails">
         <Examples cols={2}>
-          <Example tone="do" caption="One strong frame, a short title, the logo small." bg="#F5F5F5" h={180}>
+          <Example tone="do" caption="One strong frame, a short title, the logo small." bg="#F5F5F7" h={180}>
             <Frame w={240}>
               <div className="absolute inset-0 flex flex-col justify-between p-3">
                 <Wordmark color="#FFFFFF" width={50} />
@@ -235,7 +275,7 @@ export function VideoKit() {
               </div>
             </Frame>
           </Example>
-          <Example tone="dont" caption="Arrows, red circles, shocked faces, long titles." bg="#F5F5F5" h={180}>
+          <Example tone="dont" caption="Arrows, red circles, shocked faces, long titles." bg="#F5F5F7" h={180}>
             <Frame w={240} bg="#DC2626">
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-2 text-center">
                 <p className="text-[13px] font-black text-[#FDE047]">YOU WON’T BELIEVE THIS MACHINE!!!</p>
@@ -244,7 +284,7 @@ export function VideoKit() {
             </Frame>
           </Example>
         </Examples>
-        <Specs rows={[["Size", "1280 × 720 px (YouTube) · 1080 × 1920 cover for vertical"], ["Title", "3–6 words, Inter Bold"]]} />
+        <Specs rows={[["Size", "1280 × 720 px (YouTube) · 1080 × 1920 cover for vertical"], ["Title", "3–6 words, Inter SemiBold, white or silver"]]} />
       </Section>
     </Chapter>
   );
@@ -276,18 +316,19 @@ function EaseDemo() {
       <button
         type="button"
         onClick={() => setOn((v) => !v)}
-        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0A0A0A] px-3 text-[12.5px] font-semibold text-white"
+        className="inline-flex h-10 items-center gap-2 rounded-full px-5 text-[14px] font-medium text-white"
+        style={{ background: "#567FB2" }}
       >
         <PlayIcon size={12} />Play the curves
       </button>
       {EASES.map(([name, curve]) => (
         <div key={name} className="flex items-center gap-3">
-          <span className="w-20 shrink-0 font-mono text-[11px] text-[#4B5563]">{name}</span>
-          <div className="relative h-6 flex-1 rounded-full bg-[#F5F5F5]">
+          <span className="w-20 shrink-0 font-mono text-[11px] text-[#6E6E73]">{name}</span>
+          <div className="relative h-6 flex-1 rounded-full bg-[#F5F5F7]">
             <span
               className="absolute top-1 h-4 w-4 rounded-full"
               style={{
-                background: "#567FB2",
+                background: "#1D1D1F",
                 left: on ? "calc(100% - 20px)" : 4,
                 transition: reduced ? "none" : `left 900ms ${curve}`,
               }}
@@ -295,7 +336,7 @@ function EaseDemo() {
           </div>
         </div>
       ))}
-      <p className="text-[11px] text-[#4B5563]">Slowed to 900 ms so the shape of each curve is visible.{reduced ? " Motion is reduced on this device, so the dots jump." : ""}</p>
+      <p className="text-[11px] text-[#6E6E73]">Slowed to 900 ms so the shape of each curve is visible.{reduced ? " Motion is reduced on this device, so the dots jump." : ""}</p>
     </div>
   );
 }
@@ -306,11 +347,12 @@ export function Motion() {
       n={72}
       lead={
         <p>
-          Motion explains what changed: where something came from, where it went. KOLEEX motion is quick,
-          quiet and precise — it never performs for its own sake.
+          KOLEEX moves at two speeds. Brand films and marketing are slow and premium. The Koleex Hub
+          interface is quick and precise. Neither ever performs for its own sake.
         </p>
       }
       toc={[
+        { id: "two-speeds", title: "Two speeds" },
         { id: "principles", title: "Principles" },
         { id: "durations", title: "Durations" },
         { id: "curves", title: "Curves" },
@@ -319,10 +361,22 @@ export function Motion() {
         { id: "reduced", title: "Reduced motion" },
       ]}
     >
+      <Section id="two-speeds" title="Two speeds">
+        <Table
+          head={["", "Brand — films, ads, the website hero", "Interface — Koleex Hub"]}
+          rows={[
+            [<B key="a">Feel</B>, "Slow, calm, premium", "Quick, quiet, precise"],
+            [<B key="a">Durations</B>, "1.2–2.4 s for an entrance; holds of 3–6 s", "80–460 ms (the tokens below)"],
+            [<B key="a">Curve</B>, "Expo out — cubic-bezier(0.16, 1, 0.3, 1)", "By token"],
+            [<B key="a">Moves</B>, "Slow push-ins, focus pulls, fades, a gentle rise", "Fade, slide, scale"],
+          ]}
+        />
+      </Section>
+
       <Section id="principles" title="Principles">
         <Bullets items={[
           <><B>Purposeful</B> — every movement shows a change of place or state.</>,
-          <><B>Quick</B> — interface motion is over in less than half a second.</>,
+          <><B>The right speed</B> — slow in films, quick in the interface. Never in between.</>,
           <><B>2D</B> — slide, fade and scale. No 3D turns, no spins.</>,
           <><B>Light</B> — only position, scale and opacity animate, so motion stays smooth on any phone.</>,
         ]} />
@@ -353,8 +407,8 @@ export function Motion() {
 
       <Section id="video-motion" title="Motion in video and graphics">
         <Bullets items={[
-          "Cuts and short fades between shots. No wipes, spins, 3D flips or glitch effects.",
-          "Text arrives with a fade and a small rise (8–16 px), 240–320 ms.",
+          "Long holds, slow camera moves, cuts on the beat and soft fades. No wipes, spins, 3D flips or glitch effects.",
+          "Words arrive with a slow fade and a small rise (16–24 px), 800–1200 ms.",
           "Numbers may count up once; charts may grow once. Nothing loops.",
         ]} />
       </Section>
@@ -375,36 +429,25 @@ function Sting() {
   const reduced = useReducedMotion();
   const [run, setRun] = useState(0);
   return (
-    <div className="flex w-full flex-col items-center gap-4">
-      <div className="relative flex h-[200px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#0A0A0A]">
-        <div key={run} className="flex flex-col items-center gap-3">
-          <div
-            style={{
-              clipPath: "inset(0 0 0 0)",
-              animation: reduced || run === 0 ? undefined : "kxbb-reveal 600ms cubic-bezier(0.16,1,0.3,1) both",
-            }}
-          >
-            <Wordmark color="#FFFFFF" width={240} />
-          </div>
-          <div
-            className="h-[3px] w-[240px] origin-left"
-            style={{
-              background: "linear-gradient(90deg,#567FB2,#BCD8F0)",
-              animation: reduced || run === 0 ? undefined : "kxbb-line 600ms cubic-bezier(0.22,1,0.36,1) 1000ms both",
-            }}
-          />
+    <div className="flex w-full flex-col items-center gap-5">
+      <div className="relative flex h-[240px] w-full items-center justify-center overflow-hidden rounded-[20px] bg-black">
+        <div
+          key={run}
+          style={{ animation: reduced || run === 0 ? undefined : "kxbb-focus 1800ms cubic-bezier(0.16,1,0.3,1) both" }}
+        >
+          <Wordmark color="#FFFFFF" width={260} />
         </div>
       </div>
       <button
         type="button"
         onClick={() => setRun((r) => r + 1)}
-        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0A0A0A] px-3 text-[12.5px] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
+        className="inline-flex h-10 items-center gap-2 rounded-full px-5 text-[14px] font-medium text-white"
+        style={{ background: "#567FB2" }}
       >
-        <PlayIcon size={12} />Play the sting
+        <PlayIcon size={12} />Play Focus
       </button>
       <style>{`
-        @keyframes kxbb-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-        @keyframes kxbb-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        @keyframes kxbb-focus { from { opacity: 0; filter: blur(14px); transform: scale(1.1); } to { opacity: 1; filter: blur(0); transform: scale(1); } }
       `}</style>
     </div>
   );
@@ -414,55 +457,194 @@ export function LogoAnimation() {
   return (
     <Chapter
       n={73}
-      lead={
-        <p>
-          The logo moves as one piece. It is revealed, never assembled: the artwork stays exactly as drawn,
-          and only the way it appears is animated.
-        </p>
-      }
+      lead={<p>The logo arrives the way a camera finds focus: out of a soft blur, into sharp detail. One movement, slow and calm — that is Focus.</p>}
       toc={[
-        { id: "sting", title: "The standard sting" },
+        { id: "sting", title: "Focus" },
+        { id: "timing", title: "Timing" },
         { id: "allowed", title: "Allowed movements" },
         { id: "never", title: "Never" },
         { id: "files", title: "Files" },
       ]}
     >
-      <Section id="sting" title="The standard sting">
-        <Stage bg="#FFFFFF" h="auto" pad={20}><Sting /></Stage>
+      <Section id="sting" title="Focus">
+        <Stage bg="#000000" h="auto" pad={24} border={false}><Sting /></Stage>
+      </Section>
+
+      <Section id="timing" title="Timing">
         <Table
           head={["Time", "What happens"]}
           rows={[
-            ["0.0–0.6 s", "The logo is revealed left to right by a mask (expo curve)"],
-            ["1.0–1.6 s", "The Hub line grows under it"],
-            ["1.6–2.4 s", "Hold; then cut or fade to the video"],
+            ["0.0 s", "Black"],
+            ["0.3–2.1 s", "The white logo comes from blur 14 px and scale 110% to sharp and 100%, while it fades in — expo curve"],
+            ["2.1–3.5 s", "Hold, with the last note of the KOLEEX melody (ch. 74)"],
+            ["3.5 s", "Cut or slow fade to the film"],
           ]}
         />
+        <Specs rows={[
+          ["Duration", "1.8 s for the focus; 3–4 s with the hold"],
+          ["Curve", "cubic-bezier(0.16, 1, 0.3, 1)"],
+          ["Background", "Black #000000 — on white, the same move with the black logo"],
+        ]} />
       </Section>
 
       <Section id="allowed" title="Allowed movements">
         <Bullets items={[
-          "Fade in or out.",
-          "Mask reveal — left to right (right to left in Arabic material).",
-          "Slide a short distance with a fade.",
-          "Scale from 96% to 100% with a fade.",
+          "Focus — the standard, for every film, ad and presentation opening or closing.",
+          "A plain fade in or out, where Focus is too slow (short social clips).",
         ]} />
       </Section>
 
       <Section id="never" title="Never">
         <Rule why="An animation that takes the logo apart teaches people that it can be taken apart.">
-          Letters never move separately. The logo is never drawn line by line, built from pieces, morphed,
-          spun, flipped in 3D, bounced or swept with a glow.
+          Letters never move separately. The logo is never drawn, assembled, morphed, spun, flipped, bounced,
+          colored or given a glow — and never turned silver.
         </Rule>
       </Section>
 
       <Section id="files" title="Files">
-        <P>The sting will be produced as MP4 (1080p and 4K, on Ink and on White) and as a transparent file for editors, and added to <Ref n={136} />.</P>
+        <P>Focus will be delivered as MP4 (1080p and 4K, on black and on white) with the melody, and as a transparent file for editors — then added to <Ref n={136} />.</P>
       </Section>
     </Chapter>
   );
 }
 
 /* ── 74 · Sound ────────────────────────────────────────────────────────── */
+
+/* The KOLEEX melody (owner, 27/09/2026: "M4"). [note, start s, length s, bar height px] */
+const MELODY: Array<[string, number, number, number]> = [["D4", 0, 0.13, 40], ["E4", 0.14, 0.13, 52], ["G4", 0.28, 0.13, 72], ["A4", 0.42, 0.16, 84], ["D5", 0.62, 2.2, 120]];
+
+const SAMPLES = "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts@gh-pages/MusyngKite/";
+
+type Voice = { inst: string; notes: string[] };
+type Version = { id: string; name: string; use: string; voices: Voice[]; play: (ctx: AudioContext, out: AudioNode, b: Record<string, Record<string, AudioBuffer>>, t: number) => void };
+
+function note(ctx: AudioContext, out: AudioNode, buf: AudioBuffer | undefined, t: number, gain: number, attack: number, dur: number, release: number) {
+  if (!buf) return;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + attack);
+  g.gain.setTargetAtTime(0, t + dur, release / 3);
+  src.connect(g);
+  g.connect(out);
+  src.start(t);
+  src.stop(t + dur + release + 0.5);
+}
+
+/* A soft hall: decaying noise, made once per audio context. */
+function hallImpulse(ctx: AudioContext) {
+  const len = ctx.sampleRate * 3;
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.3);
+  }
+  return ir;
+}
+
+const NOTES = MELODY.map(([n]) => n);
+const VERSIONS: Version[] = [
+  { id: "signature", name: "Signature", use: "The master — choir and piano", voices: [{ inst: "choir_aahs", notes: [...NOTES, "D3", "A3"] }, { inst: "acoustic_grand_piano", notes: [...NOTES, "D2", "A2"] }],
+    play: (ctx, out, b, t) => {
+      MELODY.forEach(([n, s, d], i) => { const long = i === 4; note(ctx, out, b.acoustic_grand_piano[n], t + s, 0.42, 0.004, long ? 2.2 : 0.3, long ? 1.6 : 0.4); note(ctx, out, b.choir_aahs[n], t + s, long ? 0.34 : 0.24, 0.03, long ? d : 0.14, long ? 1.3 : 0.12); });
+      ["D2", "A2"].forEach((n) => note(ctx, out, b.acoustic_grand_piano[n], t + 0.62, 0.3, 0.004, 2.2, 1.6));
+      ["D3", "A3"].forEach((n) => note(ctx, out, b.choir_aahs[n], t + 0.62, 0.2, 0.25, 2.2, 1.3));
+    } },
+  { id: "outro", name: "Outro", use: "The end of every film — celesta, under 2 s", voices: [{ inst: "celesta", notes: NOTES }],
+    play: (ctx, out, b, t) => { [0, 0.1, 0.2, 0.3, 0.44].forEach((s, i) => note(ctx, out, b.celesta[NOTES[i]], t + s, i === 4 ? 0.5 : 0.4, 0.003, i === 4 ? 1.3 : 0.2, i === 4 ? 1 : 0.3)); } },
+  { id: "grand", name: "Grand", use: "Ads, fairs, launches — choir, strings, timpani", voices: [{ inst: "choir_aahs", notes: [...NOTES, "D3", "A3"] }, { inst: "string_ensemble_1", notes: ["D3", "A3", "D4", "Gb4"] }, { inst: "timpani", notes: ["D2"] }],
+    play: (ctx, out, b, t) => {
+      [0, 0.26, 0.52, 0.78, 1.12].forEach((s, i) => note(ctx, out, b.choir_aahs[NOTES[i]], t + s, i === 4 ? 0.38 : 0.3, 0.06, i === 4 ? 2.6 : 0.24, i === 4 ? 1.5 : 0.2));
+      Object.values(b.string_ensemble_1).forEach((x) => note(ctx, out, x, t, 0.18, 1.0, 3.4, 1.5));
+      ["D3", "A3"].forEach((n) => note(ctx, out, b.choir_aahs[n], t + 1.12, 0.22, 0.3, 2.6, 1.5));
+      note(ctx, out, b.timpani.D2, t + 0.96, 0.4, 0.003, 1.5, 1.2);
+      note(ctx, out, b.timpani.D2, t + 1.12, 0.65, 0.003, 2, 1.5);
+    } },
+  { id: "notification", name: "Notification", use: "Koleex Hub — the last three notes, quick", voices: [{ inst: "vibraphone", notes: ["G4", "A4", "D5"] }],
+    play: (ctx, out, b, t) => { [["G4", 0], ["A4", 0.08], ["D5", 0.17]].forEach(([n, s], i) => note(ctx, out, b.vibraphone[n as string], t + (s as number), i === 2 ? 0.5 : 0.4, 0.003, i === 2 ? 0.9 : 0.12, i === 2 ? 0.8 : 0.2)); } },
+  { id: "hold", name: "Hold and ringtone", use: "Phone hold, showroom — a gentle piano loop", voices: [{ inst: "acoustic_grand_piano", notes: [...NOTES, "D3", "A3", "G3", "B3"] }],
+    play: (ctx, out, b, t) => {
+      for (let r = 0; r < 2; r++) {
+        const o = t + r * 3.2;
+        [0, 0.28, 0.56, 0.84, 1.24].forEach((s, i) => note(ctx, out, b.acoustic_grand_piano[NOTES[i]], o + s, 0.32, 0.004, i === 4 ? 1.8 : 0.5, 1));
+        (r === 0 ? ["D3", "A3"] : ["G3", "B3"]).forEach((n) => note(ctx, out, b.acoustic_grand_piano[n], o + 1.24, 0.2, 0.004, 1.8, 1.2));
+      }
+    } },
+];
+
+function MelodyPlayer() {
+  const ctxRef = useRef<{ ctx: AudioContext; verb: ConvolverNode; out: GainNode | null } | null>(null);
+  const cache = useRef<Record<string, AudioBuffer>>({});
+  const [state, setState] = useState<{ id: string | null; msg: string }>({ id: null, msg: "" });
+
+  useEffect(() => () => { void ctxRef.current?.ctx.close(); }, []);
+
+  function audio() {
+    if (!ctxRef.current) {
+      const ctx = new AudioContext();
+      const verb = ctx.createConvolver();
+      verb.buffer = hallImpulse(ctx);
+      ctxRef.current = { ctx, verb, out: null };
+    }
+    const a = ctxRef.current;
+    if (a.out) { const old = a.out; old.gain.setTargetAtTime(0, a.ctx.currentTime, 0.06); window.setTimeout(() => old.disconnect(), 500); }
+    const out = a.ctx.createGain();
+    out.gain.value = 0.6;
+    const comp = a.ctx.createDynamicsCompressor();
+    out.connect(comp); comp.connect(a.ctx.destination);
+    const wet = a.ctx.createGain(); wet.gain.value = 0.34;
+    out.connect(a.verb); a.verb.connect(wet); wet.connect(comp);
+    a.out = out;
+    return a;
+  }
+
+  async function play(v: Version) {
+    const a = audio();
+    await a.ctx.resume();
+    setState({ id: v.id, msg: "Loading…" });
+    try {
+      const bufs: Record<string, Record<string, AudioBuffer>> = {};
+      for (const voice of v.voices) {
+        bufs[voice.inst] = {};
+        await Promise.all(voice.notes.map(async (n) => {
+          const url = `${SAMPLES}${voice.inst}-mp3/${n}.mp3`;
+          if (!cache.current[url]) cache.current[url] = await a.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+          bufs[voice.inst][n] = cache.current[url];
+        }));
+      }
+      setState({ id: v.id, msg: "" });
+      v.play(a.ctx, a.out as GainNode, bufs, a.ctx.currentTime + 0.08);
+    } catch {
+      setState({ id: null, msg: "The samples could not be loaded. Check the connection and try again." });
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-[24px] bg-[var(--bg-secondary)] divide-y divide-[var(--border-faint)]">
+        {VERSIONS.map((v) => (
+          <div key={v.id} className="flex items-center gap-4 px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-[16px] font-semibold text-[var(--text-primary)]">{v.name}</p>
+              <p className="text-[14px] text-[var(--text-dim)]">{v.use}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void play(v)}
+              aria-label={`Play ${v.name}`}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+              style={{ background: "#567FB2" }}
+            >
+              <PlayIcon size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+      {state.msg && <p className="text-[13px] text-[var(--text-dim)]">{state.msg}</p>}
+    </div>
+  );
+}
 
 const NOTIFICATION_TONES = [
   "alert", "announce", "arrive", "beacon", "bloom", "bounce",
@@ -500,7 +682,7 @@ function SoundButton({ label, src, playing, onPlay }: { label: string; src: stri
     <button
       type="button"
       onClick={() => onPlay(src)}
-      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-start text-[12.5px] transition-colors ${playing ? "border-[#567FB2] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"} bg-[var(--bg-secondary)]`}
+      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-start text-[12.5px] transition-colors ${playing ? "border-[var(--text-primary)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"} bg-[var(--bg-secondary)]`}
     >
       {playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
       <span>{label}</span>
@@ -515,18 +697,45 @@ export function Sound() {
       n={74}
       lead={
         <p>
-          KOLEEX sounds are quiet, short and meaningful. Each one tells you something — a message arrived, an
-          action finished, something needs attention — and none of them is there to decorate.
+          KOLEEX has a melody: five notes that anyone can learn to recognise. Around it, the Koleex Hub
+          sounds are quiet, short and meaningful — none of them is there to decorate.
         </p>
       }
       toc={[
+        { id: "melody", title: "The KOLEEX melody" },
+        { id: "versions", title: "One melody, five versions" },
         { id: "principles", title: "Principles" },
         { id: "grammar", title: "The sound grammar" },
         { id: "tones", title: "Koleex Hub notification tones" },
         { id: "video-sound", title: "Sound in video" },
-        { id: "sonic-logo", title: "The sonic logo" },
       ]}
     >
+      <Section id="melody" title="The KOLEEX melody">
+        <Stage bg="#000000" h="auto" pad={40}>
+          <div className="w-full text-center">
+            <div className="flex items-end justify-center gap-3">
+              {MELODY.map(([note, , , h], i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <span className="w-10 rounded-full md:w-14" style={{ height: h, background: i === MELODY.length - 1 ? SILVER.css : "#3A3A3C" }} />
+                  <span className="text-[15px] font-semibold text-[#F5F5F7]">{note.replace(/[0-9]/g, "")}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mx-auto mt-8 max-w-[44ch] text-[17px] leading-[1.5] text-[#A1A1A6]">Five notes on a five-note scale heard from Cairo to Taizhou — rising, then landing on one open note.</p>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Notes", "D4 · E4 · G4 · A4 → D5 (held), over an open fifth D3–A3"],
+          ["Rhythm", "Four short notes, then the long one"],
+          ["Rule", "The melody never changes. The instrument, tempo and length change with the use."],
+        ]} />
+      </Section>
+
+      <Section id="versions" title="One melody, five versions">
+        <MelodyPlayer />
+        <Note>Sketches played in the browser with recorded instrument samples (MusyngKite General MIDI soundfont, CC BY-SA 3.0). The final versions are recorded with real musicians and a choir and delivered as files (<Ref n={136} />).</Note>
+      </Section>
+
       <Section id="principles" title="Principles">
         <Bullets items={[
           <><B>One family.</B> Soft, glassy tones on one scale, so every sound belongs to KOLEEX.</>,
@@ -566,9 +775,6 @@ export function Sound() {
         ]} />
       </Section>
 
-      <Section id="sonic-logo" title="The sonic logo">
-        <P>A short sound for the logo sting (<Ref n={73} />) — one to two seconds, from the same glass family — is planned. Until it is approved, the sting plays silently or over the video’s own music.</P>
-      </Section>
     </Chapter>
   );
 }

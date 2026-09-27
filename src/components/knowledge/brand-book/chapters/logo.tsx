@@ -10,7 +10,7 @@
    a colour, an effect) — the way the mistakes actually happen. */
 
 import type { ReactNode } from "react";
-import { contrast, grade, ratioText } from "@/lib/brand-book/tokens";
+import { SILVER, contrast, grade, ratioText } from "@/lib/brand-book/tokens";
 import {
   B, Bullets, Chapter, Code, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
@@ -25,13 +25,13 @@ const LOGO_FILES = [
   { label: "KOLEEX logo — white (master vector)", href: "/brand/koleex-logo-white.svg", format: "SVG", note: "For dark backgrounds." },
   { label: "KOLEEX logo — black, 2000 px", href: "/brand/kit/koleex-logo-black-2000.png", format: "PNG", note: "Transparent. Office documents, slides, social." },
   { label: "KOLEEX logo — white, 2000 px", href: "/brand/kit/koleex-logo-white-2000.png", format: "PNG", note: "Transparent." },
-  { label: "Complete logo pack", href: "/brand/kit/koleex-logo-pack.zip", format: "ZIP", note: "All logo files, the K monogram and the colors." },
+  { label: "Complete logo pack", href: "/brand/kit/koleex-logo-pack.zip", format: "ZIP", note: "All logo files, the logo tiles and the colors." },
 ];
 
 /** A measured drawing: the master file placed in logo units (1 unit = 1/107.57 x). */
 function Diagram({ children, viewBox, dark = false, label }: { children: ReactNode; viewBox: string; dark?: boolean; label: string }) {
   return (
-    <svg viewBox={viewBox} className="w-full h-auto" role="img" aria-label={label} style={{ background: dark ? "#0A0A0A" : "#FFFFFF" }}>
+    <svg viewBox={viewBox} className="w-full h-auto" role="img" aria-label={label} style={{ background: dark ? "#000000" : "#FFFFFF" }}>
       {children}
     </svg>
   );
@@ -50,7 +50,7 @@ function MasterLogo({ x = 0, y = 0, scale = 1, white = false, opacity = 1 }: { x
   );
 }
 
-const BLUE = "#567FB2";
+const BLUE = "#8E8E93"; /* construction lines — neutral gray */
 
 /* ── 36 · The Logo ─────────────────────────────────────────────────────── */
 
@@ -88,7 +88,7 @@ export function Logo() {
               <Wordmark color="#000000" width="100%" />
               <div className="relative mt-3 h-5">
                 {letters.map(([l, at], i) => (
-                  <span key={i} className="absolute -translate-x-1/2 font-mono text-[11px] text-[#4B5563]" style={{ left: `${at}%` }}>{l}</span>
+                  <span key={i} className="absolute -translate-x-1/2 font-mono text-[11px] text-[#6E6E73]" style={{ left: `${at}%` }}>{l}</span>
                 ))}
               </div>
             </div>
@@ -109,9 +109,9 @@ export function Logo() {
         <P>The logo exists in exactly two colors. There is no color version.</P>
         <Examples cols={2}>
           <Example tone="do" caption={<><B>Positive.</B> Black (#000000) on white and light backgrounds.</>} bg="#FFFFFF" h={160}><Wordmark color="#000000" width="62%" /></Example>
-          <Example tone="do" caption={<><B>Negative.</B> White (#FFFFFF) on black and dark backgrounds.</>} bg="#0A0A0A" h={160}><Wordmark color="#FFFFFF" width="62%" /></Example>
-          <Example tone="dont" caption="Never in Hub Blue — the blue is an accent around the logo, never the logo." bg="#FFFFFF" h={140}><Wordmark color="#567FB2" width="62%" /></Example>
-          <Example tone="dont" caption="Never grey, never tinted, never in a gradient." bg="#FFFFFF" h={140}><Wordmark color="#9CA3AF" width="62%" /></Example>
+          <Example tone="do" caption={<><B>Negative.</B> White (#FFFFFF) on black and dark backgrounds.</>} bg="#000000" h={160}><Wordmark color="#FFFFFF" width="62%" /></Example>
+          <Example tone="dont" caption="Never in Hub Blue or silver — the logo is black or white, nothing else." bg="#FFFFFF" h={140}><Wordmark color="#567FB2" width="62%" /></Example>
+          <Example tone="dont" caption="Never grey, never tinted, never in a gradient." bg="#FFFFFF" h={140}><Wordmark color="#98989D" width="62%" /></Example>
         </Examples>
       </Section>
 
@@ -121,16 +121,16 @@ export function Logo() {
           Never type the word KOLEEX in its place.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="The logo signs the poster." bg="#0A0A0A" h={220} pad={0}>
+          <Example tone="do" caption="The logo signs the poster." bg="#000000" h={220} pad={0}>
             <div className="flex h-[220px] w-full flex-col justify-between p-6 text-white">
-              <p className="text-[10px] tracking-[0.18em] text-[#9CA3AF]">LOCKSTITCH · NEW SERIES</p>
+              <p className="text-[10px] tracking-[0.18em] text-[#98989D]">LOCKSTITCH · NEW SERIES</p>
               <p className="text-[22px] font-bold leading-tight">Direct-drive<br />lockstitch.</p>
               <Wordmark color="#FFFFFF" width={120} />
             </div>
           </Example>
-          <Example tone="dont" caption="The word typed in a font where the logo should be." bg="#0A0A0A" h={220} pad={0}>
+          <Example tone="dont" caption="The word typed in a font where the logo should be." bg="#000000" h={220} pad={0}>
             <div className="flex h-[220px] w-full flex-col justify-between p-6 text-white">
-              <p className="text-[10px] tracking-[0.18em] text-[#9CA3AF]">LOCKSTITCH · NEW SERIES</p>
+              <p className="text-[10px] tracking-[0.18em] text-[#98989D]">LOCKSTITCH · NEW SERIES</p>
               <p className="text-[22px] font-bold leading-tight">Direct-drive<br />lockstitch.</p>
               <span style={{ fontFamily: "Arial, sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "0.12em" }}>KOLEEX</span>
             </div>
@@ -204,7 +204,7 @@ export function Construction() {
       <Section id="clear-space" title="Clear space">
         <Stage bg="#FFFFFF" h="auto" pad={16}>
           <Diagram viewBox={`${-x - 60} ${-x - 50} ${LOGO_W + 2 * x + 120} ${LOGO_H + 2 * x + 100}`} label="Clear space of x on every side">
-            <rect x={-x} y={-x} width={LOGO_W + 2 * x} height={LOGO_H + 2 * x} fill="#BCD8F0" fillOpacity={0.35} stroke={BLUE} strokeWidth={2} strokeDasharray="10 8" />
+            <rect x={-x} y={-x} width={LOGO_W + 2 * x} height={LOGO_H + 2 * x} fill="#D1D1D6" fillOpacity={0.35} stroke={BLUE} strokeWidth={2} strokeDasharray="10 8" />
             <MasterLogo />
             {[
               [-x / 2, LOGO_H / 2], [LOGO_W + x / 2, LOGO_H / 2], [LOGO_W / 2, -x / 2], [LOGO_W / 2, LOGO_H + x / 2],
@@ -226,13 +226,13 @@ export function Construction() {
           <Example tone="do" caption="Clear space kept: the logo has room." bg="#FFFFFF" h={180}>
             <div className="flex w-full flex-col items-start gap-6 px-6">
               <Wordmark color="#000000" width={150} />
-              <p className="max-w-[260px] text-[12px] leading-5 text-[#4B5563]">Industrial garment machinery for manufacturers in more than seventy countries.</p>
+              <p className="max-w-[260px] text-[12px] leading-5 text-[#6E6E73]">Industrial garment machinery for manufacturers in more than seventy countries.</p>
             </div>
           </Example>
           <Example tone="dont" caption="Text crowding the logo, inside its clear space." bg="#FFFFFF" h={180}>
             <div className="flex w-full flex-col items-start gap-0.5 px-6">
               <Wordmark color="#000000" width={150} />
-              <p className="max-w-[260px] text-[12px] leading-5 text-[#4B5563]">Industrial garment machinery for manufacturers in more than seventy countries.</p>
+              <p className="max-w-[260px] text-[12px] leading-5 text-[#6E6E73]">Industrial garment machinery for manufacturers in more than seventy countries.</p>
             </div>
           </Example>
           <Example tone="dont" caption="The logo touching the edge of the page." bg="#FFFFFF" h={140} pad={0}>
@@ -241,7 +241,7 @@ export function Construction() {
           <Example tone="dont" caption="Another logo inside the clear space." bg="#FFFFFF" h={140}>
             <div className="flex items-center gap-2">
               <Wordmark color="#000000" width={130} />
-              <span className="flex h-7 w-20 items-center justify-center rounded border border-[#9CA3AF] text-[9px] font-semibold tracking-wider text-[#4B5563]">PARTNER</span>
+              <span className="flex h-7 w-20 items-center justify-center rounded border border-[#98989D] text-[9px] font-semibold tracking-wider text-[#6E6E73]">PARTNER</span>
             </div>
           </Example>
         </Examples>
@@ -289,7 +289,7 @@ function Lines({ dark = false, n = 3, w = "70%" }: { dark?: boolean; n?: number;
   return (
     <div className="space-y-1.5" style={{ width: w }}>
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="h-1.5 rounded-full" style={{ background: dark ? "#1A1A1A" : "#E5E7EB", width: i === n - 1 ? "60%" : "100%" }} />
+        <div key={i} className="h-1.5 rounded-full" style={{ background: dark ? "#1D1D1F" : "#D2D2D7", width: i === n - 1 ? "60%" : "100%" }} />
       ))}
     </div>
   );
@@ -320,7 +320,7 @@ export function SizePlacement() {
             {[200, 140, 100].map((w) => (
               <div key={w} className="flex flex-col items-start gap-2">
                 <Wordmark color="#000000" width={w} />
-                <span className="font-mono text-[10.5px] text-[#4B5563]">{w} px{w === 100 ? " — minimum" : ""}</span>
+                <span className="font-mono text-[10.5px] text-[#6E6E73]">{w} px{w === 100 ? " — minimum" : ""}</span>
               </div>
             ))}
             <div className="flex flex-col items-start gap-2">
@@ -332,14 +332,14 @@ export function SizePlacement() {
         <Table
           head={["Medium", "Minimum logo width", "Below the minimum"]}
           rows={[
-            ["Screens (web, apps, social)", <B key="a">100 px</B>, "Use the K monogram"],
-            ["Print (offset, digital)", <B key="a">25 mm</B>, "Use the K monogram"],
-            ["Screen printing on fabric", <B key="a">40 mm</B>, "Use the K monogram"],
-            ["Embroidery", <B key="a">50 mm</B>, "Use the K monogram (min 12 mm)"],
-            ["Laser engraving, etching, pad printing", <B key="a">20 mm</B>, "Use the K monogram"],
+            ["Screens (web, apps, social)", <B key="a">100 px</B>, "Make the space bigger — or use the logo tile (ch. 41)"],
+            ["Print (offset, digital)", <B key="a">25 mm</B>, "Make the piece bigger, or leave the logo off"],
+            ["Screen printing on fabric", <B key="a">40 mm</B>, "Move it to a larger area of the garment"],
+            ["Embroidery", <B key="a">50 mm</B>, "Move it to a larger area of the garment"],
+            ["Laser engraving, etching, pad printing", <B key="a">20 mm</B>, "Along the long side of the object, or no mark"],
           ]}
         />
-        <Note>Below the minimum, the thin strokes fill in and the X peak disappears. Use the K monogram instead — <Ref n={41} />.</Note>
+        <Note>Below the minimum, the thin strokes fill in and the X loses its shape. There is no smaller mark: use more space, or leave the logo off — <Ref n={41} />.</Note>
       </Section>
 
       <Section id="recommended" title="Recommended sizes by format">
@@ -367,26 +367,26 @@ export function SizePlacement() {
           a far corner.
         </Rule>
         <Examples cols={4}>
-          <Example tone="do" caption="Document: top-left." bg="#F5F5F5" h={200}>
+          <Example tone="do" caption="Document: top-left." bg="#F5F5F7" h={200}>
             <MiniPage w={120} h={154}>
               <div className="absolute left-3 top-3"><Wordmark color="#000000" width={40} /></div>
               <div className="absolute right-3 top-3 text-[6px] font-bold tracking-wider">QUOTATION</div>
               <div className="absolute left-3 top-12 w-[96px]"><Lines n={5} w="100%" /></div>
             </MiniPage>
           </Example>
-          <Example tone="do" caption="Cover: centered." bg="#F5F5F5" h={200}>
-            <MiniPage w={120} h={154} bg="#0A0A0A">
+          <Example tone="do" caption="Cover: centered." bg="#F5F5F7" h={200}>
+            <MiniPage w={120} h={154} bg="#000000">
               <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={64} /></div>
             </MiniPage>
           </Example>
-          <Example tone="do" caption="Social post: bottom-left." bg="#F5F5F5" h={200}>
-            <MiniPage w={124} h={155} bg="#0A0A0A">
-              <div className="absolute left-3 top-3 text-[5px] tracking-[0.2em] text-[#9CA3AF]">OVERLOCK</div>
+          <Example tone="do" caption="Social post: bottom-left." bg="#F5F5F7" h={200}>
+            <MiniPage w={124} h={155} bg="#000000">
+              <div className="absolute left-3 top-3 text-[5px] tracking-[0.2em] text-[#98989D]">OVERLOCK</div>
               <div className="absolute left-3 top-8 text-[11px] font-bold leading-tight text-white">Four threads.<br />One pass.</div>
               <div className="absolute bottom-3 left-3"><Wordmark color="#FFFFFF" width={36} /></div>
             </MiniPage>
           </Example>
-          <Example tone="dont" caption="Floating mid-side, squeezed at the edge." bg="#F5F5F5" h={200}>
+          <Example tone="dont" caption="Floating mid-side, squeezed at the edge." bg="#F5F5F7" h={200}>
             <MiniPage w={120} h={154}>
               <div className="absolute right-0.5 top-[70px]"><Wordmark color="#000000" width={40} /></div>
               <div className="absolute left-3 top-4 w-[96px]"><Lines n={6} w="100%" /></div>
@@ -397,20 +397,20 @@ export function SizePlacement() {
 
       <Section id="series" title="The same place in a series">
         <Examples cols={2}>
-          <Example tone="do" caption="One position across the series — the feed reads as one brand." bg="#F5F5F5" h={150}>
+          <Example tone="do" caption="One position across the series — the feed reads as one brand." bg="#F5F5F7" h={150}>
             <div className="flex gap-2">
               {["Lockstitch", "Overlock", "Cutting"].map((t) => (
-                <MiniPage key={t} w={78} h={98} bg="#0A0A0A">
+                <MiniPage key={t} w={78} h={98} bg="#000000">
                   <div className="absolute left-2 top-2 text-[8px] font-bold text-white">{t}</div>
                   <div className="absolute bottom-2 left-2"><Wordmark color="#FFFFFF" width={26} /></div>
                 </MiniPage>
               ))}
             </div>
           </Example>
-          <Example tone="dont" caption="A different position on every post." bg="#F5F5F5" h={150}>
+          <Example tone="dont" caption="A different position on every post." bg="#F5F5F7" h={150}>
             <div className="flex gap-2">
               {[["left-2 bottom-2"], ["right-2 top-2"], ["left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"]].map(([pos], i) => (
-                <MiniPage key={i} w={78} h={98} bg="#0A0A0A">
+                <MiniPage key={i} w={78} h={98} bg="#000000">
                   <div className="absolute left-2 top-2 text-[8px] font-bold text-white">{["Lockstitch", "Overlock", "Cutting"][i]}</div>
                   <div className={`absolute ${pos}`}><Wordmark color="#FFFFFF" width={26} /></div>
                 </MiniPage>
@@ -426,13 +426,13 @@ export function SizePlacement() {
           never mirrored, and its letters always read left to right.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="English layout: logo top-left." bg="#F5F5F5" h={170}>
+          <Example tone="do" caption="English layout: logo top-left." bg="#F5F5F7" h={170}>
             <MiniPage w={180} h={120}>
               <div className="absolute left-3 top-3"><Wordmark color="#000000" width={52} /></div>
               <div className="absolute left-3 top-10 w-[150px]"><Lines n={4} w="100%" /></div>
             </MiniPage>
           </Example>
-          <Example tone="do" caption="Arabic layout: logo top-right, logo not mirrored." bg="#F5F5F5" h={170}>
+          <Example tone="do" caption="Arabic layout: logo top-right, logo not mirrored." bg="#F5F5F7" h={170}>
             <MiniPage w={180} h={120}>
               <div className="absolute right-3 top-3"><Wordmark color="#000000" width={52} /></div>
               <div className="absolute right-3 top-10 flex w-[150px] justify-end"><Lines n={4} w="100%" /></div>
@@ -459,11 +459,10 @@ function ContrastTag({ fg, bg }: { fg: string; bg: string }) {
 export function Backgrounds() {
   const good: Array<[string, string, string]> = [
     ["#FFFFFF", "#000000", "White"],
-    ["#F5F5F5", "#000000", "Cloud #F5F5F5"],
-    ["#E5E7EB", "#000000", "Mist #E5E7EB"],
-    ["#0A0A0A", "#FFFFFF", "Ink #0A0A0A"],
-    ["#1A1A1A", "#FFFFFF", "Graphite #1A1A1A"],
-    ["#3E6796", "#FFFFFF", "Hub Blue Deep #3E6796 — Koleex Hub materials only"],
+    ["#F5F5F7", "#000000", "Cloud #F5F5F7"],
+    ["#D2D2D7", "#000000", "Mist #D2D2D7"],
+    ["#000000", "#FFFFFF", "Black #000000"],
+    ["#1D1D1F", "#FFFFFF", "Graphite #1D1D1F"],
   ];
   return (
     <Chapter
@@ -497,7 +496,7 @@ export function Backgrounds() {
 
       <Section id="not-approved" title="Backgrounds to avoid">
         <Examples cols={3}>
-          <Example tone="dont" caption={<>Mid grey — neither version reads.<ContrastTag fg="#FFFFFF" bg="#9CA3AF" /></>} bg="#9CA3AF" h={130}><Wordmark color="#FFFFFF" width="66%" /></Example>
+          <Example tone="dont" caption={<>Mid grey — neither version reads.<ContrastTag fg="#FFFFFF" bg="#98989D" /></>} bg="#98989D" h={130}><Wordmark color="#FFFFFF" width="66%" /></Example>
           <Example tone="dont" caption={<>White logo on Steel or Sky blue.<ContrastTag fg="#FFFFFF" bg="#7FA9D6" /></>} bg="#7FA9D6" h={130}><Wordmark color="#FFFFFF" width="66%" /></Example>
           <Example tone="dont" caption="The Hub gradient behind the logo." bg="#567FB2" h={130} >
             <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,#567FB2,#BCD8F0)" }} />
@@ -505,11 +504,15 @@ export function Backgrounds() {
           </Example>
           <Example tone="dont" caption="Strong colors — red, green, orange." bg="#DC2626" h={130}><Wordmark color="#FFFFFF" width="66%" /></Example>
           <Example tone="dont" caption="Patterns and textures." bg="#FFFFFF" h={130}>
-            <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(45deg,#0A0A0A 0 6px,#FFFFFF 6px 14px)" }} />
+            <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(45deg,#000000 0 6px,#FFFFFF 6px 14px)" }} />
             <span className="relative"><Wordmark color="#000000" width={170} /></span>
           </Example>
+          <Example tone="dont" caption="On a silver gradient — silver is for words and surfaces, never behind the logo." bg="#000000" h={130}>
+            <div className="absolute inset-0" style={{ background: SILVER.css }} />
+            <span className="relative"><Wordmark color="#FFFFFF" width={170} /></span>
+          </Example>
           <Example tone="dont" caption="Low contrast of any kind.">
-            <Wordmark color="#E5E7EB" width="66%" />
+            <Wordmark color="#D2D2D7" width="66%" />
           </Example>
         </Examples>
       </Section>
@@ -521,14 +524,14 @@ export function Backgrounds() {
           of 30–60%, or do not put the logo on the photograph.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="Calm, dark area of the image; logo at the start corner." bg="#0A0A0A" h={200} pad={0}>
-            <div className="relative h-[200px] w-full" style={{ background: "radial-gradient(120% 90% at 80% 20%, #4B5563 0%, #1A1A1A 45%, #0A0A0A 100%)" }}>
+          <Example tone="do" caption="Calm, dark area of the image; logo at the start corner." bg="#000000" h={200} pad={0}>
+            <div className="relative h-[200px] w-full" style={{ background: "radial-gradient(120% 90% at 80% 20%, #6E6E73 0%, #1D1D1F 45%, #000000 100%)" }}>
               <div className="absolute bottom-5 left-5"><Wordmark color="#FFFFFF" width={120} /></div>
-              <span className="absolute right-3 top-3 rounded bg-black/40 px-1.5 py-0.5 text-[9px] tracking-wider text-[#9CA3AF]">PHOTO</span>
+              <span className="absolute right-3 top-3 rounded bg-black/40 px-1.5 py-0.5 text-[9px] tracking-wider text-[#98989D]">PHOTO</span>
             </div>
           </Example>
-          <Example tone="dont" caption="Over detail, faces or the product itself." bg="#4B5563" h={200} pad={0}>
-            <div className="relative h-[200px] w-full" style={{ background: "repeating-radial-gradient(circle at 40% 50%, #9CA3AF 0 8px, #4B5563 8px 16px, #E5E7EB 16px 22px)" }}>
+          <Example tone="dont" caption="Over detail, faces or the product itself." bg="#6E6E73" h={200} pad={0}>
+            <div className="relative h-[200px] w-full" style={{ background: "repeating-radial-gradient(circle at 40% 50%, #98989D 0 8px, #6E6E73 8px 16px, #D2D2D7 16px 22px)" }}>
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Wordmark color="#FFFFFF" width={130} /></div>
               <span className="absolute right-3 top-3 rounded bg-black/40 px-1.5 py-0.5 text-[9px] tracking-wider text-white">PHOTO</span>
             </div>
@@ -573,16 +576,17 @@ export function Misuse() {
     { caption: "Recolored.", render: <Wordmark color="#DC2626" width={W} /> },
     { caption: "In Hub Blue.", render: <Wordmark color="#567FB2" width={W} /> },
     {
-      caption: "Filled with a gradient.",
+      caption: "In silver, chrome or a gradient.",
+      bg: "#000000",
       render: (
         <span
           role="img"
-          aria-label="KOLEEX logo filled with a gradient"
+          aria-label="KOLEEX logo filled with a silver gradient"
           className="block"
           style={{
             width: W,
             aspectRatio: "719.83 / 107.57",
-            background: "linear-gradient(90deg,#3E6796,#BCD8F0)",
+            background: SILVER.css,
             WebkitMask: "url(/brand/koleex-logo-black.svg) center / contain no-repeat",
             mask: "url(/brand/koleex-logo-black.svg) center / contain no-repeat",
           }}
@@ -600,14 +604,14 @@ export function Misuse() {
       ),
     },
     { caption: "With a drop shadow.", render: <Wordmark color="#000000" width={W} style={{ filter: "drop-shadow(4px 5px 3px rgba(0,0,0,0.45))" }} /> },
-    { caption: "With a glow or neon.", bg: "#0A0A0A", render: <Wordmark color="#FFFFFF" width={W} style={{ filter: "drop-shadow(0 0 6px #7FA9D6) drop-shadow(0 0 14px #567FB2)" }} /> },
+    { caption: "With a glow or neon.", bg: "#000000", render: <Wordmark color="#FFFFFF" width={W} style={{ filter: "drop-shadow(0 0 6px #7FA9D6) drop-shadow(0 0 14px #567FB2)" }} /> },
     {
       caption: "Made 3D, bevelled or metallic.",
       render: (
         <Wordmark
-          color="#9CA3AF"
+          color="#98989D"
           width={W}
-          style={{ filter: "drop-shadow(1px 1px 0 #4B5563) drop-shadow(1px 1px 0 #4B5563) drop-shadow(2px 2px 0 #1A1A1A)", transform: "skewX(-10deg)" }}
+          style={{ filter: "drop-shadow(1px 1px 0 #6E6E73) drop-shadow(1px 1px 0 #6E6E73) drop-shadow(2px 2px 0 #1D1D1F)", transform: "skewX(-10deg)" }}
         />
       ),
     },
@@ -616,12 +620,13 @@ export function Misuse() {
       caption: "Cropped or partly hidden.",
       render: <span className="block overflow-hidden" style={{ width: W * 0.62 }}><Wordmark color="#000000" width={W} /></span>,
     },
-    { caption: "Too little contrast.", bg: "#E5E7EB", render: <Wordmark color="#9CA3AF" width={W} /> },
+    { caption: "Too little contrast.", bg: "#D2D2D7", render: <Wordmark color="#98989D" width={W} /> },
     {
-      caption: "Inside a shape or a badge.",
+      caption: "Inside a badge or a seal. The plain logo tile (ch. 41) is the only container.",
       render: (
-        <span className="flex h-[92px] w-[92px] items-center justify-center rounded-full bg-[#0A0A0A]">
-          <Wordmark color="#FFFFFF" width={70} />
+        <span className="flex h-[92px] w-[92px] flex-col items-center justify-center gap-1 rounded-full border-[3px] border-double border-[#000000]">
+          <Wordmark color="#000000" width={60} />
+          <span className="text-[7px] font-semibold tracking-[0.2em] text-[#000000]">QUALITY</span>
         </span>
       ),
     },
@@ -630,7 +635,7 @@ export function Misuse() {
       render: (
         <span className="flex flex-col items-start">
           <Wordmark color="#000000" width={W} />
-          <span className="text-[9px] tracking-[0.3em] text-[#4B5563]" style={{ marginTop: 1 }}>INDUSTRIAL TOOLS</span>
+          <span className="text-[9px] tracking-[0.3em] text-[#6E6E73]" style={{ marginTop: 1 }}>INDUSTRIAL TOOLS</span>
         </span>
       ),
     },
@@ -652,7 +657,7 @@ export function Misuse() {
       ]}
     >
       <Section id="never" title="Sixteen things never to do">
-        <Examples cols={4}>
+        <Examples cols={3}>
           {cases.map((c) => (
             <Example key={c.caption} tone="dont" caption={c.caption} bg={c.bg ?? "#FFFFFF"} h={130}>
               {c.render}
@@ -665,9 +670,9 @@ export function Misuse() {
           When the logo does not fit a design, the design changes — never the logo.
         </Rule>
         <Bullets items={[
-          <>Too little room? Use the <B>K monogram</B> (<Ref n={41} />).</>,
+          <>Too little room? Give the logo more space, or use the logo tile (<Ref n={41} />).</>,
           <>Background too busy? Move the logo to a calm area, or use a solid band of white or black behind it (<Ref n={39} />).</>,
-          <>Want more color? Add Hub Blue <B>around</B> the logo — a line, a shape, a word — never in it (<Ref n={46} />).</>,
+          <>Want more presence? Put the logo on black, give it more space, or set a silver headline near it — never color in it (<Ref n={45} />).</>,
           <>Need a line of text with the logo? Use an approved lockup (<Ref n={43} />).</>,
         ]} />
       </Section>

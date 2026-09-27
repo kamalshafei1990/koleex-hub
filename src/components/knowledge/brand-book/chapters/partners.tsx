@@ -12,8 +12,8 @@ import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
-import { Monogram, Wordmark } from "../marks";
-import { HUB_LINE, INK, Post } from "../mockups";
+import { Wordmark } from "../marks";
+import { INK, Post } from "../mockups";
 
 /* ── The badge ─────────────────────────────────────────────────────────── */
 
@@ -23,11 +23,11 @@ function PartnerBadge({ role = "Distributor", place = "Country", dark = false, w
   return (
     <div className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px]" style={{ padding: w * 0.06, gap: w * 0.06, background: dark ? INK : "#FFFFFF", boxShadow: dark ? "inset 0 0 0 1px rgba(255,255,255,0.3)" : `inset 0 0 0 1.5px ${INK}` }}>
       <Wordmark color={fg} width={w * 0.36} />
-      <span className="self-stretch" style={{ width: 1, background: dark ? "#4B5563" : "#9CA3AF" }} />
+      <span className="self-stretch" style={{ width: 1, background: dark ? "#6E6E73" : "#98989D" }} />
       <span className="flex flex-col" style={{ gap: w * 0.012 }}>
-        <span className="font-semibold uppercase" style={{ color: dark ? "#9CA3AF" : "#4B5563", fontSize: w * 0.04, letterSpacing: "0.18em" }}>Authorized</span>
+        <span className="font-semibold uppercase" style={{ color: dark ? "#98989D" : "#6E6E73", fontSize: w * 0.04, letterSpacing: "0.18em" }}>Authorized</span>
         <span className="font-bold uppercase" style={{ color: fg, fontSize: w * 0.052, letterSpacing: "0.08em" }}>{role}</span>
-        <span className="font-medium" style={{ color: dark ? "#9CA3AF" : "#4B5563", fontSize: w * 0.042 }}>{place}</span>
+        <span className="font-medium" style={{ color: dark ? "#98989D" : "#6E6E73", fontSize: w * 0.042 }}>{place}</span>
       </span>
     </div>
   );
@@ -35,7 +35,7 @@ function PartnerBadge({ role = "Distributor", place = "Country", dark = false, w
 
 function Box({ label, w = 110, h = 34 }: { label: string; w?: number; h?: number }) {
   return (
-    <span className="flex items-center justify-center rounded-md border border-dashed border-[#9CA3AF] text-[9px] font-semibold tracking-[0.14em] text-[#4B5563]" style={{ width: w, height: h }}>
+    <span className="flex items-center justify-center rounded-md border border-dashed border-[#98989D] text-[9px] font-semibold tracking-[0.14em] text-[#6E6E73]" style={{ width: w, height: h }}>
       {label}
     </span>
   );
@@ -69,7 +69,7 @@ export function Agents() {
           <Example tone="do" caption="Light version — for windows, documents, websites." bg="#FFFFFF" h={150}>
             <PartnerBadge place="Country" />
           </Example>
-          <Example tone="do" caption="Dark version — for dark backgrounds and signs." bg="#0A0A0A" h={150}>
+          <Example tone="do" caption="Dark version — for dark backgrounds and signs." bg="#000000" h={150}>
             <PartnerBadge role="Agent" place="City, Country" dark />
           </Example>
         </Examples>
@@ -101,12 +101,12 @@ export function Agents() {
       </Section>
 
       <Section id="agent-card" title="Business cards and pages">
-        <Stage bg="#F5F5F5" h="auto" pad={24}>
+        <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <div className="flex w-[240px] flex-col justify-between rounded-[6px] bg-white p-3 text-[#0A0A0A] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "90 / 54" }}>
+            <div className="flex w-[240px] flex-col justify-between rounded-[6px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "90 / 54" }}>
               <Box label="AGENT’S LOGO" w={100} h={26} />
-              <div><p className="text-[10px] font-bold">Full Name</p><p className="text-[7px] text-[#4B5563]">Sales Manager</p></div>
-              <div className="flex items-end justify-between"><p className="text-[6px] text-[#4B5563]">agent-company.com</p><PartnerBadge w={110} /></div>
+              <div><p className="text-[10px] font-bold">Full Name</p><p className="text-[7px] text-[#6E6E73]">Sales Manager</p></div>
+              <div className="flex items-end justify-between"><p className="text-[6px] text-[#6E6E73]">agent-company.com</p><PartnerBadge w={110} /></div>
             </div>
           </div>
         </Stage>
@@ -124,14 +124,14 @@ export function Agents() {
 
 function ShopFront({ wrong = false }: { wrong?: boolean }) {
   return (
-    <div className="relative w-[260px] overflow-hidden rounded-[3px] bg-[#D1D5DB]" style={{ aspectRatio: "26 / 16" }}>
+    <div className="relative w-[260px] overflow-hidden rounded-[3px] bg-[#D1D1D6]" style={{ aspectRatio: "26 / 16" }}>
       <div className="absolute inset-x-0 top-0 flex h-[24%] items-center justify-center" style={{ background: wrong ? INK : "#FFFFFF" }}>
         {wrong ? <Wordmark color="#FFFFFF" width={130} /> : <Box label="DEALER’S NAME" w={140} h={24} />}
       </div>
-      <div className="absolute bottom-0 left-[6%] top-[30%] w-[52%] rounded-t-[2px]" style={{ background: "linear-gradient(180deg,#9CA3AF,#6B7280)" }}>
+      <div className="absolute bottom-0 left-[6%] top-[30%] w-[52%] rounded-t-[2px]" style={{ background: "linear-gradient(180deg,#98989D,#6E6E73)" }}>
         {!wrong && <div className="absolute right-[8%] top-[10%]"><PartnerBadge w={92} /></div>}
       </div>
-      <div className="absolute bottom-0 right-[6%] top-[30%] w-[28%] rounded-t-[2px] bg-[#4B5563]" />
+      <div className="absolute bottom-0 right-[6%] top-[30%] w-[28%] rounded-t-[2px] bg-[#6E6E73]" />
     </div>
   );
 }
@@ -154,10 +154,10 @@ export function DealerSignage() {
     >
       <Section id="front" title="The shop front">
         <Examples cols={2}>
-          <Example tone="do" caption="The dealer’s name on the fascia; the Authorized badge on the window." bg="#F5F5F5" h={210}>
+          <Example tone="do" caption="The dealer’s name on the fascia; the Authorized badge on the window." bg="#F5F5F7" h={210}>
             <ShopFront />
           </Example>
-          <Example tone="dont" caption="Our logo as the shop’s name — the shop is not a KOLEEX store." bg="#F5F5F5" h={210}>
+          <Example tone="dont" caption="Our logo as the shop’s name — the shop is not a KOLEEX store." bg="#F5F5F7" h={210}>
             <ShopFront wrong />
           </Example>
         </Examples>
@@ -221,7 +221,7 @@ export function SuppliersOem() {
         <Table
           head={["File", "Used for", "Defined in"]}
           rows={[
-            ["Logo and K monogram, vector", "Machine arm, small parts", <Ref key="a" n={107} />],
+            ["Logo, vector", "Machine arm, control box, motor cover", <Ref key="a" n={107} />],
             ["Nameplate artwork with the serial range", "Nameplate and serial labels", <Ref key="a" n={108} />],
             ["Safety and panel labels", "Machine labels", <Ref key="a" n={109} />],
             ["Carton and crate artwork", "Outer packing", <Ref key="a" n={110} />],
@@ -258,13 +258,13 @@ export function SuppliersOem() {
 function QuoteCard() {
   return (
     <Post w={220} bg="#FFFFFF">
-      <div className="absolute inset-0 flex flex-col p-[9%] text-[#0A0A0A]">
-        <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#3E6796]">Customer story</p>
-        <p className="mt-3 text-[34px] font-bold leading-none text-[#D1D5DB]">“</p>
+      <div className="absolute inset-0 flex flex-col p-[9%] text-[#1D1D1F]">
+        <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#6E6E73]">Customer story</p>
+        <p className="mt-3 text-[34px] font-bold leading-none text-[#D1D1D6]">“</p>
         <p className="-mt-2 text-[12px] font-bold leading-[1.25]">The machines arrived set up and ready. We were sewing the same afternoon.</p>
         <p className="mt-3 text-[7px] font-semibold">Name Surname</p>
-        <p className="text-[6.5px] text-[#4B5563]">Production Manager · Company · City</p>
-        <div className="mt-auto flex items-center justify-between"><Wordmark color="#000000" width="34%" /><span className="h-[2px] w-[22%]" style={{ background: HUB_LINE }} /></div>
+        <p className="text-[6.5px] text-[#6E6E73]">Production Manager · Company · City</p>
+        <div className="mt-auto flex items-center justify-between"><Wordmark color="#000000" width="34%" /></div>
       </div>
     </Post>
   );
@@ -305,14 +305,14 @@ export function Testimonials() {
 
       <Section id="quote" title="The quote">
         <Examples cols={2}>
-          <Example tone="do" caption="The customer’s own words, a real name and role, with permission." bg="#F5F5F5" h={300}>
+          <Example tone="do" caption="The customer’s own words, a real name and role, with permission." bg="#F5F5F7" h={300}>
             <QuoteCard />
           </Example>
-          <Example tone="dont" caption="Invented or polished praise, an anonymous “happy customer”, a stock photo." bg="#F5F5F5" h={300}>
+          <Example tone="dont" caption="Invented or polished praise, an anonymous “happy customer”, a stock photo." bg="#F5F5F7" h={300}>
             <Post w={220} bg="#FFFFFF">
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-[9%] text-center text-[#0A0A0A]">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-[9%] text-center text-[#1D1D1F]">
                 <p className="text-[12px] font-bold leading-tight">“The best machines in the world!!! 10/10”</p>
-                <p className="text-[7px] text-[#4B5563]">— A happy customer</p>
+                <p className="text-[7px] text-[#6E6E73]">— A happy customer</p>
                 <span className="text-[14px] tracking-[0.2em]" style={{ color: "#EAB308" }}>★★★★★</span>
               </div>
             </Post>
@@ -340,7 +340,7 @@ export function Testimonials() {
           Where a customer agrees to share the story but not the name, it is told as “a knitwear factory in
           Alexandria” — never with a made-up name. Questions: <span className="font-mono">{KOLEEX_COMPANY.email}</span>.
         </Note>
-        <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Monogram color="currentColor" style={{ width: 10 }} />Case studies use the presentation and document templates of Parts 4–5.</div>
+        <P>Case studies use the presentation and document templates of Parts 4–5.</P>
       </Section>
     </Chapter>
   );

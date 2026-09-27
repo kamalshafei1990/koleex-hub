@@ -16,7 +16,7 @@ import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { HubMark, Wordmark } from "../marks";
-import { HUB_LINE, INK } from "../mockups";
+import { INK } from "../mockups";
 
 /* ── 11 · Promise & Positioning ────────────────────────────────────────── */
 
@@ -37,10 +37,10 @@ export function PromisePositioning() {
       ]}
     >
       <Section id="promise" title="The promise">
-        <Stage bg="#0A0A0A" h="auto" pad={36}>
+        <Stage bg="#000000" h="auto" pad={36}>
           <div className="w-full max-w-[560px] text-center">
             <p className="text-[26px] font-bold leading-[1.15] text-white">Precise machines.<br />Honest advice.<br />People who stand behind what they sell.</p>
-            <span className="mx-auto mt-5 block h-[2px] w-16" style={{ background: HUB_LINE }} />
+            
           </div>
         </Stage>
         <P>It is the line the founder wrote in the foreword of this book (<Ref n={1} />), and the standard every chapter serves.</P>
@@ -104,7 +104,7 @@ export function WhyKoleex() {
             <div key={t} className="flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
               <p className="text-[16px] font-bold text-[var(--text-primary)]">{t}</p>
               <p className="mt-1.5 flex-1 text-[13.5px] leading-6 text-[var(--text-secondary)]">{d}</p>
-              <p className="mt-3 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#3E6796] dark:text-[#7FA9D6]">Proof · {p}</p>
+              <p className="mt-3 text-[12px] font-semibold text-[var(--text-dim)]">Proof · {p}</p>
             </div>
           ))}
         </div>
@@ -241,8 +241,8 @@ function Scale({ trait, from, to, at, note }: { trait: string; from: string; to:
       <p className="text-[17px] font-bold text-[var(--text-primary)]">{trait}</p>
       <div className="mt-4">
         <div className="relative h-[6px] rounded-full bg-[var(--bg-surface)]">
-          <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${at}%`, background: HUB_LINE }} />
-          <span className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white" style={{ left: `calc(${at}% - 8px)`, background: "#567FB2", boxShadow: "0 0 0 1px rgba(0,0,0,0.2)" }} />
+          <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${at}%`, background: "var(--text-primary)" }} />
+          <span className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white" style={{ left: `calc(${at}% - 8px)`, background: "var(--text-primary)", boxShadow: "0 0 0 1px rgba(0,0,0,0.2)" }} />
         </div>
         <div className="mt-2 flex justify-between text-[11.5px] text-[var(--text-dim)]"><span>{from}</span><span>{to}</span></div>
       </div>
@@ -309,7 +309,7 @@ function Node({ title, sub, children, dark = false }: { title: ReactNode; sub: s
     <div className="flex flex-col items-center">
       <div className="flex min-w-[150px] flex-col items-center gap-1 rounded-[6px] px-4 py-3 text-center" style={{ background: dark ? INK : "#FFFFFF", color: dark ? "#FFFFFF" : INK, boxShadow: dark ? "0 0 0 1px rgba(255,255,255,0.14)" : "0 0 0 1px rgba(0,0,0,0.14)" }}>
         {title}
-        <span className="text-[9px] uppercase tracking-[0.14em]" style={{ color: dark ? "#9CA3AF" : "#4B5563" }}>{sub}</span>
+        <span className="text-[9px] uppercase tracking-[0.14em]" style={{ color: dark ? "#98989D" : "#6E6E73" }}>{sub}</span>
       </div>
       {children}
     </div>
@@ -333,19 +333,19 @@ export function BrandArchitecture() {
       ]}
     >
       <Section id="structure" title="The structure">
-        <Stage bg="#F5F5F5" h="auto" pad={28}>
+        <Stage bg="#F5F5F7" h="auto" pad={28}>
           <div className="flex w-full max-w-[600px] flex-col items-center">
             <Node dark title={<span className="text-[12px] font-bold tracking-[0.04em]">KOLEEX International Group</span>} sub="The group" />
-            <span className="h-5 w-px bg-[#9CA3AF]" />
-            <div className="h-px w-[80%] bg-[#9CA3AF]" />
+            <span className="h-5 w-px bg-[#98989D]" />
+            <div className="h-px w-[80%] bg-[#98989D]" />
             <div className="grid w-full grid-cols-3 gap-2">
               {[
                 <Node key="k" title={<Wordmark color="#000000" width={76} />} sub="Master brand" />,
                 <Node key="h" title={<HubMark variant="for-light" style={{ width: 96 }} />} sub="Our system" />,
                 <Node key="g" title={<span className="text-[11px] font-semibold">Group companies</span>} sub="Own names" />,
-              ].map((n, i) => <div key={i} className="flex flex-col items-center"><span className="h-5 w-px bg-[#9CA3AF]" />{n}</div>)}
+              ].map((n, i) => <div key={i} className="flex flex-col items-center"><span className="h-5 w-px bg-[#98989D]" />{n}</div>)}
             </div>
-            <div className="mt-2 grid w-full grid-cols-3 gap-2 text-center text-[10px] text-[#4B5563]">
+            <div className="mt-2 grid w-full grid-cols-3 gap-2 text-center text-[10px] text-[#6E6E73]">
               <span>Machines · parts · service</span><span>Software for the business</span><span>Endorsed by the group</span>
             </div>
           </div>
@@ -384,12 +384,12 @@ export function BrandArchitecture() {
 /* ── 17 · Product Lines & Model Naming ─────────────────────────────────── */
 
 function CodePart({ seg, label, tone }: { seg: string; label: string; tone: "type" | "series" | "feature" }) {
-  const bg = tone === "type" ? "#FFFFFF" : tone === "series" ? "#1A1A1A" : "#2E2E2E";
+  const bg = tone === "type" ? "#FFFFFF" : tone === "series" ? "#1D1D1F" : "#38383A";
   const fg = tone === "type" ? INK : "#FFFFFF";
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="rounded-[6px] px-2.5 py-1 font-mono text-[18px] font-semibold" style={{ background: bg, color: fg, boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)" }}>{seg}</span>
-      <span className="text-[10px] text-[#9CA3AF]">{label}</span>
+      <span className="text-[10px] text-[#98989D]">{label}</span>
     </div>
   );
 }
@@ -412,12 +412,12 @@ export function ProductNaming() {
       ]}
     >
       <Section id="anatomy" title="Anatomy of a model code">
-        <Stage bg="#0A0A0A" h="auto" pad={28}>
+        <Stage bg="#000000" h="auto" pad={28}>
           <div className="flex flex-wrap items-start justify-center gap-1.5">
             <CodePart seg="XSO" label="Type: overlock" tone="type" />
-            <span className="pt-1.5 font-mono text-[18px] text-[#7FA9D6]">-</span>
+            <span className="pt-1.5 font-mono text-[18px] text-[#6E6E73]">-</span>
             <CodePart seg="7800" label="Series" tone="series" />
-            <span className="pt-1.5 font-mono text-[18px] text-[#7FA9D6]">-</span>
+            <span className="pt-1.5 font-mono text-[18px] text-[#6E6E73]">-</span>
             <CodePart seg="4" label="Model: 4-thread" tone="feature" />
           </div>
         </Stage>
@@ -447,13 +447,13 @@ export function ProductNaming() {
       <Section id="naming-examples" title="Right and wrong">
         <Examples cols={2}>
           <Example tone="do" caption="Brand, code, plain description." bg="#FFFFFF" h={130}>
-            <div className="text-[#0A0A0A]">
+            <div className="text-[#1D1D1F]">
               <p className="text-[20px] font-bold">KOLEEX <span className="font-mono">XSO-7800-4</span></p>
-              <p className="text-[12px] text-[#4B5563]">4-thread overlock</p>
+              <p className="text-[12px] text-[#6E6E73]">4-thread overlock</p>
             </div>
           </Example>
           <Example tone="dont" caption="Invented names, lower case, spaces, a supplier’s code." bg="#FFFFFF" h={130}>
-            <div className="space-y-1 text-[#0A0A0A]">
+            <div className="space-y-1 text-[#1D1D1F]">
               <p className="text-[15px] font-bold italic">SuperLock Pro 4000 by Koleex</p>
               <p className="font-mono text-[12px]">xso 7800 4 · “same as model 747”</p>
             </div>

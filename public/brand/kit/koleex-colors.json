@@ -1,24 +1,21 @@
 {
-  "source": "KOLEEX Brand Guidelines v2.0 (27/09/2026)",
-  "note": "CMYK values are a starting point; match them on a printed proof before a job runs.",
+  "source": "KOLEEX Brand Guidelines v3.0 (27/09/2026)",
+  "note": "CMYK values are a starting point; match them on a printed proof before a job runs. Silver in print is silver foil, Pantone 877 C (metallic silver).",
+  "proportions": {
+    "blackOrWhite": 60,
+    "neutrals": 28,
+    "silver": 8,
+    "hubBlue": 4
+  },
   "colors": [
     {
       "id": "black",
-      "name": "KOLEEX Black",
+      "name": "Black",
       "group": "core",
       "hex": "#000000",
       "rgb": "0, 0, 0",
       "cmyk": "C0 M0 Y0 K100",
-      "role": "The logo on light backgrounds. Pure black, nothing else."
-    },
-    {
-      "id": "ink",
-      "name": "Ink",
-      "group": "core",
-      "hex": "#0A0A0A",
-      "rgb": "10, 10, 10",
-      "cmyk": "C0 M0 Y0 K96",
-      "role": "Dark surfaces: covers, social posts, booth walls, app icon ground."
+      "role": "The logo on light, the ground of heroes, product photos and covers."
     },
     {
       "id": "white",
@@ -27,7 +24,52 @@
       "hex": "#FFFFFF",
       "rgb": "255, 255, 255",
       "cmyk": "C0 M0 Y0 K0",
-      "role": "Paper, documents, the logo on dark backgrounds."
+      "role": "Paper, pages, the logo on dark, catalog photo backgrounds."
+    },
+    {
+      "id": "graphite",
+      "name": "Graphite",
+      "group": "neutral",
+      "hex": "#1D1D1F",
+      "rgb": "29, 29, 31",
+      "cmyk": "C6 M6 Y0 K88",
+      "role": "Headlines and body text on white; panels on black."
+    },
+    {
+      "id": "gray",
+      "name": "Gray",
+      "group": "neutral",
+      "hex": "#6E6E73",
+      "rgb": "110, 110, 115",
+      "cmyk": "C4 M4 Y0 K55",
+      "role": "Secondary text, captions and labels."
+    },
+    {
+      "id": "mist",
+      "name": "Mist",
+      "group": "neutral",
+      "hex": "#D2D2D7",
+      "rgb": "210, 210, 215",
+      "cmyk": "C2 M2 Y0 K16",
+      "role": "Hairlines, borders and table rules."
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud",
+      "group": "neutral",
+      "hex": "#F5F5F7",
+      "rgb": "245, 245, 247",
+      "cmyk": "C1 M1 Y0 K3",
+      "role": "Light panels and tiles behind content."
+    },
+    {
+      "id": "silver",
+      "name": "Silver",
+      "group": "silver",
+      "hex": "#C7C7CC",
+      "rgb": "199, 199, 204",
+      "cmyk": "C2 M2 Y0 K20",
+      "role": "The premium material: big headlines on black, the machine finish, nameplates. The gradient below; foil in print."
     },
     {
       "id": "deep",
@@ -36,7 +78,7 @@
       "hex": "#3E6796",
       "rgb": "62, 103, 150",
       "cmyk": "C59 M31 Y0 K41",
-      "role": "Blue text and links on white. Blue fields behind white type."
+      "role": "Links and buttons on white."
     },
     {
       "id": "steel",
@@ -45,7 +87,7 @@
       "hex": "#567FB2",
       "rgb": "86, 127, 178",
       "cmyk": "C52 M29 Y0 K30",
-      "role": "The core Hub Blue: accents, highlights, the start of the gradient."
+      "role": "The core Hub Blue: filled buttons and the Hub mark."
     },
     {
       "id": "sky",
@@ -54,7 +96,7 @@
       "hex": "#7FA9D6",
       "rgb": "127, 169, 214",
       "cmyk": "C41 M21 Y0 K16",
-      "role": "Accents on dark backgrounds, charts, secondary highlights."
+      "role": "Links and buttons on black."
     },
     {
       "id": "ice",
@@ -63,52 +105,7 @@
       "hex": "#BCD8F0",
       "rgb": "188, 216, 240",
       "cmyk": "C22 M10 Y0 K6",
-      "role": "The end of the gradient, tints, quiet fills behind dark text."
-    },
-    {
-      "id": "ink-soft",
-      "name": "Graphite",
-      "group": "neutral",
-      "hex": "#1A1A1A",
-      "rgb": "26, 26, 26",
-      "cmyk": "C0 M0 Y0 K90",
-      "role": "Body text on white in documents; secondary dark surface."
-    },
-    {
-      "id": "soft",
-      "name": "Slate",
-      "group": "neutral",
-      "hex": "#4B5563",
-      "rgb": "75, 85, 99",
-      "cmyk": "C24 M14 Y0 K61",
-      "role": "Secondary text, captions, labels on white."
-    },
-    {
-      "id": "ghost",
-      "name": "Silver",
-      "group": "neutral",
-      "hex": "#9CA3AF",
-      "rgb": "156, 163, 175",
-      "cmyk": "C11 M7 Y0 K31",
-      "role": "Hairlines, disabled states, text on dark backgrounds."
-    },
-    {
-      "id": "border",
-      "name": "Mist",
-      "group": "neutral",
-      "hex": "#E5E7EB",
-      "rgb": "229, 231, 235",
-      "cmyk": "C3 M2 Y0 K8",
-      "role": "Borders and table rules on white."
-    },
-    {
-      "id": "surface",
-      "name": "Cloud",
-      "group": "neutral",
-      "hex": "#F5F5F5",
-      "rgb": "245, 245, 245",
-      "cmyk": "C0 M0 Y0 K4",
-      "role": "Light panels, strips and table fills."
+      "role": "Pressed and selected states behind dark text."
     },
     {
       "id": "success",
@@ -138,10 +135,16 @@
       "role": "Errors and rejections only."
     }
   ],
-  "gradient": {
-    "name": "Hub gradient",
-    "from": "#567FB2",
-    "to": "#BCD8F0",
-    "direction": "top to bottom"
+  "silverGradient": {
+    "stops": [
+      "#AEAEB2",
+      "#FFFFFF",
+      "#D1D1D6",
+      "#8E8E93"
+    ],
+    "css": "linear-gradient(135deg, #AEAEB2 0%, #FFFFFF 38%, #D1D1D6 60%, #8E8E93 100%)",
+    "textOnBlack": "linear-gradient(170deg, #C7C7CC 0%, #FFFFFF 35%, #D1D1D6 60%, #8E8E93 100%)",
+    "print": "Pantone 877 C (metallic silver)",
+    "foil": "Silver hot-foil stamping"
   }
 }

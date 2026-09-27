@@ -7,15 +7,21 @@
 
    CMYK values are a mathematical starting point (sRGB → CMYK, no ICC
    profile). They are labelled that way in the book: a printer matches them
-   on a physical proof before a job runs. No Pantone reference is claimed
-   until one has been matched on press.
+   on a physical proof before a job runs.
 
-   Brand hierarchy (owner decision, 31/07/2026): black → white → Hub Blue.
-   Hub Blue is used everywhere — the Hub, marketing and print (owner,
-   27/09/2026) — as an accent, never as a flood.
+   The identity (owner decisions, 27/09/2026, Apple direction):
+     · black and white carry every piece;
+     · four neutrals (Graphite, Gray, Mist, Cloud) do the quiet work;
+     · SILVER is the premium material — one smooth, slightly shiny
+       gradient on screen, real silver foil (Pantone 877 C) in print. It is
+       never the colour of the logo;
+     · HUB BLUE is the action — links and buttons only, never decoration;
+     · status colours only show a state.
+   Proportions in a layout: black or white 60 · neutrals 28 · silver 8 ·
+   Hub Blue 4.
    --------------------------------------------------------------------------- */
 
-export type ColorGroup = "core" | "hub" | "neutral" | "status";
+export type ColorGroup = "core" | "neutral" | "silver" | "hub" | "status";
 
 export interface BrandColor {
   id: string;
@@ -26,29 +32,52 @@ export interface BrandColor {
 }
 
 export const BRAND_COLORS: BrandColor[] = [
-  { id: "black", name: "KOLEEX Black", hex: "#000000", group: "core", role: "The logo on light backgrounds. Pure black, nothing else." },
-  { id: "ink", name: "Ink", hex: "#0A0A0A", group: "core", role: "Dark surfaces: covers, social posts, booth walls, app icon ground." },
-  { id: "white", name: "White", hex: "#FFFFFF", group: "core", role: "Paper, documents, the logo on dark backgrounds." },
-  { id: "deep", name: "Hub Blue Deep", hex: "#3E6796", group: "hub", role: "Blue text and links on white. Blue fields behind white type." },
-  { id: "steel", name: "Hub Blue Steel", hex: "#567FB2", group: "hub", role: "The core Hub Blue: accents, highlights, the start of the gradient." },
-  { id: "sky", name: "Hub Blue Sky", hex: "#7FA9D6", group: "hub", role: "Accents on dark backgrounds, charts, secondary highlights." },
-  { id: "ice", name: "Hub Blue Ice", hex: "#BCD8F0", group: "hub", role: "The end of the gradient, tints, quiet fills behind dark text." },
-  { id: "ink-soft", name: "Graphite", hex: "#1A1A1A", group: "neutral", role: "Body text on white in documents; secondary dark surface." },
-  { id: "soft", name: "Slate", hex: "#4B5563", group: "neutral", role: "Secondary text, captions, labels on white." },
-  { id: "ghost", name: "Silver", hex: "#9CA3AF", group: "neutral", role: "Hairlines, disabled states, text on dark backgrounds." },
-  { id: "border", name: "Mist", hex: "#E5E7EB", group: "neutral", role: "Borders and table rules on white." },
-  { id: "surface", name: "Cloud", hex: "#F5F5F5", group: "neutral", role: "Light panels, strips and table fills." },
+  { id: "black", name: "Black", hex: "#000000", group: "core", role: "The logo on light, the ground of heroes, product photos and covers." },
+  { id: "white", name: "White", hex: "#FFFFFF", group: "core", role: "Paper, pages, the logo on dark, catalog photo backgrounds." },
+  { id: "graphite", name: "Graphite", hex: "#1D1D1F", group: "neutral", role: "Headlines and body text on white; panels on black." },
+  { id: "gray", name: "Gray", hex: "#6E6E73", group: "neutral", role: "Secondary text, captions and labels." },
+  { id: "mist", name: "Mist", hex: "#D2D2D7", group: "neutral", role: "Hairlines, borders and table rules." },
+  { id: "cloud", name: "Cloud", hex: "#F5F5F7", group: "neutral", role: "Light panels and tiles behind content." },
+  { id: "silver", name: "Silver", hex: "#C7C7CC", group: "silver", role: "The premium material: big headlines on black, the machine finish, nameplates. The gradient below; foil in print." },
+  { id: "deep", name: "Hub Blue Deep", hex: "#3E6796", group: "hub", role: "Links and buttons on white." },
+  { id: "steel", name: "Hub Blue Steel", hex: "#567FB2", group: "hub", role: "The core Hub Blue: filled buttons and the Hub mark." },
+  { id: "sky", name: "Hub Blue Sky", hex: "#7FA9D6", group: "hub", role: "Links and buttons on black." },
+  { id: "ice", name: "Hub Blue Ice", hex: "#BCD8F0", group: "hub", role: "Pressed and selected states behind dark text." },
   { id: "success", name: "Status Green", hex: "#059669", group: "status", role: "Success and approval states only." },
   { id: "warning", name: "Status Amber", hex: "#D97706", group: "status", role: "Warnings and pending states only." },
   { id: "error", name: "Status Red", hex: "#DC2626", group: "status", role: "Errors and rejections only." },
 ];
 
+/** Silver — one smooth gradient with a single soft highlight (owner,
+ *  27/09/2026: "gradient, not wavy", "a little shiny"). */
+export const SILVER = {
+  stops: ["#AEAEB2", "#FFFFFF", "#D1D1D6", "#8E8E93"] as const,
+  /** Surfaces, swatches, nameplates. */
+  css: "linear-gradient(135deg, #AEAEB2 0%, #FFFFFF 38%, #D1D1D6 60%, #8E8E93 100%)",
+  /** Headlines on black (use with background-clip: text). */
+  cssText: "linear-gradient(170deg, #C7C7CC 0%, #FFFFFF 35%, #D1D1D6 60%, #8E8E93 100%)",
+  /** The machine finish in photographs and stand-ins, lit from above. */
+  cssFinish: "linear-gradient(180deg, #D1D1D6 0%, #FFFFFF 22%, #C7C7CC 55%, #8E8E93 100%)",
+  pantone: "Pantone 877 C (metallic silver)",
+  foil: "Silver hot-foil stamping",
+} as const;
+
+/** The Hub mark's own gradient. It belongs to the Koleex Hub mark and the
+ *  Hub interface; it is not a decoration for KOLEEX layouts. */
 export const HUB_GRADIENT = {
   from: "#567FB2",
   to: "#BCD8F0",
   css: "linear-gradient(180deg, #567FB2 0%, #BCD8F0 100%)",
   cssHorizontal: "linear-gradient(90deg, #567FB2 0%, #BCD8F0 100%)",
 } as const;
+
+/** Share of a layout, in percent (owner, 27/09/2026). */
+export const PROPORTIONS = [
+  { id: "base", label: "Black or white", pct: 60 },
+  { id: "neutral", label: "Neutrals", pct: 28 },
+  { id: "silver", label: "Silver", pct: 8 },
+  { id: "hub", label: "Hub Blue", pct: 4 },
+] as const;
 
 export function color(id: string): BrandColor {
   const c = BRAND_COLORS.find((x) => x.id === id);

@@ -18,7 +18,7 @@ export function DownloadsChapter() {
       toc={[
         { id: "pack", title: "Complete logo pack" },
         { id: "logo", title: "KOLEEX logo" },
-        { id: "k", title: "K monogram" },
+        { id: "tiles", title: "Logo tiles" },
         { id: "hub", title: "Koleex Hub mark & app icon" },
         { id: "colors", title: "Colors" },
         { id: "fonts", title: "Fonts" },
@@ -30,7 +30,7 @@ export function DownloadsChapter() {
           Always download the logo from this page. Never copy it from a website, a PDF or a screenshot.
         </Rule>
         <Downloads items={[
-          { label: "KOLEEX logo pack", href: "/brand/kit/koleex-logo-pack.zip", format: "ZIP", note: "Logo (SVG + PNG, black and white), K monogram, colors, README" },
+          { label: "KOLEEX logo pack", href: "/brand/kit/koleex-logo-pack.zip", format: "ZIP", note: "Logo (SVG + PNG, black and white), logo tiles, colors and silver, README" },
         ]} />
       </Section>
 
@@ -48,18 +48,16 @@ export function DownloadsChapter() {
         <P>Which file for which job: <Ref n={36} />.</P>
       </Section>
 
-      <Section id="k" title="K monogram">
+      <Section id="tiles" title="Logo tiles">
         <Downloads items={[
-          { label: "K — black", href: "/brand/kit/koleex-k-black.svg", format: "SVG" },
-          { label: "K — white", href: "/brand/kit/koleex-k-white.svg", format: "SVG" },
-          { label: "K tile — dark, 1024 px (profile pictures)", href: "/brand/kit/koleex-k-tile-dark-1024.png", format: "PNG" },
-          { label: "K tile — dark, 512 px", href: "/brand/kit/koleex-k-tile-dark-512.png", format: "PNG" },
-          { label: "K tile — light, 1024 px", href: "/brand/kit/koleex-k-tile-light-1024.png", format: "PNG" },
-          { label: "K tile — light, 512 px", href: "/brand/kit/koleex-k-tile-light-512.png", format: "PNG" },
-          { label: "K tile — dark, vector", href: "/brand/kit/koleex-k-tile-dark.svg", format: "SVG" },
-          { label: "K tile — light, vector", href: "/brand/kit/koleex-k-tile-light.svg", format: "SVG" },
+          { label: "Logo tile — white on black, 1024 px", href: "/brand/kit/koleex-avatar-dark-1024.png", format: "PNG", note: "Profile pictures, app icons, favicons" },
+          { label: "Logo tile — white on black, 512 px", href: "/brand/kit/koleex-avatar-dark-512.png", format: "PNG" },
+          { label: "Logo tile — black on white, 1024 px", href: "/brand/kit/koleex-avatar-light-1024.png", format: "PNG" },
+          { label: "Logo tile — black on white, 512 px", href: "/brand/kit/koleex-avatar-light-512.png", format: "PNG" },
+          { label: "Logo tile — white on black, vector", href: "/brand/kit/koleex-avatar-dark.svg", format: "SVG" },
+          { label: "Logo tile — black on white, vector", href: "/brand/kit/koleex-avatar-light.svg", format: "SVG" },
         ]} />
-        <P>When to use the K: <Ref n={41} />.</P>
+        <P>How and where to use them: <Ref n={41} />.</P>
       </Section>
 
       <Section id="hub" title="Koleex Hub mark & app icon">
@@ -87,9 +85,9 @@ export function DownloadsChapter() {
         <Table
           head={["Font", "For", "Official source"]}
           rows={[
-            ["Inter", "All Latin text", <a key="a" href="https://rsms.me/inter/" target="_blank" rel="noreferrer" className="text-[#3E6796] underline underline-offset-2 dark:text-[#7FA9D6]">rsms.me/inter</a>],
-            ["Noto Naskh Arabic", "Arabic, where the system Arabic font is missing", <a key="a" href="https://github.com/notofonts/arabic" target="_blank" rel="noreferrer" className="text-[#3E6796] underline underline-offset-2 dark:text-[#7FA9D6]">github.com/notofonts/arabic</a>],
-            ["Noto Sans SC", "Chinese, where PingFang / YaHei are missing", <a key="a" href="https://github.com/notofonts/noto-cjk" target="_blank" rel="noreferrer" className="text-[#3E6796] underline underline-offset-2 dark:text-[#7FA9D6]">github.com/notofonts/noto-cjk</a>],
+            ["Inter", "All Latin text — headlines in the Display cut", <a key="a" href="https://rsms.me/inter/" target="_blank" rel="noreferrer" className="text-[var(--bk-link)] hover:underline underline-offset-2">rsms.me/inter</a>],
+            ["Noto Sans Arabic", "All Arabic text", <a key="a" href="https://fonts.google.com/noto/specimen/Noto+Sans+Arabic" target="_blank" rel="noreferrer" className="text-[var(--bk-link)] hover:underline underline-offset-2">fonts.google.com/noto</a>],
+            ["Noto Sans SC", "All Chinese text", <a key="a" href="https://fonts.google.com/noto/specimen/Noto+Sans+SC" target="_blank" rel="noreferrer" className="text-[var(--bk-link)] hover:underline underline-offset-2">fonts.google.com/noto</a>],
           ]}
         />
         <Note>All three are free under the SIL Open Font License. If a source cannot be opened from mainland China, ask the Marketing Manager for the files.</Note>
