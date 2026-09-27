@@ -1,6 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
@@ -157,6 +158,8 @@ export async function POST(req: Request) {
          would have, so debugging stays familiar. */
       return NextResponse.json({ data: null, count: null, error: error.message }, { status: 200 });
     }
+    /* A job posting changed: the website's careers page refreshes. */
+    if (q.op !== "select" && q.table === "hr_job_postings") revalidateWebsite(["jobs"]);
     return NextResponse.json({ data: data ?? null, count: count ?? null, error: null });
   } catch (e) {
     console.error("[api/hr/data]", e instanceof Error ? e.message : e);

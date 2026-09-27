@@ -10,6 +10,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
@@ -45,6 +46,7 @@ export async function PATCH(
     console.error("[api/products media PATCH]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }
 
@@ -63,5 +65,6 @@ export async function DELETE(
     console.error("[api/products media DELETE]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

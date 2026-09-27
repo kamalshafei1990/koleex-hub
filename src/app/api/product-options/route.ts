@@ -22,6 +22,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -173,7 +174,10 @@ export async function PUT(req: Request) {
      then resolve dependencies key → id. ── */
   const del = await supabaseServer.from("product_options").delete().eq("product_id", productId);
   if (del.error) return NextResponse.json({ error: humanizeError(del.error) }, { status: 500 });
-  if (!inOptions.length) return NextResponse.json({ ok: true, count: 0 });
+  if (!inOptions.length) {
+    revalidateWebsite(["products"]);
+    return NextResponse.json({ ok: true, count: 0 });
+  }
 
   const optionRows = inOptions.map((o, i) => ({
     product_id: productId,
@@ -226,5 +230,7 @@ export async function PUT(req: Request) {
     if (upd.error) return NextResponse.json({ error: humanizeError(upd.error) }, { status: 500 });
   }
 
+  /* The product page shows these options — the website refreshes it. */
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true, count: inOptions.length });
 }

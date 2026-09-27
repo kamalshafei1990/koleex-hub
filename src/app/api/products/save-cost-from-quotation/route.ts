@@ -35,6 +35,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
 
@@ -153,11 +154,13 @@ export async function POST(req: Request) {
     }
 
     // Fill-only description (never overwrite a non-empty one).
+    let websiteChanged = false;
     if (body.description && !(found.product?.description || "").trim()) {
       await supabaseServer
         .from("products")
         .update({ description: body.description })
         .eq("id", found.product_id);
+      websiteChanged = true;
     }
     // Add photo only if the product has no image yet.
     if (body.photo) {
@@ -174,9 +177,14 @@ export async function POST(req: Request) {
           type: "image",
           role: "gallery",
         });
+        websiteChanged = true;
       }
     }
 
+    /* A description or photo was filled in: the website refreshes the
+       product. A cost change alone never shows there. (A NEW model below
+       creates a draft, which the website does not show.) */
+    if (websiteChanged) revalidateWebsite(["products"]);
     return NextResponse.json({
       status: "linked",
       changed,

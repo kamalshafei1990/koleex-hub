@@ -1,0 +1,408 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   Website catalog — what the Hub hands the public website through the bridge
+   (lib/server/website-bridge.ts). Reads only.
+
+   The website shows what a visitor may see, nothing more:
+     · products that are ACTIVE and VISIBLE (owner rule, 05/08/2026), of the
+       host company only;
+     · no price of any kind, no cost, no supplier, no MOQ, no HS code — the
+       columns are never selected here, and a product page passes through
+       scrubForWebsite() on top of the loader's own "public" audience;
+     · site pages and their sections as the Website app left them (visible
+       ones only);
+     · open job postings, without the salary.
+   validate:website-bridge pins every one of these.
+   --------------------------------------------------------------------------- */
+
+import { inChunks } from "@/lib/server/in-chunks";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { websiteTenantId } from "@/lib/server/website-bridge";
+
+/* ── Guards ─────────────────────────────────────────────────────────────── */
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,119}$/;
+export const isSlug = (v: string | null | undefined): v is string => !!v && SLUG_RE.test(v);
+
+/* A key the website never receives, at any depth. The loaders already leave
+   these out; this is the last line, so a column added to a loader later
+   cannot reach a visitor by accident. */
+const INTERNAL_KEY = /(price|cost|supplier|moq|margin|hs_?code|fob|tenant)/i;
+export function scrubForWebsite<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => scrubForWebsite(v)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (INTERNAL_KEY.test(k)) continue;
+      out[k] = scrubForWebsite(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/* ── Products ───────────────────────────────────────────────────────────── */
+
+const LIST_COLUMNS = "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, excerpt, featured, updated_at";
+
+export interface WebsiteProductCard {
+  slug: string;
+  name: string;
+  modelCode: string | null;
+  tagline: string | null;
+  excerpt: string | null;
+  /** zh / ar (and any other locale on file): name, tagline, excerpt. */
+  translations: Record<string, { name: string | null; tagline: string | null; excerpt: string | null }>;
+  brand: string | null;
+  division: string | null;
+  category: string | null;
+  subcategory: string | null;
+  featured: boolean;
+  image: string | null;
+  updatedAt: string | null;
+}
+
+export interface WebsiteProductQuery {
+  division?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  featured?: boolean;
+  q?: string | null;
+  page?: number;
+  pageSize?: number;
+}
+
+/* The API hands back at most 1000 rows a read and says nothing about the
+   rest (measured 27/09/2026: limit(10000) on a 3,806-row table → 1000 rows).
+   A read that must see every row pages through them in a stable order. */
+const API_PAGE = 1000;
+async function allRows<T>(label: string, read: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += API_PAGE) {
+    const { data, error } = await read(from, from + API_PAGE - 1);
+    if (error) throw new Error(`website ${label}: ${error.message}`);
+    const rows = (data as T[] | null) ?? [];
+    out.push(...rows);
+    if (rows.length < API_PAGE) return out;
+  }
+}
+
+/** Letters, digits, spaces and dashes in any script — nothing PostgREST
+ *  reads as a wildcard or a separator. */
+const searchTerm = (q: string | null | undefined): string =>
+  (q ?? "").normalize("NFKC").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+
+/* Words, not a phrase: "12/15 heat press" finds "12/15 in 1 Heat Press
+   Machine". As one phrase the slash became a space and "12 15" was nowhere
+   in the text (the bridge's own test caught it, 27/09/2026). Every word must
+   match; five words is plenty for a product search. */
+const searchWords = (q: string | null | undefined): string[] =>
+  Array.from(new Set(searchTerm(q).toLowerCase().split(" ").filter(Boolean))).slice(0, 5);
+
+/* The list filters as column/value pairs, so every read applies the same ones. */
+function filterPairs(query: WebsiteProductQuery): Array<[string, string | boolean]> {
+  const pairs: Array<[string, string | boolean]> = [];
+  if (isSlug(query.division)) pairs.push(["division_slug", query.division]);
+  if (isSlug(query.category)) pairs.push(["category_slug", query.category]);
+  if (isSlug(query.subcategory)) pairs.push(["subcategory_slug", query.subcategory]);
+  if (query.featured) pairs.push(["featured", true]);
+  return pairs;
+}
+
+type Hit = { id: string; product_name: string; featured: boolean | null };
+
+/* Where a visitor's words may match: the product's own text, a model's code,
+   SKU or name in any language, and the translated name, tagline and
+   description. Never the supplier tables — a visitor who types a supplier's
+   name or code finds nothing. Returns this company's active, visible
+   products that match, inside the filters, in list order. */
+async function searchHits(tenantId: string, words: string[], query: WebsiteProductQuery): Promise<Hit[]> {
+  const filters = filterPairs(query);
+  const [direct, viaModels, viaTexts] = await Promise.all([
+    allRows<Hit>("search", (from, to) => {
+      let q = supabaseServer.from("products").select("id, product_name, featured")
+        .eq("tenant_id", tenantId).eq("status", "active").eq("visible", true);
+      for (const [c, v] of filters) q = q.eq(c, v);
+      for (const w of words) q = q.ilike("search_text", `%${w}%`);
+      return q.order("id").range(from, to);
+    }),
+    allRows<{ product_id: string }>("search models", (from, to) => {
+      let q = supabaseServer.from("product_models").select("product_id")
+        .eq("visible", true).or("status.is.null,status.neq.discontinued");
+      for (const w of words) q = q.ilike("search_text", `%${w}%`);
+      return q.order("id").range(from, to);
+    }),
+    allRows<{ product_id: string }>("search translations", (from, to) => {
+      let q = supabaseServer.from("product_translations").select("product_id");
+      for (const w of words) q = q.ilike("search_text", `%${w}%`);
+      return q.order("id").range(from, to);
+    }),
+  ]);
+  /* A model or translation match must still be this company's, active,
+     visible and inside the filters. Checked in chunks, so a broad search
+     never puts thousands of ids in one URL (lib/server/in-chunks). */
+  const seen = new Set(direct.map((h) => h.id));
+  const extra = Array.from(new Set([...viaModels, ...viaTexts].map((r) => r.product_id))).filter((id) => !seen.has(id));
+  const checked = await inChunks<Hit>(extra, (chunk) => {
+    let q = supabaseServer.from("products").select("id, product_name, featured")
+      .in("id", chunk).eq("tenant_id", tenantId).eq("status", "active").eq("visible", true);
+    for (const [c, v] of filters) q = q.eq(c, v);
+    return q;
+  });
+  if (checked.error) throw new Error(`website search: ${checked.error.message}`);
+  /* The list's own order: featured first, then by name. */
+  return direct.concat(checked.data ?? []).sort((a, b) =>
+    Number(!!b.featured) - Number(!!a.featured) || a.product_name.localeCompare(b.product_name));
+}
+
+type ProductRow = { id: string; product_name: string; slug: string; brand: string | null; division_slug: string | null; category_slug: string | null; subcategory_slug: string | null; excerpt: string | null; featured: boolean | null; updated_at: string | null };
+
+export async function listWebsiteProducts(query: WebsiteProductQuery): Promise<{ items: WebsiteProductCard[]; total: number; page: number; pageSize: number }> {
+  const tenantId = await websiteTenantId();
+  const page = Math.max(1, Math.floor(query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Math.floor(query.pageSize ?? 24)));
+  if (!tenantId) return { items: [], total: 0, page, pageSize };
+  const from = (page - 1) * pageSize;
+  const words = searchWords(query.q);
+
+  let rows: ProductRow[];
+  let total: number;
+  if (words.length === 0) {
+    let q = supabaseServer
+      .from("products")
+      .select(LIST_COLUMNS, { count: "exact" })
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .eq("visible", true);
+    for (const [c, v] of filterPairs(query)) q = q.eq(c, v);
+    const { data, count, error } = await q
+      .order("featured", { ascending: false })
+      .order("product_name", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`website products: ${error.message}`);
+    rows = (data as ProductRow[] | null) ?? [];
+    total = count ?? rows.length;
+  } else {
+    const hits = await searchHits(tenantId, words, query);
+    const pageIds = hits.slice(from, from + pageSize).map((h) => h.id);
+    const { data, error } = pageIds.length
+      ? await supabaseServer.from("products").select(LIST_COLUMNS).in("id", pageIds)
+      : { data: [], error: null };
+    if (error) throw new Error(`website products: ${error.message}`);
+    const byId = new Map(((data as ProductRow[] | null) ?? []).map((r) => [r.id, r]));
+    rows = pageIds.map((id) => byId.get(id)).filter((r): r is ProductRow => !!r);
+    total = hits.length;
+  }
+  return { items: await productCards(rows), total, page, pageSize };
+}
+
+/* The cards for one page: the main image (the first gallery shot when there
+   is none), the translated texts, and the primary model's code. A failed
+   read throws — the website then keeps the copy it has rather than caching
+   cards with the images missing. */
+async function productCards(rows: ProductRow[]): Promise<WebsiteProductCard[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  type MediaRow = { product_id: string; url: string | null; type: string };
+  type TextRow = { product_id: string; locale: string; product_name: string | null; tagline: string | null; excerpt: string | null };
+  type ModelRow = { product_id: string; primary_model: string | null; model_name: string | null; tagline: string | null; visible: boolean | null; status: string | null };
+  const [media, texts, models] = await Promise.all([
+    allRows<MediaRow>("media", (from, to) => supabaseServer.from("product_media").select('product_id, url, type, "order"').in("product_id", ids).in("type", ["main_image", "gallery"]).order("order", { ascending: true }).order("id").range(from, to)),
+    allRows<TextRow>("translations", (from, to) => supabaseServer.from("product_translations").select("product_id, locale, product_name, tagline, excerpt").in("product_id", ids).order("id").range(from, to)),
+    allRows<ModelRow>("models", (from, to) => supabaseServer.from("product_models").select('product_id, primary_model, model_name, tagline, visible, status, "order"').in("product_id", ids).order("order", { ascending: true }).order("id").range(from, to)),
+  ]);
+
+  const imageOf = new Map<string, string>();
+  for (const m of media) {
+    if (!m.url) continue;
+    if (m.type === "main_image" || !imageOf.has(m.product_id)) imageOf.set(m.product_id, m.url);
+  }
+  const textsOf = new Map<string, WebsiteProductCard["translations"]>();
+  for (const t of texts) {
+    const map = textsOf.get(t.product_id) ?? {};
+    map[t.locale] = { name: t.product_name, tagline: t.tagline, excerpt: t.excerpt };
+    textsOf.set(t.product_id, map);
+  }
+  const modelsOf = new Map<string, ModelRow[]>();
+  for (const m of models) {
+    if (m.visible === false || m.status === "discontinued") continue;
+    const list = modelsOf.get(m.product_id) ?? [];
+    list.push(m);
+    modelsOf.set(m.product_id, list);
+  }
+
+  return rows.map((r): WebsiteProductCard => {
+    const list = modelsOf.get(r.id) ?? [];
+    const primary = list.find((m) => !!m.primary_model) ?? list[0] ?? null;
+    return {
+      slug: r.slug,
+      name: r.product_name,
+      modelCode: primary ? (primary.primary_model || primary.model_name) : null,
+      tagline: primary?.tagline ?? null,
+      excerpt: r.excerpt,
+      translations: textsOf.get(r.id) ?? {},
+      brand: r.brand,
+      division: r.division_slug,
+      category: r.category_slug,
+      subcategory: r.subcategory_slug,
+      featured: !!r.featured,
+      image: imageOf.get(r.id) ?? null,
+      updatedAt: r.updated_at,
+    };
+  });
+}
+
+/** The id of a product the website may show: this company's, active and
+ *  visible. null for anything else — the same "not found" either way. */
+export async function websiteProductId(slug: string): Promise<string | null> {
+  const tenantId = await websiteTenantId();
+  if (!tenantId || !isSlug(slug)) return null;
+  const { data } = await supabaseServer
+    .from("products")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("slug", slug)
+    .eq("status", "active")
+    .eq("visible", true)
+    .maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+/* ── Taxonomy ───────────────────────────────────────────────────────────── */
+
+interface Names { name: string; zh: string | null; ar: string | null }
+export interface WebsiteSubcategory extends Names { slug: string; code: string | null; description: string | null; order: number | null; productCount: number }
+export interface WebsiteCategory extends Names { slug: string; description: string | null; order: number | null; productCount: number; subcategories: WebsiteSubcategory[] }
+export interface WebsiteDivision extends Names { slug: string; tagline: string | null; description: string | null; order: number | null; productCount: number; categories: WebsiteCategory[] }
+
+/** Divisions › categories › subcategories, each with how many products the
+ *  website shows under it — the website hides the empty ones if it wants. */
+export async function websiteTaxonomy(): Promise<WebsiteDivision[]> {
+  const tenantId = await websiteTenantId();
+  type TallyRow = { division_slug: string | null; category_slug: string | null; subcategory_slug: string | null };
+  const [divs, cats, subs, prods] = await Promise.all([
+    supabaseServer.from("divisions").select('id, slug, name, name_zh, name_ar, tagline, description, "order"').order("order", { ascending: true }),
+    supabaseServer.from("categories").select('id, division_id, slug, name, name_zh, name_ar, description, "order"').order("order", { ascending: true }),
+    allRows<SubRow>("subcategories", (from, to) => supabaseServer.from("subcategories").select('id, category_id, slug, code, name, name_zh, name_ar, description, "order"').order("order", { ascending: true }).order("id").range(from, to)),
+    /* Every product the website shows, counted — paged, so the counts stay
+       right past the API's 1000-row read. */
+    tenantId
+      ? allRows<TallyRow>("taxonomy", (from, to) => supabaseServer.from("products").select("id, division_slug, category_slug, subcategory_slug").eq("tenant_id", tenantId).eq("status", "active").eq("visible", true).order("id").range(from, to))
+      : Promise.resolve([] as TallyRow[]),
+  ]);
+  if (divs.error || cats.error) throw new Error(`website taxonomy: ${(divs.error ?? cats.error)?.message}`);
+
+  const tally = new Map<string, number>();
+  const bump = (k: string | null) => { if (k) tally.set(k, (tally.get(k) ?? 0) + 1); };
+  for (const p of prods) {
+    bump(p.division_slug ? `d:${p.division_slug}` : null);
+    bump(p.category_slug ? `c:${p.category_slug}` : null);
+    bump(p.subcategory_slug ? `s:${p.subcategory_slug}` : null);
+  }
+
+  type SubRow = { id: string; category_id: string; slug: string; code: string | null; name: string; name_zh: string | null; name_ar: string | null; description: string | null; order: number | null };
+  type CatRow = { id: string; division_id: string; slug: string; name: string; name_zh: string | null; name_ar: string | null; description: string | null; order: number | null };
+  type DivRow = { id: string; slug: string; name: string; name_zh: string | null; name_ar: string | null; tagline: string | null; description: string | null; order: number | null };
+
+  const subsOf = new Map<string, WebsiteSubcategory[]>();
+  for (const s of subs) {
+    const list = subsOf.get(s.category_id) ?? [];
+    list.push({ slug: s.slug, code: s.code, name: s.name, zh: s.name_zh, ar: s.name_ar, description: s.description, order: s.order, productCount: tally.get(`s:${s.slug}`) ?? 0 });
+    subsOf.set(s.category_id, list);
+  }
+  const catsOf = new Map<string, WebsiteCategory[]>();
+  for (const c of (cats.data as CatRow[] | null) ?? []) {
+    const list = catsOf.get(c.division_id) ?? [];
+    list.push({ slug: c.slug, name: c.name, zh: c.name_zh, ar: c.name_ar, description: c.description, order: c.order, productCount: tally.get(`c:${c.slug}`) ?? 0, subcategories: subsOf.get(c.id) ?? [] });
+    catsOf.set(c.division_id, list);
+  }
+  return ((divs.data as DivRow[] | null) ?? []).map((d) => ({
+    slug: d.slug, name: d.name, zh: d.name_zh, ar: d.name_ar, tagline: d.tagline, description: d.description, order: d.order,
+    productCount: tally.get(`d:${d.slug}`) ?? 0,
+    categories: catsOf.get(d.id) ?? [],
+  }));
+}
+
+/* ── Site pages ─────────────────────────────────────────────────────────── */
+
+export interface WebsitePageSummary { slug: string; name: string; title: string | null; description: string | null; updatedAt: string | null }
+
+export async function listWebsitePages(): Promise<WebsitePageSummary[]> {
+  const { data, error } = await supabaseServer.from("pages").select("slug, name, title, description, updated_at").order("name", { ascending: true });
+  if (error) throw new Error(`website pages: ${error.message}`);
+  return ((data as Array<{ slug: string; name: string; title: string | null; description: string | null; updated_at: string | null }> | null) ?? [])
+    .map((p) => ({ slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.updated_at }));
+}
+
+/** One page with its visible sections, each with its visible elements, in
+ *  the order the Website app set. null when there is no such page. */
+export async function websitePage(slug: string): Promise<{ page: WebsitePageSummary; sections: Array<Record<string, unknown> & { elements: Array<Record<string, unknown>> }> } | null> {
+  if (!isSlug(slug)) return null;
+  const { data: page } = await supabaseServer.from("pages").select("id, slug, name, title, description, updated_at").eq("slug", slug).maybeSingle();
+  const p = page as { id: string; slug: string; name: string; title: string | null; description: string | null; updated_at: string | null } | null;
+  if (!p) return null;
+  const { data: sectionRows } = await supabaseServer
+    .from("sections")
+    .select('id, section_key, layout, title, subtitle, content, image_url, image_alt, video_url, button_text, button_link, button2_text, button2_link, background, items, "order", updated_at')
+    .eq("page_id", p.id)
+    .eq("visible", true)
+    .order("order", { ascending: true });
+  const sections = (sectionRows as Array<Record<string, unknown> & { id: string }> | null) ?? [];
+  const { data: elementRows } = sections.length
+    ? await supabaseServer
+        .from("elements")
+        .select('id, section_id, type, content, style, settings, "order"')
+        .in("section_id", sections.map((s) => s.id))
+        .eq("visible", true)
+        .order("order", { ascending: true })
+    : { data: [] };
+  const elementsOf = new Map<string, Array<Record<string, unknown>>>();
+  for (const e of (elementRows as Array<Record<string, unknown> & { section_id: string }> | null) ?? []) {
+    const list = elementsOf.get(e.section_id) ?? [];
+    list.push(e);
+    elementsOf.set(e.section_id, list);
+  }
+  return {
+    page: { slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.updated_at },
+    sections: sections.map((s) => ({ ...s, elements: elementsOf.get(s.id) ?? [] })),
+  };
+}
+
+/* ── Careers ────────────────────────────────────────────────────────────── */
+
+export interface WebsiteJob {
+  id: string;
+  title: string;
+  description: string | null;
+  requirements: string | null;
+  location: string | null;
+  employmentType: string | null;
+  department: string | null;
+  publishedAt: string | null;
+  closesAt: string | null;
+}
+
+/** Open postings, newest first — never the salary. */
+export async function listWebsiteJobs(today: string): Promise<WebsiteJob[]> {
+  const { data, error } = await supabaseServer
+    .from("hr_job_postings")
+    .select("id, title, description, requirements, location, employment_type, department_id, published_at, closes_at")
+    .in("status", ["open", "published"])
+    .or(`closes_at.is.null,closes_at.gte.${today}`)
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .limit(100);
+  if (error) throw new Error(`website jobs: ${error.message}`);
+  type Row = { id: string; title: string; description: string | null; requirements: string | null; location: string | null; employment_type: string | null; department_id: string | null; published_at: string | null; closes_at: string | null };
+  const rows = (data as Row[] | null) ?? [];
+  const deptIds = Array.from(new Set(rows.map((r) => r.department_id).filter((x): x is string => !!x)));
+  const { data: depts } = deptIds.length
+    ? await supabaseServer.from("koleex_departments").select("id, name").in("id", deptIds)
+    : { data: [] };
+  const deptName = new Map(((depts as Array<{ id: string; name: string }> | null) ?? []).map((d) => [d.id, d.name]));
+  return rows.map((r) => ({
+    id: r.id, title: r.title, description: r.description, requirements: r.requirements, location: r.location,
+    employmentType: r.employment_type, department: r.department_id ? deptName.get(r.department_id) ?? null : null,
+    publishedAt: r.published_at, closesAt: r.closes_at,
+  }));
+}

@@ -13,6 +13,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
@@ -103,5 +104,6 @@ export async function PUT(
     console.error("[api/products translations PUT]", errors.join("; "));
     return NextResponse.json({ ok: false, errors }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

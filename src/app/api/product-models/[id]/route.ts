@@ -14,6 +14,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductCostAccess, MODEL_COST_FIELDS, requireProductDataAction } from "@/lib/server/product-access";
@@ -93,6 +94,7 @@ export async function PATCH(
     }
     return NextResponse.json({ error: "Model not found" }, { status: 404 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true, updated_at: (data[0] as { updated_at?: string }).updated_at ?? null });
 }
 
@@ -116,5 +118,6 @@ export async function DELETE(
     console.error("[api/product-models DELETE]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

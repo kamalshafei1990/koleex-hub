@@ -19,6 +19,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import {
@@ -168,5 +169,6 @@ export async function POST(req: Request) {
     console.error("[api/product-models POST]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products"]);
   return NextResponse.json({ model: data });
 }

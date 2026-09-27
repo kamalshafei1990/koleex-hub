@@ -32,6 +32,7 @@ import { applyServerList } from "@/lib/server-list/apply";
 import { FRESHNESS_COLUMNS, foldFreshness } from "@/lib/products-freshness";
 import { PRODUCTS_LIST_CONFIG } from "@/lib/server-list/products-config";
 import { resolveProductSearchReach } from "@/lib/server/product-search-reach";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 
 export async function GET(req: Request) {
   const _t = stageTimer("products.list");
@@ -373,5 +374,6 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products", "taxonomy"]);
   return NextResponse.json({ product: data });
 }

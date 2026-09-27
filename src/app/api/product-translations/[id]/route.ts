@@ -4,6 +4,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 /* /api/product-translations/[id] — P0-B. DELETE one row. PD/SA only. */
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
@@ -19,5 +20,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   const { error } = await supabaseServer.from("product_translations").delete().eq("id", id);
   if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

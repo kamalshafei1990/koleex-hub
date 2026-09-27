@@ -17,6 +17,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logAudit } from "@/lib/server/audit";
 import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -113,6 +114,8 @@ export async function PATCH(
     });
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  /* The website shows this product (or stops showing it) — refresh it. */
+  revalidateWebsite(["products", "taxonomy"]);
 
   // A price/cost touch is a sensitive change; flag it as such for the feed.
   const touchesMoney = Object.keys(body).some((k) => /price|cost/i.test(k));
@@ -167,6 +170,7 @@ export async function DELETE(
     console.error("[api/products/[id] DELETE]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+  revalidateWebsite(["products", "taxonomy"]);
 
   await logAudit({
     auth,
