@@ -13,7 +13,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
 import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
-import type { MarketingAccountView, MarketingSetup, MarketingSpace } from "@/lib/marketing/spaces";
+import { MANUAL_PLATFORMS, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
 
 const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, updated_at";
 
@@ -23,6 +23,9 @@ export async function listAccounts(tenantId: string, space: MarketingSpace): Pro
     .select(VIEW_COLUMNS)
     .eq("tenant_id", tenantId)
     .eq("space", space)
+    /* A removed account keeps its row (and its posts' history) but leaves
+       the list; adding it again brings it back. */
+    .neq("status", "disconnected")
     .order("platform", { ascending: true })
     .order("name", { ascending: true });
   if (error) throw new Error(`marketing accounts: ${error.message}`);
@@ -117,6 +120,51 @@ export async function saveMetaAccounts(input: {
   return rows.length;
 }
 
+/** Add an account on a platform with no posting API (WeChat, WhatsApp,
+ *  Douyin) by its name and link. It has no access key: its posts go out
+ *  with one-tap sharing. Returns the new account, or an error message for
+ *  the person. */
+export async function addManualAccount(input: {
+  tenantId: string;
+  space: MarketingSpace;
+  platform: string;
+  name: unknown;
+  handle: unknown;
+  profileUrl: unknown;
+  createdBy: string;
+}): Promise<{ account: MarketingAccountView } | { error: string }> {
+  if (!(MANUAL_PLATFORMS as readonly string[]).includes(input.platform)) return { error: "This platform is not added by hand." };
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  if (!name || name.length > 120) return { error: "Enter the account name (up to 120 characters)." };
+  const handle = typeof input.handle === "string" ? input.handle.trim().replace(/^@+/, "").slice(0, 80) || null : null;
+  let profileUrl: string | null = null;
+  if (typeof input.profileUrl === "string" && input.profileUrl.trim()) {
+    const raw = input.profileUrl.trim();
+    let url: URL | null = null;
+    try { url = new URL(raw); } catch { url = null; }
+    if (!url || url.protocol !== "https:" || raw.length > 500) return { error: "The profile link must start with https://" };
+    profileUrl = url.toString();
+  }
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .insert({
+      tenant_id: input.tenantId,
+      space: input.space,
+      platform: input.platform as MarketingPlatform,
+      connection: "assisted",
+      external_id: null,
+      name,
+      handle,
+      profile_url: profileUrl,
+      status: "connected",
+      connected_by: input.createdBy,
+    })
+    .select(VIEW_COLUMNS)
+    .single();
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  return { account: data as MarketingAccountView };
+}
+
 /** The space an account belongs to, so a route can check the right Roles
  *  module before touching it. null when it is not this tenant's. */
 export async function accountSpace(tenantId: string, id: string): Promise<MarketingSpace | null> {
@@ -130,9 +178,9 @@ export async function accountSpace(tenantId: string, id: string): Promise<Market
   return (data as { space: MarketingSpace } | null)?.space ?? null;
 }
 
-/** Disconnect an account: its access key is deleted (the Data Deletion page
- *  promises exactly this) and it stays listed as disconnected, with its
- *  history. */
+/** Remove an account: its access key is deleted (the Data Deletion page
+ *  promises exactly this) and it leaves the list; its row stays, marked
+ *  disconnected, so its posts' history survives. */
 export async function disconnectAccount(tenantId: string, id: string): Promise<void> {
   const { error } = await supabaseServer
     .from("marketing_accounts")

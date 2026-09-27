@@ -100,6 +100,16 @@ check("disconnect: signed-in POST, then 'edit' on the ACCOUNT's own space",
   dc.indexOf("accountSpace(auth.tenant_id, id)") < dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') &&
   dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') < dc.indexOf("disconnectAccount(auth.tenant_id, id)"));
 check("disconnect deletes the key (what the Data Deletion page promises)", /update\(\{ token_encrypted: null, token_expires_at: null, status: "disconnected"/.test(acc));
+check("a removed account leaves the list (its row and history stay)", /\.neq\("status", "disconnected"\)/.test(acc.slice(acc.indexOf("export async function listAccounts"), acc.indexOf("export function marketingSetup"))));
+const addFn = acc.slice(acc.indexOf("export async function addManualAccount"), acc.indexOf("export async function accountSpace"));
+check("adding by hand: only the no-API platforms, never a key, only an https link",
+  /if \(!\(MANUAL_PLATFORMS as readonly string\[\]\)\.includes\(input\.platform\)\)/.test(addFn) && !/token/.test(addFn) &&
+  /url\.protocol !== "https:"/.test(addFn) && /connection: "assisted",/.test(addFn));
+const listRoute = code(LIST);
+const postFn = listRoute.slice(listRoute.indexOf("export async function POST"));
+check("adding by hand: a signed-in POST with 'edit' on the space, before anything is written",
+  /requireAuth\(req\)/.test(postFn) && postFn.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') > -1 &&
+  postFn.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') < postFn.indexOf("addManualAccount("));
 
 /* ── 5. The screen ── */
 console.log("\n5. The screen");

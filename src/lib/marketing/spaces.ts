@@ -25,6 +25,28 @@ export const asSpace = (v: string | null | undefined): MarketingSpace => (v === 
 
 export type MarketingPlatform = "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok" | "x" | "wechat" | "whatsapp" | "douyin";
 
+/* How each platform is added (owner, 27/09/2026: "connect any account by
+   myself, add or remove freely; Koleex accounts too, the Odoo way"):
+   · "meta"   — sign in with Facebook; the Pages chosen there and their
+                Instagram business accounts are added;
+   · "soon"   — needs Koleex's own app on that platform first (and, for some,
+                the platform's approval), so the tile says what is missing;
+   · "manual" — no API for posting (WeChat, WhatsApp, Douyin): the account is
+                added by name and link, and posts go out with one-tap sharing. */
+export const PLATFORM_FLOW: Record<MarketingPlatform, "meta" | "soon" | "manual"> = {
+  facebook: "meta",
+  instagram: "meta",
+  linkedin: "soon",
+  youtube: "soon",
+  tiktok: "soon",
+  x: "soon",
+  wechat: "manual",
+  whatsapp: "manual",
+  douyin: "manual",
+};
+export const PLATFORM_ORDER: readonly MarketingPlatform[] = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "wechat", "whatsapp", "douyin"];
+export const MANUAL_PLATFORMS = PLATFORM_ORDER.filter((p) => PLATFORM_FLOW[p] === "manual");
+
 /** What the connect flow tells the app page when it comes back (?connect=). */
 export type ConnectResult = "ok" | "cancelled" | "expired" | "failed" | "setup" | "denied";
 export const CONNECT_RESULTS: readonly ConnectResult[] = ["ok", "cancelled", "expired", "failed", "setup", "denied"];
