@@ -1,7 +1,8 @@
 import "server-only";
 
-/* POST /api/marketing/posts/[id]/approve — approve and publish now:
-   { version }. Approvers only (the super admins and the roles given «Social
+/* POST /api/marketing/posts/[id]/approve — approve: { version }. A post with
+   a time still ahead is scheduled (the cron publishes it then); any other is
+   published now. Approvers only (the super admins and the roles given «Social
    Marketing Approvals»); an approver's own draft goes out the same way.
    Publishing starts in this request (60 s at most); anything still being
    prepared (an Instagram video) continues through /publish. */
@@ -24,6 +25,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (v instanceof NextResponse) return v;
     const approved = await approvePost(g.auth.tenant_id, id, v.version, g.auth.account_id);
     if (isError(approved)) return reply(approved);
+    /* A time still ahead: the post waits for it; the cron publishes it. */
+    if (approved.scheduled) return NextResponse.json({ version: approved.version, status: "scheduled", busy: false });
     const out = await publishPost(g.auth.tenant_id, id, { budgetMs: 45_000 });
     return NextResponse.json({ version: approved.version, status: out.status, busy: out.busy });
   } catch (e) {

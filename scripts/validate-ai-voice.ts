@@ -297,9 +297,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
-    check("  …and the cron jobs sharing this file survived the edit (sixteen since the notification wake-up and the approval reminders joined sales reminders, the Discuss sweep, notes, reports, attendance, finance, tasks, calendar, project and HR)",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 16 &&
-      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance", "/api/cron/report-reminders", "/api/cron/notes-trash-purge", "/api/cron/sales-reminders", "/api/cron/discuss-pending-sweep", "/api/cron/inbox-wake", "/api/cron/approval-reminders"]
+    check("  …and the cron jobs sharing this file survived the edit (seventeen since the marketing publisher joined the notification wake-up, the approval reminders, sales reminders, the Discuss sweep, notes, reports, attendance, finance, tasks, calendar, project and HR)",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 17 &&
+      ["/api/cron/todo-reminders", "/api/cron/ai-brief", "/api/cron/calendar-reminders", "/api/cron/finance-reminders", "/api/cron/attendance", "/api/cron/report-reminders", "/api/cron/notes-trash-purge", "/api/cron/sales-reminders", "/api/cron/discuss-pending-sweep", "/api/cron/inbox-wake", "/api/cron/approval-reminders", "/api/cron/marketing-publish"]
         .every((p) => (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === p)));
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.

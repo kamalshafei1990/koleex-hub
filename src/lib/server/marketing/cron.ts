@@ -1,0 +1,85 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   marketing/cron — the work of /api/cron/marketing-publish (every 5 minutes),
+   inside one time budget:
+     1. scheduled posts whose time has come: each is CLAIMED (scheduled →
+        approved, conditionally on still being scheduled and due) before it
+        is published, so two overlapping runs never take the same post — and
+        each account is claimed again by the publisher;
+     2. posts still publishing (an Instagram video Meta is preparing, an
+        account a run did not reach) continue where they stopped, even with
+        every screen closed;
+     3. the Feed: accounts not refreshed for 3 hours are refreshed (owner,
+        27/09/2026), a few per run, so numbers and followers stay current and
+        the week-on-week change has a snapshot every day.
+   Scheduled times are instants; the screens show and pick them in Shanghai
+   time (lib/marketing/format).
+   --------------------------------------------------------------------------- */
+
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { publishPost } from "@/lib/server/marketing/publish";
+import { syncAccount } from "@/lib/server/marketing/sync";
+
+export const FEED_REFRESH_MS = 3 * 3600_000;
+
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; stoppedEarly: boolean }
+
+export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
+  const started = Date.now();
+  const budget = opts.budgetMs ?? 50_000;
+  const left = () => budget - (Date.now() - started);
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, stoppedEarly: false };
+  /* 1. Due scheduled posts, oldest first. */
+  const now = new Date().toISOString();
+  let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
+  if (opts.tenantId) dueQ = dueQ.eq("tenant_id", opts.tenantId);
+  const { data: due, error } = await dueQ.order("scheduled_at", { ascending: true }).limit(10);
+  if (error) throw new Error(`marketing posts: ${error.message}`);
+  out.due = (due ?? []).length;
+  for (const p of (due ?? []) as Array<{ id: string; tenant_id: string }>) {
+    if (left() < 15_000) { out.stoppedEarly = true; break; }
+    const { data: claimed, error: cErr } = await supabaseServer
+      .from("marketing_posts")
+      .update({ status: "approved", updated_at: new Date().toISOString() })
+      .eq("id", p.id)
+      .eq("status", "scheduled")
+      .lte("scheduled_at", new Date().toISOString())
+      .select("id");
+    if (cErr) throw new Error(`marketing posts: ${cErr.message}`);
+    if (!claimed?.length) continue;
+    await publishPost(p.tenant_id, p.id, { budgetMs: Math.min(40_000, left() - 5_000) });
+    out.published++;
+  }
+
+  /* 2. Posts still publishing. */
+  if (left() > 12_000) {
+    let busyQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "publishing");
+    if (opts.tenantId) busyQ = busyQ.eq("tenant_id", opts.tenantId);
+    const { data: busy, error: bErr } = await busyQ.order("updated_at", { ascending: true }).limit(10);
+    if (bErr) throw new Error(`marketing posts: ${bErr.message}`);
+    for (const p of (busy ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 12_000) { out.stoppedEarly = true; break; }
+      await publishPost(p.tenant_id, p.id, { budgetMs: Math.min(30_000, left() - 5_000) });
+      out.continued++;
+    }
+  }
+
+  /* 3. The Feed, every 3 hours per account. */
+  if (left() > 15_000) {
+    const stale = new Date(Date.now() - FEED_REFRESH_MS).toISOString();
+    let accQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("status", ["connected", "error"])
+      .or(`last_synced_at.is.null,last_synced_at.lt.${stale}`)
+      .or(`sync_state->>last_attempt_at.is.null,sync_state->>last_attempt_at.lt.${stale}`);
+    if (opts.tenantId) accQ = accQ.eq("tenant_id", opts.tenantId);
+    const { data: accs, error: aErr } = await accQ.order("last_synced_at", { ascending: true, nullsFirst: true }).limit(3);
+    if (aErr) throw new Error(`marketing accounts: ${aErr.message}`);
+    for (const a of (accs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 15_000) { out.stoppedEarly = true; break; }
+      const r = await syncAccount(a.tenant_id, a.id, { budgetMs: Math.min(30_000, left() - 5_000) });
+      if (r.ok && !r.skipped) out.refreshed++;
+    }
+  }
+  return out;
+}

@@ -1,6 +1,6 @@
 import "server-only";
 
-/* GET  /api/marketing/posts?space=&filter=all|drafts|review|published|problems&cursor=
+/* GET  /api/marketing/posts?space=&filter=all|drafts|review|scheduled|published|problems&cursor=
         — the space's posts written in the Hub, newest change first, 20 at a
         time, with the counts of drafts, posts waiting for approval and posts
         with a problem, and whether the caller may approve. Needs "view".
@@ -17,7 +17,7 @@ import type { PostFilter } from "@/lib/marketing/post-types";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: readonly PostFilter[] = ["all", "drafts", "review", "published", "problems"];
+const FILTERS: readonly PostFilter[] = ["all", "drafts", "review", "scheduled", "published", "problems"];
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth();

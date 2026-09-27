@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import {
   siWhatsapp, siWechat, siTelegram, siLine, siQq, siMessenger,
   siFacebook, siInstagram, siX, siYoutube, siTiktok, siPinterest, siReddit,
@@ -122,6 +122,11 @@ function keyFor(name: string): string {
 
 export default function BrandGlyph({ name, size = 16, className }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
+  /* Instagram's gradient needs an id, and it must be THIS glyph's own: with
+     one shared id, every Instagram logo borrowed the first one's gradient —
+     and when that first one sat in a hidden panel (a narrow screen showing
+     one column or a list instead of a grid), every other one drew nothing. */
+  const gradId = `ig-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const slug = slugFor(name);
 
   // Prefer an uploaded official icon when one exists for this platform.
@@ -151,7 +156,7 @@ export default function BrandGlyph({ name, size = 16, className }: Props) {
       return (
         <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden focusable="false">
           <defs>
-            <radialGradient id="ig-grad" cx="30%" cy="107%" r="135%">
+            <radialGradient id={gradId} cx="30%" cy="107%" r="135%">
               <stop offset="0%" stopColor="#FDF497" />
               <stop offset="5%" stopColor="#FDF497" />
               <stop offset="45%" stopColor="#FD5949" />
@@ -159,7 +164,7 @@ export default function BrandGlyph({ name, size = 16, className }: Props) {
               <stop offset="90%" stopColor="#285AEB" />
             </radialGradient>
           </defs>
-          <path d={icon.path} fill="url(#ig-grad)" />
+          <path d={icon.path} fill={`url(#${gradId})`} />
         </svg>
       );
     }

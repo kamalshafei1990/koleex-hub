@@ -24,7 +24,7 @@ import type { MarketingSpace } from "@/lib/marketing/spaces";
 import { POST_TONE } from "@/lib/marketing/post-status";
 import type { PostFilter, PostSummary, PostsResponse } from "@/lib/marketing/post-types";
 
-const FILTERS: PostFilter[] = ["all", "drafts", "review", "published", "problems"];
+const FILTERS: PostFilter[] = ["all", "drafts", "review", "scheduled", "published", "problems"];
 
 
 const postsHome = (space: MarketingSpace) => (space === "ceo" ? "/ceo-brand/posts" : "/social-marketing/posts");
@@ -66,7 +66,7 @@ export default function SocialPosts({ space }: { space: MarketingSpace }) {
     }
   };
 
-  const count = (f: PostFilter) => (f === "drafts" ? data?.counts.drafts : f === "review" ? data?.counts.review : f === "problems" ? data?.counts.problems : undefined);
+  const count = (f: PostFilter) => (f === "drafts" ? data?.counts.drafts : f === "review" ? data?.counts.review : f === "scheduled" ? data?.counts.scheduled : f === "problems" ? data?.counts.problems : undefined);
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
@@ -157,7 +157,7 @@ function PostCard({ post, href, t }: { post: PostSummary; href: string; t: (k: s
             {post.accounts.slice(0, 6).map((a) => <BrandGlyph key={a.id} name={a.platform} size={12} />)}
           </span>
           {post.author && <span className="truncate">{t("list.by").replace("{name}", post.author)}</span>}
-          <span className="tabular-nums">{t("list.updated").replace("{when}", dmyHm(post.updated_at))}</span>
+          <span className="tabular-nums">{post.status === "scheduled" && post.scheduled_at ? t("list.scheduledFor").replace("{when}", dmyHm(post.scheduled_at)) : t("list.updated").replace("{when}", dmyHm(post.updated_at))}</span>
         </span>
       </span>
     </Link>

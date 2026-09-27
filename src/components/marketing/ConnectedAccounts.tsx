@@ -26,6 +26,7 @@ import Modal from "@/components/kds/Modal";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import { dmyHm } from "@/lib/marketing/format";
 import {
   CONNECT_RESULTS, PLATFORM_FLOW, PLATFORM_ORDER,
   type ConnectResult, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
@@ -104,12 +105,6 @@ const T: Translations = {
   "next.comments":    { en: "Replies to comments from the Hub", zh: "在 Hub 中回复评论", ar: "الرد على التعليقات من الـHub" },
 };
 
-function dmyHm(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 const STATUS_TONE = {
   connected: "success",

@@ -40,6 +40,9 @@ export interface PostInput {
   body: string;
   media: PostMedia[];
   targets: PostTargetInput[];
+  /** When to publish once approved (an instant, ISO); null = as soon as it
+   *  is approved. Shown and picked in Shanghai time. */
+  scheduled_at: string | null;
 }
 
 export interface PostTargetView {
@@ -67,6 +70,7 @@ export interface PostView {
   decider: string | null;
   decided_at: string | null;
   decision_note: string | null;
+  scheduled_at: string | null;
   published_at: string | null;
   version: number;
   created_at: string;
@@ -83,6 +87,7 @@ export interface PostSummary {
   accounts: Array<{ id: string; platform: MarketingAccountView["platform"]; name: string }>;
   author: string | null;
   updated_at: string;
+  scheduled_at: string | null;
   published_at: string | null;
   /** Accounts it failed on. */
   failed: number;
@@ -90,13 +95,26 @@ export interface PostSummary {
   to_share: number;
 }
 
-export type PostFilter = "all" | "drafts" | "review" | "published" | "problems";
+export type PostFilter = "all" | "drafts" | "review" | "scheduled" | "published" | "problems";
 
 export interface PostsResponse {
   posts: PostSummary[];
   next: string | null;
-  counts: { drafts: number; review: number; problems: number };
+  counts: { drafts: number; review: number; scheduled: number; problems: number };
   canApprove: boolean;
+}
+
+/** One post on the calendar: written in the Hub, or published on an account
+ *  outside the Hub (from the Feed). `at` is when it goes (or went) out. */
+export interface CalendarItem {
+  kind: "hub" | "remote";
+  id: string;
+  at: string;
+  status: PostStatus | "outside";
+  excerpt: string | null;
+  thumb: { kind: "image" | "video"; url: string } | null;
+  accounts: Array<{ id: string; platform: MarketingAccountView["platform"]; name: string }>;
+  permalink: string | null;
 }
 
 export interface PostDetailResponse {

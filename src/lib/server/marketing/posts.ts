@@ -32,7 +32,11 @@ import type {
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 
 export const EDITABLE: readonly PostStatus[] = ["draft", "in_review", "rejected"];
-const POST_COLUMNS = "id, space, status, body, media, created_by, submitted_at, decided_by, decided_at, decision_note, published_at, version, created_at, updated_at";
+const POST_COLUMNS = "id, space, status, body, media, created_by, submitted_at, decided_by, decided_at, decision_note, scheduled_at, published_at, version, created_at, updated_at";
+/* A scheduled time must leave the publisher (every 5 minutes) room to
+   pick it up; and nothing is planned more than a year ahead. */
+export const SCHEDULE_LEAD_MS = 2 * 60_000;
+const SCHEDULE_MAX_MS = 366 * 86_400_000;
 const TARGET_COLUMNS = "id, post_id, account_id, body_override, status, permalink, error, published_at";
 const PAGE = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,7 +58,7 @@ export function mediaUrlPrefix(tenantId: string): string {
 type PostRow = {
   id: string; space: MarketingSpace; status: PostStatus; body: string; media: PostMedia[] | null;
   created_by: string; submitted_at: string | null; decided_by: string | null; decided_at: string | null;
-  decision_note: string | null; published_at: string | null; version: number; created_at: string; updated_at: string;
+  decision_note: string | null; scheduled_at: string | null; published_at: string | null; version: number; created_at: string; updated_at: string;
 };
 type TargetRow = {
   id: string; post_id: string; account_id: string; body_override: string | null; status: TargetStatus;
@@ -102,7 +106,15 @@ export function cleanInput(tenantId: string, raw: unknown): Result<{ input: Post
     if (override !== null && Array.from(override).length > FB_TEXT_MAX) return { error: "The text is too long.", status: 400 };
     targets.push({ account_id: id, body_override: override });
   }
-  return { input: { body, media, targets } };
+
+  let scheduled_at: string | null = null;
+  if (b.scheduled_at !== null && b.scheduled_at !== undefined) {
+    const t = typeof b.scheduled_at === "string" ? Date.parse(b.scheduled_at) : NaN;
+    if (Number.isNaN(t)) return { error: "The scheduled time is not valid.", status: 400 };
+    if (t > Date.now() + SCHEDULE_MAX_MS) return { error: "Schedule within a year.", status: 400 };
+    scheduled_at = new Date(t).toISOString();
+  }
+  return { input: { body, media, targets, scheduled_at } };
 }
 
 /** The accounts of the space a post may go to, by id. */
@@ -210,7 +222,7 @@ export async function createPost(tenantId: string, space: MarketingSpace, author
   if (isError(ok)) return ok;
   const { data, error } = await supabaseServer
     .from("marketing_posts")
-    .insert({ tenant_id: tenantId, space, status: "draft", body: input.body, media: input.media, created_by: authorId })
+    .insert({ tenant_id: tenantId, space, status: "draft", body: input.body, media: input.media, scheduled_at: input.scheduled_at, created_by: authorId })
     .select("id")
     .single();
   if (error) throw new Error(`marketing posts: ${error.message}`);
@@ -235,7 +247,7 @@ export async function updatePost(
   const status: PostStatus = row.status === "rejected" || (row.status === "in_review" && !who.approver) ? "draft" : row.status;
   const { data, error } = await supabaseServer
     .from("marketing_posts")
-    .update({ body: input.body, media: input.media, status, version: version + 1, updated_at: new Date().toISOString() })
+    .update({ body: input.body, media: input.media, scheduled_at: input.scheduled_at, status, version: version + 1, updated_at: new Date().toISOString() })
     .eq("tenant_id", tenantId)
     .eq("id", id)
     .eq("version", version)
@@ -274,6 +286,7 @@ async function readyToGo(tenantId: string, row: PostRow): Promise<Result> {
     body: row.body,
     media: Array.isArray(row.media) ? row.media : [],
     targets: targets.map((t) => ({ account_id: t.account_id, body_override: t.body_override })),
+    scheduled_at: row.scheduled_at,
   };
   const ok = await checkAccounts(tenantId, row.space, input);
   if (isError(ok)) return ok;
@@ -299,15 +312,39 @@ export async function rejectPost(tenantId: string, id: string, version: number, 
   });
 }
 
-/** Approve (an approver's own draft included); the caller then publishes. */
-export async function approvePost(tenantId: string, id: string, version: number, deciderId: string): Promise<Result<{ version: number }>> {
+/** Approve (an approver's own draft included). A post with a time still
+ *  ahead waits for it ("scheduled", published by the cron); otherwise it is
+ *  "approved" and the caller publishes it now. */
+export async function approvePost(tenantId: string, id: string, version: number, deciderId: string): Promise<Result<{ version: number; scheduled: boolean }>> {
   const row = await readPost(tenantId, id);
   if (!row) return { error: "Post not found.", status: 404 };
   const ready = await readyToGo(tenantId, row);
   if (isError(ready)) return ready;
-  return transition(tenantId, id, version, ["draft", "in_review", "rejected"], {
-    status: "approved", decided_by: deciderId, decided_at: new Date().toISOString(), decision_note: null,
+  const scheduled = !!row.scheduled_at && Date.parse(row.scheduled_at) > Date.now() + SCHEDULE_LEAD_MS;
+  const r = await transition(tenantId, id, version, ["draft", "in_review", "rejected"], {
+    status: scheduled ? "scheduled" : "approved", decided_by: deciderId, decided_at: new Date().toISOString(), decision_note: null,
   });
+  return isError(r) ? r : { version: r.version, scheduled };
+}
+
+/** Move a scheduled post to another time (approvers). */
+export async function reschedulePost(tenantId: string, id: string, version: number, at: string): Promise<Result<{ version: number }>> {
+  const t = Date.parse(at);
+  if (Number.isNaN(t)) return { error: "The scheduled time is not valid.", status: 400 };
+  if (t <= Date.now() + SCHEDULE_LEAD_MS) return { error: "Pick a time at least a few minutes ahead.", status: 400, code: "too_soon" };
+  if (t > Date.now() + SCHEDULE_MAX_MS) return { error: "Schedule within a year.", status: 400 };
+  return transition(tenantId, id, version, ["scheduled"], { scheduled_at: new Date(t).toISOString() });
+}
+
+/** Take a scheduled post off the schedule: back to draft, to be edited and
+ *  approved again (its time is kept as a suggestion). */
+export async function unschedulePost(tenantId: string, id: string, version: number): Promise<Result<{ version: number }>> {
+  return transition(tenantId, id, version, ["scheduled"], { status: "draft", decided_by: null, decided_at: null });
+}
+
+/** Publish a scheduled post now instead of at its time; the caller publishes. */
+export async function publishScheduledNow(tenantId: string, id: string, version: number, deciderId: string): Promise<Result<{ version: number }>> {
+  return transition(tenantId, id, version, ["scheduled"], { status: "approved", decided_by: deciderId, decided_at: new Date().toISOString(), scheduled_at: null });
 }
 
 export async function deletePost(tenantId: string, id: string, version: number, who: { accountId: string; approver: boolean }): Promise<Result> {
@@ -355,11 +392,12 @@ const FILTERS: Record<PostFilter, readonly PostStatus[] | null> = {
   all: null,
   drafts: ["draft", "rejected"],
   review: ["in_review"],
+  scheduled: ["scheduled"],
   published: ["published", "partly_published"],
   problems: ["failed", "partly_published"],
 };
 
-export async function listPosts(tenantId: string, space: MarketingSpace, filter: PostFilter, cursor: string | null): Promise<{ posts: PostSummary[]; next: string | null; counts: { drafts: number; review: number; problems: number } }> {
+export async function listPosts(tenantId: string, space: MarketingSpace, filter: PostFilter, cursor: string | null): Promise<{ posts: PostSummary[]; next: string | null; counts: { drafts: number; review: number; scheduled: number; problems: number } }> {
   let q = supabaseServer.from("marketing_posts").select(POST_COLUMNS).eq("tenant_id", tenantId).eq("space", space).neq("status", "archived");
   const only = FILTERS[filter];
   if (only) q = q.in("status", only as PostStatus[]);
@@ -381,7 +419,7 @@ export async function listPosts(tenantId: string, space: MarketingSpace, filter:
     targetsOf(rows.map((r) => r.id)),
     spaceAccountsWithRemoved(tenantId, space),
     namesOf(rows.map((r) => r.created_by)),
-    Promise.all((["drafts", "review", "problems"] as const).map(async (f) => {
+    Promise.all((["drafts", "review", "scheduled", "problems"] as const).map(async (f) => {
       const { count, error: cErr } = await supabaseServer.from("marketing_posts").select("id", { count: "exact", head: true })
         .eq("tenant_id", tenantId).eq("space", space).in("status", FILTERS[f] as PostStatus[]);
       if (cErr) throw new Error(`marketing posts: ${cErr.message}`);
@@ -405,6 +443,7 @@ export async function listPosts(tenantId: string, space: MarketingSpace, filter:
       accounts: ts.map((t) => accounts.get(t.account_id)).filter((a): a is MarketingAccountView => !!a).map((a) => ({ id: a.id, platform: a.platform, name: a.name })),
       author: names.get(r.created_by) || null,
       updated_at: r.updated_at,
+      scheduled_at: r.scheduled_at,
       published_at: r.published_at,
       failed: ts.filter((t) => t.status === "failed").length,
       to_share: ["approved", "publishing", "published", "partly_published"].includes(r.status)
@@ -413,5 +452,5 @@ export async function listPosts(tenantId: string, space: MarketingSpace, filter:
     };
   });
   const last = rows[rows.length - 1];
-  return { posts, next: more && last ? `${last.updated_at}|${last.id}` : null, counts: { drafts: counts[0], review: counts[1], problems: counts[2] } };
+  return { posts, next: more && last ? `${last.updated_at}|${last.id}` : null, counts: { drafts: counts[0], review: counts[1], scheduled: counts[2], problems: counts[3] } };
 }

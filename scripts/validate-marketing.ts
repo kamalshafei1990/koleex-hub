@@ -30,6 +30,13 @@
      · Instagram's and Facebook's rules are ONE module, used by the screen
        and the server; Koleex AI captions are internal-only, public-safe
        (KOLEEX only, no prices) and use ACTIVE products only.
+   Scheduling and the calendar (27/09/2026) add:
+     · the publisher cron is CLOSED without CRON_SECRET, claims each due post
+       before publishing it, and refreshes the Feed every 3 hours;
+     · a post with a time ahead is scheduled on approval, never published
+       then; moving or cancelling a schedule is for approvers;
+     · marketing time is SHANGHAI time (owner's pick), a fixed UTC+8, and
+       the screens say so next to every time they pick.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -266,6 +273,8 @@ const ROUTES: Array<{ file: string; fn: string; action: string; approver: boolea
   { file: `${POSTS_DIR}/[id]/reject/route.ts`, fn: "POST", action: "edit", approver: true, mutation: /rejectPost\(/ },
   { file: `${POSTS_DIR}/[id]/publish/route.ts`, fn: "POST", action: "edit", approver: false, mutation: /publishPost\(|retryFailed\(/ },
   { file: `${POSTS_DIR}/[id]/targets/[targetId]/shared/route.ts`, fn: "POST", action: "edit", approver: false, mutation: /markShared\(/ },
+  { file: `${POSTS_DIR}/[id]/schedule/route.ts`, fn: "POST", action: "edit", approver: true, mutation: /reschedulePost\(|publishScheduledNow\(/ },
+  { file: `${POSTS_DIR}/[id]/unschedule/route.ts`, fn: "POST", action: "edit", approver: true, mutation: /unschedulePost\(/ },
 ];
 for (const r of ROUTES) {
   const src = code(r.file);
@@ -305,9 +314,11 @@ const clean = po.slice(po.indexOf("export function cleanInput"), po.indexOf("asy
 check("pictures: only this tenant's uploads (path prefix, no ..), the link REBUILT from the path",
   /!path\.startsWith\(pathPrefix\)/.test(clean) && /path\.includes\("\.\."\)/.test(clean) &&
   /url: `\$\{urlPrefix\}\$\{path\.slice\(pathPrefix\.length\)\}`/.test(clean));
+/* The check AND its early return — a computed-but-ignored verdict is no check. */
+const refuses = /const ready = await readyToGo\(tenantId, row\);\s*if \(isError\(ready\)\) return ready;/;
 check("submit and approve refuse a post that cannot go to one of its accounts (422)",
-  /const ready = await readyToGo\(tenantId, row\);/.test(po.slice(po.indexOf("export async function submitPost"), po.indexOf("export async function rejectPost"))) &&
-  /const ready = await readyToGo\(tenantId, row\);/.test(po.slice(po.indexOf("export async function approvePost"), po.indexOf("export async function deletePost"))) &&
+  refuses.test(po.slice(po.indexOf("export async function submitPost"), po.indexOf("export async function rejectPost"))) &&
+  refuses.test(po.slice(po.indexOf("export async function approvePost"), po.indexOf("export async function reschedulePost"))) &&
   /status: 422, code: "issues"/.test(po));
 const pb = code(PUBLISH);
 const loop = pb.slice(pb.indexOf("export async function publishPost"), pb.indexOf("export async function markShared"));
@@ -344,6 +355,49 @@ check("composer: AI buttons wear the AI glow", (readFileSync(COMPOSER, "utf8").m
 check("composer: never slides sideways", !/overflow-x-(auto|scroll)/.test(cm) && !/overflow-x-(auto|scroll)/.test(code("src/components/marketing/SocialPosts.tsx")));
 dictionary("src/lib/marketing/posts-i18n.ts", 120);
 check("the Posts tab sits between the Feed and Accounts", /\{ key: SPACE_HOME\[space\][\s\S]*\{ key: SPACE_POSTS\[space\][\s\S]*\{ key: SPACE_ROUTE\[space\]/.test(code("src/components/marketing/MarketingHeader.tsx")));
+
+/* ── 8. Scheduling, the calendar and the cron ── */
+console.log("\n8. Scheduling, the calendar and the cron");
+const cronRoute = code("src/app/api/cron/marketing-publish/route.ts");
+check("the cron is CLOSED without CRON_SECRET, and checks it before any work",
+  before(cronRoute, 'if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`)', "runMarketingCron(") &&
+  /const secret = process\.env\.CRON_SECRET;/.test(cronRoute) && /export const maxDuration = 60;/.test(cronRoute));
+const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons?: Array<{ path: string; schedule: string }> };
+check("vercel.json runs it every 5 minutes, off the other crons' minutes",
+  (vercel.crons ?? []).some((c) => c.path === "/api/cron/marketing-publish" && c.schedule === "2-59/5 * * * *"));
+const cr8 = code("src/lib/server/marketing/cron.ts");
+const dueLoop = cr8.slice(cr8.indexOf("for (const p of (due ?? [])"), cr8.indexOf("if (left() > 12_000)"));
+check("a due post is CLAIMED (still scheduled, still due) before it is published",
+  /\.eq\("status", "scheduled"\)\s*\.lte\("scheduled_at", new Date\(\)\.toISOString\(\)\)/.test(dueLoop) &&
+  before(dueLoop, "if (!claimed?.length) continue;", "publishPost("));
+check("the Feed is refreshed every 3 hours per account — a failed account waits its turn too",
+  /export const FEED_REFRESH_MS = 3 \* 3600_000;/.test(cr8) && /sync_state->>last_attempt_at\.is\.null,sync_state->>last_attempt_at\.lt\./.test(cr8) && /last_synced_at\.is\.null,last_synced_at\.lt\./.test(cr8));
+const ap8 = po.slice(po.indexOf("export async function approvePost"), po.indexOf("export async function reschedulePost"));
+check("approving a post with a time ahead SCHEDULES it (the publisher's lead included), never publishes it",
+  /Date\.parse\(row\.scheduled_at\) > Date\.now\(\) \+ SCHEDULE_LEAD_MS/.test(ap8) && /status: scheduled \? "scheduled" : "approved"/.test(ap8) &&
+  before(code(`${POSTS_DIR}/[id]/approve/route.ts`), "if (approved.scheduled) return NextResponse.json(", "publishPost("));
+const rs8 = po.slice(po.indexOf("export async function reschedulePost"), po.indexOf("export async function unschedulePost"));
+check("a new time must be ahead, and only a scheduled post moves",
+  /if \(t <= Date\.now\(\) \+ SCHEDULE_LEAD_MS\)/.test(rs8) && /transition\(tenantId, id, version, \["scheduled"\]/.test(rs8));
+check("cancelling a schedule returns the post to draft and clears its approval",
+  /transition\(tenantId, id, version, \["scheduled"\], \{ status: "draft", decided_by: null, decided_at: null \}\)/.test(po));
+const calRoute = code("src/app/api/marketing/calendar/route.ts");
+check("calendar: 'view' before reading; a range of at most six weeks",
+  before(calRoute, 'requireModuleAction(auth, SPACE_MODULE[space], "view")', "loadCalendar(") && /const MAX_DAYS = 42;/.test(code("src/lib/server/marketing/calendar.ts")));
+const calLib = code("src/lib/server/marketing/calendar.ts");
+const calReads = calLib.split(/(?=\.from\("marketing_)/).slice(1);
+check(`calendar: every read is bounded (${calReads.length} reads)`, calReads.length >= 4 && calReads.every((r) => /\.limit\(/.test(r)));
+check("calendar: posts published FROM the Hub are not listed twice", /\.is\("target_id", null\)/.test(calLib));
+const fm = code("src/lib/marketing/format.ts");
+check("marketing time is Shanghai time, a fixed UTC+8 both ways",
+  /export const MARKETING_TZ = "Asia\/Shanghai";/.test(fm) && /const OFFSET_MS = 8 \* 3600_000;/.test(fm) && /\$\{date\}T\$\{time\}:00\+08:00/.test(fm));
+check("the composer picks a time only as a Shanghai day + time, and says so",
+  /fromShanghai\(day, time\)/.test(code(COMPOSER)) && /t\("tz\.label"\)/.test(code(COMPOSER)));
+const calScreen = code("src/components/marketing/SocialCalendar.tsx");
+check("calendar screen: Shanghai days, the time zone shown, grid or list by the page's width, never sideways",
+  /dayKey\(i\.at\)/.test(calScreen) && /t\("tz\.label"\)/.test(calScreen) && /@max-\[44rem\]:hidden/.test(calScreen) && /@\[44rem\]:hidden/.test(calScreen) && !/overflow-x-(auto|scroll)/.test(calScreen));
+check("the Calendar tab sits between Posts and Accounts",
+  /\{ key: SPACE_POSTS\[space\][\s\S]*\{ key: SPACE_CALENDAR\[space\][\s\S]*\{ key: SPACE_ROUTE\[space\]/.test(code("src/components/marketing/MarketingHeader.tsx")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

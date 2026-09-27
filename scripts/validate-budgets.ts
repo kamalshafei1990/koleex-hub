@@ -313,7 +313,12 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      Koleex AI captions and picture preparation live in the post's own chunk;
      nothing heavy (no editor library) came with it. */
   "social-marketing/posts": { chunks: 10, kbytes: 600 },
+  /* +18 KB 27/09/2026: the composer gained scheduling — the Hub DatePicker
+     (578 → 596 KB measured); the budget still holds it. */
   "social-marketing/posts/[id]": { chunks: 11, kbytes: 647 },
+  /* The calendar (27/09/2026): measured 9 chunks / 543 KB, +12% headroom.
+     A plain month grid — no calendar library came with it. */
+  "social-marketing/calendar": { chunks: 10, kbytes: 608 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

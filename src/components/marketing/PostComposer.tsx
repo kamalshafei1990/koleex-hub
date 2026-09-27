@@ -33,6 +33,7 @@ import StatusPill from "@/components/kds/StatusPill";
 import EmptyState from "@/components/kds/EmptyState";
 import Modal from "@/components/kds/Modal";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
+import DatePicker from "@/components/ui/DatePicker";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
@@ -43,7 +44,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation } from "@/lib/i18n";
 import { POSTS_T } from "@/lib/marketing/posts-i18n";
 import { POST_TONE, TARGET_TONE } from "@/lib/marketing/post-status";
-import { dmyHm } from "@/lib/marketing/format";
+import { dayKey, dmyHm, fromShanghai, hm } from "@/lib/marketing/format";
 import { IG_CAPTION_MAX, IG_HASHTAGS_MAX, MAX_MEDIA, charCount, hashtagCount, targetIssues, type Issue } from "@/lib/marketing/post-rules";
 import { MediaPrepError, isPicture, isVideo, uploadPostMedia } from "@/lib/marketing/media-prep";
 import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
@@ -51,7 +52,7 @@ import type { ComposerSetup, PostDetailResponse, PostMedia, PostStatus, PostTarg
 
 type Tr = (key: string) => string;
 type Setup = ComposerSetup & { canCreate: boolean };
-type Busy = null | "save" | "submit" | "approve" | "reject" | "delete" | "retry" | "share";
+type Busy = null | "save" | "submit" | "approve" | "reject" | "delete" | "retry" | "share" | "schedule";
 type Uploading = { key: string; name: string; error: string | null };
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -68,7 +69,7 @@ function targetError(t: Tr, error: string | null): string | null {
 }
 
 export default function PostComposer({ space, postId }: { space: MarketingSpace; postId: string }) {
-  const { t } = useTranslation(POSTS_T);
+  const { t, lang } = useTranslation(POSTS_T);
   const router = useRouter();
   const home = space === "ceo" ? "/ceo-brand/posts" : "/social-marketing/posts";
   const [id, setId] = useState<string | null>(postId === "new" ? null : postId);
@@ -82,6 +83,12 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
   const [media, setMedia] = useState<PostMedia[]>([]);
   const [uploading, setUploading] = useState<Uploading[]>([]);
   const [dirty, setDirty] = useState(false);
+  /* When: as soon as it is approved, or at a Shanghai day and time. */
+  const [later, setLater] = useState(false);
+  const [day, setDay] = useState("");
+  const [time, setTime] = useState("10:00");
+  const [retiming, setRetiming] = useState(false);
+  const [unscheduling, setUnscheduling] = useState(false);
 
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
@@ -103,6 +110,9 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     setOverrides(Object.fromEntries(d.post.targets.filter((x) => x.body_override !== null).map((x) => [x.account.id, x.body_override as string])));
     setBody(d.post.body);
     setMedia(d.post.media);
+    setLater(!!d.post.scheduled_at);
+    if (d.post.scheduled_at) { setDay(dayKey(d.post.scheduled_at)); setTime(hm(d.post.scheduled_at)); }
+    setRetiming(false);
     setDirty(false);
     setConflict(false);
     setServerIssues(null);
@@ -134,6 +144,15 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     })();
     return () => { alive = false; };
   }, [space, postId, loadPost]);
+
+  /* A new post opened from a calendar day (?date=YYYY-MM-DD) starts on that
+     day. Read in an effect: an initializer would see the old URL on a
+     client navigation. */
+  useEffect(() => {
+    if (postId !== "new") return;
+    const d = new URLSearchParams(window.location.search).get("date");
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) { setLater(true); setDay(d); }
+  }, [postId]);
 
   /* Leaving with unsaved changes asks first. */
   useEffect(() => {
@@ -173,7 +192,10 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
   const igChosen = chosen.some((a) => a.platform === "instagram" && a.connection === "api");
   const aiPlatforms = (["facebook", "instagram"] as const).filter((p) => chosen.some((a) => a.platform === p && a.connection === "api"));
   const stillUploading = uploading.some((u) => !u.error);
-  const ready = chosen.length > 0 && issues.length === 0 && !stillUploading;
+  const scheduledAt = later && day ? fromShanghai(day, time) : null;
+  const timeAhead = !!scheduledAt && Date.parse(scheduledAt) > Date.now() + 2 * 60_000;
+  const timePassed = later && !!scheduledAt && !timeAhead;
+  const ready = chosen.length > 0 && issues.length === 0 && !stillUploading && (!later || !!scheduledAt);
 
   const touch = () => { setDirty(true); setNotice(null); setServerIssues(null); };
   const toggleAccount = (aid: string) => {
@@ -193,6 +215,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     body,
     media,
     targets: selected.map((aid) => ({ account_id: aid, body_override: aid in overrides ? overrides[aid] : null })),
+    scheduled_at: scheduledAt,
   });
 
   /** Save what is on screen; the post's id and version after it. */
@@ -276,6 +299,31 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     if (!res.ok) { fail(b); return false; }
     return true;
   });
+  const retime = () => run("schedule", async () => {
+    if (!id || !post || !scheduledAt) return false;
+    const res = await fetch(`/api/marketing/posts/${id}/schedule`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ version: post.version, scheduled_at: scheduledAt }) });
+    const b = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    if (!res.ok) { if (b.code === "too_soon") { setNotice({ tone: "error", text: t("w.tooSoon") }); return false; } fail(b); return false; }
+    await loadPost(id);
+    return true;
+  });
+  const publishNowInstead = () => run("schedule", async () => {
+    if (!id || !post) return false;
+    const res = await fetch(`/api/marketing/posts/${id}/schedule`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ version: post.version, scheduled_at: null }) });
+    const b = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    await loadPost(id).catch(() => {});
+    if (!res.ok) { fail(b); return false; }
+    return true;
+  });
+  const unschedule = () => run("schedule", async () => {
+    if (!id || !post) return false;
+    const res = await fetch(`/api/marketing/posts/${id}/unschedule`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ version: post.version }) });
+    const b = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    setUnscheduling(false);
+    await loadPost(id).catch(() => {});
+    if (!res.ok) { fail(b); return false; }
+    return true;
+  });
   const copyText = async (key: string, text: string) => {
     try { await navigator.clipboard.writeText(text); setCopied(key); window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 2_000); } catch { /* the text is on screen */ }
   };
@@ -354,6 +402,30 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
         </p>
       )}
       {post?.status === "publishing" && <p className="mt-4 rounded-xl border border-[#567FB2]/40 bg-[#567FB2]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">{t("b.publishing")}</p>}
+      {post?.status === "scheduled" && post.scheduled_at && (
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#567FB2]/40 bg-[#567FB2]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">
+          <p>
+            {t("b.scheduled").replace("{when}", dmyHm(post.scheduled_at))}
+            {post.decider ? ` ${t("b.approvedBy").replace("{name}", post.decider)}` : ""}
+          </p>
+          <p className="text-[11px] text-[var(--text-dim)]">{t("b.cronNote")}</p>
+          {approver && (
+            retiming ? (
+              <div className="flex flex-wrap items-end gap-3">
+                <When t={t} lang={lang} day={day} time={time} onDay={setDay} onTime={setTime} />
+                <Button type="button" disabled={busy !== null || !timeAhead} onClick={() => void retime()}>{t("a.saveTime")}</Button>
+                <Button type="button" variant="ghost" onClick={() => { setRetiming(false); if (post.scheduled_at) { setDay(dayKey(post.scheduled_at)); setTime(hm(post.scheduled_at)); } }}>{t("a.cancel")}</Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setRetiming(true)}>{t("a.changeTime")}</Button>
+                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void publishNowInstead()}>{t("a.publishNowInstead")}</Button>
+                <Button type="button" variant="ghost" disabled={busy !== null} onClick={() => setUnscheduling(true)}>{t("a.unschedule")}</Button>
+              </div>
+            )
+          )}
+        </div>
+      )}
       {setup && !writing && !post && <p className="mt-4 text-[13px] text-[var(--text-dim)]">{t("b.noCreate")}</p>}
       {notice && (
         <p role={notice.tone === "error" ? "alert" : "status"} className={`mt-4 rounded-xl border px-4 py-3 text-[13px] text-[var(--text-primary)] ${notice.tone === "error" ? "border-[#FF3333]/35 bg-[#FF3333]/10" : "border-[#10B981]/35 bg-[#10B981]/10"}`}>{notice.text}</p>
@@ -438,6 +510,24 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
               )}
             </section>
 
+            {writing && (
+              <section className="flex flex-col gap-2">
+                <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("w.title")}</h2>
+                <div role="radiogroup" aria-label={t("w.title")} className="flex flex-wrap gap-2">
+                  {([false, true] as const).map((v) => (
+                    <button key={String(v)} type="button" role="radio" aria-checked={later === v} onClick={() => { touch(); setLater(v); }}
+                      className={`inline-flex h-10 items-center rounded-full border px-4 text-[12px] font-semibold transition-colors ${
+                        later === v ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      }`}>
+                      {v ? t("w.later") : t("w.now")}
+                    </button>
+                  ))}
+                </div>
+                {later && <When t={t} lang={lang} day={day} time={time} onDay={(d) => { touch(); setDay(d); }} onTime={(v) => { touch(); setTime(v); }} />}
+                {timePassed && <p className="text-[12px] text-[#F59E0B]">{t("w.past")}</p>}
+              </section>
+            )}
+
             <section
               className="flex flex-col gap-2"
               onDragOver={(e) => { if (writing) e.preventDefault(); }}
@@ -517,7 +607,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
                 {approver ? (
                   <Button type="button" disabled={!ready || busy !== null} onClick={() => void approve()}>
                     {busy === "approve" ? <SpinnerIcon size={14} className="motion-safe:animate-spin" /> : null}
-                    {post?.status === "in_review" ? t("a.approve") : t("a.publish")}
+                    {timeAhead ? t("a.schedule") : post?.status === "in_review" ? t("a.approve") : t("a.publish")}
                   </Button>
                 ) : (
                   <Button type="button" disabled={!ready || busy !== null || post?.status === "in_review"} onClick={() => void submit()}>
@@ -559,6 +649,17 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
       </Modal>
 
       <ConfirmDialog
+        open={unscheduling}
+        title={t("a.unscheduleTitle")}
+        message={t("a.unscheduleBody")}
+        confirmLabel={t("a.unschedule")}
+        cancelLabel={t("a.cancel")}
+        busy={busy === "schedule"}
+        onConfirm={() => void unschedule()}
+        onCancel={() => setUnscheduling(false)}
+      />
+
+      <ConfirmDialog
         open={deleting}
         title={t("a.deleteTitle")}
         message={t("a.deleteBody")}
@@ -568,6 +669,27 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
         onConfirm={() => void remove()}
         onCancel={() => setDeleting(false)}
       />
+    </div>
+  );
+}
+
+/** A Shanghai day and time — the only way a time is picked in marketing. */
+function When({ t, lang, day, time, onDay, onTime }: {
+  t: Tr; lang: string; day: string; time: string; onDay: (d: string) => void; onTime: (v: string) => void;
+}) {
+  const today = dayKey(new Date());
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <label className="flex flex-col gap-1 text-[12px] text-[var(--text-muted)]">
+        {t("w.date")}
+        <DatePicker value={day} onChange={onDay} min={today} lang={lang} floating heightCls="h-10" format={(iso) => iso.split("-").reverse().join("/")} className="w-[168px]" />
+      </label>
+      <label className="flex flex-col gap-1 text-[12px] text-[var(--text-muted)]">
+        {t("w.time")}
+        <input type="time" value={time} step={300} onChange={(e) => onTime(e.target.value)} dir="ltr"
+          className="h-10 w-[120px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 text-[13px] tabular-nums text-[var(--text-primary)] focus:border-[var(--border-focus)] focus:outline-none" />
+      </label>
+      <span className="pb-2.5 text-[11px] text-[var(--text-dim)]">{t("tz.label")}</span>
     </div>
   );
 }

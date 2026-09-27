@@ -27,6 +27,12 @@ export const SPACE_POSTS: Record<MarketingSpace, string> = {
   ceo: "/ceo-brand/posts",
 };
 
+/** Each space's Calendar tab. */
+export const SPACE_CALENDAR: Record<MarketingSpace, string> = {
+  company: "/social-marketing/calendar",
+  ceo: "/ceo-brand/calendar",
+};
+
 /** The accounts page each space returns to after connecting an account. */
 export const SPACE_ROUTE: Record<MarketingSpace, string> = {
   company: "/social-marketing/accounts",
