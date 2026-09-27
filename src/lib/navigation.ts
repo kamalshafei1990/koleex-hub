@@ -50,6 +50,12 @@ import DiscussIcon from "@/components/icons/DiscussIcon";
 import CalendarIcon from "@/components/icons/CalendarIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import MarketingCardsIcon from "@/components/icons/MarketingCardsIcon";
+import MarketingSidebarIcon from "@/components/icons/MarketingSidebarIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import CrownIcon from "@/components/icons/ui/CrownIcon";
+import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 import EventsIcon from "@/components/icons/EventsIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
@@ -260,9 +266,18 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "reports",          tKey: "app.reports",          name: "Reports",           icon: ReportsIcon,   route: "/reports",          active: true,  newSince: "2026-09-25", openAccess: true },
   { id: "translator",       tKey: "app.translator",       name: "Translator",        icon: TranslatorIcon, route: "/translator",      active: true,  newSince: "2026-07-22", openAccess: true },
 
-  /* ── Marketing & Growth ── */
-  { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
+  /* ── Marketing — the section's 8 apps (owner, 27/09/2026, plan v6). Built
+     in phases: an app stays active:false — off the rail for everyone, a
+     "coming soon" tile on Home for super admins only — until its first real
+     screen ships. Their icons here are fallbacks; each gets its app.* binding
+     in the Visual Library when it goes live. */
   { id: "marketing",        tKey: "app.marketing",        name: "Marketing",         icon: MarketingIcon, route: "/marketing",        active: false },
+  { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
+  { id: "social-marketing", tKey: "app.social-marketing", name: "Social Marketing",  icon: Share2Icon,    route: "/social-marketing", active: false },
+  { id: "ceo-brand",        tKey: "app.ceo-brand",        name: "CEO Brand",         icon: CrownIcon,     route: "/ceo-brand",        active: false },
+  { id: "email-marketing",  tKey: "app.email-marketing",  name: "Email Marketing",   icon: MailOpenIcon,  route: "/email-marketing",  active: false },
+  { id: "sms-whatsapp",     tKey: "app.sms-whatsapp",     name: "SMS & WhatsApp",    icon: MessageSquareIcon, route: "/sms-whatsapp", active: false },
+  { id: "marketing-automation", tKey: "app.marketing-automation", name: "Marketing Automation", icon: WorkflowIcon, route: "/marketing-automation", active: false },
   { id: "marketing-cards",  tKey: "app.marketing-cards",  name: "Marketing Cards",   icon: MarketingCardsIcon, route: "/marketing-cards", active: false },
   { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: false },
 
@@ -332,7 +347,17 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "contracts", "orders", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "contracts", "orders", "sales", "crm", "contacts", "markets", "price-calculator"],
+  },
+  /* Marketing (owner, 27/09/2026): the section with its 8 apps. Website moved
+     back here from Commercial. The rail lists only what is active and what the
+     viewer may open, so it grows as each app ships. */
+  {
+    id: "marketing",
+    tKey: "cat.marketing",
+    label: "Marketing",
+    icon: MarketingSidebarIcon,
+    appIds: ["marketing", "website", "social-marketing", "ceo-brand", "email-marketing", "sms-whatsapp", "marketing-automation", "marketing-cards"],
   },
   {
     id: "finance",
@@ -356,10 +381,6 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     /* Notifications (the center, /inbox) sits beside Discuss — owner, 26/09. */
     appIds: ["todo", "discuss", "inbox", "calendar", "notes", "reports"],
   },
-  /* "Marketing & Growth" group dissolved 2026-07-31 (owner-approved): it
-     rendered a single live item (Website, ~7 events/30d). Website now lives
-     under Commercial as a commercial channel; marketing/marketing-cards/
-     events return with their own group when they actually ship. */
   {
     id: "planning",
     tKey: "cat.planning",
