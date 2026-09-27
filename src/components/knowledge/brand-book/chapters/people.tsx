@@ -14,6 +14,7 @@ import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { KoleexLogoPaths } from "@/components/layout/KoleexLogo";
 import { Avatar, INK, Phone, Post, Scaled } from "../mockups";
 import { SILVER } from "@/lib/brand-book/tokens";
 
@@ -91,6 +92,95 @@ function QrTile() {
   return <span className="inline-block h-[20px] w-[20px] bg-white" style={{ backgroundImage: "repeating-conic-gradient(#000 0 25%, #fff 0 50%)", backgroundSize: "5px 5px", boxShadow: "0 0 0 2px #FFFFFF" }} />;
 }
 
+type GarmentKind = "shirt" | "shirt-white" | "shirt-trim" | "workshirt" | "coverall" | "workjacket" | "softshell" | "down" | "quarterzip" | "tee" | "tee-back";
+
+const LONG_BODY = "M60 30 L84 20 Q100 28 116 20 L140 30 L180 72 L174 176 L156 174 L152 96 L150 214 L50 214 L48 96 L44 174 L26 176 L20 72 Z";
+const SHIRT_COLLAR = "M84 20 L100 42 L116 20 L124 36 L102 46 L98 46 L76 36 Z";
+
+/** The logo inside a garment drawing, from the official paths. */
+function GLogo({ x, y, w, color = "#FFFFFF" }: { x: number; y: number; w: number; color?: string }) {
+  return <svg x={x} y={y} width={w} height={(w * 107.57) / 719.83} viewBox="0 0 719.83 107.57" fill={color}><KoleexLogoPaths /></svg>;
+}
+
+/** The rest of the uniform set (owner, 28/09/2026 — every option approved):
+ *  office shirts, technicians' wear, cold-weather wear and the T-shirt, all
+ *  black with white details and the white logo on the wearer's left chest. */
+function Garment({ kind }: { kind: GarmentKind }) {
+  const INKG = "#111111";
+  const EDGE = "#3A3A3C";
+  if (kind === "coverall") {
+    return (
+      <svg viewBox="0 0 200 300" width={200} height={300} aria-hidden>
+        <path d="M60 30 L84 20 Q100 28 116 20 L140 30 L180 72 L174 176 L156 174 L152 96 L152 290 L108 290 L100 200 L92 290 L48 290 L48 96 L44 174 L26 176 L20 72 Z" fill={INKG} />
+        <path d={SHIRT_COLLAR} fill="#FFFFFF" />
+        <line x1="100" y1="46" x2="100" y2="196" stroke="#FFFFFF" strokeWidth="1.4" />
+        <rect x="48" y="150" width="104" height="8" fill="#1C1C1E" />
+        <rect x="112" y="76" width="28" height="28" fill="#1C1C1E" stroke={EDGE} />
+        <GLogo x={114} y={66} w={26} />
+      </svg>
+    );
+  }
+  if (kind === "tee" || kind === "tee-back") {
+    return (
+      <svg viewBox="0 0 200 230" width={200} height={230} aria-hidden>
+        <path d="M60 30 L84 22 Q100 34 116 22 L140 30 L176 56 L160 82 L145 72 L145 210 L55 210 L55 72 L40 82 L24 56 Z" fill={INKG} />
+        {kind === "tee" ? <><path d="M84 22 Q100 34 116 22" fill="none" stroke="#FFFFFF" strokeWidth="3" /><GLogo x={112} y={66} w={26} /></> : <GLogo x={60} y={70} w={80} />}
+      </svg>
+    );
+  }
+  const white = kind === "shirt-white";
+  const body = white ? "#FFFFFF" : INKG;
+  return (
+    <svg viewBox="0 0 200 230" width={200} height={230} aria-hidden>
+      {kind === "workjacket"
+        ? <path d="M60 30 L84 20 Q100 28 116 20 L140 30 L180 72 L174 176 L156 174 L152 96 L150 178 L50 178 L48 96 L44 174 L26 176 L20 72 Z" fill={body} />
+        : <path d={LONG_BODY} fill={body} stroke={white ? "#C7C7CC" : "none"} />}
+      {(kind === "shirt" || kind === "shirt-white" || kind === "shirt-trim") && (
+        <>
+          <path d={SHIRT_COLLAR} fill={kind === "shirt-trim" ? "#FFFFFF" : white ? "#FFFFFF" : "#1C1C1E"} stroke={kind === "shirt-trim" ? "none" : white ? "#C7C7CC" : EDGE} />
+          {kind === "shirt-trim" ? <rect x="95" y="46" width="10" height="168" fill="#FFFFFF" /> : <line x1="100" y1="46" x2="100" y2="214" stroke={white ? "#D1D1D6" : EDGE} />}
+          {[62, 90, 118, 146].map((y) => <circle key={y} cx="100" cy={y} r="1.8" fill={kind === "shirt-trim" ? INKG : white ? "#AEAEB2" : "#48484A"} />)}
+          {[26, 154].map((x) => <rect key={x} x={x} y="162" width="20" height="12" fill={kind === "shirt-trim" ? "#FFFFFF" : white ? "#FFFFFF" : "#1C1C1E"} stroke={kind === "shirt-trim" ? "none" : white ? "#C7C7CC" : EDGE} />)}
+          <GLogo x={112} y={70} w={26} color={white ? "#000000" : "#FFFFFF"} />
+        </>
+      )}
+      {kind === "workshirt" && (
+        <>
+          <path d={SHIRT_COLLAR} fill="#FFFFFF" />
+          <path d="M80 24 L24 70 M120 24 L176 70" stroke="#FFFFFF" strokeWidth="2.2" />
+          <line x1="100" y1="46" x2="100" y2="214" stroke={EDGE} />
+          {[58, 112].map((x) => <g key={x}><rect x={x} y="76" width="30" height="32" fill="#1C1C1E" stroke={EDGE} /><rect x={x} y="76" width="30" height="8" fill="#2C2C2E" /></g>)}
+          <GLogo x={114} y={66} w={26} />
+        </>
+      )}
+      {kind === "workjacket" && (
+        <>
+          <rect x="50" y="166" width="100" height="14" fill="#1C1C1E" />
+          <path d="M84 20 L100 34 L116 20 L118 30 L100 40 L82 30 Z" fill="#2C2C2E" />
+          <line x1="100" y1="40" x2="100" y2="178" stroke="#FFFFFF" strokeWidth="1.4" />
+          {[58, 114].map((x) => <rect key={x} x={x} y="96" width="28" height="30" fill="#1C1C1E" stroke={EDGE} />)}
+          <GLogo x={114} y={70} w={26} />
+        </>
+      )}
+      {(kind === "softshell" || kind === "down") && (
+        <>
+          <path d="M82 16 L118 16 L118 32 L100 38 L82 32 Z" fill="#1C1C1E" stroke={EDGE} />
+          {kind === "down" && [70, 100, 130, 160, 190].map((y) => <line key={y} x1="48" y1={y} x2="152" y2={y} stroke="#2C2C2E" strokeWidth="2" />)}
+          <line x1="100" y1="36" x2="100" y2="214" stroke="#FFFFFF" strokeWidth="2" />
+          <GLogo x={112} y={kind === "down" ? 80 : 66} w={26} />
+        </>
+      )}
+      {kind === "quarterzip" && (
+        <>
+          <path d="M84 16 L116 16 L116 30 L100 34 L84 30 Z" fill="#1C1C1E" stroke={EDGE} />
+          <line x1="100" y1="30" x2="100" y2="80" stroke="#FFFFFF" strokeWidth="2" />
+          <GLogo x={112} y={84} w={26} />
+        </>
+      )}
+    </svg>
+  );
+}
+
 /* ── 122 · Uniforms ────────────────────────────────────────────────────── */
 
 export function Uniforms() {
@@ -112,28 +202,42 @@ export function Uniforms() {
     >
       <Section id="set" title="The set">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
-          <div className="flex flex-wrap items-end justify-center gap-4">
-            <Item label="Polo A — piping"><Scaled w={92} base={200} h={200}><Polo trim="piping" /></Scaled></Item>
-            <Item label="Polo B — placket"><Scaled w={92} base={200} h={200}><Polo trim="placket" /></Scaled></Item>
-            <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
+          <div className="w-full space-y-6">
+            {([
+              ["Polo — everyone", [["A — piping", <Polo key="a" trim="piping" />, 200], ["B — placket", <Polo key="b" trim="placket" />, 200]]],
+              ["Office shirt — meetings, visits, management", [["A — black", <Garment key="a" kind="shirt" />, 230], ["B — white", <Garment key="b" kind="shirt-white" />, 230], ["C — polo details", <Garment key="c" kind="shirt-trim" />, 230]]],
+              ["Technicians — installation and service", [["Work shirt", <Garment key="a" kind="workshirt" />, 230], ["Coverall", <Garment key="b" kind="coverall" />, 300], ["Work jacket", <Garment key="c" kind="workjacket" />, 230]]],
+              ["Cold weather", [["Soft-shell", <Garment key="a" kind="softshell" />, 230], ["Down jacket", <Garment key="b" kind="down" />, 230], ["Quarter-zip", <Garment key="c" kind="quarterzip" />, 230]]],
+              ["T-shirt — booth crews, training days", [["Front", <Garment key="a" kind="tee" />, 230], ["Back", <Garment key="b" kind="tee-back" />, 230]]],
+            ] as Array<[string, Array<[string, ReactNode, number]>]>).map(([group, items]) => (
+              <div key={group}>
+                <p className="mb-2 text-[12px] font-semibold text-[#1D1D1F]">{group}</p>
+                <div className="flex flex-wrap items-end gap-4">
+                  {items.map(([label, node, h]) => (
+                    <Item key={label} label={label}><Scaled w={Math.round((92 * 200) / h)} base={200} h={h}>{node}</Scaled></Item>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </Stage>
         <Table
           head={["Who", "Garment", "Colors"]}
           rows={[
             ["Sales, office, exhibitions, visits", "Piqué polo — design A (shoulder piping) or B (white placket)", "Black body; white collar, cuffs, trims and logo"],
-            ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Black, white logo"],
-            ["Cold weather", "Soft-shell jacket", "Black, white logo"],
+            ["Meetings, visits, management", "Long-sleeve shirt — A black, B white, or C black with the polo's white collar, placket and cuffs", "The logo embroidered, one colour"],
+            ["Technicians", "Work shirt with two pockets and the polo's piping; a coverall for dirty jobs; a short work jacket over black trousers", "Black, white details; the coverall and jacket carry the large logo on the back"],
+            ["Cold weather", "Soft-shell jacket (white zip) for everyone; a down jacket for the Chinese winter; a quarter-zip pullover in the office", "Black, white logo; jackets may carry the back logo"],
+            ["Booth crews, training days", "Crew-neck T-shirt, white neck rib", "Black, white logo; the large logo on the back allowed"],
             ["Second version", "Polo or shirt", "White, black trims and logo — hot days and white rooms (ch. 47)"],
           ]}
         />
-        <Note>The polo is set. Shirts, jackets and technicians’ workwear are designed next, in the same black-and-white language.</Note>
       </Section>
 
       <Section id="placement" title="Logo placement">
         <Specs rows={[
           ["Chest", "Wearer’s left, 70–80 mm wide, 180–200 mm below the shoulder seam"],
-          ["Back (jackets, fair polos)", "Optional: logo 200–250 mm wide, 100 mm below the collar"],
+          ["Back (jackets, coveralls, fair polos, T-shirts)", "Optional: logo 200–250 mm wide, 100 mm below the collar; screen print on T-shirts"],
           ["Sleeve, cap", "The full logo, 40–50 mm wide — or nothing"],
           ["Method", "Embroidery, one thread color — screen print or DTF only on technical fabrics (ch. 39)"],
         ]} />
