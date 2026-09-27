@@ -217,6 +217,43 @@ export function SignatureBlock({ labels = ["Seller", "Buyer"] }: { labels?: stri
   );
 }
 
+/* ── Objects (Parts 6–9) ───────────────────────────────────────────────── */
+
+/** A drawing designed at `base` × `h` px and shown at `w` px wide, so every
+ *  object keeps its real proportions at any size. */
+export function Scaled({ w, base, h, children }: { w: number; base: number; h: number; children: ReactNode }) {
+  const s = w / base;
+  return (
+    <div className="relative shrink-0 overflow-hidden" style={{ width: w, height: h * s }}>
+      <div className="absolute left-0 top-0" style={{ width: base, height: h, transform: `scale(${s})`, transformOrigin: "top left" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** A barcode, drawn — it stands for the real one and does not scan. */
+export function Barcode({ w = 80, h = 18, color = INK }: { w?: number; h?: number; color?: string }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block"
+      style={{ width: w, height: h, background: `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 3px, ${color} 3px 5px, transparent 5px 6px, ${color} 6px 7px, transparent 7px 10px)` }}
+    />
+  );
+}
+
+/** A QR code, drawn — it stands for the real one and does not scan. */
+export function QrBox({ size = 32 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block shrink-0 rounded-[2px]"
+      style={{ width: size, height: size, background: `repeating-conic-gradient(${INK} 0 25%, #FFFFFF 0 50%) 0 0 / ${Math.max(4, Math.round(size / 6))}px ${Math.max(4, Math.round(size / 6))}px`, boxShadow: "0 0 0 2px #FFFFFF, 0 0 0 3px rgba(0,0,0,0.12)" }}
+    />
+  );
+}
+
 /** Avatar: the K tile, as platforms show it (circle). */
 export function Avatar({ size = 40 }: { size?: number }) {
   return (
