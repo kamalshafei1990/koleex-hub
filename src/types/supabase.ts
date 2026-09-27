@@ -208,6 +208,11 @@ export type SectionUpdate = Partial<SectionInsert>;
    Product Catalog Types — Maps to the product tables.
    --------------------------------------------------------------------------- */
 
+/* product_media.type is NOT free text: the CHECK constraint valid_media_type
+   allows exactly these 13 values (read from pg_constraint, 27/09/2026), and
+   the database rejects any other. A new type needs a migration AND this
+   union; validate:product-page-images §4 checks that the two lists match and
+   that every insert uses one of them. */
 export type ProductMediaType =
   | "main_image"
   | "gallery"
@@ -217,8 +222,7 @@ export type ProductMediaType =
   | "manual"
   | "ar_3d"
   | "video"
-  /* Document types (Phase 2 — Media & Documents). product_media.type is
-     free text in the DB, so these need no migration; they widen the
+  /* Document types (Phase 2 — Media & Documents): they widen the
      hand-maintained union the form + renderers switch on. */
   /* Per-model hero (family Phase 3): bound via product_media.model_id;
      a model without one inherits the family's main_image. */

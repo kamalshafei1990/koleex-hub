@@ -17,6 +17,12 @@
  * Both directions are exercised: the rule on the real files, and the rule
  * on a copy with one src un-wrapped — a guard that never sees a failure
  * proves nothing.
+ *
+ * §4 (27/09/2026): a photo can only show if it was saved at all.
+ * product_media.type has a CHECK constraint (valid_media_type), so every
+ * insert must use one of its 13 values. ProductMediaType must be that same
+ * list. Quotation photos were saved as "image", rejected by the database,
+ * and dropped without a trace.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -112,6 +118,66 @@ for (const rel of CLIENT_TREE) {
   const src = code(fs.readFileSync(path.join(ROOT, CLIENT_TREE[0]), "utf8"));
   const mutated = src.replace('from "@/lib/product-schema/visibility"', 'from "@/lib/product-schema"');
   expect(mutated !== src && barrelImport.test(mutated), "  (the rule sees the failure direction)");
+}
+
+console.log("\n§4 every photo the Hub saves has a type product_media accepts");
+/* product_media.type has a CHECK constraint, valid_media_type, with exactly
+   these 13 values (read from pg_constraint, 27/09/2026). The database
+   rejects any other type. save-cost-from-quotation saved "image" and never
+   read the error, so every photo saved from a quotation was dropped without
+   a trace. The union the renderers switch on must be this same list, and
+   every insert must use one of its values. */
+const DB_MEDIA_TYPES = ["main_image", "gallery", "packing_photo", "label", "logo_detail", "manual", "ar_3d", "video", "model_image", "datasheet", "brochure", "certificate", "parts_list"];
+const unionSrc = /export type ProductMediaType =([^;]+);/.exec(code(fs.readFileSync(path.join(ROOT, "src/types/supabase.ts"), "utf8")))?.[1] ?? "";
+const unionTypes = [...unionSrc.matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);
+expect(unionTypes.length === DB_MEDIA_TYPES.length && DB_MEDIA_TYPES.every((t) => unionTypes.includes(t)),
+  `ProductMediaType is the database's list (${unionTypes.length} of ${DB_MEDIA_TYPES.length})`, `union: ${unionTypes.join(", ")}`);
+
+/** The text between a call's "(" and its matching ")", stepping over strings. */
+function callArgs(src: string, open: number): string {
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") { for (i++; i < src.length && src[i] !== c; i++) if (src[i] === "\\") i++; continue; }
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return src.slice(open + 1, i);
+  }
+  return "";
+}
+/** Every literal `type:` a product_media insert/upsert or a createProductMedia(…) call writes. */
+function mediaTypesWritten(src: string): string[] {
+  const out: string[] = [];
+  const s = code(src);
+  for (const m of s.matchAll(/\.from\(\s*["']product_media["']\s*\)\s*\.(?:insert|upsert)\(|\bcreateProductMedia\(/g)) {
+    const args = callArgs(s, m.index + m[0].length - 1);
+    for (const t of args.matchAll(/\btype:\s*["']([^"']+)["']/g)) out.push(t[1]);
+  }
+  return out;
+}
+function walkCode(dir: string, out: string[] = []): string[] {
+  for (const f of fs.readdirSync(path.join(ROOT, dir))) {
+    const rel = path.join(dir, f);
+    if (fs.statSync(path.join(ROOT, rel)).isDirectory()) { if (f !== "node_modules") walkCode(rel, out); }
+    else if (/\.(ts|tsx|mjs|js)$/.test(f) && !/^validate-/.test(f)) out.push(rel);
+  }
+  return out;
+}
+const written: Array<{ file: string; type: string }> = [];
+for (const rel of [...walkCode("src"), ...walkCode("scripts")]) {
+  for (const type of mediaTypesWritten(fs.readFileSync(path.join(ROOT, rel), "utf8"))) written.push({ file: rel, type });
+}
+const unknown = written.filter((w) => !DB_MEDIA_TYPES.includes(w.type));
+expect(unknown.length === 0, `every product_media insert writes a known type (${written.length} literal types seen)`,
+  unknown.map((w) => `${w.file}: type "${w.type}"`).join("\n      "));
+expect(written.length >= 6, "the matcher saw the real inserts (6 on 27/09/2026: quotation ×2, Main Photo slot, model photo, catalog import, catalog retry)",
+  "if the count collapsed, the insert matcher is broken and the guard is passing on nothing");
+const quoteRoute = fs.readFileSync(path.join(ROOT, "src/app/api/products/save-cost-from-quotation/route.ts"), "utf8");
+const quote = code(quoteRoute);
+expect((quote.match(/const \{ error: photoErr \} = await supabaseServer\.from\("product_media"\)\.insert\(/g) ?? []).length === 2 && (quote.match(/if \(photoErr\)/g) ?? []).length === 2,
+  "a quotation photo reads its insert error (both paths)", "an unread insert error is how every quotation photo disappeared");
+{
+  const mutated = quoteRoute.replace('type: "main_image"', 'type: "image"');
+  expect(mutated !== quoteRoute && mediaTypesWritten(mutated).includes("image"), "  (the rule sees the failure direction)");
 }
 
 console.log(failed ? `\n✗ product page images: ${failed} check(s) failed\n` : "\n✓ product page images: all checks passed\n");

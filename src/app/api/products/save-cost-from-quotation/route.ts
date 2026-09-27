@@ -19,7 +19,8 @@ import { humanizeError } from "@/lib/ui/humanize-error";
           so the UI can ask before changing a real cost.
         - Otherwise set cost_price = headCostRmb (+ provenance columns).
         - Fill-only: description set only if currently empty; photo added only
-          if the product has no image yet. Existing data is never overwritten.
+          if the product has no main or gallery photo yet, as its MAIN product
+          photo. Existing data is never overwritten.
         - Append history (initial when previous was null, else updated).
    • Model NOT found → create a DRAFT product (+ model, + media, + history):
         status='draft', visible=false, created_source='quotation_module',
@@ -90,6 +91,10 @@ export async function POST(req: Request) {
   const userId = auth.account_id;
   const userName = auth.username;
   const pattern = escapeLike(model);
+  /* The quotation line's photo: a link to the media bucket (all 849 on
+     27/09/2026 were). Anything else — an inline data: blob — is not saved
+     as a product photo; it would ride along in every list that reads media. */
+  const photoUrl = typeof body.photo === "string" && /^https?:\/\//i.test(body.photo.trim()) ? body.photo.trim() : null;
 
   // ── 1. Tenant-scoped exact lookup: model_name → primary_model → reference_model
   let found: FoundModel | null = null;
@@ -162,22 +167,28 @@ export async function POST(req: Request) {
         .eq("id", found.product_id);
       websiteChanged = true;
     }
-    // Add photo only if the product has no image yet.
-    if (body.photo) {
+    /* Add the photo only if the product has no picture yet (no main or
+       gallery photo — a datasheet is not a picture). It becomes the MAIN
+       product photo, saved as the Main Product Photo slot saves one:
+       type main_image, no model, order 0. The type used to be "image",
+       which product_media's CHECK (valid_media_type) rejects — and the
+       error was never read, so every quotation photo was dropped. */
+    if (photoUrl) {
       const { data: existingImg } = await supabaseServer
         .from("product_media")
         .select("id")
         .eq("product_id", found.product_id)
+        .in("type", ["main_image", "gallery"])
         .limit(1);
       if (!existingImg || existingImg.length === 0) {
-        await supabaseServer.from("product_media").insert({
+        const { error: photoErr } = await supabaseServer.from("product_media").insert({
           product_id: found.product_id,
-          model_id: found.id,
-          url: body.photo,
-          type: "image",
-          role: "gallery",
+          type: "main_image",
+          url: photoUrl,
+          order: 0,
         });
-        websiteChanged = true;
+        if (photoErr) console.error("[save-cost] photo", photoErr.message);
+        else websiteChanged = true;
       }
     }
 
@@ -242,14 +253,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: pmErr?.message || "Create model failed" }, { status: 500 });
   }
 
-  if (body.photo) {
-    await supabaseServer.from("product_media").insert({
+  /* The new product's MAIN photo (its model inherits it — see the
+     "Choose your model" table), in a type product_media accepts. */
+  if (photoUrl) {
+    const { error: photoErr } = await supabaseServer.from("product_media").insert({
       product_id: prod.id,
-      model_id: pm.id,
-      url: body.photo,
-      type: "image",
-      role: "gallery",
+      type: "main_image",
+      url: photoUrl,
+      order: 0,
     });
+    if (photoErr) console.error("[save-cost] photo", photoErr.message);
   }
 
   await supabaseServer.from("product_cost_history").insert({
