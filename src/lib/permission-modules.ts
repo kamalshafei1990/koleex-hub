@@ -60,9 +60,13 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    Sep 2026): "Management Reports" — starting the executive and control
    report types (the weekly executive summary, the department KPIs, the
    monthly business review, the access review, the system usage), and
-   reading the company-wide numbers they carry. */
+   reading the company-wide numbers they carry. Social Marketing (owner's
+   pick, 27 Sep 2026): "Social Marketing Approvals" — approving Koleex's
+   posts and publishing them (the CEO or the marketing manager, either one
+   is enough; super admins always can). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
+export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
@@ -70,6 +74,7 @@ export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = 
   { name: "Management Reports", app: "Reports" },
   { name: BANK_PROFIT_MODULE, app: "Finance" },
   { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
+  { name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */

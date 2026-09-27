@@ -100,9 +100,7 @@ const T: Translations = {
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
   "next.title":       { en: "Coming next, on these accounts", zh: "接下来将基于这些账号推出", ar: "القادم على هذه الحسابات" },
-  "next.composer":    { en: "One post for several accounts, with captions from Koleex AI", zh: "一次发布到多个账号，并由 Koleex AI 撰写文案", ar: "منشور واحد لعدة حسابات، بتعليقات من Koleex AI" },
   "next.calendar":    { en: "Calendar and scheduling", zh: "日历与定时发布", ar: "التقويم وجدولة النشر" },
-  "next.approval":    { en: "Approval by the CEO or the marketing manager before publishing", zh: "发布前由 CEO 或营销经理审批", ar: "موافقة المدير التنفيذي أو مدير التسويق قبل النشر" },
   "next.comments":    { en: "Replies to comments from the Hub", zh: "在 Hub 中回复评论", ar: "الرد على التعليقات من الـHub" },
 };
 
@@ -347,9 +345,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("next.title")}</h2>
             <ul className="mt-3 flex list-disc flex-col gap-2 ps-5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-              <li>{t("next.composer")}</li>
               <li>{t("next.calendar")}</li>
-              <li>{t("next.approval")}</li>
               <li>{t("next.comments")}</li>
             </ul>
           </div>

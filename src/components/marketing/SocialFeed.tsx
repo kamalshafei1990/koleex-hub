@@ -267,7 +267,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
     if (repaired.current.has(post.id)) { setBroken((s) => withItem(s, post.id, true)); return; }
     repaired.current.add(post.id);
     try {
-      const res = await fetch(`/api/marketing/posts/${post.id}?part=media`, { cache: "no-store" });
+      const res = await fetch(`/api/marketing/feed/${post.id}?part=media`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const detail = (await res.json()) as PostDetail;
       if (!detail.post.thumb || detail.post.thumb.url === post.thumb?.url) throw new Error("unchanged");
@@ -652,7 +652,7 @@ function PostDetailView({ post, platform, t, onLoaded }: { post: FeedPost; platf
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/marketing/posts/${post.id}`, { cache: "no-store" })
+    fetch(`/api/marketing/feed/${post.id}`, { cache: "no-store" })
       .then((res) => (res.ok ? (res.json() as Promise<PostDetail>) : Promise.reject(new Error(String(res.status)))))
       .then((d) => {
         if (!alive) return;

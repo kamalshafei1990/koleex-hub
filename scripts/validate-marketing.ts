@@ -18,6 +18,18 @@
        key "expired";
      · the screen never slides sideways (no horizontal scroller), sends no
        referrer to Meta's picture servers, and speaks en/zh/ar.
+   The composer (27/09/2026) adds:
+     · approving (and so publishing) is the super admins' and «Social
+       Marketing Approvals»' — a Roles capability, never a department;
+     · every posts route passes the same door (signed in, the post's own
+       space, the action) before it reads or writes, and approver-only
+       actions check the approver after it;
+     · every person-made change carries the version it read; publishing
+       claims each account before anything is sent (never twice); pictures
+       can only be this tenant's uploads, their link rebuilt from the path;
+     · Instagram's and Facebook's rules are ONE module, used by the screen
+       and the server; Koleex AI captions are internal-only, public-safe
+       (KOLEEX only, no prices) and use ACTIVE products only.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -31,6 +43,9 @@ function check(label: string, cond: boolean) {
   else { failures.push(label); console.log(`  ✗ ${label}`); }
 }
 const code = (p: string) => (existsSync(p) ? stripComments(readFileSync(p, "utf8"), { line: "all" }) : "");
+/* An order check must also require the call to exist: indexOf -1 is
+   "before" everything. */
+const before = (src: string, first: string, then: string) => src.indexOf(first) > -1 && src.indexOf(then) > src.indexOf(first);
 function walk(dir: string, out: string[] = []): string[] {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
@@ -52,8 +67,17 @@ const SYNC = "src/lib/server/marketing/sync.ts";
 const FEED = "src/lib/server/marketing/feed.ts";
 const FEED_ROUTE = "src/app/api/marketing/feed/route.ts";
 const SYNC_ROUTE = "src/app/api/marketing/accounts/[id]/sync/route.ts";
-const POST_ROUTE = "src/app/api/marketing/posts/[id]/route.ts";
+const POST_ROUTE = "src/app/api/marketing/feed/[id]/route.ts";
 const FEED_SCREEN = "src/components/marketing/SocialFeed.tsx";
+const POSTS = "src/lib/server/marketing/posts.ts";
+const PUBLISH = "src/lib/server/marketing/publish.ts";
+const META_PUBLISH = "src/lib/server/marketing/meta-publish.ts";
+const APPROVALS = "src/lib/server/marketing/approvals.ts";
+const GATE = "src/lib/server/marketing/post-gate.ts";
+const CAPTIONS = "src/lib/server/marketing/captions.ts";
+const RULES = "src/lib/marketing/post-rules.ts";
+const COMPOSER = "src/components/marketing/PostComposer.tsx";
+const POSTS_DIR = "src/app/api/marketing/posts";
 
 /* ── 1. The key store ── */
 console.log("\n1. Access keys are encrypted with their own key");
@@ -97,6 +121,10 @@ check("the login dialog carries config_id — never scope", /searchParams\.set\(
 check("the state cookie is httpOnly, Secure, SameSite=Lax, 10 minutes, connect routes only",
   /httpOnly: true,/.test(meta) && /secure: true,/.test(meta) && /sameSite: "lax" as const,/.test(meta) && /path: "\/api\/marketing\/connect\/meta",/.test(meta) && /maxAge: 600,/.test(meta));
 check("token-bearing Graph calls use the Authorization header", /headers: token \? \{ Authorization: `Bearer \$\{token\}` \}/.test(meta));
+const metaPostFn = meta.slice(meta.indexOf("export async function metaPost"), meta.indexOf("export async function exchangeCode"));
+check("Graph writes (metaPost) carry the token in the header — the body is the params only",
+  /headers: \{ Authorization: `Bearer \$\{token\}`, "Content-Type": "application\/x-www-form-urlencoded" \}/.test(metaPostFn) &&
+  /body: new URLSearchParams\(params\)\.toString\(\),/.test(metaPostFn) && !/access_token/.test(metaPostFn) && !/URLSearchParams\([^)]*token/.test(metaPostFn));
 const st = code(START);
 check("start: 'edit' on the space's module before the login URL is built",
   st.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') > -1 && st.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') < st.indexOf("metaLoginUrl("));
@@ -211,6 +239,111 @@ check(`Feed screen: every picture sends no referrer to Meta (${imgs.length} <img
 check("Feed screen: dates are D/M/Y (lib/marketing/format)", /from "@\/lib\/marketing\/format"/.test(fs) && !/toLocale(Date)?String\(/.test(fs));
 check("Feed screen: side-by-side columns are chosen in CSS by the number of accounts",
   /2: \{ chips: "@\[36rem\]:hidden", others: "@max-\[36rem\]:hidden", grid: "@\[36rem\]:grid-cols-2" \}/.test(fs));
+
+/* ── 7. The composer ── */
+console.log("\n7. The composer");
+const pm = code("src/lib/permission-modules.ts");
+check("«Social Marketing Approvals» is a Roles capability under Social Marketing (closed by default)",
+  /export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";/.test(pm) && /\{ name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" \},/.test(pm));
+const ap = code(APPROVALS);
+check("an approver = a super admin, or the capability — company space only; CEO Brand = super admins",
+  /if \(auth\.is_super_admin\) return true;/.test(ap) && /if \(space !== "company"\) return false;/.test(ap) &&
+  /return \(await requireModuleAccess\(auth, SOCIAL_APPROVALS_MODULE\)\) === null;/.test(ap) && !/department|dept/i.test(ap));
+const gt = code(GATE);
+const gateFn = gt.slice(gt.indexOf("export async function gatePost"), gt.indexOf("export function reply"));
+check("the posts door: signed in → valid id → this tenant's post → the action on the POST's space → approver",
+  gateFn.indexOf("requireAuth(req ?? undefined)") > -1 &&
+  gateFn.indexOf("requireAuth(req ?? undefined)") < gateFn.indexOf("postMeta(auth.tenant_id, id)") &&
+  gateFn.indexOf("postMeta(auth.tenant_id, id)") < gateFn.indexOf("requireModuleAction(auth, SPACE_MODULE[post.space], action)") &&
+  gateFn.indexOf("requireModuleAction(auth, SPACE_MODULE[post.space], action)") < gateFn.indexOf("canApprovePosts(auth, post.space)"));
+/* Each [id] route: which action it opens with, and whether it needs an approver. */
+const ROUTES: Array<{ file: string; fn: string; action: string; approver: boolean; mutation: RegExp }> = [
+  { file: `${POSTS_DIR}/[id]/route.ts`, fn: "GET", action: "view", approver: false, mutation: /loadPost\(/ },
+  { file: `${POSTS_DIR}/[id]/route.ts`, fn: "PATCH", action: "edit", approver: false, mutation: /updatePost\(/ },
+  { file: `${POSTS_DIR}/[id]/route.ts`, fn: "DELETE", action: "delete", approver: false, mutation: /deletePost\(/ },
+  { file: `${POSTS_DIR}/[id]/submit/route.ts`, fn: "POST", action: "edit", approver: false, mutation: /submitPost\(/ },
+  { file: `${POSTS_DIR}/[id]/approve/route.ts`, fn: "POST", action: "edit", approver: true, mutation: /approvePost\(/ },
+  { file: `${POSTS_DIR}/[id]/reject/route.ts`, fn: "POST", action: "edit", approver: true, mutation: /rejectPost\(/ },
+  { file: `${POSTS_DIR}/[id]/publish/route.ts`, fn: "POST", action: "edit", approver: false, mutation: /publishPost\(|retryFailed\(/ },
+  { file: `${POSTS_DIR}/[id]/targets/[targetId]/shared/route.ts`, fn: "POST", action: "edit", approver: false, mutation: /markShared\(/ },
+];
+for (const r of ROUTES) {
+  const src = code(r.file);
+  const start = src.indexOf(`export async function ${r.fn}(`);
+  const end = src.indexOf("export async function", start + 10);
+  const body = start < 0 ? "" : src.slice(start, end < 0 ? undefined : end);
+  const door = body.indexOf(`gatePost(${r.fn === "GET" ? "null" : "req"}, id, "${r.action}")`);
+  const act = body.search(r.mutation);
+  const appr = body.indexOf("if (!g.approver) return notApprover();");
+  check(`${r.file.replace(POSTS_DIR, "posts")} ${r.fn}: the door ("${r.action}") before anything${r.approver ? ", then the approver" : ""}`,
+    door > -1 && act > door && (!r.approver || (appr > door && appr < act)));
+}
+const pubRoute = code(`${POSTS_DIR}/[id]/publish/route.ts`);
+check("publish: trying the failed accounts again is for approvers only",
+  /if \(body\.retry === true\) \{\s*if \(!g\.approver\) return notApprover\(\);/.test(pubRoute));
+check("approve and publish have 60 s; the approver's own approval is what publishes",
+  /export const maxDuration = 60;/.test(code(`${POSTS_DIR}/[id]/approve/route.ts`)) && /export const maxDuration = 60;/.test(pubRoute) &&
+  before(code(`${POSTS_DIR}/[id]/approve/route.ts`), "approvePost(", "publishPost("));
+const listRt = code(`${POSTS_DIR}/route.ts`);
+check("posts list: 'view' before reading; new post: signed-in POST, 'create' before writing",
+  before(listRt, 'requireModuleAction(auth, SPACE_MODULE[space], "view")', "listPosts(") &&
+  /requireAuth\(req\)/.test(listRt.slice(listRt.indexOf("export async function POST"))) &&
+  before(listRt, 'requireModuleAction(auth, SPACE_MODULE[space], "create")', "createPost("));
+const po = code(POSTS);
+const tr = po.slice(po.indexOf("async function transition"), po.indexOf("async function readyToGo"));
+const upd = po.slice(po.indexOf("export async function updatePost"), po.indexOf("async function transition"));
+const del = po.slice(po.indexOf("export async function deletePost"), po.indexOf("export async function postMeta"));
+check("every person-made change is conditional on the version it read, and bumps it",
+  /\.eq\("version", version\)/.test(tr) && /version: version \+ 1/.test(tr) &&
+  /\.eq\("version", version\)/.test(upd) && /version: version \+ 1/.test(upd) && /\.eq\("version", version\)/.test(del));
+check("only drafts, posts in review and posts sent back can be edited or deleted",
+  /export const EDITABLE: readonly PostStatus\[\] = \["draft", "in_review", "rejected"\];/.test(po) &&
+  /\.in\("status", EDITABLE as PostStatus\[\]\)/.test(upd) && /\.in\("status", EDITABLE as PostStatus\[\]\)/.test(del));
+check("only the author or an approver edits or deletes",
+  /if \(row\.created_by !== who\.accountId && !who\.approver\)/.test(upd) && /if \(row\.created_by !== who\.accountId && !who\.approver\)/.test(del));
+const clean = po.slice(po.indexOf("export function cleanInput"), po.indexOf("async function spaceAccounts"));
+check("pictures: only this tenant's uploads (path prefix, no ..), the link REBUILT from the path",
+  /!path\.startsWith\(pathPrefix\)/.test(clean) && /path\.includes\("\.\."\)/.test(clean) &&
+  /url: `\$\{urlPrefix\}\$\{path\.slice\(pathPrefix\.length\)\}`/.test(clean));
+check("submit and approve refuse a post that cannot go to one of its accounts (422)",
+  /const ready = await readyToGo\(tenantId, row\);/.test(po.slice(po.indexOf("export async function submitPost"), po.indexOf("export async function rejectPost"))) &&
+  /const ready = await readyToGo\(tenantId, row\);/.test(po.slice(po.indexOf("export async function approvePost"), po.indexOf("export async function deletePost"))) &&
+  /status: 422, code: "issues"/.test(po));
+const pb = code(PUBLISH);
+const loop = pb.slice(pb.indexOf("export async function publishPost"), pb.indexOf("export async function markShared"));
+check("publishing: each account is CLAIMED before the first call to Meta",
+  loop.indexOf("if (!(await claim(t))) continue;") > -1 && loop.indexOf("if (!(await claim(t))) continue;") < loop.search(/publishTo(Facebook|Instagram)\(/));
+const claimFn = pb.slice(pb.indexOf("async function claim"), pb.indexOf("async function finishTarget"));
+check("the claim is conditional on the status and lease it read (compare-and-set), with a 90 s lease",
+  /\.eq\("status", t\.status\)/.test(claimFn) && /q\.eq\("next_attempt_at", t\.next_attempt_at\) : q\.is\("next_attempt_at", null\)/.test(claimFn) && /const LEASE_MS = 90_000;/.test(pb));
+check("the platform rules are checked again right before sending", /const issues = targetIssues\(account, body, media\);/.test(loop));
+check("hand-shared accounts are never sent by the Hub", /if \(!account \|\| account\.connection !== "api"\) continue;/.test(loop));
+check("an expired key (190) marks the account expired", /if \(e instanceof MetaError && e\.code === 190\) \{\s*await recordSync\(account\.id, \{ status: "expired"/.test(loop));
+check("a published account goes into the Feed at once, linked to its target", /\.from\("marketing_remote_posts"\)\.upsert\(\{[\s\S]*?target_id: t\.id/.test(loop));
+const mp = code(META_PUBLISH);
+check("meta-publish: every call through metaPost/metaGet (token in the header), never fetch", !/\bfetch\(/.test(mp) && !/access_token/.test(mp) && (mp.match(/metaPost</g) ?? []).length >= 8);
+check("Instagram: a container already PUBLISHED is never published twice", /if \(s\.code === "PUBLISHED"\) \{[\s\S]*?return \{ done: true/.test(mp));
+const rules = code(RULES);
+check("the platform rules are ONE module, used by the composer and by the server",
+  /from "@\/lib\/marketing\/post-rules"/.test(code(COMPOSER)) && /from "@\/lib\/marketing\/post-rules"/.test(po) && /from "@\/lib\/marketing\/post-rules"/.test(pb) &&
+  /export const IG_CAPTION_MAX = 2200;/.test(rules) && /export const IG_RATIO_MIN = 4 \/ 5;/.test(rules) && /export const IG_RATIO_MAX = 1\.91;/.test(rules) &&
+  /export const IMAGE_MIMES = \["image\/jpeg"\] as const;/.test(rules));
+const cp = code(CAPTIONS);
+const cr = code("src/app/api/marketing/captions/route.ts");
+check("captions: internal accounts only, 'create' on the space, before the model is called",
+  before(cr, "requireInternalUser(auth)", "writeCaptions(") && before(cr, 'requireModuleAction(auth, SPACE_MODULE[space], "create")', "writeCaptions("));
+check("captions are public-safe: KOLEEX the only company, no supplier codes, no prices, facts only",
+  /KOLEEX is the ONLY company name allowed/.test(readFileSync(CAPTIONS, "utf8")) && /no prices or discounts/.test(readFileSync(CAPTIONS, "utf8")) && /never invent specifications/.test(readFileSync(CAPTIONS, "utf8")));
+check("captions and the product search read ACTIVE products only, public fields only",
+  (cp.match(/\.eq\("status", "active"\)/g) ?? []).length === 2 && !/cost|price|supplier/i.test(cp.slice(cp.indexOf("export async function productFacts"), cp.indexOf("function factsBlock"))));
+const pr2 = code("src/app/api/marketing/products/route.ts");
+check("the product search: internal accounts, 'view' on the space", /requireInternalUser\(auth\)/.test(pr2) && /requireModuleAction\(auth, SPACE_MODULE\[space\], "view"\)/.test(pr2));
+const cm = code(COMPOSER);
+check("composer: an approver publishes, anyone else sends for approval", /\{approver \? \(/.test(cm) && /void approve\(\)/.test(cm) && /void submit\(\)/.test(cm));
+check("composer: AI buttons wear the AI glow", (readFileSync(COMPOSER, "utf8").match(/kx-ai-glow/g) ?? []).length >= 1 && /kx-ai-glow/.test(readFileSync("src/components/marketing/CaptionAssistant.tsx", "utf8")));
+check("composer: never slides sideways", !/overflow-x-(auto|scroll)/.test(cm) && !/overflow-x-(auto|scroll)/.test(code("src/components/marketing/SocialPosts.tsx")));
+dictionary("src/lib/marketing/posts-i18n.ts", 120);
+check("the Posts tab sits between the Feed and Accounts", /\{ key: SPACE_HOME\[space\][\s\S]*\{ key: SPACE_POSTS\[space\][\s\S]*\{ key: SPACE_ROUTE\[space\]/.test(code("src/components/marketing/MarketingHeader.tsx")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

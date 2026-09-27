@@ -21,6 +21,12 @@ export const SPACE_HOME: Record<MarketingSpace, string> = {
   ceo: "/ceo-brand",
 };
 
+/** Each space's Posts tab (the composer lives under it). */
+export const SPACE_POSTS: Record<MarketingSpace, string> = {
+  company: "/social-marketing/posts",
+  ceo: "/ceo-brand/posts",
+};
+
 /** The accounts page each space returns to after connecting an account. */
 export const SPACE_ROUTE: Record<MarketingSpace, string> = {
   company: "/social-marketing/accounts",

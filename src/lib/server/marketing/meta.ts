@@ -73,7 +73,12 @@ export class MetaError extends Error {
   }
 }
 
-type GraphError = { error?: { message?: string; code?: number } };
+type GraphError = { error?: { message?: string; code?: number; error_user_msg?: string } };
+
+/* Meta's own explanation for a person ("The aspect ratio is not supported")
+   when it gives one, else its technical message. */
+const graphMessage = (e: GraphError["error"], status: number): string =>
+  e?.error_user_msg || e?.message || `Meta answered HTTP ${status}`;
 
 /** One Graph API read. The token goes in the Authorization header, never
  *  in the URL. Shared with lib/server/marketing/meta-feed. */
@@ -84,7 +89,22 @@ export async function metaGet<T>(url: URL | string, token?: string): Promise<T> 
     signal: AbortSignal.timeout(15_000),
   });
   const body = (await res.json().catch(() => ({}))) as T & GraphError;
-  if (!res.ok || body.error) throw new MetaError(body.error?.message ?? `Meta answered HTTP ${res.status}`, body.error?.code ?? null);
+  if (!res.ok || body.error) throw new MetaError(graphMessage(body.error, res.status), body.error?.code ?? null);
+  return body;
+}
+
+/** One Graph API write (publishing): form-encoded, the token in the
+ *  Authorization header — never in the URL or the body. */
+export async function metaPost<T>(url: URL | string, token: string, params: Record<string, string>): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params).toString(),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
+  });
+  const body = (await res.json().catch(() => ({}))) as T & GraphError;
+  if (!res.ok || body.error) throw new MetaError(graphMessage(body.error, res.status), body.error?.code ?? null);
   return body;
 }
 

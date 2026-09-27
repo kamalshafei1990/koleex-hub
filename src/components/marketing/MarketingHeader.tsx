@@ -1,7 +1,7 @@
 "use client";
 
 /* MarketingHeader — the header of a marketing space's screens: its name and
-   the tabs between them (Feed, Accounts). One place for both screens, so
+   the tabs between them (Feed, Posts, Accounts). One place for its screens, so
    their header and tabs never drift apart. Tabs are routes (key = href);
    PageHeader lights the one the address matches. */
 
@@ -11,8 +11,9 @@ import Share2Icon from "@/components/icons/ui/Share2Icon";
 import CrownIcon from "@/components/icons/ui/CrownIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
+import PenSquareIcon from "@/components/icons/ui/PenSquareIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
-import { SPACE_HOME, SPACE_ROUTE, type MarketingSpace } from "@/lib/marketing/spaces";
+import { SPACE_HOME, SPACE_POSTS, SPACE_ROUTE, type MarketingSpace } from "@/lib/marketing/spaces";
 
 const T: Translations = {
   "title.company": { en: "Social Marketing", zh: "社交媒体营销", ar: "التسويق عبر السوشيال ميديا" },
@@ -20,6 +21,7 @@ const T: Translations = {
   "sub.company":   { en: "Koleex's social accounts, their posts and numbers", zh: "Koleex 的社交账号及其帖子和数据", ar: "حسابات كولكس على السوشيال ميديا ومنشوراتها وأرقامها" },
   "sub.ceo":       { en: "The CEO's own social accounts", zh: "CEO 本人的社交账号", ar: "حسابات السوشيال ميديا الخاصة بالمدير التنفيذي" },
   "tab.feed":      { en: "Feed", zh: "动态", ar: "الـFeed" },
+  "tab.posts":     { en: "Posts", zh: "帖子", ar: "المنشورات" },
   "tab.accounts":  { en: "Accounts", zh: "账号", ar: "الحسابات" },
 };
 
@@ -34,6 +36,7 @@ export default function MarketingHeader({ space, action }: { space: MarketingSpa
       action={action}
       tabs={[
         { key: SPACE_HOME[space], label: t("tab.feed"), icon: <LayoutGridIcon size={14} /> },
+        { key: SPACE_POSTS[space], label: t("tab.posts"), icon: <PenSquareIcon size={14} /> },
         { key: SPACE_ROUTE[space], label: t("tab.accounts"), icon: <UsersIcon size={14} /> },
       ]}
     />

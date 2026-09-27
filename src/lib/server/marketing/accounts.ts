@@ -79,6 +79,19 @@ export async function feedAccount(tenantId: string, id: string): Promise<FeedAcc
   return toFeedAccount(row);
 }
 
+/** Every account of a space, removed ones included — a post keeps showing
+ *  the accounts it went to after one is removed. Never the key. */
+export async function allSpaceAccounts(tenantId: string, space: MarketingSpace): Promise<MarketingAccountView[]> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select(VIEW_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .eq("space", space)
+    .limit(200);
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  return (data ?? []) as MarketingAccountView[];
+}
+
 /** Which server settings are in place, as booleans — what the connect card
  *  needs to explain itself. Never the values. */
 export function marketingSetup(): MarketingSetup {
