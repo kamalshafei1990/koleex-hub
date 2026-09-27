@@ -50,24 +50,23 @@ export function Browser({ children, url = "www.koleexgroup.com", w = 520 }: { ch
 /** A social post, drawn at a fixed width and its platform ratio. */
 export function Post({ w = 200, ratio = "4 / 5", bg = INK, children, style }: { w?: number; ratio?: string; bg?: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <div className="relative shrink-0 overflow-hidden rounded-md" style={{ width: w, aspectRatio: ratio, background: bg, boxShadow: "0 0 0 1px rgba(0,0,0,0.12)", ...style }}>
+    <div className="relative shrink-0 overflow-hidden rounded-md ring-1 ring-black/10 dark:ring-white/15" style={{ width: w, aspectRatio: ratio, background: bg, ...style }}>
       {children}
     </div>
   );
 }
 
-/** The KOLEEX post grammar: small label, big headline, image area, logo. */
+/** The KOLEEX post grammar: the logo top-left, small label, big headline,
+ *  image area (owner, 27/09/2026: the logo sits top-left in marketing). */
 export function PostBody({ label, title, dark = true, image = true, foot }: { label: string; title: ReactNode; dark?: boolean; image?: boolean; foot?: ReactNode }) {
   const fg = dark ? "#FFFFFF" : INK;
   return (
     <div className="absolute inset-0 flex flex-col p-[8%]">
-      <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em]" style={{ color: dark ? "#98989D" : "#6E6E73" }}>{label}</p>
+      <Wordmark color={dark ? "#FFFFFF" : "#000000"} width="34%" />
+      <p className="mt-[9%] text-[6.5px] font-semibold uppercase tracking-[0.2em]" style={{ color: dark ? "#98989D" : "#6E6E73" }}>{label}</p>
       <p className="mt-1.5 text-[13px] font-semibold leading-[1.15]" style={{ color: fg }}>{title}</p>
-      {image ? <div className="my-2.5 flex-1 rounded" style={{ background: dark ? "#1D1D1F" : "#F5F5F7" }} /> : <div className="flex-1" />}
-      <div className="flex items-center justify-between">
-        <Wordmark color={dark ? "#FFFFFF" : "#000000"} width="34%" />
-        {foot}
-      </div>
+      {image ? <div className="mt-2.5 flex flex-1 items-center justify-center"><MachineShot w="88%" dark={dark} label={false} /></div> : <div className="flex-1" />}
+      {foot && <div className="mt-2.5 flex items-center justify-end">{foot}</div>}
     </div>
   );
 }
@@ -87,20 +86,19 @@ export function BusinessCard({ side, w = 270, name = "Full Name", title = "Job T
   const h = (w * 54) / 90;
   if (side === "front") {
     return (
-      <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[6px]" style={{ width: w, height: h, background: INK, boxShadow: "0 0 0 1px rgba(255,255,255,0.12)" }}>
-        <Wordmark color="#FFFFFF" width="44%" />
-        
+      <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[6px]" style={{ width: w, height: h, background: INK, boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>
+        <Wordmark color="#FFFFFF" width="44%" style={{ filter: "drop-shadow(0 1px 0 rgba(255,255,255,0.3)) drop-shadow(0 -1px 0 rgba(0,0,0,0.9))" }} />
       </div>
     );
   }
   return (
-    <div className="flex shrink-0 flex-col justify-between overflow-hidden rounded-[6px] bg-white text-[#1D1D1F]" style={{ width: w, height: h, padding: w * 0.055, boxShadow: "0 0 0 1px rgba(0,0,0,0.12)" }}>
-      <Wordmark color="#000000" width="28%" />
+    <div className="flex shrink-0 flex-col justify-between overflow-hidden rounded-[6px] text-[#F5F5F7]" style={{ width: w, height: h, padding: w * 0.055, background: INK, boxShadow: "0 0 0 1px rgba(255,255,255,0.14)" }}>
+      <Wordmark color="#FFFFFF" width="28%" />
       <div>
         <p className="font-semibold" style={{ fontSize: w * 0.047 }}>{name}</p>
-        <p className="text-[#6E6E73]" style={{ fontSize: w * 0.034 }}>{title}</p>
+        <p className="text-[#98989D]" style={{ fontSize: w * 0.034 }}>{title}</p>
       </div>
-      <div className="leading-[1.5] text-[#1D1D1F]" style={{ ...MONO, fontSize: w * 0.029 }}>
+      <div className="leading-[1.5] text-[#F5F5F7]" style={{ ...MONO, fontSize: w * 0.029 }}>
         <p>M {KOLEEX_COMPANY.mobile} · WhatsApp</p>
         <p>{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</p>
       </div>
@@ -266,9 +264,10 @@ export function Avatar({ size = 40, light = false }: { size?: number; light?: bo
 
 /* ── The machine, standing in for a studio photograph ──────────────────── */
 
-/* The silver finish, lit from above (SILVER.cssFinish as SVG stops). */
-const FINISH_DARK: Array<[number, string]> = [[0, "#D1D1D6"], [0.22, "#FFFFFF"], [0.55, "#C7C7CC"], [1, "#8E8E93"]];
-const FINISH_LIGHT: Array<[number, string]> = [[0, "#C7C7CC"], [1, "#8E8E93"]];
+/* The KOLEEX white body (owner, 27/09/2026), lit from above: bright on
+   black, soft gray shading on white. */
+const FINISH_DARK: Array<[number, string]> = [[0, "#FFFFFF"], [0.35, "#F5F5F7"], [0.7, "#E8E8ED"], [1, "#C7C7CC"]];
+const FINISH_LIGHT: Array<[number, string]> = [[0, "#FFFFFF"], [0.5, "#F2F2F5"], [1, "#D1D1D6"]];
 const FINISH_GRAPHITE: Array<[number, string]> = [[0, "#636366"], [0.3, "#3A3A3C"], [1, "#1D1D1F"]];
 
 /** An industrial machine head in side view, designed at 400 × 210. */
@@ -287,13 +286,13 @@ function MachineShape({ fill }: { fill: string }) {
 }
 
 /** Where a real studio photograph of the machine goes. Until the photo
- *  shoot, the book shows the machine as a silver shape: on pure black with
- *  a top light (heroes, ads) or grey on pure white (catalog, website) — the
+ *  shoot, the book shows the white KOLEEX machine as a shape: on pure black with
+ *  a top light (heroes, ads) or softly shaded on pure white (catalog, website) — the
  *  two backgrounds the owner chose (27/09/2026). */
-export function MachineShot({ w = 320, dark = true, label = true, logo = true, body = "silver", logoColor, children, style }: {
+export function MachineShot({ w = 320, dark = true, label = true, logo = true, body = "white", logoColor, children, style }: {
   w?: number | string; dark?: boolean; label?: boolean; logo?: boolean;
   /** "graphite" = a machine with a dark body (white logo). */
-  body?: "silver" | "graphite"; logoColor?: string; children?: ReactNode; style?: CSSProperties;
+  body?: "white" | "graphite"; logoColor?: string; children?: ReactNode; style?: CSSProperties;
 }) {
   const id = body === "graphite" ? "kx-finish-g" : dark ? "kx-finish-d" : "kx-finish-l";
   const stops = body === "graphite" ? FINISH_GRAPHITE : dark ? FINISH_DARK : FINISH_LIGHT;
@@ -307,7 +306,7 @@ export function MachineShot({ w = 320, dark = true, label = true, logo = true, b
         </defs>
       </svg>
       <div className="relative">
-        <MachineShape fill={`url(#${id})`} />
+        <div style={dark || body === "graphite" ? undefined : { filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.14))" }}><MachineShape fill={`url(#${id})`} /></div>
         {logo && (
           <span className="absolute" style={{ left: "37.5%", top: "27.5%", width: "28%" }}>
             <Wordmark color={logoColor ?? (body === "graphite" ? "#FFFFFF" : "#1D1D1F")} width="100%" />

@@ -45,23 +45,23 @@ function Nameplate({ ce = true }: { ce?: boolean }) {
     ["Year", "2026"],
   ];
   return (
-    <div className="relative rounded-[6px] p-3 text-[#1D1D1F]" style={{ width: 240, height: 150, background: "#D2D2D7", boxShadow: "inset 0 0 0 1px #98989D" }}>
+    <div className="relative rounded-[6px] p-3 text-[#F5F5F7]" style={{ width: 240, height: 150, background: "#1D1D1F", boxShadow: "inset 0 0 0 1px #3A3A3C" }}>
       {[[6, 6], [226, 6], [6, 136], [226, 136]].map(([l, t]) => (
-        <span key={`${l}-${t}`} className="absolute h-[8px] w-[8px] rounded-full" style={{ left: l, top: t, background: "#D1D1D6", boxShadow: "inset 0 0 0 1px #98989D" }} />
+        <span key={`${l}-${t}`} className="absolute h-[8px] w-[8px] rounded-full" style={{ left: l, top: t, background: "#3A3A3C", boxShadow: "inset 0 0 0 1px #48484A" }} />
       ))}
       <div className="flex items-center justify-between px-1">
-        <Wordmark color="#000000" width={72} />
-        {ce && <span className="rounded-[2px] border border-dashed border-[#6E6E73] px-1 text-[7px] font-bold text-[#6E6E73]">CE</span>}
+        <Wordmark color="#FFFFFF" width={72} />
+        {ce && <span className="rounded-[2px] border border-dashed border-[#98989D] px-1 text-[7px] font-bold text-[#98989D]">CE</span>}
       </div>
       <div className="mt-2 space-y-[2px] px-1">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between border-b border-[#D1D1D6] pb-[1px] text-[7.5px]">
-            <span className="font-semibold uppercase tracking-[0.06em] text-[#6E6E73]">{k}</span>
+          <div key={k} className="flex justify-between border-b border-[#3A3A3C] pb-[1px] text-[7.5px]">
+            <span className="font-semibold uppercase tracking-[0.06em] text-[#98989D]">{k}</span>
             <span style={MONO}>{v}</span>
           </div>
         ))}
       </div>
-      <p className="mt-1.5 px-1 text-[5.6px] leading-[1.3] text-[#1D1D1F]">{KOLEEX_COMPANY.en} · Taizhou, Zhejiang, China · MADE IN CHINA</p>
+      <p className="mt-1.5 px-1 text-[5.6px] leading-[1.3] text-[#D1D1D6]">{KOLEEX_COMPANY.en} · Taizhou, Zhejiang, China · MADE IN CHINA</p>
     </div>
   );
 }
@@ -77,10 +77,20 @@ function Handling({ kind, size = 22, color = INK }: { kind: "up" | "dry" | "frag
   );
 }
 
-function Carton({ w = 280, children }: { w?: number; children: ReactNode }) {
+/** The three KOLEEX cartons (owner, 27/09/2026): which one a model ships in
+ *  depends on the product. Same grammar on all three. */
+type CartonTone = "kraft" | "white" | "black";
+const CARTON: Record<CartonTone, { bg: string; ink: string; edge: string }> = {
+  kraft: { bg: "#C9A67A", ink: "#000000", edge: "rgba(0,0,0,0.18)" },
+  white: { bg: "#F5F5F7", ink: "#000000", edge: "rgba(0,0,0,0.14)" },
+  black: { bg: "#1D1D1F", ink: "#FFFFFF", edge: "rgba(255,255,255,0.12)" },
+};
+
+function Carton({ w = 280, tone = "black", children }: { w?: number; tone?: CartonTone; children: ReactNode }) {
+  const c = CARTON[tone];
   return (
-    <div className="relative overflow-hidden rounded-[3px] p-3 text-[#1D1D1F]" style={{ width: w, aspectRatio: "60 / 40", background: "#C9A67A", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.18)" }}>
-      <div className="absolute inset-x-0 top-[46%] h-[10px]" style={{ background: "rgba(0,0,0,0.06)" }} />
+    <div className="relative overflow-hidden rounded-[3px] p-3" style={{ width: w, aspectRatio: "60 / 40", background: c.bg, color: c.ink, boxShadow: `inset 0 0 0 1px ${c.edge}` }}>
+      <div className="absolute inset-x-0 top-[46%] h-[10px]" style={{ background: "#000000" }} />
       {children}
     </div>
   );
@@ -102,7 +112,7 @@ export function MachineBranding() {
         { id: "rule", title: "The rule" },
         { id: "where", title: "Where the brand goes" },
         { id: "specs", title: "Specifications" },
-        { id: "bodies", title: "Light and dark bodies" },
+        { id: "bodies", title: "The KOLEEX white" },
         { id: "never", title: "What never to do" },
       ]}
     >
@@ -138,7 +148,8 @@ export function MachineBranding() {
       <Section id="specs" title="Specifications">
         <Specs rows={[
           ["Logo width on the arm", "60–90 mm, by the size of the head; never below 20 mm (ch. 38)"],
-          ["Logo color", "Black on light bodies, white on dark bodies — one flat color"],
+          ["Body color", "White — every KOLEEX machine (proposal: RAL 9016 traffic white, confirmed on a painted sample)"],
+          ["Logo color", "Black on the white body — one flat color"],
           ["Method", "Pad print or screen print on the casting; a durable decal only where printing is not possible"],
           ["Durability test", "Rub 20 times with a cloth soaked in sewing-machine oil: the logo must not fade, smear or lift"],
           ["Model name", "Inter SemiBold, capitals, in the same color as the logo, 4–6 mm tall"],
@@ -147,12 +158,16 @@ export function MachineBranding() {
         <Note>How to name models is set in <Ref n={17} />. Until then, use the model name exactly as it is written in Koleex Hub.</Note>
       </Section>
 
-      <Section id="bodies" title="Light and dark bodies">
+      <Section id="bodies" title="The KOLEEX white">
+        <Rule why="One color across the whole range makes a line of machines on a factory floor read as KOLEEX from the door — before anyone sees a logo.">
+          Every KOLEEX machine body is white, with the logo in black. Until a model can be ordered in white, it
+          takes the factory’s lightest gray — never a color. A black body is only for special editions (ch. 47).
+        </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="Light body — black logo." bg="#FFFFFF" h={200}>
+          <Example tone="do" caption="White body — black logo." bg="#F5F5F7" h={200}>
             <MachineShot w={260} dark={false} label={false} />
           </Example>
-          <Example tone="do" caption="Dark body — white logo." bg="#FFFFFF" h={200}>
+          <Example tone="dont" caption="Colored bodies, or mixed colors in one range." bg="#FFFFFF" h={200}>
             <MachineShot w={260} dark={false} label={false} body="graphite" />
           </Example>
         </Examples>
@@ -247,7 +262,9 @@ export function Nameplates() {
       <Section id="plate-specs" title="Specifications">
         <Specs rows={[
           ["Size", "80 × 50 mm on machine heads; 60 × 40 mm on small machines"],
-          ["Material", "Aluminum 0.5 mm, black print or etching; riveted, or bonded with industrial adhesive"],
+          ["Material", "Black anodized aluminum, 0.8 mm; logo and text laser-engraved — they read white"],
+          ["Fixing", "Four rivets, or bonded with industrial adhesive where rivets are not possible"],
+          ["On a black machine", "The second version: white plate, black print (ch. 47)"],
           ["Serial label", "50 × 20 mm polyester, thermal-transfer print, Code 128 barcode"],
           ["Type", "Inter; the logo from the master file (ch. 136)"],
           ["Position", "Back or side of the pillar; readable when the machine stands on its table"],
@@ -357,7 +374,8 @@ export function Cartons() {
       lead={
         <p>
           A carton is the first KOLEEX object a customer’s warehouse sees. It travels through ports, trucks and
-          other people’s hands, so it is simple, strong and honest: brown board, black print, clear marks.
+          other people’s hands, so it is simple, strong and clear. KOLEEX has three cartons — one grammar, chosen
+          by the product.
         </p>
       }
       toc={[
@@ -368,20 +386,28 @@ export function Cartons() {
       ]}
     >
       <Section id="carton" title="The carton">
-        <Examples cols={2}>
-          <Example tone="do" caption="Long side: the logo, the machine kind, handling symbols." bg="#F5F5F7" h={220}>
-            <Carton w={260}>
-              <div className="relative flex h-full flex-col justify-between">
-                <Wordmark color="#000000" width={96} />
-                <div className="flex items-end justify-between">
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.1em]"><FlatBedMachineIcon size={16} />Machine head</span>
-                  <span className="flex gap-1"><Handling kind="up" /><Handling kind="dry" /><Handling kind="fragile" /></span>
+        <Rule why="Different products travel and are seen differently — a head in a container, a small machine on a dealer’s shelf, a flagship at a fair. One grammar keeps all three KOLEEX.">
+          Each product ships in one of three KOLEEX cartons — kraft, white or black. The carton is set per model
+          in its packing data in Koleex Hub and never changes between shipments of that model.
+        </Rule>
+        <Examples cols={3}>
+          {([["kraft", "Kraft — black print."], ["white", "White — black print."], ["black", "Black — white print."]] as Array<[CartonTone, string]>).map(([t, cap]) => (
+            <Example key={t} tone="do" caption={cap} bg="#F5F5F7" h={170}>
+              <Carton w={200} tone={t}>
+                <div className="relative flex h-full flex-col justify-between">
+                  <Wordmark color={CARTON[t].ink} width={76} />
+                  <div className="flex items-end justify-between">
+                    <span className="inline-flex items-center gap-1 text-[7px] font-bold uppercase tracking-[0.1em]"><FlatBedMachineIcon size={12} />Machine head</span>
+                    <span className="flex gap-0.5"><Handling kind="up" size={16} color={CARTON[t].ink} /><Handling kind="dry" size={16} color={CARTON[t].ink} /><Handling kind="fragile" size={16} color={CARTON[t].ink} /></span>
+                  </div>
                 </div>
-              </div>
-            </Carton>
-          </Example>
+              </Carton>
+            </Example>
+          ))}
+        </Examples>
+        <Examples cols={2}>
           <Example tone="do" caption="Short side: the shipping marks (ch. 111)." bg="#F5F5F7" h={220}>
-            <div className="relative overflow-hidden rounded-[3px] p-3 text-[#1D1D1F]" style={{ width: 170, aspectRatio: "40 / 40", background: "#C9A67A", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.18)" }}>
+            <div className="relative overflow-hidden rounded-[3px] p-3 text-[#F5F5F7]" style={{ width: 170, aspectRatio: "40 / 40", background: "#1D1D1F", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)" }}>
               <div className="space-y-[1px] text-[9px] font-bold leading-tight" style={MONO}>
                 <p>ABC</p><p>ALEXANDRIA</p><p>KL-IN-12349</p><p>C/NO. 3/12</p><p>MADE IN CHINA</p>
               </div>
@@ -413,12 +439,16 @@ export function Cartons() {
 
       <Section id="carton-specs" title="Specifications">
         <Specs rows={[
-          ["Board", "Brown corrugated, 5-ply for machine heads and tables, 3-ply for small items"],
-          ["Print", "One color, black flexo — no full-color printing on shipping cartons"],
+          ["Kraft", "Brown corrugated, black flexo print"],
+          ["White", "White-top corrugated, black flexo print"],
+          ["Black", "Black kraft liner (or white-top flooded black), white print"],
+          ["Strength", "5-ply for machine heads and tables, 3-ply for small items — whichever carton"],
+          ["Print", "One color only — no full-color printing on shipping cartons"],
           ["Logo", "On both long sides, about one third of the side’s width, never below 80 mm"],
-          ["Handling symbols", "ISO 780: this way up, keep dry, fragile — official artwork, black"],
+          ["Handling symbols", "ISO 780: this way up, keep dry, fragile — official artwork, in the print color"],
           ["Crates", "Heat-treated wood with the ISPM 15 stamp; logo stenciled in black, at least 200 mm wide"],
-          ["Tape", "Plain brown or clear — or KOLEEX tape: the black logo repeated on white"],
+          ["Tape", "KOLEEX tape on all three: black, the white logo repeated"],
+          ["Labels", "Shipping labels stay white with black print, so every scanner reads them (ch. 111)"],
         ]} />
       </Section>
 
@@ -538,11 +568,13 @@ export function SparePartsPackaging() {
                 </div>
               </div>
             </div>
-            <div className="flex w-[140px] flex-col items-center justify-center gap-2 rounded-[3px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "1 / 1" }}>
-              <Wordmark color="#000000" width={80} />
-              <p className="text-[7px] font-semibold uppercase tracking-[0.14em] text-[#6E6E73]">Service kit</p>
-              <OverlockMachineIcon size={26} />
-            </div>
+            {([["#000000", "#FFFFFF", "#98989D", "rgba(255,255,255,0.14)"], ["#FFFFFF", "#000000", "#6E6E73", "rgba(0,0,0,0.12)"]] as const).map(([bg, ink, dim, edge]) => (
+              <div key={bg} className="flex w-[130px] flex-col items-center justify-center gap-2 rounded-[3px] p-3" style={{ aspectRatio: "1 / 1", background: bg, color: ink, boxShadow: `0 0 0 1px ${edge}` }}>
+                <Wordmark color={ink} width={76} />
+                <p className="text-[7px] font-semibold uppercase tracking-[0.14em]" style={{ color: dim }}>Service kit</p>
+                <OverlockMachineIcon size={24} />
+              </div>
+            ))}
           </div>
         </Stage>
       </Section>
@@ -550,7 +582,7 @@ export function SparePartsPackaging() {
       <Section id="part-specs" title="Specifications">
         <Specs rows={[
           ["Bags", "Clear PE with a white 60 × 40 mm label"],
-          ["Boxes", "White or brown board, one-color black print, the full logo"],
+          ["Boxes", "Black (white logo) or white (black logo) — set per product in Koleex Hub; the white part label carries the data and the barcode"],
           ["Mark on the label", "The full logo, 30 mm wide across the top of the label (ch. 41)"],
           ["Part number", "The KOLEEX part number from Koleex Hub; never a supplier’s code on the outside"],
           ["Fits", "The KOLEEX models the part fits, by their names in Koleex Hub"],
@@ -570,7 +602,7 @@ export function Manuals() {
       lead={
         <p>
           The manual is read when something needs doing — setting up, threading, fixing. It is clear before it
-          is beautiful: safety first, flat technical drawings, short steps, the reader’s language.
+          is beautiful: safety first, photographs with numbered parts, short steps, the reader’s language.
         </p>
       }
       toc={[
@@ -582,17 +614,19 @@ export function Manuals() {
       <Section id="manual" title="The manual">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-start justify-center gap-5">
-            <div className="relative w-[150px] overflow-hidden rounded-[3px] bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "148 / 210" }}>
-              <div className="absolute inset-3 flex flex-col">
-                <Wordmark color="#000000" width={52} />
-                <div className="mt-auto">
-                  <FlatBedMachineIcon size={34} />
-                  <p className="mt-2 text-[12px] font-bold leading-tight">Model name</p>
-                  <p className="text-[7px] text-[#6E6E73]">Instruction Manual</p>
-                  <p className="mt-2 text-[6px] tracking-[0.1em] text-[#6E6E73]">EN · <span lang="ar">العربية</span> · <span lang="zh-Hans">中文</span></p>
+            {([["#000000", "#FFFFFF", "#98989D", true], ["#FFFFFF", "#000000", "#6E6E73", false], ["#F5F5F7", "#000000", "#6E6E73", false]] as const).map(([bg, ink, dim, dark]) => (
+              <div key={bg} className="relative w-[130px] overflow-hidden rounded-[3px]" style={{ aspectRatio: "148 / 210", background: bg, color: ink, boxShadow: dark ? "0 0 0 1px rgba(255,255,255,0.14)" : "0 0 0 1px rgba(0,0,0,0.12)" }}>
+                <div className="absolute inset-3 flex flex-col">
+                  <Wordmark color={ink} width={48} />
+                  <div className="mt-auto">
+                    <MachineShot w="100%" dark={dark} label={false} />
+                    <p className="mt-2 text-[11px] font-semibold leading-tight">Model name</p>
+                    <p className="text-[7px]" style={{ color: dim }}>Instruction Manual</p>
+                    <p className="mt-2 text-[6px] tracking-[0.1em]" style={{ color: dim }}>EN · <span lang="ar">العربية</span> · <span lang="zh-Hans">中文</span></p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ))}
             <div className="relative w-[150px] overflow-hidden rounded-[3px] bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "148 / 210" }}>
               <div className="absolute inset-3 flex flex-col text-[6px]">
                 <p className="text-[9px] font-bold">1 · Safety first</p>
@@ -601,7 +635,11 @@ export function Manuals() {
                   <p className="leading-tight">Switch off before threading the needle or changing parts.</p>
                 </div>
                 <p className="mt-2 text-[9px] font-bold">2 · Threading</p>
-                <div className="mt-1 flex h-[38%] items-center justify-center rounded-[2px] bg-[#F5F5F7]"><FlatBedMachineIcon size={46} /></div>
+                <div className="relative mt-1 flex h-[38%] items-center justify-center rounded-[2px] bg-[#F5F5F7] px-2">
+                  <MachineShot w="100%" dark={false} label={false} logo={false} />
+                  <span className="absolute left-[22%] top-[18%] flex h-3 w-3 items-center justify-center rounded-full bg-white text-[6px] font-semibold text-black shadow-[0_0_0_1px_rgba(0,0,0,0.5)]">1</span>
+                  <span className="absolute left-[58%] top-[30%] flex h-3 w-3 items-center justify-center rounded-full bg-white text-[6px] font-semibold text-black shadow-[0_0_0_1px_rgba(0,0,0,0.5)]">2</span>
+                </div>
                 <div className="mt-1.5"><Lines n={3} /></div>
                 <p className="mt-auto text-end text-[#98989D]">4</p>
               </div>
@@ -609,9 +647,9 @@ export function Manuals() {
           </div>
         </Stage>
         <Bullets items={[
-          <>Drawings are flat line drawings (<Ref n={60} />); photographs only where a drawing cannot show it.</>,
+          <>Photographs, not drawings: the machine with numbered parts, and a close-up for every step (<Ref n={60} />).</>,
           "Safety comes first, in the same words as the labels on the machine (ch. 109).",
-          "One step, one sentence, one drawing. Numbers on the drawing match the numbers in the text.",
+          "One step, one sentence, one photograph. Numbers on the photograph match the numbers in the text.",
           "English, plus the language of the market — never a machine translation that has not been checked (ch. 30).",
           "Never a supplier’s manual with our logo pasted over theirs.",
         ]} />
@@ -645,7 +683,8 @@ export function Manuals() {
 
       <Section id="manual-specs" title="Specifications">
         <Specs rows={[
-          ["Manual", "A5 148 × 210 mm, saddle-stitched, uncoated 100 g/m² inside, 250 g/m² cover, black print"],
+          ["Manual", "A5 148 × 210 mm, saddle-stitched; cover 250 g/m², uncoated 100 g/m² inside"],
+          ["Cover", "Black, white or Cloud gray, with the machine — set per product in Koleex Hub, the same for every manual of that model"],
           ["Digital copy", "PDF with the same pages, linked by a QR code on the cover and on the machine"],
           ["Warranty card", "A6 148 × 105 mm, 300 g/m² uncoated card"],
           ["Type", "Inter 9/13 pt for steps; the Arabic and Chinese faces of ch. 52–53"],

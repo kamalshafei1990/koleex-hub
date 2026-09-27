@@ -81,7 +81,7 @@ export function PhotoPrinciples() {
           <Example tone="do" caption="First: pure black, one light from above — heroes, ads, launches." bg="#000000" h={260}><MachineShot w={300} /></Example>
           <Example tone="do" caption="Second: pure white, soft even light — catalog, website, spec sheets." bg="#FFFFFF" h={260}><MachineShot w={300} dark={false} /></Example>
         </Examples>
-        <Note>Until the studio shoot, the book shows the machine as a silver shape. Every place it appears is a place for a real KOLEEX photograph.</Note>
+        <Note>Until the studio shoot, the book shows the white KOLEEX machine as a simple shape. Every place it appears is a place for a real KOLEEX photograph.</Note>
       </Section>
 
       <Section id="five" title="Five principles">
@@ -379,9 +379,9 @@ export function PeoplePhoto() {
 
       <Section id="portraits" title="Team portraits">
         <Examples cols={2}>
-          <Example tone="do" caption="Plain light background, soft side light, shoulders up, level eyes." bg="#F5F5F7" h={200}>
-            <div className="flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md bg-[#D2D2D7] shadow-[0_0_0_1px_rgba(0,0,0,0.1)]">
-              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full bg-[#6E6E73]" /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1D1D1F]" /></div>
+          <Example tone="do" caption="Black background, soft light from above, shoulders up, level eyes." bg="#F5F5F7" h={200}>
+            <div className="flex h-[170px] w-[136px] items-end justify-center overflow-hidden rounded-md shadow-[0_0_0_1px_rgba(0,0,0,0.1)]" style={{ background: "radial-gradient(90% 70% at 50% 10%, #3A3A3C 0%, #000000 70%)" }}>
+              <div className="flex flex-col items-center"><div className="h-14 w-14 rounded-full" style={{ background: "linear-gradient(180deg,#D1D1D6,#8E8E93)" }} /><div className="mt-1 h-16 w-28 rounded-t-[48px] bg-[#1D1D1F]" /></div>
             </div>
           </Example>
           <Example tone="dont" caption="Busy background, harsh flash, cropped at an angle." bg="#F5F5F7" h={200}>
@@ -391,8 +391,8 @@ export function PeoplePhoto() {
           </Example>
         </Examples>
         <Specs rows={[
-          ["Background", "Plain white wall, or black for the founder and leadership portraits"],
-          ["Light", "Soft side light; no flash"],
+          ["Background", "Black for everyone — the same as the machine photos; plain white is the second version (ch. 47)"],
+          ["Light", "Soft light from above and a little to the side, like the machine hero shots; no flash"],
           ["Crop", "Shoulders up, 4 : 5, eyes on the upper third"],
           ["Clothes", "KOLEEX uniform or plain dark clothing; no large logos"],
           ["Color", "Cool and muted — lower saturation, clean skin tones. A series may be black and white — never mixed on one page"],

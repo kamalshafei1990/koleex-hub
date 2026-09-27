@@ -14,19 +14,24 @@ import {
 } from "../kit";
 import { Wordmark } from "../marks";
 import { INK, Post } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 /* ── The badge ─────────────────────────────────────────────────────────── */
 
 /** "Authorized KOLEEX Distributor" — the one mark a partner may show. */
-function PartnerBadge({ role = "Distributor", place = "Country", dark = false, w = 220 }: { role?: string; place?: string; dark?: boolean; w?: number }) {
+/** The badge is black with a silver frame and silver words (owner,
+ *  27/09/2026); the year is renewed every year. The white version is the
+ *  second version (ch. 47). */
+function PartnerBadge({ role = "Distributor", place = "Country", dark = true, w = 220, year = "2026" }: { role?: string; place?: string; dark?: boolean; w?: number; year?: string }) {
   const fg = dark ? "#FFFFFF" : INK;
+  const silverText = { backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } as const;
   return (
-    <div className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px]" style={{ padding: w * 0.06, gap: w * 0.06, background: dark ? INK : "#FFFFFF", boxShadow: dark ? "inset 0 0 0 1px rgba(255,255,255,0.3)" : `inset 0 0 0 1.5px ${INK}` }}>
+    <div className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px]" style={{ padding: w * 0.06, gap: w * 0.06, background: dark ? INK : "#FFFFFF", boxShadow: dark ? "inset 0 0 0 1.5px #AEAEB2" : `inset 0 0 0 1.5px ${INK}` }}>
       <Wordmark color={fg} width={w * 0.36} />
-      <span className="self-stretch" style={{ width: 1, background: dark ? "#6E6E73" : "#98989D" }} />
+      <span className="self-stretch" style={{ width: 1, background: dark ? SILVER.css : "#98989D" }} />
       <span className="flex flex-col" style={{ gap: w * 0.012 }}>
-        <span className="font-semibold uppercase" style={{ color: dark ? "#98989D" : "#6E6E73", fontSize: w * 0.04, letterSpacing: "0.18em" }}>Authorized</span>
-        <span className="font-bold uppercase" style={{ color: fg, fontSize: w * 0.052, letterSpacing: "0.08em" }}>{role}</span>
+        <span className="font-semibold uppercase" style={{ ...(dark ? silverText : { color: "#6E6E73" }), fontSize: w * 0.04, letterSpacing: "0.18em" }}>Authorized · {year}</span>
+        <span className="font-bold uppercase" style={{ ...(dark ? silverText : { color: fg }), fontSize: w * 0.052, letterSpacing: "0.08em" }}>{role}</span>
         <span className="font-medium" style={{ color: dark ? "#98989D" : "#6E6E73", fontSize: w * 0.042 }}>{place}</span>
       </span>
     </div>
@@ -66,11 +71,11 @@ export function Agents() {
           ours, and never by calling itself KOLEEX.
         </Rule>
         <Examples cols={2}>
-          <Example tone="do" caption="Light version — for windows, documents, websites." bg="#FFFFFF" h={150}>
+          <Example tone="do" caption="The badge — black, a silver frame and silver words, with the year. Renewed every year." bg="#F5F5F7" h={150}>
             <PartnerBadge place="Country" />
           </Example>
-          <Example tone="do" caption="Dark version — for dark backgrounds and signs." bg="#000000" h={150}>
-            <PartnerBadge role="Agent" place="City, Country" dark />
+          <Example tone="do" caption="The white version — where the badge sits on black would not work (ch. 47)." bg="#FFFFFF" h={150}>
+            <PartnerBadge role="Agent" place="City, Country" dark={false} />
           </Example>
         </Examples>
         <Specs rows={[
@@ -164,7 +169,7 @@ export function DealerSignage() {
         <Specs rows={[
           ["Window decal", "Authorized badge, 300–400 mm wide, cut vinyl, at eye height near the door"],
           ["Fascia", "The dealer’s own name; KOLEEX only with our written approval, and never larger than the dealer’s name"],
-          ["Light box", "Optional: the badge in a white-face light box, 600 × 300 mm"],
+          ["Lit sign", "Optional: halo-lit letters, white light only (ch. 39) — no light boxes"],
         ]} />
       </Section>
 

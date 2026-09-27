@@ -461,6 +461,7 @@ const LISTS: Array<[string, string[]]> = [
   ["Every piece", [
     "The logo is the master file, one flat color, with its clear space (ch. 36–40)",
     "Colors are from the palette; silver as the premium touch, Hub Blue on links and buttons only (ch. 45–47)",
+    "The piece is in its black or its white version — not half and half (ch. 47)",
     "Type is Inter (or the Arabic and Chinese faces) on the type scale (ch. 50–51)",
     "No prices, costs, supplier names, customer names or unannounced plans",
     "Every number and claim has a source (ch. 132)",
@@ -469,7 +470,7 @@ const LISTS: Array<[string, string[]]> = [
     "File named by the rules (ch. 135) and approved (ch. 134)",
   ]],
   ["Social post", [
-    "Made from a post template; logo in its fixed place (ch. 80)",
+    "Made from a post template; the logo top-left, the same on every post (ch. 38, 80)",
     "Headline six words or fewer; caption hook under 80 characters",
     "Right size for the platform (ch. 81–88)",
     "Three to five hashtags; one clear next step",
@@ -482,10 +483,10 @@ const LISTS: Array<[string, string[]]> = [
     "Physical proof approved in daylight next to an approved sample",
   ]],
   ["Machine shipment", [
-    "Logo on the arm, straight, durable (ch. 107)",
-    "Nameplate with the right model, serial, voltage and year (ch. 108)",
+    "White body; the black logo on the arm, straight, durable (ch. 107)",
+    "Black engraved nameplate with the right model, serial, voltage and year (ch. 108)",
     "Safety labels in English and the market’s language (ch. 109)",
-    "Cartons, marks and labels match the packing list (ch. 110–111)",
+    "The model’s own carton (kraft, white or black); marks and labels match the packing list (ch. 110–111)",
     "No supplier name, code or logo anywhere (ch. 130)",
   ]],
 ];

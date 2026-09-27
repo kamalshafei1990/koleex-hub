@@ -267,12 +267,11 @@ export function VideoKit() {
 
       <Section id="thumbnail" title="Thumbnails">
         <Examples cols={2}>
-          <Example tone="do" caption="One strong frame, a short title, the logo small." bg="#F5F5F7" h={180}>
+          <Example tone="do" caption="The logo top-left, the title in silver on the left, the machine on the right." bg="#F5F5F7" h={180}>
             <Frame w={240}>
-              <div className="absolute inset-0 flex flex-col justify-between p-3">
-                <Wordmark color="#FFFFFF" width={50} />
-                <p className="text-[15px] font-bold leading-tight text-white">Threading an<br />overlock in 60 s</p>
-              </div>
+              <div className="absolute left-3 top-3"><Wordmark color="#FFFFFF" width={44} /></div>
+              <p className="absolute left-3 top-[34%] w-[46%] text-[14px] font-semibold leading-[1.05] tracking-[-0.02em]" style={{ backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Threading an overlock in 60 s</p>
+              <div className="absolute bottom-[10%] right-2 w-[50%]"><MachineShot w="100%" label={false} /></div>
             </Frame>
           </Example>
           <Example tone="dont" caption="Arrows, red circles, shocked faces, long titles." bg="#F5F5F7" h={180}>
@@ -284,7 +283,11 @@ export function VideoKit() {
             </Frame>
           </Example>
         </Examples>
-        <Specs rows={[["Size", "1280 × 720 px (YouTube) · 1080 × 1920 cover for vertical"], ["Title", "3–6 words, Inter SemiBold, white or silver"]]} />
+        <Specs rows={[
+          ["Horizontal (YouTube)", "1280 × 720 px: the logo top-left, the title in silver on the left half, the machine on the right — like the page covers (ch. 79)"],
+          ["Vertical (Reels, TikTok, Douyin, Stories)", "1080 × 1920 px: the post layout — the logo top-left, the silver headline, the machine (ch. 80)"],
+          ["Title", "3–6 words, Inter SemiBold, silver or white"],
+        ]} />
       </Section>
     </Chapter>
   );

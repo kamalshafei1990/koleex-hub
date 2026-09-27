@@ -12,9 +12,10 @@
 import type { ReactNode } from "react";
 import { SILVER, contrast, grade, ratioText } from "@/lib/brand-book/tokens";
 import {
-  B, Bullets, Chapter, Code, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
+  B, Bullets, Chapter, Code, Downloads, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Sub, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
+import { MachineShot } from "../mockups";
 
 const LOGO_W = 719.83;
 const LOGO_H = 107.57;
@@ -349,7 +350,7 @@ export function SizePlacement() {
             ["House document (210 × 270 mm)", "45 mm", "Top-left; document title top-right"],
             ["Business card (90 × 54 mm)", "40 mm front · 25 mm back", "Centered on the front; top-left on the back"],
             ["Presentation (1920 × 1080 px)", "480 px cover · 200 px content slides", "Centered on the cover; top-left on content slides"],
-            ["Social post (1080 × 1350 px)", "200–240 px", "Bottom-left or top-left — the same across the series"],
+            ["Social post (1080 × 1350 px)", "200–240 px", "Top-left, the same on every post"],
             ["Story / reel cover (1080 × 1920 px)", "240 px", "Top-left, at least 250 px below the top edge"],
             ["Website header", "120–140 px", "Top-left (top-right in Arabic)"],
             ["Email signature", "120 px", "Above the contact lines"],
@@ -362,8 +363,8 @@ export function SizePlacement() {
 
       <Section id="placement" title="Where the logo goes">
         <Rule why="A logo that always appears in the same place is recognised before it is read.">
-          The logo sits at the <B>start corner</B> (top-left, or bottom-left on social media) or <B>centered</B> on
-          covers, cards, signs and packaging fronts. It never floats in the middle of a side or squeezes into
+          The logo sits <B>top-left</B> — on documents, posts, ads and posters — or <B>centered</B> on covers,
+          business cards, signs and packaging fronts. It never floats in the middle of a side or squeezes into
           a far corner.
         </Rule>
         <Examples cols={4}>
@@ -379,11 +380,12 @@ export function SizePlacement() {
               <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width={64} /></div>
             </MiniPage>
           </Example>
-          <Example tone="do" caption="Social post: bottom-left." bg="#F5F5F7" h={200}>
+          <Example tone="do" caption="Post, ad, poster: top-left." bg="#F5F5F7" h={200}>
             <MiniPage w={124} h={155} bg="#000000">
-              <div className="absolute left-3 top-3 text-[5px] tracking-[0.2em] text-[#98989D]">OVERLOCK</div>
-              <div className="absolute left-3 top-8 text-[11px] font-bold leading-tight text-white">Four threads.<br />One pass.</div>
-              <div className="absolute bottom-3 left-3"><Wordmark color="#FFFFFF" width={36} /></div>
+              <div className="absolute left-3 top-3"><Wordmark color="#FFFFFF" width={36} /></div>
+              <div className="absolute left-3 top-9 text-[5px] tracking-[0.2em] text-[#98989D]">OVERLOCK</div>
+              <div className="absolute left-3 top-[46px] text-[11px] font-semibold leading-tight text-white">Four threads.<br />One pass.</div>
+              <div className="absolute inset-x-3 bottom-3"><MachineShot w="100%" label={false} logo={false} /></div>
             </MiniPage>
           </Example>
           <Example tone="dont" caption="Floating mid-side, squeezed at the edge." bg="#F5F5F7" h={200}>
@@ -401,8 +403,8 @@ export function SizePlacement() {
             <div className="flex gap-2">
               {["Lockstitch", "Overlock", "Cutting"].map((t) => (
                 <MiniPage key={t} w={78} h={98} bg="#000000">
-                  <div className="absolute left-2 top-2 text-[8px] font-bold text-white">{t}</div>
-                  <div className="absolute bottom-2 left-2"><Wordmark color="#FFFFFF" width={26} /></div>
+                  <div className="absolute left-2 top-2"><Wordmark color="#FFFFFF" width={26} /></div>
+                  <div className="absolute left-2 top-7 text-[8px] font-semibold text-white">{t}</div>
                 </MiniPage>
               ))}
             </div>
@@ -411,7 +413,7 @@ export function SizePlacement() {
             <div className="flex gap-2">
               {[["left-2 bottom-2"], ["right-2 top-2"], ["left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"]].map(([pos], i) => (
                 <MiniPage key={i} w={78} h={98} bg="#000000">
-                  <div className="absolute left-2 top-2 text-[8px] font-bold text-white">{["Lockstitch", "Overlock", "Cutting"][i]}</div>
+                  <div className="absolute left-2 top-7 text-[8px] font-semibold text-white">{["Lockstitch", "Overlock", "Cutting"][i]}</div>
                   <div className={`absolute ${pos}`}><Wordmark color="#FFFFFF" width={26} /></div>
                 </MiniPage>
               ))}
@@ -477,7 +479,7 @@ export function Backgrounds() {
         { id: "approved", title: "Approved backgrounds" },
         { id: "not-approved", title: "Backgrounds to avoid" },
         { id: "photos", title: "On photographs" },
-        { id: "materials", title: "On materials" },
+        { id: "materials", title: "Materials & production" },
       ]}
     >
       <Section id="approved" title="Approved backgrounds">
@@ -540,24 +542,95 @@ export function Backgrounds() {
         <Note>Photographs in this book are placeholders until our own photo library is shot — see <Ref n={63} />.</Note>
       </Section>
 
-      <Section id="materials" title="On materials">
-        <Rule why="Effects imitate materials badly and age fast. A flat, one-color logo is right on every material.">
-          On any material the logo is one flat color at full strength: black, white — or, when it is
-          engraved or etched, the material’s own tone. No metallic effects, bevels, shadows or 3D.
+      <Section id="materials" title="Materials & production">
+        <Rule why="Effects imitate materials badly and age fast. One flat color reads on every material, from 3 m or 30 m.">
+          Whatever the method, the logo is one flat color: black, white — or, where it is engraved, debossed or
+          frosted, the material’s own tone. Never silver, gold, chrome, colored or lit in color.
         </Rule>
-        <Table
-          head={["Material", "Method", "Logo color", "Minimum width"]}
+        <Specs
+          title="Every production"
           rows={[
-            ["Paper and card", "Offset or digital print", "Black (K100) or white knock-out", "25 mm"],
-            ["Fabric", "Embroidery", "Black or white thread", "50 mm"],
-            ["Fabric", "Screen print or DTF", "Black or white", "40 mm"],
-            ["Metal", "Laser engraving or etching", "The metal's own tone", "20 mm"],
-            ["Metal and plastic", "Pad or UV printing", "Black or white", "20 mm"],
-            ["Glass", "Frosted or cut vinyl", "White, black or frosted", "60 mm"],
-            ["Signs", "Cut vinyl, acrylic, light box", "Black or white; lit signs: white face", "—"],
+            ["Artwork", "The master vector file only (SVG, PDF or EPS from ch. 136) — never a screenshot, a PNG or a redraw"],
+            ["Sample first", "A physical sample — a sew-out, a proof, a test engraving, a lit letter — approved before the run"],
+            ["Approval", "Marketing Manager, then the Founder & CEO (ch. 134)"],
           ]}
         />
-        <P>The machine body and its nameplate are covered in <Ref n={107} /> and <Ref n={108} />.</P>
+
+        <Sub title="Embroidery — uniforms, caps, bags">
+          <Specs rows={[
+            ["Minimum width", "50 mm — below it the strokes are thinner than 1 mm and fill in"],
+            ["Sizes", "Left chest 70–80 mm · cap front 60–70 mm · sleeve 50–60 mm · back 200–250 mm"],
+            ["Thread", "Matte polyester, one color: white on dark fabric, black on light — never metallic thread"],
+            ["Stitch", "Flat satin stitch, the X triangle filled; the digitizer works from the vector file"],
+            ["Never", "3D puff, outline-only stitching, a patch border around the logo"],
+          ]} />
+        </Sub>
+
+        <Sub title="Woven labels, patches and prints on fabric">
+          <Specs rows={[
+            ["Woven label", "Damask weave, black ground, white logo; logo at least 25 mm wide"],
+            ["Rubber or silicone patch", "Black, logo white and flat — one level, no bevel"],
+            ["Screen print or DTF", "Minimum 40 mm; plastisol or water-based ink, matte, black or white"],
+          ]} />
+        </Sub>
+
+        <Sub title="Metal — laser engraving, etching, plates">
+          <Specs rows={[
+            ["Minimum width", "20 mm (fine laser); 30 mm for deep engraving or chemical etching"],
+            ["Bare steel or aluminium", "Black laser marking — the logo reads dark on the metal"],
+            ["Anodized or painted metal", "Engraving opens the surface: the logo reads white on black anodizing"],
+            ["Deep engraving", "0.1–0.3 mm deep, filled black or white — or left in the metal’s tone on dark metal"],
+            ["Never", "Polished chrome, mirror, gold or silver-look logos; raised polished letters"],
+          ]} />
+          <P>Machine bodies and nameplates: <Ref n={107} /> and <Ref n={108} />.</P>
+        </Sub>
+
+        <Sub title="Illuminated signs — buildings, showroom, booths">
+          <Specs rows={[
+            ["The KOLEEX sign", "Halo-lit 3D letters: the light is behind the letters, on the wall — never through them"],
+            ["Letters and wall", "Black letters on a light wall; on a dark wall, white letters. The wall is plain, one color"],
+            ["Light", "Pure white, 6000–6500 K, even — no hot spots, no visible LEDs"],
+            ["Never", "Face-lit letters, light boxes, colored, RGB or blue light, flashing or animation, neon-look tubes, stainless or chrome letters"],
+            ["Size", "Letter height about 25 mm for every 3 m of reading distance — 250 mm letters read from 30 m"],
+            ["Letters", "50–100 mm deep; halo-lit letters stand 30–50 mm off the wall"],
+            ["Day and night", "By day the letters read on the wall; by night they stand in a soft white halo"],
+          ]} />
+          <P>Where the law asks for a local name on a sign, it is set in type beside the logo — <Ref n={117} />.</P>
+        </Sub>
+
+        <Sub title="Paper — print, foil, emboss">
+          <Specs rows={[
+            ["Print", "Offset or digital; black K100 or a white knock-out; minimum 25 mm"],
+            ["Foil", "Black or white foil only — silver foil is for words and lines, never the logo"],
+            ["Emboss or deboss", "Blind (the paper’s own tone) or with white or black foil on top — the business card (ch. 91); minimum 30 mm, board 350 g/m² or more"],
+            ["Painted edges", "Silver (Pantone 877 C) on thick board, 600 g/m² or more — the edge is material, not the logo"],
+          ]} />
+        </Sub>
+
+        <Sub title="Glass, walls and vehicles">
+          <Specs rows={[
+            ["Glass", "Frosted vinyl or acid etching; minimum 60 mm; at eye height on doors"],
+            ["Walls", "Cut matte vinyl or paint through a stencil, black or white"],
+            ["Vehicles", "Matte cut vinyl, never printed on a colored panel — ch. 120"],
+          ]} />
+        </Sub>
+
+        <Sub title="Leather, wood, gifts and packaging">
+          <Specs rows={[
+            ["Leather", "Blind deboss or laser, the leather’s own tone; minimum 30 mm"],
+            ["Wood", "Laser engraving, the wood’s own tone; minimum 25 mm"],
+            ["Pens, mugs, USB, bottles", "Pad print or laser, one color; minimum 20 mm — ch. 123"],
+            ["Cartons and tape", "One-color flexo print, black; minimum 60 mm on a carton — ch. 110"],
+          ]} />
+        </Sub>
+
+        <Sub title="Screens and LED walls">
+          <Specs rows={[
+            ["Background", "Black, the logo white — the bright logo on a dark wall"],
+            ["Minimum", "100 px wide on any screen (ch. 38); on an LED wall, at least 12 LED rows tall"],
+            ["Motion", "Only the Focus animation (ch. 73) — never spinning, pulsing or scrolling"],
+          ]} />
+        </Sub>
       </Section>
     </Chapter>
   );

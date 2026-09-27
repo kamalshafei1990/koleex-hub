@@ -48,9 +48,12 @@ export function CompanyProfile() {
       <Section id="layout" title="Layout">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-5">
-            <Page w={200} dark ratio="16 / 10">
-              <div className="absolute inset-0 flex items-center justify-center"><Wordmark color="#FFFFFF" width="40%" /></div>
-              <p className="absolute bottom-3 left-4 text-[7px]">KOLEEX International Group<br /><span className="text-[#98989D]">Company Profile</span></p>
+            <Page w={160} dark ratio="210 / 270">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                <p className="text-[12px] font-semibold tracking-[-0.02em]" style={{ background: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Company Profile</p>
+                <MachineShot w="86%" label={false} logo={false} />
+                <div className="flex flex-col items-center gap-1"><Wordmark color="#FFFFFF" width={54} /><p className="text-[5px] tracking-[0.2em] text-[#98989D]">2026</p></div>
+              </div>
             </Page>
             <Spread>
               <Page w={150} dark ratio="8 / 10"><div className="absolute inset-3 rounded-sm bg-[#1D1D1F]" /><span className="absolute bottom-2 left-3 rounded bg-black/50 px-1 text-[5px] tracking-[0.14em] text-white">OWN PHOTO</span></Page>
@@ -163,6 +166,7 @@ export function Catalogs() {
           "KOLEEX machines only — never a supplier's catalog with our logo added, never a supplier's name or code.",
           "Specifications exactly as in Koleex Hub's product data; blank is better than a guess.",
           "Our own photographs — the hero on black, product pages on white (ch. 64); never a borrowed photo or a drawing.",
+          "The cover is black; a white cover is the second version (ch. 47).",
           "Light-led pages for easy reading and office printing (ch. 47); dark only for cover and openers if wished.",
         ]} />
         <Note>The catalog’s product pages can be generated from Koleex Hub, so the catalog and the website always say the same thing.</Note>
@@ -196,13 +200,13 @@ export function Brochures() {
 
       <Section id="flyer" title="The flyer">
         <Examples cols={2}>
-          <Example tone="do" caption="Front: one machine, one line, the logo." bg="#F5F5F7" h={260}>
+          <Example tone="do" caption="Front: the logo top-left, one line, one machine." bg="#F5F5F7" h={260}>
             <Page w={160} ratio="148 / 210" dark>
               <div className="absolute inset-3 flex flex-col">
-                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Coverstitch</p>
+                <Wordmark color="#FFFFFF" width={40} />
+                <p className="mt-3 text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Coverstitch</p>
                 <p className="mt-1 text-[12px] font-semibold leading-tight tracking-[-0.02em]">Flat seams for knitwear.</p>
-                <div className="my-2 flex flex-1 items-center justify-center"><MachineShot w="92%" label={false} /></div>
-                <div className="flex items-center justify-between"><Wordmark color="#FFFFFF" width={40} /></div>
+                <div className="mt-2 flex flex-1 items-center justify-center"><MachineShot w="92%" label={false} /></div>
               </div>
             </Page>
           </Example>
@@ -292,13 +296,13 @@ export function Posters() {
     >
       <Section id="poster" title="The poster">
         <Examples cols={2}>
-          <Example tone="do" caption="Black, one message in silver, the machine, the logo." bg="#F5F5F7" h={300}>
+          <Example tone="do" caption="The logo top-left, one message in silver, the machine." bg="#F5F5F7" h={300}>
             <Page w={180} ratio="420 / 594" dark>
               <div className="absolute inset-4 flex flex-col">
-                <p className="text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Spreading</p>
+                <Wordmark color="#FFFFFF" width={60} />
+                <p className="mt-4 text-[6px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Spreading</p>
                 <p className="mt-1 text-[18px] font-semibold leading-[1.05] tracking-[-0.03em]" style={{ background: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Lay it flat.<br />Cut it right.</p>
-                <div className="my-3 flex flex-1 items-center justify-center"><MachineShot w="96%" label={false} /></div>
-                <div className="flex items-center justify-center"><Wordmark color="#FFFFFF" width={60} /></div>
+                <div className="mt-3 flex flex-1 items-center justify-center"><MachineShot w="96%" label={false} /></div>
               </div>
             </Page>
           </Example>

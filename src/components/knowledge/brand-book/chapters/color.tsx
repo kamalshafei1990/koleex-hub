@@ -135,9 +135,14 @@ export function SilverHubBlue() {
       <Section id="silver-where" title="Where silver goes">
         <Examples cols={3}>
           <Example tone="do" caption="Big headlines on black." bg="#000000" h={170}><SilverWords size={30}>Quiet power.</SilverWords></Example>
-          <Example tone="do" caption="The machine itself — its finish in every photo." bg="#000000" h={170}><MachineShot w={210} label={false} /></Example>
-          <Example tone="do" caption="Nameplates and premium print, as real metal or foil." bg="#F5F5F7" h={170}>
-            <div className="flex h-[88px] w-[160px] items-center justify-center rounded-[12px]" style={{ background: SILVER.css, boxShadow: "inset 0 0 0 1px #AEAEB2" }}><Wordmark color="#1D1D1F" width={96} /></div>
+          <Example tone="do" caption="The painted edges of the business card." bg="#F5F5F7" h={170}>
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex h-[70px] w-[118px] items-center justify-center rounded-[5px] bg-black"><Wordmark color="#FFFFFF" width={54} /></div>
+              <div className="h-[7px] w-[118px] rounded-[2px]" style={{ background: SILVER.css }} />
+            </div>
+          </Example>
+          <Example tone="do" caption="Silver foil on words and lines — covers, invitations." bg="#000000" h={170}>
+            <div className="flex flex-col items-center gap-2"><SilverWords size={22}>Product Catalog</SilverWords><div className="h-px w-24" style={{ background: SILVER.css }} /></div>
           </Example>
         </Examples>
       </Section>
@@ -197,6 +202,7 @@ export function ColorUsage() {
       toc={[
         { id: "proportions", title: "Proportions" },
         { id: "dark-light", title: "Black first, then white" },
+        { id: "two-versions", title: "Black and white versions" },
         { id: "which", title: "Which one, where" },
         { id: "usage-donts", title: "What never to do" },
       ]}
@@ -230,16 +236,46 @@ export function ColorUsage() {
         </Examples>
       </Section>
 
+      <Section id="two-versions" title="Every piece, in black and in white">
+        <Rule why="Black is KOLEEX at its strongest; white is KOLEEX in daylight, in a bright room, next to a partner’s white space. Having both ready means no one invents a third.">
+          Every KOLEEX piece exists in two versions: black and white. The main version is set below — mostly
+          black; the other is ready for where the main one does not work. One piece is one version — never half and half.
+        </Rule>
+        <Table
+          head={["Piece", "Main version", "Second version"]}
+          rows={[
+            ["Logo", "White logo on black", "Black logo on white"],
+            ["Business card", "Black both sides, raised logo, silver edges (ch. 91)", "White both sides, raised black logo, silver edges"],
+            ["Envelope", "White, black liner (ch. 92)", "Black, white liner"],
+            ["Catalog, company profile cover", "Black (ch. 102–103)", "White"],
+            ["Social posts", "Black posts", "White posts — alternating on the grid (ch. 79)"],
+            ["Website", "The black hero (ch. 75)", "The light pages below it"],
+            ["Machine body", "White is the KOLEEX machine (ch. 107)", "Black — for special editions only"],
+            ["Nameplate", "Black, engraved (ch. 108)", "White, black print — for black machines"],
+            ["Cartons, spare parts, manuals", "Set per product (ch. 110–113)", "Set per product"],
+            ["Booth", "All black (ch. 114)", "All white, black halo-lit letters"],
+            ["Showroom, reception", "Black (ch. 117–118)", "White"],
+            ["Vehicles", "Black, white logo (ch. 120)", "White, black logo"],
+            ["Uniforms", "Black, white logo (ch. 122)", "White, black logo"],
+            ["Merchandise", "Black, white logo (ch. 123)", "White, black logo"],
+            ["Gift box", "Black, silver band (ch. 124)", "White, black band"],
+            ["Signs", "White halo-lit letters on a dark wall", "Black letters on a light wall (ch. 39)"],
+            ["Business documents", "White — paper documents stay white (ch. 94)", "—"],
+          ]}
+        />
+        <Note>When to use white: bright daylight and outdoor heat (vehicles in hot countries), white rooms and partner spaces, and wherever black would look heavy or print badly.</Note>
+      </Section>
+
       <Section id="which" title="Which one, where">
         <Table
           head={["Piece", "Ground", "Silver", "Hub Blue"]}
           rows={[
-            ["Website hero, ads, launch posts", "Black", "Headline, machine", "Links and buttons"],
-            ["Catalog, spec sheet, website pages", "White", "Machine finish", "Links only"],
+            ["Website hero, ads, launch posts", "Black", "Headline", "Links and buttons"],
+            ["Catalog, spec sheet, website pages", "White", "—", "Links only"],
             ["Business documents", "White", "—", "—"],
             ["Booth, roll-up, fascia", "Black", "Headline", "—"],
-            ["Business card", "Black front, white back", "—", "—"],
-            ["Nameplate", "Silver metal", "The plate itself", "—"],
+            ["Business card", "Black, both sides", "Painted edges", "—"],
+            ["Nameplate", "Black anodized metal", "—", "—"],
           ]}
         />
       </Section>
@@ -292,8 +328,8 @@ export function ColorPrint() {
         <Specs rows={[
           ["Paper and card", `${SILVER.foil} — never silver ink simulated with gray`],
           ["When foil is not possible", `${SILVER.pantone} as a spot color`],
-          ["Metal", "The metal’s own finish: anodised or brushed aluminum"],
-          ["Signs", "Silver acrylic or aluminum composite — never gray vinyl"],
+          ["Edges", "Painted silver on thick board — the business card (ch. 91)"],
+          ["Signs", "No silver on signs — halo-lit black or white letters (ch. 39)"],
         ]} />
       </Section>
 
@@ -323,8 +359,8 @@ export function ColorPrint() {
             ["Coated paper", "K100 / rich black for areas", "Paper white", "Silver foil"],
             ["Uncoated paper", "K100", "Paper white", "Silver foil, tested first"],
             ["Embroidery thread", "Black thread", "White thread", "—"],
-            ["Vinyl and signs", "Matte black vinyl", "White vinyl", "Silver acrylic or aluminum"],
-            ["Metal", "Black print", "White print", "The metal’s own finish"],
+            ["Vinyl and signs", "Matte black vinyl", "White vinyl", "—"],
+            ["Metal", "Black print or laser marking", "Engraved on black anodizing", "—"],
           ]}
         />
       </Section>

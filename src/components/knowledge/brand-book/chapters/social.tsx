@@ -16,7 +16,8 @@ import {
   B, Bullets, Chapter, Code, Example, Examples, Note, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { LogoTile, Wordmark } from "../marks";
-import { Avatar, INK, Phone, Post, PostBody } from "../mockups";
+import { Avatar, INK, MachineShot, Phone, Post, PostBody } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 /* ── Shared ────────────────────────────────────────────────────────────── */
 
@@ -55,6 +56,7 @@ export function SocialProfiles() {
       }
       toc={[
         { id: "identity", title: "One identity everywhere" },
+        { id: "cover", title: "The cover image" },
         { id: "bio", title: "The description" },
         { id: "profile-donts", title: "What never to do" },
       ]}
@@ -72,6 +74,26 @@ export function SocialProfiles() {
             ]} />
           </div>
         </div>
+      </Section>
+
+      <Section id="cover" title="The cover image">
+        <Stage bg="#F5F5F7" h="auto" pad={20}>
+          <div className="w-full max-w-[560px] overflow-hidden rounded-[12px] bg-white ring-1 ring-black/10">
+            <div className="relative grid grid-cols-2 items-center bg-[#000000] px-8" style={{ aspectRatio: "820 / 312" }}>
+              <p className="text-[28px] font-semibold leading-[1.02] tracking-[-0.03em]" style={{ backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Stitch.<br />Perfected.</p>
+              <MachineShot w="100%" label={false} />
+              <div className="absolute -bottom-7 left-6"><Avatar size={64} /></div>
+            </div>
+            <div className="h-12 pl-[100px] pt-2 text-[13px] font-semibold text-[#1D1D1F]">KOLEEX</div>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Look", "Black; the headline in silver on the left, the machine on the right — no logo (the profile picture carries it)"],
+          ["Headline", "The current tagline or campaign line, two to four words"],
+          ["Safe area", "Keep the headline and the machine inside the middle 70% — every platform crops the edges on phones"],
+          ["Sizes", "Facebook 1640 × 624 · LinkedIn 1128 × 191 · YouTube 2560 × 1440 (safe 1546 × 423) · X 1500 × 500"],
+          ["Changes", "With each campaign or product launch; the same cover on every platform at the same time"],
+        ]} />
       </Section>
 
       <Section id="bio" title="The description">
@@ -115,8 +137,8 @@ export function PostTemplates() {
       n={80}
       lead={
         <p>
-          Every KOLEEX post is built on the same four parts: a small label, one clear headline, one image, and
-          the logo. The content changes; the grammar does not.
+          Every KOLEEX post is built on the same four parts: the logo top-left, a small label, one clear
+          headline and one image. The content changes; the grammar does not.
         </p>
       }
       toc={[
@@ -131,17 +153,17 @@ export function PostTemplates() {
           <div className="flex flex-wrap items-center gap-6">
             <Post w={230}><PostBody label="Overlock · Series" title={<>Four threads.<br />One pass.</>} /></Post>
             <ol className="space-y-2 text-[12px] text-[#1D1D1F]">
-              <li><B>1 · Label</B> — category or context, 11–12 px capitals, Sky on dark / Deep on light</li>
-              <li><B>2 · Headline</B> — six words or fewer, Inter Bold</li>
-              <li><B>3 · Image</B> — our own photograph (ch. 63) or a clean graphic</li>
-              <li><B>4 · Signature</B> — the logo at the end</li>
+              <li><B>1 · Logo</B> — top-left, the same place on every post</li>
+              <li><B>2 · Label</B> — category or context, small capitals, gray</li>
+              <li><B>3 · Headline</B> — six words or fewer, Inter SemiBold, white or silver on black</li>
+              <li><B>4 · Image</B> — the machine, our own photograph (ch. 63)</li>
             </ol>
           </div>
         </Stage>
         <Specs rows={[
           ["Feed size", "1080 × 1350 px (4:5); 1080 × 1080 where a platform needs square"],
           ["Margins", "72 px on every side (ch. 55)"],
-          ["Logo", "200–240 px wide, bottom-left, the same place on every post"],
+          ["Logo", "200–240 px wide, top-left, the same place on every post"],
           ["Text on the image", "20% of the area at most — the caption carries the detail"],
         ]} />
       </Section>
@@ -225,7 +247,7 @@ export function Facebook() {
     <PlatformChapter
       n={81}
       lead="Facebook is where many of our Arabic-speaking customers follow KOLEEX. The page is our shop window in the Middle East and North Africa."
-      sizes={[["Profile picture", "1024 × 1024", "The logo tile"], ["Cover", "1640 × 624", "Keep text and logo in the central 820 × 312 — phones crop the sides"], ["Feed post", "1080 × 1350", "4:5"], ["Event cover", "1920 × 1005"], ["Story / Reel", "1080 × 1920", "Safe areas: ch. 70"]]}
+      sizes={[["Profile picture", "1024 × 1024", "The logo tile"], ["Cover", "1640 × 624", "The KOLEEX cover (ch. 79): headline and machine in the central 820 × 312 — phones crop the sides"], ["Feed post", "1080 × 1350", "4:5"], ["Event cover", "1920 × 1005"], ["Story / Reel", "1080 × 1920", "Safe areas: ch. 70"]]}
       profile={[["Page name", "KOLEEX"], ["About", "The short description (ch. 79), Arabic and English"], ["Buttons", "\"WhatsApp\" as the main button"], ["Replies", "Messages answered within one working day"]]}
       content={["Product posts and short machine videos", "Exhibitions and events, with dates DD/MM/YYYY", "Occasions: Ramadan, Eid al-Fitr, Eid al-Adha, national days of our markets", "Captions in Arabic first, English below — or one post per language"]}
     />
@@ -237,7 +259,7 @@ export function Instagram() {
     <PlatformChapter
       n={82}
       lead="Instagram (@koleexgroup) is our visual showroom. The grid is seen as a whole, so every post is designed to sit beside the others."
-      sizes={[["Profile picture", "1024 × 1024", "Shown as a circle"], ["Feed post", "1080 × 1350", "Shown cropped to 3:4 on the grid — keep the headline inside"], ["Story", "1080 × 1920", "Top 250 px and bottom 340 px stay clear"], ["Reel cover", "1080 × 1920", "Title inside the central 1080 × 1440"], ["Highlight cover", "1080 × 1920", "A Hub library icon, white on Ink"]]}
+      sizes={[["Profile picture", "1024 × 1024", "Shown as a circle"], ["Feed post", "1080 × 1350", "Shown cropped to 3:4 on the grid — keep the headline inside"], ["Story", "1080 × 1920", "Top 250 px and bottom 340 px stay clear"], ["Reel cover", "1080 × 1920", "The post layout (logo top-left, silver headline, machine), inside the central 1080 × 1440"], ["Highlight cover", "1080 × 1920", "A Hub library icon, white on Ink"]]}
       profile={[["Handle", "@koleexgroup"], ["Bio", "Short description + one link"], ["Highlights", "Machines · Services · Events · Contact — each with its icon"], ["Link", "The website or WhatsApp"]]}
       content={["Alternate dark-led and light-led posts so the grid breathes", "Reels of machines running — the most watched format", "Stories for events, day-to-day work and quick tips"]}
       extra={
@@ -246,7 +268,7 @@ export function Instagram() {
             <div className="grid w-[240px] grid-cols-3 gap-[3px]">
               {Array.from({ length: 9 }).map((_, i) => (
                 <Post key={i} w={78} ratio="3 / 4" bg={i % 2 ? "#FFFFFF" : INK}>
-                  <div className="absolute bottom-1.5 left-1.5"><Wordmark color={i % 2 ? "#000000" : "#FFFFFF"} width={22} /></div>
+                  <div className="absolute left-1.5 top-1.5"><Wordmark color={i % 2 ? "#000000" : "#FFFFFF"} width={22} /></div>
                 </Post>
               ))}
             </div>
@@ -263,7 +285,7 @@ export function LinkedIn() {
     <PlatformChapter
       n={83}
       lead="LinkedIn is where distributors, large factories, partners and future colleagues check who we are. The tone is the most formal of our channels."
-      sizes={[["Logo", "400 × 400", "The logo tile"], ["Cover", "1128 × 191", "Logo and descriptor centered; phones crop the sides"], ["Post image", "1200 × 627 or 1080 × 1350"], ["Document (carousel)", "1080 × 1350 pages, PDF", "Our house style, 10 pages at most"]]}
+      sizes={[["Logo", "400 × 400", "The logo tile"], ["Cover", "1128 × 191", "The KOLEEX cover (ch. 79), headline and machine in the middle; phones crop the sides"], ["Post image", "1200 × 627 or 1080 × 1350"], ["Document (carousel)", "1080 × 1350 pages, PDF", "Our house style, 10 pages at most"]]}
       profile={[["Page name", "KOLEEX International Group"], ["Tagline", "Industrial Garment Machinery"], ["Industry", "Industrial Machinery Manufacturing"], ["About", "The 100-word company description (ch. 32)"]]}
       content={["Company news, exhibitions, new partnerships (with permission)", "Knowledge: how to choose a machine, how we inspect", "Hiring (ch. 125) — and staff sharing, not re-posting word for word (ch. 126)", "English; no hashtag lists, no emoji"]}
     />
@@ -275,7 +297,7 @@ export function TikTokDouyin() {
     <PlatformChapter
       n={84}
       lead="Short vertical video: a machine running, a tip, a moment from the factory. TikTok reaches our international audience; Douyin (抖音) is its separate Chinese twin, with its own account and content in Chinese."
-      sizes={[["Video", "1080 × 1920", "9:16, 15–60 s"], ["Cover", "1080 × 1920", "Title in the upper middle"], ["Profile picture", "1024 × 1024", "The logo tile"], ["Safe areas", "Top 250 · bottom 420 · right 150 px", "Ch. 70"]]}
+      sizes={[["Video", "1080 × 1920", "9:16, 15–60 s"], ["Cover", "1080 × 1920", "The post layout: logo top-left, silver headline, the machine (ch. 71)"], ["Profile picture", "1024 × 1024", "The logo tile"], ["Safe areas", "Top 250 · bottom 420 · right 150 px", "Ch. 70"]]}
       profile={[["TikTok", "@koleexgroup, English and Arabic"], ["Douyin", "An enterprise account under our Taizhou company, in Chinese"], ["Link", "Website or WhatsApp (TikTok) · WeChat (Douyin)"]]}
       content={["The machine is the star: real sound of the machine, subtitles, logo in the first or last second", "Music only from the platform's own licensed library", "Never re-upload a TikTok to Douyin (or back) with the other app's watermark — export clean from the edit", "Chinese content follows Chinese advertising rules: no \"best\", \"first\", \"top\" (ch. 29)"]}
     />

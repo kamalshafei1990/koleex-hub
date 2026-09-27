@@ -15,6 +15,7 @@ import {
 } from "../kit";
 import { Wordmark } from "../marks";
 import { Avatar, INK, Phone, Post, Scaled } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 const FOUNDER_PHOTO = "/brand/book/founder-kamal-shafei.webp";
 
@@ -55,8 +56,8 @@ export function Uniforms() {
       n={122}
       lead={
         <p>
-          A uniform tells a customer who to ask. Ours is simple and well made: black or white, the logo on
-          the chest, nothing else. It looks the same at CISMA, in a customer’s factory and in our office.
+          A uniform tells a customer who to ask. Ours is simple and well made: black, the white logo on the
+          chest, nothing else. It looks the same at CISMA, in a customer’s factory and in our office.
         </p>
       }
       toc={[
@@ -68,18 +69,17 @@ export function Uniforms() {
       <Section id="set" title="The set">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-end justify-center gap-4">
-            <Item label="Polo — sales, fairs"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
-            <Item label="Polo — office, visits"><Scaled w={92} base={200} h={200}><Polo color="#FFFFFF" ink="#000000" /></Scaled></Item>
-            <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo color="#38383A" /></Scaled></Item>
+            <Item label="Polo — everyone"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
+            <Item label="Work shirt — technicians"><Scaled w={92} base={200} h={200}><Polo /></Scaled></Item>
           </div>
         </Stage>
         <Table
           head={["Who", "Garment", "Colors"]}
           rows={[
-            ["Sales, exhibitions", "Piqué polo", "Black, white logo"],
-            ["Office, customer visits", "Polo or oxford shirt", "White, black logo"],
-            ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Graphite #38383A, white logo"],
+            ["Sales, office, exhibitions, visits", "Piqué polo", "Black, white logo"],
+            ["Technicians, warehouse", "Work shirt or jacket, durable cotton", "Black, white logo"],
             ["Cold weather", "Soft-shell jacket", "Black, white logo"],
+            ["Second version", "Polo or shirt", "White, black logo — hot days and white rooms (ch. 47)"],
           ]}
         />
       </Section>
@@ -143,14 +143,14 @@ export function Merchandise() {
             </Item>
             <Item label="Tote bag">
               <div className="relative flex h-[84px] w-[72px] items-end">
-                <div className="absolute left-1/2 top-0 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-[#D8CFBF]" />
-                <div className="flex h-[66px] w-full items-center justify-center rounded-[2px] bg-[#EFE8DC]" style={{ boxShadow: "inset 0 0 0 1px #D8CFBF" }}><Wordmark color="#000000" width={46} /></div>
+                <div className="absolute left-1/2 top-0 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-[#000000]" />
+                <div className="flex h-[66px] w-full items-center justify-center rounded-[2px] bg-[#000000]"><Wordmark color="#FFFFFF" width={46} /></div>
               </div>
             </Item>
             <Item label="Mug">
               <div className="relative flex h-[84px] items-end">
-                <div className="flex h-[58px] w-[50px] items-center justify-center rounded-b-[8px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }}><Wordmark color="#000000" width={34} /></div>
-                <div className="mb-3 h-7 w-4 rounded-r-full border-[3px] border-l-0 border-[#D1D1D6]" />
+                <div className="flex h-[58px] w-[50px] items-center justify-center rounded-b-[8px] bg-[#000000]"><Wordmark color="#FFFFFF" width={34} /></div>
+                <div className="mb-3 h-7 w-4 rounded-r-full border-[3px] border-l-0 border-[#000000]" />
               </div>
             </Item>
             <Item label="Cap">
@@ -166,8 +166,8 @@ export function Merchandise() {
           rows={[
             ["Notebook, A5, black", "Blind or white foil deboss", "Logo 40 mm, bottom center"],
             ["Pen, black metal", "Laser engraving", "The full logo along the barrel, 30 mm"],
-            ["Tote bag, natural cotton", "Screen print, black", "Logo 120–150 mm"],
-            ["Mug, white ceramic", "Ceramic print, black", "Logo 60 mm, on the side facing the drinker’s right hand"],
+            ["Tote bag, black cotton", "Screen print, white", "Logo 120–150 mm"],
+            ["Mug, black ceramic (matte)", "Ceramic print, white", "Logo 60 mm, on the side facing the drinker’s right hand"],
             ["Cap, black cotton", "Embroidery, white", "The full logo, 50–60 mm on the front"],
             ["Tape measure, seam ripper, thread snips", "Pad print", "The full logo along the longest flat side — tools for the people who use our machines"],
           ]}
@@ -176,7 +176,7 @@ export function Merchandise() {
 
       <Section id="merch-rules" title="Rules">
         <Bullets items={[
-          "One color, one logo per item.",
+          "Black first, the logo white; white is the second version (ch. 47) — one color, one logo per item.",
           "No slogans, website lists or social icons on gifts.",
           "Sample first: every item is approved on a physical sample before an order (ch. 134).",
           "Gifts follow the law and the customer’s own rules; never cash or cash-like gifts.",
@@ -190,8 +190,8 @@ export function Merchandise() {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="flex w-[150px] flex-col items-center justify-between rounded-[3px] bg-white p-3 text-center text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ aspectRatio: "105 / 148" }}>
-      <Wordmark color="#000000" width={52} />
+    <div className="flex w-[150px] flex-col items-center justify-between rounded-[3px] bg-[#000000] p-3 text-center text-[#F5F5F7] shadow-[0_0_0_1px_rgba(255,255,255,0.14)]" style={{ aspectRatio: "105 / 148" }}>
+      <Wordmark color="#FFFFFF" width={52} />
       <div className="space-y-1">{children}</div>
       
     </div>
@@ -211,6 +211,7 @@ export function SeasonalGifts() {
       }
       toc={[
         { id: "calendar", title: "The calendar" },
+        { id: "box", title: "The gift box" },
         { id: "cards", title: "The cards" },
         { id: "season-rule", title: "Colors of the season" },
       ]}
@@ -229,25 +230,42 @@ export function SeasonalGifts() {
         <Note>Dates of Islamic and Chinese holidays move every year. Plan from the official calendar of each country, two months ahead.</Note>
       </Section>
 
+      <Section id="box" title="The gift box">
+        <Stage bg="#F5F5F7" h="auto" pad={28}>
+          <div className="relative h-[150px] w-[220px] overflow-hidden rounded-[6px] bg-[#000000] shadow-[0_0_0_1px_rgba(255,255,255,0.14)]">
+            <div className="absolute inset-y-0 left-[60%] w-[14px]" style={{ background: SILVER.css }} />
+            <div className="absolute left-4 top-4"><Wordmark color="#FFFFFF" width={70} /></div>
+            <p dir="rtl" lang="ar" className="absolute bottom-4 left-4 text-[18px] font-semibold" style={{ backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>رمضان كريم</p>
+          </div>
+        </Stage>
+        <Specs rows={[
+          ["Box", "Black rigid box, soft-touch, the white logo top-left"],
+          ["Band", "A silver band (Pantone 877 C or silver foil paper) around the box"],
+          ["Message", "The greeting of the season in silver foil, in the partner’s language"],
+          ["Inside", "The gift itself — and the KOLEEX card below"],
+          ["Second version", "White box, black band, the greeting in black (ch. 47)"],
+        ]} />
+      </Section>
+
       <Section id="cards" title="The cards">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
           <div className="flex flex-wrap items-center justify-center gap-5">
             <Card>
               <p dir="rtl" lang="ar" className="text-[16px] font-bold">عيد مبارك</p>
-              <p className="text-[7px] text-[#6E6E73]">Eid Mubarak from all of us at KOLEEX</p>
+              <p className="text-[7px] text-[#98989D]">Eid Mubarak from all of us at KOLEEX</p>
             </Card>
             <Card>
               <p lang="zh-Hans" className="text-[16px] font-bold">新春快乐</p>
-              <p className="text-[7px] text-[#6E6E73]">Happy Spring Festival</p>
+              <p className="text-[7px] text-[#98989D]">Happy Spring Festival</p>
             </Card>
             <Card>
               <p className="text-[14px] font-bold">Happy New Year</p>
-              <p className="text-[7px] text-[#6E6E73]">Thank you for a year of work together</p>
+              <p className="text-[7px] text-[#98989D]">Thank you for a year of work together</p>
             </Card>
           </div>
         </Stage>
         <Specs rows={[
-          ["Card", "105 × 148 mm (A6), 350 g/m² uncoated white card, black print"],
+          ["Card", "105 × 148 mm (A6), 350 g/m² black card; white logo, the greeting in silver foil"],
           ["Inside", "A handwritten line and a real signature — never a printed signature"],
           ["Digital version", "1080 × 1350 px, same layout, for WhatsApp and WeChat (ch. 80)"],
         ]} />
@@ -261,7 +279,7 @@ export function SeasonalGifts() {
           <Example tone="do" caption="Traditional gift (a mooncake box, a red envelope) with the KOLEEX card." bg="#F5F5F7" h={170}>
             <div className="flex items-end gap-3">
               <div className="h-[80px] w-[80px] rounded-[4px]" style={{ background: "#B91C1C", boxShadow: "inset 0 0 0 4px #EAB308" }} />
-              <div className="flex h-[96px] w-[68px] flex-col items-center justify-center gap-2 rounded-[2px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]"><Wordmark color="#000000" width={40} /></div>
+              <div className="flex h-[96px] w-[68px] flex-col items-center justify-center gap-2 rounded-[2px] bg-[#000000] shadow-[0_0_0_1px_rgba(255,255,255,0.14)]"><Wordmark color="#FFFFFF" width={40} /></div>
             </div>
           </Example>
           <Example tone="dont" caption="The logo recolored gold or red for the season." bg="#B91C1C" h={170}>
@@ -436,7 +454,7 @@ export function FounderBrand() {
         <Specs rows={[
             ["Name", "Kamal Shafei"],
             ["Title", "Founder & CEO, KOLEEX International Group"],
-            ["Portrait", "One official portrait, black and white, updated every two years"],
+            ["Portrait", "One official portrait on black, soft light from above (ch. 66), updated every two years"],
             ["Channels", "LinkedIn first; WeChat for partners in China"],
             ["Profile link", KOLEEX_COMPANY.web],
           ]} />

@@ -13,7 +13,7 @@ import { PROPORTIONS, SILVER } from "@/lib/brand-book/tokens";
 import {
   AR_FONT, B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Sub, Table, ZH_FONT,
 } from "../kit";
-import { HubMark, LogoTile, Wordmark } from "../marks";
+import { LogoTile, Wordmark } from "../marks";
 import { MachineShot } from "../mockups";
 
 const FOUNDER_PHOTO = "/brand/book/founder-kamal-shafei.webp";
@@ -48,7 +48,6 @@ export function Welcome() {
       toc={[
         { id: "one-brand", title: "One brand" },
         { id: "foreword", title: "From the founder" },
-        { id: "two-brands", title: "Two marks" },
         { id: "five-rules", title: "Five rules" },
         { id: "start", title: "Start where you work" },
       ]}
@@ -80,17 +79,6 @@ export function Welcome() {
             <p className="text-[13px] text-[var(--text-dim)]">Founder &amp; CEO, KOLEEX International Group</p>
           </div>
         </div>
-      </Section>
-
-      <Section id="two-brands" title="Two marks">
-        <Examples cols={2}>
-          <Example caption={<><B>KOLEEX — the company brand.</B> Machines, documents, print, social, places.</>} bg="#000000" h={200}>
-            <Wordmark color="#FFFFFF" width="56%" />
-          </Example>
-          <Example caption={<><B>Koleex Hub — our platform.</B> The software, and marketing about it (<Ref n={42} />).</>} bg="#000000" h={200}>
-            <HubMark variant="for-dark" style={{ width: "60%" }} />
-          </Example>
-        </Examples>
       </Section>
 
       <Section id="five-rules" title="Five rules. No exceptions.">
@@ -234,7 +222,7 @@ export function AtAGlance() {
       </Section>
 
       <Section id="color" title="Color">
-        <div className="overflow-hidden rounded-[28px]">
+        <div className="overflow-hidden rounded-[28px] ring-1 ring-black/5 dark:ring-white/15">
           <div className="flex h-[140px]">
             {PROPORTIONS.map((p) => (
               <div key={p.id} className="flex items-end p-4" style={{ flex: p.pct, background: p.id === "base" ? "#000000" : p.id === "neutral" ? "#F5F5F7" : p.id === "silver" ? SILVER.css : "#567FB2" }}>
@@ -243,7 +231,7 @@ export function AtAGlance() {
             ))}
           </div>
         </div>
-        <P><B>Black and white</B> carry every piece. <B>Silver</B> is the premium material. <B>Hub Blue</B> is for links and buttons only. <Ref n={45} /></P>
+        <P><B>Black and white</B> carry every piece. <B>Silver</B> is the premium material. <B>Hub Blue</B> is for links and buttons only. Every piece exists in a black and a white version. <Ref n={45} /> <Ref n={47} /></P>
       </Section>
 
       <Section id="type" title="Type">

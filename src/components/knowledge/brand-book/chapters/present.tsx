@@ -11,7 +11,10 @@ import {
   B, Bullets, Chapter, Code, Example, Examples, Note, P, Ref, Section, Specs, Stage, Table,
 } from "../kit";
 import { Wordmark } from "../marks";
-import { BusinessCard, Lines, Post, PostBody, Slide, Strips } from "../mockups";
+import { BusinessCard, Lines, MachineShot, Post, PostBody, Slide, Strips } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
+
+const SILVER_TEXT = { backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } as const;
 
 /* ── 89 · Digital Advertising ──────────────────────────────────────────── */
 
@@ -47,7 +50,7 @@ export function DigitalAds() {
       <Section id="anatomy" title="An ad, built right">
         <Examples cols={2}>
           <Example tone="do" caption="One message, one machine, one action, the logo." bg="#F5F5F7" h={290}>
-            <Post w={200}><PostBody label="Overlock" title={<>Four threads.<br />One pass.</>} foot={<span className="rounded bg-white px-1.5 py-0.5 text-[6.5px] font-semibold text-[#1D1D1F]">Request a quotation</span>} /></Post>
+            <Post w={200}><PostBody label="Overlock" title={<>Four threads.<br />One pass.</>} foot={<span className="rounded-full px-2 py-0.5 text-[6.5px] font-medium text-white" style={{ background: "#567FB2" }}>Request a quotation</span>} /></Post>
           </Example>
           <Example tone="dont" caption="Many messages, prices, red bursts, no logo." bg="#F5F5F7" h={290}>
             <Post w={200} bg="#DC2626">
@@ -103,22 +106,23 @@ export function Presentations() {
     >
       <Section id="types" title="The six slides">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="46%" /><p className="text-[8px] tracking-[0.2em] text-[#98989D]">COMPANY PRESENTATION · 2026</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>1 · Cover</B> — logo centered on Ink, title, year</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute bottom-[18%] left-[7%]"><p className="text-[7px] tracking-[0.2em] text-[#98989D]">02</p><p className="text-[16px] font-bold">Our machines</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>2 · Section</B> — number and title, bottom-left</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute left-[7%] top-[26%] w-[40%]"><p className="text-[11px] font-bold">Inspected before shipping</p><div className="mt-2"><Lines n={4} /></div></div><div className="absolute bottom-[10%] right-[6%] top-[10%] w-[40%] rounded bg-[#F5F5F7]" /></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>3 · Content</B> — title, short text, one image</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] bottom-[14%] flex items-end gap-3">{[40, 58, 51, 74].map((v, i) => <div key={i} className="flex-1 rounded-t" style={{ height: v * 0.8, background: i === 3 ? "#3E6796" : "#BCD8F0" }} />)}</div><p className="absolute left-[7%] top-[24%] text-[11px] font-bold">One chart, one message</p></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>4 · Data</B> — one chart, the message as the title</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] top-[30%] grid grid-cols-3 gap-2">{["Selected", "Checked", "Delivered"].map((t) => <div key={t} className="rounded-md border border-[#D2D2D7] p-2"><p className="mt-1 text-[8px] font-semibold">{t}</p><div className="mt-1"><Lines n={2} /></div></div>)}</div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>5 · Three points</B> — three short cards</figcaption></figure>
-          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="36%" /><p className="font-mono text-[7px] text-[#98989D]">{KOLEEX_COMPANY.web} · {KOLEEX_COMPANY.email}</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>6 · Close</B> — logo and one way to reach us</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5"><Wordmark color="#FFFFFF" width="30%" /><p className="text-[15px] font-semibold tracking-[-0.02em]" style={SILVER_TEXT}>Stitch. Perfected.</p><div className="w-[34%]"><MachineShot w="100%" label={false} /></div></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>1 · Cover</B> — black: the logo, one line in silver, the machine</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute left-[7%] top-[10%]"><Wordmark color="#FFFFFF" width={50} /></div><div className="absolute bottom-[18%] left-[7%]"><p className="text-[7px] tracking-[0.2em] text-[#98989D]">02</p><p className="text-[18px] font-semibold tracking-[-0.02em]" style={SILVER_TEXT}>Our machines</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>2 · Section</B> — black: number and title in silver</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute left-[7%] top-[26%] w-[40%]"><p className="text-[11px] font-semibold">Inspected before shipping</p><div className="mt-2"><Lines n={4} /></div></div><div className="absolute bottom-[12%] right-[5%] w-[46%]"><MachineShot w="100%" dark={false} label={false} /></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>3 · Content</B> — white: title, short text, the machine</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] bottom-[14%] flex items-end gap-3">{[40, 58, 51, 74].map((v, i) => <div key={i} className="flex-1 rounded-t" style={{ height: v * 0.8, background: i === 3 ? "#1D1D1F" : "#D1D1D6" }} />)}</div><p className="absolute left-[7%] top-[24%] text-[11px] font-semibold">One chart, one message</p></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>4 · Data</B> — gray bars, the key value in black (ch. 61)</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W}><div className="absolute left-[7%] top-[10%]"><Wordmark color="#000000" width={50} /></div><div className="absolute inset-x-[7%] top-[30%] grid grid-cols-3 gap-2">{["Selected", "Checked", "Delivered"].map((t) => <div key={t} className="rounded-[10px] bg-[#F5F5F7] p-2"><p className="mt-1 text-[8px] font-semibold">{t}</p><div className="mt-1"><Lines n={2} /></div></div>)}</div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>5 · Three points</B> — white: three short panels</figcaption></figure>
+          <figure className="space-y-2"><Slide w={W} dark><div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><Wordmark color="#FFFFFF" width="36%" /><p className="font-mono text-[7px] text-[#98989D]">{KOLEEX_COMPANY.web} · {KOLEEX_COMPANY.email}</p></div></Slide><figcaption className="text-[12px] text-[var(--text-secondary)]"><B>6 · Close</B> — black: the logo centered and one way to reach us</figcaption></figure>
         </div>
       </Section>
 
       <Section id="specs" title="Specifications">
         <Specs rows={[
           ["Format", "16:9, 1920 × 1080"],
+          ["Look", "Black for cover, section and close; white for content — easy to read in a lit room and to print"],
           ["Grid", "12 columns, 96 px margins (ch. 55)"],
           ["Typeface", "Inter; Arial when the file travels to computers without Inter (set it in the master)"],
           ["Title size", "40–56 px; text no smaller than 20 px"],
-          ["Logo", "Centered on cover and close; top-left on content slides, 200 px"],
+          ["Logo", "Centered on cover and close; top-left on every other slide, 200 px"],
           ["Numbers", "Slide number bottom-right on content slides"],
         ]} />
         <P>The PowerPoint and Keynote master files will be added to <Ref n={137} />.</P>
@@ -145,8 +149,8 @@ export function BusinessCards() {
       n={91}
       lead={
         <p>
-          The business card is often the first KOLEEX object a customer holds. It is simple: the logo on
-          black on the front, and on the back exactly what someone needs to reach you — in English.
+          The business card is often the first KOLEEX object a customer holds. Black on both sides, the logo
+          raised on the front, silver edges — and on the back exactly what someone needs to reach you.
         </p>
       }
       toc={[
@@ -161,6 +165,7 @@ export function BusinessCards() {
           <div className="flex flex-wrap items-center justify-center gap-6">
             <div className="space-y-2 text-center"><BusinessCard side="front" w={300} /><p className="text-[11px] text-[#6E6E73]">Front</p></div>
             <div className="space-y-2 text-center"><BusinessCard side="back" w={300} /><p className="text-[11px] text-[#6E6E73]">Back</p></div>
+            <div className="space-y-2 text-center"><div className="h-[10px] w-[300px] rounded-[3px]" style={{ background: SILVER.css }} /><p className="text-[11px] text-[#6E6E73]">The edge — painted silver</p></div>
           </div>
         </Stage>
       </Section>
@@ -168,10 +173,12 @@ export function BusinessCards() {
       <Section id="card-specs" title="Specifications">
         <Specs rows={[
           ["Size", "90 × 54 mm (owner decision), 3 mm bleed on every side, 4 mm safe margin"],
-          ["Paper", "Uncoated or soft-touch matte board, 400–450 g/m²"],
-          ["Front", "Black #000000 (rich black), logo white knock-out 40 mm wide, centered"],
-          ["Back", "White; logo black 25 mm, top-left; name Inter Bold 9 pt; title 7 pt; contacts 6.5 pt monospace"],
-          ["Finish", "No foil, no emboss, no spot gloss — flat print, like the brand"],
+          ["Board", "Black board, soft-touch matte, 600–700 g/m² (thick enough for painted edges)"],
+          ["Front", "The logo 40 mm wide, centered — white foil and raised (emboss), nothing else"],
+          ["Back", "Black; logo white 25 mm top-left; name white Inter SemiBold 9 pt; title gray 7 pt; contacts white 6.5 pt monospace — white foil or white print"],
+          ["Edges", "Painted silver (Pantone 877 C) all around"],
+          ["Second version", "White both sides — raised black logo, black text, the same silver edges (ch. 47)"],
+          ["Never", "Silver or gold foil on the logo, spot gloss, colored edges"],
           ["Language", "English only (owner decision)"],
         ]} />
       </Section>
@@ -194,7 +201,7 @@ export function BusinessCards() {
         <Bullets items={[
           "Several phone numbers from different countries on one card.",
           "Slogans, product lists, social icons in a row.",
-          "Gold foil, gradients or the Hub gradient as a background.",
+          "Gold foil, a silver logo, gradients or the Hub gradient as a background.",
           "Printing cards locally in a different size or paper without approval.",
         ]} />
       </Section>
@@ -241,16 +248,30 @@ export function Letterhead() {
 
       <Section id="envelopes" title="Envelopes">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
-          <div className="relative h-[110px] w-[220px] rounded-sm bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
-            <div className="absolute left-3 top-3"><Wordmark color="#000000" width={46} /></div>
-            <p className="absolute left-3 top-[30px] w-[120px] text-[4.5px] leading-snug text-[#6E6E73]">{KOLEEX_COMPANY.en}</p>
-            <div className="absolute bottom-5 left-[52%] space-y-1"><div className="h-[2.5px] w-20 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-16 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-12 rounded bg-[#D2D2D7]" /></div>
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <div className="space-y-2 text-center">
+              <div className="relative h-[110px] w-[220px] rounded-sm bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+                <div className="absolute left-3 top-3"><Wordmark color="#000000" width={46} /></div>
+                <p className="absolute left-3 top-[30px] w-[120px] text-[4.5px] leading-snug text-[#6E6E73]">{KOLEEX_COMPANY.en}</p>
+                <div className="absolute bottom-5 left-[52%] space-y-1"><div className="h-[2.5px] w-20 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-16 rounded bg-[#D2D2D7]" /><div className="h-[2.5px] w-12 rounded bg-[#D2D2D7]" /></div>
+              </div>
+              <p className="text-[11px] text-[#6E6E73]">Outside</p>
+            </div>
+            <div className="space-y-2 text-center">
+              <div className="relative h-[110px] w-[220px] overflow-hidden rounded-sm bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+                <div className="absolute inset-x-0 top-0 h-0" style={{ borderLeft: "110px solid transparent", borderRight: "110px solid transparent", borderTop: "58px solid #000000" }} />
+                <div className="absolute left-1/2 top-3 -translate-x-1/2"><Wordmark color="#FFFFFF" width={40} /></div>
+              </div>
+              <p className="text-[11px] text-[#6E6E73]">Opened — the black liner</p>
+            </div>
           </div>
         </Stage>
         <Specs rows={[
           ["Sizes", "DL 220 × 110 mm for letters; C4 324 × 229 mm for documents flat"],
           ["Front", "Logo top-left 30 mm, the legal name under it; nothing else"],
-          ["Paper", "White, uncoated"],
+          ["Outside", "White, uncoated, 120 g/m² — the address reads clearly and the post handles it like any letter"],
+          ["Inside", "A black liner; the white logo printed on the flap, seen when it opens"],
+          ["Second version", "Black outside, white liner (ch. 47)"],
         ]} />
       </Section>
     </Chapter>

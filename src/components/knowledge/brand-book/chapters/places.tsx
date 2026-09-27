@@ -17,16 +17,17 @@ import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { HubMark, Wordmark } from "../marks";
-import { INK, QrBox, Scaled, Slide } from "../mockups";
+import { INK, MachineShot, QrBox, Scaled, Slide } from "../mockups";
+import { SILVER } from "@/lib/brand-book/tokens";
 
 /* ── Drawings ──────────────────────────────────────────────────────────── */
 
-/** A plinth with a machine on it, front view. */
-function Plinth({ icon, left, w = 70 }: { icon: ReactNode; left: number; w?: number }) {
+/** A black plinth with the white KOLEEX machine on it, front view. */
+function Plinth({ left, w = 70 }: { left: number; w?: number }) {
   return (
     <div className="absolute bottom-[14px] flex flex-col items-center" style={{ left, width: w }}>
-      <div className="text-[#1D1D1F]">{icon}</div>
-      <div className="mt-[2px] h-[42px] w-full rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }} />
+      <MachineShot w={w + 6} label={false} />
+      <div className="mt-[2px] h-[42px] w-full rounded-[2px] bg-[#1D1D1F]" style={{ boxShadow: "inset 0 0 0 1px #3A3A3C" }} />
     </div>
   );
 }
@@ -34,7 +35,7 @@ function Plinth({ icon, left, w = 70 }: { icon: ReactNode; left: number; w?: num
 /** A 3 × 3 m shell-scheme booth, front elevation, designed at 360 × 240. */
 function Booth({ wrong = false }: { wrong?: boolean }) {
   return (
-    <div className="relative overflow-hidden" style={{ width: 360, height: 240, background: "#D2D2D7" }}>
+    <div className="relative overflow-hidden" style={{ width: 360, height: 240, background: wrong ? "#D2D2D7" : "#1D1D1F" }}>
       {/* fascia */}
       <div className="absolute inset-x-0 top-0 flex h-[30px] items-center justify-center" style={{ background: wrong ? "#FFFFFF" : INK }}>
         {wrong
@@ -46,8 +47,7 @@ function Booth({ wrong = false }: { wrong?: boolean }) {
         {!wrong && (
           <div className="absolute left-[22px] top-[26px]">
             <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
-            <p className="mt-1 text-[18px] font-bold leading-[1.05] text-white">Precise machines.<br />Honest advice.</p>
-            
+            <p className="mt-1 text-[18px] font-semibold leading-[1.05] tracking-[-0.02em]" style={{ backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Precise machines.<br />Honest advice.</p>
           </div>
         )}
         {wrong && <p className="absolute left-[16px] top-[18px] text-[9px] font-bold text-white">BEST PRICES!!! ALL MACHINES · SPARE PARTS · SERVICE · CALL NOW</p>}
@@ -57,15 +57,15 @@ function Booth({ wrong = false }: { wrong?: boolean }) {
         </div>
       </div>
       {/* side walls */}
-      <div className="absolute bottom-[14px] left-0 top-[30px] w-[10px] bg-[#D1D1D6]" />
-      <div className="absolute bottom-[14px] right-0 top-[30px] w-[10px] bg-[#D1D1D6]" />
+      <div className="absolute bottom-[14px] left-0 top-[30px] w-[10px]" style={{ background: wrong ? "#D1D1D6" : "#000000" }} />
+      <div className="absolute bottom-[14px] right-0 top-[30px] w-[10px]" style={{ background: wrong ? "#D1D1D6" : "#000000" }} />
       {/* floor */}
-      <div className="absolute inset-x-0 bottom-0 h-[14px] bg-[#98989D]" />
-      <Plinth left={30} icon={<FlatBedMachineIcon size={40} style={{ color: "#FFFFFF" }} />} />
-      <Plinth left={116} icon={<OverlockMachineIcon size={40} style={{ color: "#FFFFFF" }} />} />
+      <div className="absolute inset-x-0 bottom-0 h-[14px]" style={{ background: wrong ? "#98989D" : "#000000" }} />
+      <Plinth left={30} />
+      <Plinth left={116} />
       {/* counter */}
-      <div className="absolute bottom-[14px] right-[26px] flex h-[62px] w-[110px] items-center justify-center rounded-[2px] bg-white" style={{ boxShadow: "inset 0 0 0 1px #D1D1D6" }}>
-        {wrong ? <span className="text-[7px] font-bold text-[#DC2626]">brochures · prices · flyers</span> : <Wordmark color="#000000" width={64} />}
+      <div className="absolute bottom-[14px] right-[26px] flex h-[62px] w-[110px] items-center justify-center rounded-[2px]" style={{ background: wrong ? "#FFFFFF" : "#000000", boxShadow: wrong ? "inset 0 0 0 1px #D1D1D6" : "inset 0 0 0 1px #3A3A3C" }}>
+        {wrong ? <span className="text-[7px] font-bold text-[#DC2626]">brochures · prices · flyers</span> : <Wordmark color="#FFFFFF" width={64} />}
       </div>
     </div>
   );
@@ -121,7 +121,7 @@ export function ExhibitionBooth() {
     >
       <Section id="booth" title="The booth">
         <Rule why="A calm booth in a loud hall is the one people notice — and it looks like the machines: precise.">
-          One logo, one message, real machines on white plinths. Everything else is space.
+          All black: one logo, one message, the white machines on black plinths, lit from above. Everything else is space.
         </Rule>
         <Stage bg="#F5F5F7" h="auto" pad={20}>
           <Scaled w={300} base={360} h={240}><Booth /></Scaled>
@@ -129,10 +129,12 @@ export function ExhibitionBooth() {
         <Specs rows={[
           ["Fascia", "Our logo panel replaces the organizer’s lettering wherever the rules allow; logo height at most 60% of the fascia (ch. 38)"],
           ["Back wall", "Black, one headline in silver or white, the machine lit from above"],
-          ["Machines", "Real machines, running, on white plinths 750–800 mm high, 1–2 per 9 m²"],
+          ["Walls", "All black — back wall, side walls and counter"],
+          ["Machines", "Real machines, running, on black plinths 750–800 mm high, 1–2 per 9 m²"],
           ["Screen", "Koleex Hub or product video — this is where Aurora may appear (ch. 77)"],
           ["Light", "Neutral white 4000 K on the machines; no colored lighting"],
-          ["Floor", "Grey or black carpet; no printed floors"],
+          ["Floor", "Black carpet; no printed floors"],
+          ["Second version", "All white — white walls and plinths, black halo-lit letters — where the hall or a partner’s space is white (ch. 47)"],
         ]} />
       </Section>
 
@@ -373,9 +375,9 @@ export function OfficeSignage() {
               </div>
             </Sign>
           </Example>
-          <Example tone="do" caption="Reception wall: the logo alone, cut from the material." bg="#FFFFFF" h={200}>
-            <div className="flex h-[130px] w-[240px] items-center justify-center rounded-[2px]" style={{ background: "#F5F5F7", boxShadow: "inset 0 0 0 1px #D2D2D7" }}>
-              <div style={{ filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.12))" }}><Wordmark color="#000000" width={140} /></div>
+          <Example tone="do" caption="Reception wall: black, the logo alone, halo-lit white." bg="#FFFFFF" h={200}>
+            <div className="flex h-[130px] w-[240px] items-center justify-center rounded-[2px]" style={{ background: "#000000" }}>
+              <div style={{ filter: "drop-shadow(0 0 10px rgba(255,255,255,0.55))" }}><Wordmark color="#FFFFFF" width={140} /></div>
             </div>
           </Example>
         </Examples>
@@ -420,10 +422,11 @@ export function OfficeSignage() {
 
       <Section id="office-specs" title="Specifications">
         <Specs rows={[
-          ["Entrance plate", "Black acrylic or brushed steel, logo and names cut or printed white; about 600 × 360 mm"],
-          ["Reception logo", "Cut acrylic or metal, 15–20 mm deep, black on a light wall or white on a dark wall; 1000–1600 mm wide"],
+          ["Offices", "Black walls where people meet us (reception, meeting rooms), like the showroom; work areas may stay light. White is the second version (ch. 47)"],
+          ["Entrance plate", "Black acrylic or black anodized aluminum, logo and names engraved or printed white; about 600 × 360 mm"],
+          ["Reception logo", "3D letters, white on the black wall, halo-lit (ch. 39); 1000–1600 mm wide"],
           ["Room signs", "150 × 60 mm, white acrylic, black print, fixed at 1500 mm to the center"],
-          ["Lit signs", "White face only; no colored light (ch. 39)"],
+          ["Lit signs", "Halo-lit letters, white light only (ch. 39)"],
         ]} />
       </Section>
     </Chapter>
@@ -456,14 +459,14 @@ export function Showroom() {
     >
       <Section id="plan" title="The plan">
         <Stage bg="#F5F5F7" h="auto" pad={24}>
-          <div className="grid w-[280px] grid-cols-2 gap-2 rounded-[4px] bg-white p-3 text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
+          <div className="grid w-[280px] grid-cols-2 gap-2 rounded-[4px] bg-[#000000] p-3 text-[#F5F5F7] shadow-[0_0_0_1px_rgba(255,255,255,0.12)]">
             {zones.map(([name, icon]) => (
-              <div key={name} className="flex flex-col items-center justify-center gap-1 rounded-[3px] border border-[#D2D2D7] py-3">
+              <div key={name} className="flex flex-col items-center justify-center gap-1 rounded-[3px] bg-[#1D1D1F] py-3">
                 {icon}
                 <span className="text-[8px] font-semibold uppercase tracking-[0.1em]">{name}</span>
               </div>
             ))}
-            <div className="col-span-2 flex items-center justify-between rounded-[3px] bg-[#000000] px-3 py-2 text-white">
+            <div className="col-span-2 flex items-center justify-between rounded-[3px] bg-[#1D1D1F] px-3 py-2 text-white" style={{ boxShadow: "inset 0 0 0 1px #3A3A3C" }}>
               <span className="text-[8px] font-semibold uppercase tracking-[0.1em]">Meeting table · Koleex Hub</span>
               <Wordmark color="#FFFFFF" width={40} />
             </div>
@@ -493,7 +496,7 @@ export function Showroom() {
       <Section id="showroom-rules" title="Rules">
         <Bullets items={[
           "Machines grouped by category, labeled with the machine icons (ch. 59).",
-          "White or light grey walls; the logo once, at the entrance to the room.",
+          "Black walls, ceiling and floor; the white machines lit from above (4000 K), on black plinths — the logo once, halo-lit, at the entrance. White is the second version (ch. 47).",
           "Every machine threaded, clean and ready to sew; a fabric tray at each one.",
           "A screen may show the website or Koleex Hub; no TV channels, no music videos.",
         ]} />
@@ -556,7 +559,7 @@ export function WarehouseSignage() {
         <Specs rows={[
           ["Zone signs", "600 × 700 mm hanging, black with white letters, letter height 300 mm"],
           ["Rack labels", "100 × 50 mm, white, black code 20 mm tall, with a barcode"],
-          ["Building sign", "White logo on the dark facade, or black on light; lit signs white face only"],
+          ["Building sign", "Halo-lit 3D letters — black on a light facade, white on a dark one; white light only (ch. 39)"],
           ["Material", "Aluminum composite or rigid PVC; matte, no reflections under high-bay lights"],
         ]} />
       </Section>
@@ -569,9 +572,9 @@ export function WarehouseSignage() {
 function Van({ wrong = false }: { wrong?: boolean }) {
   return (
     <div className="relative" style={{ width: 320, height: 150 }}>
-      <div className="absolute left-[10px] top-[24px] h-[96px] w-[230px] rounded-[10px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #D1D1D6" }} />
-      <div className="absolute left-[236px] top-[46px] h-[74px] w-[74px] rounded-r-[26px] rounded-tl-[6px] bg-white" style={{ boxShadow: "inset 0 0 0 1.5px #D1D1D6" }} />
-      <div className="absolute left-[252px] top-[54px] h-[26px] w-[40px] rounded-r-[14px] rounded-tl-[3px] bg-[#98989D]" />
+      <div className="absolute left-[10px] top-[24px] h-[96px] w-[230px] rounded-[10px]" style={{ background: wrong ? "#FFFFFF" : "#000000", boxShadow: wrong ? "inset 0 0 0 1.5px #D1D1D6" : "inset 0 0 0 1.5px #1D1D1F" }} />
+      <div className="absolute left-[236px] top-[46px] h-[74px] w-[74px] rounded-r-[26px] rounded-tl-[6px]" style={{ background: wrong ? "#FFFFFF" : "#000000", boxShadow: wrong ? "inset 0 0 0 1.5px #D1D1D6" : "inset 0 0 0 1.5px #1D1D1F" }} />
+      <div className="absolute left-[252px] top-[54px] h-[26px] w-[40px] rounded-r-[14px] rounded-tl-[3px] bg-[#3A3A3C]" />
       {[52, 250].map((l) => (
         <div key={l} className="absolute top-[106px] h-[36px] w-[36px] rounded-full bg-[#1D1D1F]" style={{ left: l, boxShadow: "inset 0 0 0 9px #1D1D1F, inset 0 0 0 14px #98989D" }} />
       ))}
@@ -583,9 +586,9 @@ function Van({ wrong = false }: { wrong?: boolean }) {
         </div>
       ) : (
         <div className="absolute left-[30px] top-[48px] flex flex-col gap-2">
-          <Wordmark color="#000000" width={130} />
-          <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#6E6E73]">Industrial Garment Machinery</p>
-          <p className="text-[7px] text-[#1D1D1F]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>{KOLEEX_COMPANY.web}</p>
+          <Wordmark color="#FFFFFF" width={130} />
+          <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
+          <p className="text-[7px] text-[#F5F5F7]" style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>{KOLEEX_COMPANY.web}</p>
         </div>
       )}
     </div>
@@ -599,7 +602,7 @@ export function Vehicles() {
       lead={
         <p>
           A company van is a moving sign. It is seen by more people than any poster — and judged by how it is
-          driven and kept. White body, black logo, one line, one address.
+          driven and kept. Black body, white logo, one line, one address.
         </p>
       }
       toc={[
@@ -609,7 +612,7 @@ export function Vehicles() {
     >
       <Section id="livery" title="The livery">
         <Examples cols={2}>
-          <Example tone="do" caption="White body; logo, descriptor, website." bg="#F5F5F7" h={180}>
+          <Example tone="do" caption="Black body; the white logo, descriptor, website." bg="#F5F5F7" h={180}>
             <Scaled w={260} base={320} h={150}><Van /></Scaled>
           </Example>
           <Example tone="dont" caption="Colors, slogans, a list of services and phone numbers." bg="#F5F5F7" h={180}>
@@ -617,10 +620,11 @@ export function Vehicles() {
           </Example>
         </Examples>
         <Specs rows={[
-          ["Vehicle color", "White (or the vehicle’s own black); no full wraps"],
+          ["Vehicle color", "Black — factory black paint, or a matte black wrap where the vehicle is not black"],
           ["Logo", "Both sides, 900–1200 mm wide on a van; the back doors 500 mm"],
           ["Text", "The descriptor and the website only"],
-          ["Material", "Cut matte vinyl, black on white bodies, white on black bodies"],
+          ["Material", "Cut matte white vinyl"],
+          ["Second version", "White body, black logo — for hot climates, or where the local fleet is white (ch. 47)"],
         ]} />
       </Section>
 

@@ -11,8 +11,10 @@ import {
   B, Bullets, Chapter, Example, Examples, Note, P, Ref, Rule, Section, Specs, Stage, Table,
 } from "../kit";
 import { HubMark, Wordmark } from "../marks";
-import { Browser } from "../mockups";
-import { HUB_GRADIENT } from "@/lib/brand-book/tokens";
+import { Browser, MachineShot } from "../mockups";
+import { HUB_GRADIENT, SILVER } from "@/lib/brand-book/tokens";
+
+const SILVER_TEXT = { backgroundImage: SILVER.cssText, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } as const;
 
 /* ── 75 · Website ──────────────────────────────────────────────────────── */
 
@@ -54,47 +56,79 @@ export function Website() {
 
       <Section id="header" title="Header and home">
         <Stage bg="#F5F5F7" h="auto" pad={20}>
-          <Browser>
-            <div className="flex items-center gap-4 border-b border-[#D2D2D7] px-4 py-2.5">
+          <Browser w={560}>
+            <div className="flex items-center gap-4 border-b border-[#D2D2D7] px-4 py-2.5" style={{ background: "rgba(245,245,247,0.86)", backdropFilter: "saturate(180%) blur(20px)", WebkitBackdropFilter: "saturate(180%) blur(20px)" }}>
               <Wordmark color="#000000" width={72} />
-              <nav className="flex flex-1 gap-3 text-[9px] text-[#6E6E73]"><span>Machines</span><span>Services</span><span>About</span><span>News</span><span>Contact</span></nav>
+              <nav className="flex flex-1 gap-3 text-[9px] text-[#424245]"><span>Machines</span><span>Services</span><span>About</span><span>News</span><span>Contact</span></nav>
               <span className="text-[8.5px] text-[#6E6E73]">EN · 中文 · عربي</span>
-              <span className="rounded-md bg-[#000000] px-2 py-1 text-[8.5px] font-semibold text-white">Request a quotation</span>
+              <span className="rounded-full px-2.5 py-1 text-[8.5px] font-medium text-white" style={{ background: "#567FB2" }}>Request a quotation</span>
             </div>
-            <div className="relative bg-[#000000] px-6 py-8 text-white">
-              <p className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">Industrial Garment Machinery</p>
-              <p className="mt-1.5 max-w-[260px] text-[20px] font-bold leading-tight">Machines for garment factories — selected, checked, delivered.</p>
-              <div className="mt-3 flex gap-2"><span className="rounded-md bg-white px-2 py-1 text-[8.5px] font-semibold text-[#1D1D1F]">See the machines</span><span className="rounded-md border border-white/40 px-2 py-1 text-[8.5px]">Chat on WhatsApp</span></div>
-              
+            <div className="bg-[#000000] px-6 pb-4 pt-9 text-center">
+              <p className="text-[30px] font-semibold leading-none tracking-[-0.03em]" style={SILVER_TEXT}>Stitch. Perfected.</p>
+              <p className="mt-2 text-[10px] text-[#A1A1A6]">Industrial garment machinery — selected, checked, delivered.</p>
+              <div className="mt-3 flex items-center justify-center gap-3">
+                <span className="rounded-full px-3 py-1 text-[8.5px] font-medium text-white" style={{ background: "#567FB2" }}>See the machines</span>
+                <span className="text-[8.5px] text-[#7FA9D6]">Chat on WhatsApp ›</span>
+              </div>
+              <div className="mx-auto mt-6 w-[62%]"><MachineShot w="100%" label={false} /></div>
             </div>
-            <div className="grid grid-cols-3 gap-2 p-4">
+            <div className="grid grid-cols-3 gap-2 bg-[#F5F5F7] p-4">
               {[["Flat bed", FlatBedMachineIcon], ["Overlock", OverlockMachineIcon], ["Coverstitch", CoverstitchIcon]].map(([n, I]) => {
                 const Icon = I as typeof FlatBedMachineIcon;
-                return <div key={n as string} className="flex items-center gap-2 rounded-lg border border-[#D2D2D7] px-2.5 py-2 text-[9px] font-semibold"><Icon size={16} />{n as string}</div>;
+                return <div key={n as string} className="flex flex-col items-center gap-1.5 rounded-[14px] bg-white px-2.5 py-3 text-[9px] font-medium text-[#1D1D1F]"><Icon size={22} />{n as string}</div>;
               })}
             </div>
           </Browser>
         </Stage>
+        <Specs rows={[
+          ["Header", "Light and translucent (Cloud #F5F5F7 at 86%, blurred), the black logo top-left, gray menu, the language switch, one Hub Blue button"],
+          ["Home hero", "Black, centered: the headline in silver, one line under it, one button and one link — the machine below"],
+          ["Below the hero", "The machine categories on Cloud, each with its line icon (ch. 58)"],
+          ["Buttons and links", "Hub Blue only — Steel pill buttons, Sky links on black, Deep links on white (ch. 46)"],
+        ]} />
       </Section>
 
       <Section id="product-page" title="The machine page">
+        <Rule why="A factory owner decides with his eyes first and his spreadsheet second. The machine, big and sharp, sells before the numbers do.">
+          Every machine page tells a short story from the top down: the machine on black, three key numbers,
+          close-ups, then the full specifications and the downloads.
+        </Rule>
         <Stage bg="#F5F5F7" h="auto" pad={20}>
-          <Browser url="www.koleexgroup.com/en/machines/overlock">
-            <div className="grid grid-cols-[1fr_1.1fr] gap-4 p-4">
-              <div className="flex aspect-square items-center justify-center rounded-lg bg-[#F5F5F7]"><OverlockMachineIcon size={60} /></div>
-              <div className="space-y-2">
-                <span className="inline-flex items-center gap-1 rounded-md border border-[#D2D2D7] px-1.5 py-0.5 text-[7.5px] font-semibold uppercase tracking-[0.12em] text-[#6E6E73]"><OverlockMachineIcon size={10} />Overlock</span>
-                <p className="text-[15px] font-bold leading-tight">Model name</p>
-                <div className="space-y-1 text-[8.5px]">{["Key feature one", "Key feature two", "Key feature three"].map((f) => <p key={f} className="flex items-center gap-1.5">{f}</p>)}</div>
-                <div className="flex gap-1.5 pt-1"><span className="rounded-md bg-[#000000] px-2 py-1 text-[8px] font-semibold text-white">Request a quotation</span><span className="rounded-md border border-[#000000] px-2 py-1 text-[8px] font-semibold">WhatsApp</span></div>
-                <p className="text-[8px] text-[#3E6796] underline">Download the spec sheet (PDF)</p>
-              </div>
+          <Browser url="www.koleexgroup.com/en/machines/overlock/model" w={420}>
+            <div className="bg-[#000000] px-6 pb-4 pt-7 text-center">
+              <p className="text-[7px] font-medium uppercase tracking-[0.2em] text-[#98989D]">Overlock</p>
+              <p className="mt-1 text-[24px] font-semibold leading-none tracking-[-0.03em]" style={SILVER_TEXT}>Model name</p>
+              <p className="mt-1.5 text-[9.5px] text-[#A1A1A6]">Four threads. One pass.</p>
+              <span className="mt-2.5 inline-block rounded-full px-3 py-1 text-[8.5px] font-medium text-white" style={{ background: "#567FB2" }}>Request a quotation</span>
+              <div className="mx-auto mt-5 w-[74%]"><MachineShot w="100%" label={false} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 bg-white px-4 py-5 text-center">
+              {[["6,000", "stitches per minute"], ["4", "threads"], ["550 W", "servo motor"]].map(([v, l]) => (
+                <div key={l}><p className="text-[18px] font-semibold tracking-[-0.02em] text-[#1D1D1F]">{v}</p><p className="text-[8px] text-[#6E6E73]">{l}</p></div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2 bg-white px-4 pb-4">
+              {["Needle", "Stitch", "Panel"].map((c) => (
+                <div key={c} className="flex aspect-square items-end rounded-[12px] bg-[#F5F5F7] p-2 text-[7.5px] text-[#6E6E73]">Close-up · {c}</div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-t border-[#E8E8ED] bg-white px-4 py-3 text-[8.5px]">
+              <span className="text-[#1D1D1F]">Full specifications</span>
+              <span className="text-[#3E6796]">Download the spec sheet (PDF) ›</span>
             </div>
           </Browser>
         </Stage>
+        <Table
+          head={["Order", "Section", "On"]}
+          rows={[
+            ["1", "Category, model name in silver, one line, Request a quotation, the machine", "Black"],
+            ["2", "Three key numbers, big", "White"],
+            ["3", "Close-ups: needle, stitch, control panel", "White"],
+            ["4", "Full specifications table, downloads, related machines", "White"],
+          ]}
+        />
         <Bullets items={[
-          <>Photos: our own, on white, the standard angles (<Ref n={64} />).</>,
-          "Key features first, then the full specification table.",
+          <>Photos: our own — the hero on black, close-ups and details on white (<Ref n={64} />).</>,
           <><B>No prices</B> on the website — prices are given in quotations.</>,
           "Never a supplier's name, factory code or catalog.",
         ]} />
@@ -305,15 +339,15 @@ export function Email() {
         <Stage bg="#F5F5F7" h="auto" pad={20}>
           <div className="w-[300px] overflow-hidden rounded-md bg-white text-[#1D1D1F] shadow-[0_0_0_1px_rgba(0,0,0,0.12)]">
             <div className="flex items-center justify-between px-4 py-3"><Wordmark color="#000000" width={70} /><span className="text-[7.5px] text-[#6E6E73]">September 2026</span></div>
-            <div className="relative bg-[#000000] px-4 py-6 text-white">
-              <p className="text-[6.5px] font-semibold uppercase tracking-[0.2em] text-[#98989D]">New · Spreading</p>
-              <p className="mt-1 text-[14px] font-bold leading-tight">Lay it flat.<br />Cut it right.</p>
-              
+            <div className="bg-[#000000] px-4 pb-4 pt-6 text-center">
+              <p className="text-[6.5px] font-medium uppercase tracking-[0.2em] text-[#98989D]">New · Spreading</p>
+              <p className="mt-1 text-[17px] font-semibold leading-[1.05] tracking-[-0.02em]" style={SILVER_TEXT}>Lay it flat.<br />Cut it right.</p>
+              <span className="mt-2.5 inline-block rounded-full px-3 py-1 text-[8px] font-medium text-white" style={{ background: "#567FB2" }}>See the machine</span>
+              <div className="mx-auto mt-4 w-[78%]"><MachineShot w="100%" label={false} /></div>
             </div>
             <div className="space-y-2 px-4 py-3">
               <div className="h-[3px] w-full rounded bg-[#D2D2D7]" /><div className="h-[3px] w-5/6 rounded bg-[#D2D2D7]" />
-              <span className="inline-block rounded-md bg-[#000000] px-2 py-1 text-[8px] font-semibold text-white">See the machine</span>
-              <div className="grid grid-cols-2 gap-2 pt-1">{[0, 1].map((i) => <div key={i} className="h-14 rounded bg-[#F5F5F7]" />)}</div>
+              <div className="grid grid-cols-2 gap-2 pt-1">{[0, 1].map((i) => <div key={i} className="rounded-[10px] bg-[#F5F5F7] p-2"><MachineShot w="100%" dark={false} label={false} /></div>)}</div>
             </div>
             <div className="space-y-0.5 bg-[#F5F5F7] px-4 py-3 text-[6px] leading-snug text-[#6E6E73]">
               <p className="font-semibold text-[#1D1D1F]">{KOLEEX_COMPANY.en}</p>
@@ -331,7 +365,9 @@ export function Email() {
           ["Fonts", "Arial / Helvetica for Latin, Tahoma for Arabic, Microsoft YaHei / PingFang for Chinese — email apps do not load Inter"],
           ["Logo", "PNG from our domain, on a white header so it survives dark mode"],
           ["Images", "Hosted on our own domain, each with alternative text; the email must still make sense with images off"],
-          ["Buttons", "Black with white text, 8 px corners, at least 44 px tall"],
+          ["Layout", "White email, the black logo top-left in a white header, then a black hero: the headline, one button, the machine"],
+          ["Silver headlines", "Sent as images (PNG with alternative text) — email apps cannot draw the silver gradient"],
+          ["Buttons", "Hub Blue Steel #567FB2 pill, white text, at least 44 px tall"],
           ["Footer", "Legal name in English and Chinese, website, email, unsubscribe link"],
         ]} />
       </Section>
