@@ -112,10 +112,9 @@ export const businessCard: TemplateDef = {
     { key: "dealerName", kind: "text", labelKey: "tpl.f.dealerName", group: "person", max: 60, when: isStyle("dealer") },
     { key: "dealerLogo", kind: "image", labelKey: "tpl.f.dealerLogo", group: "person", hintKey: "tpl.f.dealerLogoHint", when: isStyle("dealer") },
 
-    { key: "company", kind: "text", labelKey: "tpl.f.company", group: "company", max: 60 },
+    { key: "company", kind: "text", labelKey: "tpl.f.company", group: "company", max: 60, hintKey: "tpl.f.companyHint" },
     { key: "companyBack", kind: "switch", labelKey: "tpl.f.companyBack", group: "company", when: (v) => !NO_COMPANY_BACK.includes(styleOf(v)) },
     { key: "companyFront", kind: "switch", labelKey: "tpl.f.companyFront", group: "company", when: (v) => !NO_COMPANY_FRONT.includes(styleOf(v)) },
-    { key: "companySpread", kind: "switch", labelKey: "tpl.f.companySpread", group: "company" },
 
     { key: "rows", kind: "rows", labelKey: "tpl.f.rows", group: "contacts", langKey: "lang" },
     { key: "labels", kind: "switch", labelKey: "tpl.f.labels", group: "contacts" },
@@ -137,7 +136,7 @@ export const businessCard: TemplateDef = {
   defaults: {
     style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100,
     name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "",
-    company: EVERYDAY_NAME_EN, companyBack: true, companyFront: false, companySpread: false,
+    company: "KOLEEX INTERNATIONAL GROUP", companyBack: true, companyFront: false,
     rows: defaultRows("en"), labels: true, whatsapp: true,
     photo: "", photoZoom: 100, photoX: 0, photoY: 0, soft: true,
     stroke: true, bar: true, slash: true, italic: true,

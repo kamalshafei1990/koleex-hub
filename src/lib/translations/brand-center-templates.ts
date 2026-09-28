@@ -192,11 +192,13 @@ export const brandCenterTemplatesT: Translations = {
                    ar: "أي لون أو أسود مش مظبوط يتظبط عند المطبعة قبل الشغل الحقيقي — مش في الملف بتاعنا." },
 
   /* ── the group's name under the logo (owner 29/09) ── */
-  "tpl.group.company":    { en: "Company name under the logo", zh: "标志下方的公司名", ar: "اسم الشركة تحت اللوجو" },
+  "tpl.group.company":    { en: "Company name with the logo", zh: "标志与公司名", ar: "اسم الشركة مع اللوجو" },
   "tpl.f.company":        { en: "Text", zh: "文字", ar: "الكلام" },
+  "tpl.f.companyHint":    { en: "As the brand book sets it (ch. 43): in capitals, Inter Light, exactly as wide as the logo, in the logo's colour. On the back it sits beside the logo after a hairline (the horizontal lockup); on the front under a 40 mm logo.",
+                            zh: "按品牌手册（第 43 章）：全大写、Inter Light、与标志同宽、与标志同色。背面放在标志旁的细线之后（横式组合）；正面放在 40 毫米标志下方。",
+                            ar: "زي كتاب البراند (فصل 43): حروف كبيرة، Inter Light، بعرض اللوجو بالظبط وبلونه. على الضهر بيبقى جنب اللوجو بعد خط رفيع (الشكل الأفقي)، وعلى الوش تحت لوجو 40 مم." },
   "tpl.f.companyBack":    { en: "On the back", zh: "放在背面", ar: "على الضهر" },
   "tpl.f.companyFront":   { en: "On the front", zh: "放在正面", ar: "على الوش" },
-  "tpl.f.companySpread":  { en: "Spread to the logo's width", zh: "与标志同宽", ar: "بعرض اللوجو بالظبط" },
 
   /* ── my templates (owner 29/09) ── */
   "saved.title":      { en: "My templates", zh: "我的模板", ar: "قوالبي" },

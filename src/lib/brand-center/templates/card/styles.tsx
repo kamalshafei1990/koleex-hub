@@ -29,7 +29,7 @@ import type { DrawContext, TemplateValues } from "../types";
 import { PT } from "../types";
 import {
   ColumnRows, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, HAIRLINE_ON_WHITE, INK, InlineRows, LIGHT_ON_INK, Line, Logo,
-  Photo, PhotoPlaceholder, QrZone, Stroke, WHITE, columnRowsSpan, companyLine, fit, lockupHeight, logoHeight, textWidth, wrap, type PrintRow, type Zone,
+  Photo, PhotoPlaceholder, QrZone, STACKED_MIN, Stroke, WHITE, columnRowsSpan, fit, lockupHeight, lockupLines, logoHeight, stackedLine, textWidth, wrap, type PrintRow, type Zone,
 } from "./parts";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { asLang, fontOf, langOf, num, printedRows, qrsOf, relangRows, rowsOf, str, type Lang } from "./model";
@@ -41,9 +41,11 @@ export const STYLES = [
 export type CardStyle = (typeof STYLES)[number];
 export const styleOf = (v: TemplateValues): CardStyle => ((STYLES as readonly string[]).includes(String(v.style)) ? (v.style as CardStyle) : "team-black");
 export const PORTRAIT_STYLES: CardStyle[] = ["classic", "management"];
-/** Backs that already carry the group's name in the lockup, or the partner's (no line). */
+/** Where the name with the logo has no place (ch. 43/44): the lockup backs
+ *  carry it already; the portrait fronts' logos are under 40 mm (the logo
+ *  alone); the dealer card is co-branded. */
 export const NO_COMPANY_BACK: CardStyle[] = ["classic", "management", "executive", "dealer"];
-export const NO_COMPANY_FRONT: CardStyle[] = ["dealer"];
+export const NO_COMPANY_FRONT: CardStyle[] = ["classic", "management", "executive", "dealer"];
 export const VERTICAL_STYLES: CardStyle[] = ["vertical", "vertical-white"];
 
 const INSET = 5; // text and marks stay 1 mm inside the 4 mm safe margin
@@ -74,16 +76,28 @@ function read(v: TemplateValues, ctx: DrawContext) {
     name: str(v, "name"), title: str(v, "title"), rows: printedRows(v) as PrintRow[],
     front: all.filter((q) => q.side === "front"), back: all.filter((q) => q.side === "back"),
     codes: ctx.qrs, uid: ctx.uid,
-    /** The group's name under the logo: on the back by default, on the front when asked. */
+    /** The group's name with the logo (ch. 43): on the back by default, on the front when asked. */
     company: typeof v.company === "string" ? v.company.trim() : EVERYDAY_NAME_EN,
     companyOn: { front: v.companyFront === true, back: v.companyBack !== false } as Record<"front" | "back", boolean>,
-    spread: v.companySpread === true,
   };
 }
 
-/** The company line under a logo on one side, or nothing. */
-function company(r: Read, side: "front" | "back", logo: { x: number; y: number; w: number }, align: "start" | "middle" | "end", fill: string) {
-  return r.companyOn[side] ? companyLine({ text: r.company, logo, align, fill, font: r.font, spread: r.spread }) : { node: null, room: 0 };
+/** The book's two ways to put the name with the logo (ch. 43):
+ *  · the stacked lockup under a logo of 40 mm or more (a face's logo);
+ *  · the horizontal lockup — logo | hairline | three lines — for the wide,
+ *    short top of an information side ("the back of the business card"). */
+const HORIZONTAL_W = 25 * 1190 / 720; // its logo is 25 mm, the book's card logo
+function stacked(r: Read, side: "front" | "back", logo: { x: number; y: number; w: number }, fill: string) {
+  return r.companyOn[side] && logo.w >= STACKED_MIN - 0.01 ? stackedLine({ text: r.company, logo, fill, font: r.font }) : { node: null, room: 0 };
+}
+function topMark(r: Read, side: "front" | "back", at: { x: number; y: number; rtl: boolean; w?: number; logoW?: number }, fill: string) {
+  if (r.companyOn[side]) {
+    const w = at.w ?? HORIZONTAL_W;
+    const x = at.rtl ? at.x - w : at.x;
+    return { node: <GroupLockup x={x} y={at.y} width={w} fill={fill} font={r.font} lines={lockupLines(r.company)} />, height: lockupHeight(w), width: w };
+  }
+  const lw = at.logoW ?? 25;
+  return { node: <Logo x={at.rtl ? at.x - lw : at.x} y={at.y} width={lw} fill={fill} />, height: logoHeight(lw), width: lw };
 }
 type Read = ReturnType<typeof read>;
 
@@ -168,7 +182,6 @@ function classicFront(v: TemplateValues, ctx: DrawContext): ReactNode {
         ? <Photo href={photo} box={photoBox} zoom={num(v, "photoZoom", 100) / 100} px={num(v, "photoX", 0)} py={num(v, "photoY", 0)} soft={v.soft !== false} uid={`${r.uid}-p`} />
         : <PhotoPlaceholder box={{ x: f.fx(0.08), y: f.fy(0.08), w: f.w * 0.42, h: f.h * 0.92 + f.b }} label={word(r.lang, "addPhoto")} font={font} />}
       <Logo x={f.fx(C.logo.x)} y={f.fy(C.logo.y)} width={f.w * C.logo.w} fill={WHITE} />
-      {company(r, "front", { x: f.fx(C.logo.x), y: f.fy(C.logo.y), w: f.w * C.logo.w }, "end", WHITE).node}
       {v.bar !== false ? (
         <rect x={rtl ? end - f.w * C.bar.w : f.fx(C.bar.x)} y={f.fy(C.bar.y)} width={f.w * C.bar.w} height={f.h * C.bar.h} fill={WHITE} />
       ) : null}
@@ -268,7 +281,6 @@ function portraitFront(v: TemplateValues, ctx: DrawContext, withPhoto: boolean):
         : <PhotoPlaceholder box={box} label={word(r.lang, "addPhoto")} font={font} />) : null}
       {withPhoto ? <ShadeBottom f={f} uid={r.uid} /> : null}
       <Logo x={f.right - lw} y={f.top} width={lw} fill={WHITE} />
-      {company(r, "front", { x: f.right - lw, y: f.top, w: lw }, "end", LIGHT_ON_INK).node}
       <ColumnRows rows={r.rows} x={rtl ? f.right : colX} y={top} align="top" width={colW} rtl={rtl} size={size} fill={WHITE} font={font} maxWrap={3} />
       <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_INK} max={12}
         zone={{ x: colX, y: top + span + size * 2, w: colW, h: Math.max(6, f.bottom - 9 - (top + span + size * 2)), dir: "row", align: rtl ? "end" : "start" }} />
@@ -331,15 +343,15 @@ function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
   const vertical = ctx.h > ctx.w;
   const start = rtl ? f.right : f.left;
 
-  const line = o.top === "cobrand" ? { node: null, room: 0 } : company(r, o.side, { x: rtl ? f.right - 25 : f.left, y: f.top, w: 25 }, rtl ? "end" : "start", sub);
+  const mark = topMark(r, o.side, { x: rtl ? f.right : f.left, y: f.top, rtl }, fg);
   const top = o.top === "cobrand"
     ? { node: coBrand({ x: rtl ? f.right - Math.min(44, f.inner) : f.left, y: f.top + 3.2, width: Math.min(44, f.inner), rtl, partner: str(v, "dealerLogo"), placeholder: word(lang, "addLogo"), font }), bottom: f.top + 6.4 }
-    : { node: <><Logo x={rtl ? f.right - 25 : f.left} y={f.top} width={25} fill={fg} />{line.node}</>, bottom: f.top + logoHeight(25) + line.room };
+    : { node: mark.node, bottom: f.top + mark.height };
 
   const nameSize = 9 * PT * k;
   const titleSize = 7 * PT * k;
   const rowsSize = 6.5 * PT * k;
-  const nameY = vertical ? f.top + 27 + line.room : top.bottom + (line.room ? 9.5 : 11.5);
+  const nameY = vertical ? top.bottom + 23.3 : top.bottom + 11.5;
   const n = o.qrs.length;
   const qrMax = vertical ? 14 : 15;
   const corner = cornerZone(r, n, qrMax, vertical ? "center" : "end");
@@ -370,17 +382,19 @@ function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
 function logoFace(v: TemplateValues, ctx: DrawContext, dark: boolean, logoW = 40): ReactNode {
   const r = read(v, ctx);
   const { f, font } = r;
-  const lw = Math.min(logoW, f.inner - 6);
+  /* With the name, the logo is at least the stacked lockup's 40 mm. */
+  const lw = Math.min(r.companyOn.front ? Math.max(logoW, STACKED_MIN) : logoW, f.inner - 4);
   const vertical = ctx.h > ctx.w;
   const corner = cornerZone(r, r.front.length, 12, vertical ? "center" : "end");
-  const probe = company(r, "front", { x: 0, y: 0, w: lw }, "middle", dark ? LIGHT_ON_INK : GREY_ON_WHITE);
+  const probe = stacked(r, "front", { x: 0, y: 0, w: lw }, WHITE);
   const ly = (r.front.length && vertical ? f.b + f.h * 0.4 - logoHeight(lw) / 2 : f.b + (f.h - logoHeight(lw)) / 2) - probe.room / 2;
   const lx = f.b + (f.w - lw) / 2;
+  const ink = dark ? WHITE : INK;
   return (
     <>
       {fill(f, dark ? INK : WHITE)}
-      <Logo x={lx} y={ly} width={lw} fill={dark ? WHITE : INK} />
-      {company(r, "front", { x: lx, y: ly, w: lw }, "middle", dark ? LIGHT_ON_INK : GREY_ON_WHITE).node}
+      <Logo x={lx} y={ly} width={lw} fill={ink} />
+      {stacked(r, "front", { x: lx, y: ly, w: lw }, ink).node}
       <QrZone items={r.front} codes={r.codes} font={font} captionFill={dark ? GREY_ON_INK : GREY_ON_WHITE} max={12} zone={corner.zone} />
     </>
   );
@@ -404,12 +418,13 @@ function salesFront(v: TemplateValues, ctx: DrawContext): ReactNode {
       <path d={d} fill="none" stroke={WHITE} strokeOpacity={0.14} strokeWidth={1.6} strokeLinecap="round" />
       <path d={d} fill="none" stroke={WHITE} strokeWidth={0.32} strokeLinecap="round" />
       {(() => {
-        const room = company(r, "front", { x: 0, y: 0, w: lw }, "start", LIGHT_ON_INK).room;
-        const logo = { x: rtl ? f.right - lw : f.left, y: f.bottom - logoHeight(lw) - room, w: lw };
+        const w = r.companyOn.front ? STACKED_MIN : lw;
+        const room = stacked(r, "front", { x: 0, y: 0, w }, WHITE).room;
+        const logo = { x: rtl ? f.right - w : f.left, y: f.bottom - logoHeight(w) - room, w };
         return (
           <>
-            <Logo x={logo.x} y={logo.y} width={lw} fill={WHITE} />
-            {company(r, "front", logo, rtl ? "end" : "start", LIGHT_ON_INK).node}
+            <Logo x={logo.x} y={logo.y} width={w} fill={WHITE} />
+            {stacked(r, "front", logo, WHITE).node}
           </>
         );
       })()}
@@ -475,8 +490,8 @@ function centeredBack(v: TemplateValues, ctx: DrawContext, dark: boolean): React
   const lw = 20;
   /* Top down: logo, name, title, rule; the lines fill what is left above
      the QR row (tighter when there are codes). */
-  const line = company(r, "back", { x: cx - lw / 2, y: f.top, w: lw }, "middle", sub);
-  const nameY = f.top + logoHeight(lw) + line.room + (n ? 6.2 : 8.5);
+  const mark = topMark(r, "back", { x: cx - (r.companyOn.back ? HORIZONTAL_W : lw) / 2, y: f.top, rtl: false, logoW: lw }, fg);
+  const nameY = f.top + mark.height + (n ? 6.2 : 8.5);
   const ruleY = nameY + 3.4 * k + 2.6;
   const rowsTop = ruleY + 3.6;
   const floor = n ? corner.zone.y - 1.6 : f.bottom;
@@ -484,8 +499,7 @@ function centeredBack(v: TemplateValues, ctx: DrawContext, dark: boolean): React
   return (
     <>
       {fill(f, dark ? INK : WHITE)}
-      <Logo x={cx - lw / 2} y={f.top} width={lw} fill={fg} />
-      {line.node}
+      {mark.node}
       {r.name ? <Line x={cx} y={nameY} rtl={rtl} anchor="middle" font={font} size={10 * PT * k} weight={600} fill={fg} max={f.inner}>{r.name}</Line> : null}
       {r.title ? <Line x={cx} y={nameY + 3.4 * k} rtl={rtl} anchor="middle" font={font} size={7 * PT * k} fill={sub} max={f.inner}>{r.title}</Line> : null}
       <rect x={cx - 4} y={ruleY} width={8} height={0.2} fill={sub} />
@@ -502,8 +516,8 @@ function gridBack(v: TemplateValues, ctx: DrawContext): ReactNode {
   const { f, rtl, font, k } = r;
   const colGap = 4;
   const colW = (f.inner - colGap) / 2;
-  const line = company(r, "back", { x: rtl ? f.right - 20 : f.left, y: f.top, w: 20 }, rtl ? "end" : "start", GREY_ON_WHITE);
-  const bandY = f.top + 7 + line.room * 0.8;
+  const mark = topMark(r, "back", { x: rtl ? f.right : f.left, y: f.top, rtl, w: 34, logoW: 20 }, INK);
+  const bandY = f.top + Math.max(7, mark.height + 3);
   const leftX = rtl ? f.right : f.left;
   const rightX = rtl ? f.left + colW : f.left + colW + colGap;
   const rowsSize = 6 * PT * k;
@@ -515,9 +529,8 @@ function gridBack(v: TemplateValues, ctx: DrawContext): ReactNode {
   return (
     <>
       {fill(f, WHITE)}
-      <Logo x={rtl ? f.right - 20 : f.left} y={f.top} width={20} fill={INK} />
-      {line.node}
-      {web ? <Line x={rtl ? f.left : f.right} y={f.top + logoHeight(20) - 0.2} rtl={rtl} anchor="end" font={font} size={5.5 * PT} fill={GREY_ON_WHITE}>{web}</Line> : null}
+      {mark.node}
+      {web ? <Line x={rtl ? f.left : f.right} y={f.top + mark.height - 0.2} rtl={rtl} anchor="end" font={font} size={5.5 * PT} fill={GREY_ON_WHITE}>{web}</Line> : null}
       <rect x={f.left} y={bandY} width={f.inner} height={0.12} fill={HAIRLINE_ON_WHITE} />
       {r.name ? <Line x={leftX} y={bandY + 6} rtl={rtl} font={font} size={9 * PT * k} weight={600} fill={INK} max={colW}>{r.name}</Line> : null}
       {r.title ? wrap(r.title, 6.5 * PT * k, colW, 2, 400, font).map((t, i) => (

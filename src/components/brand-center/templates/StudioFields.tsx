@@ -82,6 +82,7 @@ export function Field({ t, f, values, setMany, personPhoto }: { t: T; f: FieldDe
           <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
           <input id={id} dir="auto" value={typeof value === "string" ? value : ""} maxLength={f.max} placeholder={f.placeholder}
             onChange={(e) => set(e.target.value)} className={`${FIELD} mt-1`} />
+          {f.hintKey ? <span className="mt-1 block text-[11px] leading-4 text-[var(--text-dim)]">{t(f.hintKey)}</span> : null}
         </label>
       );
   }

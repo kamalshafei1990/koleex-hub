@@ -30,17 +30,19 @@ export function Logo({ x, y, width, fill }: { x: number; y: number; width: numbe
   return <g transform={`translate(${x} ${y}) scale(${width / LOGO_W})`} fill={fill}><KoleexLogoPaths /></g>;
 }
 
-/** The horizontal group lockup (ch. 43): logo, hairline, KOLEEX /
- *  INTERNATIONAL / GROUP — drawn in the book's 1190 × 160 box. */
-export function GroupLockup({ x, y, width, fill, font, weight = 300 }: { x: number; y: number; width: number; fill: string; font: string; weight?: number }) {
+/** The horizontal group lockup (ch. 43): logo, hairline, and the name on
+ *  three lines in Inter Light — the book's 1190 × 160 box, scaled to
+ *  `width`. For wide, short spaces such as the back of the business card. */
+export function GroupLockup({ x, y, width, fill, font, weight = 300, lines = ["KOLEEX", "INTERNATIONAL", "GROUP"] }: {
+  x: number; y: number; width: number; fill: string; font: string; weight?: number; lines?: string[];
+}) {
+  const shown = lines.slice(0, 3);
   return (
     <g transform={`translate(${x} ${y}) scale(${width / 1190})`} fill={fill}>
       <g transform={`translate(0 26) scale(${720 / LOGO_W})`}><KoleexLogoPaths /></g>
       <rect x={786} y={0} width={3} height={160} />
       <text style={{ fontFamily: font, fontWeight: weight, fontSize: 40, letterSpacing: 1 }}>
-        <tspan x={846} y={42}>KOLEEX</tspan>
-        <tspan x={846} y={99}>INTERNATIONAL</tspan>
-        <tspan x={846} y={156}>GROUP</tspan>
+        {shown.map((t, i) => <tspan key={i} x={846} y={[42, 99, 156][i + (3 - shown.length)]}>{t}</tspan>)}
       </text>
     </g>
   );
@@ -54,25 +56,32 @@ export function Stroke({ x, top, bottom, width, lean, fill = WHITE }: { x: numbe
   return <polygon points={`${x},${top} ${x + width},${top} ${x + width + dx},${bottom} ${x + dx},${bottom}`} fill={fill} />;
 }
 
-/** The group's name under a logo (owner 29/09/2026: "write under the logo
- *  Koleex International Group"). At least 5 pt, about half the logo's
- *  height; spread to the logo's exact width when asked, like the book's
- *  stacked lockup. Returns the drawing and the room it takes below the logo. */
-export function companyLine({ text, logo, align, fill, font, spread }: {
-  text: string; logo: { x: number; y: number; w: number }; align: "start" | "middle" | "end"; fill: string; font: string; spread: boolean;
-}): { node: ReactNode; room: number } {
-  if (!text) return { node: null, room: 0 };
-  const size = Math.max(5 * PT, logoHeight(logo.w) * 0.42);
-  const y = logo.y + logoHeight(logo.w) + size * 1.55;
-  const natural = textWidth(text, size, 400, font);
-  const spreadIt = spread && natural < logo.w;
-  const x = spreadIt || align === "start" ? logo.x : align === "middle" ? logo.x + logo.w / 2 : logo.x + logo.w;
+/** The group's name as the book writes it (ch. 43): always English, always
+ *  capitals — the owner's text is kept, set in capitals. */
+export const lockupText = (text: string) => (text.trim() || "KOLEEX INTERNATIONAL GROUP").toUpperCase();
+/** The same name on the horizontal lockup's three lines. */
+export function lockupLines(text: string): string[] {
+  const words = lockupText(text).split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return words;
+  return [words[0], words.slice(1, -1).join(" "), words[words.length - 1]];
+}
+
+/** The stacked group lockup (ch. 43): the name under the logo in Inter
+ *  Light, spaced to exactly the logo's width; capital height 0.2 × the
+ *  logo's height, 0.3 × its height below it; in the logo's colour. Only for
+ *  a logo 40 mm or wider (smaller: the logo alone). Returns the drawing and
+ *  the height it adds under the logo. */
+export const STACKED_MIN = 40;
+export function stackedLine({ text, logo, fill, font }: { text: string; logo: { x: number; y: number; w: number }; fill: string; font: string }): { node: ReactNode; room: number } {
+  const lh = logoHeight(logo.w);
+  const cap = 0.2 * lh;
+  const size = cap / 0.727; // Inter's capital height
+  const top = logo.y + lh + 0.3 * lh;
   const node = (
-    <text x={x} y={y} textAnchor={spreadIt ? "start" : align} direction="ltr" fill={fill}
-      {...(spreadIt ? { textLength: logo.w, lengthAdjust: "spacing" as const } : fit(text, size, Math.max(logo.w * 2.2, 30), 400, font))}
-      style={{ fontFamily: font, fontSize: size, fontWeight: 400, unicodeBidi: "plaintext" }}>{text}</text>
+    <text x={logo.x} y={top + cap} textLength={logo.w} lengthAdjust="spacing" fill={fill}
+      style={{ fontFamily: font, fontSize: size, fontWeight: 300 }}>{lockupText(text)}</text>
   );
-  return { node, room: size * 1.9 };
+  return { node, room: 0.3 * lh + cap };
 }
 
 /* ── text ──────────────────────────────────────────────────────────────── */

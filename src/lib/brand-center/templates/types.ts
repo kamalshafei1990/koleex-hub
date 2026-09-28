@@ -27,7 +27,7 @@ type Common = {
 };
 
 export type FieldDef = Common & (
-  | { kind: "text"; max: number; placeholder?: string }
+  | { kind: "text"; max: number; placeholder?: string; hintKey?: string }
   | { kind: "choice"; options: Array<{ value: string; labelKey: string }> }
   | { kind: "switch" }
   | { kind: "range"; min: number; max: number; step: number; unit?: "%" | "x" }
