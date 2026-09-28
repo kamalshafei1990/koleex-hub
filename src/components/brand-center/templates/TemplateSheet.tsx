@@ -38,7 +38,7 @@ const SLUG_SIZE = 1.6; // mm; the slug stays between the two bottom crop marks
 
 export function sheetSize(def: TemplateDef, values: TemplateValues, mode: "screen" | "print") {
   const { w, h } = def.size(values);
-  const pad = mode === "print" ? PRINT_MARGIN : def.bleed;
+  const pad = mode === "print" && def.marks !== false ? PRINT_MARGIN : def.bleed;
   return { w, h, outerW: w + pad * 2, outerH: h + pad * 2 };
 }
 
@@ -51,7 +51,8 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
   const page = def.pages.find((p) => p.id === pageId) ?? def.pages[0];
   const { w, h, outerW, outerH } = sheetSize(def, values, mode);
   const b = def.bleed;
-  const off = mode === "print" ? PRINT_MARGIN - b : 0; // where the bleed box starts
+  const marks = mode === "print" && def.marks !== false;
+  const off = marks ? PRINT_MARGIN - b : 0; // where the bleed box starts
   const trim = { x: off + b, y: off + b };
   const body = page.draw(values, { w, h, bleed: b, qrs, uid: `${uid}-${page.id}` });
 
@@ -78,7 +79,7 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
         </g>
       ) : null}
 
-      {mode === "print" ? (
+      {marks ? (
         <g stroke="#000000" strokeWidth={0.1} fill="none">
           {[trim.x, trim.x + w].map((x) => (
             <g key={`v${x}`}>
@@ -94,7 +95,7 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
           ))}
         </g>
       ) : null}
-      {mode === "print" && slug ? (
+      {marks && slug ? (
         <text x={trim.x + 2} y={outerH - 3} fill="#666666"
           {...(slug.length * SLUG_SIZE * 0.6 > w - 4 ? { textLength: w - 4, lengthAdjust: "spacingAndGlyphs" as const } : {})}
           style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: SLUG_SIZE }}>{slug}</text>

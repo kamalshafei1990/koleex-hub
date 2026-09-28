@@ -72,6 +72,11 @@ export interface TemplateDef {
   bleed: number;
   /** Safe margin inside the trim, mm (nothing important outside it). */
   safe: number;
+  /** Crop marks and a slug around the printed page (default true). A sheet
+   *  printed as is (the proof) has none, so it prints on its own paper size. */
+  marks?: boolean;
+  /** The studio offers "Fill from Employees" (default true). */
+  usesPeople?: boolean;
   fields: FieldDef[];
   defaults: TemplateValues;
   pages: TemplatePage[];

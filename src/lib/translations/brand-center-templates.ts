@@ -172,4 +172,22 @@ export const brandCenterTemplatesT: Translations = {
 
   "spec.bilingual":  { en: "Both sides printed black on white: English on the front, the second language on the back.", zh: "两面均为白底黑字：正面英文，背面第二语言。", ar: "الوشّين طباعة سودا على أبيض: الإنجليزي على الوش، واللغة التانية على الضهر." },
   "spec.execFront":  { en: "Front: white print on black — name, title and lines; the logo in white foil.", zh: "正面：黑底白字 — 姓名、职位与联系方式；标志为白色烫印。", ar: "الوش: طباعة بيضا على أسود — الاسم والمسمى والبيانات، واللوجو فويل أبيض." },
+
+  /* ── the print proof sheet (plan step C8) ── */
+  "tpl.printProof":   { en: "Print proof sheet", zh: "印刷打样页", ar: "صفحة بروفة الطباعة" },
+  "tpl.page.sheet":   { en: "The sheet (A4)", zh: "样张（A4）", ar: "الصفحة (A4)" },
+  "tpl.group.job":    { en: "The job", zh: "印件", ar: "الشغلانة" },
+  "tpl.f.job":        { en: "Job", zh: "印件", ar: "الشغلانة" },
+  "tpl.f.printer":    { en: "Printer", zh: "印刷厂", ar: "المطبعة" },
+  "tpl.f.paper":      { en: "Paper or board", zh: "纸张或卡纸", ar: "الورق أو الكرتون" },
+  "tpl.f.date":       { en: "Date (empty = today)", zh: "日期（留空 = 今天）", ar: "التاريخ (فاضي = النهارده)" },
+  "spec.proof1": { en: "Save it as PDF (A4, 100 %) and send it to the printer with the job — in Chinese for a printer in China.",
+                   zh: "存为 PDF（A4，100%），随印件一起发给印刷厂 — 中国的印刷厂请用中文版。",
+                   ar: "احفظه PDF (A4، 100%) وابعته للمطبعة مع الشغلانة — بالصيني لو المطبعة في الصين." },
+  "spec.proof2": { en: "They print it on the job's paper and press, tick every box, and send back a photo of the printed sheet.",
+                   zh: "印刷厂用本印件的纸张和印刷机印出，逐项勾选，并把印好的样张拍照发回。",
+                   ar: "المطبعة تطبعه على ورق الشغلانة وماكينتها، وتعلّم على كل خانة، وتبعت صورة الصفحة المطبوعة." },
+  "spec.proof3": { en: "A colour or a black that is off is fixed at the press before the real job runs — never in our file.",
+                   zh: "颜色或黑色有偏差，在正式开印前于印刷端调整 — 不改我们的文件。",
+                   ar: "أي لون أو أسود مش مظبوط يتظبط عند المطبعة قبل الشغل الحقيقي — مش في الملف بتاعنا." },
 };

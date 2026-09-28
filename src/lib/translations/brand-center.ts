@@ -46,6 +46,7 @@ export const brandCenterT: Translations = {
                 zh: "填写、下载、打印。设计已锁定，任何内容都不会偏离规范。",
                 ar: "املا، حمّل، اطبع. التصميم مقفول، فمفيش حاجة تطلع برا القواعد." },
   "tpl.businessCard": { en: "Business card — from Employees", zh: "名片 — 来自员工资料", ar: "كارت البيزنس — من بيانات الموظفين" },
+  "tpl.printProof":   { en: "Print proof sheet — for the printer", zh: "印刷打样页 — 给印刷厂", ar: "صفحة بروفة الطباعة — للمطبعة" },
   "tpl.staffCard":    { en: "Staff ID card",                  zh: "员工工牌",             ar: "كارت الموظف" },
   "tpl.signature":    { en: "Email signature",                zh: "邮件签名",             ar: "توقيع الإيميل" },
   "tpl.badge":        { en: "Event badge",                    zh: "活动胸牌",             ar: "بادج الإيفنت" },

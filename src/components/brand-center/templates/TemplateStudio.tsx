@@ -37,7 +37,7 @@ type People = { state: "loading" } | { state: "error" } | { state: "ready"; scop
 
 const ARABIC = /[\u0600-\u06FF]/;
 const CJK = /[\u2E80-\u9FFF]/;
-const GROUPS = ["look", "person", "contacts", "photo", "details", "qr"];
+const GROUPS = ["look", "job", "person", "contacts", "photo", "details", "qr"];
 
 /** A mobile in the book's international format (ch. 91: "+86 130 7380
  *  0720") when it is a Chinese or Egyptian mobile; anything else as typed. */
@@ -89,14 +89,16 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   const [guides, setGuides] = useState(true);
   const [blocked, setBlocked] = useState<string | null>(null);
 
+  const wantsPeople = def?.usesPeople !== false;
   useEffect(() => {
+    if (!wantsPeople) return;
     let alive = true;
     void bc.people().then((res) => {
       if (!alive) return;
       setPeople(res.ok ? { state: "ready", scope: res.data.scope, people: res.data.people } : { state: "error" });
     });
     return () => { alive = false; };
-  }, []);
+  }, [wantsPeople]);
 
   const qrs = useMemo(() => (def ? qrCodes(def.qrRequests?.(values)) : {}), [def, values]);
 
@@ -153,7 +155,8 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   const fileBase = [def.id, typeof values.style === "string" ? values.style : "", who.normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()]
     .filter(Boolean).join("-");
   const print = () => {
-    const missing = def.check?.(values) ?? (who ? null : "studio.needName");
+    /* What must be filled is the template's own rule (a proof sheet has no name). */
+    const missing = def.check ? def.check(values) : null;
     if (missing) { setBlocked(missing); return; }
     printTemplate({ templateId: def.id, values, fileName: fileBase, slug });
   };
@@ -174,8 +177,8 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-start">
           <aside data-kx-pane className={`${CARD} px-4 py-4`}>
-            <FillFrom t={t} people={people} person={person} onChoose={choose} />
-            <div className="mt-4 flex justify-end">
+            {def.usesPeople !== false ? <FillFrom t={t} people={people} person={person} onChoose={choose} /> : null}
+            <div className={`${def.usesPeople !== false ? "mt-4 " : ""}flex justify-end`}>
               <button type="button" onClick={clear} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("studio.clear")}</button>
             </div>
             {GROUPS.map((g) => {
