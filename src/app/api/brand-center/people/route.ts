@@ -3,8 +3,8 @@ import "server-only";
 /* GET /api/brand-center/people — who a fill-in template (business card,
    badge, signature …) can be filled for, with only the fields a template
    prints: name, other-script name, position (with its Chinese and Arabic
-   titles), department, work email, mobile, and the profile photo (the
-   management card's portrait).
+   titles), department, work email, mobile, the profile photo (the portrait
+   cards and the ID badge) and the staff number (the ID badge).
      · Brand Center "create" right → every active employee of the tenant;
      · anyone else who can open Brand Center → only themselves, so each
        employee can make their own card without seeing anyone else's data.
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   }
 
   let q = supabaseServer.from("koleex_employees")
-    .select("id, person_id, work_email, work_phone")
+    .select("id, person_id, work_email, work_phone, employee_number")
     .eq("tenant_id", auth.tenant_id).eq("employment_status", "active");
   if (personFilter) q = q.eq("person_id", personFilter);
   const { data: emps, error } = await q;
@@ -75,6 +75,8 @@ export async function GET(req: Request) {
       titleZh: pos?.title_zh || null,
       titleAr: pos?.title_ar || null,
       photo: p.avatar_url || null,
+      /* The staff number — the ID badge prints it (ch. HR documents). */
+      staffNo: (e.employee_number as string | null) || null,
       department: (a?.department_id && deptById.get(a.department_id)) || null,
       email: (e.work_email as string | null) || p.email || null,
       mobile: p.mobile || (e.work_phone as string | null) || p.phone || null,

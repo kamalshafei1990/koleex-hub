@@ -17,7 +17,7 @@
      grid          white, Swiss: hairlines, two columns
      sales         the light line on the front (ch. 57)
      technician    the service hotline leads the back
-     dealer        co-branded (ch. 44), on white
+     dealer        the agent's own card with the Authorized badge (ch. 128)
      bilingual     English on the front, Chinese or Arabic on the back
 
    Every style takes the same slots; QR codes go to the side the person
@@ -28,8 +28,8 @@ import type { ReactNode } from "react";
 import type { DrawContext, TemplateValues } from "../types";
 import { PT } from "../types";
 import {
-  ColumnRows, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, HAIRLINE_ON_WHITE, INK, InlineRows, LIGHT_ON_INK, Line, Logo,
-  Photo, PhotoPlaceholder, QrZone, STACKED_MIN, Stroke, WHITE, columnRowsSpan, fit, lockupHeight, lockupLines, logoHeight, stackedLine, textWidth, wrap, type PrintRow, type Zone,
+  AuthorizedBadge, ColumnRows, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, HAIRLINE_ON_WHITE, INK, InlineRows, LIGHT_ON_INK, Line, Logo,
+  Photo, PhotoPlaceholder, QrZone, STACKED_MIN, badgeSize, Stroke, WHITE, columnRowsSpan, fit, lockupHeight, lockupLines, logoHeight, stackedLine, textWidth, wrap, type PrintRow, type Zone,
 } from "./parts";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { asLang, fontOf, langOf, num, printedRows, qrsOf, relangRows, rowsOf, str, type Lang } from "./model";
@@ -62,7 +62,7 @@ const WORDS: Record<string, Record<Lang, string>> = {
   hotline: { en: "Service hotline", zh: "服务热线", ar: "خط الخدمة" },
   dealer: { en: "Authorized dealer", zh: "授权经销商", ar: "موزّع معتمد" },
   addPhoto: { en: "Photo", zh: "照片", ar: "الصورة" },
-  addLogo: { en: "Dealer logo", zh: "经销商标志", ar: "لوجو الموزّع" },
+  addLogo: { en: "AGENT'S LOGO", zh: "代理商标志", ar: "لوجو الوكيل" },
 };
 const word = (lang: Lang, k: string) => WORDS[k][lang];
 
@@ -324,7 +324,7 @@ function lockupBack(v: TemplateValues, ctx: DrawContext): ReactNode {
 
 interface InfoOpts {
   dark: boolean;
-  top?: "logo" | "cobrand";
+  top?: "logo" | "agent";
   /** Which face this is — the company line has a switch per face. */
   side: "front" | "back";
   hotline?: string;
@@ -344,8 +344,8 @@ function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
   const start = rtl ? f.right : f.left;
 
   const mark = topMark(r, o.side, { x: rtl ? f.right : f.left, y: f.top, rtl }, fg);
-  const top = o.top === "cobrand"
-    ? { node: coBrand({ x: rtl ? f.right - Math.min(44, f.inner) : f.left, y: f.top + 3.2, width: Math.min(44, f.inner), rtl, partner: str(v, "dealerLogo"), placeholder: word(lang, "addLogo"), font }), bottom: f.top + 6.4 }
+  const top = o.top === "agent"
+    ? { node: agentLogo({ x: rtl ? f.right - 32 : f.left, y: f.top, w: 32, h: 8, href: str(v, "dealerLogo"), placeholder: word(lang, "addLogo"), font }), bottom: f.top + 8 }
     : { node: mark.node, bottom: f.top + mark.height };
 
   const nameSize = 9 * PT * k;
@@ -433,45 +433,41 @@ function salesFront(v: TemplateValues, ctx: DrawContext): ReactNode {
   );
 }
 
-/** Ch. 44: KOLEEX first (left; right in Arabic), a hairline, the partner's
- *  logo optically as large as ours. */
-function coBrand({ x, y, width, rtl, partner, placeholder, font }: { x: number; y: number; width: number; rtl: boolean; partner: string; placeholder: string; font: string }) {
-  const gap = width * 0.07;
-  const each = (width - gap * 2) / 2;
-  const lh = logoHeight(each);
-  const boxH = lh * 2.4;
-  const ours = rtl ? x + each + gap * 2 : x;
-  const theirs = rtl ? x : x + each + gap * 2;
-  return (
+/** The agent's own logo in a box (contained, its own colours), or a dashed
+ *  place for it. */
+function agentLogo({ x, y, w, h, href, placeholder, font }: { x: number; y: number; w: number; h: number; href: string; placeholder: string; font: string }) {
+  return href ? (
+    <image href={href} x={x} y={y} width={w} height={h} preserveAspectRatio="xMinYMid meet" />
+  ) : (
     <g>
-      <Logo x={ours} y={y - lh / 2} width={each} fill={INK} />
-      <rect x={x + each + gap - 0.075} y={y - boxH / 2} width={0.15} height={boxH} fill={INK} />
-      {partner ? (
-        <image href={partner} x={theirs} y={y - boxH / 2} width={each} height={boxH} preserveAspectRatio="xMidYMid meet" />
-      ) : (
-        <g>
-          <rect x={theirs} y={y - boxH / 2} width={each} height={boxH} fill="none" stroke="#AAAAAA" strokeWidth={0.15} strokeDasharray="0.8 0.6" />
-          <text x={theirs + each / 2} y={y + 0.7} textAnchor="middle" fill="#AAAAAA" style={{ fontFamily: font, fontSize: 5.5 * PT }}>{placeholder}</text>
-        </g>
-      )}
+      <rect x={x} y={y} width={w} height={h} fill="none" stroke="#AEAEB2" strokeWidth={0.15} strokeDasharray="0.8 0.6" />
+      <text x={x + w / 2} y={y + h / 2 + 0.7} textAnchor="middle" fill="#AEAEB2" style={{ fontFamily: font, fontSize: 5.5 * PT, fontWeight: 600, letterSpacing: 0.3 }}>{placeholder}</text>
     </g>
   );
 }
 
+/** Agent / dealer (ch. 128): "the agent's card is the agent's own, with its
+ *  own logo and contacts. The Authorized badge sits at the foot" — never
+ *  the agent's logo next to ours. */
 function dealerFront(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
-  const { f, rtl, font, lang } = r;
-  const width = Math.min(60, f.inner);
-  const cy = f.b + f.h * 0.42;
-  const dealer = str(v, "dealerName");
+  const { f, rtl, font, k, lang } = r;
+  const year = str(v, "badgeYear") || String(new Date().getFullYear());
+  const role = str(v, "badgeRole") || "Distributor";
+  const place = str(v, "badgePlace") || "—";
+  const { width: badgeW, height: bh } = badgeSize(40, year, role, place, font);
+  const web = r.rows.find((x) => /^www\.|^https?:/i.test(x.value))?.value ?? "";
   const corner = cornerZone(r, r.front.length, 11, "end");
   return (
     <>
       {fill(f, WHITE)}
-      {coBrand({ x: f.b + (f.w - width) / 2, y: cy, width, rtl, partner: str(v, "dealerLogo"), placeholder: word(lang, "addLogo"), font })}
-      {dealer ? <Line x={f.b + f.w / 2} y={cy + 10} rtl={rtl} anchor="middle" font={font} size={7 * PT} weight={600} fill={INK} max={f.inner}>{dealer}</Line> : null}
-      <Line x={f.b + f.w / 2} y={cy + (dealer ? 13.2 : 10)} rtl={rtl} anchor="middle" font={font} size={5.5 * PT} fill={GREY_ON_WHITE}>{word(lang, "dealer")}</Line>
-      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_WHITE} max={11} zone={corner.zone} />
+      {agentLogo({ x: rtl ? f.right - 38 : f.left, y: f.top, w: 38, h: 10, href: str(v, "dealerLogo"), placeholder: word(lang, "addLogo"), font })}
+      {r.name ? <Line x={rtl ? f.right : f.left} y={f.b + f.h * 0.5} rtl={rtl} font={font} size={10 * PT * k} weight={700} fill={INK} max={f.inner}>{r.name}</Line> : null}
+      {r.title ? <Line x={rtl ? f.right : f.left} y={f.b + f.h * 0.5 + 3.6 * k} rtl={rtl} font={font} size={7 * PT * k} fill={GREY_ON_WHITE} max={f.inner}>{r.title}</Line> : null}
+      {web ? <Line x={rtl ? f.right : f.left} y={f.bottom} rtl={rtl} font={font} size={6 * PT * k} fill={GREY_ON_WHITE} max={f.inner - badgeW - 3}>{web}</Line> : null}
+      <AuthorizedBadge x={rtl ? f.left : f.right - badgeW} y={f.bottom - bh} base={40} year={year} role={role} place={place} font={font} uid={`${r.uid}-b`} />
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_WHITE} max={11}
+        zone={{ ...corner.zone, y: f.bottom - bh - 3 - corner.zone.h }} />
     </>
   );
 }
@@ -600,7 +596,7 @@ export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
     case "centered": return centeredBack(v, ctx, true);
     case "grid": return gridBack(v, ctx);
     case "technician": return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back, hotline: str(v, "hotline") });
-    case "dealer": return infoSide(v, ctx, { side: "back", dark: false, qrs: r.back, top: "cobrand" });
+    case "dealer": return infoSide(v, ctx, { side: "back", dark: false, qrs: r.back, top: "agent" });
     case "bilingual": {
       const lang2 = asLang(v.lang2 === "en" ? "zh" : v.lang2 ?? "zh");
       const rows2 = printedRows({ ...v, rows: relangRows(rowsOf(v).map((x) => ({ ...x })), lang2) }) as PrintRow[];
@@ -614,7 +610,7 @@ export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
 export function specKeysFor(v: TemplateValues): string[] {
   switch (styleOf(v)) {
     case "team-white": case "vertical-white": case "grid": return ["spec.whiteFront", "spec.blackPrint", "spec.whiteBoard", "spec.edges", "spec.never"];
-    case "dealer": return ["spec.dealerFront", "spec.blackPrint", "spec.whiteBoard", "spec.edges", "spec.partner"];
+    case "dealer": return ["spec.agentCard", "spec.agentBadge", "spec.blackPrint", "spec.whiteBoard"];
     case "bilingual": return ["spec.bilingual", "spec.whiteBoard", "spec.edges"];
     case "classic": case "management": return ["spec.photoFront", "spec.photoBack", "spec.photoBoard", "spec.edges"];
     case "executive": return ["spec.execFront", "spec.whitePrint", "spec.blackBoard", "spec.edges"];

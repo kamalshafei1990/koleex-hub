@@ -84,6 +84,54 @@ export function stackedLine({ text, logo, fill, font }: { text: string; logo: { 
   return { node, room: 0.3 * lh + cap };
 }
 
+/** The Authorized badge (ch. 128) — the one mark an agent or distributor may
+ *  show: black, a silver frame, the white logo, a silver hairline, then
+ *  AUTHORIZED · <year> / <ROLE> / <place>. Every size is a share of `base`
+ *  (the book's drawing is 220 wide); like the book's, the badge is as wide
+ *  as its words need — at least 40 mm in print. */
+const SILVER_STOPS = ["#AEAEB2", "#FFFFFF", "#D1D1D6", "#8E8E93"];
+function badgeParts(base: number, year: string, role: string, place: string, font: string) {
+  const pad = base * 0.06;
+  const lw = base * 0.36;
+  const s1 = base * 0.04, s2 = base * 0.052, s3 = base * 0.042, gap = base * 0.012;
+  const l1 = `AUTHORIZED · ${year}`.toUpperCase(), l2 = role.toUpperCase();
+  const spaced = (t: string, size: number, weight: number, track: number) => textWidth(t, size, weight, font) + t.length * size * track;
+  const textW = Math.max(spaced(l1, s1, 600, 0.18), spaced(l2, s2, 700, 0.08), textWidth(place, s3, 500, font));
+  const width = Math.max(40, pad * 4 + lw + 0.2 + textW);
+  const height = pad * 2 + (s1 + s2 + s3) * 1.18 + gap * 2;
+  return { pad, lw, s1, s2, s3, gap, l1, l2, width, height };
+}
+export function badgeSize(base: number, year: string, role: string, place: string, font: string) {
+  const b = badgeParts(base, year, role, place, font);
+  return { width: b.width, height: b.height };
+}
+export function AuthorizedBadge({ x, y, base, year, role, place, font, uid }: {
+  x: number; y: number; base: number; year: string; role: string; place: string; font: string; uid: string;
+}) {
+  const { pad, lw, s1, s2, s3, gap, l1, l2, width, height: h } = badgeParts(base, year, role, place, font);
+  const lx = x + pad;
+  const divX = lx + lw + pad;
+  const tx = divX + 0.2 + pad;
+  const top = y + (h - ((s1 + s2 + s3) * 1.18 + gap * 2)) / 2;
+  const silver = `url(#${uid}-silver)`;
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`${uid}-silver`} x1="0" y1="0" x2="1" y2="1">
+          {SILVER_STOPS.map((c, i) => <stop key={c} offset={[0, 0.35, 0.6, 1][i]} stopColor={c} />)}
+        </linearGradient>
+      </defs>
+      <rect x={x} y={y} width={width} height={h} rx={base * 0.027} fill={INK} />
+      <rect x={x + 0.25} y={y + 0.25} width={width - 0.5} height={h - 0.5} rx={base * 0.025} fill="none" stroke="#AEAEB2" strokeWidth={0.25} />
+      <Logo x={lx} y={y + (h - logoHeight(lw)) / 2} width={lw} fill={WHITE} />
+      <rect x={divX} y={y + pad} width={0.2} height={h - pad * 2} fill={silver} />
+      <text x={tx} y={top + s1 * 0.95} fill={silver} style={{ fontFamily: font, fontSize: s1, fontWeight: 600, letterSpacing: s1 * 0.18 }}>{l1}</text>
+      <text x={tx} y={top + s1 * 1.18 + gap + s2 * 0.95} fill={silver} style={{ fontFamily: font, fontSize: s2, fontWeight: 700, letterSpacing: s2 * 0.08 }}>{l2}</text>
+      <text x={tx} y={top + (s1 + s2) * 1.18 + gap * 2 + s3 * 0.95} fill="#98989D" style={{ fontFamily: font, fontSize: s3, fontWeight: 500 }}>{place}</text>
+    </g>
+  );
+}
+
 /* ── text ──────────────────────────────────────────────────────────────── */
 
 const CJK = /[\u2E80-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/;
@@ -264,8 +312,10 @@ export function QrZone({ items, codes, zone, max, captionFill, font, gap = 2.5 }
 
 /** A photo in a box, black and white, zoomed (1–3) and moved (x / y
  *  −100…100) by the person, its edges melting into the black when `soft`. */
-export function Photo({ href, box, zoom, px, py, soft, uid }: {
+export function Photo({ href, box, zoom, px, py, soft, uid, tone = "bw", radius = 0 }: {
   href: string; box: { x: number; y: number; w: number; h: number }; zoom: number; px: number; py: number; soft: boolean; uid: string;
+  /** "bw" the portrait cards; "muted" the book's team colour (ch. 66: cool, lower saturation). */
+  tone?: "bw" | "muted"; radius?: number;
 }) {
   const zw = box.w * zoom;
   const zh = box.h * zoom;
@@ -275,9 +325,9 @@ export function Photo({ href, box, zoom, px, py, soft, uid }: {
   return (
     <g>
       <defs>
-        <clipPath id={`${uid}-photo`}><rect x={box.x} y={box.y} width={box.w} height={box.h} /></clipPath>
+        <clipPath id={`${uid}-photo`}><rect x={box.x} y={box.y} width={box.w} height={box.h} rx={radius} /></clipPath>
         <filter id={`${uid}-bw`} colorInterpolationFilters="sRGB">
-          <feColorMatrix type="saturate" values="0" />
+          <feColorMatrix type="saturate" values={tone === "bw" ? "0" : "0.78"} />
           <feComponentTransfer><feFuncR type="linear" slope="1.1" intercept="-0.04" /><feFuncG type="linear" slope="1.1" intercept="-0.04" /><feFuncB type="linear" slope="1.1" intercept="-0.04" /></feComponentTransfer>
         </filter>
         <radialGradient id={`${uid}-fade`} cx="0.5" cy="0.5" r="0.56" gradientTransform="translate(0.5 0.5) scale(1 1.3) translate(-0.5 -0.5)">

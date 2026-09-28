@@ -13,7 +13,7 @@ export const brandCenterTemplatesT: Translations = {
   "tpl.style.management":   { en: "Management — portrait", zh: "管理层 — 肖像", ar: "الإدارة — بالصورة" },
   "tpl.style.sales":        { en: "Sales & export", zh: "销售与出口", ar: "المبيعات والتصدير" },
   "tpl.style.technician":   { en: "Technician", zh: "技术服务", ar: "الفني" },
-  "tpl.style.dealer":       { en: "Dealer — co-branded", zh: "经销商 — 联合品牌", ar: "الموزّع — مشترك" },
+  "tpl.style.dealer":       { en: "Agent / dealer — Authorized badge", zh: "代理 / 经销商 — 授权标志", ar: "الوكيل / الموزّع — شارة معتمد" },
 
   "tpl.f.name":     { en: "Name",      zh: "姓名", ar: "الاسم" },
   "tpl.f.title":    { en: "Job title", zh: "职位", ar: "المسمى الوظيفي" },
@@ -23,8 +23,8 @@ export const brandCenterTemplatesT: Translations = {
   "tpl.f.photoHint": { en: "Turned black and white for you. Best: a sharp head-and-shoulders photo on a plain or cut-out background.",
                        zh: "自动转为黑白。最好使用清晰的半身照，背景为纯色或已抠图。",
                        ar: "بتتحول أبيض وأسود لوحدها. الأحسن صورة واضحة من الكتف لفوق على خلفية سادة أو مفرّغة." },
-  "tpl.f.dealerName":     { en: "Dealer company", zh: "经销商公司", ar: "شركة الموزّع" },
-  "tpl.f.dealerLogo":     { en: "Dealer logo", zh: "经销商标志", ar: "لوجو الموزّع" },
+  "tpl.f.dealerName":     { en: "The agent's company", zh: "代理商公司", ar: "شركة الوكيل" },
+  "tpl.f.dealerLogo":     { en: "The agent's logo", zh: "代理商标志", ar: "لوجو الوكيل" },
   "tpl.f.dealerLogoHint": { en: "PNG with a transparent background, or SVG — in its own colours, never recoloured.",
                             zh: "透明背景 PNG 或 SVG — 保持原色，不得改色。",
                             ar: "PNG بخلفية شفافة أو SVG — بألوانه الأصلية من غير تغيير." },
@@ -218,4 +218,27 @@ export const brandCenterTemplatesT: Translations = {
   "saved.removeAsk":  { en: "Remove {name}?", zh: "删除 {name}？", ar: "تمسح {name}؟" },
   "saved.removeYes":  { en: "Remove", zh: "删除", ar: "امسح" },
   "saved.removeNo":   { en: "Keep", zh: "保留", ar: "سيبه" },
+
+  /* ── the staff ID badge (plan step C10) ── */
+  "tpl.idBadge":          { en: "Staff ID badge", zh: "员工工牌", ar: "كارنيه الموظف" },
+  "tpl.f.staffNo":        { en: "Staff number", zh: "员工编号", ar: "رقم الموظف" },
+  "tpl.f.idLabel":        { en: "Before the number", zh: "编号前缀", ar: "قبل الرقم" },
+  "tpl.f.bw":             { en: "Black and white photo", zh: "黑白照片", ar: "صورة أبيض وأسود" },
+  "tpl.f.badgePhotoHint": { en: "The team portrait (ch. 66): shoulders up, 4 : 5, on black. Colour is set cool and muted; a whole series may be black and white.",
+                            zh: "团队肖像（第 66 章）：肩部以上，4:5，黑色背景。颜色偏冷、低饱和；整批可统一为黑白。",
+                            ar: "صورة الفريق (فصل 66): من الكتف لفوق، 4:5، على خلفية سودا. الألوان هادية وباردة، وممكن الدفعة كلها أبيض وأسود." },
+  "spec.badge1": { en: "Card: PVC 0.76 mm (CR80) or 600–700 g/m² board; full colour, the band black to the edges.", zh: "卡片：PVC 0.76 毫米（CR80）或 600–700 克卡纸；全彩印刷，顶部黑条满版。", ar: "الكارت: PVC 0.76 مم (CR80) أو كرتون 600–700 جرام؛ ألوان كاملة، والشريط الأسود لحد الحواف." },
+  "spec.badge2": { en: "Slot punch 13 × 3 mm at the top centre, inside the black band — clear of the logo.", zh: "顶部居中打 13 × 3 毫米挂绳孔，位于黑条内，避开标志。", ar: "فتحة الشريط 13 × 3 مم فوق في النص، جوّه الشريط الأسود وبعيد عن اللوجو." },
+  "spec.badge3": { en: "Name, job title and staff number only — no other personal data (HR documents).", zh: "仅姓名、职位和员工编号 — 不含其他个人信息（人事文件章节）。", ar: "الاسم والمسمى ورقم الموظف بس — مفيش أي بيانات شخصية تانية (فصل مستندات الموارد البشرية)." },
+
+  /* ── the agent's card with the Authorized badge (ch. 128) ── */
+  "tpl.f.badgeRole":      { en: "Authorized as", zh: "授权身份", ar: "معتمد كـ" },
+  "tpl.badge.distributor": { en: "Distributor", zh: "经销商", ar: "موزّع" },
+  "tpl.badge.agent":      { en: "Agent", zh: "代理商", ar: "وكيل" },
+  "tpl.badge.service":    { en: "Service Center", zh: "服务中心", ar: "مركز خدمة" },
+  "tpl.f.badgePlace":     { en: "Place (country or city)", zh: "地区（国家或城市）", ar: "المكان (دولة أو مدينة)" },
+  "tpl.f.badgePlaceHint": { en: "The country or city the agreement covers — nothing wider (ch. 128).", zh: "协议覆盖的国家或城市 — 不得扩大（第 128 章）。", ar: "الدولة أو المدينة اللي الاتفاق بيغطيها — مش أوسع من كده (فصل 128)." },
+  "tpl.f.badgeYear":      { en: "Year (renewed every year)", zh: "年份（每年更新）", ar: "السنة (بتتجدد كل سنة)" },
+  "spec.agentCard":  { en: "The agent's own card — its logo and contacts; our logo is never placed next to it (ch. 128).", zh: "代理商自己的名片 — 使用其标志和联系方式；我们的标志不得与其并排（第 128 章）。", ar: "كارت الوكيل نفسه — بلوجوه وبياناته؛ لوجونا عمره ما يتحط جنب لوجوه (فصل 128)." },
+  "spec.agentBadge": { en: "The Authorized badge at the foot: black, silver frame and words in silver foil, at least 40 mm wide.", zh: "底部放授权标志：黑底，银框与银字用银色烫印，宽度不小于 40 毫米。", ar: "شارة «معتمد» تحت: سودا، الإطار والكلام فويل فضي، وعرضها 40 مم على الأقل." },
 };

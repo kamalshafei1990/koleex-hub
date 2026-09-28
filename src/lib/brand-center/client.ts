@@ -43,8 +43,10 @@ export interface BcPerson {
   /** The position's title in English, and in Chinese / Arabic when translated. */
   title: string | null; titleZh: string | null; titleAr: string | null;
   department: string | null; email: string | null; mobile: string | null;
-  /** The profile photo (public URL), for the management card. */
+  /** The profile photo (public URL), for the portrait cards and the ID badge. */
   photo: string | null;
+  /** The staff number, for the ID badge. */
+  staffNo: string | null;
 }
 
 /** A saved fill of a template ("my templates"); pictures are never kept. */

@@ -19,9 +19,10 @@ import { brandCenterTemplatesT } from "@/lib/translations/brand-center-templates
 import { bc, type BcPerson } from "@/lib/brand-center/client";
 import { templateById } from "@/lib/brand-center/templates/registry";
 import { qrCodes } from "@/lib/brand-center/templates/qr";
-import type { FieldDef, TemplateDef, TemplateItem, TemplateValue, TemplateValues } from "@/lib/brand-center/templates/types";
-import { asLang, list, type Lang } from "@/lib/brand-center/templates/card/model";
+import type { FieldDef, TemplateDef, TemplateValue, TemplateValues } from "@/lib/brand-center/templates/types";
+import { asLang, list } from "@/lib/brand-center/templates/card/model";
 import { titleIn } from "@/lib/brand-center/templates/card/titles";
+import { nameIn, titleOf } from "@/lib/brand-center/templates/person";
 import PageHeader from "@/components/ui/PageHeader";
 import BrandCenterIcon from "@/components/icons/BrandCenterIcon";
 import Toggle from "@/components/kds/Toggle";
@@ -36,50 +37,7 @@ const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const ARABIC = /[\u0600-\u06FF]/;
-const CJK = /[\u2E80-\u9FFF]/;
 const GROUPS = ["look", "job", "person", "company", "contacts", "photo", "details", "qr"];
-
-/** A mobile in the book's international format (ch. 91: "+86 130 7380
- *  0720") when it is a Chinese or Egyptian mobile; anything else as typed. */
-function formatMobile(raw: string): string {
-  const d = raw.replace(/[^\d+]/g, "");
-  let m = d.match(/^(?:\+|00)?86(1\d{2})(\d{4})(\d{4})$/);
-  if (m) return `+86 ${m[1]} ${m[2]} ${m[3]}`;
-  m = d.match(/^(?:\+|00)?20(1\d)(\d{4})(\d{4})$/);
-  if (m) return `+20 ${m[1]} ${m[2]} ${m[3]}`;
-  return raw.trim();
-}
-
-/** The name as in the passport (ch. 91) — no "Mr.", "Dr." or "Eng." before it. */
-const HONORIFIC = /^(?:mr|mrs|ms|miss|dr|eng|prof)\.?\s+/i;
-const nameIn = (p: BcPerson, lang: Lang) => {
-  const alt = p.nameAlt ?? "";
-  return (lang === "zh" && CJK.test(alt)) || (lang === "ar" && ARABIC.test(alt)) ? alt : p.name.replace(HONORIFIC, "");
-};
-const titleOf = (p: BcPerson, lang: Lang) =>
-  (lang === "zh" ? p.titleZh || (p.title ? titleIn(p.title, "zh") : null) : lang === "ar" ? p.titleAr || (p.title ? titleIn(p.title, "ar") : null) : null) || p.title || "";
-
-/** What a person puts on the card: names and titles in the card's
- *  language(s), the mobile and email lines, the Hub photo. */
-function personPatch(p: BcPerson, v: TemplateValues): TemplateValues {
-  const lang = asLang(v.lang);
-  const lang2 = asLang(v.lang2 === "ar" ? "ar" : "zh");
-  const rows = list(v, "rows").map((r) => ({ ...r }));
-  const setRow = (kind: string, value: string) => {
-    if (!value) return;
-    const i = rows.findIndex((r) => r.kind === kind);
-    if (i >= 0) rows[i] = { ...rows[i], value };
-  };
-  setRow("mobile", p.mobile ? formatMobile(p.mobile) : "");
-  setRow("email", p.email ?? "");
-  return {
-    name: nameIn(p, lang), title: titleOf(p, lang), titleKey: p.title ?? "",
-    name2: nameIn(p, lang2), title2: titleOf(p, lang2), title2Key: p.title ?? "",
-    rows: rows as TemplateItem[],
-    ...(typeof v.photo === "string" && v.photo.startsWith("data:") ? {} : { photo: p.photo ?? "" }),
-  };
-}
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -147,14 +105,14 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
       if (typeof o.dealerLogo === "string" && o.dealerLogo && !next.dealerLogo) next.dealerLogo = o.dealerLogo;
       const pictures = list(o, "qrs").filter((q) => typeof q.image === "string" && q.image);
       next.qrs = list(next, "qrs").map((q) => (q.image ? q : { ...q, image: pictures.find((p) => p.kind === q.kind)?.image ?? "" }));
-      if (person && !(typeof saved.name === "string" && saved.name)) next = { ...next, ...personPatch(person, next) };
+      if (person && !(typeof saved.name === "string" && saved.name)) next = { ...next, ...(def.fromPerson ? def.fromPerson(person, next) : {}) };
       return next;
     });
   };
   const choose = (p: BcPerson | null) => {
     setPerson(p);
     setBlocked(null);
-    if (p) setValues((o) => ({ ...o, ...personPatch(p, o) }));
+    if (p) setValues((o) => ({ ...o, ...(def.fromPerson ? def.fromPerson(p, o) : {}) }));
   };
   const clear = () => {
     setPerson(null); setBlocked(null);

@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import type { BcPerson } from "@/lib/brand-center/client";
 
 export type TemplateScalar = string | boolean | number;
 /** One entry of a list slot (a contact line, a QR code). */
@@ -90,6 +91,8 @@ export interface TemplateDef {
   relang?: (v: TemplateValues, lang: string) => TemplateValues;
   /** The fill after picking another style (its own defaults, e.g. typeface). */
   restyle?: (v: TemplateValues, style: string) => TemplateValues;
+  /** The slots a chosen employee fills (name, title, photo …). */
+  fromPerson?: (p: BcPerson, v: TemplateValues) => TemplateValues;
   /** What is still missing before it can print (a words key), or null. */
   check?: (v: TemplateValues) => string | null;
   /** The fill as it is saved to "my templates": the look and the company's

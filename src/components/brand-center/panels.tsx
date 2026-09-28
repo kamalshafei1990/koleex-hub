@@ -13,7 +13,7 @@ type T = (key: string) => string;
 const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "live" | "building" | "planned"; href?: string }> = [
   { key: "businessCard", icon: "id-badge", status: "live", href: "/brand-center/templates/business-card" },
   { key: "printProof", icon: "print", status: "live", href: "/brand-center/templates/print-proof" },
-  { key: "staffCard", icon: "id-badge", status: "planned" },
+  { key: "staffCard", icon: "id-badge", status: "live", href: "/brand-center/templates/id-badge" },
   { key: "signature", icon: "signature", status: "planned" },
   { key: "badge", icon: "ticket", status: "planned" },
   { key: "certificate", icon: "award", status: "planned" },

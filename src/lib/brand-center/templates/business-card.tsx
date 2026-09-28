@@ -8,8 +8,12 @@
    --------------------------------------------------------------------------- */
 
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
+import type { BcPerson } from "@/lib/brand-center/client";
+import { formatMobile, nameIn, titleOf } from "./person";
 import type { TemplateDef, TemplateItem, TemplateValues, QrRequest } from "./types";
-import { asLang, defaultRows, qrsOf, relangRows, rowsOf, str, isPictureQr, list } from "./card/model";
+import { CARD_ADDRESS, LANGS, asLang, defaultRows, qrsOf, relangRows, rowsOf, str, isPictureQr, list } from "./card/model";
+
+const KOLEEX_WEB = "www.koleexgroup.com";
 import { NO_COMPANY_BACK, NO_COMPANY_FRONT, PORTRAIT_STYLES, STYLES, VERTICAL_STYLES, drawBack, drawFront, specKeysFor, styleOf } from "./card/styles";
 
 const SIZES: Record<string, { w: number; h: number }> = {
@@ -49,6 +53,27 @@ function vcard(v: TemplateValues): string | null {
   if (styleOf(v) === "technician" && str(v, "hotline")) out.push(`TEL;TYPE=WORK:${digits(str(v, "hotline"))}`);
   out.push("END:VCARD");
   return out.join("\n");
+}
+
+/** What a person puts on the card: names and titles in the card's
+ *  language(s), the mobile and email lines, the Hub photo. */
+function cardFromPerson(p: BcPerson, v: TemplateValues): TemplateValues {
+  const lang = asLang(v.lang);
+  const lang2 = asLang(v.lang2 === "ar" ? "ar" : "zh");
+  const rows = list(v, "rows").map((r) => ({ ...r }));
+  const setRow = (kind: string, value: string) => {
+    if (!value) return;
+    const i = rows.findIndex((r) => r.kind === kind);
+    if (i >= 0) rows[i] = { ...rows[i], value };
+  };
+  setRow("mobile", p.mobile ? formatMobile(p.mobile) : "");
+  setRow("email", p.email ?? "");
+  return {
+    name: nameIn(p, lang), title: titleOf(p, lang), titleKey: p.title ?? "",
+    name2: nameIn(p, lang2), title2: titleOf(p, lang2), title2Key: p.title ?? "",
+    rows: rows as TemplateItem[],
+    ...(typeof v.photo === "string" && v.photo.startsWith("data:") ? {} : { photo: p.photo ?? "" }),
+  };
 }
 
 const firstRow = (v: TemplateValues, kind: string) => rowsOf(v).find((r) => r.kind === kind && r.on && r.value.trim())?.value.trim() ?? "";
@@ -111,6 +136,11 @@ export const businessCard: TemplateDef = {
     { key: "hotline", kind: "text", labelKey: "tpl.f.hotline", group: "person", max: 24, when: isStyle("technician") },
     { key: "dealerName", kind: "text", labelKey: "tpl.f.dealerName", group: "person", max: 60, when: isStyle("dealer") },
     { key: "dealerLogo", kind: "image", labelKey: "tpl.f.dealerLogo", group: "person", hintKey: "tpl.f.dealerLogoHint", when: isStyle("dealer") },
+    { key: "badgeRole", kind: "choice", labelKey: "tpl.f.badgeRole", group: "person", when: isStyle("dealer"), options: [
+      { value: "Distributor", labelKey: "tpl.badge.distributor" }, { value: "Agent", labelKey: "tpl.badge.agent" }, { value: "Service Center", labelKey: "tpl.badge.service" },
+    ] },
+    { key: "badgePlace", kind: "text", labelKey: "tpl.f.badgePlace", group: "person", max: 40, hintKey: "tpl.f.badgePlaceHint", when: isStyle("dealer") },
+    { key: "badgeYear", kind: "text", labelKey: "tpl.f.badgeYear", group: "person", max: 4, when: isStyle("dealer") },
 
     { key: "company", kind: "text", labelKey: "tpl.f.company", group: "company", max: 60, hintKey: "tpl.f.companyHint" },
     { key: "companyBack", kind: "switch", labelKey: "tpl.f.companyBack", group: "company", when: (v) => !NO_COMPANY_BACK.includes(styleOf(v)) },
@@ -135,7 +165,7 @@ export const businessCard: TemplateDef = {
   ],
   defaults: {
     style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100,
-    name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "",
+    name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "", badgeRole: "Distributor", badgePlace: "", badgeYear: String(new Date().getFullYear()),
     company: "KOLEEX INTERNATIONAL GROUP", companyBack: true, companyFront: false,
     rows: defaultRows("en"), labels: true, whatsapp: true,
     photo: "", photoZoom: 100, photoX: 0, photoY: 0, soft: true,
@@ -147,6 +177,7 @@ export const businessCard: TemplateDef = {
     { id: "back", draw: drawBack },
   ],
   qrRequests,
+  fromPerson: cardFromPerson,
   specKeys: specKeysFor,
   fillName: (v, t) => t(`tpl.style.${styleOf(v)}`),
   relang: (v, lang) => ({ ...v, lang, rows: relangRows(list(v, "rows"), asLang(lang)) }),
@@ -155,6 +186,14 @@ export const businessCard: TemplateDef = {
   restyle: (v, style) => {
     const qrs = list(v, "qrs");
     const next: TemplateValues = { ...v, style };
+    /* The agent's card is the agent's own (ch. 128): our address and website
+       leave it; they come back when another style is picked. */
+    const lang = asLang(v.lang);
+    const ours = (r: TemplateItem) => (r.kind === "address" && LANGS.some((l) => CARD_ADDRESS[l] === r.value)) || (r.kind === "web" && r.value === KOLEEX_WEB);
+    if (style === "dealer") next.rows = list(v, "rows").map((r) => (ours(r) ? { ...r, value: "" } : r));
+    else if (styleOf(v) === "dealer") {
+      next.rows = list(v, "rows").map((r) => (r.kind === "address" && !r.value ? { ...r, value: CARD_ADDRESS[lang] } : r.kind === "web" && !r.value ? { ...r, value: KOLEEX_WEB } : r));
+    }
     if (style === "classic") {
       next.font = "helvetica";
       if (sameQrs(qrs, DEFAULT_QRS)) next.qrs = CLASSIC_QRS;
