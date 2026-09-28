@@ -133,7 +133,9 @@ function ScrollToTopOnRouteChange() {
    pages and the Hub chrome (header, sidebar, panels) must NOT be
    present in the captured output. */
 const BYPASS_SUFFIXES = ["/print"];
-const BYPASS_PREFIXES = ["/auth"];
+/* /legal: Koleex's public legal pages (privacy, terms, data deletion) —
+   read by the social platforms' reviewers, who never sign in. */
+const BYPASS_PREFIXES = ["/auth", "/legal"];
 
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;
