@@ -9,11 +9,13 @@
 
 import Link from "next/link";
 import { LEGAL_DOCS, LEGAL_LANGS, LEGAL_SLUGS, type LegalLang, type LegalPart, type LegalSlug } from "@/lib/legal/documents";
+import { legalNameEn } from "@/lib/legal-name";
 
 const LANG_NAME: Record<LegalLang, string> = { en: "English", ar: "العربية", zh: "中文" };
+/* The formal name from the one source; built at deploy like the page. */
 const FOOTER: Record<LegalLang, string> = {
-  en: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
-  ar: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
+  en: legalNameEn(),
+  ar: legalNameEn(),
   zh: "科莱恪斯国际商业管理（台州）有限公司",
 };
 

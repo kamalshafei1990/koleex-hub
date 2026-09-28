@@ -4,7 +4,8 @@
 
    Written 27/09/2026 for the platforms' app requirements (Meta, Google /
    YouTube, LinkedIn, TikTok, X), with the company's facts from the Hub
-   (official name, the Taizhou address, info@koleexgroup.com). Served
+   (official name, the Taizhou address, info@koleexgroup.com). The names
+   come from lib/legal-name.ts — never typed here (validate:legal-name). Served
    publicly by /legal/<doc>/<lang> (owner, 28/09/2026: on the Hub, since the
    Wix site's classic Editor cannot take new pages by API). Drafts, not legal
    advice: the governing-law clause names the PRC and the courts where
@@ -13,6 +14,13 @@
    Inline parts: a string, { b } bold, { a, text } a link, { ltr } a Latin
    run inside Arabic, { br } a line break.
    --------------------------------------------------------------------------- */
+
+import { EVERYDAY_NAME_EN, legalNameEn } from "@/lib/legal-name";
+
+/** The formal name, from the one source (lib/legal-name.ts): the pages are
+ *  built at deploy, so they carry the name in force on the day they are
+ *  built — from 01/10/2026 the new spelling. */
+const LEGAL_EN = legalNameEn();
 
 export type LegalPart = string | { b: string } | { a: string; text: string } | { ltr: string } | { br: true };
 export type LegalBlock =
@@ -48,7 +56,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "This Privacy Policy explains how KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD. (trading as Koleex International Group, “Koleex”, “we”, “us”) collects, uses and protects personal information. Our registered address is Room 206, Building 88, West Feiyue Technological Innovative Park, Jingshui An Community, Xiachen Street, Jiaojiang District, Taizhou City, Zhejiang Province, China. You can contact us about privacy at info@koleexgroup.com."
+      `This Privacy Policy explains how ${LEGAL_EN} (trading as ${EVERYDAY_NAME_EN}, “Koleex”, “we”, “us”) collects, uses and protects personal information. Our registered address is Room 206, Building 88, West Feiyue Technological Innovative Park, Jingshui An Community, Xiachen Street, Jiaojiang District, Taizhou City, Zhejiang Province, China. You can contact us about privacy at info@koleexgroup.com.`
      ]
     },
     {
@@ -282,7 +290,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
+      LEGAL_EN,
       {
        "br": true
       },
@@ -310,7 +318,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
      "parts": [
       "توضح سياسة الخصوصية هذه كيف تجمع شركة ",
       {
-       "ltr": "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD."
+       "ltr": LEGAL_EN
       },
       " (وتعمل تحت اسم كولكس إنترناشونال جروب، ويُشار إليها فيما يلي بـ«كولكس» أو «نحن») المعلومات الشخصية وتستخدمها وتحميها. عنواننا المسجل: ",
       {
@@ -563,7 +571,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
      "t": "p",
      "parts": [
       {
-       "ltr": "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD."
+       "ltr": LEGAL_EN
       },
       {
        "br": true
@@ -599,7 +607,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "本隐私政策说明科莱恪斯国际商业管理（台州）有限公司（KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.，以 Koleex International Group 名义开展业务，以下简称“Koleex”或“我们”）如何收集、使用和保护个人信息。我们的注册地址为：浙江省台州市椒江区下陈街道泾水岸社区飞跃科创园西区88幢206室。如对隐私有任何疑问，请联系 info@koleexgroup.com。"
+      `本隐私政策说明科莱恪斯国际商业管理（台州）有限公司（${LEGAL_EN}，以 ${EVERYDAY_NAME_EN} 名义开展业务，以下简称“Koleex”或“我们”）如何收集、使用和保护个人信息。我们的注册地址为：浙江省台州市椒江区下陈街道泾水岸社区飞跃科创园西区88幢206室。如对隐私有任何疑问，请联系 info@koleexgroup.com。`
      ]
     },
     {
@@ -861,7 +869,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "These Terms of Service govern your use of www.koleexgroup.com and the online services of KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD. (trading as Koleex International Group, “Koleex”, “we”, “us”). By using the website you accept these terms. If you do not accept them, please do not use the website."
+      `These Terms of Service govern your use of www.koleexgroup.com and the online services of ${LEGAL_EN} (trading as ${EVERYDAY_NAME_EN}, “Koleex”, “we”, “us”). By using the website you accept these terms. If you do not accept them, please do not use the website.`
      ]
     },
     {
@@ -1034,7 +1042,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
       },
       " والخدمات الإلكترونية لشركة ",
       {
-       "ltr": "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD."
+       "ltr": LEGAL_EN
       },
       " (وتعمل تحت اسم كولكس إنترناشونال جروب، ويُشار إليها فيما يلي بـ«كولكس» أو «نحن»). وباستخدامك للموقع فإنك توافق على هذه الشروط، وإذا لم توافق عليها فيُرجى عدم استخدام الموقع."
      ]
@@ -1205,7 +1213,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "本服务条款适用于您对 www.koleexgroup.com 及科莱恪斯国际商业管理（台州）有限公司（以 Koleex International Group 名义开展业务，以下简称“Koleex”或“我们”）在线服务的使用。使用本网站即表示您接受本条款；如您不接受，请勿使用本网站。"
+      `本服务条款适用于您对 www.koleexgroup.com 及科莱恪斯国际商业管理（台州）有限公司（以 ${EVERYDAY_NAME_EN} 名义开展业务，以下简称“Koleex”或“我们”）在线服务的使用。使用本网站即表示您接受本条款；如您不接受，请勿使用本网站。`
      ]
     },
     {
@@ -1368,7 +1376,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
     {
      "t": "p",
      "parts": [
-      "Koleex (KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.) uses the platforms’ official interfaces to manage Koleex’s own accounts on Facebook, Instagram, WhatsApp, LinkedIn, YouTube, TikTok, X and WeChat. When you interact with these accounts, we may receive and keep your public name or username, your profile picture, and the comments or messages you send to us."
+      `Koleex (${LEGAL_EN}) uses the platforms’ official interfaces to manage Koleex’s own accounts on Facebook, Instagram, WhatsApp, LinkedIn, YouTube, TikTok, X and WeChat. When you interact with these accounts, we may receive and keep your public name or username, your profile picture, and the comments or messages you send to us.`
      ]
     },
     {
@@ -1446,7 +1454,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
      "parts": [
       "تستخدم كولكس (",
       {
-       "ltr": "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD."
+       "ltr": LEGAL_EN
       },
       ") الواجهات الرسمية للمنصات لإدارة حساباتها على Facebook وInstagram وWhatsApp وLinkedIn وYouTube وTikTok وX وWeChat. وعندما تتفاعل مع هذه الحسابات، قد نتلقى ونحتفظ باسمك العام أو اسم المستخدم، وصورة ملفك الشخصي، والتعليقات أو الرسائل التي ترسلها إلينا."
      ]
