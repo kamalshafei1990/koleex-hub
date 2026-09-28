@@ -62,6 +62,7 @@ export const INSIGHTS_T: Translations = {
   "g.F":            { en: "Women", zh: "女性", ar: "نساء" },
   "g.U":            { en: "Unspecified", zh: "未指定", ar: "غير محدد" },
   "a.none":         { en: "Meta has not shared the audience yet. It comes once a day.", zh: "Meta 尚未提供受众数据，每天更新一次。", ar: "لم تشارك Meta بيانات الجمهور بعد. تصل مرة يوميًا." },
+  "a.unavailable":  { en: "Meta no longer shares a Page's audience with apps. It is still in Meta Business Suite → Insights → Audience.", zh: "Meta 已不再向应用提供主页的受众数据。仍可在 Meta Business Suite → 洞察 → 受众 中查看。", ar: "لم تعد Meta تشارك جمهور الصفحة مع التطبيقات. ما زال موجودًا في Meta Business Suite ← الإحصاءات ← الجمهور." },
   "a.pageNote":     { en: "Meta no longer shares a Page's age and gender.", zh: "Meta 已不再提供主页的年龄和性别数据。", ar: "لم تعد Meta تشارك عمر ونوع جمهور الصفحة." },
   "top":            { en: "Top posts", zh: "热门帖子", ar: "أفضل المنشورات" },
   "top.hint":       { en: "The last 12 months, by views", zh: "最近 12 个月，按浏览量", ar: "آخر 12 شهرًا، حسب المشاهدات" },

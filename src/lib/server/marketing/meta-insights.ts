@@ -230,8 +230,10 @@ export async function facebookPageInsights(pageId: string, token: string, from: 
 }
 
 /** A Page's audience by country and city (Meta's lifetime snapshot). Meta
- *  no longer gives a Page's age and gender. null when it gives neither. */
-export async function facebookDemographics(pageId: string, token: string): Promise<Pick<AudienceSnapshot, "countries" | "cities" | "totals"> | null> {
+ *  no longer gives a Page's age and gender. Live (29/09/2026): page_fans_*
+ *  are refused and page_follows_* answer with nothing — then the snapshot
+ *  says unavailable, so the screen says so instead of "not yet". */
+export async function facebookDemographics(pageId: string, token: string): Promise<Pick<AudienceSnapshot, "countries" | "cities" | "totals" | "unavailable">> {
   for (const [country, city] of [["page_fans_country", "page_fans_city"], ["page_follows_country", "page_follows_city"]]) {
     const data = await readEach(`${pageId}/insights`, token, [country, city], { period: "lifetime" }).catch((e) => {
       if (stopsRun(e)) throw e;
@@ -249,7 +251,7 @@ export async function facebookDemographics(pageId: string, token: string): Promi
     if (countries.length || cities.length) return { countries, cities, totals: { countries: totalOf(c), cities: totalOf(ci) } };
     if (data.length) warnShape(pageId, `${country}, ${city} (nothing counted)`, data);
   }
-  return null;
+  return { countries: [], cities: [], totals: {}, unavailable: true };
 }
 
 const results = (m: GraphMetric | undefined) =>

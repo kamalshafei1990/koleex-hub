@@ -468,8 +468,8 @@ function TopPosts({ a, t }: { a: AccountInsights; t: T }) {
 }
 
 function AudienceBlock({ audience, platform, t, lang }: { audience: AudienceSnapshot | null; platform: string; t: T; lang: string }) {
-  if (!audience) {
-    return <Section title={t("audience")}><p className="text-[12px] text-[var(--text-muted)]">{t("a.none")}</p></Section>;
+  if (!audience || audience.unavailable) {
+    return <Section title={t("audience")}><p className="text-[12px] text-[var(--text-muted)]">{t(audience?.unavailable ? "a.unavailable" : "a.none")}</p></Section>;
   }
   let regions: Intl.DisplayNames | null = null;
   try { regions = new Intl.DisplayNames([lang], { type: "region" }); } catch { /* an old browser: the codes stay */ }

@@ -194,6 +194,9 @@ export interface AudienceSnapshot {
   genders: AudienceEntry[];
   /** Everyone in each part (the lists keep the top 10), so a share is of the whole. */
   totals: Partial<Record<AudiencePart, number>>;
+  /** Meta answered but shares none of it with apps (a Page's audience since
+   *  the New Pages Experience, seen 29/09/2026); asked again every day. */
+  unavailable?: boolean;
 }
 
 /** Largest first, the top n. */
