@@ -47,7 +47,14 @@ export interface BcPerson {
   photo: string | null;
 }
 
+/** A saved fill of a template ("my templates"); pictures are never kept. */
+export interface BcSaved { id: string; account_id: string; template_id: string; name: string; fill: Record<string, unknown>; shared: boolean; mine: boolean; updated_at: string }
+
 export const bc = {
+  saved: (template: string) => call<{ canShare: boolean; saved: BcSaved[] }>(`/api/brand-center/saved?template=${encodeURIComponent(template)}`),
+  saveTemplate: (b: { templateId: string; name: string; fill: Record<string, unknown>; shared: boolean }) => send<{ saved: BcSaved }>("/api/brand-center/saved", "POST", b),
+  editSaved: (id: string, b: { name?: string; fill?: Record<string, unknown>; shared?: boolean }) => send<{ saved: BcSaved }>(`/api/brand-center/saved/${id}`, "PATCH", b),
+  deleteSaved: (id: string) => call<{ ok: true }>(`/api/brand-center/saved/${id}`, { method: "DELETE" }),
   people: () => call<{ scope: "all" | "self"; people: BcPerson[] }>("/api/brand-center/people"),
   library: () => call<{ sections: BcSectionRow[] }>("/api/brand-center/library"),
   section: (key: string) => call<BcSectionData>(`/api/brand-center/sections/${encodeURIComponent(key)}`),

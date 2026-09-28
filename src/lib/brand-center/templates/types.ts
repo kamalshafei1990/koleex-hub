@@ -92,6 +92,10 @@ export interface TemplateDef {
   restyle?: (v: TemplateValues, style: string) => TemplateValues;
   /** What is still missing before it can print (a words key), or null. */
   check?: (v: TemplateValues) => string | null;
+  /** The fill as it is saved to "my templates": the look and the company's
+   *  lines always; a person's own details only when `keepPerson`. Pictures
+   *  are never saved (the server drops them too). */
+  forSaving?: (v: TemplateValues, keepPerson: boolean) => TemplateValues;
 }
 
 /** 1 pt in mm — type sizes in the book are in points. */

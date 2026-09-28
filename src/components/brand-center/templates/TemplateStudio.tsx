@@ -30,6 +30,7 @@ import { FIELD, fill } from "../ui";
 import TemplateSheet from "./TemplateSheet";
 import { Field } from "./StudioFields";
 import { printTemplate } from "./print";
+import SavedTemplates from "./SavedTemplates";
 
 const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
@@ -37,7 +38,7 @@ type People = { state: "loading" } | { state: "error" } | { state: "ready"; scop
 
 const ARABIC = /[\u0600-\u06FF]/;
 const CJK = /[\u2E80-\u9FFF]/;
-const GROUPS = ["look", "job", "person", "contacts", "photo", "details", "qr"];
+const GROUPS = ["look", "job", "person", "company", "contacts", "photo", "details", "qr"];
 
 /** A mobile in the book's international format (ch. 91: "+86 130 7380
  *  0720") when it is a Chinese or Egyptian mobile; anything else as typed. */
@@ -136,6 +137,20 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
       return next;
     });
   };
+  /* A saved template: its look over the defaults; this session's pictures
+     stay, and the chosen employee fills in when the template kept no one. */
+  const applySaved = (saved: TemplateValues) => {
+    setBlocked(null);
+    setValues((o) => {
+      let next: TemplateValues = { ...def.defaults, ...saved };
+      if (typeof o.photo === "string" && o.photo && !next.photo) next.photo = o.photo;
+      if (typeof o.dealerLogo === "string" && o.dealerLogo && !next.dealerLogo) next.dealerLogo = o.dealerLogo;
+      const pictures = list(o, "qrs").filter((q) => typeof q.image === "string" && q.image);
+      next.qrs = list(next, "qrs").map((q) => (q.image ? q : { ...q, image: pictures.find((p) => p.kind === q.kind)?.image ?? "" }));
+      if (person && !(typeof saved.name === "string" && saved.name)) next = { ...next, ...personPatch(person, next) };
+      return next;
+    });
+  };
   const choose = (p: BcPerson | null) => {
     setPerson(p);
     setBlocked(null);
@@ -177,6 +192,9 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-start">
           <aside data-kx-pane className={`${CARD} px-4 py-4`}>
+            <div className="mb-4 border-b border-[var(--border-faint)] pb-4">
+              <SavedTemplates t={t} def={def} values={values} onApply={applySaved} />
+            </div>
             {def.usesPeople !== false ? <FillFrom t={t} people={people} person={person} onChoose={choose} /> : null}
             <div className={`${def.usesPeople !== false ? "mt-4 " : ""}flex justify-end`}>
               <button type="button" onClick={clear} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("studio.clear")}</button>

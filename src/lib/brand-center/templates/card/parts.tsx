@@ -54,6 +54,27 @@ export function Stroke({ x, top, bottom, width, lean, fill = WHITE }: { x: numbe
   return <polygon points={`${x},${top} ${x + width},${top} ${x + width + dx},${bottom} ${x + dx},${bottom}`} fill={fill} />;
 }
 
+/** The group's name under a logo (owner 29/09/2026: "write under the logo
+ *  Koleex International Group"). At least 5 pt, about half the logo's
+ *  height; spread to the logo's exact width when asked, like the book's
+ *  stacked lockup. Returns the drawing and the room it takes below the logo. */
+export function companyLine({ text, logo, align, fill, font, spread }: {
+  text: string; logo: { x: number; y: number; w: number }; align: "start" | "middle" | "end"; fill: string; font: string; spread: boolean;
+}): { node: ReactNode; room: number } {
+  if (!text) return { node: null, room: 0 };
+  const size = Math.max(5 * PT, logoHeight(logo.w) * 0.42);
+  const y = logo.y + logoHeight(logo.w) + size * 1.55;
+  const natural = textWidth(text, size, 400, font);
+  const spreadIt = spread && natural < logo.w;
+  const x = spreadIt || align === "start" ? logo.x : align === "middle" ? logo.x + logo.w / 2 : logo.x + logo.w;
+  const node = (
+    <text x={x} y={y} textAnchor={spreadIt ? "start" : align} direction="ltr" fill={fill}
+      {...(spreadIt ? { textLength: logo.w, lengthAdjust: "spacing" as const } : fit(text, size, Math.max(logo.w * 2.2, 30), 400, font))}
+      style={{ fontFamily: font, fontSize: size, fontWeight: 400, unicodeBidi: "plaintext" }}>{text}</text>
+  );
+  return { node, room: size * 1.9 };
+}
+
 /* ── text ──────────────────────────────────────────────────────────────── */
 
 const CJK = /[\u2E80-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/;

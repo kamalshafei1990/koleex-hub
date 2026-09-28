@@ -190,4 +190,30 @@ export const brandCenterTemplatesT: Translations = {
   "spec.proof3": { en: "A colour or a black that is off is fixed at the press before the real job runs — never in our file.",
                    zh: "颜色或黑色有偏差，在正式开印前于印刷端调整 — 不改我们的文件。",
                    ar: "أي لون أو أسود مش مظبوط يتظبط عند المطبعة قبل الشغل الحقيقي — مش في الملف بتاعنا." },
+
+  /* ── the group's name under the logo (owner 29/09) ── */
+  "tpl.group.company":    { en: "Company name under the logo", zh: "标志下方的公司名", ar: "اسم الشركة تحت اللوجو" },
+  "tpl.f.company":        { en: "Text", zh: "文字", ar: "الكلام" },
+  "tpl.f.companyBack":    { en: "On the back", zh: "放在背面", ar: "على الضهر" },
+  "tpl.f.companyFront":   { en: "On the front", zh: "放在正面", ar: "على الوش" },
+  "tpl.f.companySpread":  { en: "Spread to the logo's width", zh: "与标志同宽", ar: "بعرض اللوجو بالظبط" },
+
+  /* ── my templates (owner 29/09) ── */
+  "saved.title":      { en: "My templates", zh: "我的模板", ar: "قوالبي" },
+  "saved.none":       { en: "Nothing saved yet — set up the card the way you like it and save it here.", zh: "还没有保存 — 按您的喜好设置好后在此保存。", ar: "مفيش حاجة محفوظة لسه — ظبّط الكارت زي ما تحب واحفظه هنا." },
+  "saved.company":    { en: "Company", zh: "公司", ar: "الشركة" },
+  "saved.saveNew":    { en: "Save as my template", zh: "另存为我的模板", ar: "احفظ كقالب ليا" },
+  "saved.name":       { en: "Name of the template", zh: "模板名称", ar: "اسم القالب" },
+  "saved.keepPerson": { en: "Keep this person's details too (name, title, mobile, email)", zh: "同时保存此人的资料（姓名、职位、手机、邮箱）", ar: "احفظ بيانات الشخص ده كمان (الاسم، المسمى، الموبايل، الإيميل)" },
+  "saved.share":      { en: "Share with everyone in the company", zh: "与公司所有人共享", ar: "شاركه مع كل الشركة" },
+  "saved.pictures":   { en: "Pictures (portrait, QR pictures, dealer logo) are not saved — add them again when you use it.", zh: "图片（肖像、二维码图片、经销商标志）不保存 — 使用时请重新添加。", ar: "الصور (الصورة الشخصية، صور أكواد QR، لوجو الموزّع) مش بتتحفظ — ضيفها تاني لما تستخدمه." },
+  "saved.save":       { en: "Save", zh: "保存", ar: "احفظ" },
+  "saved.cancel":     { en: "Cancel", zh: "取消", ar: "إلغاء" },
+  "saved.done":       { en: "Saved: {name}", zh: "已保存：{name}", ar: "اتحفظ: {name}" },
+  "saved.error":      { en: "Not saved — try again.", zh: "未保存 — 请重试。", ar: "ما اتحفظش — حاول تاني." },
+  "saved.update":     { en: "Save changes to {name}", zh: "保存对 {name} 的修改", ar: "احفظ التعديلات على {name}" },
+  "saved.remove":     { en: "Remove", zh: "删除", ar: "امسح" },
+  "saved.removeAsk":  { en: "Remove {name}?", zh: "删除 {name}？", ar: "تمسح {name}؟" },
+  "saved.removeYes":  { en: "Remove", zh: "删除", ar: "امسح" },
+  "saved.removeNo":   { en: "Keep", zh: "保留", ar: "سيبه" },
 };
