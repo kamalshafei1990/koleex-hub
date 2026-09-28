@@ -64,6 +64,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { stripComments } from "./lib/strip-comments";
 import { COMMENTS_T } from "../src/lib/marketing/comments-i18n";
+import { INSIGHTS_T } from "../src/lib/marketing/insights-i18n";
 import { LEGAL_DOCS, LEGAL_SLUGS } from "../src/lib/legal/documents";
 
 let pass = 0;
@@ -638,6 +639,73 @@ for (const [slug, key] of Object.entries(LEGAL_SLUGS)) {
 check(`the three pages in en / zh / ar say the same number of things, each with a date and the contact email (${Object.keys(LEGAL_SLUGS).length} pages)`,
   legalIssues.length === 0 && Object.keys(LEGAL_SLUGS).join(",") === "privacy-policy,terms-of-service,data-deletion");
 if (legalIssues.length) console.log(`    ${legalIssues.join("; ")}`);
+
+/* ── 12. Insights ── */
+console.log("\n12. Insights (each account's numbers per day)");
+const insMig = readFileSync("supabase/migrations/20260928_marketing_insights.sql", "utf8");
+const insMigSql = insMig.replace(/--[^\n]*/g, "");
+check("one additive table, one row per account per day, server-only (RLS on, no policy)",
+  /CREATE TABLE IF NOT EXISTS marketing_insight_days/.test(insMigSql) && /PRIMARY KEY \(account_id, day\)/.test(insMigSql) &&
+  /REFERENCES marketing_accounts\(id\) ON DELETE CASCADE/.test(insMigSql) && /ALTER TABLE marketing_insight_days ENABLE ROW LEVEL SECURITY;/.test(insMigSql) &&
+  !/CREATE POLICY|\bDROP\b|\bDELETE\s+FROM\b|\bTRUNCATE\b/i.test(insMigSql));
+const MI = "src/lib/server/marketing/meta-insights.ts";
+const mi = code(MI);
+const META_NAMES = ["page_media_view", "page_total_media_view_unique", "page_daily_follows_unique", "page_daily_unfollows_unique", "page_views_total", "page_post_engagements", "page_video_view_time", "follows_and_unfollows", "profile_links_taps"];
+const namesElsewhere = walk("src").filter((f) => f !== MI && META_NAMES.some((n) => code(f).includes(`"${n}"`)));
+check(`Meta's metric names live in meta-insights only — a renamed metric changes one map${namesElsewhere.length ? ` — also in: ${namesElsewhere.join(", ")}` : ""}`,
+  namesElsewhere.length === 0 && META_NAMES.every((n) => mi.includes(`${n}`)));
+check("every call goes through metaGet (the key in the Authorization header), never in the address",
+  /^import "server-only";/m.test(readFileSync(MI, "utf8")) && /metaGet<GraphInsights>\(metaGraphUrl\(path, \{ \.\.\.params, metric: list\.join\(","\) \}\), token\)/.test(mi) &&
+  !/access_token|fetch\(/.test(mi));
+check("an expired key or a rate limit stops the run: never retried metric by metric",
+  /export const stopsRun = \(e: unknown\): boolean => e instanceof MetaError && \(e\.code === 190 \|\| META_RATE_LIMIT_CODES\.has\(e\.code \?\? -1\)\);/.test(mi) &&
+  /if \(!\(e instanceof MetaError\) \|\| stopsRun\(e\) \|\| metrics\.length === 1\) throw e;/.test(mi) &&
+  /for \(const s of settled\) if \(s\.status === "rejected" && stopsRun\(s\.reason\)\) throw s\.reason;/.test(mi));
+check("Instagram: a day Meta refuses is stored empty ({}), a day the network lost is asked again (null)",
+  /return settled\.every\(\(s\) => s\.status === "rejected" && s\.reason instanceof MetaError\) \? \{\} : null;/.test(mi));
+const insLib = code("src/lib/marketing/insights.ts");
+const additive = insLib.match(/export const ADDITIVE_KEYS = \[([\s\S]*?)\] as const/)?.[1] ?? "";
+check("viewers and reach are unique people: never added up, Meta's window figure instead, none for 90 days",
+  !!additive && !/viewers|reach/.test(additive) && /if \(period !== 90\) \{/.test(insLib) && /const now = rows\.get\(end\)\?\.\[key\];/.test(insLib));
+check("the change is shown only when the Hub has every day of both periods",
+  /const fullBefore = days === period && daysBefore === period;/.test(insLib) && /const before = fullBefore \?/.test(insLib) &&
+  /if \(m\.before === null \|\| m\.before === 0\) return null;/.test(insLib));
+check("Meta's day: it starts at midnight US Pacific (DST-aware), yesterday is Meta's",
+  /timeZone: "America\/Los_Angeles"/.test(insLib) && /export const metaYesterday = /.test(insLib) && /for \(const h of \[7, 8\]\)/.test(insLib));
+const insSrv = code("src/lib/server/marketing/insights.ts");
+const insFn = insSrv.match(/export async function syncInsights\([\s\S]*?\n\}/)?.[0] ?? "";
+check("syncInsights claims the account before any call to Meta; a claim and the «complete» mark are version-checked",
+  before(insFn, "await claimInsights(a, gap)", "facebookPageInsights(") && before(insFn, "await claimInsights(a, gap)", "instagramDay(") &&
+  /export async function claimInsights\(a: AccountForSync, minGapMs: number\)[\s\S]*?\.eq\("updated_at", a\.updated_at\)/.test(code(ACCOUNTS)) &&
+  /export async function recordInsights\(a: AccountForSync, complete: boolean\)[\s\S]*?\.eq\("updated_at", a\.updated_at\);/.test(code(ACCOUNTS)));
+check("a day is read again until 72 hours after it ends, not every run; days merge, nothing read is wiped",
+  /const SETTLE_MS = 72 \* 3600_000;/.test(insSrv) && /const readAgo = opts\.force \? 10 \* 60_000 : INSIGHTS_REFRESH_MS;/.test(insFn) &&
+  /metrics: \{ \.\.\.have\.get\(day\)\?\.metrics, \.\.\.m \}/.test(insFn) &&
+  /synced_at: dayFetched\.has\(day\) \? now : have\.get\(day\)\?\.synced_at \?\? new Date\(0\)\.toISOString\(\)/.test(insFn));
+check("an expired key marks the account expired; any other failure keeps what was read",
+  /if \(e instanceof MetaError && e\.code === 190\) \{\s*await recordSync\(a\.id, \{ status: "expired"/.test(insFn));
+check("the screen's days: a reach-only day is not a day the Hub has; the key never reaches the screen",
+  /const counted = new Set\(\[\.\.\.stored\.values\(\)\]\.filter\(\(r\) => Date\.parse\(r\.synced_at\) > 0\)/.test(insSrv) &&
+  /summarize\(rows, end, period, counted\)/.test(insSrv) && !/token/.test(insSrv.match(/export async function loadInsights\([\s\S]*?\n\}/)?.[0] ?? "token") &&
+  /\.select\("day, metrics, synced_at"\)/.test(insSrv));
+const insGet = code("src/app/api/marketing/insights/route.ts");
+const insRefresh = code("src/app/api/marketing/insights/refresh/route.ts");
+check("both routes: signed in, then 'view' on the space's module, before any read; answers never cached",
+  before(insGet, "requireModuleAction(auth, SPACE_MODULE[space], \"view\")", "loadInsights(") && /"Cache-Control": "private, no-store"/.test(insGet) &&
+  before(insRefresh, "requireModuleAction(auth, SPACE_MODULE[space], \"view\")", "syncInsights(") && /force: true/.test(insRefresh));
+const cronSrc = code("src/lib/server/marketing/cron.ts");
+check("the cron's fifth step keeps the numbers current: Pages and Instagram only, a few per run, each claimed",
+  /\.in\("platform", \["facebook", "instagram"\]\)/.test(cronSrc) && /await syncInsights\(a\.tenant_id, a\.id, \{ budgetMs: Math\.min\(25_000, left\(\) - 5_000\) \}\)/.test(cronSrc) &&
+  /insights: number;/.test(cronSrc));
+const insScreen = code("src/components/marketing/SocialInsights.tsx");
+const insT = INSIGHTS_T as Record<string, Record<string, string | undefined>>;
+const insMissing = Object.entries(insT).filter(([, v]) => !["en", "zh", "ar"].every((l) => (v[l] ?? "").trim())).map(([k]) => k);
+check(`the Insights screen: never sideways, session copy guarded, speaks en/zh/ar (${Object.keys(insT).length} phrases)`,
+  !/overflow-x-(auto|scroll)/.test(insScreen) && insMissing.length === 0 &&
+  /try \{\s*const raw = sessionStorage\.getItem\(key\);/.test(insScreen) && /try \{ sessionStorage\.setItem\(key, JSON\.stringify\(data\)\); \} catch/.test(insScreen));
+const mhSrc = code("src/components/marketing/MarketingHeader.tsx");
+check("the Insights tab follows Feed; Comments stays last",
+  /\{ key: SPACE_HOME\[space\][^\n]*\n\s*\{ key: SPACE_INSIGHTS\[space\]/.test(mhSrc) && /\{ key: SPACE_COMMENTS\[space\][^\n]*\n\s*\]\}/.test(mhSrc));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

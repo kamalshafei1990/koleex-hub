@@ -15,7 +15,10 @@ import "server-only";
         the week-on-week change has a snapshot every day;
      4. comments: the last 14 days' posts of every account, every 15 minutes
         (28/09/2026), so a question waits minutes, not hours, for the team to
-        see it — each account claimed first (claimComments).
+        see it — each account claimed first (claimComments);
+     5. insights: each Page's and Instagram account's numbers per day
+        (28/09/2026) — every run while the 180 days of history come in, then
+        every 6 hours — each account claimed first (claimInsights).
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
@@ -23,16 +26,17 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { publishPost } from "@/lib/server/marketing/publish";
 import { COMMENTS_REFRESH_MS, refreshRecentComments, syncAccount } from "@/lib/server/marketing/sync";
+import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insights";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -98,6 +102,27 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       if (left() < 10_000) { out.stoppedEarly = true; break; }
       const r = await refreshRecentComments(a.tenant_id, a.id, { minGapMs: COMMENTS_REFRESH_MS, budgetMs: Math.min(20_000, left() - 5_000) });
       if (r.ok && !r.skipped) out.comments++;
+    }
+  }
+
+  /* 5. Insights: while an account's history is still coming in, every run;
+        after that, every 6 hours (syncInsights decides; claimInsights keeps
+        two runs off one account). Facebook Pages and Instagram only. */
+  if (left() > 12_000) {
+    const staleLong = new Date(Date.now() - INSIGHTS_REFRESH_MS).toISOString();
+    const staleShort = new Date(Date.now() - 4 * 60_000).toISOString();
+    let iQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
+      .in("status", ["connected", "error"])
+      .or(`sync_state->>insights_full.is.null,sync_state->>insights_full.neq.true,sync_state->>insights_at.lt.${staleLong}`)
+      .or(`sync_state->>insights_at.is.null,sync_state->>insights_at.lt.${staleShort}`);
+    if (opts.tenantId) iQ = iQ.eq("tenant_id", opts.tenantId);
+    const { data: iAccs, error: iErr } = await iQ.order("updated_at", { ascending: true }).limit(3);
+    if (iErr) throw new Error(`marketing accounts: ${iErr.message}`);
+    for (const a of (iAccs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 12_000) { out.stoppedEarly = true; break; }
+      const r = await syncInsights(a.tenant_id, a.id, { budgetMs: Math.min(25_000, left() - 5_000) });
+      if (r.ok && !r.skipped) out.insights++;
     }
   }
   return out;

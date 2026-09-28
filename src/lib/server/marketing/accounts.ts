@@ -257,6 +257,41 @@ export async function claimComments(a: AccountForSync, minGapMs: number): Promis
   return true;
 }
 
+/** Mark an Insights refresh as started — the same rules as claimComments,
+ *  on sync_state.insights_at. true = this caller runs it. */
+export async function claimInsights(a: AccountForSync, minGapMs: number): Promise<boolean> {
+  const last = typeof a.sync_state.insights_at === "string" ? Date.parse(a.sync_state.insights_at) || 0 : 0;
+  if (last && Date.now() - last < minGapMs) return false;
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, insights_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
+}
+
+/** After an Insights refresh: whether every wanted day is in (then the next
+ *  refresh waits hours, not minutes). Only if nothing changed the account
+ *  since the claim — a Feed sync's newer sync_state is never overwritten;
+ *  a skipped write only brings the next refresh sooner. */
+export async function recordInsights(a: AccountForSync, complete: boolean): Promise<void> {
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, insights_full: complete };
+  const { error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at);
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+}
+
 /** After a sync: the account's status, audience and where the history
  *  import stopped. */
 export async function recordSync(id: string, patch: {
