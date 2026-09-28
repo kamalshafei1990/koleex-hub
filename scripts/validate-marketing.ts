@@ -68,6 +68,13 @@
      · the approvers are asked once per week's draft (Social Marketing
        only), reminded while it waits, and the request clears once it is
        approved or the week ends.
+   Comments on ads (29/09/2026) add:
+     · only posts that exist SOLELY as ads are kept (a boosted post stays the
+       Feed's), in their own table that the Feed, Insights and the plan never
+       read; their comments hang under them (ad_post_id);
+     · the person's own key (Instagram's ads) is encrypted like the Page keys,
+       kept only with the ads permissions, deleted with the account, and a
+       lapsed or refused one never marks the account expired.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -179,7 +186,10 @@ const iExchange = cb.search(/\b(exchangeCode|longLivedUserToken|managedPages|gra
 check("callback: the state is compared in constant time", /crypto\.timingSafeEqual\(x, y\)/.test(cb));
 check("callback: state, then permission, then the exchange — in that order", iState > -1 && iPerm > iState && iExchange > iPerm);
 check("callback: every way out clears the state cookie", /res\.cookies\.set\(META_STATE_COOKIE, "", \{ \.\.\.META_STATE_COOKIE_OPTIONS, maxAge: 0 \}\)/.test(cb) && !/NextResponse\.(json|redirect)\((?![^)]*SPACE_ROUTE)/.test(cb.replace(/const back[\s\S]*?return res;\n  \};/, "")));
-check("callback: saves through lib/server/marketing/accounts (keys encrypted there)", /saveMetaAccounts\(\{ tenantId: auth\.tenant_id, space, connectedBy: auth\.account_id, pages, scopes \}\)/.test(cb) && /encryptToken\(page\.access_token\)/.test(acc));
+check("callback: saves through lib/server/marketing/accounts (keys encrypted there); the person's own key only with the ads permissions",
+  /saveMetaAccounts\(\{ tenantId: auth\.tenant_id, space, connectedBy: auth\.account_id, pages, scopes, userToken \}\)/.test(cb) &&
+  /const userToken = instagramAdsGranted\(scopes\) \? long : null;/.test(cb) &&
+  /encryptToken\(page\.access_token\)/.test(acc) && /const userKey = input\.userToken \? encryptToken\(input\.userToken\.token\) : null;/.test(acc));
 
 /* ── 4. The routes are gated ── */
 console.log("\n4. Every route is gated");
@@ -845,6 +855,56 @@ check("the Feed's plan card: one fixed-height line from its first frame, asked a
 dictionary("src/components/marketing/PlanFeedCard.tsx", 6);
 check("the Plan tab follows Insights",
   /\{ key: SPACE_INSIGHTS\[space\][^\n]*\n\s*\{ key: SPACE_PLAN\[space\]/.test(mhSrc) && /company: "\/social-marketing\/plan",/.test(code("src/lib/marketing/spaces.ts")));
+
+console.log("\n14. Comments on ads");
+const adMigSql = readFileSync("supabase/migrations/20260929_marketing_ad_comments.sql", "utf8").replace(/--[^\n]*/g, "");
+check("additive: the ad posts' own table (one row per account and post, server-only), a comment's ad link, the person's key columns",
+  /CREATE TABLE IF NOT EXISTS marketing_ad_posts/.test(adMigSql) && /UNIQUE \(account_id, external_id\)/.test(adMigSql) &&
+  /ALTER TABLE marketing_ad_posts ENABLE ROW LEVEL SECURITY;/.test(adMigSql) &&
+  /ALTER TABLE marketing_comments ADD COLUMN IF NOT EXISTS ad_post_id uuid REFERENCES marketing_ad_posts\(id\) ON DELETE CASCADE;/.test(adMigSql) &&
+  /ALTER TABLE marketing_accounts ADD COLUMN IF NOT EXISTS user_token_encrypted text;/.test(adMigSql) &&
+  !/CREATE POLICY|\bDROP\b|\bDELETE\s+FROM\b|\bTRUNCATE\b/i.test(adMigSql));
+const adReaders = walk("src").filter((f) => code(f).includes('"marketing_ad_posts"')).sort();
+check(`the ad posts are read only by the ads scan and the Comments tab — never the Feed, Insights or the plan (${adReaders.map((f) => f.split("/").pop()).join(", ")})`,
+  JSON.stringify(adReaders) === JSON.stringify(["src/lib/server/marketing/ad-comments.ts", "src/lib/server/marketing/comments.ts"]));
+const ADS = "src/lib/server/marketing/ad-comments.ts";
+const adsSrc = code(ADS);
+const metaAds = code("src/lib/server/marketing/meta-ads.ts");
+check("Facebook: the Page's ad posts with the Page key, the inline-created (dark) ones included",
+  /metaGraphUrl\(`\$\{pageId\}\/ads_posts`, params\), token\)/.test(metaAds) && /include_inline_create: "true",/.test(metaAds) &&
+  /found = await facebookAdPosts\(a\.external_id, a\.token, since\);/.test(adsSrc));
+check("Instagram: the ad account read with the person's key; the media with the Page key, only this account's",
+  /await adAccounts\(a\.userToken!\)/.test(adsSrc) && /await instagramAdMediaIds\(act, a\.userToken!, since\)/.test(adsSrc) &&
+  /await instagramAdMedia\(a\.external_id!, a\.token!, \[\.\.\.ids\]\)/.test(adsSrc) && /const mine = \(m: IgAdMedia \| undefined\) => !!m && m\.owner\?\.id === igId;/.test(metaAds));
+check("a boosted post is the Feed's: only the posts that exist solely as ads are kept",
+  /const boosted = await organic\(a, found\.map\(\(f\) => f\.external_id\)\);/.test(adsSrc) && /await saveAds\(a, found\.filter\(\(f\) => !boosted\.has\(f\.external_id\)\)\)/.test(adsSrc));
+check("an ad is read when its count grew; its comments hang under it (ad_post_id), its count at the read is kept",
+  /\.filter\(\(r\) => \(r\.comments \?\? 0\) > \(r\.comments_seen \?\? 0\)\)/.test(adsSrc) && /ad_post_id: adPostId/.test(adsSrc) &&
+  !/remote_post_id/.test(adsSrc) && /\.update\(\{ comments_seen: r\.comments \?\? 0 \}\)/.test(adsSrc));
+check("without the permissions Meta is not asked (the account still waits its turn)",
+  before(adsSrc, "if (!(await claimAdScan(a, AD_SCAN_MS)))", "if (!allowed) return { ok: true, skipped: \"no_permission\" };") &&
+  before(adsSrc, "if (!allowed) return { ok: true, skipped: \"no_permission\" };", "facebookAdPosts(") &&
+  /export const facebookAdsGranted = \(scopes: readonly string\[\]\) => FACEBOOK_ADS_SCOPES\.every\(\(s\) => scopes\.includes\(s\)\);/.test(code("src/lib/marketing/ads.ts")));
+const igAdsFn = adsSrc.slice(adsSrc.indexOf("async function instagramAds("), adsSrc.indexOf("export async function scanAdComments("));
+check("the person's key lapsed or refused: the ads already found still come; the account is never marked expired for it",
+  /const ids = new Set\(known\.map\(\(k\) => k\.external_id\)\);/.test(igAdsFn) && /keyError = text\(e\);/.test(igAdsFn) &&
+  /keyError = AD_KEY_LAPSED;/.test(igAdsFn) && !/recordSync\(/.test(igAdsFn) && /if \(e instanceof MetaError && RATE_LIMIT_CODES\.has\(e\.code \?\? -1\)\) throw e;/.test(igAdsFn));
+check("the person's key: decrypted only on the server, never a column the screens get, deleted with the account",
+  /userToken: user_token_encrypted \? decryptToken\(user_token_encrypted\) : null,/.test(acc) &&
+  /status: "disconnected", user_token_encrypted: null, user_token_expires_at: null,/.test(acc) &&
+  (acc.slice(acc.indexOf("export async function adsStates("), acc.indexOf("/** After a sync:")).match(/out\[r\.id\] = \{[^}]*\}/g) ?? []).every((o) => !/token/.test(o)));
+check("the cron's eighth step, claimed per account, runs before the plan's Koleex AI call",
+  before(cronSrc, "await scanAdComments(a.tenant_id, a.id, { budgetMs: Math.min(20_000, left() - 5_000) });", "await weekPlansStep(") &&
+  /sync_state->>ads_scan_at\.is\.null,sync_state->>ads_scan_at\.lt\.\$\{staleAds\}/.test(cronSrc));
+const cmtAds = code("src/lib/server/marketing/comments.ts");
+check("the Comments tab: an ad's thread shows the ad (marked), a reply stays under it, Koleex AI sees the ad's words",
+  /is_ad: !!ad \}/.test(cmtAds) && /ad_post_id: target\.ad_post_id,/.test(cmtAds) &&
+  /c\.ad_post_id\s*\?\s*supabaseServer\.from\("marketing_ad_posts"\)\.select\("message"\)/.test(cmtAds));
+const commentsScreen = code("src/components/marketing/SocialComments.tsx");
+check("the screens: «Ad» on the thread, and each account's ads status on the Accounts tab",
+  /\{p\?\.is_ad && <StatusPill tone="brand" className="shrink-0">\{t\("ad"\)\}<\/StatusPill>\}/.test(commentsScreen) &&
+  /\{a\.connection === "api" && ads\[a\.id\] && <AdsLine state=\{ads\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
+  /const \[accounts, ads\] = await Promise\.all\(\[listAccounts\(auth\.tenant_id, space\), adsStates\(auth\.tenant_id, space\)\]\);/.test(code(LIST)));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

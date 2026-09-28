@@ -23,6 +23,7 @@ import {
 } from "@/lib/server/marketing/meta";
 import { isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
 import { saveMetaAccounts } from "@/lib/server/marketing/accounts";
+import { instagramAdsGranted } from "@/lib/marketing/ads";
 import { syncAccounts } from "@/lib/server/marketing/sync";
 import { SPACE_MODULE, SPACE_ROUTE, asSpace, type ConnectResult } from "@/lib/marketing/spaces";
 
@@ -63,8 +64,11 @@ export async function GET(req: NextRequest) {
   try {
     const short = await exchangeCode(cfg, code);
     const long = await longLivedUserToken(cfg, short);
-    const [pages, scopes] = await Promise.all([managedPages(long), grantedScopes(long)]);
-    const saved = await saveMetaAccounts({ tenantId: auth.tenant_id, space, connectedBy: auth.account_id, pages, scopes });
+    const [pages, scopes] = await Promise.all([managedPages(long.token), grantedScopes(long.token)]);
+    /* The person's own key is kept only for Instagram's ads (found through
+       the ad account), and only when the ads permissions were granted. */
+    const userToken = instagramAdsGranted(scopes) ? long : null;
+    const saved = await saveMetaAccounts({ tenantId: auth.tenant_id, space, connectedBy: auth.account_id, pages, scopes, userToken });
     const tenantId = auth.tenant_id;
     after(() => syncAccounts(tenantId, saved).then(() => undefined, (e) => {
       console.error(`[marketing/meta callback] first refresh: ${e instanceof Error ? e.message : String(e)}`);

@@ -14,6 +14,7 @@ import { inChunks } from "@/lib/server/in-chunks";
 import { decryptToken, encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
 import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
 import { MANUAL_PLATFORMS, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
+import { FACEBOOK_ADS_SCOPES, instagramAdsGranted, type AdsState } from "@/lib/marketing/ads";
 
 const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, audience, updated_at";
 
@@ -112,8 +113,13 @@ export async function saveMetaAccounts(input: {
   connectedBy: string;
   pages: MetaPage[];
   scopes: string[];
+  /** The connecting person's long-lived key — passed only when the ads
+   *  permissions were granted (Instagram's ads are found with it); a
+   *  reconnect without them removes the one kept before. */
+  userToken?: { token: string; expiresAt: string | null } | null;
 }): Promise<string[]> {
   const now = new Date().toISOString();
+  const userKey = input.userToken ? encryptToken(input.userToken.token) : null;
   type Row = Record<string, unknown> & { platform: "facebook" | "instagram"; external_id: string };
   const rows: Row[] = [];
   for (const page of input.pages) {
@@ -124,6 +130,8 @@ export async function saveMetaAccounts(input: {
       connection: "api",
       token_encrypted: token,
       token_expires_at: null,
+      user_token_encrypted: userKey,
+      user_token_expires_at: userKey ? input.userToken?.expiresAt ?? null : null,
       scopes: input.scopes,
       status: "connected",
       last_error: null,
@@ -200,19 +208,31 @@ export interface AccountForSync {
   /** The row's version: a sync claims the account only if it is unchanged. */
   updated_at: string;
   token: string | null;
+  /** The permissions Meta granted at connect. */
+  scopes: string[];
+  /** The connecting person's key (Instagram ads), DECRYPTED; null when not
+   *  kept. Never a route's answer. */
+  userToken: string | null;
+  user_token_expires_at: string | null;
 }
 
 export async function loadAccountForSync(tenantId: string, id: string): Promise<AccountForSync | null> {
   const { data, error } = await supabaseServer
     .from("marketing_accounts")
-    .select("id, tenant_id, space, platform, connection, external_id, handle, status, last_synced_at, sync_state, updated_at, token_encrypted")
+    .select("id, tenant_id, space, platform, connection, external_id, handle, status, last_synced_at, sync_state, updated_at, scopes, token_encrypted, user_token_encrypted, user_token_expires_at")
     .eq("tenant_id", tenantId)
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   if (!data) return null;
-  const { token_encrypted, ...rest } = data as Omit<AccountForSync, "token"> & { token_encrypted: string | null };
-  return { ...rest, sync_state: rest.sync_state ?? {}, token: token_encrypted ? decryptToken(token_encrypted) : null };
+  const { token_encrypted, user_token_encrypted, ...rest } = data as Omit<AccountForSync, "token" | "userToken"> & { token_encrypted: string | null; user_token_encrypted: string | null };
+  return {
+    ...rest,
+    sync_state: rest.sync_state ?? {},
+    scopes: rest.scopes ?? [],
+    token: token_encrypted ? decryptToken(token_encrypted) : null,
+    userToken: user_token_encrypted ? decryptToken(user_token_encrypted) : null,
+  };
 }
 
 /** Mark a sync as started — unless another one started since this account
@@ -331,6 +351,55 @@ export async function claimCommentScan(a: AccountForSync, minGapMs: number): Pro
   return true;
 }
 
+/** The ads scan's claim (sync_state.ads_scan_at), like claimCommentScan:
+ *  one run at a time per account, at most every minGapMs. */
+export async function claimAdScan(a: AccountForSync, minGapMs: number): Promise<boolean> {
+  const last = typeof a.sync_state.ads_scan_at === "string" ? Date.parse(a.sync_state.ads_scan_at) || 0 : 0;
+  if (last && Date.now() - last < minGapMs) return false;
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, ads_scan_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
+}
+
+/** What the Accounts screen says about each Page's and Instagram account's
+ *  ads — derived here, so no key or key date leaves the server as a column. */
+export async function adsStates(tenantId: string, space: MarketingSpace): Promise<Record<string, AdsState>> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select("id, platform, scopes, sync_state, user_token_expires_at, user_token_encrypted")
+    .eq("tenant_id", tenantId)
+    .eq("space", space)
+    .eq("connection", "api")
+    .in("platform", ["facebook", "instagram"])
+    .neq("status", "disconnected");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  const out: Record<string, AdsState> = {};
+  for (const r of (data ?? []) as Array<{ id: string; platform: string; scopes: string[] | null; sync_state: Record<string, unknown> | null; user_token_expires_at: string | null; user_token_encrypted: string | null }>) {
+    const scopes = r.scopes ?? [];
+    const err = typeof r.sync_state?.ads_error === "string" ? r.sync_state.ads_error : null;
+    if (r.platform === "facebook") {
+      const missing = FACEBOOK_ADS_SCOPES.filter((x) => !scopes.includes(x));
+      out[r.id] = { ready: missing.length === 0, missing, findUntil: null, error: err };
+    } else {
+      const granted = instagramAdsGranted(scopes);
+      const until = r.user_token_encrypted ? r.user_token_expires_at : null;
+      const live = !!r.user_token_encrypted && (!until || Date.parse(until) > Date.now());
+      out[r.id] = { ready: granted && live, missing: granted ? [] : [...FACEBOOK_ADS_SCOPES], findUntil: until, error: err };
+    }
+  }
+  return out;
+}
+
 /** After a sync: the account's status, audience and where the history
  *  import stopped. */
 export async function recordSync(id: string, patch: {
@@ -413,7 +482,7 @@ export async function accountSpace(tenantId: string, id: string): Promise<Market
 export async function disconnectAccount(tenantId: string, id: string): Promise<void> {
   const { error } = await supabaseServer
     .from("marketing_accounts")
-    .update({ token_encrypted: null, token_expires_at: null, status: "disconnected", updated_at: new Date().toISOString() })
+    .update({ token_encrypted: null, token_expires_at: null, status: "disconnected", user_token_encrypted: null, user_token_expires_at: null, updated_at: new Date().toISOString() })
     .eq("tenant_id", tenantId)
     .eq("id", id);
   if (error) throw new Error(`marketing accounts: ${error.message}`);

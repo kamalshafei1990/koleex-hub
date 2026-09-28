@@ -20,6 +20,8 @@ export const COMMENTS_T: Translations = {
   "retry":          { en: "Try again", zh: "重试", ar: "إعادة المحاولة" },
   "more":           { en: "Show more", zh: "显示更多", ar: "عرض المزيد" },
   "onPost":         { en: "On the post", zh: "所在帖子", ar: "على المنشور" },
+  "onAd":           { en: "On the ad", zh: "所在广告", ar: "على الإعلان" },
+  "ad":             { en: "Ad", zh: "广告", ar: "إعلان" },
   "openOn":         { en: "Open on {platform}", zh: "在 {platform} 打开", ar: "افتح على {platform}" },
   "someone":        { en: "Someone", zh: "某人", ar: "شخص ما" },
   "by":             { en: "by {name}", zh: "由 {name}", ar: "بواسطة {name}" },

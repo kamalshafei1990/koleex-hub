@@ -127,16 +127,18 @@ export async function exchangeCode(cfg: MetaAppConfig, code: string): Promise<st
 }
 
 /** A short-lived user token → a long-lived one, so the Page tokens read with
- *  it do not expire. */
-export async function longLivedUserToken(cfg: MetaAppConfig, shortToken: string): Promise<string> {
-  const body = await metaGet<{ access_token?: string }>(metaGraphUrl("oauth/access_token", {
+ *  it do not expire. expiresAt: the long-lived one's own end (about 60
+ *  days; null when Meta does not say). */
+export async function longLivedUserToken(cfg: MetaAppConfig, shortToken: string): Promise<{ token: string; expiresAt: string | null }> {
+  const body = await metaGet<{ access_token?: string; expires_in?: number }>(metaGraphUrl("oauth/access_token", {
     grant_type: "fb_exchange_token",
     client_id: cfg.appId,
     client_secret: cfg.appSecret,
     fb_exchange_token: shortToken,
   }));
   if (!body.access_token) throw new MetaError("Meta returned no long-lived token.", null);
-  return body.access_token;
+  const secs = typeof body.expires_in === "number" && Number.isFinite(body.expires_in) && body.expires_in > 0 ? body.expires_in : null;
+  return { token: body.access_token, expiresAt: secs ? new Date(Date.now() + secs * 1000).toISOString() : null };
 }
 
 export interface MetaPage {

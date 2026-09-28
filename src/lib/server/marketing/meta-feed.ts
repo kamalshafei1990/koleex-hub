@@ -59,7 +59,7 @@ export async function facebookAudience(pageId: string, token: string): Promise<n
 }
 
 type FbAttachment = { media_type?: string; media?: { image?: { src?: string }; source?: string }; subattachments?: { data?: FbAttachment[] } };
-type FbPost = {
+export type FbPost = {
   id: string; message?: string; created_time?: string; permalink_url?: string; full_picture?: string;
   attachments?: { data?: FbAttachment[] };
   shares?: { count?: number };
@@ -67,7 +67,7 @@ type FbPost = {
   comments?: { summary?: { total_count?: number } };
 };
 
-function facebookMedia(p: FbPost): RemoteMedia[] {
+export function facebookMedia(p: FbPost): RemoteMedia[] {
   const out: RemoteMedia[] = [];
   const walk = (a: FbAttachment) => {
     const src = a.media?.image?.src;
@@ -204,13 +204,13 @@ export async function instagramAudience(igId: string, token: string): Promise<nu
   return num(b.followers_count);
 }
 
-type IgMedia = {
+export type IgMedia = {
   id: string; caption?: string; media_type?: string; media_url?: string; thumbnail_url?: string; permalink?: string; timestamp?: string;
   like_count?: number; comments_count?: number;
   children?: { data?: Array<{ media_type?: string; media_url?: string; thumbnail_url?: string }> };
 };
 
-function instagramMediaList(m: IgMedia): RemoteMedia[] {
+export function instagramMediaList(m: IgMedia): RemoteMedia[] {
   const one = (t?: string, url?: string, thumb?: string): RemoteMedia | null => {
     const src = t === "VIDEO" ? thumb ?? url : url;
     return src ? { kind: t === "VIDEO" ? "video" : "image", url: src } : null;

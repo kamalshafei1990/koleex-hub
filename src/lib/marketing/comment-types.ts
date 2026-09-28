@@ -36,7 +36,9 @@ export interface CommentThread {
   /** The first comment's id. */
   id: string;
   account: MarketingAccountView;
-  post: { id: string; excerpt: string | null; permalink: string | null; thumb: string | null; posted_at: string | null } | null;
+  /** is_ad: the comment is on an ad — a post that exists only as an ad
+   *  (marketing_ad_posts), marked «Ad» on the screen. */
+  post: { id: string; excerpt: string | null; permalink: string | null; thumb: string | null; posted_at: string | null; is_ad?: boolean } | null;
   first: CommentView;
   replies: CommentView[];
   last_at: string | null;

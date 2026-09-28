@@ -27,6 +27,7 @@ import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { dmyHm } from "@/lib/marketing/format";
+import type { AdsState } from "@/lib/marketing/ads";
 import {
   CONNECT_RESULTS, PLATFORM_FLOW, PLATFORM_ORDER,
   type ConnectResult, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
@@ -77,6 +78,11 @@ const T: Translations = {
   "status.error":        { en: "Needs attention", zh: "需要处理", ar: "يحتاج متابعة" },
   "status.disconnected": { en: "Removed", zh: "已移除", ar: "تمت الإزالة" },
   "lastSync":         { en: "Last synced {when}", zh: "上次同步：{when}", ar: "آخر مزامنة: {when}" },
+  "ads.on":           { en: "Comments on ads: on", zh: "广告评论：已开启", ar: "تعليقات الإعلانات: شغّالة" },
+  "ads.until":        { en: "Comments on ads: on · new ads found until {date}", zh: "广告评论：已开启 · 可发现新广告至 {date}", ar: "تعليقات الإعلانات: شغّالة · بيلاقي الإعلانات الجديدة لحد {date}" },
+  "ads.missing":      { en: "Comments on ads: add {perms} in Meta, then connect again", zh: "广告评论：请先在 Meta 添加 {perms}，再重新连接", ar: "تعليقات الإعلانات: أضف {perms} في Meta وبعدين اربط تاني" },
+  "ads.lapsed":       { en: "Comments on ads: connect again to keep finding new Instagram ads", zh: "广告评论：请重新连接以继续发现新的 Instagram 广告", ar: "تعليقات الإعلانات: اربط تاني عشان يفضل يلاقي إعلانات Instagram الجديدة" },
+  "ads.refused":      { en: "Comments on ads: Meta refused — {why}", zh: "广告评论：Meta 拒绝了——{why}", ar: "تعليقات الإعلانات: Meta رفضت — {why}" },
   "notSynced":        { en: "Not synced yet", zh: "尚未同步", ar: "لم تتم المزامنة بعد" },
   "open":             { en: "Open", zh: "打开", ar: "فتح" },
   "remove":           { en: "Remove", zh: "移除", ar: "إزالة" },
@@ -101,9 +107,6 @@ const T: Translations = {
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
   "next.title":       { en: "Coming next, on these accounts", zh: "接下来将基于这些账号推出", ar: "القادم على هذه الحسابات" },
-  "next.insights":    { en: "Insights: views, followers, visits, interactions and video, against the period before", zh: "数据洞察：浏览、粉丝、访问、互动和视频，并与上一周期对比", ar: "الإحصاءات: المشاهدات والمتابعون والزيارات والتفاعل والفيديو، مقارنةً بالفترة السابقة" },
-  "next.adComments":  { en: "Comments on ads, answered here like the others", zh: "广告下的评论，也可在此回复", ar: "تعليقات الإعلانات، والرد عليها هنا مثل غيرها" },
-  "next.plan":        { en: "A weekly plan suggested by Koleex AI", zh: "由 Koleex AI 建议的每周计划", ar: "خطة أسبوعية يقترحها Koleex AI" },
   "next.messages":    { en: "Replies to Messenger and Instagram messages, once Meta approves", zh: "回复 Messenger 和 Instagram 私信（待 Meta 批准后）", ar: "الرد على رسائل Messenger وInstagram، بعد موافقة Meta" },
 };
 
@@ -123,6 +126,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const { t } = useTranslation(T);
   const [accounts, setAccounts] = useState<MarketingAccountView[] | null>(null);
   const [setup, setSetup] = useState<MarketingSetup | null>(null);
+  const [ads, setAds] = useState<Record<string, AdsState>>({});
   const [loadError, setLoadError] = useState(false);
   const [result, setResult] = useState<{ code: ConnectResult; n: number } | null>(null);
   const [adding, setAdding] = useState(false);
@@ -139,8 +143,9 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     try {
       const res = await fetch(`/api/marketing/accounts?space=${space}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { accounts: MarketingAccountView[]; setup: MarketingSetup };
+      const body = (await res.json()) as { accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; setup: MarketingSetup };
       setAccounts(body.accounts);
+      setAds(body.ads ?? {});
       setSetup(body.setup);
     } catch {
       setLoadError(true);
@@ -302,6 +307,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                         {a.last_synced_at ? t("lastSync").replace("{when}", dmyHm(a.last_synced_at)) : t("notSynced")}
                       </div>
                     )}
+                    {a.connection === "api" && ads[a.id] && <AdsLine state={ads[a.id]} t={t} />}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {a.profile_url && (
@@ -342,9 +348,6 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("next.title")}</h2>
             <ul className="mt-3 flex list-disc flex-col gap-2 ps-5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-              <li>{t("next.insights")}</li>
-              <li>{t("next.adComments")}</li>
-              <li>{t("next.plan")}</li>
               <li>{t("next.messages")}</li>
             </ul>
           </div>
@@ -438,4 +441,15 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
       />
     </div>
   );
+}
+
+/* Comments on ads, in one line: on (Instagram: until when new ads are
+   found), what to add in Meta, a reconnect, or Meta's refusal. */
+function AdsLine({ state, t }: { state: AdsState; t: (k: string) => string }) {
+  let line: string;
+  if (state.error === "key_lapsed" || (!state.ready && state.missing.length === 0)) line = t("ads.lapsed");
+  else if (!state.ready) line = t("ads.missing").replace("{perms}", state.missing.join(", "));
+  else if (state.error) line = t("ads.refused").replace("{why}", state.error.slice(0, 120));
+  else line = state.findUntil ? t("ads.until").replace("{date}", dmyHm(state.findUntil).slice(0, 10)) : t("ads.on");
+  return <div className={`mt-0.5 text-[11px] ${state.ready && !state.error ? "text-[var(--text-dim)]" : "text-[#F59E0B]"}`}>{line}</div>;
 }

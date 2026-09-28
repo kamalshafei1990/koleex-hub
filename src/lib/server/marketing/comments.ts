@@ -43,11 +43,11 @@ const PENDING = "pending:";
 const CLAIM_MS = 120_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const COLUMNS = "id, account_id, remote_post_id, external_id, parent_external_id, author_name, author_avatar_url, message, commented_at, is_ours, hidden, replied_by, handled_at, handled_by";
+const COLUMNS = "id, account_id, remote_post_id, ad_post_id, external_id, parent_external_id, author_name, author_avatar_url, message, commented_at, is_ours, hidden, replied_by, handled_at, handled_by";
 const COUNT_COLUMNS = "id, account_id, external_id, parent_external_id, is_ours, hidden, commented_at, handled_at";
 
 type Row = {
-  id: string; account_id: string; remote_post_id: string | null; external_id: string; parent_external_id: string | null;
+  id: string; account_id: string; remote_post_id: string | null; ad_post_id: string | null; external_id: string; parent_external_id: string | null;
   author_name: string | null; author_avatar_url: string | null; message: string | null; commented_at: string | null;
   is_ours: boolean; hidden: boolean; replied_by: string | null; handled_at: string | null; handled_by: string | null;
 };
@@ -131,25 +131,35 @@ export async function listThreads(
   const next = opts.cursor + PAGE < picked.length ? opts.cursor + PAGE : null;
 
   const postIds = [...new Set(page.map((g) => g.first.remote_post_id).filter((p): p is string => !!p))];
+  /* A comment on an ad hangs under its ad post (marketing_ad_posts). */
+  const adIds = [...new Set(page.map((g) => g.first.ad_post_id).filter((p): p is string => !!p))];
   const people = page.flatMap((g) => [g.first.handled_by, ...[g.first, ...g.replies].map((r) => r.replied_by)]).filter((x): x is string => !!x);
-  const [{ data: posts, error: pErr }, names] = await Promise.all([
+  const none = Promise.resolve({ data: [], error: null });
+  const [{ data: posts, error: pErr }, { data: adPosts, error: aErr }, names] = await Promise.all([
     postIds.length
       ? supabaseServer.from("marketing_remote_posts").select("id, message, media, permalink, posted_at").eq("tenant_id", tenantId).in("id", postIds).limit(postIds.length)
-      : Promise.resolve({ data: [], error: null }),
+      : none,
+    adIds.length
+      ? supabaseServer.from("marketing_ad_posts").select("id, message, media, permalink, posted_at").eq("tenant_id", tenantId).in("id", adIds).limit(adIds.length)
+      : none,
     namesOf(people),
   ]);
   if (pErr) throw new Error(`marketing posts: ${pErr.message}`);
-  const postById = new Map(((posts ?? []) as Array<{ id: string; message: string | null; media: Array<{ url: string }> | null; permalink: string | null; posted_at: string | null }>).map((p) => [p.id, p]));
+  if (aErr) throw new Error(`marketing ad posts: ${aErr.message}`);
+  type PostRow = { id: string; message: string | null; media: Array<{ url: string }> | null; permalink: string | null; posted_at: string | null };
+  const postById = new Map(((posts ?? []) as PostRow[]).map((p) => [p.id, p]));
+  const adById = new Map(((adPosts ?? []) as PostRow[]).map((p) => [p.id, p]));
   const threads: CommentThread[] = [];
   for (const g of page) {
     const account = byId.get(g.first.account_id);
     if (!account) continue;
-    const p = g.first.remote_post_id ? postById.get(g.first.remote_post_id) : undefined;
+    const ad = g.first.ad_post_id ? adById.get(g.first.ad_post_id) : undefined;
+    const p = ad ?? (g.first.remote_post_id ? postById.get(g.first.remote_post_id) : undefined);
     const text = p?.message?.trim() || null;
     threads.push({
       id: g.first.id,
       account,
-      post: p ? { id: p.id, excerpt: text ? Array.from(text).slice(0, 120).join("") : null, permalink: p.permalink, thumb: Array.isArray(p.media) ? p.media[0]?.url ?? null : null, posted_at: p.posted_at } : null,
+      post: p ? { id: p.id, excerpt: text ? Array.from(text).slice(0, 120).join("") : null, permalink: p.permalink, thumb: Array.isArray(p.media) ? p.media[0]?.url ?? null : null, posted_at: p.posted_at, is_ad: !!ad } : null,
       first: view(g.first, names),
       replies: g.replies.filter((r) => opts.canSeeHidden || !r.hidden).map((r) => view(r, names)),
       last_at: g.last,
@@ -215,7 +225,7 @@ export async function replyToComment(tenantId: string, commentId: string, actorI
   const key = `${PENDING}${crypto.createHash("sha256").update(`${thread}|${message}`).digest("hex").slice(0, 32)}:${Math.floor(Date.now() / CLAIM_MS)}`;
   const now = new Date().toISOString();
   const { data: claimed, error: cErr } = await supabaseServer.from("marketing_comments").insert({
-    tenant_id: tenantId, account_id: a.id, remote_post_id: target.remote_post_id, external_id: key, parent_external_id: thread,
+    tenant_id: tenantId, account_id: a.id, remote_post_id: target.remote_post_id, ad_post_id: target.ad_post_id, external_id: key, parent_external_id: thread,
     message, commented_at: now, is_ours: true, hidden: false, replied_by: actorId, replied_at: now,
   }).select(COLUMNS).single();
   if (cErr) {
@@ -290,9 +300,11 @@ export async function threadContext(tenantId: string, c: Row): Promise<{ post: s
     supabaseServer.from("marketing_comments").select("external_id, is_ours, hidden, message, commented_at")
       .eq("tenant_id", tenantId).eq("account_id", c.account_id).or(inThread)
       .order("commented_at", { ascending: true }).limit(40),
-    c.remote_post_id
-      ? supabaseServer.from("marketing_remote_posts").select("message").eq("tenant_id", tenantId).eq("id", c.remote_post_id).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+    c.ad_post_id
+      ? supabaseServer.from("marketing_ad_posts").select("message").eq("tenant_id", tenantId).eq("id", c.ad_post_id).maybeSingle()
+      : c.remote_post_id
+        ? supabaseServer.from("marketing_remote_posts").select("message").eq("tenant_id", tenantId).eq("id", c.remote_post_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
   ]);
   if (error) throw new Error(`marketing comments: ${error.message}`);
   if (pErr) throw new Error(`marketing posts: ${pErr.message}`);

@@ -26,7 +26,12 @@ import "server-only";
         closed with their tally, and from Monday 09:00 (Shanghai) Koleex AI
         drafts the week's plan and the approvers are asked — when Koleex AI
         cannot answer inside the run's time, the next run tries again
-        (lib/server/marketing/week-plan).
+        (lib/server/marketing/week-plan);
+     8. comments on ADS (29/09/2026): every 30 minutes per Facebook Page and
+        Instagram account, the posts that exist only as ads and the comments
+        on them (lib/server/marketing/ad-comments), each account claimed
+        first (claimAdScan). It runs BEFORE step 7, whose Koleex AI call may
+        take the rest of the run.
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
@@ -36,16 +41,17 @@ import { publishPost } from "@/lib/server/marketing/publish";
 import { COMMENTS_REFRESH_MS, COMMENT_SCAN_MS, refreshRecentComments, scanOlderComments, syncAccount } from "@/lib/server/marketing/sync";
 import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insights";
 import { weekPlansStep } from "@/lib/server/marketing/week-plan";
+import { AD_SCAN_MS, scanAdComments } from "@/lib/server/marketing/ad-comments";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; adComments: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, adComments: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -153,6 +159,25 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       if (left() < 10_000) { out.stoppedEarly = true; break; }
       const r = await scanOlderComments(a.tenant_id, a.id, { budgetMs: Math.min(20_000, left() - 5_000) });
       if (r.ok && !r.skipped) out.olderComments++;
+    }
+  }
+
+  /* 8. Comments on ads, every 30 minutes per account (scanAdComments
+        decides; claimAdScan keeps two runs off one account). Before the
+        plan: its Koleex AI call may take the rest of the run. */
+  if (left() > 10_000) {
+    const staleAds = new Date(Date.now() - AD_SCAN_MS).toISOString();
+    let adQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
+      .in("status", ["connected", "error"])
+      .or(`sync_state->>ads_scan_at.is.null,sync_state->>ads_scan_at.lt.${staleAds}`);
+    if (opts.tenantId) adQ = adQ.eq("tenant_id", opts.tenantId);
+    const { data: adAccs, error: adErr } = await adQ.order("updated_at", { ascending: true }).limit(2);
+    if (adErr) throw new Error(`marketing accounts: ${adErr.message}`);
+    for (const a of (adAccs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 10_000) { out.stoppedEarly = true; break; }
+      const r = await scanAdComments(a.tenant_id, a.id, { budgetMs: Math.min(20_000, left() - 5_000) });
+      if (r.ok && !r.skipped) out.adComments++;
     }
   }
 

@@ -15,6 +15,7 @@ import MarketingHeader, { publishCommentsCount } from "@/components/marketing/Ma
 import CommentThread, { type ThreadState } from "@/components/marketing/CommentThread";
 import Button from "@/components/kds/Button";
 import EmptyState from "@/components/kds/EmptyState";
+import StatusPill from "@/components/kds/StatusPill";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
@@ -220,10 +221,11 @@ function ThreadHeader({ thread, t }: { thread: Thread; t: (k: string) => string 
         <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
           <BrandGlyph name={thread.account.platform} size={12} />
           <span className="truncate">{thread.account.name}</span>
+          {p?.is_ad && <StatusPill tone="brand" className="shrink-0">{t("ad")}</StatusPill>}
           {p?.posted_at && <span className="shrink-0 font-normal text-[var(--text-dim)]">· <span dir="ltr" className="tabular-nums">{dmyHm(p.posted_at)}</span></span>}
         </span>
         <span dir="auto" className="line-clamp-1 break-words text-[12px] text-[var(--text-muted)]">
-          {t("onPost")}: {p?.excerpt ?? "—"}
+          {p?.is_ad ? t("onAd") : t("onPost")}: {p?.excerpt ?? "—"}
         </span>
       </span>
       {p?.permalink && (
@@ -244,7 +246,8 @@ function PostThumb({ post, platform }: { post: Thread["post"]; platform: string 
   const repaired = useRef(false);
 
   const onError = async () => {
-    if (!post || repaired.current) { setFailed(true); return; }
+    /* An ad's picture is not a Feed post's: no second fetch, the mark stands in. */
+    if (!post || post.is_ad || repaired.current) { setFailed(true); return; }
     repaired.current = true;
     try {
       const res = await fetch(`/api/marketing/feed/${post.id}?part=media`, { cache: "no-store" });
