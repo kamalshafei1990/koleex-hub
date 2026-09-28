@@ -194,6 +194,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      is only allowed with a measurement and a reason; both are above. */
   "accounts": { chunks: 12, kbytes: 880 },
   "ai": { chunks: 10, kbytes: 570 },
+  /* Brand Center (28/09/2026) — MEASURED 7 chunks / 393 KB, the shared
+     baseline: the first screen ships its numbers with the page and makes no
+     request. +12% as usual. */
+  "brand-center": { chunks: 8, kbytes: 440 },
   "calendar": { chunks: 12, kbytes: 824 },
   "catalogs": { chunks: 15, kbytes: 1124 },
   /* Re-measured 2026-08-21 after a chunk repack (11 → 8 chunks, 673 KB —

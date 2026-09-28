@@ -60,6 +60,7 @@ import EventsIcon from "@/components/icons/EventsIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
+import BrandCenterIcon from "@/components/icons/BrandCenterIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
@@ -290,6 +291,11 @@ export const APP_REGISTRY: AppDef[] = [
 
   /* ── Knowledge ── */
   { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
+  /* Brand Center (owner, 28/09/2026): the brand as a working tool — the full
+     guidelines, every branded item with its files, fill-in templates. Open
+     to every employee to read and download; only the owner edits (the edit
+     rights are checked on the server, not by this flag). */
+  { id: "brand-center",     tKey: "app.brand-center",     name: "Brand Center",      icon: BrandCenterIcon, route: "/brand-center",   active: true,  newSince: "2026-09-28", openAccess: true },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: true,  newSince: "2026-06-03" },
   /* Owner 2026-08-07: Issue Reports is TOTALLY separate from the Database
      app — its own tile, its own /issues route (the old /database/issues
@@ -360,7 +366,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.marketing",
     label: "Marketing",
     icon: MarketingSidebarIcon,
-    appIds: ["marketing", "website", "social-marketing", "ceo-brand", "email-marketing", "sms-whatsapp", "marketing-automation", "marketing-cards"],
+    appIds: ["marketing", "brand-center", "website", "social-marketing", "ceo-brand", "email-marketing", "sms-whatsapp", "marketing-automation", "marketing-cards"],
   },
   {
     id: "finance",
