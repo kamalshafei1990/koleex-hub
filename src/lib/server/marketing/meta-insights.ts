@@ -14,9 +14,12 @@ import "server-only";
    Instagram — /{ig-user}/insights with metric_type=total_value answers ONE
    total for since..until, so a day is one window. A breakdown only fits
    the metrics that support it, so a day is three calls: views by
-   follower_type, follows_and_unfollows by follow_type (FOLLOWER = follows,
+   follow_type (Meta's table says "follower_type" for views, but Meta refuses
+   that name — seen live 28/09/2026 — so follow_type, then no breakdown at
+   all), follows_and_unfollows by follow_type (FOLLOWER = follows,
    NON_FOLLOWER = unfollows), and the interactions without a breakdown.
-   Reach is unique too: one call per window.
+   Reach is unique too: one call per window. A refused call is logged once
+   per metric and message, so a Meta change shows up in the logs.
 
    A call that fails for one metric (Meta fails the whole call) is repeated
    metric by metric, keeping the ones Meta accepts. An expired key (190) is
@@ -43,6 +46,15 @@ const unix = (ms: number) => String(Math.floor(ms / 1000));
 export const META_RATE_LIMIT_CODES: ReadonlySet<number> = new Set([4, 17, 32, 613, 80001, 80002]);
 /** A failure that must stop the whole run: an expired key or a rate limit. */
 export const stopsRun = (e: unknown): boolean => e instanceof MetaError && (e.code === 190 || META_RATE_LIMIT_CODES.has(e.code ?? -1));
+
+const warned = new Set<string>();
+/** One log line per account, metric and Meta message (per server instance). */
+function warnRefused(where: string, what: string, e: unknown): void {
+  const key = `${where}|${what}|${e instanceof Error ? e.message : String(e)}`;
+  if (warned.has(key) || warned.size > 500) return;
+  warned.add(key);
+  console.warn(`[marketing/insights] Meta refused ${what} for ${where}: ${e instanceof Error ? e.message : String(e)}`);
+}
 
 /** Facebook Page metrics per day → the Hub's names. */
 export const FB_DAY_METRICS: Readonly<Record<string, InsightKey>> = {
@@ -90,6 +102,7 @@ async function readEach(path: string, token: string, metrics: string[], params: 
         out.push(...(await read([m])));
       } catch (one) {
         if (!(one instanceof MetaError) || stopsRun(one)) throw one;
+        warnRefused(path, m, one);
       }
     }
     return out;
@@ -131,12 +144,23 @@ const results = (m: GraphMetric | undefined) =>
 export async function instagramDay(igId: string, token: string, day: string): Promise<DayMetrics | null> {
   const base = { period: "day", metric_type: "total_value", since: unix(metaDayStart(day)), until: unix(metaDayStart(addDays(day, 1))) };
   const path = `${igId}/insights`;
+  const readViews = async () => {
+    try {
+      return await readEach(path, token, ["views"], { ...base, breakdown: "follow_type" });
+    } catch (e) {
+      if (!(e instanceof MetaError) || stopsRun(e)) throw e;
+      warnRefused(path, "views by follow_type", e);
+      return readEach(path, token, ["views"], base);
+    }
+  };
   const settled = await Promise.allSettled([
-    readEach(path, token, ["views"], { ...base, breakdown: "follower_type" }),
+    readViews(),
     readEach(path, token, ["follows_and_unfollows"], { ...base, breakdown: "follow_type" }),
     readEach(path, token, Object.keys(IG_TOTALS), base),
   ]);
   for (const s of settled) if (s.status === "rejected" && stopsRun(s.reason)) throw s.reason;
+  const labels = ["views", "follows_and_unfollows", "interactions"];
+  settled.forEach((s, i) => { if (s.status === "rejected" && s.reason instanceof MetaError) warnRefused(path, labels[i], s.reason); });
   if (settled.every((s) => s.status === "rejected")) {
     return settled.every((s) => s.status === "rejected" && s.reason instanceof MetaError) ? {} : null;
   }

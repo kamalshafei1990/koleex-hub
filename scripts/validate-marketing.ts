@@ -661,6 +661,9 @@ check("an expired key or a rate limit stops the run: never retried metric by met
   /export const stopsRun = \(e: unknown\): boolean => e instanceof MetaError && \(e\.code === 190 \|\| META_RATE_LIMIT_CODES\.has\(e\.code \?\? -1\)\);/.test(mi) &&
   /if \(!\(e instanceof MetaError\) \|\| stopsRun\(e\) \|\| metrics\.length === 1\) throw e;/.test(mi) &&
   /for \(const s of settled\) if \(s\.status === "rejected" && stopsRun\(s\.reason\)\) throw s\.reason;/.test(mi));
+check("Instagram views: by follow_type, then with no breakdown — never follower_type (Meta refuses it, seen live 28/09); a refusal is logged once",
+  mi.includes('readEach(path, token, ["views"], { ...base, breakdown: "follow_type" })') && mi.includes('return readEach(path, token, ["views"], base);') &&
+  !mi.includes('"follower_type"') && /function warnRefused\(where: string, what: string, e: unknown\): void/.test(mi) && /warnRefused\(path, m, one\);/.test(mi));
 check("Instagram: a day Meta refuses is stored empty ({}), a day the network lost is asked again (null)",
   /return settled\.every\(\(s\) => s\.status === "rejected" && s\.reason instanceof MetaError\) \? \{\} : null;/.test(mi));
 const insLib = code("src/lib/marketing/insights.ts");

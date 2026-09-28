@@ -34,6 +34,8 @@ export const INSIGHTS_T: Translations = {
   "m.net_follows":  { en: "Net follows", zh: "净增关注", ar: "صافي المتابعات" },
   "m.visits":       { en: "Page visits", zh: "主页访问", ar: "زيارات الصفحة" },
   "m.interactions": { en: "Interactions", zh: "互动", ar: "التفاعلات" },
+  "m.engagement":   { en: "Post engagement", zh: "帖子互动", ar: "التفاعل مع المنشورات" },
+  "hint.engagement": { en: "Reactions, comments, shares and clicks", zh: "回应、评论、分享和点击", ar: "التفاعلات والتعليقات والمشاركات والنقرات" },
   "m.likes":        { en: "Likes", zh: "点赞", ar: "الإعجابات" },
   "m.comments":     { en: "Comments", zh: "评论", ar: "التعليقات" },
   "m.shares":       { en: "Shares", zh: "分享", ar: "المشاركات" },

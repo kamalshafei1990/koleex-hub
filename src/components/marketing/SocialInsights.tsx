@@ -201,7 +201,7 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
   const count = (v: MetricView | undefined) => (v ? figure(v.now) : "");
   const row = (key: string, v: MetricView | undefined): Row | null => (v ? { label: t(`m.${key}`), value: count(v), pct: changePct(v) } : null);
   const duration = (ms: number) => {
-    const mins = Math.round(ms / 60_000);
+    const mins = Math.floor(ms / 60_000); // like Meta: 75.9 minutes is 1h 15m
     return mins >= 60 ? t("hm").replace("{h}", String(Math.floor(mins / 60))).replace("{m}", String(mins % 60)) : t("m").replace("{m}", String(mins));
   };
   // Each part of the two Meta split the views into — they always add up to 100%.
@@ -250,7 +250,7 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
               <Card label={t("m.views")} m={m.views} value={count(m.views)} rows={[row("viewers", m.viewers)]} t={t} />
               <Card label={t("m.follows")} m={m.follows} value={count(m.follows)} rows={[row("unfollows", m.unfollows), row("net_follows", m.net_follows)]} t={t} />
               <Card label={t("m.visits")} m={m.visits} value={count(m.visits)} t={t} />
-              <Card label={t("m.interactions")} m={m.interactions} value={count(m.interactions)} t={t} />
+              <Card label={t("m.engagement")} hint={t("hint.engagement")} m={m.interactions} value={count(m.interactions)} t={t} />
               <Card
                 label={t("m.video_views")}
                 m={m.video_views}
@@ -289,13 +289,16 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
   );
 }
 
-function Card({ label, m, value, rows = [], t }: { label: string; m: MetricView | undefined; value: string; rows?: Array<Row | null>; t: T }) {
+function Card({ label, hint, m, value, rows = [], t }: { label: string; hint?: string; m: MetricView | undefined; value: string; rows?: Array<Row | null>; t: T }) {
   if (!m) return null;
   const list = rows.filter((r): r is Row => r !== null);
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] p-3.5">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-[12px] font-medium text-[var(--text-muted)]">{label}</span>
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[12px] font-medium text-[var(--text-muted)]">{label}</span>
+          {hint && <span className="text-[11px] leading-4 text-[var(--text-dim)]">{hint}</span>}
+        </span>
         <Sparkline values={m.series} />
       </div>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
