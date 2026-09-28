@@ -3,7 +3,8 @@
    validate:home-layout — the Home launcher's layout and My apps rules.
 
    The owner picked this layout from real screenshots on 23 Sep 2026 (option
-   F): smaller tiles, groups packed into bands on one column grid, and a
+   F) and aligned it on 28 Sep 2026 (sample B): every group one row on one
+   column grid of up to 12, short groups sharing a line, and a
    "My apps" row seeded once from the person's own usage. These checks pin
    the parts that would break silently: the band packer's output for the real
    catalogue, its invariants on random catalogues, the seeding rules, the
@@ -25,51 +26,50 @@ function check(name: string, ok: boolean, detail?: string) {
 }
 const show = (bands: AppBand[]) => bands.map((b) => `[${b.rows}] ` + b.groups.map((g) => `${g.index}:${g.span}`).join(" ")).join(" | ");
 
-console.log("── Columns: size-driven, tiles never narrower than 112 px ──");
-check("1320 px of grid (a 1440 laptop) → 10 columns", launcherColumns(1320) === 10);
-check("1105 px (1200 wide) → 9, 883 px (978 wide) → 7, 608 px (640 wide) → 5",
-  launcherColumns(1105) === 9 && launcherColumns(883) === 7 && launcherColumns(608) === 5);
+console.log("── Columns: size-driven, tiles never narrower than 96 px, at most 12 ──");
+check("1320 px of grid (a 1440 laptop) → 12 columns", launcherColumns(1320) === 12);
+check("1105 px (1200 wide) → 10, 883 px (978 wide) → 8, 608 px (640 wide) → 5",
+  launcherColumns(1105) === 10 && launcherColumns(883) === 8 && launcherColumns(608) === 5);
+check("a very wide screen stays at 12 columns", launcherColumns(2400) === 12);
 check("nothing measured yet → 3, never 0", launcherColumns(0) === 3 && launcherColumns(Number.NaN) === 3);
 
-console.log("── Bands for the real catalogue (Operations 8, Commercial 12, Finance 2, People 4, Communication 5, Planning 3, Knowledge 5, System 10) ──");
-const OWNER = [8, 12, 2, 4, 5, 3, 5, 10];
-const b10 = packAppBands(OWNER, 10);
-check("10 columns: Operations 4×2 | Commercial 6×2 · Finance | People | Planning · Communication | Knowledge · System",
-  show(b10) === "[2] 0:4 1:6 | [1] 2:2 3:4 5:3 | [1] 4:5 6:5 | [1] 7:10", show(b10));
-const b9 = packAppBands(OWNER, 9);
-check("9 columns: System is not pulled up beside Operations (an order swap must cost more than a gap)",
-  !b9[0].groups.some((g) => g.index === 7), show(b9));
+console.log("── Lines for the real catalogue (Operations 8, Commercial 11, Marketing 9, Finance 2, People 4, Communication 6, Planning 3, Knowledge 5, System 8) ──");
+const OWNER = [8, 11, 9, 2, 4, 6, 3, 5, 8];
+const b12 = packAppBands(OWNER, 12);
+check("12 columns (owner pick B): Operations · People | Commercial | Marketing · Finance | Communication · Knowledge | Planning · System",
+  show(b12) === "[1] 0:8 4:4 | [1] 1:11 | [1] 2:9 3:2 | [1] 5:6 7:5 | [1] 6:3 8:8", show(b12));
+check("phones: every group on a line of its own, in order",
+  show(packAppBands(OWNER, 4, false)) === "[2] 0:4 | [3] 1:4 | [3] 2:4 | [1] 3:2 | [1] 4:4 | [2] 5:4 | [1] 6:3 | [2] 7:4 | [2] 8:4");
 
-console.log("── Band invariants on random catalogues ──");
+console.log("── Line invariants on random catalogues ──");
 let seed = 20260923;
 const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 let bad = "";
 for (let trial = 0; trial < 1500 && !bad; trial++) {
-  const n = 1 + Math.floor(rnd() * 8);
+  const n = 1 + Math.floor(rnd() * 10);
   const counts = Array.from({ length: n }, () => 1 + Math.floor(rnd() * 16));
-  const C = 5 + Math.floor(rnd() * 8);
+  const C = 4 + Math.floor(rnd() * 9);
   const bands = packAppBands(counts, C);
   const seen = new Map<number, number>();
   let lowestUnplaced = 0;
   for (const band of bands) {
     const used = band.groups.reduce((a, g) => a + g.span, 0);
-    if (used > C) { bad = `band wider than ${C}: ${show(bands)}`; break; }
-    if (band.groups[0].index !== lowestUnplaced) { bad = `band does not start with the lowest unplaced group: ${show(bands)}`; break; }
+    if (used > C) { bad = `line wider than ${C}: ${show(bands)}`; break; }
+    if (band.groups[0].index !== lowestUnplaced) { bad = `line does not start with the lowest unplaced group: ${show(bands)}`; break; }
     for (const g of band.groups) {
       seen.set(g.index, (seen.get(g.index) ?? 0) + 1);
       const cnt = counts[g.index];
-      const solo = band.groups.length === 1 && g.span === Math.min(cnt, C);
-      const fits = band.rows * g.span >= cnt && (band.rows - 1) * g.span < cnt;
-      const shaped = band.rows === 1 || (g.span >= 3 && band.rows * g.span - cnt <= 1);
-      if (!fits || (!shaped && !solo)) { bad = `group ${g.index} (${cnt}) is not a closed block: ${show(bands)} C=${C}`; break; }
+      const oneRow = band.rows === 1 && g.span === cnt;
+      const solo = band.groups.length === 1 && g.span === Math.min(cnt, C) && band.rows === Math.ceil(cnt / g.span);
+      if (!oneRow && !solo) { bad = `group ${g.index} (${cnt}) is not one row: ${show(bands)} C=${C}`; break; }
     }
     while (seen.has(lowestUnplaced)) lowestUnplaced++;
   }
   if (!bad && (seen.size !== n || [...seen.values()].some((v) => v !== 1))) bad = `a group missing or placed twice: ${show(bands)} counts=${counts}`;
 }
-check("1500 random catalogues: every group once, never wider than the grid, each a closed block, registry order kept", !bad, bad);
+check("1500 random catalogues: every group once, one row each (or full-width lines when wider than the grid), never wider than the grid, registry order leads", !bad, bad);
 const t0 = performance.now();
-for (let i = 0; i < 1000; i++) packAppBands(OWNER, [10, 9, 7][i % 3]);
+for (let i = 0; i < 1000; i++) packAppBands(OWNER, [12, 10, 8][i % 3]);
 const perCall = (performance.now() - t0) / 1000;
 check(`packing the real catalogue costs ${perCall.toFixed(3)} ms (budget 1 ms)`, perCall < 1);
 

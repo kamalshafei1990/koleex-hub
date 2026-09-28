@@ -252,12 +252,13 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 }
 
 /* ── Full App Card (for grid) ── */
-/* ── Launcher layout (owner pick F, 23 Sep 2026) ──
-   From 640 px up the launcher is size-driven: tiles never narrower than
-   112 px (lib/home/app-bands.ts), groups packed into bands on one column
-   grid, icons 30 px. Below 640 px the phone stack of three columns stays as
-   it was. Read as an external store so the first client render already
-   knows which one it is drawing. */
+/* ── Launcher layout (owner pick B, 28 Sep 2026: "same rows and columns") ──
+   From 640 px up the launcher is size-driven: up to 12 columns, tiles never
+   narrower than 96 px (lib/home/app-bands.ts), every group ONE row on the
+   shared column grid and short groups sharing a line, icons 30 px. Below
+   640 px: four columns, every group on a line of its own, icons 28 px. Read
+   as an external store so the first client render already knows which one
+   it is drawing. */
 /* hubT (shared with the shell) + the launcher's own strings, merged once here
    so the launcher strings stay in the Home chunk. */
 const HOME_T: Translations = { ...hubT, ...homeLauncherT };
@@ -274,7 +275,7 @@ function readWide(): boolean {
 /** First-render guess of the column count; the layout effect corrects it
     before the first paint when the measured grid differs. */
 function estimateLauncherColumns(): number {
-  if (typeof window === "undefined") return 10;
+  if (typeof window === "undefined") return 12;
   const vw = window.innerWidth;
   return launcherColumns(Math.min(vw, 1400) - (vw >= 768 ? 80 : 32));
 }
@@ -345,7 +346,7 @@ const AppCard = memo(function AppCard({
     appUnread > 0
       ? `${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`
       : `${appBadgeCount} open item${appBadgeCount === 1 ? "" : "s"}`;
-  const tileCls = `relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
+  const tileCls = `relative flex flex-col items-center justify-center gap-1.5 p-1.5 sm:gap-2.5 sm:p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
         dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
       } ${
         isAi
@@ -436,11 +437,11 @@ const AppCard = memo(function AppCard({
                 </span>
               );
             }
-            return <BoundIcon semanticKey={`app.${app.id}`} className={iconPx === 30 ? "h-[30px] w-[30px]" : "h-[34px] w-[34px]"} fallback={<Icon size={iconPx} />} />;
+            return <BoundIcon semanticKey={`app.${app.id}`} className={iconPx === 30 ? "h-[30px] w-[30px]" : iconPx === 28 ? "h-[28px] w-[28px]" : "h-[34px] w-[34px]"} fallback={<Icon size={iconPx} />} />;
           })()}
         </span>
       </span>
-      <span className={`kx-app-label text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
+      <span className={`kx-app-label text-[11px] sm:text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
         app.active
           ? isCurrentApp
             ? dk ? "text-white font-semibold" : "text-black font-semibold"
@@ -1188,14 +1189,14 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
-  /* ── Launcher layout: size-driven columns + bands (owner pick F) ──
+  /* ── Launcher layout: size-driven columns, one row per group (owner pick B) ──
      `launcherRef` wraps the whole apps zone, so its width IS the grid's.
      The first render uses a guess from the window; the layout effect measures
      and, if the count differs, React re-renders before the first paint — the
      bands never visibly rearrange. Resizing only re-packs when the column
      count actually changes. */
   const wide = useSyncExternalStore(subscribeWide, readWide, () => false);
-  const iconPx = wide ? 30 : 34;
+  const iconPx = wide ? 30 : 28;
   /* Which launcher (Settings → Display, owner 28/09/2026): "classic" tile
      groups by default, or "today" — the Today strip and department cards. */
   const homeLayout = useHomeLayout();
@@ -1624,7 +1625,7 @@ export default function HomePage() {
         ) : isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category — the same
              size-driven columns as the launcher from 640 px up. */
-          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3`}>
+          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] sm:gap-3`}>
             {filteredApps.map((app) => renderCard(app, null))}
           </div>
         ) : (
@@ -1662,7 +1663,7 @@ export default function HomePage() {
                 )}
               </div>
               {seedingMyApps ? (
-                <div aria-hidden className={wide ? "grid gap-3" : "grid grid-cols-3 gap-3"} style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}>
+                <div aria-hidden className={wide ? "grid gap-3" : "grid grid-cols-4 gap-2"} style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}>
                   {Array.from({ length: seedCount }).map((_, i) => (
                     <div key={i} className={`aspect-square rounded-2xl border animate-pulse ${dk ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.025] border-black/[0.05]"}`} />
                   ))}
@@ -1674,7 +1675,7 @@ export default function HomePage() {
               ) : (
                 <div
                   ref={myAppsGridRef}
-                  className={`${introMotion ? "kx-grid " : ""}grid ${wide ? "" : "grid-cols-3"} gap-3`}
+                  className={`${introMotion ? "kx-grid " : ""}grid ${wide ? "gap-3" : "grid-cols-4 gap-2"}`}
                   style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
                 >
                   {myApps.map((app, i) => renderCard(app, "mine", i))}
@@ -1744,7 +1745,8 @@ export default function HomePage() {
                 ))}
               </div>
             ) : (
-              /* Phones: the stack of groups, three columns, as it was. */
+              /* Phones: four columns, every group on a line of its own, so
+                 every tile sits under the one above it. */
               <div className="space-y-7">
                 {groupedApps.map((group) => (
                   <div key={group.id}>
@@ -1754,7 +1756,7 @@ export default function HomePage() {
                       </span>
                       <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
                     </div>
-                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 gap-3`}>
+                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-4 gap-2`}>
                       {group.apps.map((app) => renderCard(app, "catalog"))}
                     </div>
                   </div>
@@ -1957,7 +1959,7 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
         Loading your apps…
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] sm:gap-3">
         {Array.from({ length: 14 }).map((_, i) => (
           <div
             key={i}
