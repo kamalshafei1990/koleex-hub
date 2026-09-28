@@ -11,8 +11,9 @@
    that are short share a line so it fills up:
 
    · launcherColumns() — how many tile columns fit a width. A tile is never
-     narrower than TILE_MIN_PX (96 px) and there are never more than
-     MAX_COLUMNS (12): 1440 px gets 12 columns of 99 px, 1200 px 10, 978 px 8.
+     narrower than TILE_MIN_PX (112 px — the tile size from before, owner:
+     "i want the app sizes same as before") and there are never more than
+     MAX_COLUMNS (12): 1440 px gets 10 columns of 121 px, 1200 px 9, 978 px 7.
 
    · packAppBands() — lays the groups out in LINES. Each line starts with the
      lowest-numbered group not yet placed, so the registry's order leads, and
@@ -23,7 +24,7 @@
      programme over "which groups are placed" (2^9 states for the Hub's 9).
    --------------------------------------------------------------------------- */
 
-export const TILE_MIN_PX = 96;
+export const TILE_MIN_PX = 112;
 export const TILE_GAP_PX = 12;
 export const MAX_COLUMNS = 12;
 

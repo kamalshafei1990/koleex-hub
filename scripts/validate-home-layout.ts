@@ -26,20 +26,23 @@ function check(name: string, ok: boolean, detail?: string) {
 }
 const show = (bands: AppBand[]) => bands.map((b) => `[${b.rows}] ` + b.groups.map((g) => `${g.index}:${g.span}`).join(" ")).join(" | ");
 
-console.log("── Columns: size-driven, tiles never narrower than 96 px, at most 12 ──");
-check("1320 px of grid (a 1440 laptop) → 12 columns", launcherColumns(1320) === 12);
-check("1105 px (1200 wide) → 10, 883 px (978 wide) → 8, 608 px (640 wide) → 5",
-  launcherColumns(1105) === 10 && launcherColumns(883) === 8 && launcherColumns(608) === 5);
+console.log("── Columns: size-driven, tiles never narrower than 112 px, at most 12 ──");
+check("1320 px of grid (a 1440 laptop) → 10 columns", launcherColumns(1320) === 10);
+check("1105 px (1200 wide) → 9, 883 px (978 wide) → 7, 608 px (640 wide) → 5",
+  launcherColumns(1105) === 9 && launcherColumns(883) === 7 && launcherColumns(608) === 5);
 check("a very wide screen stays at 12 columns", launcherColumns(2400) === 12);
 check("nothing measured yet → 3, never 0", launcherColumns(0) === 3 && launcherColumns(Number.NaN) === 3);
 
 console.log("── Lines for the real catalogue (Operations 8, Commercial 11, Marketing 9, Finance 2, People 4, Communication 6, Planning 3, Knowledge 5, System 8) ──");
 const OWNER = [8, 11, 9, 2, 4, 6, 3, 5, 8];
+const b10 = packAppBands(OWNER, 10);
+check("10 columns (a 1440 laptop): Operations · Finance | Commercial (wraps) | Marketing | People · Communication | Planning · Knowledge | System",
+  show(b10) === "[1] 0:8 3:2 | [2] 1:10 | [1] 2:9 | [1] 4:4 5:6 | [1] 6:3 7:5 | [1] 8:8", show(b10));
 const b12 = packAppBands(OWNER, 12);
-check("12 columns (owner pick B): Operations · People | Commercial | Marketing · Finance | Communication · Knowledge | Planning · System",
+check("12 columns (a wide screen): Operations · People | Commercial | Marketing · Finance | Communication · Knowledge | Planning · System",
   show(b12) === "[1] 0:8 4:4 | [1] 1:11 | [1] 2:9 3:2 | [1] 5:6 7:5 | [1] 6:3 8:8", show(b12));
 check("phones: every group on a line of its own, in order",
-  show(packAppBands(OWNER, 4, false)) === "[2] 0:4 | [3] 1:4 | [3] 2:4 | [1] 3:2 | [1] 4:4 | [2] 5:4 | [1] 6:3 | [2] 7:4 | [2] 8:4");
+  show(packAppBands(OWNER, 3, false)) === "[3] 0:3 | [4] 1:3 | [3] 2:3 | [1] 3:2 | [2] 4:3 | [2] 5:3 | [1] 6:3 | [2] 7:3 | [3] 8:3");
 
 console.log("── Line invariants on random catalogues ──");
 let seed = 20260923;
