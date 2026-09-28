@@ -10,7 +10,7 @@
    Refresh brings in new comments now; the cron does it every 15 minutes.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MarketingHeader, { publishCommentsCount } from "@/components/marketing/MarketingHeader";
 import CommentThread, { type ThreadState } from "@/components/marketing/CommentThread";
 import Button from "@/components/kds/Button";
@@ -23,6 +23,7 @@ import { COMMENTS_T } from "@/lib/marketing/comments-i18n";
 import { dmyHm } from "@/lib/marketing/format";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 import type { CommentFilter, CommentThread as Thread } from "@/lib/marketing/comment-types";
+import type { PostDetail } from "@/lib/marketing/feed-types";
 
 type ListResponse = { threads: Thread[]; next: number | null; counts: { needs: number; hidden: number }; canReply: boolean; canHide: boolean };
 
@@ -214,14 +215,7 @@ function ThreadHeader({ thread, t }: { thread: Thread; t: (k: string) => string 
   const platform = PLATFORM_NAME[thread.account.platform] ?? thread.account.platform;
   return (
     <div className="flex min-w-0 items-start gap-2.5 border-b border-[var(--border-subtle)] pb-3">
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-surface-subtle)]">
-        {p?.thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-        ) : (
-          <BrandGlyph name={thread.account.platform} size={18} />
-        )}
-      </span>
+      <PostThumb key={p?.thumb ?? "none"} post={p} platform={thread.account.platform} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
           <BrandGlyph name={thread.account.platform} size={12} />
@@ -238,5 +232,39 @@ function ThreadHeader({ thread, t }: { thread: Thread; t: (k: string) => string 
         </a>
       )}
     </div>
+  );
+}
+
+/* The post's picture. The platforms' picture links stop working after some
+   days: a broken one is fetched again once, the way the Feed does, and if
+   that fails too the platform's mark stands in — never an empty square. */
+function PostThumb({ post, platform }: { post: Thread["post"]; platform: string }) {
+  const [src, setSrc] = useState(post?.thumb ?? null);
+  const [failed, setFailed] = useState(false);
+  const repaired = useRef(false);
+
+  const onError = async () => {
+    if (!post || repaired.current) { setFailed(true); return; }
+    repaired.current = true;
+    try {
+      const res = await fetch(`/api/marketing/feed/${post.id}?part=media`, { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const next = ((await res.json()) as PostDetail).post.thumb?.url;
+      if (!next || next === src) throw new Error("unchanged");
+      setSrc(next);
+    } catch {
+      setFailed(true);
+    }
+  };
+
+  return (
+    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-surface-subtle)]">
+      {src && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => void onError()} className="h-full w-full object-cover" />
+      ) : (
+        <BrandGlyph name={platform} size={18} />
+      )}
+    </span>
   );
 }

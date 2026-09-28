@@ -101,8 +101,10 @@ const T: Translations = {
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
   "next.title":       { en: "Coming next, on these accounts", zh: "接下来将基于这些账号推出", ar: "القادم على هذه الحسابات" },
-  "next.calendar":    { en: "Calendar and scheduling", zh: "日历与定时发布", ar: "التقويم وجدولة النشر" },
-  "next.comments":    { en: "Replies to comments from the Hub", zh: "在 Hub 中回复评论", ar: "الرد على التعليقات من الـHub" },
+  "next.insights":    { en: "Insights: views, followers, visits, interactions and video, against the period before", zh: "数据洞察：浏览、粉丝、访问、互动和视频，并与上一周期对比", ar: "الإحصاءات: المشاهدات والمتابعون والزيارات والتفاعل والفيديو، مقارنةً بالفترة السابقة" },
+  "next.adComments":  { en: "Comments on ads, answered here like the others", zh: "广告下的评论，也可在此回复", ar: "تعليقات الإعلانات، والرد عليها هنا مثل غيرها" },
+  "next.plan":        { en: "A weekly plan suggested by Koleex AI", zh: "由 Koleex AI 建议的每周计划", ar: "خطة أسبوعية يقترحها Koleex AI" },
+  "next.messages":    { en: "Replies to Messenger and Instagram messages, once Meta approves", zh: "回复 Messenger 和 Instagram 私信（待 Meta 批准后）", ar: "الرد على رسائل Messenger وInstagram، بعد موافقة Meta" },
 };
 
 
@@ -340,8 +342,10 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("next.title")}</h2>
             <ul className="mt-3 flex list-disc flex-col gap-2 ps-5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-              <li>{t("next.calendar")}</li>
-              <li>{t("next.comments")}</li>
+              <li>{t("next.insights")}</li>
+              <li>{t("next.adComments")}</li>
+              <li>{t("next.plan")}</li>
+              <li>{t("next.messages")}</li>
             </ul>
           </div>
         </aside>

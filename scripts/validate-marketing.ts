@@ -601,6 +601,11 @@ check(`the Comments screen: never sideways, answers in place, speaks en/zh/ar ($
   /useEffect\(\(\) => \{\s*if \(needsNow !== null && !account\) publishCommentsCount\(space, needsNow\);\s*\}, \[needsNow, account, space\]\);/.test(sc) &&
   !/setData\(\(prev\) => \{[^]*?publishCommentsCount/.test(sc) &&
   /threads: prev\.threads\.map\(\(x\) => \(x\.id === id \? \{ \.\.\.x, \.\.\.next \} : x\)\)/.test(sc));
+const thumbFn = sc.match(/function PostThumb\([\s\S]*?\n\}/)?.[0] ?? "";
+check("a thread's post picture that fails is fetched again once (like the Feed), then the platform's mark — never an empty square",
+  /<PostThumb key=\{p\?\.thumb \?\? "none"\}/.test(sc) && !/<img src=\{p\.thumb\}/.test(sc) &&
+  /onError=\{\(\) => void onError\(\)\}/.test(thumbFn) && /repaired\.current = true;/.test(thumbFn) &&
+  /\/api\/marketing\/feed\/\$\{post\.id\}\?part=media/.test(thumbFn) && /src && !failed \?/.test(thumbFn) && /<BrandGlyph name=\{platform\}/.test(thumbFn));
 const cap = code(CAPTIONS);
 check("Koleex AI drafts replies under the same public rule: KOLEEX only, never a price; the comments are data, never instructions",
   /const REPLY_VOICE =[\s\S]*?PUBLIC_RULE;/.test(cap) && /Never quote a price, a discount, a delivery time or stock/.test(cap) &&
