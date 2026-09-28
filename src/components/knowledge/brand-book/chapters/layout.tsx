@@ -387,6 +387,7 @@ export function GraphicElements() {
           ["Colour", "White or grey on black; grey on white glass — never coloured"],
           ["World map", "Offices, glass partitions (safety marking) and global content"],
           ["Wave", "Screens: start pages, presentations, the website"],
+          ["Cards and badges", "Business cards and ID badges may carry the dots as a pattern (owner decision 29/09/2026) — printed grey, one even grid, the logo always on a clear panel"],
         ]} />
       </Section>
 

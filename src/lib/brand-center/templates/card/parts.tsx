@@ -132,6 +132,35 @@ export function AuthorizedBadge({ x, y, base, year, role, place, font, uid }: {
   );
 }
 
+/** The dots (ch. 57): one even grid, every dot the same size — grey or
+ *  white on black, grey on white — filling `area` (a rect) and, when given,
+ *  only inside `shape` (an SVG path in the same mm space). The grid is laid
+ *  from `origin` so a card's pattern sits square on its trim. */
+export function Dots({ area, pitch = 1.8, r = 0.32, fill, shape, origin, uid, opacity = 1 }: {
+  area: { x: number; y: number; w: number; h: number }; pitch?: number; r?: number; fill: string; shape?: string;
+  origin: { x: number; y: number }; uid: string; opacity?: number;
+}) {
+  return (
+    <g opacity={opacity}>
+      <defs>
+        <pattern id={`${uid}-dots`} patternUnits="userSpaceOnUse" x={origin.x - pitch / 2} y={origin.y - pitch / 2} width={pitch} height={pitch}>
+          <circle cx={pitch / 2} cy={pitch / 2} r={r} fill={fill} />
+        </pattern>
+        {shape ? <clipPath id={`${uid}-dotclip`}><path d={shape} /></clipPath> : null}
+      </defs>
+      <rect x={area.x} y={area.y} width={area.w} height={area.h} fill={`url(#${uid}-dots)`} clipPath={shape ? `url(#${uid}-dotclip)` : undefined} />
+    </g>
+  );
+}
+
+/** The book's wave (ch. 57, 280 × 150) as a closed shape filling the space
+ *  under the curve, scaled into a box. */
+export function waveShape(box: { x: number; y: number; w: number; h: number }): string {
+  const X = (x: number) => box.x + (x / 280) * box.w;
+  const Y = (y: number) => box.y + (y / 150) * box.h;
+  return `M${X(0)} ${Y(96)} C ${X(60)} ${Y(60)}, ${X(120)} ${Y(140)}, ${X(180)} ${Y(92)} S ${X(280)} ${Y(66)}, ${X(280)} ${Y(66)} L${X(280)} ${Y(150)} L${X(0)} ${Y(150)} Z`;
+}
+
 /* ── text ──────────────────────────────────────────────────────────────── */
 
 const CJK = /[\u2E80-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/;
@@ -155,7 +184,7 @@ export function fit(text: string, size: number, max: number, weight = 400, font?
 /** Word-wrap to lines of at most `max` mm (CJK wraps between characters). */
 export function wrap(text: string, size: number, max: number, maxLines = 2, weight = 400, font?: string, italic = false): string[] {
   const cjk = CJK.test(text) && !/\s/.test(text);
-  const units = cjk ? Array.from(text) : text.split(/\s+/).filter(Boolean);
+  const units = cjk ? Array.from(text) : glueSeparators(text.split(/\s+/).filter(Boolean));
   const join = cjk ? "" : " ";
   const lines: string[] = [];
   let cur = "";
@@ -166,6 +195,37 @@ export function wrap(text: string, size: number, max: number, maxLines = 2, weig
   if (cur) lines.push(cur);
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(join)];
+}
+
+/** A lone "·", "|" or "/" rides with the word before it — a line never
+ *  starts or ends on a bare separator. */
+function glueSeparators(words: string[]): string[] {
+  const out: string[] = [];
+  for (const w of words) {
+    if (/^[·|/–—-]$/.test(w) && out.length) out[out.length - 1] += ` ${w}`;
+    else out.push(w);
+  }
+  return out;
+}
+
+/** Two lines of about the same width (a designer's break: no word left
+ *  alone on the second line), or one line when it fits. */
+export function wrapBalanced(text: string, size: number, max: number, weight = 400, font?: string, italic = false): string[] {
+  if (textWidth(text, size, weight, font, italic) <= max) return [text];
+  const cjk = CJK.test(text) && !/\s/.test(text);
+  const units = cjk ? Array.from(text) : glueSeparators(text.split(/\s+/).filter(Boolean));
+  const join = cjk ? "" : " ";
+  if (units.length < 2) return [text];
+  let best: string[] = [text];
+  let bestScore = Infinity;
+  for (let i = 1; i < units.length; i++) {
+    const a = units.slice(0, i).join(join), b = units.slice(i).join(join);
+    const wa = textWidth(a, size, weight, font, italic), wb = textWidth(b, size, weight, font, italic);
+    const over = Math.max(0, wa - max) + Math.max(0, wb - max);
+    const score = over * 100 + Math.abs(wa - wb);
+    if (score < bestScore) { bestScore = score; best = [a, b]; }
+  }
+  return best;
 }
 
 /** A line of text from its logical start: left, or right in Arabic. */
@@ -179,7 +239,7 @@ export function Line({ x, y, rtl, children, size, weight = 400, fill, max, ancho
   );
 }
 
-export interface PrintRow { label: string; value: string; rtlValue: boolean }
+export interface PrintRow { label: string; value: string; rtlValue: boolean; kind?: string }
 
 /** Contact lines with the labels in their own column, so the values line
  *  up; the address may wrap. `y` is the first baseline (align "top") or the
@@ -210,9 +270,13 @@ export function ColumnRows({ rows, x, y, align, width, rtl, size, fill, labelFil
 function layoutColumns(rows: PrintRow[], size: number, width: number, maxWrap: number, font?: string) {
   const labelW = rows.some((r) => r.label) ? Math.max(...rows.map((r) => (r.label ? textWidth(r.label, size, 600, font) + size * 0.6 : 0))) : 0;
   const room = width - labelW;
-  const lines = rows.flatMap((r) =>
-    (textWidth(r.value, size, 400, font) > room ? wrap(r.value, size, room, maxWrap, 400, font) : [r.value]).map((text, i) => ({ label: i ? "" : r.label, text, rtl: r.rtlValue })),
-  );
+  /* Design review 29/09: only the address wraps — into two even lines; a
+     phone, e-mail or link never breaks (it condenses a little instead). */
+  const lines = rows.flatMap((r) => {
+    const wraps = (r.kind === "address" || r.kind === "custom") && textWidth(r.value, size, 400, font) > room;
+    const parts = wraps ? (maxWrap > 2 ? wrap(r.value, size, room, maxWrap, 400, font) : wrapBalanced(r.value, size, room, 400, font)) : [r.value];
+    return parts.map((text, i) => ({ label: i ? "" : r.label, text, rtl: r.rtlValue }));
+  });
   return { labelW, room, lines };
 }
 export function columnRowsSpan(rows: PrintRow[], size: number, width: number, lead = 1.42, maxWrap = 2, font?: string): number {

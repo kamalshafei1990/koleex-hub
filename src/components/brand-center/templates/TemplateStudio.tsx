@@ -37,7 +37,7 @@ const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const GROUPS = ["look", "job", "person", "company", "contacts", "photo", "details", "qr"];
+const GROUPS = ["look", "job", "person", "company", "contacts", "photo", "details", "back", "qr"];
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -182,7 +182,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
             {guides ? <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("studio.guidesHint")}</p> : null}
 
             <div className={`mt-4 grid gap-5 ${vertical ? "grid-cols-2" : "xl:grid-cols-2"}`}>
-              {def.pages.map((p) => (
+              {def.pages.filter((p) => !def.pagesFor || def.pagesFor(values).includes(p.id)).map((p) => (
                 <figure key={p.id} className="m-0">
                   <div className={`mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_10px_30px_rgba(0,0,0,0.35)] ${vertical ? "max-w-[300px]" : "max-w-[560px]"}`}>
                     <TemplateSheet def={def} values={values} pageId={p.id} qrs={qrs} mode="screen" guides={guides} slug={t(`tpl.page.${p.id}`)} />
@@ -231,7 +231,7 @@ function StylePicker({ t, def, values, field, qrs, onPick }: {
             <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onPick(o.value)}
               className={`flex flex-col items-center gap-2 rounded-xl border px-2 py-2.5 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"}`}>
               <span className="flex h-[64px] w-full items-center justify-center gap-1.5">
-                {def.pages.map((p) => (
+                {def.pages.filter((p) => !def.pagesFor || def.pagesFor(v).includes(p.id)).map((p) => (
                   <span key={p.id} className={`block overflow-hidden rounded-[2px] shadow-[0_3px_10px_rgba(0,0,0,0.35)] ${tall ? "w-[34px]" : "w-[82px]"}`}>
                     <TemplateSheet def={def} values={v} pageId={p.id} qrs={qrs} mode="screen" slug={`${t(o.labelKey)} — ${t(`tpl.page.${p.id}`)}`} />
                   </span>

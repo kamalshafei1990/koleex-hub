@@ -28,25 +28,28 @@ import type { ReactNode } from "react";
 import type { DrawContext, TemplateValues } from "../types";
 import { PT } from "../types";
 import {
-  AuthorizedBadge, ColumnRows, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, HAIRLINE_ON_WHITE, INK, InlineRows, LIGHT_ON_INK, Line, Logo,
-  Photo, PhotoPlaceholder, QrZone, STACKED_MIN, badgeSize, Stroke, WHITE, columnRowsSpan, fit, lockupHeight, lockupLines, logoHeight, stackedLine, textWidth, wrap, type PrintRow, type Zone,
+  AuthorizedBadge, ColumnRows, Dots, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, HAIRLINE_ON_WHITE, INK, InlineRows, LIGHT_ON_INK, Line, Logo,
+  Photo, PhotoPlaceholder, QrZone, STACKED_MIN, badgeSize, Stroke, WHITE, columnRowsSpan, fit, waveShape, wrapBalanced, lockupHeight, lockupLines, logoHeight, stackedLine, textWidth, type PrintRow, type Zone,
 } from "./parts";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { asLang, fontOf, langOf, num, printedRows, qrsOf, relangRows, rowsOf, str, type Lang } from "./model";
 
 export const STYLES = [
-  "classic", "management", "executive", "team-black", "team-white", "vertical", "vertical-white",
-  "centered", "grid", "sales", "technician", "dealer", "bilingual",
+  "classic", "management", "executive", "vertical-portrait",
+  "team-black", "team-white", "silver", "name-first",
+  "dots-field", "dots-field-white", "dots-wave", "dots-vertical",
+  "split", "band", "rules", "grid", "centered", "centered-white",
+  "vertical", "vertical-white", "sales", "light-white", "technician", "bilingual", "dealer",
 ] as const;
 export type CardStyle = (typeof STYLES)[number];
 export const styleOf = (v: TemplateValues): CardStyle => ((STYLES as readonly string[]).includes(String(v.style)) ? (v.style as CardStyle) : "team-black");
-export const PORTRAIT_STYLES: CardStyle[] = ["classic", "management"];
+export const PORTRAIT_STYLES: CardStyle[] = ["classic", "management", "vertical-portrait"];
 /** Where the name with the logo has no place (ch. 43/44): the lockup backs
  *  carry it already; the portrait fronts' logos are under 40 mm (the logo
  *  alone); the dealer card is co-branded. */
 export const NO_COMPANY_BACK: CardStyle[] = ["classic", "management", "executive", "dealer"];
-export const NO_COMPANY_FRONT: CardStyle[] = ["classic", "management", "executive", "dealer"];
-export const VERTICAL_STYLES: CardStyle[] = ["vertical", "vertical-white"];
+export const NO_COMPANY_FRONT: CardStyle[] = ["classic", "management", "executive", "dealer", "vertical-portrait", "split", "name-first"];
+export const VERTICAL_STYLES: CardStyle[] = ["vertical", "vertical-white", "dots-vertical", "vertical-portrait"];
 
 const INSET = 5; // text and marks stay 1 mm inside the 4 mm safe margin
 
@@ -165,7 +168,7 @@ function classicFront(v: TemplateValues, ctx: DrawContext): ReactNode {
   const italic = v.italic !== false && !/[\u0600-\u06FF\u2E80-\u9FFF]/.test(r.title);
   /* His card sets the title a little narrower than Helvetica's own width:
      wrap against 12 % more room, then condense to the real room. */
-  const titleLines = r.title ? (beside ? wrap(r.title, titleSize, titleRoom * 1.12, 2, 400, font, italic) : [r.title]) : [];
+  const titleLines = r.title ? (beside ? wrapBalanced(r.title, titleSize, titleRoom * 1.12, 400, font, italic) : [r.title]) : [];
   const slashPts = `${sx},${sBottom} ${sx + thick},${sBottom} ${sx + thick + lean},${sTop} ${sx + lean},${sTop}`;
 
   const rowsSize = f.h * C.rows.size * k;
@@ -247,7 +250,7 @@ function portraitName(r: Read, light: string) {
   const nameW = Math.min(textWidth(r.name, nameSize, 600, font), f.inner * 0.66);
   const room = f.inner - nameW - 2.6;
   const beside = room >= 22;
-  const lines = r.title ? (beside ? wrap(r.title, titleSize, room, 2, 300, font) : [r.title]) : [];
+  const lines = r.title ? (beside ? wrapBalanced(r.title, titleSize, room, 300, font) : [r.title]) : [];
   const nameX = rtl ? f.right : f.left;
   const titleX = beside ? (rtl ? f.right - nameW - 2.6 : f.left + nameW + 2.6) : nameX;
   return (
@@ -275,7 +278,9 @@ function portraitFront(v: TemplateValues, ctx: DrawContext, withPhoto: boolean):
   return (
     <>
       {fill(f, INK)}
-      {withPhoto && v.stroke !== false ? <Stroke x={f.b + 0.073 * f.w - Math.tan((42 * Math.PI) / 180) * f.b} top={0} bottom={f.b + 0.78 * f.h} width={0.073 * f.w} lean={Math.tan((42 * Math.PI) / 180)} /> : null}
+      {/* Design review 29/09: the stroke ends behind the head — below it, it
+          showed beside the shoulder as a stray white wedge. */}
+      {withPhoto && v.stroke !== false ? <Stroke x={f.b + 0.073 * f.w - Math.tan((42 * Math.PI) / 180) * f.b} top={0} bottom={f.b + 0.5 * f.h} width={0.073 * f.w} lean={Math.tan((42 * Math.PI) / 180)} /> : null}
       {withPhoto ? (photo
         ? <Photo href={photo} box={box} zoom={num(v, "photoZoom", 100) / 100} px={num(v, "photoX", 0)} py={num(v, "photoY", 0)} soft={v.soft !== false} uid={`${r.uid}-p`} />
         : <PhotoPlaceholder box={box} label={word(r.lang, "addPhoto")} font={font} />) : null}
@@ -330,6 +335,16 @@ interface InfoOpts {
   hotline?: string;
   name?: string; title?: string; rows?: PrintRow[]; lang?: Lang;
   qrs: Read["back"];
+  /** Drawn right over the ground (a dotted panel …). */
+  under?: ReactNode;
+  /** Millimetres kept free on the end side (a panel beside the text). */
+  reserve?: number;
+  /** Where the QR codes go instead of the bottom-end corner. */
+  qrZone?: Zone;
+  /** The name as a headline in silver (foil) — the silver style. */
+  silverName?: boolean;
+  /** The lines centred in the space under the logo (a back without a name). */
+  rowsMiddle?: boolean;
 }
 
 function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
@@ -354,13 +369,21 @@ function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
   const nameY = vertical ? top.bottom + 23.3 : top.bottom + 11.5;
   const n = o.qrs.length;
   const qrMax = vertical ? 14 : 15;
-  const corner = cornerZone(r, n, qrMax, vertical ? "center" : "end");
-  const rowsWidth = vertical || !n ? f.inner : f.inner - corner.used - 3;
-  const rowsBottom = vertical && n ? corner.zone.y - 3 : f.bottom;
+  /* Design review 29/09: the codes follow the text's edge (no centred QR
+     under start-aligned text). */
+  const corner = cornerZone(r, n, qrMax, "end");
+  const reserve = o.reserve ?? 0;
+  const qrBeside = !o.qrZone && !vertical && n;
+  const rowsWidth = (qrBeside ? f.inner - corner.used - 3 : f.inner) - (o.qrZone ? 0 : 0) - reserve;
+  const span = columnRowsSpan(r.rows, 6.5 * PT * k, f.inner - (qrBeside ? corner.used + 3 : 0) - (o.reserve ?? 0), 1.42, 2, font);
+  const rowsBottom = o.rowsMiddle ? top.bottom + (f.bottom - top.bottom + span) / 2 + 1 : vertical && n && !o.qrZone ? corner.zone.y - 3 : f.bottom;
+  const textMax = f.inner - reserve;
+  const silverId = `${r.uid}-silvername`;
 
   return (
     <>
       {fill(f, o.dark ? INK : WHITE)}
+      {o.under}
       {top.node}
       {o.hotline ? (
         <g>
@@ -369,18 +392,26 @@ function infoSide(v: TemplateValues, ctx: DrawContext, o: InfoOpts): ReactNode {
             style={{ fontFamily: font, fontSize: 10 * PT * k, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{o.hotline}</text>
         </g>
       ) : null}
-      {r.name ? <Line x={start} y={nameY} rtl={rtl} font={font} size={nameSize} weight={600} fill={fg} max={f.inner}>{r.name}</Line> : null}
-      {r.title ? <Line x={start} y={nameY + titleSize * 1.55} rtl={rtl} font={font} size={titleSize} fill={sub} max={f.inner}>{r.title}</Line> : null}
+      {o.silverName ? (
+        <defs><linearGradient id={silverId} x1="0" y1="0" x2="1" y2="1">{["#E5E5EA", "#FFFFFF", "#D1D1D6", "#AEAEB2"].map((c, i) => <stop key={c} offset={[0, 0.35, 0.6, 1][i]} stopColor={c} />)}</linearGradient></defs>
+      ) : null}
+      {r.name ? (
+        <Line x={start} y={o.silverName ? nameY + 1.2 : nameY} rtl={rtl} font={font} size={o.silverName ? 13 * PT * k : nameSize} weight={o.silverName ? 500 : 600}
+          fill={o.silverName ? `url(#${silverId})` : fg} max={textMax}>{r.name}</Line>
+      ) : null}
+      {r.title ? <Line x={start} y={(o.silverName ? nameY + 1.2 : nameY) + titleSize * 1.55 + (o.silverName ? 0.8 : 0)} rtl={rtl} font={font} size={titleSize} fill={sub} max={textMax}>{r.title}</Line> : null}
       <ColumnRows rows={r.rows} x={start} y={rowsBottom} align="bottom" width={rowsWidth} rtl={rtl} size={rowsSize} fill={fg} font={font} />
-      <QrZone items={o.qrs} codes={r.codes} font={font} captionFill={sub} max={qrMax} zone={corner.zone} />
+      <QrZone items={o.qrs} codes={r.codes} font={font} captionFill={sub} max={qrMax} zone={o.qrZone ?? corner.zone} />
     </>
   );
 }
 
 /** A logo-only face (the book's team front), with any QR codes put on it
  *  small in the bottom corner. */
-function logoFace(v: TemplateValues, ctx: DrawContext, dark: boolean, logoW = 40): ReactNode {
-  const r = read(v, ctx);
+function logoFace(v: TemplateValues, ctx: DrawContext, dark: boolean, logoW = 40, side: "front" | "back" = "front"): ReactNode {
+  const r0 = read(v, ctx);
+  /* A back drawn as a logo face reads the back's switch and the back's codes. */
+  const r = side === "back" ? { ...r0, companyOn: { ...r0.companyOn, front: r0.companyOn.back }, front: r0.back } : r0;
   const { f, font } = r;
   /* With the name, the logo is at least the stacked lockup's 40 mm. */
   const lw = Math.min(r.companyOn.front ? Math.max(logoW, STACKED_MIN) : logoW, f.inner - 4);
@@ -529,7 +560,7 @@ function gridBack(v: TemplateValues, ctx: DrawContext): ReactNode {
       {web ? <Line x={rtl ? f.left : f.right} y={f.top + mark.height - 0.2} rtl={rtl} anchor="end" font={font} size={5.5 * PT} fill={GREY_ON_WHITE}>{web}</Line> : null}
       <rect x={f.left} y={bandY} width={f.inner} height={0.12} fill={HAIRLINE_ON_WHITE} />
       {r.name ? <Line x={leftX} y={bandY + 6} rtl={rtl} font={font} size={9 * PT * k} weight={600} fill={INK} max={colW}>{r.name}</Line> : null}
-      {r.title ? wrap(r.title, 6.5 * PT * k, colW, 2, 400, font).map((t, i) => (
+      {r.title ? wrapBalanced(r.title, 6.5 * PT * k, colW, 400, font).map((t, i) => (
         <Line key={i} x={leftX} y={bandY + 9.4 + i * 2.8 * k} rtl={rtl} font={font} size={6.5 * PT * k} fill={GREY_ON_WHITE} max={colW}>{t}</Line>
       )) : null}
       <rect x={f.left + colW + colGap / 2 - 0.06} y={bandY + 3} width={0.12} height={f.bottom - bandY - 3} fill={HAIRLINE_ON_WHITE} />
@@ -567,6 +598,267 @@ function executiveBack(v: TemplateValues, ctx: DrawContext): ReactNode {
   );
 }
 
+
+/* ── round 4 (owner 29/09: "too many different, really professional
+      designs", "dots as a pattern") ─────────────────────────────────────
+   The dots are the book's (ch. 57): one even grid, every dot the same size,
+   grey on black or on white; a logo never sits on them — it gets a clear
+   panel, its clear space as tall as the logo (ch. 40). */
+
+const DOT_ON_INK = "#48484A";
+const DOT_ON_WHITE = "#C7C7CC";
+const PITCH = 1.8;
+/** Half a panel's size, snapped so its edges fall between two dot columns. */
+const snapHalf = (half: number) => (Math.ceil(half / PITCH - 0.5) + 0.5) * PITCH;
+
+/** Dots — field: the whole face one dot grid, the logo on its clear panel. */
+function dotsFieldFront(v: TemplateValues, ctx: DrawContext, dark: boolean): ReactNode {
+  const r = read(v, ctx);
+  const { f, font } = r;
+  const lw = 40;
+  const lh = logoHeight(lw);
+  const room = stacked(r, "front", { x: 0, y: 0, w: lw }, WHITE).room;
+  const cx = f.b + f.w / 2, cy = f.b + f.h / 2;
+  const hw = snapHalf(lw / 2 + lh), hh = snapHalf((lh + room) / 2 + lh);
+  const ground = dark ? INK : WHITE, ink = dark ? WHITE : INK;
+  const logo = { x: cx - lw / 2, y: cy - (lh + room) / 2, w: lw };
+  const corner = cornerZone(r, r.front.length, 11, "end");
+  return (
+    <>
+      {fill(f, ground)}
+      <Dots area={{ x: 0, y: 0, w: f.W, h: f.H }} fill={dark ? DOT_ON_INK : DOT_ON_WHITE} origin={{ x: cx, y: cy }} uid={`${r.uid}-d`} pitch={PITCH} />
+      <rect x={cx - hw} y={cy - hh} width={hw * 2} height={hh * 2} fill={ground} />
+      <Logo x={logo.x} y={logo.y} width={lw} fill={ink} />
+      {stacked(r, "front", logo, ink).node}
+      {r.front.length ? <rect x={corner.zone.x - 1.5} y={corner.zone.y - 1.5} width={corner.zone.w + 3} height={corner.zone.h + 3} fill={ground} /> : null}
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={dark ? GREY_ON_INK : GREY_ON_WHITE} max={11} zone={corner.zone} />
+    </>
+  );
+}
+
+/** Dots — field, the back: the details on the plain ground, a dotted panel
+ *  down the end side that carries the QR codes on white plates. */
+function dotsFieldBack(v: TemplateValues, ctx: DrawContext, dark: boolean): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl } = r;
+  const panelW = f.w * 0.27 + f.b;
+  const px = rtl ? 0 : f.W - panelW;
+  const inner = panelW - f.b - 7;
+  return (
+    <>
+      {infoSide(v, ctx, {
+        side: "back", dark, qrs: [], reserve: panelW - f.b - INSET + 3,
+        under: <Dots area={{ x: px, y: 0, w: panelW, h: f.H }} fill={dark ? DOT_ON_INK : DOT_ON_WHITE} origin={{ x: f.b + f.w / 2, y: f.b + f.h / 2 }} uid={`${r.uid}-d`} pitch={PITCH} />,
+      })}
+      <QrZone items={r.back} codes={r.codes} font={r.font} captionFill={dark ? GREY_ON_INK : GREY_ON_WHITE} max={Math.min(13, inner)} gap={3}
+        zone={{ x: rtl ? f.b + 3.5 : px + 3.5, y: f.top, w: inner, h: f.bottom - f.top, dir: "column", align: "center" }} />
+    </>
+  );
+}
+
+/** Dots — wave: the book's wave of dots across the lower face, the logo
+ *  clear above it. */
+function dotsWaveFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, font } = r;
+  const lw = 40;
+  const room = stacked(r, "front", { x: 0, y: 0, w: lw }, WHITE).room;
+  const logo = { x: f.b + (f.w - lw) / 2, y: f.b + f.h * 0.3 - (logoHeight(lw) + room) / 2, w: lw };
+  const box = { x: 0, y: f.b + f.h * 0.24, w: f.W, h: f.H - (f.b + f.h * 0.24) };
+  const corner = cornerZone(r, r.front.length, 11, "end");
+  return (
+    <>
+      {fill(f, INK)}
+      <Dots area={box} shape={waveShape(box)} fill={DOT_ON_INK} origin={{ x: f.b + f.w / 2, y: f.b + f.h / 2 }} uid={`${r.uid}-d`} pitch={PITCH} />
+      <Logo x={logo.x} y={logo.y} width={lw} fill={WHITE} />
+      {stacked(r, "front", logo, WHITE).node}
+      {r.front.length ? <rect x={corner.zone.x - 1.5} y={corner.zone.y - 1.5} width={corner.zone.w + 3} height={corner.zone.h + 3} fill={INK} /> : null}
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_INK} max={11} zone={corner.zone} />
+    </>
+  );
+}
+
+/** Dots — vertical: the lower half one dot field under a clean edge, the
+ *  logo in the upper half. */
+function dotsVerticalFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, font } = r;
+  const lw = 40;
+  const room = stacked(r, "front", { x: 0, y: 0, w: lw }, WHITE).room;
+  const logo = { x: f.b + (f.w - lw) / 2, y: f.b + f.h * 0.3 - (logoHeight(lw) + room) / 2, w: lw };
+  const edge = f.b + f.h * 0.55;
+  const corner = cornerZone(r, r.front.length, 11, "end");
+  return (
+    <>
+      {fill(f, INK)}
+      <Dots area={{ x: 0, y: edge, w: f.W, h: f.H - edge }} fill={DOT_ON_INK} origin={{ x: f.b + f.w / 2, y: edge + PITCH / 2 }} uid={`${r.uid}-d`} pitch={PITCH} />
+      <Logo x={logo.x} y={logo.y} width={lw} fill={WHITE} />
+      {stacked(r, "front", logo, WHITE).node}
+      {r.front.length ? <rect x={corner.zone.x - 1.5} y={corner.zone.y - 1.5} width={corner.zone.w + 3} height={corner.zone.h + 3} fill={INK} /> : null}
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_INK} max={11} zone={corner.zone} />
+    </>
+  );
+}
+
+/** Split: a black panel with the logo, the person and the lines on white —
+ *  everything on the front; the back is the logo. */
+function splitFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font, k } = r;
+  const panel = f.b + f.w * 0.38;
+  const px = rtl ? f.W - panel : 0;
+  const lw = Math.min(26, f.w * 0.38 - 10);
+  const colX = rtl ? f.W - panel - INSET : panel + INSET;
+  const colW = f.b + f.w - INSET - (panel + INSET);
+  const n = r.front.length;
+  const corner = cornerZone(r, n, 11, "end");
+  const rowsW = n ? colW - corner.used - 3 : colW;
+  const sub = GREY_ON_WHITE;
+  const lx = rtl ? f.W - (panel + f.b) / 2 - lw / 2 : (panel + f.b) / 2 - lw / 2;
+  return (
+    <>
+      {fill(f, WHITE)}
+      <rect x={px} y={0} width={panel} height={f.H} fill={INK} />
+      <Logo x={lx} y={f.b + (f.h - logoHeight(lw)) / 2} width={lw} fill={WHITE} />
+      {r.name ? <Line x={colX} y={f.top + 5} rtl={rtl} font={font} size={9.5 * PT * k} weight={600} fill={INK} max={colW}>{r.name}</Line> : null}
+      {r.title ? <Line x={colX} y={f.top + 5 + 3.6 * k} rtl={rtl} font={font} size={7 * PT * k} fill={sub} max={colW}>{r.title}</Line> : null}
+      <rect x={rtl ? colX - 8 : colX} y={f.top + 12 * k} width={8} height={0.25} fill={INK} />
+      <ColumnRows rows={r.rows} x={colX} y={f.bottom} align="bottom" width={rowsW} rtl={rtl} size={6 * PT * k} fill={INK} labelFill={sub} font={font} maxWrap={3} />
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={sub} max={11} zone={corner.zone} />
+    </>
+  );
+}
+
+/** Band: white, the person above a black band that carries the lines. */
+function bandFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font, k } = r;
+  const bandY = f.b + f.h * 0.62;
+  const start = rtl ? f.right : f.left;
+  const mark = topMark(r, "front", { x: start, y: f.top, rtl }, INK);
+  const n = r.front.length;
+  const qr = Math.min(12, f.b + f.h - bandY - 6);
+  const zw = n * qr + Math.max(0, n - 1) * 2.5;
+  const zone: Zone = { x: rtl ? f.left : f.right - zw, y: bandY + (f.b + f.h - bandY - qr) / 2, w: zw, h: qr, dir: "row", align: rtl ? "start" : "end" };
+  const rowsW = f.inner - (n ? zw + 3 : 0);
+  return (
+    <>
+      {fill(f, WHITE)}
+      {mark.node}
+      {r.name ? <Line x={start} y={bandY - 7.2} rtl={rtl} font={font} size={9.5 * PT * k} weight={600} fill={INK} max={f.inner}>{r.name}</Line> : null}
+      {r.title ? <Line x={start} y={bandY - 3.6} rtl={rtl} font={font} size={7 * PT * k} fill={GREY_ON_WHITE} max={f.inner}>{r.title}</Line> : null}
+      <rect x={0} y={bandY} width={f.W} height={f.H - bandY} fill={INK} />
+      <ColumnRows rows={r.rows} x={start} y={bandY + (f.b + f.h - bandY - columnRowsSpan(r.rows, 6 * PT * k, rowsW, 1.36, 2, font)) / 2 + 6 * PT * k * 0.36} align="top" width={rowsW} rtl={rtl} size={6 * PT * k} fill={WHITE} labelFill={GREY_ON_INK} font={font} lead={1.36} />
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_INK} max={qr} zone={zone} />
+    </>
+  );
+}
+
+/** Name first: the person large on the front (white); the lines on the back. */
+function nameFirstFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font, k } = r;
+  const start = rtl ? f.right : f.left;
+  const size = 13 * PT * k;
+  const lines = r.name ? wrapBalanced(r.name, size, f.inner, 600, font) : [];
+  const base = f.b + f.h * 0.46 - (lines.length - 1) * size * 1.1;
+  const last = base + Math.max(0, lines.length - 1) * size * 1.1;
+  const lw = 22;
+  const corner = cornerZone(r, r.front.length, 11, "end");
+  return (
+    <>
+      {fill(f, WHITE)}
+      {lines.map((l, i) => <Line key={i} x={start} y={base + i * size * 1.1} rtl={rtl} font={font} size={size} weight={600} fill={INK} max={f.inner}>{l}</Line>)}
+      {r.title ? <Line x={start} y={last + 4.4 * k} rtl={rtl} font={font} size={7.5 * PT * k} fill={GREY_ON_WHITE} max={f.inner}>{r.title}</Line> : null}
+      <rect x={rtl ? f.right - 10 : f.left} y={last + 8 * k} width={10} height={0.3} fill={INK} />
+      <Logo x={rtl ? f.left : f.right - lw} y={f.bottom - logoHeight(lw)} width={lw} fill={INK} />
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_WHITE} max={11} zone={{ ...corner.zone, x: rtl ? f.right - corner.used : f.left, align: rtl ? "end" : "start" }} />
+    </>
+  );
+}
+
+/** Rules: white, Swiss — every line of details between hairlines. */
+function rulesBack(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font, k } = r;
+  const start = rtl ? f.right : f.left;
+  const mark = topMark(r, "back", { x: start, y: f.top, rtl, w: 34, logoW: 22 }, INK);
+  const size = 6 * PT * k;
+  const step = 4.1 * k;
+  const rows = r.rows;
+  const top = f.bottom - rows.length * step + step * 0.72;
+  const n = r.back.length;
+  const nameY = f.top + mark.height + 6.5;
+  const zone: Zone = { x: rtl ? f.left : f.right - 12, y: f.top, w: 12, h: 12 + 2.4, dir: "column", align: "start" };
+  return (
+    <>
+      {fill(f, WHITE)}
+      {mark.node}
+      {r.name ? <Line x={start} y={nameY} rtl={rtl} font={font} size={9 * PT * k} weight={600} fill={INK} max={f.inner - (n ? 15 : 0)}>{r.name}</Line> : null}
+      {r.title ? <Line x={start} y={nameY + 3.4 * k} rtl={rtl} font={font} size={6.5 * PT * k} fill={GREY_ON_WHITE} max={f.inner - (n ? 15 : 0)}>{r.title}</Line> : null}
+      {rows.map((row, i) => {
+        const y = top + i * step;
+        return (
+          <g key={i}>
+            <rect x={f.left} y={y - step * 0.72} width={f.inner} height={0.12} fill={HAIRLINE_ON_WHITE} />
+            <InlineRows rows={[row]} x={start} y={y} width={f.inner} rtl={rtl} size={size} fill={INK} labelFill={GREY_ON_WHITE} font={font} labelWeight={600} />
+          </g>
+        );
+      })}
+      <QrZone items={r.back} codes={r.codes} font={font} captionFill={GREY_ON_WHITE} max={12} zone={zone} />
+    </>
+  );
+}
+
+/** Light line on white: the book's line in black (ch. 57 "black on white"). */
+function lightWhiteFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font } = r;
+  const sx = (x: number) => (x / 640) * f.W;
+  const sy = (y: number) => (y / 220) * (f.H * 0.72);
+  const d = `M${sx(-10)} ${sy(180)} C ${sx(140)} ${sy(180)}, ${sx(170)} ${sy(70)}, ${sx(330)} ${sy(66)} S ${sx(540)} ${sy(130)}, ${sx(650)} ${sy(40)}`;
+  const w = r.companyOn.front ? STACKED_MIN : 30;
+  const room = stacked(r, "front", { x: 0, y: 0, w }, INK).room;
+  const logo = { x: rtl ? f.right - w : f.left, y: f.bottom - logoHeight(w) - room, w };
+  const corner = cornerZone(r, r.front.length, 11, "end");
+  return (
+    <>
+      {fill(f, WHITE)}
+      <path d={d} fill="none" stroke={INK} strokeOpacity={0.08} strokeWidth={1.6} strokeLinecap="round" />
+      <path d={d} fill="none" stroke={INK} strokeWidth={0.3} strokeLinecap="round" />
+      <Logo x={logo.x} y={logo.y} width={w} fill={INK} />
+      {stacked(r, "front", logo, INK).node}
+      <QrZone items={r.front} codes={r.codes} font={font} captionFill={GREY_ON_WHITE} max={11} zone={corner.zone} />
+    </>
+  );
+}
+
+/** Vertical portrait: the portrait over the top of a standing card, the
+ *  name under it, the logo at the foot (ch. 91's portrait card, standing). */
+function verticalPortraitFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const r = read(v, ctx);
+  const { f, rtl, font, k } = r;
+  const photo = str(v, "photo");
+  const box = { x: 0, y: 0, w: f.W, h: f.b + f.h * 0.6 };
+  const start = rtl ? f.right : f.left;
+  const nameY = box.h + 7.5;
+  const lw = 24;
+  return (
+    <>
+      {fill(f, INK)}
+      {v.stroke !== false ? <Stroke x={f.b + f.w * 0.08} top={0} bottom={box.h * 0.55} width={f.w * 0.1} lean={0.55} /> : null}
+      {photo
+        ? <Photo href={photo} box={box} zoom={num(v, "photoZoom", 100) / 100} px={num(v, "photoX", 0)} py={num(v, "photoY", 0)} soft={v.soft !== false} uid={`${r.uid}-p`} />
+        : <PhotoPlaceholder box={{ x: f.b + f.w * 0.2, y: f.b + 4, w: f.w * 0.6, h: box.h - f.b - 4 }} label={word(r.lang, "addPhoto")} font={font} />}
+      <defs><linearGradient id={`${r.uid}-fadeup`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={INK} stopOpacity="0" /><stop offset="1" stopColor={INK} /></linearGradient></defs>
+      <rect x={0} y={box.h - 10} width={f.W} height={10} fill={`url(#${r.uid}-fadeup)`} />
+      {r.name ? <Line x={start} y={nameY} rtl={rtl} font={font} size={10.5 * PT * k} weight={600} fill={WHITE} max={f.inner}>{r.name}</Line> : null}
+      {r.title ? <Line x={start} y={nameY + 4 * k} rtl={rtl} font={font} size={7 * PT * k} weight={300} fill={LIGHT_ON_INK} max={f.inner}>{r.title}</Line> : null}
+      <Logo x={rtl ? f.left : f.right - lw} y={f.bottom - logoHeight(lw)} width={lw} fill={WHITE} />
+    </>
+  );
+}
+
 /* ── the style table ───────────────────────────────────────────────────── */
 
 export function drawFront(v: TemplateValues, ctx: DrawContext): ReactNode {
@@ -582,6 +874,18 @@ export function drawFront(v: TemplateValues, ctx: DrawContext): ReactNode {
     case "sales": return salesFront(v, ctx);
     case "dealer": return dealerFront(v, ctx);
     case "bilingual": return infoSide(v, ctx, { side: "front", dark: true, qrs: r.front, lang: "en", name: str(v, "name"), title: str(v, "title"), rows: printedRows(v) });
+    case "vertical-portrait": return verticalPortraitFront(v, ctx);
+    case "silver": return logoFace(v, ctx, true);
+    case "name-first": return nameFirstFront(v, ctx);
+    case "dots-field": return dotsFieldFront(v, ctx, true);
+    case "dots-field-white": return dotsFieldFront(v, ctx, false);
+    case "dots-wave": return dotsWaveFront(v, ctx);
+    case "dots-vertical": return dotsVerticalFront(v, ctx);
+    case "split": return splitFront(v, ctx);
+    case "band": return bandFront(v, ctx);
+    case "rules": return logoFace(v, ctx, false, 34);
+    case "centered-white": return logoFace(v, ctx, false);
+    case "light-white": return lightWhiteFront(v, ctx);
     default: return logoFace(v, ctx, true);
   }
 }
@@ -602,6 +906,16 @@ export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
       const rows2 = printedRows({ ...v, rows: relangRows(rowsOf(v).map((x) => ({ ...x })), lang2) }) as PrintRow[];
       return infoSide(v, ctx, { side: "back", dark: false, qrs: r.back, lang: lang2, name: str(v, "name2") || str(v, "name"), title: str(v, "title2") || str(v, "title"), rows: rows2 });
     }
+    case "vertical-portrait": return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back });
+    case "silver": return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back, silverName: true });
+    case "name-first": return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back, name: "", title: "", rowsMiddle: true });
+    case "dots-field": return dotsFieldBack(v, ctx, true);
+    case "dots-field-white": return dotsFieldBack(v, ctx, false);
+    case "dots-wave": case "dots-vertical": return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back });
+    case "split": case "band": return logoFace(v, ctx, true, 40, "back");
+    case "rules": return rulesBack(v, ctx);
+    case "centered-white": return centeredBack(v, ctx, false);
+    case "light-white": return infoSide(v, ctx, { side: "back", dark: false, qrs: r.back });
     default: return infoSide(v, ctx, { side: "back", dark: true, qrs: r.back });
   }
 }
@@ -609,7 +923,13 @@ export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
 /** The words keys of the print notes for a style (studio "How it is printed"). */
 export function specKeysFor(v: TemplateValues): string[] {
   switch (styleOf(v)) {
-    case "team-white": case "vertical-white": case "grid": return ["spec.whiteFront", "spec.blackPrint", "spec.whiteBoard", "spec.edges", "spec.never"];
+    case "team-white": case "vertical-white": case "grid": case "rules": case "centered-white": case "light-white": case "name-first":
+      return ["spec.whiteFront", "spec.blackPrint", "spec.whiteBoard", "spec.edges", "spec.never"];
+    case "dots-field": case "dots-wave": case "dots-vertical": return ["spec.foilFront", "spec.dots", "spec.whitePrint", "spec.blackBoard", "spec.edges"];
+    case "dots-field-white": return ["spec.whiteFront", "spec.dotsWhite", "spec.blackPrint", "spec.whiteBoard", "spec.edges"];
+    case "split": case "band": return ["spec.twoTone", "spec.whiteBoard", "spec.edges"];
+    case "silver": return ["spec.foilFront", "spec.silverName", "spec.whitePrint", "spec.blackBoard", "spec.edges"];
+    case "vertical-portrait": return ["spec.photoFront", "spec.whitePrint", "spec.photoBoard", "spec.edges"];
     case "dealer": return ["spec.agentCard", "spec.agentBadge", "spec.blackPrint", "spec.whiteBoard"];
     case "bilingual": return ["spec.bilingual", "spec.whiteBoard", "spec.edges"];
     case "classic": case "management": return ["spec.photoFront", "spec.photoBack", "spec.photoBoard", "spec.edges"];

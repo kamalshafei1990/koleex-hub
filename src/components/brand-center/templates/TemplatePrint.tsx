@@ -51,7 +51,7 @@ export default function TemplatePrint() {
         .kx-brand-page + .kx-brand-page { break-before: page; page-break-before: always; }
         .kx-brand-page svg { display: block; }
       `}</style>
-      {def.pages.map((p) => (
+      {def.pages.filter((p) => !def.pagesFor || def.pagesFor(job.values).includes(p.id)).map((p) => (
         <div key={p.id} className="kx-brand-page">
           <TemplateSheet def={def} values={job.values} pageId={p.id} qrs={qrs} mode="print"
             slug={`${job.slug} · ${t(`tpl.page.${p.id}`)}`} />

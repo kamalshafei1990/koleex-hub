@@ -100,7 +100,7 @@ export function printedRows(v: TemplateValues, key = "rows"): Array<{ label: str
 
 /* ── QR codes ──────────────────────────────────────────────────────────── */
 
-export const QR_KINDS = ["contact", "whatsapp", "web", "link", "wechat", "image"] as const;
+export const QR_KINDS = ["contact", "whatsapp", "web", "link", "staff", "wechat", "image"] as const;
 export type QrKind = (typeof QR_KINDS)[number];
 export interface QrItem { id: string; kind: QrKind; side: "front" | "back"; caption: string; link: string; image: string; logo: boolean }
 
@@ -123,6 +123,7 @@ export const QR_CAPTIONS: Record<QrKind, Record<Lang, string>> = {
   whatsapp: { en: "WhatsApp", zh: "WhatsApp", ar: "واتساب" },
   web: { en: "Website", zh: "网站", ar: "الموقع" },
   link: { en: "Scan me", zh: "扫一扫", ar: "امسح الكود" },
+  staff: { en: "Staff number", zh: "员工编号", ar: "رقم الموظف" },
   wechat: { en: "WeChat", zh: "微信", ar: "ويتشات" },
   image: { en: "", zh: "", ar: "" },
 };

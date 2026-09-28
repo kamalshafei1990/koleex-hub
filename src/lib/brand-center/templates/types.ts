@@ -91,6 +91,8 @@ export interface TemplateDef {
   relang?: (v: TemplateValues, lang: string) => TemplateValues;
   /** The fill after picking another style (its own defaults, e.g. typeface). */
   restyle?: (v: TemplateValues, style: string) => TemplateValues;
+  /** The pages this fill shows and prints (e.g. no back side), by id. */
+  pagesFor?: (v: TemplateValues) => string[];
   /** The slots a chosen employee fills (name, title, photo …). */
   fromPerson?: (p: BcPerson, v: TemplateValues) => TemplateValues;
   /** What is still missing before it can print (a words key), or null. */
