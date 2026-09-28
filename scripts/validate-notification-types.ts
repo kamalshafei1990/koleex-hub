@@ -589,8 +589,11 @@ check("the Gate publishes the per-app numbers with the count it already reads",
   /publishInboxUnread\(accountId,\s*unreadInbox,\s*inbox\.data\?\.byApp/.test(gateSrc));
 const homeSrc = fileSrc("src/app/page.tsx");
 const own = homeSrc.match(/const OWN_TILE_NUMBER = new Set\(\[([^\]]*)\]\)/)?.[1].replace(/\s/g, "") ?? "";
+/* The tile's id may be spelled `app.id` or `id` (the Home rebuild, f2792ff6c,
+   moved it into unreadFor(id)); the backreference still demands the SAME
+   id on both sides of the ternary. */
 check("Discuss, To-do, Projects and Planning keep their own numbers — and only they",
-  own === '"discuss","todo","projects","planning"' && /OWN_TILE_NUMBER\.has\(app\.id\)\s*\?\s*0\s*:\s*unreadByApp\[app\.id\]/.test(homeSrc), own || "OWN_TILE_NUMBER not found");
+  own === '"discuss","todo","projects","planning"' && /OWN_TILE_NUMBER\.has\(([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?)\)\s*\?\s*0\s*:\s*unreadByApp\[\1\]/.test(homeSrc), own || "OWN_TILE_NUMBER not found");
 /* Home reads them again only when the count moved without them. */
 const homeReads = [...homeSrc.matchAll(/fetchUnreadByApp\(\)/g)].length;
 check("Home never asks for them on its own load — only when the count moved without them",
