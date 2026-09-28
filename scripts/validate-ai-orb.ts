@@ -299,9 +299,24 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /<OrbPicker accountId=\{account\.id\}/.test(tab) && /<ChosenOrb style=\{style\}/.test(tab) &&
     /setOrbStyle\(style\);\s*void updateAccountPreferences\(accountId, \{ orb: style \}\)/.test(tab) &&
     /role="radiogroup"/.test(tab) && /aria-checked=\{on\}/.test(tab));
-  const disp = readFileSync(join(srcRoot, "lib/display-prefs.tsx"), "utf8");
+  /* ORDER inside the account effect, never adjacency. Another account sync
+     may sit between the two (the Home layout's does since 99de75883) and the
+     rule still holds: the orb sync runs before the display guard, in the same
+     effect. Comments go first and each statement must start its own line, so
+     a commented-out call does not count. The effect is found by its own code
+     (`if (!account) return;` … `}, [account]);`) and picked by the guard it
+     carries; a missing marker fails the check instead of reading on. */
+  const disp = stripComments(readFileSync(join(srcRoot, "lib/display-prefs.tsx"), "utf8"));
+  const accountEffects = [...disp.matchAll(/useEffect\(\(\) => \{\s*if \(!account\) return;[\s\S]*?\}, \[account\]\);/g)].map((m) => m[0]);
+  const DISPLAY_GUARD = /^\s*if \(Date\.now\(\) < localWriteUntil\) return;/m;
+  const ORB_SYNC = /^\s*syncOrbStyleFromAccount\(account\.preferences\?\.orb\);/m;
+  const accountEffect = accountEffects.find((e) => DISPLAY_GUARD.test(e)) ?? "";
+  const orbSyncAt = accountEffect.search(ORB_SYNC), guardAt = accountEffect.search(DISPLAY_GUARD);
   check("settings: a choice made on another device arrives with the account, ahead of the display guard",
-    /syncOrbStyleFromAccount\(account\.preferences\?\.orb\);\s*\/\*[\s\S]*?\*\/\s*if \(Date\.now\(\) < localWriteUntil\) return;/.test(disp));
+    orbSyncAt >= 0 && guardAt > orbSyncAt,
+    !accountEffects.length ? "no `useEffect(() => { if (!account) return; … }, [account]);` in display-prefs.tsx"
+      : !accountEffect ? "no account effect carries `if (Date.now() < localWriteUntil) return;`"
+      : `in the account effect: syncOrbStyleFromAccount at ${orbSyncAt}, display guard at ${guardAt} (-1 = not on a line of its own)`);
 
   const dotted = readFileSync(join(srcRoot, "components/ai-orb/DottedOrb.tsx"), "utf8");
   check("dots: it rests when it cannot be seen, and holds still when the user asked for stillness",
