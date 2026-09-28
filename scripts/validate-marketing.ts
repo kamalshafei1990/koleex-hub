@@ -58,6 +58,16 @@
      · /legal/<doc>[/<lang>] is public — outside the Hub's sign-in and chrome
        — static, and kept out of search; every page in en / zh / ar, the
        three languages saying the same number of things.
+   The weekly plan (29/09/2026) adds:
+     · Koleex AI drafts it from the accounts' numbers only; its answer is
+       cleaned (known kinds, connected platforms, sane targets) and every
+       expected-views figure is the server's, from our own posts;
+     · a draft is approved by an approver; every change carries the plan's
+       version; an edit never ticks a hand task; a week that ends is closed
+       with its tally, task by task;
+     · the approvers are asked once per week's draft (Social Marketing
+       only), reminded while it waits, and the request clears once it is
+       approved or the week ends.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -65,6 +75,7 @@ import { join } from "node:path";
 import { stripComments } from "./lib/strip-comments";
 import { COMMENTS_T } from "../src/lib/marketing/comments-i18n";
 import { INSIGHTS_T } from "../src/lib/marketing/insights-i18n";
+import { PLAN_T } from "../src/lib/marketing/plan-i18n";
 import { LEGAL_DOCS, LEGAL_SLUGS } from "../src/lib/legal/documents";
 
 let pass = 0;
@@ -575,9 +586,11 @@ check("«Needs a reply» is ONE rule — the server's count, the Comments tab an
   /needsReply\(g\.first, g\.replies\)/.test(cmt) && /needsReply\(\{ \.\.\.s\.first, handled_at: s\.handled_at \}, s\.replies\)/.test(code("src/components/marketing/CommentThread.tsx")) &&
   /needs_reply: needsReply\(first, replies\)/.test(code(FEED_SCREEN)));
 const cmReads = cmt.split(/(?=\.from\("marketing_(?:comments|remote_posts)"\)\s*\.select)/).slice(1);
-check(`comment reads are bounded (${cmReads.length} reads; 3,000 in the window, 300 older parents)`,
-  cmReads.length >= 5 && cmReads.every((r) => /\.(limit|maybeSingle|single)\(/.test(r.slice(0, 700))) &&
-  /const WINDOW_ROWS = 3000;/.test(cmt) && /const PARENTS_MAX = 300;/.test(cmt));
+/* The window's read is paged (the API answers 1000 rows at most, silently)
+   with WINDOW_ROWS as its ceiling; every other read carries its limit. */
+check(`comment reads are bounded (${cmReads.length} reads; 3,000 in the window — paged —, 300 older parents)`,
+  cmReads.length >= 5 && cmReads.every((r) => /\.(limit|maybeSingle|single)\(|"marketing comments",\s*WINDOW_ROWS,\s*\)/.test(r.slice(0, 700))) &&
+  /const WINDOW_ROWS = 3000;/.test(cmt) && /const PARENTS_MAX = 300;/.test(cmt) && !/\.limit\(WINDOW_ROWS\)/.test(cmt));
 const syncC = code(SYNC);
 const recent = syncC.slice(syncC.indexOf("export async function refreshRecentComments"));
 check("comments of the last 14 days' posts refresh every 15 minutes, the account CLAIMED before Meta is asked",
@@ -737,6 +750,101 @@ check("the screen: a card opens a large chart with the period before; a copy kep
 const mhSrc = code("src/components/marketing/MarketingHeader.tsx");
 check("the Insights tab follows Feed; Comments stays last",
   /\{ key: SPACE_HOME\[space\][^\n]*\n\s*\{ key: SPACE_INSIGHTS\[space\]/.test(mhSrc) && /\{ key: SPACE_COMMENTS\[space\][^\n]*\n\s*\]\}/.test(mhSrc));
+
+console.log("\n13. The weekly plan");
+const planMigSql = readFileSync("supabase/migrations/20260929_marketing_week_plans.sql", "utf8").replace(/--[^\n]*/g, "");
+check("one additive table, one plan per space per week, server-only (RLS on, no policy)",
+  /CREATE TABLE IF NOT EXISTS marketing_week_plans/.test(planMigSql) && /UNIQUE \(tenant_id, space, week_start\)/.test(planMigSql) &&
+  /CHECK \(status IN \('draft', 'active', 'closed'\)\)/.test(planMigSql) && /version\s+integer NOT NULL DEFAULT 1/.test(planMigSql) &&
+  /ALTER TABLE marketing_week_plans ENABLE ROW LEVEL SECURITY;/.test(planMigSql) && !/CREATE POLICY|\bDROP\b|\bDELETE\s+FROM\b|\bTRUNCATE\b/i.test(planMigSql));
+const wpLib = code("src/lib/marketing/week-plan.ts");
+check("the week runs Monday to Sunday in Shanghai (a fixed UTC+8)",
+  /const SHANGHAI_MS = 8 \* 3_600_000;/.test(wpLib) && /const dow = \(local\.getUTCDay\(\) \+ 6\) % 7;/.test(wpLib) &&
+  /const from = Date\.parse\(`\$\{weekStart\}T00:00:00Z`\) - SHANGHAI_MS;/.test(wpLib));
+check("Koleex AI's tasks are cleaned: known kinds, connected platforms only, targets 1–5, one reply task, two hand tasks, seven in all",
+  /export const PLAN_LIMITS = \{ tasks: 7, manual: 2, publishTarget: 5, text: 220 \} as const;/.test(wpLib) &&
+  /if \(!platforms\.includes\(platform\)\) continue;/.test(wpLib) && /if \(reply\+\+\) continue;/.test(wpLib) &&
+  /if \(!title \|\| manual >= PLAN_LIMITS\.manual\) continue;/.test(wpLib) && /if \(out\.length >= PLAN_LIMITS\.tasks/.test(wpLib) &&
+  /Math\.min\(PLAN_LIMITS\.publishTarget, Math\.max\(1, Number\.isFinite\(n\) \? n : 1\)\)/.test(wpLib));
+check("progress: a reply task counts the week's customer threads with the Comments tab's own rule",
+  /const answered = theirs\.filter\(\(t\) => !needsReply\(t\.first, t\.replies\)\)\.length;/.test(wpLib) && /export const planThreads = <R extends ThreadRow>\(rows: R\[\]\) => groupThreads\(rows\);/.test(wpLib));
+const WPS = "src/lib/server/marketing/week-plan.ts";
+const wps = code(WPS);
+const ctxFn = wps.slice(wps.indexOf("async function planContext("), wps.indexOf("class TryLater"));
+check("Koleex AI gets numbers only — no comment, post text or person's name reaches it",
+  ctxFn.length > 200 && !/message|excerpt|author|permalink|\.name\b|handle/.test(ctxFn) && /topPost: a\.top\[0\] \? \{ views: a\.top\[0\]\.views, format: a\.top\[0\]\.format \} : null,/.test(ctxFn));
+const draftFn = wps.slice(wps.indexOf("async function draftTasks("), wps.indexOf("export type DraftOutcome"));
+check("every expected-views figure is the server's (from our own posts), and a hand task is never drafted as done",
+  /let tasks = ai \? cleanTasks\(ai\.tasks, platforms\) : \[\];/.test(draftFn) &&
+  /tasks = withEstimates\(tasks\.map\(\(t\) => \(\{ \.\.\.t, done_manual: false, done_by: null, done_at: null \}\)\), stats\);/.test(draftFn) &&
+  /estimate: null, done_manual: false, done_by: null, done_at: null \}\);/.test(wpLib));
+check("room for three languages: the plan asks for more tokens; each provider keeps its own default otherwise",
+  /\], \{ maxTokens: PLAN_MAX_TOKENS \}\)/.test(wps) && /const PLAN_MAX_TOKENS = 1400;/.test(wps) &&
+  /max_tokens: opts\.maxTokens \?\? 600/.test(code("src/lib/server/ai-provider.ts")) && /max_tokens: opts\.maxTokens \?\? 120,/.test(code("src/lib/server/ai-provider.ts")) &&
+  /maxOutputTokens: opts\.maxTokens \?\? 2048,/.test(code("src/lib/server/ai-provider.ts")) &&
+  /if \(provider === "deepseek"\) return await deepseekChat\(messages, opts\);/.test(code("src/lib/server/ai-provider.ts")));
+check("the cron's draft never waits past its run: a slow or failed Koleex AI is asked again next run; the plain plan only after 3 hours",
+  /const r = await Promise\.race\(\[ask, late\]\);/.test(wps) && /if \(r === "late"\) throw new TryLater\(\);/.test(wps) &&
+  /if \(!byAi && configured && !opts\.fallback\) throw new TryLater\(\);/.test(draftFn) && /export const PLAN_RETRY_H = 3;/.test(wps) &&
+  /const fallback = now >= draftFrom \+ PLAN_RETRY_H \* 3_600_000;/.test(wps) && /if \(aiWithinMs < MIN_AI_MS\) break;/.test(wps));
+const writeFn = wps.slice(wps.indexOf("async function write("), wps.indexOf("async function current("));
+check("every change carries the plan's version (a stale one is refused, never overwritten)",
+  /\.eq\("id", plan\.id\)\.eq\("version", plan\.version\)\.select\(COLUMNS\);/.test(writeFn) && /data\?\.length \? \{ plan: await view\(data\[0\] as PlanRow\) \} : \{ error: "conflict" \}/.test(writeFn) &&
+  /if \(plan\.version !== version\) return \{ error: "conflict" \};/.test(wps));
+const editFn = wps.slice(wps.indexOf("export async function editPlan("), wps.indexOf("export async function approvePlan("));
+check("an edit never ticks a hand task: the tick stored stays; an approved plan is changed by an approver only",
+  /return \{ \.\.\.t, done_manual: !!mine\?\.done_manual, done_by: mine\?\.done_by \?\? null, done_at: mine\?\.done_at \?\? null \};/.test(editFn) &&
+  /if \(plan\.status === "closed" \|\| \(plan\.status === "active" && !opts\.approver\)\) return \{ error: "locked" \};/.test(editFn) &&
+  /tasks: withEstimates\(cleaned, await postStats\(accounts, Date\.now\(\)\)\)/.test(editFn));
+const closeFn = wps.slice(wps.indexOf("async function closePlan("), wps.indexOf("export async function weekPlansStep("));
+check("a week that ends is closed with its tally task by task (version-checked); the approvers' request clears",
+  /result: \{ done: v\.done, total: v\.total, tasks: v\.progress \}/.test(closeFn) && /\.eq\("id", plan\.id\)\.eq\("version", plan\.version\)/.test(closeFn) &&
+  /if \(data\?\.length\) await settlePlan\(plan\.id\);/.test(closeFn) && /\.neq\("status", "closed"\)\.lt\("week_start", week\)/.test(wps));
+check("only Social Marketing plans for now: CEO Brand has no screens to open",
+  /export const PLAN_SPACES: readonly MarketingSpace\[\] = \["company"\];/.test(wps) && /\.in\("space", \[\.\.\.PLAN_SPACES\]\)/.test(wps));
+const planRoute = code("src/app/api/marketing/plan/route.ts");
+const planGet = planRoute.slice(planRoute.indexOf("export async function GET"), planRoute.indexOf("export async function POST"));
+const planPost = planRoute.slice(planRoute.indexOf("export async function POST"));
+check("the route: 'view' to read (never cached), 'edit' before any change, approving is an approver's",
+  before(planGet, 'requireModuleAction(auth, SPACE_MODULE[space], "view")', "loadPlan(") && /"Cache-Control": "private, no-store"/.test(planGet) &&
+  /requireAuth\(req\)/.test(planPost) && before(planPost, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "draftPlan(") &&
+  before(planPost, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "tickTask(") &&
+  before(planPost, "if (!(await canApprovePosts(auth, space)))", "approvePlan(") &&
+  /return answer\(await editPlan\(auth\.tenant_id, space, id, version, body\.tasks, \{ approver: approve \}\)\);/.test(planPost));
+check("only this week's plan is drafted by hand; the approvers are asked after the answer, the request clears on approval",
+  /if \(week !== planWeekStart\(\)\) return NextResponse\.json/.test(planPost) &&
+  /if \(r\.created\) after\(\(\) => notifyPlanReady\(auth\.tenant_id, r\.plan\.id, auth\.account_id\)\);/.test(planPost) &&
+  /if \(!\("error" in r\)\) after\(\(\) => settlePlan\(r\.plan\.id\)\);/.test(planPost));
+const ntPlan = nt.slice(nt.indexOf("export const notifyPlanReady"), nt.indexOf("export const settlePlan"));
+check("the request: a draft of Social Marketing's space, to exactly the approvers, one per plan; cleared by plan_id",
+  /if \(!plan \|\| plan\.space !== "company" \|\| plan\.status !== "draft"\) return;/.test(ntPlan) && /recipients: await marketingApproverIds\(tenantId\),/.test(ntPlan) &&
+  /supersede: \{ type: "marketing_plan_approval_request", plan_id: plan\.id \}/.test(ntPlan) &&
+  /await clearUnreadByMeta\(\{ type: "marketing_plan_approval_request", plan_id: planId \}\);/.test(nt));
+check("registered under Approvals (it waits on the reader); reminded while the plan is a draft",
+  /marketing_plan_approval_request: \{ app: "social-marketing", activity: "approvals", severity: "action", lifecycle: \{ kind: "clear", key: "plan_id",/.test(reg9) &&
+  /marketing_plan_approval_request: \{\s*table: "marketing_week_plans", cols: "id, status",\s*id: \(m\) => str\(m\.plan_id\),\s*waiting: \(e\) => e\.status === "draft",/.test(rem9));
+check("the cron's seventh step: past weeks closed, this week's draft with Koleex AI's time bounded by the run",
+  /const r = await weekPlansStep\(\{ tenantId: opts\.tenantId, aiBudgetMs: \(\) => left\(\) - 8_000 \}\);/.test(cronSrc) &&
+  /if \(now < draftFrom\) return \{ closed, drafted \};/.test(wps) && /export const PLAN_DRAFT_HOUR = 9;/.test(wps));
+const planScreen = code("src/components/marketing/SocialPlan.tsx");
+const planCache = code("src/lib/marketing/plan-cache.ts");
+const planT = PLAN_T as Record<string, Record<string, string | undefined>>;
+const planMissing = Object.entries(planT).filter(([, v]) => !["en", "zh", "ar"].every((l) => (v[l] ?? "").trim())).map(([k]) => k);
+check(`the Plan screen: behind AuthGate, never sideways, session copy guarded, Koleex AI's buttons glow, speaks en/zh/ar (${Object.keys(planT).length} phrases)`,
+  /<AuthGate>[\s\S]*<SocialPlan space="company" \/>[\s\S]*<\/AuthGate>/.test(code("src/app/social-marketing/plan/page.tsx")) &&
+  !/overflow-x-(auto|scroll)/.test(planScreen) && planMissing.length === 0 &&
+  /try \{\s*const raw = sessionStorage\.getItem\(key\);/.test(planCache) && /try \{ sessionStorage\.setItem\(key, JSON\.stringify\(data\)\); \} catch/.test(planCache) &&
+  (planScreen.match(/className="kx-ai-glow"/g) ?? []).length === 3 && !/kx-ai-glow[^"]*truncate/.test(planScreen));
+check("a stale version answers with the plan as it is now, and the screen shows it",
+  /const plan = code === "conflict" && id \? await planById\(auth\.tenant_id, space, id\) : undefined;/.test(planPost) &&
+  /if \(res\.status === 409 && body\.code === "conflict"\) \{\s*if \(body\.plan !== undefined\) show\(body\.plan\);/.test(planScreen));
+const card = code("src/components/marketing/PlanFeedCard.tsx");
+check("the Feed's plan card: one fixed-height line from its first frame, asked after the Feed's own requests, without the Plan tab's module",
+  /className="flex h-\[52px\] min-w-0 items-center/.test(card) && /void whenNetworkQuiet\(\)\.then\(/.test(card) &&
+  !/components\/marketing\/SocialPlan|plan-i18n/.test(card) && /<PlanFeedCard space=\{space\} \/>/.test(code(FEED_SCREEN)));
+dictionary("src/components/marketing/PlanFeedCard.tsx", 6);
+check("the Plan tab follows Insights",
+  /\{ key: SPACE_INSIGHTS\[space\][^\n]*\n\s*\{ key: SPACE_PLAN\[space\]/.test(mhSrc) && /company: "\/social-marketing\/plan",/.test(code("src/lib/marketing/spaces.ts")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

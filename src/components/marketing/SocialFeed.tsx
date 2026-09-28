@@ -21,6 +21,9 @@
 
    Pictures: Meta's picture links expire after some days. A picture that
    fails asks for its post's pictures again, once; then a placeholder.
+
+   Above the columns: the week's plan in one line (PlanFeedCard, fixed
+   height from its first frame).
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
@@ -51,6 +54,7 @@ import { compact, dmyHm } from "@/lib/marketing/format";
 import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import type { FeedColumn, FeedComment, FeedPost, FeedResponse, PostDetail } from "@/lib/marketing/feed-types";
 import CommentThread, { type ThreadState } from "@/components/marketing/CommentThread";
+import PlanFeedCard from "@/components/marketing/PlanFeedCard";
 import { groupThreads, needsReply } from "@/lib/marketing/comment-types";
 
 const T: Translations = {
@@ -317,6 +321,8 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
             {loadError && (
               <p role="status" className="rounded-xl border border-[#F59E0B]/35 bg-[#F59E0B]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">{t("refreshError")}</p>
             )}
+
+            <PlanFeedCard space={space} />
 
             <div role="group" aria-label={t("chips.label")} className={`flex flex-wrap gap-2 ${layout.chips}`}>
               {columns.map((c) => {

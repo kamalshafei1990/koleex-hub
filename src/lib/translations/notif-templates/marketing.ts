@@ -1,7 +1,8 @@
 import type { Translations } from "@/lib/i18n";
 
 /* Social Marketing — lib/server/marketing/notify.ts: a post sent for
-   approval, the decision on it, and what publishing it came to. {accounts}
+   approval, the decision on it, what publishing it came to, and the
+   weekly plan waiting on an approver. {accounts}
    is "Facebook · Instagram" (platform names read the same in every
    language); {when} is Shanghai time, D/M/Y, like every marketing screen. */
 export const marketingTpl: Translations = {
@@ -28,4 +29,11 @@ export const marketingTpl: Translations = {
 
   "marketing_post_published.s": { en: "Your post is live", zh: "你的帖子已发布", ar: "نُشر منشورك" },
   "marketing_post_published.b": { en: "Published on {accounts}.", zh: "已发布到 {accounts}。", ar: "نُشر على {accounts}." },
+
+  "marketing_plan_approval_request.s": { en: "This week's social media plan is ready to approve", zh: "本周社交媒体计划待审批", ar: "خطة السوشيال ميديا لهذا الأسبوع جاهزة لموافقتك" },
+  "marketing_plan_approval_request.b": {
+    en: "Koleex AI drafted it from the accounts' numbers — review it, edit it if needed, and approve it.",
+    zh: "Koleex AI 根据各账号的数据起草了这份计划——请查看，必要时修改，然后批准。",
+    ar: "أعدّها Koleex AI من أرقام الحسابات — راجعها وعدّلها لو لزم ثم وافق عليها.",
+  },
 };

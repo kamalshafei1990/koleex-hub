@@ -96,6 +96,12 @@ const CHECKS: Record<string, Check> = {
     id: (m) => str(m.post_id),
     waiting: (e) => e.status === "in_review",
   },
+  /* A weekly plan waits while it is a draft (closed at its week's end). */
+  marketing_plan_approval_request: {
+    table: "marketing_week_plans", cols: "id, status",
+    id: (m) => str(m.plan_id),
+    waiting: (e) => e.status === "draft",
+  },
 };
 export const REMINDED_TYPES = Object.keys(CHECKS);
 

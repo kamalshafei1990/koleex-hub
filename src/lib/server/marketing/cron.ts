@@ -21,7 +21,12 @@ import "server-only";
         every 6 hours — each account claimed first (claimInsights);
      6. comments on OLDER posts (29/09/2026): every post's comment count
         once a day, and the posts whose count grew are read — every run while
-        a backlog remains — each account claimed first (claimCommentScan).
+        a backlog remains — each account claimed first (claimCommentScan);
+     7. the weekly plan (29/09/2026): plans of weeks that have ended are
+        closed with their tally, and from Monday 09:00 (Shanghai) Koleex AI
+        drafts the week's plan and the approvers are asked — when Koleex AI
+        cannot answer inside the run's time, the next run tries again
+        (lib/server/marketing/week-plan).
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
@@ -30,16 +35,17 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { publishPost } from "@/lib/server/marketing/publish";
 import { COMMENTS_REFRESH_MS, COMMENT_SCAN_MS, refreshRecentComments, scanOlderComments, syncAccount } from "@/lib/server/marketing/sync";
 import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insights";
+import { weekPlansStep } from "@/lib/server/marketing/week-plan";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -148,6 +154,15 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       const r = await scanOlderComments(a.tenant_id, a.id, { budgetMs: Math.min(20_000, left() - 5_000) });
       if (r.ok && !r.skipped) out.olderComments++;
     }
+  }
+
+  /* 7. The weekly plan: Koleex AI gets the run's time left but 8 seconds
+        (the rest of the draft); a draft it cannot answer in time waits for
+        the next run. Closing a week never waits. */
+  if (left() > 8_000) {
+    const r = await weekPlansStep({ tenantId: opts.tenantId, aiBudgetMs: () => left() - 8_000 });
+    out.plansClosed = r.closed;
+    out.plansDrafted = r.drafted;
   }
   return out;
 }

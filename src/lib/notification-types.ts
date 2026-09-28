@@ -160,6 +160,8 @@ export const NOTIFICATION_TYPES = {
   marketing_post_decided:     { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "supersede", key: "post_id" } },
   marketing_publish_failed:   { app: "social-marketing", activity: "marketing_activity", severity: "warning", lifecycle: { kind: "clear", key: "post_id", when: "the accounts that failed are sent again (a newer failure replaces it first)" } },
   marketing_post_published:   { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
+  /* The weekly plan (owner, 29/09/2026): Koleex AI's draft waits on an approver. */
+  marketing_plan_approval_request: { app: "social-marketing", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "plan_id", when: "the plan is approved, or its week ends before anyone approved it" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },

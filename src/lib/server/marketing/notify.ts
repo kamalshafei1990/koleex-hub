@@ -15,6 +15,9 @@ import "server-only";
        approver who let it go.
      · Published with nobody watching (a scheduled post at its time, a video
        Instagram took longer to prepare) → the author hears it went out.
+     · The weekly plan (29/09/2026): Koleex AI's draft for the week → every
+       approver is asked to review and approve it; the request stops asking
+       once it is approved or its week ends (settlePlan).
 
    A person never hears of their own act (notifyLite drops the sender), and
    a request stops asking once nobody can answer it any more: approved, sent
@@ -260,4 +263,30 @@ export const settleDeleted = quiet("settleDeleted", async (postId: string): Prom
  *  the news (a new one replaces it; a success needs none). */
 export const settleFailure = quiet("settleFailure", async (postId: string): Promise<void> => {
   await clearUnreadByMeta({ type: "marketing_publish_failed", post_id: postId });
+});
+
+/** A week's plan was drafted: every approver is asked to review it (the
+ *  person who drafted it by hand hears nothing of their own act). Only a
+ *  draft of Social Marketing's space asks. */
+export const notifyPlanReady = quiet("notifyPlanReady", async (tenantId: string, planId: string, senderId: string | null): Promise<void> => {
+  const { data, error } = await supabaseServer.from("marketing_week_plans").select("id, space, status").eq("tenant_id", tenantId).eq("id", planId).maybeSingle();
+  if (error) throw new Error(`marketing week plans: ${error.message}`);
+  const plan = data as { id: string; space: string; status: string } | null;
+  if (!plan || plan.space !== "company" || plan.status !== "draft") return;
+  await notifyLite({
+    tenantId,
+    recipients: await marketingApproverIds(tenantId),
+    senderId,
+    tpl: { k: "marketing_plan_approval_request" },
+    link: "/social-marketing/plan",
+    type: "marketing_plan_approval_request",
+    metadata: { source: "social-marketing", plan_id: plan.id },
+    tag: `mkt-plan:${plan.id}`,
+    supersede: { type: "marketing_plan_approval_request", plan_id: plan.id },
+  });
+});
+
+/** The plan was approved, or its week ended: nobody is asked any more. */
+export const settlePlan = quiet("settlePlan", async (planId: string): Promise<void> => {
+  await clearUnreadByMeta({ type: "marketing_plan_approval_request", plan_id: planId });
 });

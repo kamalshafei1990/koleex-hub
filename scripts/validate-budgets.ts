@@ -332,6 +332,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      the same night (the large chart, top posts, audience, formats — still
      inline SVG) measured 10 chunks / 559 KB: +12% → 11 / 626. */
   "social-marketing/insights": { chunks: 11, kbytes: 626 },
+  /* The weekly plan (29/09/2026): measured 9 chunks / 561 KB, +12% headroom.
+     Its cache helpers live apart (lib/marketing/plan-cache) so the Feed's
+     plan card carries them without this screen: the Feed measured 582 KB
+     with the card, inside its budget. */
+  "social-marketing/plan": { chunks: 10, kbytes: 628 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

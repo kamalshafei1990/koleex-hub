@@ -958,7 +958,7 @@ const remX = fileSrc("src/lib/server/approval-reminders.ts");
 const remTypes = [...remX.matchAll(/^  ([a-z_]+): \{\s*\n\s*table: "/gm)].map((m) => m[1]);
 check("hourly", /"path": "\/api\/cron\/approval-reminders",\s*"schedule": "20 \* \* \* \*"/.test(vercelW));
 check("the request types it covers are registered requests (severity action)",
-  remTypes.length === 7 && remTypes.every((t) => entries.has(t) && new RegExp(`^\\s+${t}:\\s*\\{[^\\n]*severity: "action"`, "m").test(regSrc)), remTypes.join(", "));
+  remTypes.length === 8 && remTypes.every((t) => entries.has(t) && new RegExp(`^\\s+${t}:\\s*\\{[^\\n]*severity: "action"`, "m").test(regSrc)), remTypes.join(", "));
 check("\"still waiting\" is asked of the request itself (its own table), never of the notification's state",
   /await supabaseServer\.from\(check\.table\)\.select\(check\.cols\)\.in\("id", ids\.slice\(i, i \+ 100\)\)/.test(remX)
   && /const waiting = rows\.filter\(\(r\) => verdict\(r\) === true\);/.test(remX)

@@ -39,6 +39,12 @@ export const SPACE_INSIGHTS: Record<MarketingSpace, string> = {
   ceo: "/ceo-brand/insights",
 };
 
+/** Each space's Plan tab (the weekly plan). */
+export const SPACE_PLAN: Record<MarketingSpace, string> = {
+  company: "/social-marketing/plan",
+  ceo: "/ceo-brand/plan",
+};
+
 /** Each space's Comments tab. */
 export const SPACE_COMMENTS: Record<MarketingSpace, string> = {
   company: "/social-marketing/comments",

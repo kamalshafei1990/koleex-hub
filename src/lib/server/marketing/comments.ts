@@ -22,6 +22,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { inChunks } from "@/lib/server/in-chunks";
 import { listAccounts, loadAccountForSync, recordSync, type AccountForSync } from "@/lib/server/marketing/accounts";
 import { MetaError } from "@/lib/server/marketing/meta";
@@ -59,17 +60,23 @@ export const isError = <T,>(r: Result<T>): r is { error: string; status: number;
 async function windowRows<R extends { external_id: string; parent_external_id: string | null }>(tenantId: string, accountIds: string[], columns: string): Promise<R[]> {
   if (!accountIds.length) return [];
   const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
-  const { data, error } = await supabaseServer
-    .from("marketing_comments")
-    .select(columns)
-    .eq("tenant_id", tenantId)
-    .in("account_id", accountIds)
-    .gte("commented_at", since)
-    .not("external_id", "like", `${PENDING}%`)
-    .order("commented_at", { ascending: false })
-    .limit(WINDOW_ROWS);
+  /* Paged: the API answers 1000 rows at most, silently; WINDOW_ROWS stays
+     the ceiling (reaching it is logged). */
+  const { data, error } = await allRows<R>(
+    supabaseServer
+      .from("marketing_comments")
+      .select(columns)
+      .eq("tenant_id", tenantId)
+      .in("account_id", accountIds)
+      .gte("commented_at", since)
+      .not("external_id", "like", `${PENDING}%`)
+      .order("commented_at", { ascending: false })
+      .order("id"),
+    "marketing comments",
+    WINDOW_ROWS,
+  );
   if (error) throw new Error(`marketing comments: ${error.message}`);
-  const rows = (data ?? []) as unknown as R[];
+  const rows = data ?? [];
   const have = new Set(rows.map((r) => r.external_id));
   const missing = [...new Set(rows.map((r) => r.parent_external_id).filter((p): p is string => !!p && !have.has(p)))].slice(0, PARENTS_MAX);
   if (missing.length) {
