@@ -135,8 +135,12 @@ export interface AppDef {
    * With this flag the module still appears in Roles & Permissions, and an
    * explicit row ALWAYS wins — so an admin can still restrict or hide it.
    * The flag only decides what happens when nothing has been said yet.
+   *
+   * `"view"` opens READING only (Brand Center, 28/09/2026: every employee
+   * reads and downloads the brand; creating, editing and deleting need a
+   * grant in Roles & Permissions like any other module).
    */
-  openAccess?: boolean;
+  openAccess?: boolean | "view";
 
   /**
    * ISO-date (YYYY-MM-DD) marking when the app was first launched.
@@ -293,9 +297,9 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
   /* Brand Center (owner, 28/09/2026): the brand as a working tool — the full
      guidelines, every branded item with its files, fill-in templates. Open
-     to every employee to read and download; only the owner edits (the edit
-     rights are checked on the server, not by this flag). */
-  { id: "brand-center",     tKey: "app.brand-center",     name: "Brand Center",      icon: BrandCenterIcon, route: "/brand-center",   active: true,  newSince: "2026-09-28", openAccess: true },
+     to every employee to read and download (openAccess "view"); creating,
+     editing and deleting are granted in Roles & Permissions. */
+  { id: "brand-center",     tKey: "app.brand-center",     name: "Brand Center",      icon: BrandCenterIcon, route: "/brand-center",   active: true,  newSince: "2026-09-28", openAccess: "view" },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: true,  newSince: "2026-06-03" },
   /* Owner 2026-08-07: Issue Reports is TOTALLY separate from the Database
      app — its own tile, its own /issues route (the old /database/issues

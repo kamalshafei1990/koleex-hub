@@ -629,7 +629,7 @@ export async function requireModuleAction(
      admin configures it — otherwise a newly shipped utility is dead for every
      role until someone grants it one by one. A hide-override was already
      honoured above, and any explicit row falls through to the checks below. */
-  if (!row && isOpenAccessModule(moduleName)) return null;
+  if (!row && isOpenAccessModule(moduleName, action)) return null;
 
   const col =
     action === "create" ? row?.can_create

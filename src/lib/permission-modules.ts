@@ -130,12 +130,22 @@ export const PERMISSION_MODULES: string[] = PERMISSION_GROUPS.flatMap((g) => g.m
 export const OPEN_ACCESS_MODULES: ReadonlySet<string> = new Set(
   APP_REGISTRY.filter((a) => a.openAccess).map((a) => a.name),
 );
+/** Open for reading only (openAccess "view"): writes still need a grant. */
+const VIEW_ONLY_OPEN = new Set(
+  APP_REGISTRY.filter((a) => a.openAccess === "view").map((a) => a.name.toLowerCase()),
+);
 
-/** True when a module is open to everyone in the absence of an explicit row.
- *  Case-insensitive, because module_name is compared with ilike server-side. */
-export function isOpenAccessModule(moduleName: string): boolean {
-  if (OPEN_ACCESS_MODULES.has(moduleName)) return true;
+/** True when a module is open to everyone for this action in the absence
+ *  of an explicit row. Case-insensitive, because module_name is compared
+ *  with ilike server-side. A view-only open module answers false for
+ *  create / edit / delete. */
+export function isOpenAccessModule(
+  moduleName: string,
+  action: "view" | "create" | "edit" | "delete" = "view",
+): boolean {
   const lower = moduleName.toLowerCase();
-  for (const m of OPEN_ACCESS_MODULES) if (m.toLowerCase() === lower) return true;
-  return false;
+  let open = OPEN_ACCESS_MODULES.has(moduleName);
+  if (!open) for (const m of OPEN_ACCESS_MODULES) if (m.toLowerCase() === lower) { open = true; break; }
+  if (!open) return false;
+  return action === "view" || !VIEW_ONLY_OPEN.has(lower);
 }

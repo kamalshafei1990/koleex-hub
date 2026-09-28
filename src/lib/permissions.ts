@@ -114,7 +114,7 @@ export function usePermissions(): PermissionState {
       /* No row yet. Deny-by-default is right for anything holding company
          records, but an openAccess tool (see AppDef.openAccess) is available
          until an admin says otherwise — an explicit row below still wins. */
-      if (!perm) return isOpenAccessModule(module);
+      if (!perm) return isOpenAccessModule(module, action);
 
       switch (action) {
         case "view": return perm.can_view;
