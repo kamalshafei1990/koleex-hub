@@ -166,18 +166,25 @@ async function paintBadge(parts) {
 }
 
 async function badgeFromPush(payload) {
+  /* WHILE THE HUB IS OPEN THE PAGE OWNS THE NUMBER. This worker only guesses
+     (a Discuss message adds one even when that chat is on screen and read as
+     it arrives), and the Mac app's dock kept the guess — 3, then 1, while the
+     bell said nothing (owner, 29/09/2026). With a Hub window open, nothing is
+     painted here: the page is asked to put its own reading back on the icon,
+     and it counts a genuinely new item itself. */
+  let wins = [];
+  try {
+    wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  } catch { /* no clients API — fall through to the closed-Hub path */ }
+  if (wins.length > 0) {
+    for (const w of wins) w.postMessage({ type: "kx-icon-badge-painted" });
+    return;
+  }
   const parts = await readBadgeParts();
   if (typeof payload.unread === "number") parts.inbox = payload.unread;
   if (payload.kind === "discuss_message") parts.discuss = (parts.discuss | 0) + 1;
   await writeBadgeParts(parts);
   await paintBadge(parts);
-  /* An open Hub knows better than this guess (a Discuss message read on
-     screen as it arrived never raised the bell): ask it to put its own
-     reading back on the icon. */
-  try {
-    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const w of wins) w.postMessage({ type: "kx-icon-badge-painted" });
-  } catch { /* no open window — the guess stands until the Hub opens */ }
 }
 
 self.addEventListener("message", (event) => {
