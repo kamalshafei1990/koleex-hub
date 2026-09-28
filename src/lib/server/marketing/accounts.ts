@@ -406,13 +406,13 @@ export async function recordSync(id: string, patch: {
   status: "connected" | "expired" | "error";
   last_error: string | null;
   audience?: number | null;
-  sync_state?: Record<string, unknown>;
   synced: boolean;
 }): Promise<void> {
+  /* Never the sync state: several steps keep marks there, so it is only
+     ever MERGED (recordSyncState) or claimed version-checked (claim*). */
   const now = new Date().toISOString();
   const row: Record<string, unknown> = { status: patch.status, last_error: patch.last_error, updated_at: now };
   if (patch.audience !== undefined) row.audience = patch.audience;
-  if (patch.sync_state) row.sync_state = patch.sync_state;
   if (patch.synced) row.last_synced_at = now;
   const { error } = await supabaseServer.from("marketing_accounts").update(row).eq("id", id);
   if (error) throw new Error(`marketing accounts: ${error.message}`);

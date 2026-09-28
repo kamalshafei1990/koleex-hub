@@ -906,6 +906,16 @@ check("the screens: «Ad» on the thread, and each account's ads status on the A
   /\{a\.connection === "api" && ads\[a\.id\] && <AdsLine state=\{ads\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   /const \[accounts, ads\] = await Promise\.all\(\[listAccounts\(auth\.tenant_id, space\), adsStates\(auth\.tenant_id, space\)\]\);/.test(code(LIST)));
 
+/* The account's sync state holds every step's marks (the Feed's history,
+   insights, the comment scans, the ads scan): until 29/09/2026 the Feed
+   wrote it WHOLE on every refresh and wiped the others'. */
+const recAt = acc.indexOf("export async function recordSync(");
+const recFn = recAt < 0 ? "" : acc.slice(recAt, acc.indexOf("\nexport ", recAt + 1));
+const stateWrites = walk("src/lib/server/marketing").flatMap((f) => [...code(f).matchAll(/\.update\(\{[^}]*\bsync_state\b[^}]*\}\)([\s\S]{0,160})/g)].map((m) => m[1]));
+check(`the sync state is never written whole: every write is version-checked (a claim or recordSyncState, ${stateWrites.length} writes); the Feed's marks are merged`,
+  recFn.length > 100 && !/sync_state/.test(recFn) && stateWrites.length >= 6 && stateWrites.every((tail) => /\.eq\("updated_at", /.test(tail)) &&
+  /await recordSyncState\(a, \{\s*history_after: historyDone \|\| restart \? null : after,/.test(code(SYNC)));
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   for (const f of failures) console.log(`  ✗ ${f}`);

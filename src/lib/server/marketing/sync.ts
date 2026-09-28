@@ -299,18 +299,17 @@ export async function syncAccount(
     const comments = await saveComments(a, commentRows);
 
     await saveDay(a, audience, first.posts.map((p) => ({ posted_at: p.posted_at, metrics: saved.get(p.external_id)?.metrics ?? p.metrics })));
-    await recordSync(a.id, {
-      status: "connected",
-      last_error: null,
-      audience,
-      sync_state: {
-        history_after: historyDone || restart ? null : after,
-        history_done: historyDone,
-        last_attempt_at: attemptOf(a),
-        last_run_posts: seen.length,
-      },
-      synced: true,
+    /* The Feed's marks are MERGED onto the account's current state: the
+       other steps keep theirs there too (insights, the comment scans, the
+       ads scan). Writing this object whole wiped them on every refresh
+       (found 29/09/2026). */
+    await recordSyncState(a, {
+      history_after: historyDone || restart ? null : after,
+      history_done: historyDone,
+      last_attempt_at: attemptOf(a),
+      last_run_posts: seen.length,
     });
+    await recordSync(a.id, { status: "connected", last_error: null, audience, synced: true });
     return { accountId, ok: true, posts: seen.length, comments, historyDone };
   } catch (e) {
     const expired = e instanceof MetaError && e.code === 190;
