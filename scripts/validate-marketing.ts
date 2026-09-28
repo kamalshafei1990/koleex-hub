@@ -870,17 +870,23 @@ check(`the ad posts are read only by the ads scan and the Comments tab — never
 const ADS = "src/lib/server/marketing/ad-comments.ts";
 const adsSrc = code(ADS);
 const metaAds = code("src/lib/server/marketing/meta-ads.ts");
-check("Facebook: the Page's ad posts with the Page key, the inline-created (dark) ones included",
-  /metaGraphUrl\(`\$\{pageId\}\/ads_posts`, params\), token\)/.test(metaAds) && /include_inline_create: "true",/.test(metaAds) &&
-  /found = await facebookAdPosts\(a\.external_id, a\.token, since\);/.test(adsSrc));
+const fbAdsFn = metaAds.slice(metaAds.indexOf("export async function facebookAdPosts("), metaAds.indexOf("export async function adAccounts("));
+check("Facebook: the Page's ad posts with the Page key, the inline-created (dark) ones included, of any age (an old post boosted now)",
+  /metaGraphUrl\(`\$\{pageId\}\/ads_posts`, params\), token\)/.test(fbAdsFn) && /include_inline_create: "true",/.test(fbAdsFn) && !/since/.test(fbAdsFn) &&
+  /found = await facebookAdPosts\(a\.external_id, a\.token\);/.test(adsSrc));
 check("Instagram: the ad account read with the person's key; the media with the Page key, only this account's",
   /await adAccounts\(a\.userToken!\)/.test(adsSrc) && /await instagramAdMediaIds\(act, a\.userToken!, since\)/.test(adsSrc) &&
   /await instagramAdMedia\(a\.external_id!, a\.token!, \[\.\.\.ids\]\)/.test(adsSrc) && /const mine = \(m: IgAdMedia \| undefined\) => !!m && m\.owner\?\.id === igId;/.test(metaAds));
 check("a boosted post is the Feed's: only the posts that exist solely as ads are kept",
   /const boosted = await organic\(a, found\.map\(\(f\) => f\.external_id\)\);/.test(adsSrc) && /await saveAds\(a, found\.filter\(\(f\) => !boosted\.has\(f\.external_id\)\)\)/.test(adsSrc));
 check("an ad is read when its count grew; its comments hang under it (ad_post_id), its count at the read is kept",
-  /\.filter\(\(r\) => \(r\.comments \?\? 0\) > \(r\.comments_seen \?\? 0\)\)/.test(adsSrc) && /ad_post_id: adPostId/.test(adsSrc) &&
-  !/remote_post_id/.test(adsSrc) && /\.update\(\{ comments_seen: r\.comments \?\? 0 \}\)/.test(adsSrc));
+  /\.filter\(\(r\) => \(r\.comments \?\? 0\) > \(r\.comments_seen \?\? 0\)\)/.test(adsSrc) && /await saveComments\(a, \{ ad_post_id: d\.ad\.id \}, comments\);/.test(adsSrc) &&
+  /from\("marketing_ad_posts"\)\.update\(\{ comments_seen: d\.count \}\)\.eq\("id", d\.ad\.id\)/.test(adsSrc));
+check("a BOOSTED post's new comments (any age — past the Feed's 12-month scan) are read as the post's own, and what Meta returned is kept",
+  /return \(typeof seen === "number" \? f\.comments > seen : f\.comments > 0\)/.test(adsSrc) &&
+  /await saveComments\(a, \{ remote_post_id: d\.post\.id \}, comments\);/.test(adsSrc) &&
+  /from\("marketing_remote_posts"\)\.update\(\{ metrics: \{ \.\.\.d\.post\.metrics, comments_seen: d\.count \} \}\)/.test(adsSrc) &&
+  /ads_listed: found\.length, ads_boosted: boosted\.size,/.test(adsSrc));
 check("without the permissions Meta is not asked (the account still waits its turn)",
   before(adsSrc, "if (!(await claimAdScan(a, AD_SCAN_MS)))", "if (!allowed) return { ok: true, skipped: \"no_permission\" };") &&
   before(adsSrc, "if (!allowed) return { ok: true, skipped: \"no_permission\" };", "facebookAdPosts(") &&

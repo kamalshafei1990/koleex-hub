@@ -6,8 +6,9 @@ import "server-only";
 
    · Facebook: the Page's ad posts, /{page}/ads_posts with
      include_inline_create (the posts made inside Ads Manager — "dark"
-     posts, never on the Page's timeline), read with the Page key. Each
-     comes with its comment count (replies included, like the Feed's scan).
+     posts, never on the Page's timeline), read with the Page key, of any
+     age (an old post boosted today). Each comes with its comment count
+     (replies included, like the Feed's scan).
    · Instagram: an ad's Instagram media is known only to its ad account:
      /me/adaccounts, then each account's ads and their creative's
      effective_instagram_media_id — read with the connecting person's key.
@@ -34,15 +35,15 @@ export interface AdPost {
 type Paging = { paging?: { cursors?: { after?: string }; next?: string } };
 const nextCursor = (b: Paging): string | null => (b.paging?.next ? b.paging.cursors?.after ?? null : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
-const unix = (iso: string) => String(Math.floor(Date.parse(iso) / 1000));
 
 /** Pages of ads read per scan: a few hundred ads at most. */
 const PAGES_MAX = 10;
 /** Media read per call (Meta's limit for ?ids=). */
 const IDS_PER_CALL = 50;
 
-/** A Page's ad posts made since `since`, with their comment counts. */
-export async function facebookAdPosts(pageId: string, token: string, since: string): Promise<AdPost[]> {
+/** A Page's ad posts, with their comment counts. No age limit: an old post
+ *  boosted today gets its comments from the ad now. */
+export async function facebookAdPosts(pageId: string, token: string): Promise<AdPost[]> {
   const out: AdPost[] = [];
   let after: string | null = null;
   for (let page = 0; page < PAGES_MAX; page++) {
@@ -50,7 +51,6 @@ export async function facebookAdPosts(pageId: string, token: string, since: stri
       fields: "id,message,created_time,permalink_url,full_picture,attachments{media_type,media,subattachments{media_type,media}},comments.filter(stream).limit(0).summary(true)",
       include_inline_create: "true",
       limit: "50",
-      since: unix(since),
     };
     if (after) params.after = after;
     const b = await metaGet<{ data?: FbPost[] } & Paging>(metaGraphUrl(`${pageId}/ads_posts`, params), token);
@@ -70,7 +70,8 @@ export async function facebookAdPosts(pageId: string, token: string, since: stri
   return out;
 }
 
-/** The ad accounts the connecting person can read ("act_…"). */
+/** The ad accounts the connecting person can read ("act_…") — only the ones
+ *  granted in the Facebook sign-in's asset step. */
 export async function adAccounts(userToken: string): Promise<string[]> {
   const b = await metaGet<{ data?: Array<{ id?: string }> }>(metaGraphUrl("me/adaccounts", { fields: "id", limit: "50" }), userToken);
   return (b.data ?? []).map((a) => a.id).filter((id): id is string => typeof id === "string" && /^act_\d+$/.test(id));

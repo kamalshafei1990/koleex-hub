@@ -11,14 +11,19 @@ import "server-only";
         connecting person's key, then read with the Page key. When that key
         is gone or lapsed, the Instagram ads already found still get fresh
         counts — only NEW ones wait for a reconnect;
-     2. a BOOSTED post is an organic post — the Feed's posts and its comment
-        scans already cover it — so only the posts that exist solely as ads
-        are kept (marketing_ad_posts): ads never mix into the Feed, Insights
-        or the weekly plan's numbers;
+     2. a BOOSTED post is an organic post: it stays the Feed's, and only the
+        posts that exist solely as ads are kept (marketing_ad_posts) — ads
+        never mix into the Feed, Insights or the weekly plan's numbers. But
+        an OLD post boosted now is past the Feed's comment scans (12 months),
+        so a boosted post whose count grew is read here too, as the post's
+        own comments (remote_post_id, its metrics.comments_seen);
      3. an ad whose count grew since its comments were last read (or never
         read and with comments) is read, newest first; its comments land in
         marketing_comments with ad_post_id, so the Comments tab, «Needs a
         reply» and replying work as for any comment.
+   What Meta returned is kept for the Accounts screen and for checking
+   (sync_state.ads_listed, ads_boosted; Instagram: ads_accounts — the ad
+   accounts the person granted in the sign-in's asset step).
    Without the permissions (see lib/marketing/ads) nothing is asked of Meta
    (the account is still claimed, so it waits its turn).
    A refusal is kept for the Accounts screen (sync_state.ads_error); an
@@ -53,14 +58,15 @@ export interface AdScanOutcome {
 const text = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
 
 type AdRow = { id: string; external_id: string; posted_at: string | null; comments: number | null; comments_seen: number | null };
+type OrganicRow = { id: string; external_id: string; posted_at: string | null; metrics: Record<string, number> | null };
 
-/** Which of these the Feed already has as organic posts (a boosted post). */
-async function organic(a: AccountForSync, ids: string[]): Promise<Set<string>> {
-  if (!ids.length) return new Set();
-  const { data, error } = await inChunks<{ external_id: string }>(ids, (chunk) =>
-    supabaseServer.from("marketing_remote_posts").select("external_id").eq("account_id", a.id).in("external_id", chunk));
+/** The ones the Feed already has as organic posts (boosted posts). */
+async function organic(a: AccountForSync, ids: string[]): Promise<Map<string, OrganicRow>> {
+  if (!ids.length) return new Map();
+  const { data, error } = await inChunks<OrganicRow>(ids, (chunk) =>
+    supabaseServer.from("marketing_remote_posts").select("id, external_id, posted_at, metrics").eq("account_id", a.id).in("external_id", chunk));
   if (error) throw new Error(`marketing posts: ${error.message}`);
-  return new Set((data ?? []).map((r) => r.external_id));
+  return new Map((data ?? []).map((r) => [r.external_id, r]));
 }
 
 async function knownAds(a: AccountForSync): Promise<AdRow[]> {
@@ -90,9 +96,11 @@ async function saveAds(a: AccountForSync, ads: AdPost[]): Promise<AdRow[]> {
   return out;
 }
 
-async function saveAdComments(a: AccountForSync, adPostId: string, comments: RemoteComment[]): Promise<void> {
+/** Comments saved under their post: an ad post's (ad_post_id) or a boosted
+ *  organic post's (remote_post_id — the Feed's own post). */
+async function saveComments(a: AccountForSync, parent: { ad_post_id: string } | { remote_post_id: string }, comments: RemoteComment[]): Promise<void> {
   /* One statement may not touch a row twice. */
-  const list = [...new Map(comments.map((c) => [c.external_id, { ...c, tenant_id: a.tenant_id, account_id: a.id, ad_post_id: adPostId }])).values()];
+  const list = [...new Map(comments.map((c) => [c.external_id, { ...c, tenant_id: a.tenant_id, account_id: a.id, ...parent }])).values()];
   for (let i = 0; i < list.length; i += 500) {
     const { error } = await supabaseServer.from("marketing_comments").upsert(list.slice(i, i + 500), { onConflict: "account_id,external_id" });
     if (error) throw new Error(`marketing comments: ${error.message}`);
@@ -101,13 +109,16 @@ async function saveAdComments(a: AccountForSync, adPostId: string, comments: Rem
 
 /** Instagram's ads: the ones the ad accounts name now (when the personal key
  *  works) and the ones already found, read with the Page key. */
-async function instagramAds(a: AccountForSync, since: string, known: AdRow[]): Promise<{ ads: AdPost[]; keyError: string | null }> {
+async function instagramAds(a: AccountForSync, since: string, known: AdRow[]): Promise<{ ads: AdPost[]; keyError: string | null; accounts: number | null }> {
   const ids = new Set(known.map((k) => k.external_id));
   let keyError: string | null = null;
+  let accounts: number | null = null;
   const live = !!a.userToken && (!a.user_token_expires_at || Date.parse(a.user_token_expires_at) > Date.now());
   if (live && instagramAdsGranted(a.scopes)) {
     try {
-      for (const act of await adAccounts(a.userToken!)) {
+      const acts = await adAccounts(a.userToken!);
+      accounts = acts.length;
+      for (const act of acts) {
         for (const id of await instagramAdMediaIds(act, a.userToken!, since)) ids.add(id);
       }
     } catch (e) {
@@ -120,7 +131,7 @@ async function instagramAds(a: AccountForSync, since: string, known: AdRow[]): P
     /* A code, not words: the Accounts screen says it in the reader's language. */
     keyError = AD_KEY_LAPSED;
   }
-  return { ads: ids.size ? await instagramAdMedia(a.external_id!, a.token!, [...ids]) : [], keyError };
+  return { ads: ids.size ? await instagramAdMedia(a.external_id!, a.token!, [...ids]) : [], keyError, accounts };
 }
 
 export async function scanAdComments(tenantId: string, accountId: string, opts: { budgetMs: number }): Promise<AdScanOutcome> {
@@ -140,26 +151,45 @@ export async function scanAdComments(tenantId: string, accountId: string, opts: 
   try {
     let found: AdPost[];
     let keyError: string | null = null;
-    if (a.platform === "facebook") found = await facebookAdPosts(a.external_id, a.token, since);
-    else ({ ads: found, keyError } = await instagramAds(a, since, known0));
+    let accounts: number | null = null;
+    if (a.platform === "facebook") found = await facebookAdPosts(a.external_id, a.token);
+    else ({ ads: found, keyError, accounts } = await instagramAds(a, since, known0));
     const boosted = await organic(a, found.map((f) => f.external_id));
     const saved = await saveAds(a, found.filter((f) => !boosted.has(f.external_id)));
-    const due = saved
-      .filter((r) => (r.comments ?? 0) > (r.comments_seen ?? 0))
-      .sort((x, y) => (Date.parse(y.posted_at ?? "") || 0) - (Date.parse(x.posted_at ?? "") || 0));
+    type Due = { ad: AdRow | null; post: OrganicRow | null; external_id: string; count: number; at: string | null };
+    const due: Due[] = [
+      ...saved.filter((r) => (r.comments ?? 0) > (r.comments_seen ?? 0))
+        .map((r) => ({ ad: r, post: null, external_id: r.external_id, count: r.comments ?? 0, at: r.posted_at })),
+      ...found.flatMap((f) => {
+        const p = boosted.get(f.external_id);
+        if (!p) return [];
+        const seen = p.metrics?.comments_seen;
+        return (typeof seen === "number" ? f.comments > seen : f.comments > 0)
+          ? [{ ad: null, post: p, external_id: f.external_id, count: f.comments, at: p.posted_at }] : [];
+      }),
+    ].sort((x, y) => (Date.parse(y.at ?? "") || 0) - (Date.parse(x.at ?? "") || 0));
     let read = 0;
-    for (const r of due) {
+    for (const d of due) {
       if (read >= AD_READS || Date.now() - started > opts.budgetMs - 3_000) break;
       const comments = a.platform === "facebook"
-        ? await facebookComments(a.external_id, r.external_id, a.token)
-        : await instagramComments(r.external_id, a.handle, a.token);
-      if (comments.length) await saveAdComments(a, r.id, comments);
-      const { error } = await supabaseServer.from("marketing_ad_posts").update({ comments_seen: r.comments ?? 0 }).eq("id", r.id);
-      if (error) throw new Error(`marketing ad posts: ${error.message}`);
+        ? await facebookComments(a.external_id, d.external_id, a.token)
+        : await instagramComments(d.external_id, a.handle, a.token);
+      if (d.ad) {
+        if (comments.length) await saveComments(a, { ad_post_id: d.ad.id }, comments);
+        const { error } = await supabaseServer.from("marketing_ad_posts").update({ comments_seen: d.count }).eq("id", d.ad.id);
+        if (error) throw new Error(`marketing ad posts: ${error.message}`);
+      } else if (d.post) {
+        if (comments.length) await saveComments(a, { remote_post_id: d.post.id }, comments);
+        const { error } = await supabaseServer.from("marketing_remote_posts").update({ metrics: { ...d.post.metrics, comments_seen: d.count } }).eq("id", d.post.id);
+        if (error) throw new Error(`marketing posts: ${error.message}`);
+      }
       read++;
     }
     const left = due.length - read;
-    await recordSyncState(a, { ads_scan_full: left <= 0, ads_error: keyError, ads_found: saved.length });
+    await recordSyncState(a, {
+      ads_scan_full: left <= 0, ads_error: keyError, ads_found: saved.length,
+      ads_listed: found.length, ads_boosted: boosted.size, ...(accounts !== null ? { ads_accounts: accounts } : {}),
+    });
     return { ok: true, ads: saved.length, read, left };
   } catch (e) {
     if (e instanceof MetaError && e.code === 190) {
