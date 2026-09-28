@@ -3,7 +3,8 @@
 
    Owner, 27/09/2026: the formal English name is exactly
    "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD." and it appears on
-   formal documents only (everyday text says "KOLEEX International Group").
+   formal documents only. Everywhere else — screens, cards, signatures,
+   contact QR codes — the company is EVERYDAY_NAME_EN (owner, 28/09/2026).
    A document keeps the name that was in force when it was MADE: every
    quotation, invoice, packing list, payslip and contract created before
    01/10/2026 still prints the old spelling, however often it is reopened.
@@ -13,6 +14,10 @@
      for letter, or a transfer can be refused;
    · a signed sales contract — it prints the name frozen in its snapshot.
    --------------------------------------------------------------------------- */
+
+/** The everyday name (owner, 28/09/2026: "always, except official
+ *  documents"). Formal documents use legalNameEn() instead. */
+export const EVERYDAY_NAME_EN = "Koleex International Group";
 
 /** The formal English name in force today. */
 export const LEGAL_NAME_EN = "KOLEEX INTERNATIONAL CORPORATION (TAIZHOU) CO., LTD.";

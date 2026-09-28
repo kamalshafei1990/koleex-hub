@@ -15,7 +15,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { BANK_BENEFICIARY_NAME, LEGAL_NAME_EN, LEGAL_NAME_HISTORY, legalNameEn } from "../src/lib/legal-name";
+import { BANK_BENEFICIARY_NAME, EVERYDAY_NAME_EN, LEGAL_NAME_EN, LEGAL_NAME_HISTORY, legalNameEn } from "../src/lib/legal-name";
 
 const ROOT = join(__dirname, "..");
 let failures = 0;
@@ -35,6 +35,7 @@ check(legalNameEn("2026-10-01T00:00:00+08:00") === LEGAL_NAME_EN, "a document ma
 check(legalNameEn("2026-09-30") === OLD, "a September payslip (period end 2026-09-30) keeps the old name");
 check(legalNameEn("not a date") === legalNameEn(), "an unreadable date means now");
 check(BANK_BENEFICIARY_NAME === "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD.", "the bank's beneficiary name is exactly as the bank holds it");
+check(EVERYDAY_NAME_EN === "Koleex International Group", "the everyday name is the owner's exact spelling");
 
 /* 2 · One source */
 const NAME_PATTERN = /CORPORATION[ ,(]*TAIZHOU|Corporation[ ,(]*Taizhou/;

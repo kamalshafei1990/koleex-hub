@@ -153,7 +153,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
             <div className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-3">
               <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("studio.spec")}</p>
               <ul className="mt-1.5 grid gap-1 text-[12px] text-[var(--text-secondary)]">
-                {["front", "back", "paper", "never"].map((k) => <li key={k}>{t(`studio.spec.${k}`)}</li>)}
+                {["front", "back", "paper", "edges", "never"].map((k) => <li key={k}>{t(`studio.spec.${k}`)}</li>)}
               </ul>
             </div>
 

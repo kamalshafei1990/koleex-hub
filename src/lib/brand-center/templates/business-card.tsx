@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { KoleexLogoPaths } from "@/components/layout/KoleexLogo";
 import { PT, type DrawContext, type TemplateDef, type TemplateValues } from "./types";
 
@@ -119,7 +120,8 @@ function fit(text: string, size: number, per: number, max: number) {
   return text.length * size * wide > max ? { textLength: max, lengthAdjust: "spacingAndGlyphs" as const } : {};
 }
 
-/** vCard 3.0 — what a phone saves when it reads the card's QR. */
+/** vCard 3.0 — what a phone saves when it reads the card's QR. The company
+ *  is the everyday name: a card is not a formal document. */
 function vcard(v: TemplateValues): string | null {
   if (!v.qr) return null;
   const esc = (s: string) => s.replace(/([,;\\])/g, "\\$1").replace(/\n/g, " ");
@@ -128,7 +130,7 @@ function vcard(v: TemplateValues): string | null {
   /* N is required by vCard 3.0 — family name last, as it is written in English. */
   const parts = name.split(/\s+/);
   const n = parts.length > 1 ? `${esc(parts[parts.length - 1])};${esc(parts.slice(0, -1).join(" "))};;;` : `${esc(name)};;;;`;
-  const out = ["BEGIN:VCARD", "VERSION:3.0", `N:${n}`, `FN:${esc(name)}`, `ORG:${esc(KOLEEX_COMPANY.en)}`];
+  const out = ["BEGIN:VCARD", "VERSION:3.0", `N:${n}`, `FN:${esc(name)}`, `ORG:${esc(EVERYDAY_NAME_EN)}`];
   if (str(v, "title")) out.push(`TITLE:${esc(str(v, "title"))}`);
   if (str(v, "mobile")) out.push(`TEL;TYPE=CELL:${str(v, "mobile").replace(/[^\d+]/g, "")}`);
   if (str(v, "email")) out.push(`EMAIL;TYPE=WORK:${esc(str(v, "email"))}`);

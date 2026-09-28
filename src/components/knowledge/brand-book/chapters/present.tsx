@@ -245,7 +245,7 @@ export function BusinessCards() {
           ["Edges", "Painted silver (Pantone 877 C) all around"],
           ["Second version", "White both sides — raised black logo, black text, the same silver edges (ch. 47)"],
           ["Never", "Silver or gold foil on the logo, spot gloss, colored edges"],
-          ["Language", "English only (owner decision)"],
+          ["Language", "The back in English, Chinese or Arabic — one language per card (owner decision 28/09/2026)"],
         ]} />
       </Section>
 

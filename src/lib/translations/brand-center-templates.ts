@@ -46,7 +46,8 @@ export const brandCenterTemplatesT: Translations = {
   "studio.spec":        { en: "How it is printed", zh: "印刷要求", ar: "بيتطبع إزاي" },
   "studio.spec.front":  { en: "Front: the logo in white foil, raised (emboss). Nothing else.", zh: "正面：白色烫印标志，凸起（压凸）。无其他内容。", ar: "الوش: اللوجو فويل أبيض بارز (إمبوس). ولا حاجة تانية." },
   "studio.spec.back":   { en: "Back: white print or white foil on black.", zh: "背面：黑底白色印刷或白色烫印。", ar: "الضهر: طباعة بيضا أو فويل أبيض على أسود." },
-  "studio.spec.paper":  { en: "Paper: 400 gsm uncoated (recommended).", zh: "纸张：400 克非涂布纸（推荐）。", ar: "الورق: 400 جرام غير مطلي (المقترح)." },
+  "studio.spec.paper":  { en: "Board: black, soft-touch matte, 600–700 g/m².", zh: "卡纸：黑色，触感哑光膜，600–700 克/平方米。", ar: "الكرتون: أسود، سوفت تاتش مطفي، 600–700 جرام/م²." },
+  "studio.spec.edges":  { en: "Edges: painted silver (Pantone 877 C) all around.", zh: "边缘：四边刷银色（Pantone 877 C）。", ar: "الحواف: مدهونة فضي (Pantone 877 C) من كل الجهات." },
   "studio.spec.never":  { en: "Never: silver or gold foil on the logo, spot gloss, coloured edges.", zh: "禁止：标志使用银色或金色烫印、局部光油、彩色封边。", ar: "ممنوع: فويل فضي أو دهبي على اللوجو، لمعة سبوت، حواف ملوّنة." },
 
   "print.none":         { en: "Open this page from Brand Center → Templates.", zh: "请从 品牌中心 → 模板 打开此页面。", ar: "افتح الصفحة دي من مركز البراند ← القوالب." },
