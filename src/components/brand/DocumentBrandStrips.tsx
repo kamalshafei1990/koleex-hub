@@ -35,8 +35,12 @@ export default function DocumentBrandStrips({
 }) {
   return (
     /* Both strips share one rounded container so the radius shows only on
-       the outer corners and the pair reads as a single header block. */
-    <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+       the outer corners and the pair reads as a single header block. The
+       company's names and the tagline are Latin and Chinese: they read left
+       to right on every paper — on an Arabic (RTL) sheet the bidi algorithm
+       otherwise carried the closing full stops to the front
+       (".KOLEEX … LTD", ".SHAPING THE FUTURE"). */
+    <div dir="ltr" style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
       <div
         className="pq-strip-black"
         style={{

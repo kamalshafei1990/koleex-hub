@@ -56,6 +56,7 @@ check(typed.length === 0, `no file in src/ types the legal name${typed.length ? 
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const DOCS: Array<[string, RegExp, string]> = [
   ["src/components/brand/DocumentBrandStrips.tsx", /legalNameEn\(madeAt\)/, "the black company strip prints the name of the document's day"],
+  ["src/components/brand/DocumentBrandStrips.tsx", /<div dir="ltr" style=\{\{ borderRadius: 12/, "the company strip reads left to right on an Arabic paper too"],
   ["src/components/quotations/QuotationA4Preview.tsx", /madeAt=\{current\.createdAt\}/, "quotations and invoices: the strip gets the creation date"],
   ["src/components/quotations/QuotationA4Preview.tsx", /legalNameEn\(current\.createdAt\)/, "quotations and invoices: the seller card by creation date"],
   ["src/components/quotations/QuotationA4Preview.tsx", /value=\{BANK_BENEFICIARY_NAME\}/, "quotations and invoices: the bank row prints the bank's own spelling"],
