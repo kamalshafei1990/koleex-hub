@@ -1,0 +1,53 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Brand Center — the template studio and its print page (plan steps C6, C7, C9). */
+export const brandCenterTemplatesT: Translations = {
+  "tpl.businessCardTeam": { en: "Business card — team", zh: "名片 — 团队", ar: "كارت البيزنس — الفريق" },
+  "tpl.page.front": { en: "Front", zh: "正面", ar: "الوش" },
+  "tpl.page.back":  { en: "Back",  zh: "背面", ar: "الضهر" },
+
+  "tpl.f.name":     { en: "Name",      zh: "姓名", ar: "الاسم" },
+  "tpl.f.title":    { en: "Job title", zh: "职位", ar: "المسمى الوظيفي" },
+  "tpl.f.mobile":   { en: "Mobile",    zh: "手机", ar: "الموبايل" },
+  "tpl.f.whatsapp": { en: "The mobile is on WhatsApp", zh: "手机可用 WhatsApp", ar: "الموبايل عليه واتساب" },
+  "tpl.f.email":    { en: "Email",     zh: "邮箱", ar: "الإيميل" },
+  "tpl.f.web":      { en: "Website",   zh: "网站", ar: "الموقع" },
+  "tpl.f.lang":     { en: "Language on the back", zh: "背面语言", ar: "لغة الضهر" },
+  "tpl.lang.en":    { en: "English", zh: "英文",   ar: "إنجليزي" },
+  "tpl.lang.zh":    { en: "Chinese", zh: "中文",   ar: "صيني" },
+  "tpl.lang.ar":    { en: "Arabic",  zh: "阿拉伯文", ar: "عربي" },
+  "tpl.f.size":     { en: "Size", zh: "尺寸", ar: "المقاس" },
+  "tpl.size.90x54": { en: "90 × 54 mm — China", zh: "90 × 54 毫米 — 中国", ar: "90 × 54 مم — الصين" },
+  "tpl.size.85x55": { en: "85 × 55 mm — Egypt / Europe", zh: "85 × 55 毫米 — 埃及 / 欧洲", ar: "85 × 55 مم — مصر / أوروبا" },
+  "tpl.size.89x51": { en: "89 × 51 mm — US", zh: "89 × 51 毫米 — 美国", ar: "89 × 51 مم — أمريكا" },
+  "tpl.f.qr":       { en: "QR code that saves the contact", zh: "扫码保存联系人", ar: "كود QR يحفظ الكونتاكت" },
+
+  "studio.fillFrom":    { en: "Fill from Employees", zh: "从员工资料填写", ar: "املى من بيانات الموظفين" },
+  "studio.pick":        { en: "Choose an employee", zh: "选择员工", ar: "اختار موظف" },
+  "studio.me":          { en: "Fill with my details", zh: "用我的资料填写", ar: "املى ببياناتي" },
+  "studio.noMe":        { en: "Your employee record was not found — type the details.", zh: "未找到您的员工资料 — 请手动填写。", ar: "ملقيناش ملفك كموظف — اكتب البيانات بإيدك." },
+  "studio.peopleError": { en: "Employees could not be loaded — type the details.", zh: "无法加载员工资料 — 请手动填写。", ar: "بيانات الموظفين ما حمّلتش — اكتبها بإيدك." },
+  "studio.details":     { en: "On the card", zh: "名片内容", ar: "اللي على الكارت" },
+  "studio.clear":       { en: "Clear", zh: "清空", ar: "امسح" },
+  "studio.preview":     { en: "Preview", zh: "预览", ar: "المعاينة" },
+  "studio.guides":      { en: "Trim and safe lines", zh: "裁切线和安全线", ar: "خط القص وخط الأمان" },
+  "studio.guidesHint":  { en: "Blue: where the card is cut. Grey dashes: keep text inside. The pale edge is bleed and is cut away.",
+                          zh: "蓝线：裁切位置。灰色虚线：文字保持在内。浅色边缘为出血，会被裁掉。",
+                          ar: "الأزرق: مكان القص. الخط الرمادي المتقطع: الكلام يفضل جوّاه. الحافة الفاتحة هامش قص بيتشال." },
+  "studio.print":       { en: "Print / Save as PDF", zh: "打印 / 存为 PDF", ar: "اطبع / احفظ PDF" },
+  "studio.printHint":   { en: "Real size, 3 mm bleed, crop marks — one page per side. In the print window choose Save as PDF at 100% and send that file to the printer.",
+                          zh: "真实尺寸、3 毫米出血、裁切标记 — 每面一页。在打印窗口选择“存为 PDF”，缩放 100%，把文件发给印刷厂。",
+                          ar: "مقاس حقيقي، هامش قص 3 مم، وعلامات القص — صفحة لكل وش. في شباك الطباعة اختار Save as PDF على 100% وابعت الملف للمطبعة." },
+  "studio.svg":         { en: "SVG — {page}", zh: "SVG — {page}", ar: "SVG — {page}" },
+  "studio.needName":    { en: "Type the name first.", zh: "请先填写姓名。", ar: "اكتب الاسم الأول." },
+  "studio.notFound":    { en: "This template does not exist.", zh: "此模板不存在。", ar: "القالب ده مش موجود." },
+  "studio.size":        { en: "{w} × {h} mm · bleed {b} mm · safe {s} mm", zh: "{w} × {h} 毫米 · 出血 {b} 毫米 · 安全边距 {s} 毫米", ar: "{w} × {h} مم · هامش قص {b} مم · هامش أمان {s} مم" },
+
+  "studio.spec":        { en: "How it is printed", zh: "印刷要求", ar: "بيتطبع إزاي" },
+  "studio.spec.front":  { en: "Front: the logo in white foil, raised (emboss). Nothing else.", zh: "正面：白色烫印标志，凸起（压凸）。无其他内容。", ar: "الوش: اللوجو فويل أبيض بارز (إمبوس). ولا حاجة تانية." },
+  "studio.spec.back":   { en: "Back: white print or white foil on black.", zh: "背面：黑底白色印刷或白色烫印。", ar: "الضهر: طباعة بيضا أو فويل أبيض على أسود." },
+  "studio.spec.paper":  { en: "Paper: 400 gsm uncoated (recommended).", zh: "纸张：400 克非涂布纸（推荐）。", ar: "الورق: 400 جرام غير مطلي (المقترح)." },
+  "studio.spec.never":  { en: "Never: silver or gold foil on the logo, spot gloss, coloured edges.", zh: "禁止：标志使用银色或金色烫印、局部光油、彩色封边。", ar: "ممنوع: فويل فضي أو دهبي على اللوجو، لمعة سبوت، حواف ملوّنة." },
+
+  "print.none":         { en: "Open this page from Brand Center → Templates.", zh: "请从 品牌中心 → 模板 打开此页面。", ar: "افتح الصفحة دي من مركز البراند ← القوالب." },
+};

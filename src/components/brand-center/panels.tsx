@@ -1,15 +1,17 @@
 "use client";
 
 /* Brand Center — the three panels that describe what is being built next:
-   templates, "who am I?" and requests. Plain lists: no data, no requests. */
+   templates, "who am I?" and requests. Plain lists: no data, no requests. A
+   template that is ready opens its studio. */
 
+import Link from "next/link";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { CARD } from "@/components/travel/fields";
 
 type T = (key: string) => string;
 
-const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "building" | "planned" }> = [
-  { key: "businessCard", icon: "id-badge", status: "building" },
+const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "live" | "building" | "planned"; href?: string }> = [
+  { key: "businessCard", icon: "id-badge", status: "live", href: "/brand-center/templates/business-card-team" },
   { key: "staffCard", icon: "id-badge", status: "planned" },
   { key: "signature", icon: "signature", status: "planned" },
   { key: "badge", icon: "ticket", status: "planned" },
@@ -41,15 +43,26 @@ export function TemplatesPanel({ t }: { t: T }) {
     <section data-kx-pane>
       <Lead text={t("tpl.lead")} />
       <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        {TEMPLATES.map((x) => (
-          <li key={x.key} className={`${CARD} flex items-center gap-3 px-4 py-3.5`}>
-            <span className="text-[var(--text-dim)]" aria-hidden><RrIcon name={x.icon} size={16} /></span>
-            <span className="flex-1 text-[13.5px] font-medium text-[var(--text-primary)]">{t(`tpl.${x.key}`)}</span>
-            <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${x.status === "building" ? "border-[var(--border-strong)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
-              {t(`status.${x.status}`)}
-            </span>
-          </li>
-        ))}
+        {TEMPLATES.map((x) => {
+          const inner = (
+            <>
+              <span className="text-[var(--text-dim)]" aria-hidden><RrIcon name={x.icon} size={16} /></span>
+              <span className="flex-1 text-[13.5px] font-medium text-[var(--text-primary)]">{t(`tpl.${x.key}`)}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${x.status === "live" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500" : x.status === "building" ? "border-[var(--border-strong)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
+                {t(`status.${x.status}`)}
+              </span>
+            </>
+          );
+          return (
+            <li key={x.key}>
+              {x.href ? (
+                <Link href={x.href} className={`${CARD} flex items-center gap-3 px-4 py-3.5 transition-colors hover:border-[var(--border-strong)]`}>{inner}</Link>
+              ) : (
+                <div className={`${CARD} flex items-center gap-3 px-4 py-3.5`}>{inner}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

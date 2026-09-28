@@ -1,0 +1,86 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   One page of a template, drawn in millimetres (plan steps C6 + C7).
+
+   The drawing is always left-to-right (a template places its own text for
+   Arabic); an RTL page around it must not flip the anchors.
+
+   screen — the page with its bleed; `guides` greys the bleed and draws the
+            trim (blue) and the safe margin (grey dashes).
+   print  — the real size for the press: the page with its bleed, crop marks
+            at the trim lines outside the bleed, and a slug line that names
+            the job. The <svg> is sized in mm, so the browser's PDF is 1:1.
+   --------------------------------------------------------------------------- */
+
+import type { CSSProperties } from "react";
+import type { TemplateDef, TemplateValues } from "@/lib/brand-center/templates/types";
+
+/** Paper around the trim on a print page: bleed + crop marks + the slug. */
+export const PRINT_MARGIN = 12;
+const MARK_GAP = 1; // crop marks stop 1 mm short of the bleed
+const SLUG_SIZE = 1.6; // mm; the slug stays between the two bottom crop marks
+
+export function sheetSize(def: TemplateDef, values: TemplateValues, mode: "screen" | "print") {
+  const { w, h } = def.size(values);
+  const pad = mode === "print" ? PRINT_MARGIN : def.bleed;
+  return { w, h, outerW: w + pad * 2, outerH: h + pad * 2 };
+}
+
+export default function TemplateSheet({ def, values, pageId, qr, mode, guides = false, slug, className, style }: {
+  def: TemplateDef; values: TemplateValues; pageId: string; qr: boolean[][] | null;
+  mode: "screen" | "print"; guides?: boolean; slug?: string; className?: string; style?: CSSProperties;
+}) {
+  const page = def.pages.find((p) => p.id === pageId) ?? def.pages[0];
+  const { w, h, outerW, outerH } = sheetSize(def, values, mode);
+  const b = def.bleed;
+  const off = mode === "print" ? PRINT_MARGIN - b : 0; // where the bleed box starts
+  const trim = { x: off + b, y: off + b };
+  const body = page.draw(values, { w, h, bleed: b, qr });
+
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${outerW} ${outerH}`}
+      width={mode === "print" ? `${outerW}mm` : "100%"} height={mode === "print" ? `${outerH}mm` : undefined}
+      className={className} style={{ direction: "ltr", ...style }} role="img" aria-label={slug}>
+      {mode === "print" ? <rect x={0} y={0} width={outerW} height={outerH} fill="#FFFFFF" /> : null}
+      <defs>
+        <clipPath id={`bleed-${page.id}`}><rect x={off} y={off} width={w + b * 2} height={h + b * 2} /></clipPath>
+      </defs>
+      <g clipPath={`url(#bleed-${page.id})`}>
+        <g transform={`translate(${off} ${off})`}>{body}</g>
+      </g>
+
+      {mode === "screen" && guides ? (
+        <g pointerEvents="none">
+          <path fillRule="evenodd" fill="#FFFFFF" fillOpacity={0.32}
+            d={`M0 0H${outerW}V${outerH}H0Z M${trim.x} ${trim.y}h${w}v${h}h-${w}Z`} />
+          <rect x={trim.x} y={trim.y} width={w} height={h} fill="none" stroke="#0066FF" strokeWidth={0.2} />
+          <rect x={trim.x + def.safe} y={trim.y + def.safe} width={w - def.safe * 2} height={h - def.safe * 2}
+            fill="none" stroke="#AAAAAA" strokeWidth={0.15} strokeDasharray="0.8 0.6" />
+        </g>
+      ) : null}
+
+      {mode === "print" ? (
+        <g stroke="#000000" strokeWidth={0.1} fill="none">
+          {[trim.x, trim.x + w].map((x) => (
+            <g key={`v${x}`}>
+              <line x1={x} y1={0} x2={x} y2={off - MARK_GAP} />
+              <line x1={x} y1={outerH - off + MARK_GAP} x2={x} y2={outerH} />
+            </g>
+          ))}
+          {[trim.y, trim.y + h].map((y) => (
+            <g key={`h${y}`}>
+              <line x1={0} y1={y} x2={off - MARK_GAP} y2={y} />
+              <line x1={outerW - off + MARK_GAP} y1={y} x2={outerW} y2={y} />
+            </g>
+          ))}
+        </g>
+      ) : null}
+      {mode === "print" && slug ? (
+        <text x={trim.x + 2} y={outerH - 3} fill="#666666"
+          {...(slug.length * SLUG_SIZE * 0.6 > w - 4 ? { textLength: w - 4, lengthAdjust: "spacingAndGlyphs" as const } : {})}
+          style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: SLUG_SIZE }}>{slug}</text>
+      ) : null}
+    </svg>
+  );
+}

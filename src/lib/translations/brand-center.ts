@@ -52,6 +52,7 @@ export const brandCenterT: Translations = {
   "tpl.certificate":  { en: "Certificates",                   zh: "证书",                 ar: "الشهادات" },
   "tpl.productPost":  { en: "Product posts",                  zh: "产品帖子",             ar: "بوستات المنتج" },
   "tpl.occasionPost": { en: "Occasion, hiring and event posts", zh: "节日、招聘和活动帖子", ar: "بوستات المناسبات والتوظيف والإيفنتات" },
+  "status.live":      { en: "Ready",       zh: "可用",   ar: "جاهز" },
   "status.building":  { en: "Being built", zh: "建设中", ar: "بيتبني" },
   "status.planned":   { en: "Planned",     zh: "计划中", ar: "في الخطة" },
 

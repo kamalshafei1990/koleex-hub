@@ -37,7 +37,11 @@ async function call<T>(url: string, init?: RequestInit): Promise<Res<T>> {
 }
 const send = <T>(url: string, method: string, body: unknown) => call<T>(url, { method, body: JSON.stringify(body) });
 
+/** Someone a fill-in template can be filled for (GET /api/brand-center/people). */
+export interface BcPerson { id: string; name: string; nameAlt: string | null; title: string | null; department: string | null; email: string | null; mobile: string | null }
+
 export const bc = {
+  people: () => call<{ scope: "all" | "self"; people: BcPerson[] }>("/api/brand-center/people"),
   library: () => call<{ sections: BcSectionRow[] }>("/api/brand-center/library"),
   section: (key: string) => call<BcSectionData>(`/api/brand-center/sections/${encodeURIComponent(key)}`),
   item: (id: string) => call<BcItemData>(`/api/brand-center/items/${encodeURIComponent(id)}`),
