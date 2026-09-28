@@ -322,8 +322,13 @@ export function EmployeeLink({ id, name, className }: {
 }) {
   if (!id) return <span className={className}>{name}</span>;
   return (
+    /* prefetch={false}: this renders for every name in every HR list, and
+       each visible one prefetched its profile — a server render per name
+       plus the profile's code, on the connection the HR screen itself was
+       loading on (measured 28/09). The profile loads when it is opened. */
     <Link
       href={`/employees/${id}`}
+      prefetch={false}
       onClick={(e: MouseEvent) => e.stopPropagation()}
       className={`${className ?? ""} hover:underline underline-offset-2`}
       title={name}

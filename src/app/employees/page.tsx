@@ -211,6 +211,12 @@ export default function EmployeesPage() {
             action={
               <Link
                 href="/employees/new"
+                /* The add form is a large chunk; fetch it when aimed at, not
+                   on every visit to the list. */
+                prefetch={false}
+                onPointerEnter={() => router.prefetch("/employees/new")}
+                onTouchStart={() => router.prefetch("/employees/new")}
+                onFocus={() => router.prefetch("/employees/new")}
                 className="h-10 px-3 sm:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
                 aria-label={t("app.add")}
               >
@@ -324,7 +330,7 @@ export default function EmployeesPage() {
               {employees.length === 0 ? t("list.empty.body") : ""}
             </p>
             {employees.length === 0 && (
-              <Link href="/employees/new" className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg">
+              <Link href="/employees/new" prefetch={false} className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all shadow-lg">
                 <PlusIcon className="h-4 w-4" /> {t("app.add")}
               </Link>
             )}
@@ -347,9 +353,15 @@ export default function EmployeesPage() {
                    /employees/[id]. The profile page aggregates
                    cross-app activity (CRM, Quotations, Projects,
                    Todos, HR leave, Notes, Calendar). */
+                /* prefetch={false}: every VISIBLE row used to prefetch its
+                   profile — a server render per employee on each open of the
+                   list. The profile is fetched when the row is aimed at. */
                 <Link
                   key={emp.id}
                   href={`/employees/${emp.id}`}
+                  prefetch={false}
+                  onPointerEnter={() => router.prefetch(`/employees/${emp.id}`)}
+                  onTouchStart={() => router.prefetch(`/employees/${emp.id}`)}
                   className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer"
                 >
                   <Avatar src={fpAvatar(emp.person.avatar_url)} name={emp.person.full_name} size={40} />

@@ -394,7 +394,7 @@ export default function ReportsModule({ employees, t }: HRModuleProps) {
                 <ul className="divide-y divide-[var(--border-subtle)] max-h-64 overflow-y-auto">
                   {report.expiries.map((x, i) => (
                     <li key={i} className="py-2 flex items-center justify-between gap-3 text-[13px]">
-                      <span className="min-w-0 truncate"><Link href={`/employees/${x.employeeId}`} className="font-medium text-[var(--text-primary)] hover:underline">{x.name}</Link> <span className="text-[var(--text-dim)]">· {x.kind}</span></span>
+                      <span className="min-w-0 truncate"><Link href={`/employees/${x.employeeId}`} prefetch={false} className="font-medium text-[var(--text-primary)] hover:underline">{x.name}</Link> <span className="text-[var(--text-dim)]">· {x.kind}</span></span>
                       <span className={`shrink-0 tabular-nums ${x.daysLeft <= 14 ? "text-[#FF3333]" : x.daysLeft <= 30 ? "text-[#FFCC00]" : "text-[var(--text-dim)]"}`}>{fmtDate(x.date)} · {x.daysLeft} {t("hr.rpt.daysLeft")}</span>
                     </li>
                   ))}
@@ -414,7 +414,7 @@ export default function ReportsModule({ employees, t }: HRModuleProps) {
                 <ul className="divide-y divide-[var(--border-subtle)] max-h-64 overflow-y-auto">
                   {report.occasions.map((x, i) => (
                     <li key={i} className="py-2 flex items-center justify-between gap-3 text-[13px]">
-                      <span className="min-w-0 truncate"><Link href={`/employees/${x.employeeId}`} className="font-medium text-[var(--text-primary)] hover:underline">{x.name}</Link> <span className="text-[var(--text-dim)]">· {x.kind === "birthday" ? t("hr.rpt.birthday") : `${t("hr.rpt.anniversary")} · ${x.years} ${t("hr.rpt.years")}`}</span></span>
+                      <span className="min-w-0 truncate"><Link href={`/employees/${x.employeeId}`} prefetch={false} className="font-medium text-[var(--text-primary)] hover:underline">{x.name}</Link> <span className="text-[var(--text-dim)]">· {x.kind === "birthday" ? t("hr.rpt.birthday") : `${t("hr.rpt.anniversary")} · ${x.years} ${t("hr.rpt.years")}`}</span></span>
                       <span className="shrink-0 tabular-nums text-[var(--text-dim)]">{fmtDate(x.date)} · {t("hr.rpt.inDays")} {x.daysLeft} {t("hr.rpt.daysLeft")}</span>
                     </li>
                   ))}
