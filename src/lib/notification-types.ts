@@ -41,7 +41,8 @@ export type NotifApp =
   | "todo" | "calendar" | "issue-reports" | "reports" | "hr" | "me"
   | "projects" | "planning" | "inventory" | "quotations" | "invoices"
   | "finance" | "notes" | "accounts" | "ai" | "discuss" | "activity-monitor"
-  | "settings" | "orders" | "contracts" | "crm" | "expenses" | "purchase";
+  | "settings" | "orders" | "contracts" | "crm" | "expenses" | "purchase"
+  | "social-marketing";
 
 export type NotifSeverity = "info" | "action" | "warning" | "critical";
 
@@ -153,6 +154,12 @@ export const NOTIFICATION_TYPES = {
   expense_approval_request: { app: "expenses", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "expense_id", when: "the expense is approved, rejected, sent back or withdrawn to draft" } },
   expense_decided:          { app: "expenses", activity: "finance_activity", severity: "info", lifecycle: { kind: "supersede", key: "expense_id" } },
   purchase_received:        { app: "purchase", activity: "inventory_activity", severity: "info", lifecycle: { kind: "supersede", key: "purchase_order_id" } },
+
+  /* ── Social Marketing: posts written in the Hub (owner, 28/09/2026) ── */
+  marketing_approval_request: { app: "social-marketing", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "post_id", when: "the post is approved or sent back, its author edits it back to a draft, or it is deleted (sending it again replaces it first)" } },
+  marketing_post_decided:     { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "supersede", key: "post_id" } },
+  marketing_publish_failed:   { app: "social-marketing", activity: "marketing_activity", severity: "warning", lifecycle: { kind: "clear", key: "post_id", when: "the accounts that failed are sent again (a newer failure replaces it first)" } },
+  marketing_post_published:   { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },

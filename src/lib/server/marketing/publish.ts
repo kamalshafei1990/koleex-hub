@@ -18,18 +18,23 @@ import "server-only";
      · hand-shared accounts (no posting API) are never sent — a person shares
        them and marks them shared.
    The post's status then follows its accounts: published, partly_published,
-   failed, or still publishing.
+   failed, or still publishing. A move to a settled status is written once,
+   from the status it was read with, and only that writer tells the people
+   concerned (./notify): a failure reaches the author and the approver, a
+   post published with nobody watching reaches its author.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { MetaError } from "@/lib/server/marketing/meta";
 import { publishToFacebook, publishToInstagram, type PublishStep } from "@/lib/server/marketing/meta-publish";
 import { loadAccountForSync, recordSync } from "@/lib/server/marketing/accounts";
+import { later, notifyPublishOutcome } from "@/lib/server/marketing/notify";
 import { targetIssues } from "@/lib/marketing/post-rules";
 import type { PostMedia, PostStatus, TargetStatus } from "@/lib/marketing/post-types";
 
 const LEASE_MS = 90_000;
 const PUBLISHABLE: readonly PostStatus[] = ["approved", "publishing", "partly_published", "failed"];
+const SETTLED: readonly PostStatus[] = ["published", "partly_published", "failed"];
 
 type TargetRow = {
   id: string; account_id: string; body_override: string | null; status: TargetStatus;
@@ -69,8 +74,9 @@ async function finishTarget(id: string, patch: Record<string, unknown>): Promise
   if (error) throw new Error(`marketing post targets: ${error.message}`);
 }
 
-/** Recompute the post's status from its accounts. */
-export async function settlePost(tenantId: string, postId: string): Promise<{ status: PostStatus; busy: boolean }> {
+/** Recompute the post's status from its accounts. `actorId`: whose request
+ *  ran the publishing (null for the cron) — they saw the result on screen. */
+export async function settlePost(tenantId: string, postId: string, opts: { actorId?: string | null } = {}): Promise<{ status: PostStatus; busy: boolean }> {
   const { data: post, error } = await supabaseServer.from("marketing_posts").select("status, published_at").eq("tenant_id", tenantId).eq("id", postId).maybeSingle();
   if (error) throw new Error(`marketing posts: ${error.message}`);
   if (!post) return { status: "failed", busy: false };
@@ -99,13 +105,20 @@ export async function settlePost(tenantId: string, postId: string): Promise<{ st
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
   if (!current.published_at && (status === "published" || status === "partly_published")) patch.published_at = new Date().toISOString();
   if (status !== current.status || patch.published_at) {
-    const { error: uErr } = await supabaseServer.from("marketing_posts").update(patch).eq("tenant_id", tenantId).eq("id", postId);
+    /* From the status it was read with: of two runs settling at once, one
+       writes the move — and only that one tells anyone about it. */
+    const { data: moved, error: uErr } = await supabaseServer.from("marketing_posts").update(patch)
+      .eq("tenant_id", tenantId).eq("id", postId).eq("status", current.status).select("id");
     if (uErr) throw new Error(`marketing posts: ${uErr.message}`);
+    if (moved?.length && status !== current.status && SETTLED.includes(status)) {
+      const actorId = opts.actorId ?? null;
+      later(() => notifyPublishOutcome(tenantId, postId, status, actorId));
+    }
   }
   return { status, busy };
 }
 
-export async function publishPost(tenantId: string, postId: string, opts: { budgetMs?: number } = {}): Promise<{ status: PostStatus; busy: boolean }> {
+export async function publishPost(tenantId: string, postId: string, opts: { budgetMs?: number; actorId?: string | null } = {}): Promise<{ status: PostStatus; busy: boolean }> {
   const started = Date.now();
   const deadline = started + (opts.budgetMs ?? 45_000);
   const { data: post, error } = await supabaseServer.from("marketing_posts").select("id, status, body, media").eq("tenant_id", tenantId).eq("id", postId).maybeSingle();
@@ -170,12 +183,12 @@ export async function publishPost(tenantId: string, postId: string, opts: { budg
       }
     }
   }
-  return settlePost(tenantId, postId);
+  return settlePost(tenantId, postId, { actorId: opts.actorId ?? null });
 }
 
 /** A person shared the post on a hand-shared account (WeChat, WhatsApp,
  *  Douyin). Only after approval, only once. */
-export async function markShared(tenantId: string, postId: string, targetId: string): Promise<{ ok: true; status: PostStatus } | { error: string; status: number }> {
+export async function markShared(tenantId: string, postId: string, targetId: string, actorId: string | null = null): Promise<{ ok: true; status: PostStatus } | { error: string; status: number }> {
   const { data: post, error } = await supabaseServer.from("marketing_posts").select("status").eq("tenant_id", tenantId).eq("id", postId).maybeSingle();
   if (error) throw new Error(`marketing posts: ${error.message}`);
   const st = (post as { status: PostStatus } | null)?.status;
@@ -193,6 +206,6 @@ export async function markShared(tenantId: string, postId: string, targetId: str
     .eq("id", targetId).eq("status", "pending").select("id");
   if (uErr) throw new Error(`marketing post targets: ${uErr.message}`);
   if (!done?.length) return { error: "Already marked as shared.", status: 409 };
-  const settled = await settlePost(tenantId, postId);
+  const settled = await settlePost(tenantId, postId, { actorId });
   return { ok: true, status: settled.status };
 }

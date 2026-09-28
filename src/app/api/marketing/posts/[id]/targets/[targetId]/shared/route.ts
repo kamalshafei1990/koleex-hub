@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const g = await gatePost(req, id, "edit");
     if (g instanceof NextResponse) return g;
     if (!UUID_RE.test(targetId)) return NextResponse.json({ error: "Invalid account." }, { status: 400 });
-    const out = await markShared(g.auth.tenant_id, id, targetId);
+    const out = await markShared(g.auth.tenant_id, id, targetId, g.auth.account_id);
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     return NextResponse.json(out);
   } catch (e) {

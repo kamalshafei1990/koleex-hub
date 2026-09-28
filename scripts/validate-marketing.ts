@@ -37,6 +37,14 @@
        then; moving or cancelling a schedule is for approvers;
      · marketing time is SHANGHAI time (owner's pick), a fixed UTC+8, and
        the screens say so next to every time they pick.
+   Approval notifications (28/09/2026) add:
+     · a post sent for approval asks exactly the people the approve route
+       lets through, and no one else; the request opens the post (no
+       buttons in the bell — the owner's pick) and stops asking once nobody
+       can answer it: approved, sent back, edited back to a draft, deleted;
+     · every decision reaches the author; publishing's outcome is told ONCE
+       (only the run that writes the settled status tells), never to the
+       person who watched it happen; a retry clears the old failure first.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -398,6 +406,100 @@ check("calendar screen: Shanghai days, the time zone shown, grid or list by the 
   /dayKey\(i\.at\)/.test(calScreen) && /t\("tz\.label"\)/.test(calScreen) && /@max-\[44rem\]:hidden/.test(calScreen) && /@\[44rem\]:hidden/.test(calScreen) && !/overflow-x-(auto|scroll)/.test(calScreen));
 check("the Calendar tab sits between Posts and Accounts",
   /\{ key: SPACE_POSTS\[space\][\s\S]*\{ key: SPACE_CALENDAR\[space\][\s\S]*\{ key: SPACE_ROUTE\[space\]/.test(code("src/components/marketing/MarketingHeader.tsx")));
+
+/* ── 9. Approval notifications ── */
+console.log("\n9. Approval notifications");
+const NOTIFY = "src/lib/server/marketing/notify.ts";
+const nt = code(NOTIFY);
+const fnBody = (src: string, name: string) => {
+  const at = src.indexOf(`export const ${name} = quiet(`);
+  if (at < 0) return "";
+  const next = src.indexOf("\nexport ", at + 1);
+  return src.slice(at, next < 0 ? src.length : next);
+};
+const approvers = nt.slice(nt.indexOf("export async function marketingApproverIds"), nt.indexOf("export const notifyPostSubmitted"));
+check("the approvers asked are exactly whom the approve route lets through: Super Admins + «Social Marketing Approvals» AND 'edit' on Social Marketing, overrides winning",
+  /const ids = new Set\(await superAdminAccountIds\(tenantId\)\);/.test(approvers) &&
+  /const APPROVALS = SOCIAL_APPROVALS_MODULE;/.test(approvers) && /const APP = SPACE_MODULE\.company;/.test(approvers) &&
+  /\.eq\("status", "active"\)/.test(approvers) && /\.not\("role_id", "is", null\)/.test(approvers) &&
+  /const mayApprove = typeof oA\?\.can_view === "boolean" \? oA\.can_view : rA\?\.can_view === true;/.test(approvers) &&
+  /if \(oM\?\.can_view === false\) continue;/.test(approvers) &&
+  /const edit = typeof oM\?\.can_edit === "boolean" \? oM\.can_edit : rM\?\.can_edit;/.test(approvers) &&
+  /if \(edit === true \|\| \(!oM && !rM && isOpenAccessModule\(APP\)\)\) ids\.add\(c\.id\);/.test(approvers) &&
+  /requireModuleAccess\(auth, SOCIAL_APPROVALS_MODULE\)/.test(code(APPROVALS)) &&
+  /gatePost\(req, id, "edit"\)/.test(code(`${POSTS_DIR}/[id]/approve/route.ts`)) && /if \(!g\.approver\) return notApprover\(\);/.test(code(`${POSTS_DIR}/[id]/approve/route.ts`)));
+const submitted = fnBody(nt, "notifyPostSubmitted");
+check("sent for approval → the approvers are asked after the response, only once it really was sent, never the sender",
+  /const sent = await submitPost\(g\.auth\.tenant_id, id, v\.version\);\s*if \(!isError\(sent\)\) after\(\(\) => notifyPostSubmitted\(g\.auth, id\)\);\s*return reply\(sent\);/.test(code(`${POSTS_DIR}/[id]/submit/route.ts`)) &&
+  /if \(!post \|\| post\.space !== "company" \|\| post\.status !== "in_review"\) return;/.test(submitted) &&
+  /recipients: await marketingApproverIds\(a\.tenant_id\),\s*senderId: a\.account_id,/.test(submitted) &&
+  /supersede: \{ type: "marketing_approval_request", post_id: post\.id \}/.test(submitted));
+check("no approve buttons in the bell: the request opens the post, whose preview is what is approved (owner's pick)",
+  !/marketing_/.test(code("src/lib/notification-decisions.ts")) &&
+  /const postLink = \(id: string\) => `\/social-marketing\/posts\/\$\{encodeURIComponent\(id\)\}`;/.test(nt) &&
+  (nt.match(/link: postLink\(post\.id\),/g) ?? []).length === 4);
+const decided = fnBody(nt, "notifyPostDecided");
+check("every decision answers the request for every approver first, then tells the author (never the one who decided)",
+  before(decided, 'await clearUnreadByMeta({ type: "marketing_approval_request", post_id: postId });', "const post = await loadPost(") &&
+  /recipients: \[post\.created_by\],\s*senderId: a\.account_id,/.test(decided) &&
+  /supersede: \{ type: "marketing_post_decided", post_id: post\.id \}/.test(decided));
+const apR = code(`${POSTS_DIR}/[id]/approve/route.ts`);
+const scR = code(`${POSTS_DIR}/[id]/schedule/route.ts`);
+check("approve (scheduled or now), send back, move, publish now and cancel each tell the author — and only after they succeeded",
+  before(apR, 'if (isError(approved)) return reply(approved);', 'after(() => notifyPostDecided(g.auth, id, approved.scheduled ? "scheduled" : "approved"));') &&
+  before(apR, 'after(() => notifyPostDecided(g.auth, id, approved.scheduled ? "scheduled" : "approved"));', "if (approved.scheduled) return") &&
+  /if \(!isError\(back\)\) after\(\(\) => notifyPostDecided\(g\.auth, id, "rejected"\)\);/.test(code(`${POSTS_DIR}/[id]/reject/route.ts`)) &&
+  /if \(!isError\(moved\)\) after\(\(\) => notifyPostDecided\(g\.auth, id, "scheduled"\)\);/.test(scR) &&
+  before(scR, "if (isError(now)) return reply(now);", 'after(() => notifyPostDecided(g.auth, id, "approved"));') &&
+  /if \(!isError\(off\)\) after\(\(\) => notifyPostDecided\(g\.auth, id, "unscheduled"\)\);/.test(code(`${POSTS_DIR}/[id]/unschedule/route.ts`)));
+const itemR = code(`${POSTS_DIR}/[id]/route.ts`);
+const review = fnBody(nt, "settleReview");
+check("a request stops asking when an edit takes the post out of review (asked of the post itself) or the post is deleted",
+  /if \(!isError\(saved\) && g\.post\.status === "in_review"\) after\(\(\) => settleReview\(g\.auth\.tenant_id, id\)\);/.test(itemR) &&
+  before(review, '?.status === "in_review") return;', 'await clearUnreadByMeta({ type: "marketing_approval_request", post_id: postId });') &&
+  /if \(!isError\(gone\)\) after\(\(\) => settleDeleted\(id\)\);/.test(itemR) &&
+  /clearUnreadByMetaIn\(\{ post_id: postId \}, "type", \["marketing_approval_request", "marketing_post_decided", "marketing_publish_failed"\]\)/.test(nt));
+const pb9 = code(PUBLISH);
+const settle9 = pb9.slice(pb9.indexOf("export async function settlePost"), pb9.indexOf("export async function publishPost"));
+check("publishing's outcome is told ONCE: the settled status is written from the status it was read with, and only a run that moved it tells",
+  /const SETTLED: readonly PostStatus\[\] = \["published", "partly_published", "failed"\];/.test(pb9) &&
+  /\.eq\("tenant_id", tenantId\)\.eq\("id", postId\)\.eq\("status", current\.status\)\.select\("id"\);/.test(settle9) &&
+  before(settle9, "if (moved?.length && status !== current.status && SETTLED.includes(status)) {", "later(() => notifyPublishOutcome(tenantId, postId, status, actorId));"));
+const outcome = fnBody(nt, "notifyPublishOutcome");
+const actorCalls = [apR, scR, code(`${POSTS_DIR}/[id]/publish/route.ts`)].filter((src) => /publishPost\(g\.auth\.tenant_id, id, \{ budgetMs: 45_000, actorId: g\.auth\.account_id \}\)/.test(src)).length;
+check("whoever watched the publishing is not told again: each person's run passes its actor, the cron none; a failure reaches the author and its approver",
+  actorCalls === 3 &&
+  /markShared\(g\.auth\.tenant_id, id, targetId, g\.auth\.account_id\)/.test(code(`${POSTS_DIR}/[id]/targets/[targetId]/shared/route.ts`)) &&
+  /return settlePost\(tenantId, postId, \{ actorId: opts\.actorId \?\? null \}\);/.test(pb9) &&
+  /const settled = await settlePost\(tenantId, postId, \{ actorId \}\);/.test(pb9) &&
+  !/actorId/.test(code("src/lib/server/marketing/cron.ts")) &&
+  /if \(to === "published"\) \{\s*if \(actorId\) return;/.test(outcome) &&
+  /recipients: \[post\.created_by, post\.decided_by\],\s*senderId: actorId,/.test(outcome) &&
+  /supersede: \{ type: "marketing_publish_failed", post_id: post\.id \}/.test(outcome));
+const retry9 = code(`${POSTS_DIR}/[id]/publish/route.ts`);
+check("a retry clears the old failure BEFORE it publishes again (a new failure writes its own)",
+  before(retry9, "const r = await retryFailed(g.auth.tenant_id, id);", "await settleFailure(id);") && before(retry9, "await settleFailure(id);", "publishPost(") &&
+  /clearUnreadByMeta\(\{ type: "marketing_publish_failed", post_id: postId \}\)/.test(nt));
+check("only Social Marketing's space notifies until CEO Brand has screens to open",
+  ["notifyPostSubmitted", "notifyPostDecided", "notifyPublishOutcome"].every((n) => /post\.space !== "company"/.test(fnBody(nt, n))));
+const rem9 = code("src/lib/server/approval-reminders.ts");
+check("a request that waits a day comes back to the approvers (the Hub's reminders), while the post is in review",
+  /marketing_approval_request: \{\s*table: "marketing_posts", cols: "id, status",\s*id: \(m\) => str\(m\.post_id\),\s*waiting: \(e\) => e\.status === "in_review",/.test(rem9));
+const reg9 = code("src/lib/notification-types.ts");
+check("registered: the request under Approvals (waits on the reader); decisions, failures and publishing under Social marketing",
+  /marketing_approval_request: \{ app: "social-marketing", activity: "approvals", severity: "action", lifecycle: \{ kind: "clear", key: "post_id",/.test(reg9) &&
+  /marketing_post_decided: +\{ app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: \{ kind: "supersede", key: "post_id" \} \}/.test(reg9) &&
+  /marketing_publish_failed: +\{ app: "social-marketing", activity: "marketing_activity", severity: "warning", lifecycle: \{ kind: "clear", key: "post_id",/.test(reg9) &&
+  /marketing_post_published: +\{ app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: \{ kind: "info" \} \}/.test(reg9));
+check("Settings has the Social marketing switch everywhere a switch lives (mute, sound, default on, en/zh/ar)",
+  /"marketing_activity",\s*\] as const;/.test(code("src/lib/notification-activity.ts")) &&
+  /if \(type\.startsWith\("marketing"\)\) return "marketing_activity";/.test(code("src/lib/notification-activity.ts")) &&
+  /"marketing_activity",\s*\] as const;/.test(code("src/lib/notificationSound.ts")) &&
+  /marketing_activity\?: boolean;/.test(code("src/lib/access-control.ts")) && /marketing_activity: true,/.test(code("src/lib/access-control.ts")) &&
+  /\{ key: "marketing_activity", tKey: "act\.marketing" \}/.test(code("src/components/settings/tabs/NotificationsTab.tsx")) &&
+  /marketing_activity: "act\.marketing",/.test(code("src/components/settings/tabs/SoundsTab.tsx")) &&
+  /"act\.marketing": \{ en: "[^"]+", zh: "[^"]+", ar: "[^"]+" \}/.test(code("src/lib/translations/settings.ts")) &&
+  /"act\.marketing\.hint": \{ en: "[^"]+", zh: "[^"]+", ar: "[^"]+" \}/.test(code("src/lib/translations/settings.ts")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

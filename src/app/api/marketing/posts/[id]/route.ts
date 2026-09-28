@@ -6,12 +6,15 @@ import "server-only";
           author or an approver, only while a draft, in review or sent back.
    DELETE ?version= — delete a draft (or one sent back / in review). "delete";
           only the author or an approver.
-   Every change carries the version the screen read (409 when stale). */
+   Every change carries the version the screen read (409 when stale). An
+   edit that takes a post out of review, or a delete, settles its
+   notifications after the response (marketing/notify). */
 
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { requireModuleAction } from "@/lib/server/auth";
 import { EDITABLE, cleanInput, deletePost, isError, loadPost, updatePost } from "@/lib/server/marketing/posts";
 import { gatePost, readVersion, reply } from "@/lib/server/marketing/post-gate";
+import { settleDeleted, settleReview } from "@/lib/server/marketing/notify";
 import { SPACE_MODULE } from "@/lib/marketing/spaces";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +55,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (v instanceof NextResponse) return v;
     const clean = cleanInput(g.auth.tenant_id, v.body);
     if (isError(clean)) return reply(clean);
-    return reply(await updatePost(g.auth.tenant_id, id, v.version, clean.input, { accountId: g.auth.account_id, approver: g.approver }));
+    const saved = await updatePost(g.auth.tenant_id, id, v.version, clean.input, { accountId: g.auth.account_id, approver: g.approver });
+    if (!isError(saved) && g.post.status === "in_review") after(() => settleReview(g.auth.tenant_id, id));
+    return reply(saved);
   } catch (e) {
     console.error("[api/marketing/posts/id PATCH]", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Could not save the post." }, { status: 500 });
@@ -66,7 +71,9 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     if (g instanceof NextResponse) return g;
     const version = Number(req.nextUrl.searchParams.get("version"));
     if (!Number.isInteger(version) || version < 1) return NextResponse.json({ error: "Reload the post and try again.", code: "no_version" }, { status: 400 });
-    return reply(await deletePost(g.auth.tenant_id, id, version, { accountId: g.auth.account_id, approver: g.approver }));
+    const gone = await deletePost(g.auth.tenant_id, id, version, { accountId: g.auth.account_id, approver: g.approver });
+    if (!isError(gone)) after(() => settleDeleted(id));
+    return reply(gone);
   } catch (e) {
     console.error("[api/marketing/posts/id DELETE]", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Could not delete the post." }, { status: 500 });

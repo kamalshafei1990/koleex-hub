@@ -23,7 +23,7 @@ export const NOTIFICATION_ACTIVITIES = [
   "quotation_activity", "low_stock", "inventory_activity",
   "finance_activity", "qa_reports", "price_fx",
   "hr_activity", "discuss_messages", "security_alerts", "comments_activity",
-  "membership_requests", "reports_activity",
+  "membership_requests", "reports_activity", "marketing_activity",
 ] as const;
 export type NotificationActivity = (typeof NOTIFICATION_ACTIVITIES)[number];
 
@@ -53,6 +53,9 @@ export function classifyBySubstring(type: string): NotificationActivity | null {
   /* Order matters: specific families before generic word matches. */
   if (type.includes("mention")) return "mentions";
   if (type.includes("approval")) return "approvals";
+  /* Social Marketing's posts — decided, published, failed to publish. A
+     request to approve one went to "approvals" just above. */
+  if (type.startsWith("marketing")) return "marketing_activity";
   if (
     type.includes("login") || type.includes("device") || type.includes("new_ip") ||
     type.includes("password") || type.includes("security") || type.includes("2fa") ||

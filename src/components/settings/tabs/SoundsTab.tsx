@@ -93,6 +93,7 @@ const ACTIVITY_KEYS: Record<SoundActivity, string> = {
   security_alerts: "act.security",
   comments_activity: "act.comments",
   reports_activity: "act.reports",
+  marketing_activity: "act.marketing",
 };
 
 /** What the picker screen is currently editing. */

@@ -90,6 +90,12 @@ const CHECKS: Record<string, Check> = {
     id: (m) => str(m.membership_request_id) ?? str(m.request_id),
     waiting: (e) => e.status === "pending",
   },
+  /* A Social Marketing post waits while it is in review. */
+  marketing_approval_request: {
+    table: "marketing_posts", cols: "id, status",
+    id: (m) => str(m.post_id),
+    waiting: (e) => e.status === "in_review",
+  },
 };
 export const REMINDED_TYPES = Object.keys(CHECKS);
 

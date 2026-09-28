@@ -69,6 +69,7 @@ const ACTIVITY_GROUPS: { tKey: string; items: { key: ActivityKey; tKey: string }
     tKey: "act.group.business",
     items: [
       { key: "quotation_activity", tKey: "act.quotation" },
+      { key: "marketing_activity", tKey: "act.marketing" },
       { key: "low_stock", tKey: "act.lowStock" },
       { key: "inventory_activity", tKey: "act.inventory" },
       { key: "finance_activity", tKey: "act.finance" },

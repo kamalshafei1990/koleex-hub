@@ -366,7 +366,7 @@ console.log("\nI. every date a notification shows reads D/M/Y");
    page, 2026-09-20 inside the text — and not one of them day first. */
 const DATE_KEYS = new Set(["date", "day", "due", "from", "to", "when", "until", "deadline", "expires"]);
 /* A date parameter is made by a day-first formatter, each proven below. */
-const DMY_MAKERS = /\bdmyDate\(|\bfmt\(|\bformatWhen\(|\bw\.when\b|\bspan\(/;
+const DMY_MAKERS = /\bdmyDate\(|\bfmt\(|\bformatWhen\(|\bw\.when\b|\bspan\(|\bdmyHm\(/;
 /* Values that pass for a reason other than their own text. */
 const DATE_OK: Record<string, string> = {
   "src/app/api/hr/attendance/overtime/route.ts date: only.date": "Decided.date, built with dmyDate(x.rec.date) where the day is decided",
@@ -395,10 +395,13 @@ const fileSrc = (rel: string) => stripComments(fs.readFileSync(R(rel), "utf8"));
 const dmyBody = fileSrc("src/lib/work-reports.ts").match(/export function dmyDate\([\s\S]*?\n\}/)?.[0] ?? "";
 const planningFmt = fileSrc("src/lib/server/planning-notify.ts").match(/const fmt = [\s\S]*?\n\};/)?.[0] ?? "";
 const calendarWhen = fileSrc("src/lib/server/calendar-notify.ts").match(/function whenParts[\s\S]*?\n\}/)?.[0] ?? "";
+/* Social Marketing's times: Shanghai wall-clock, day first. */
+const marketingDmyHm = fileSrc("src/lib/marketing/format.ts").match(/export function dmyHm\([\s\S]*?\n\}/)?.[0] ?? "";
 const formatterOk = [
   ["work-reports dmyDate", /`\$\{m\[3\]\}\/\$\{m\[2\]\}\/\$\{m\[1\]\}`/.test(dmyBody) && /getDate\(\)[^`]*\/\$\{[^`]*getMonth\(\)/.test(dmyBody)],
   ["planning-notify fmt", /getUTCDate\(\)\)\}\/\$\{p\(d\.getUTCMonth\(\)/.test(planningFmt)],
   ["calendar-notify whenParts", /"en-GB"/.test(calendarWhen) && /reverse\(\)\.join\("\/"\)/.test(calendarWhen)],
+  ["marketing format dmyHm", /`\$\{p2\(s\.d\)\}\/\$\{p2\(s\.m\)\}\/\$\{s\.y\} /.test(marketingDmyHm) && /shanghai\(iso\)/.test(marketingDmyHm)],
 ].filter(([, ok]) => !ok).map(([n]) => n);
 check("each of those formatters writes the day first", formatterOk.length === 0, formatterOk.join(", "));
 /* The surfaces that show a notification never format a date by locale. */
@@ -955,7 +958,7 @@ const remX = fileSrc("src/lib/server/approval-reminders.ts");
 const remTypes = [...remX.matchAll(/^  ([a-z_]+): \{\s*\n\s*table: "/gm)].map((m) => m[1]);
 check("hourly", /"path": "\/api\/cron\/approval-reminders",\s*"schedule": "20 \* \* \* \*"/.test(vercelW));
 check("the request types it covers are registered requests (severity action)",
-  remTypes.length === 6 && remTypes.every((t) => entries.has(t) && new RegExp(`^\\s+${t}:\\s*\\{[^\\n]*severity: "action"`, "m").test(regSrc)), remTypes.join(", "));
+  remTypes.length === 7 && remTypes.every((t) => entries.has(t) && new RegExp(`^\\s+${t}:\\s*\\{[^\\n]*severity: "action"`, "m").test(regSrc)), remTypes.join(", "));
 check("\"still waiting\" is asked of the request itself (its own table), never of the notification's state",
   /await supabaseServer\.from\(check\.table\)\.select\(check\.cols\)\.in\("id", ids\.slice\(i, i \+ 100\)\)/.test(remX)
   && /const waiting = rows\.filter\(\(r\) => verdict\(r\) === true\);/.test(remX)

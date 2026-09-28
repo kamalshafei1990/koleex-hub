@@ -265,6 +265,7 @@ export interface NotificationPrefs {
   security_alerts?: boolean;
   comments_activity?: boolean;
   reports_activity?: boolean;
+  marketing_activity?: boolean;
   /* Quiet hours — a daily window (recipient-local) during which push and
      chimes stay silent. `tz` is snapshotted from the browser at save time so
      the SERVER can evaluate the window without guessing the user's zone.
@@ -430,6 +431,7 @@ export const DEFAULT_PREFERENCES: Required<
     security_alerts: true,
     comments_activity: true,
     reports_activity: true,
+    marketing_activity: true,
     popup_cards: true,
   },
   display: {
