@@ -50,6 +50,8 @@ const CHUNK_PRELOADERS: Record<string, () => Promise<unknown>> = {
   customers: () => import("@/components/contacts/Contacts"),
   suppliers: () => import("@/components/contacts/Contacts"),
   quotations: () => import("@/components/quotations/Quotations"),
+  /* Settings opens on Profile unless a ?tab= says otherwise. */
+  settings: () => import("@/components/settings/tabs/ProfileTab"),
 };
 
 import { isHeavyPreloadAllowed, readNetworkContext } from "./app-prefetch";

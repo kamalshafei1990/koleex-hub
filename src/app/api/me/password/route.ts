@@ -71,7 +71,9 @@ export async function POST(req: Request) {
   const { hash, algo } = await hashForWrite(next);
   const { error: updErr } = await supabaseServer
     .from("accounts")
-    .update({ password_hash: hash, password_algo: algo, force_password_change: false })
+    /* password_changed_at: lib/server/password.ts expects every writer to
+       stamp it, and this self-service path did not. */
+    .update({ password_hash: hash, password_algo: algo, force_password_change: false, password_changed_at: new Date().toISOString() })
     .eq("id", auth.account_id);
   if (updErr) {
     console.error("[me/password] update:", updErr.message);

@@ -131,7 +131,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Accounts", "edit");
   if (deny) return deny;
@@ -218,7 +218,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(_req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Accounts", "delete");
   if (deny) return deny;

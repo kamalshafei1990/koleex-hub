@@ -5,18 +5,21 @@
    Instant-apply, iOS-style. The device/push management stays on the
    dedicated /settings/notifications page. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { NotificationPrefs } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
-import { SettingsCard, SwitchRow, Chevron } from "./ui";
+import { SettingsCard, SwitchRow, Chevron, SaveError } from "./ui";
+import { usePrefSlice } from "./usePrefSlice";
 import { isPushSupported, isIosNeedsInstall, permissionState, resyncPushSubscription, subscribeToPush, unsubscribeCurrent } from "@/lib/push-client";
 import type { QuietHoursPref } from "@/lib/access-control";
 import { inQuietHours } from "@/lib/notification-activity";
-import { fetchMyChannels, setChannelMuted } from "@/lib/discuss";
+/* @/lib/discuss is loaded when the muted list needs it, not with the tab:
+   its static import pulled supabase-js along (~184 KB) and the tab waited for
+   all of it before painting a single switch (speed audit, 29/09/2026). */
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import type { DiscussChannelWithState } from "@/types/supabase";
 import { useTranslation } from "@/lib/i18n";
@@ -218,7 +221,8 @@ function MutedConversationsCard() {
   useEffect(() => {
     let cancelled = false;
     if (!account?.id) return;
-    fetchMyChannels(account.id)
+    import("@/lib/discuss")
+      .then(({ fetchMyChannels }) => fetchMyChannels(account.id))
       .then((rows) => { if (!cancelled) setChannels(rows.filter((c) => c.muted)); })
       .catch(() => { if (!cancelled) setChannels([]); });
     return () => { cancelled = true; };
@@ -227,6 +231,7 @@ function MutedConversationsCard() {
   async function unmute(id: string) {
     if (!account?.id) return;
     setBusyId(id);
+    const { setChannelMuted } = await import("@/lib/discuss");
     const ok = await setChannelMuted(id, account.id, false);
     if (ok) setChannels((prev) => (prev ?? []).filter((c) => c.id !== id));
     setBusyId(null);
@@ -308,37 +313,17 @@ export default function NotificationsTab({ account, onChanged }: {
 }) {
   const { t } = useTranslation(settingsT);
   const { data: boot } = useMeBootstrap();
-  const [n, setN] = useState<NotificationPrefs>(() => withDefaults(account.preferences).notifications as NotificationPrefs);
-  /* What we last wrote — same stale-snapshot guard as DisplayTab/RegionTab.
-     Without it the post-save account refresh could arrive carrying the
-     PRE-save bag, visibly flipping a just-toggled switch back; a user (or a
-     fast double-click) then "corrects" the phantom revert and unknowingly
-     re-saves the OLD value. Verified live before the fix: UI said Approvals
-     ON while the DB kept false. */
-  const savedRef = useRef<string | null>(null);
-
-  /* Re-sync when the account refreshes so this tab reflects saves from
-     elsewhere and merges onto fresh values. */
-  useEffect(() => {
-    const incoming = withDefaults(account.preferences).notifications as NotificationPrefs;
-    const json = JSON.stringify(incoming);
-    if (savedRef.current !== null) {
-      if (json !== savedRef.current) return;   // still stale — keep the local edit
-      savedRef.current = null;                 // caught up; resume normal syncing
-    }
-    setN(incoming);
-  }, [account.preferences]);
-
-  function patch(next: Partial<NotificationPrefs>) {
-    const merged = { ...n, ...next };
-    savedRef.current = JSON.stringify(merged);
-    setN(merged);
-    // Persist ONLY the notifications slice; the server merges it onto the rest.
-    void updateAccountPreferences(account.id, { notifications: merged }).then((ok) => { if (ok) onChanged(); });
-  }
+  /* Only the switches changed are sent, never `pause_until` (the bell owns
+     it — sending this tab's copy cancelled a pause, or brought an old one
+     back); a failed save is put back and said (usePrefSlice). */
+  const { value: n, patch, failed } = usePrefSlice<NotificationPrefs>(
+    withDefaults(account.preferences).notifications as NotificationPrefs,
+    (changed) => updateAccountPreferences(account.id, { notifications: changed as NotificationPrefs }).then((ok) => { if (ok) onChanged(); return ok; }),
+  );
 
   return (
     <div className="space-y-4">
+      <SaveError show={failed} text={t("saveFailed")} />
       <PushEnableCard />
       {/* Pop-up cards while the Hub is in front (layout/NotificationCards). */}
       <SettingsCard title={t("notif.cards")} subtitle={t("notif.cards.sub")}>

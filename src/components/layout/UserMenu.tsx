@@ -46,6 +46,14 @@ export default function UserMenu({ dk }: { dk: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  /* Settings is one tap away once this menu is open — warm its route and its
+     first tab then, so the tap does not pay a cold round trip (speed audit,
+     29/09/2026: the other ways in already prefetch; this one did not). */
+  useEffect(() => {
+    if (!open) return;
+    try { router.prefetch("/settings"); } catch { /* ignore */ }
+    void import("@/lib/app-chunk-preload").then(({ preloadAppChunk }) => preloadAppChunk("settings")).catch(() => {});
+  }, [open, router]);
   const [signedIn, setSignedIn] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

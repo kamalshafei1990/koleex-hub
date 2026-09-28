@@ -3,7 +3,7 @@
 /* Settings → Display & Accessibility. Edits accounts.preferences.display
    (jsonb) and applies instantly to <html> — no Save button, iOS-style. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { DisplayPrefs, TextSizePref, DensityPref } from "@/lib/access-control";
@@ -12,7 +12,8 @@ import {
   applyDisplayPreferences, saveDisplayPreferencesLocally, getThemePreference, setTheme,
   TEXT_SCALE, type ThemePreference,
 } from "@/lib/display-prefs";
-import { SettingsCard, ControlRow, Segmented, SwitchRow, AppearancePreview } from "./ui";
+import { SettingsCard, ControlRow, Segmented, SwitchRow, AppearancePreview, SaveError } from "./ui";
+import { usePrefSlice } from "./usePrefSlice";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { getSkin, setSkin, DEFAULT_SKIN, type Skin } from "@/lib/appearance";
@@ -34,12 +35,14 @@ const DEFAULT_DISPLAY: Partial<DisplayPrefs> = {
 export default function DisplayTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
-  const [d, setD] = useState<DisplayPrefs>(() => withDefaults(account.preferences).display as DisplayPrefs);
-  /* What we last wrote. The account refresh below can arrive carrying the
-     PRE-save snapshot (shared identity cache), which would visibly revert the
-     user's choice a second after they made it — so ignore incoming snapshots
-     until they catch up with our own write. */
-  const savedRef = useRef<string | null>(null);
+  /* Only the fields changed are sent; a failed save is put back and said
+     (usePrefSlice). */
+  const { value: d, patch, failed } = usePrefSlice<DisplayPrefs>(
+    withDefaults(account.preferences).display as DisplayPrefs,
+    (changed) => updateAccountPreferences(account.id, { display: changed as DisplayPrefs }).then((ok) => { if (ok) onChanged(); return ok; }),
+    (merged) => { applyDisplayPreferences(merged); saveDisplayPreferencesLocally(merged); },
+  );
+  const [layoutFailed, setLayoutFailed] = useState(false);
 
   const { t } = useTranslation(settingsT);
   const [theme, setThemeState] = useState<ThemePreference>("dark");
@@ -74,8 +77,14 @@ export default function DisplayTab({ account, onChanged }: {
      every device follows. */
   const homeLayout = useHomeLayout();
   function pickHomeLayout(v: HomeLayout) {
+    const before = homeLayout;
     setHomeLayout(v);
-    void updateAccountPreferences(account.id, { home_layout: v }).then((ok) => { if (ok) onChanged(); });
+    setLayoutFailed(false);
+    void updateAccountPreferences(account.id, { home_layout: v }).then((ok) => {
+      if (ok) { onChanged(); return; }
+      setHomeLayout(before);
+      setLayoutFailed(true);
+    });
   }
 
   function pickTheme(t: ThemePreference) {
@@ -83,30 +92,9 @@ export default function DisplayTab({ account, onChanged }: {
     setTheme(t);   // resolves + data-theme + "themechange" (header syncs)
   }
 
-  /* Re-sync local state whenever the account refreshes (e.g. after another
-     tab saved the shared `display` slice) so edits merge onto fresh values. */
-  useEffect(() => {
-    const incoming = withDefaults(account.preferences).display as DisplayPrefs;
-    const json = JSON.stringify(incoming);
-    if (savedRef.current !== null) {
-      if (json !== savedRef.current) return;   // still stale — keep the local edit
-      savedRef.current = null;                 // caught up; resume normal syncing
-    }
-    setD(incoming);
-  }, [account.preferences]);
-
-  function patch(next: Partial<DisplayPrefs>) {
-    const merged = { ...d, ...next };
-    savedRef.current = JSON.stringify(merged);
-    setD(merged);
-    applyDisplayPreferences(merged);       // live, whole-app
-    saveDisplayPreferencesLocally(merged);
-    // Persist ONLY the display slice; the server merges it onto the rest.
-    void updateAccountPreferences(account.id, { display: merged }).then((ok) => { if (ok) onChanged(); });
-  }
-
   return (
     <div className="space-y-4">
+      <SaveError show={failed || layoutFailed} text={t("saveFailed")} />
       <SettingsCard title={t("display.title")} subtitle={t("display.sub")}>
         {/* THE CHOICE IS SHOWN, NOT NAMED. Both of these were rows of
             word-buttons, which asks the reader to pick a look from its label —

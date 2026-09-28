@@ -15,7 +15,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
   return (
     <div className={`flex items-center justify-between gap-4 py-3 ${last ? "" : "border-b border-[var(--border-faint)]"}`}>
       <span className="text-[13px] text-[var(--text-dim)]">{label}</span>
-      <span className="text-[13px] font-medium text-[var(--text-primary)] text-right truncate max-w-[60%]">{value}</span>
+      <span className="text-[13px] font-medium text-[var(--text-primary)] text-end truncate max-w-[60%]">{value}</span>
     </div>
   );
 }
@@ -30,7 +30,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
       /Edg\//.test(ua) ? "Edge" :
       /Chrome\//.test(ua) ? "Chrome" :
       /Safari\//.test(ua) ? "Safari" :
-      /Firefox\//.test(ua) ? "Firefox" : "Browser";
+      /Firefox\//.test(ua) ? "Firefox" : "";
     const installed = window.matchMedia?.("(display-mode: standalone)")?.matches
       || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     setDevice({ browser, installed: !!installed });
@@ -49,7 +49,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
         <div className="space-y-1">
           <Row label={t("about.version")} value={APP_VERSION} />
           <Row label={t("about.desktop")} value={`v${DESKTOP_VERSION} (macOS)`} />
-          <Row label={t("about.device")} value={`${device.browser}${device.installed ? ` · ${t("about.installed")}` : ""}`} last />
+          <Row label={t("about.device")} value={`${device.browser || t("hist.browser")}${device.installed ? ` · ${t("about.installed")}` : ""}`} last />
         </div>
       </section>
 
@@ -65,7 +65,7 @@ export default function AboutTab({ account }: { account: AccountWithLinks; onCha
       <section className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{t("about.support")}</h2>
         <p className="text-[12px] text-[var(--text-dim)]">
-          {t("about.support.pre")} <span className="font-medium text-[var(--text-secondary)]">{t("about.support.report")}</span> {t("about.support.post")}
+          {t("about.support.body")}
         </p>
       </section>
     </div>

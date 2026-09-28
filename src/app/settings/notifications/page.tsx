@@ -24,7 +24,10 @@ import {
   permissionState,
   subscribeToPush,
   unsubscribeCurrent,
+  currentEndpoint,
 } from "@/lib/push-client";
+import { useConfirm } from "@/components/kds/useConfirm";
+import { fmtDMYTime } from "@/lib/finance/format";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -34,6 +37,7 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 
 interface Device {
   id: string;
+  endpoint: string | null;
   device_name: string | null;
   browser: string | null;
   os: string | null;
@@ -50,11 +54,8 @@ interface HistoryRow {
   created_at: string;
 }
 
-function fmt(ts: string | null): string {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
-}
+/* D/M/Y, the Hub's one date order — toLocaleString() printed M/D/Y. */
+const fmt = (ts: string | null): string => fmtDMYTime(ts);
 
 export default function NotificationsSettingsPage() {
   const { t } = useTranslation(settingsT);
@@ -68,6 +69,12 @@ export default function NotificationsSettingsPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [busy, setBusy] = useState(false);
+  /* Its own flag: "Send test" used to spin the Enable button. */
+  const [testing, setTesting] = useState(false);
+  /* Which row is THIS device — removing it is the only removal that should
+     also switch push off here. */
+  const [myEndpoint, setMyEndpoint] = useState<string | null>(null);
+  const { askConfirm, confirmDialog } = useConfirm();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [prefsOpen, setPrefsOpen] = useState(false);
 
@@ -75,6 +82,7 @@ export default function NotificationsSettingsPage() {
     setSupported(isPushSupported());
     setNeedsInstall(isIosNeedsInstall());
     setPerm(permissionState());
+    void currentEndpoint().then(setMyEndpoint);
   }, []);
 
   const loadDevices = useCallback(async () => {
@@ -99,6 +107,7 @@ export default function NotificationsSettingsPage() {
     setPerm(permissionState());
     if (r.ok) {
       setMsg({ kind: "ok", text: t("push.registered") });
+      setMyEndpoint(await currentEndpoint());
       await loadDevices();
     } else {
       setMsg({ kind: "err", text: r.error || t("push.enableFailed") });
@@ -107,7 +116,7 @@ export default function NotificationsSettingsPage() {
   };
 
   const sendTest = async () => {
-    setBusy(true);
+    setTesting(true);
     setMsg(null);
     const res = await fetch("/api/push/test", { method: "POST", credentials: "include" });
     const j = (await res.json().catch(() => ({}))) as { ok?: boolean; sent?: number; error?: string };
@@ -117,19 +126,31 @@ export default function NotificationsSettingsPage() {
         : { kind: "err", text: j.error || t("push.noDevices") },
     );
     await loadHistory();
-    setBusy(false);
+    setTesting(false);
   };
 
-  const removeDevice = async (id: string) => {
-    await fetch("/api/push/devices", {
-      method: "DELETE",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    await loadDevices();
-    await unsubscribeCurrent().catch(() => {});
-  };
+  /* Removing ANY row used to unsubscribe the device in your hand as well —
+     deleting an old laptop turned push off on the phone doing the deleting.
+     Only the row that is this device does that now, and every removal asks
+     first. */
+  const removeDevice = (d: Device) =>
+    askConfirm(t("push.removeConfirm"), async () => {
+      const res = await fetch("/api/push/devices", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: d.id }),
+      });
+      if (!res.ok) {
+        setMsg({ kind: "err", text: t("push.removeFailed") });
+        return;
+      }
+      if (d.endpoint && d.endpoint === myEndpoint) {
+        await unsubscribeCurrent().catch(() => {});
+        setMyEndpoint(null);
+      }
+      await loadDevices();
+    }, { confirmLabel: t("push.removeDevice") });
 
   if (bootLoading) {
     return (
@@ -207,11 +228,12 @@ export default function NotificationsSettingsPage() {
               {busy ? <SpinnerIcon className="h-4 w-4" /> : <BellIcon className="h-4 w-4" />}
               {t("push.enableBtn")}
             </button>
-            <button onClick={sendTest} disabled={busy} className={btnGhost}>
+            <button onClick={sendTest} disabled={busy || testing} className={btnGhost}>
+              {testing && <SpinnerIcon className="h-4 w-4" />}
               {t("push.testBtn")}
             </button>
             <button onClick={() => setPrefsOpen(true)} className={btnGhost}>
-              <LockIcon className="h-4 w-4" /> {t("push.prefsBtn")}
+              <BellIcon className="h-4 w-4" /> {t("push.prefsBtn")}
             </button>
           </div>
 
@@ -235,7 +257,7 @@ export default function NotificationsSettingsPage() {
         <div className={card}>
           <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">{t("push.yourDevices")}</h3>
           {devices.length === 0 ? (
-            <p className="text-[12.5px] text-[var(--text-ghost)]">{t("push.noneRegistered")}</p>
+            <p className="text-[12.5px] text-[var(--text-dim)]">{t("push.noneRegistered")}</p>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {devices.map((d) => (
@@ -243,13 +265,16 @@ export default function NotificationsSettingsPage() {
                   <MonitorIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] text-[var(--text-primary)] truncate">
-                      {d.device_name || `${d.browser ?? "?"} on ${d.os ?? "?"}`}
+                      {d.device_name || [d.browser, d.os].filter(Boolean).join(" · ") || "—"}
+                      {d.endpoint && d.endpoint === myEndpoint && (
+                        <span className="ms-2 text-[11px] font-medium text-[var(--text-dim)]">{t("push.thisDevice")}</span>
+                      )}
                     </div>
-                    <div className="text-[11px] text-[var(--text-ghost)]">{t("push.added").replace("{a}", fmt(d.created_at)).replace("{b}", fmt(d.last_used_at))}</div>
+                    <div className="text-[11px] text-[var(--text-dim)]">{t("push.added").replace("{a}", fmt(d.created_at)).replace("{b}", fmt(d.last_used_at))}</div>
                   </div>
                   <button
-                    onClick={() => removeDevice(d.id)}
-                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[#FF3333]/10 hover:text-[#FF6B6B]"
+                    onClick={() => removeDevice(d)}
+                    className="h-11 w-11 inline-flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[#FF3333]/10 hover:text-[#FF6B6B]"
                     aria-label={t("push.removeDevice")}
                   >
                     <TrashIcon className="h-4 w-4" />
@@ -264,7 +289,7 @@ export default function NotificationsSettingsPage() {
         <div className={card}>
           <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-3">{t("push.recent")}</h3>
           {history.length === 0 ? (
-            <p className="text-[12.5px] text-[var(--text-ghost)]">{t("push.nothingSent")}</p>
+            <p className="text-[12.5px] text-[var(--text-dim)]">{t("push.nothingSent")}</p>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {history.map((h) => (
@@ -272,7 +297,9 @@ export default function NotificationsSettingsPage() {
                   <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${h.status === "sent" ? "bg-[#00CC66]" : h.status === "failed" ? "bg-[#FF3333]" : "bg-[var(--text-ghost)]"}`} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] text-[var(--text-primary)] truncate">{h.body || h.title}</div>
-                    <div className="text-[10.5px] text-[var(--text-ghost)]">{h.channel} · {h.status} · {fmt(h.created_at)}</div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">
+                      {h.status === "sent" ? t("push.status.sent") : h.status === "failed" ? t("push.status.failed") : h.status} · {fmt(h.created_at)}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -282,6 +309,7 @@ export default function NotificationsSettingsPage() {
       </div>
 
       {prefsOpen && <AlertPreferencesModal onClose={() => setPrefsOpen(false)} />}
+      {confirmDialog}
     </div>
   );
 }

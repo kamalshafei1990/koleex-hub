@@ -23,7 +23,7 @@ export async function GET() {
        login_email, force_password_change, two_factor_enabled,
        last_login_at, created_at, updated_at, is_super_admin,
        preferences,
-       person:people(id, full_name, name_alt, email, avatar_url, first_name, last_name, phone, job_title, country, city, language),
+       person:people(id, full_name, name_alt, display_name, email, avatar_url, first_name, last_name, phone, mobile, job_title, country, city, state, postal_code, address_line1, address_line2, notes, language),
        role:roles(id, name, is_super_admin, can_view_private, description, display_order)`,
     )
     .eq("id", auth.account_id)

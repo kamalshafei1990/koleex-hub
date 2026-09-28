@@ -21,7 +21,7 @@
 
 import { getSoundPrefs, playSoundFile, primeSoundFiles, soundContext, soundEngineHeld } from "@/lib/notificationSound";
 import { scheduleTone, TONE_GAIN } from "@/lib/voice/tones";
-import { SOUND_CATALOG, soundByKey, soundLength, type SoundKey } from "./catalog";
+import { soundByKey, soundLength, type SoundKey } from "./catalog";
 
 /** Where a cue's recording lives. Pure. */
 export function soundSrc(key: SoundKey): string {
@@ -62,12 +62,15 @@ export function primeSounds(keys: readonly SoundKey[]): void {
   }
 }
 
-/** The whole catalog, for the settings screen's preview. */
-export function primeAllSounds(): void {
+/** One cue, whether or not it is switched on — the Sounds screen's preview,
+ *  inside the tap. It primed the WHOLE catalog (31 files, ~268 KB) on the
+ *  first preview (speed audit, 29/09/2026). */
+export function primeSound(key: SoundKey): void {
   try {
-    primeSoundFiles(SOUND_CATALOG.map((s) => soundSrc(s.key)));
+    primeSoundFiles([soundSrc(key)]);
   } catch { /* as above */ }
 }
+
 
 const lastPlayed = new Map<SoundKey, number>();
 

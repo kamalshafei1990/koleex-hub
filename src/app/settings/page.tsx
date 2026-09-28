@@ -4,17 +4,14 @@
    /settings — self-service account settings.
 
    Deliberately narrower than the admin Accounts app. Exposes only what
-   a regular user can change about themselves:
-
-     - Profile photo
-     - Display name + personal phone + personal email
-     - Preferences (language / theme / notifications / signature)
-     - Calendar (timezone / working hours / default meeting length / OOO)
+   a regular user can change about themselves: profile, calendar, display,
+   wallpaper, sounds, Koleex AI, language & region, notifications, their own
+   password, sign-in history and privacy (plus the tenant's stamp and admin
+   tools for Super Admins).
 
    Locked away on purpose (admin-only, in /accounts/[id]):
      - Username
      - Login email
-     - Password       ← super-admin-only per policy
      - Role / permissions / access rights
      - Status, tenant, company, user_type
      - HR data (hire date, salary, bank, visa, passport, etc.)
@@ -84,20 +81,44 @@ const tabLoading = () => (
     <SpinnerIcon size={20} />
   </div>
 );
-const ProfileTab        = dynamic(() => import("@/components/settings/tabs/ProfileTab"),        { loading: tabLoading });
-const CalendarTab       = dynamic(() => import("@/components/admin/accounts/tabs/CalendarTab"), { loading: tabLoading });
-const DisplayTab        = dynamic(() => import("@/components/settings/tabs/DisplayTab"),        { loading: tabLoading });
-const SoundsTab         = dynamic(() => import("@/components/settings/tabs/SoundsTab"),         { loading: tabLoading });
-const WallpaperTab      = dynamic(() => import("@/components/settings/tabs/WallpaperTab"),      { loading: tabLoading });
-const RegionTab         = dynamic(() => import("@/components/settings/tabs/RegionTab"),         { loading: tabLoading });
-const NotificationsTab  = dynamic(() => import("@/components/settings/tabs/NotificationsTab"),  { loading: tabLoading });
-const PasswordTab       = dynamic(() => import("@/components/settings/tabs/PasswordTab"),       { loading: tabLoading });
-const LoginHistoryTab   = dynamic(() => import("@/components/settings/tabs/LoginHistoryTab"),   { loading: tabLoading });
-const PrivacyTab        = dynamic(() => import("@/components/settings/tabs/PrivacyTab"),        { loading: tabLoading });
-const StampSignatureTab = dynamic(() => import("@/components/settings/tabs/StampSignatureTab"), { loading: tabLoading });
-const AdminTab          = dynamic(() => import("@/components/settings/tabs/AdminTab"),          { loading: tabLoading });
-const AboutTab          = dynamic(() => import("@/components/settings/tabs/AboutTab"),          { loading: tabLoading });
-const AiTab             = dynamic(() => import("@/components/settings/tabs/AiTab"),             { loading: tabLoading });
+/* One loader per tab, so the same import can be started early (below) and
+   by the row under the pointer — import() de-dupes, next/dynamic reuses it. */
+const TAB_LOADERS = {
+  profile:       () => import("@/components/settings/tabs/ProfileTab"),
+  calendar:      () => import("@/components/admin/accounts/tabs/CalendarTab"),
+  display:       () => import("@/components/settings/tabs/DisplayTab"),
+  sounds:        () => import("@/components/settings/tabs/SoundsTab"),
+  wallpaper:     () => import("@/components/settings/tabs/WallpaperTab"),
+  region:        () => import("@/components/settings/tabs/RegionTab"),
+  notifications: () => import("@/components/settings/tabs/NotificationsTab"),
+  password:      () => import("@/components/settings/tabs/PasswordTab"),
+  security:      () => import("@/components/settings/tabs/LoginHistoryTab"),
+  privacy:       () => import("@/components/settings/tabs/PrivacyTab"),
+  assets:        () => import("@/components/settings/tabs/StampSignatureTab"),
+  admin:         () => import("@/components/settings/tabs/AdminTab"),
+  about:         () => import("@/components/settings/tabs/AboutTab"),
+  ai:            () => import("@/components/settings/tabs/AiTab"),
+} as const;
+const ProfileTab        = dynamic(TAB_LOADERS.profile,       { loading: tabLoading });
+const CalendarTab       = dynamic(TAB_LOADERS.calendar,      { loading: tabLoading });
+const DisplayTab        = dynamic(TAB_LOADERS.display,       { loading: tabLoading });
+const SoundsTab         = dynamic(TAB_LOADERS.sounds,        { loading: tabLoading });
+const WallpaperTab      = dynamic(TAB_LOADERS.wallpaper,     { loading: tabLoading });
+const RegionTab         = dynamic(TAB_LOADERS.region,        { loading: tabLoading });
+const NotificationsTab  = dynamic(TAB_LOADERS.notifications, { loading: tabLoading });
+const PasswordTab       = dynamic(TAB_LOADERS.password,      { loading: tabLoading });
+const LoginHistoryTab   = dynamic(TAB_LOADERS.security,      { loading: tabLoading });
+const PrivacyTab        = dynamic(TAB_LOADERS.privacy,       { loading: tabLoading });
+const StampSignatureTab = dynamic(TAB_LOADERS.assets,        { loading: tabLoading });
+const AdminTab          = dynamic(TAB_LOADERS.admin,         { loading: tabLoading });
+const AboutTab          = dynamic(TAB_LOADERS.about,         { loading: tabLoading });
+const AiTab             = dynamic(TAB_LOADERS.ai,            { loading: tabLoading });
+
+/** Start a tab's code early. Safe to call often. */
+function warmTab(id: string) {
+  const load = (TAB_LOADERS as Record<string, (() => Promise<unknown>) | undefined>)[id];
+  if (load) void load().catch(() => {});
+}
 
 /* Language names in their own script, the way the switcher shows them — a
    reader scanning for "العربية" should find the word they picked, not a
@@ -111,6 +132,11 @@ function requestedTab(): Tab | null {
   const want = new URLSearchParams(window.location.search).get("tab");
   return want && (TABS as readonly string[]).includes(want) ? (want as Tab) : null;
 }
+
+/* THE FIRST TAB STARTS DOWNLOADING WITH THE PAGE (speed audit, 29/09/2026).
+   It used to wait for hydration, AuthGate and the account — then one more
+   round trip for its own code. Now its chunk loads alongside all of that. */
+if (typeof window !== "undefined") warmTab(requestedTab() ?? "profile");
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -186,7 +212,7 @@ function SettingsContent() {
 
   if (!account) {
     return (
-      <WorkspaceSkeleton label="Loading settings…" />
+      <WorkspaceSkeleton label={t("loading")} />
     );
   }
 
@@ -241,7 +267,9 @@ function SettingsContent() {
      and it says so there. */
   const pushValue = pushPermissionValue(t);
   const notifPrefs = withDefaults(account.preferences).notifications as NotificationPrefs;
-  const mutedCount = Object.values(notifPrefs).filter((v) => v === false).length;
+  /* Activities switched off — not pop-up cards (a presentation choice, not a
+     silenced activity) and not the pause/quiet-hours values. */
+  const mutedCount = Object.entries(notifPrefs).filter(([k, v]) => v === false && k !== "popup_cards").length;
 
   const sections: SectionDef[] = [
     {
@@ -448,6 +476,7 @@ function SettingsContent() {
                 <SettingsRow
                   active={!mobileDetail && tab === "notifications"}
                   onClick={() => openSection("notifications")}
+                  onIntent={() => warmTab("notifications")}
                   icon={notificationsItem.icon}
                   label={notificationsItem.label}
                   subtitle={notificationsItem.subtitle}
@@ -495,10 +524,13 @@ function SettingsContent() {
             <button
               type="button"
               onClick={() => setMobileDetail(false)}
-              className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
+              className="md:hidden h-11 -ms-1 pe-3 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
             >
               <Chevron back /> {t("allSettings")}
             </button>
+            {/* On a phone the section had no name once pushed — Admin, Stamp
+                and Calendar open straight onto a card. */}
+            <h1 className="md:hidden mb-3 text-[20px] font-semibold text-[var(--text-primary)]">{active.label}</h1>
             {/* Fill the detail pane on desktop; cap only so ultra-wide
                 monitors don't stretch forms to unreadable line lengths.
                 key + kx-tab-in: switching sections must RIDE in, never
@@ -532,6 +564,7 @@ function MasterGroup({
             key={s.id}
             active={!mobileDetail && activeTab === s.id}
             onClick={() => onOpen(s.id)}
+            onIntent={() => warmTab(s.id)}
             icon={s.icon}
             label={s.label}
             subtitle={s.subtitle}
@@ -547,9 +580,12 @@ function MasterGroup({
 /* ─────────────── iOS-style disclosure row ─────────────── */
 
 function SettingsRow({
-  active, onClick, href, icon, label, subtitle, value, isLast,
+  active, onClick, onIntent, href, icon, label, subtitle, value, isLast,
 }: {
-  active?: boolean; onClick?: () => void; href?: string;
+  active?: boolean; onClick?: () => void;
+  /** Pointer or focus arrived — warm the tab's code before the tap. */
+  onIntent?: () => void;
+  href?: string;
   icon: React.ReactNode; label: string; subtitle?: string;
   /** Current state, shown at the inline end. Omit when the row has none. */
   value?: string; isLast?: boolean;
@@ -604,7 +640,7 @@ function SettingsRow({
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls} data-selected={active} data-kx-keep-hover="">
+    <button type="button" onClick={onClick} onPointerEnter={onIntent} onTouchStart={onIntent} onFocus={onIntent} className={cls} data-selected={active} aria-current={active ? "page" : undefined} data-kx-keep-hover="">
       {inner}
     </button>
   );

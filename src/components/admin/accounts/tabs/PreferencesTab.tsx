@@ -59,9 +59,14 @@ export default function PreferencesTab({ account, onChanged }: Props) {
   async function save() {
     setSaving(true);
     setError(null);
-    // Persist the full merged bag — simpler than diffing and the jsonb
-    // payload is small.
-    const ok = await updateAccountPreferences(account.id, prefs);
+    /* Only what this screen edits (Settings audit, 29/09/2026): the full
+       withDefaults bag wrote this screen's copy of every other slice — the
+       person's wallpaper, My apps, display, pause — back over newer values. */
+    const ok = await updateAccountPreferences(account.id, {
+      language: prefs.language,
+      theme: prefs.theme,
+      email_signature: prefs.email_signature,
+    });
     setSaving(false);
     if (!ok) {
       setError(t("acc.err.preferencesFailed"));

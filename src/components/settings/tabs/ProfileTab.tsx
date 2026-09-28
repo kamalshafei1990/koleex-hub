@@ -21,6 +21,8 @@ import { withDefaults } from "@/lib/access-control";
 import type { ProfilePrefs } from "@/lib/access-control";
 import { updateAccountAvatar, updateAccountPreferences } from "@/lib/accounts-admin";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
+import { fmtDMY, fmtDMYTime } from "@/lib/finance/format";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -38,7 +40,8 @@ import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
-import { SettingsCard } from "@/components/settings/tabs/ui";
+import { SettingsCard, BodyPortal } from "@/components/settings/tabs/ui";
+import { useConfirm } from "@/components/kds/useConfirm";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ── State shape ── */
@@ -100,21 +103,22 @@ export default function ProfileTab({
 
   /* May this user edit identity fields? Fail-closed: fields stay locked
      until the server says yes (same rule as PATCH /api/people/[id]). */
-  const [canEditIdentity, setCanEditIdentity] = useState(false);
+  const { data: boot } = useMeBootstrap();
+  const isSA = !!boot?.isSuperAdmin;
+  const [allowedByServer, setCanEditIdentity] = useState(false);
+  /* A Super Admin is always allowed (the route says so for them too), so the
+     question is not asked — one round trip less on the default tab. */
+  const canEditIdentity = isSA || allowedByServer;
   useEffect(() => {
+    if (isSA) return;
     let cancelled = false;
     fetch("/api/me/can-edit-profile", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { allowed: false }))
       .then((j: { allowed?: boolean }) => { if (!cancelled) setCanEditIdentity(j.allowed === true); })
       .catch(() => { /* stay locked */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [isSA]);
 
-  /* Re-sync when the account refreshes (avatar save, prefs save elsewhere). */
-  useEffect(() => { setForm(peopleFrom(account)); }, [account]);
-  useEffect(() => {
-    setProf(withDefaults(account.preferences).profile as ProfilePrefs);
-  }, [account.preferences]);
 
   useEffect(() => {
     if (!toast) return;
@@ -138,6 +142,20 @@ export default function ProfileTab({
     () => withDefaults(account.preferences).profile as ProfilePrefs,
     [account.preferences],
   );
+  /* Follow the account (avatar save, a save elsewhere) ONLY while nothing is
+     being edited — the old effect replaced the form on every refresh, so
+     uploading a photo mid-edit threw the typed fields away. Done during
+     render, so there is no frame with the stale form. */
+  const [seenBase, setSeenBase] = useState(base);
+  if (base !== seenBase) {
+    setSeenBase(base);
+    if ((Object.keys(form) as (keyof PeopleForm)[]).every((k) => form[k] === seenBase[k])) setForm(base);
+  }
+  const [seenProf, setSeenProf] = useState(baseProf);
+  if (baseProf !== seenProf) {
+    setSeenProf(baseProf);
+    if (JSON.stringify(prof) === JSON.stringify(seenProf)) setProf(baseProf);
+  }
   const peopleDirty =
     canEditIdentity &&
     (Object.keys(form) as (keyof PeopleForm)[]).some((k) => form[k] !== base[k]);
@@ -158,23 +176,16 @@ export default function ProfileTab({
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            full_name: form.full_name.trim() || null,
-            display_name: form.display_name.trim() || null,
-            name_alt: form.name_alt.trim() || null,
-            job_title: form.job_title.trim() || null,
-            phone: form.phone.trim() || null,
-            mobile: form.mobile.trim() || null,
-            email: form.email.trim() || null,
-            notes: form.notes.trim() || null,
-            language: form.language.trim() || null,
-            address_line1: form.address_line1.trim() || null,
-            address_line2: form.address_line2.trim() || null,
-            city: form.city.trim() || null,
-            state: form.state.trim() || null,
-            country: form.country.trim() || null,
-            postal_code: form.postal_code.trim() || null,
-          }),
+          /* ONLY THE FIELDS THAT CHANGED (Settings audit, 29/09/2026). It
+             sent all fifteen, and seven of them (mobile, notes, address,
+             state, postal code, display name) never reached this form — so
+             any save wrote them back as empty. Sending the edited ones means
+             a field this screen could not see can never be touched. */
+          body: JSON.stringify(Object.fromEntries(
+            (Object.keys(form) as (keyof PeopleForm)[])
+              .filter((k) => form[k] !== base[k])
+              .map((k) => [k, form[k].trim() || null]),
+          )),
         });
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -212,6 +223,7 @@ export default function ProfileTab({
     }
   }
 
+  const { askConfirm, confirmDialog } = useConfirm();
   async function removePhoto() {
     setUploadingAvatar(true);
     const ok = await updateAccountAvatar(account.id, null);
@@ -227,6 +239,7 @@ export default function ProfileTab({
 
   return (
     <div className="space-y-4 pb-2">
+      <BodyPortal>{confirmDialog}</BodyPortal>
       <IdentitySourceNote
         text={
           canEditIdentity ? t("prof.note.editable") : t("prof.note.readonly")
@@ -255,7 +268,7 @@ export default function ProfileTab({
                 <SpinnerIcon className="h-5 w-5 text-white" />
               </span>
             ) : (
-              <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-60 flex items-center justify-center transition-opacity">
                 <CameraIcon size={18} className="text-white" />
               </span>
             )}
@@ -271,7 +284,7 @@ export default function ProfileTab({
             <p className="text-[13px] text-[var(--text-primary)] font-medium">{t("prof.photo")}</p>
             <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{t("prof.photo.hint")}</p>
             {avatarUrl && (
-              <button type="button" onClick={removePhoto} disabled={uploadingAvatar} className="mt-2 text-[11px] text-red-400 hover:text-red-300">
+              <button type="button" onClick={() => askConfirm(t("prof.removePhotoConfirm"), removePhoto, { cancelLabel: t("confirm.cancel"), confirmLabel: t("assets.remove") })} disabled={uploadingAvatar} className="mt-2 min-h-11 text-[12px] text-[#FF6B6B] hover:text-[#FF3333]">
                 {t("prof.photo.remove")}
               </button>
             )}
@@ -490,18 +503,16 @@ function ReadRow({ icon, label, value, badge }: {
 
 function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
+/* D/M/Y, the Hub's one date order — toLocaleDateString(undefined, …) followed
+   the browser and printed "Sep 28, 2026". */
 function fmtDate(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  const s = fmtDMY(iso);
+  return s === "—" ? null : s;
 }
 
 function fmtDateTime(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const s = fmtDMYTime(iso);
+  return s === "—" ? null : s;
 }
 
 /* Image resize — crop-to-square, same logic AccountDetail uses so avatars

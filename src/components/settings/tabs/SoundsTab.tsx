@@ -36,14 +36,14 @@ import {
   setSoundPrefs,
   subscribeSoundPrefs,
 } from "@/lib/notificationSound";
-import { SettingsCard, SwitchRow } from "@/components/settings/tabs/ui";
+import { SettingsCard, SwitchRow, Chevron } from "@/components/settings/tabs/ui";
 import VlIcon from "@/components/ui/VlIcon";
 import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { SOUND_CATALOG, type SoundGroup } from "@/lib/sounds/catalog";
-import { previewSoundMoment, primeAllSounds, setSoundMoment, soundEnabled } from "@/lib/sounds/player";
+import { previewSoundMoment, primeSound, setSoundMoment, soundEnabled } from "@/lib/sounds/player";
 
 const TONE_LABELS: Record<"classic" | SynthTone, string> = {
   classic: "Classic",
@@ -63,7 +63,7 @@ function toneLabel(tone: SoundTone | undefined, t: (k: string) => string): strin
   return (
     LIBRARY_LABELS[tone as LibraryTone] ??
     TONE_LABELS[tone as "classic" | SynthTone] ??
-    "Silent"
+    t("sounds.silent")
   );
 }
 
@@ -142,6 +142,7 @@ export default function SoundsTab() {
             <div className="text-[13px] font-medium text-[var(--text-primary)]">{t("sounds.volume")}</div>
             <input
               type="range"
+              aria-label={t("sounds.volume")}
               min={0}
               max={100}
               value={Math.round(prefs.volume * 100)}
@@ -233,7 +234,7 @@ export default function SoundsTab() {
                 label={s.label[lang]}
                 hint={s.when[lang]}
                 checked={soundEnabled(s.key, prefs)}
-                onPreview={() => { primeAllSounds(); previewSoundMoment(s.key); }}
+                onPreview={() => { primeSound(s.key); previewSoundMoment(s.key); }}
                 onChange={(on) => setSoundMoment(s.key, on, setSoundPrefs, prefs)}
                 last={i === items.length - 1}
                 dim={!prefs.ai.enabled || muted}
@@ -348,9 +349,9 @@ function NavRow({
       </span>
       <span className="flex shrink-0 items-center gap-1.5">
         <span className="text-[13px] text-[var(--text-muted)]">{value}</span>
-        {/* -90° turns the down-chevron into the standard "drills in" arrow —
-            one Visual Library asset instead of a second near-identical one. */}
-        <VlIcon slug="angle-small-down" size={14} className="-rotate-90 text-[var(--text-dim)]" />
+        {/* The shared settings chevron: it mirrors in Arabic, the rotated
+            Visual Library arrow did not. */}
+        <Chevron className="text-[var(--text-dim)]" />
       </span>
     </button>
   );
@@ -399,9 +400,9 @@ function TonePicker({
           type="button"
           onClick={onBack}
           aria-label={t("sounds.back")}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+          className="inline-flex h-11 w-11 -ms-2 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
         >
-          <VlIcon slug="angle-small-down" size={16} className="rotate-90" />
+          <Chevron back />
         </button>
         <h2 className="min-w-0 truncate text-[15px] font-bold text-[var(--text-primary)]">{title}</h2>
       </div>

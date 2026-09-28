@@ -149,6 +149,19 @@ export async function releasePushOnSignOut(): Promise<void> {
   try { localStorage.removeItem(SYNCED_KEY); } catch { /* ignore */ }
 }
 
+/** This device's push endpoint, or null when it has no subscription — how
+ *  the devices list tells "this device" from the others. */
+export async function currentEndpoint(): Promise<string | null> {
+  try {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    return sub?.endpoint ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Unsubscribe this device locally + mark inactive on the server. */
 export async function unsubscribeCurrent(): Promise<void> {
   try {

@@ -41,9 +41,15 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const preferences = withDefaults(
-    (acct as { preferences?: unknown } | null)?.preferences as never,
-  );
+  const rawPrefs = ((acct as { preferences?: Record<string, unknown> | null } | null)?.preferences ?? {}) as Record<string, unknown>;
+  /* withDefaults returns the screens' keys only, so what the assistant
+     remembers about the person (ai_memory) and their reply language were
+     missing from their own data export. Personal data — it goes in. */
+  const preferences = {
+    ...withDefaults(rawPrefs as never),
+    ...(rawPrefs.ai_memory !== undefined ? { ai_memory: rawPrefs.ai_memory } : {}),
+    ...(rawPrefs.ai_reply_language !== undefined ? { ai_reply_language: rawPrefs.ai_reply_language } : {}),
+  };
 
   const payload = {
     exported_at: new Date().toISOString(),

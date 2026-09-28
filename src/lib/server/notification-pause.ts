@@ -14,7 +14,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
+import { mergeAccountPrefsNested } from "@/lib/server/account-prefs-nested";
 import { expandWithExceptions, type CalendarRec } from "@/lib/calendar-recurrence";
 import { accountTimezones } from "@/lib/server/calendar-notify";
 import { loadExceptions } from "@/lib/server/calendar-exceptions";
@@ -101,8 +101,8 @@ export type PauseResult =
   | { ok: true; until: string | null; meeting: boolean }
   | { ok: false; status: number; error: string };
 
-/** Start (or end) the account's pause. The notifications slice is written
- *  whole, as Settings writes it — merged onto the stored one here. */
+/** Start (or end) the account's pause: `notifications.pause_until` only,
+ *  merged into the stored slice in one statement. */
 export async function setPause(accountId: string, req: PauseRequest, now: Date = new Date()): Promise<PauseResult> {
   const nowMs = now.getTime();
   let until: Date | null = null;
@@ -121,11 +121,10 @@ export async function setPause(accountId: string, req: PauseRequest, now: Date =
     return { ok: false, status: 400, error: "until or meeting required" };
   }
 
-  const { data, error } = await supabaseServer.from("accounts").select("preferences").eq("id", accountId).maybeSingle();
-  if (error || !data) return { ok: false, status: 500, error: "Could not read preferences." };
-  const stored = ((data as { preferences?: { notifications?: Record<string, unknown> } | null }).preferences?.notifications ?? {}) as Record<string, unknown>;
+  /* One atomic write of the one field — the old read-then-write of the whole
+     slice could lose a switch toggled in Settings at the same moment. */
   const iso = until ? until.toISOString() : null;
-  const merged = await mergeAccountPrefs(accountId, { notifications: { ...stored, pause_until: iso } });
+  const merged = await mergeAccountPrefsNested(accountId, { notifications: { pause_until: iso } }, ["notifications"]);
   if (merged === null) return { ok: false, status: 500, error: "Could not save preferences." };
   return { ok: true, until: iso, meeting };
 }

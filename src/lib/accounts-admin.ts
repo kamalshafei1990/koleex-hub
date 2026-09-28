@@ -863,6 +863,9 @@ async function updateAccountPreferencesNow(
     const res = await fetch("/api/accounts/" + id + "/preferences", {
       method: "PATCH",
       credentials: "include",
+      /* A save fired as the page goes away (Wallpaper flushes on pagehide)
+         must outlive it. Payloads are small; the route caps them at 32 KB. */
+      keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preferences }),
     });

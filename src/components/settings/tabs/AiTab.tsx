@@ -31,7 +31,8 @@ import {
   type AiStyle,
   normalizeAiPersonalization,
 } from "@/lib/ai-personalization";
-import { ControlRow, Segmented, SelectControl, SettingsGroup, SwitchRow } from "@/components/settings/tabs/ui";
+import { ControlRow, Segmented, SelectControl, SettingsGroup, SwitchRow, SaveError, BodyPortal } from "@/components/settings/tabs/ui";
+import { useConfirm } from "@/components/kds/useConfirm";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -54,6 +55,8 @@ export default function AiTab({ account, onChanged }: {
   onChanged: () => void;
 }) {
   const { t, lang } = useTranslation(settingsT);
+  /* In-app, translated, RTL-aware — window.confirm was none of those. */
+  const { askConfirm, confirmDialog } = useConfirm();
 
   /* The account arrives with its preferences, so the form has a first
      value before the fetch answers; the fetch adds the memory facts and
@@ -137,6 +140,7 @@ export default function AiTab({ account, onChanged }: {
 
   return (
     <div className="space-y-6">
+      <BodyPortal>{confirmDialog}</BodyPortal>
       <OrbPicker accountId={account.id} onChanged={onChanged} />
 
       <SettingsGroup header={t("ai.tone.title")} footer={t("ai.guard")}>
@@ -231,7 +235,7 @@ export default function AiTab({ account, onChanged }: {
             {facts.length > 0 && (
               <button
                 type="button"
-                onClick={() => { if (window.confirm(t("ai.forgetAll.confirm"))) void forget("all"); }}
+                onClick={() => askConfirm(t("ai.forgetAll.confirm"), () => forget("all"), { confirmLabel: t("ai.forgetAll"), cancelLabel: t("confirm.cancel") })}
                 disabled={forgetting !== null}
                 className="text-[12px] text-[#FF3333] hover:underline disabled:opacity-40"
               >
@@ -460,7 +464,7 @@ function UsageSection({ t }: { t: (k: string) => string }) {
                 <tbody>
                   {report.days.map((d) => (
                     <tr key={d.day} className="border-t border-[var(--border-subtle)] text-[var(--text-primary)]">
-                      <td className="py-1 px-1 text-[var(--text-secondary)]">{d.day.slice(5)}</td>
+                      <td className="py-1 px-1 text-[var(--text-secondary)]">{`${d.day.slice(8, 10)}/${d.day.slice(5, 7)}`}</td>
                       {cols.map(([, key]) => <td key={key} className="text-end py-1 px-1">{d[key] || <span className="text-[var(--text-dim)]">·</span>}</td>)}
                     </tr>
                   ))}
@@ -502,15 +506,25 @@ function UsageSection({ t }: { t: (k: string) => string }) {
 function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () => void }) {
   const { t } = useTranslation(settingsT);
   const current = useOrbStyle();
+  const [failed, setFailed] = useState(false);
 
   function pick(style: OrbStyle) {
     if (style === current) return;
+    const before = current;
     setOrbStyle(style);
-    void updateAccountPreferences(accountId, { orb: style }).then((ok) => { if (ok) onChanged(); });
+    setFailed(false);
+    /* A failed save puts the orb back and says so — before, the new orb
+       stayed on screen and the account quietly won it back seconds later. */
+    void updateAccountPreferences(accountId, { orb: style }).then((ok) => {
+      if (ok) { onChanged(); return; }
+      setOrbStyle(before);
+      setFailed(true);
+    });
   }
 
   return (
     <SettingsGroup header={t("ai.orb.title")} footer={t("ai.orb.hint")} flush={false}>
+      <SaveError show={failed} text={t("saveFailed")} />
       <div role="radiogroup" aria-label={t("ai.orb.title")} className="flex gap-3 py-2">
         {ORB_STYLES.map((style) => {
           const on = style === current;

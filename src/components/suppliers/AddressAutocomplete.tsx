@@ -33,7 +33,7 @@ export default function AddressAutocomplete({
   // Probe once: if the key isn't configured the route says { disabled: true }.
   useEffect(() => {
     let alive = true;
-    fetch("/api/geocode?q=%E5%8C%97%E4%BA%AC", { credentials: "include" })
+    fetch("/api/geocode?probe=1", { credentials: "include" })
       .then((r) => r.json())
       .then((j) => { if (alive) setEnabled(!j?.disabled); })
       .catch(() => { if (alive) setEnabled(false); });

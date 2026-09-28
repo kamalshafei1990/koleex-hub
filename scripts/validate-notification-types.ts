@@ -889,7 +889,9 @@ check("\"in a meeting\" reads the Calendar — invited and not declined, timed, 
   && /expandWithExceptions\(/.test(pauseSrv) && /const MEETING_MAX_MS = 12 \* HOUR;/.test(pauseSrv)
   && /until = end \?\? new Date\(nowMs \+ HOUR\);/.test(pauseSrv));
 check("it is saved with the account (so every device and Settings see it) and survives withDefaults",
-  /mergeAccountPrefs\(accountId, \{ notifications: \{ \.\.\.stored, pause_until: iso \} \}\)/.test(pauseSrv)
+  /* 29/09/2026: one field, merged into the stored slice in one statement
+     (account_prefs_merge_nested) — no read-then-write of the whole slice. */
+  /mergeAccountPrefsNested\(accountId, \{ notifications: \{ pause_until: iso \} \}, \["notifications"\]\)/.test(pauseSrv)
   && /pause_until\?: string \| null;/.test(fileSrc("src/lib/access-control.ts"))
   && /\.\.\.\(p\.notifications \?\? \{\}\),/.test(fileSrc("src/lib/access-control.ts"))
   && /"quiet_hours" \| "popup_cards" \| "pause_until"/.test(fileSrc("src/components/settings/tabs/NotificationsTab.tsx"))

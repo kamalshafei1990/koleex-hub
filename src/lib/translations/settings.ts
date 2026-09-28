@@ -9,6 +9,13 @@ export const settingsT: Translations = {
   "title":                { en: "Settings", zh: "设置", ar: "الإعدادات" },
   "subtitle":             { en: "Your profile, preferences, and calendar defaults", zh: "您的资料、偏好和日历默认设置", ar: "ملفك الشخصي وتفضيلاتك وإعدادات التقويم" },
   "allSettings":          { en: "All settings", zh: "全部设置", ar: "كل الإعدادات" },
+  "saveFailed":           { en: "That change didn't save — it has been put back. Check your connection and try again.", zh: "该更改未能保存，已恢复原值。请检查网络后重试。", ar: "لم يُحفظ هذا التغيير وأُعيد كما كان. تحقّق من الاتصال وحاول مرة أخرى." },
+  "hist.browser":         { en: "Browser", zh: "浏览器", ar: "المتصفح" },
+  "confirm.cancel":       { en: "Cancel", zh: "取消", ar: "إلغاء" },
+  "assets.removeConfirm": { en: "Remove it? Quotations, invoices and packing lists will print without it until a new one is uploaded.", zh: "确定移除？在上传新的之前，报价单、发票和装箱单将不再显示它。", ar: "إزالته؟ ستُطبع عروض الأسعار والفواتير وقوائم التعبئة بدونه حتى يُرفع واحد جديد." },
+  "wp.removePhotoConfirm":{ en: "Remove this photo? It will be deleted.", zh: "移除这张照片？它将被删除。", ar: "إزالة هذه الصورة؟ سيتم حذفها." },
+  "prof.removePhotoConfirm": { en: "Remove your profile photo?", zh: "移除你的头像？", ar: "إزالة صورة ملفك الشخصي؟" },
+  "loading":              { en: "Loading settings…", zh: "正在加载设置…", ar: "جارٍ تحميل الإعدادات…" },
 
   /* Group names answer "what am I trying to do", not "what kind of setting is
      this". Display / Sounds / Region were three separate groups that all
@@ -16,8 +23,8 @@ export const settingsT: Translations = {
      one group now. Owner's reference does the same: Accessibility groups by
      Vision / Hearing / Speech, a human capability, not by feature type. */
   "group.personal":       { en: "Me", zh: "我", ar: "أنا" },
-  "group.display":        { en: "The Hub, for me", zh: "我的 Hub", ar: "الهاب عندي" },
-  "group.notifications":  { en: "What reaches me", zh: "发送给我的内容", ar: "اللي يوصلني" },
+  "group.display":        { en: "Preferences", zh: "偏好设置", ar: "التفضيلات" },
+  "group.notifications":  { en: "Notifications", zh: "通知", ar: "الإشعارات" },
   "group.security":       { en: "Security", zh: "安全", ar: "الأمان" },
   /* "group.workspace" removed with its group: it labelled a single row
      (Signature & stamp) that has moved into Administration, where the
@@ -37,7 +44,7 @@ export const settingsT: Translations = {
   "nav.sounds":           { en: "Sounds", zh: "声音", ar: "الأصوات" },
   "nav.sounds.sub":       { en: "Tones, volume, do not disturb", zh: "铃声、音量、勿扰模式", ar: "النغمات ومستوى الصوت وعدم الإزعاج" },
   "nav.region":           { en: "Language & region", zh: "语言与地区", ar: "اللغة والمنطقة" },
-  "nav.region.sub":       { en: "Date, time, number formats", zh: "日期、时间、数字格式", ar: "تنسيقات التاريخ والوقت والأرقام" },
+  "nav.region.sub":       { en: "Language, time format, week start", zh: "语言、时间格式、每周首日", ar: "اللغة وتنسيق الوقت وبداية الأسبوع" },
   "nav.notifications":    { en: "Notification preferences", zh: "通知偏好", ar: "تفضيلات الإشعارات" },
   "nav.notifications.sub":{ en: "Channels and per-activity", zh: "渠道与按活动设置", ar: "القنوات وحسب النشاط" },
   /* Shown on the master row only when something IS muted — see the note where
@@ -48,7 +55,7 @@ export const settingsT: Translations = {
   /* Push state on the master row. Only these two — "default" (never asked)
      shows nothing, because it is not a state the reader has chosen. */
   "push.on":            { en: "On",             zh: "已开启",     ar: "مفعّل" },
-  "push.off":           { en: "Off",            zh: "已关闭",     ar: "مقفول" },
+  "push.off":           { en: "Off",            zh: "已关闭",     ar: "متوقف" },
   "act.group.forMe":    { en: "Waiting on me",  zh: "等我处理",   ar: "مستني مني" },
   "act.group.myWork":   { en: "My schedule",    zh: "我的日程",   ar: "مواعيدي" },
   "act.group.business": { en: "The business",   zh: "业务动态",   ar: "حركة الشغل" },
@@ -141,7 +148,7 @@ export const settingsT: Translations = {
   "region.sun":           { en: "Sun", zh: "周日", ar: "الأحد" },
   "region.mon":           { en: "Mon", zh: "周一", ar: "الاثنين" },
   "region.sat":           { en: "Sat", zh: "周六", ar: "السبت" },
-  "region.footer":        { en: "First day of week drives the Calendar. Date, time and number formats are being adopted screen by screen — Login history uses them today.", zh: "“每周首日”会影响日历。日期、时间和数字格式正在逐屏启用——登录记录已在使用。", ar: "«أول أيام الأسبوع» يتحكم في التقويم. تنسيقات التاريخ والوقت والأرقام يجري اعتمادها شاشة تلو الأخرى — سجل الدخول يستخدمها اليوم." },
+  "region.footer":        { en: "Dates in the Hub are always day/month/year. Time format applies to notifications and sign-in history; first day of week drives the Calendar.", zh: "Hub 中的日期始终为 日/月/年。时间格式用于通知和登录记录；“每周首日”会影响日历。", ar: "التواريخ في المنصة دائمًا يوم/شهر/سنة. تنسيق الوقت يُطبَّق على الإشعارات وسجل الدخول، و«أول أيام الأسبوع» يتحكم في التقويم." },
 
   /* ── Koleex AI (personalization + memory) ── */
   "nav.ai":               { en: "Koleex AI", zh: "Koleex AI", ar: "Koleex AI" },
@@ -413,9 +420,7 @@ export const settingsT: Translations = {
   "about.accountType":    { en: "Account type", zh: "账户类型", ar: "نوع الحساب" },
   "about.role":           { en: "Role", zh: "角色", ar: "الدور" },
   "about.support":        { en: "Support", zh: "支持", ar: "الدعم" },
-  "about.support.pre":    { en: "Found a problem? Use the floating", zh: "发现问题？使用任意页面右下角的悬浮", ar: "واجهت مشكلة؟ استخدم زر" },
-  "about.support.report": { en: "Report", zh: "报告", ar: "الإبلاغ" },
-  "about.support.post":   { en: "button at the bottom-right of any page — it captures the screen and page for the team.", zh: "按钮——它会为团队截取当前屏幕和页面。", ar: "العائم أسفل يمين أي صفحة — يلتقط الشاشة والصفحة للفريق." },
+  "about.support.body":   { en: "Found a problem? Use the floating Report button in the corner of any page — it captures the screen and the page for the team.", zh: "发现问题？使用任意页面角落的悬浮“报告”按钮——它会为团队截取当前屏幕和页面。", ar: "واجهت مشكلة؟ استخدم زر «الإبلاغ» العائم في زاوية أي صفحة — يلتقط الشاشة والصفحة للفريق." },
 
   /* ── Profile ── */
   "prof.note.editable":   { en: "Your name, contact, and address are one shared person record — the same details also shown in the Accounts app and your HR profile. Editing here updates them everywhere.", zh: "您的姓名、联系方式和地址是一条共享的人员记录——与账户应用和 HR 档案中显示的信息相同。在此编辑会同步更新所有位置。", ar: "اسمك وجهات اتصالك وعنوانك سجل شخص واحد مشترك — نفس التفاصيل الظاهرة في تطبيق الحسابات وملفك في الموارد البشرية. التعديل هنا يحدّثها في كل مكان." },
@@ -514,6 +519,11 @@ export const settingsT: Translations = {
   "push.noneRegistered":  { en: "No devices registered yet. Tap “Enable Mobile Notifications” above.", zh: "尚未注册设备。请点按上方的“开启移动通知”。", ar: "لا أجهزة مسجّلة بعد. اضغط «تفعيل إشعارات الجوّال» أعلاه." },
   "push.added":           { en: "Added {a} · last used {b}", zh: "添加于 {a} · 最近使用 {b}", ar: "أُضيف {a} · آخر استخدام {b}" },
   "push.removeDevice":    { en: "Remove device", zh: "移除设备", ar: "إزالة الجهاز" },
+  "push.removeConfirm":   { en: "Remove this device? It will stop receiving notifications.", zh: "移除此设备？它将不再接收通知。", ar: "إزالة هذا الجهاز؟ لن يستقبل الإشعارات بعد ذلك." },
+  "push.removeFailed":    { en: "Couldn't remove the device. Try again.", zh: "无法移除设备，请重试。", ar: "تعذّرت إزالة الجهاز. حاول مرة أخرى." },
+  "push.thisDevice":      { en: "This device", zh: "本设备", ar: "هذا الجهاز" },
+  "push.status.sent":     { en: "Delivered", zh: "已送达", ar: "تم التوصيل" },
+  "push.status.failed":   { en: "Failed", zh: "失败", ar: "فشل" },
   "push.recent":          { en: "Recent notifications", zh: "最近通知", ar: "الإشعارات الأخيرة" },
   "push.nothingSent":     { en: "Nothing sent yet.", zh: "尚未发送任何通知。", ar: "لم يُرسل شيء بعد." },
 
