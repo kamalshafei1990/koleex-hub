@@ -11,7 +11,7 @@ import { CARD } from "@/components/travel/fields";
 type T = (key: string) => string;
 
 const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "live" | "building" | "planned"; href?: string }> = [
-  { key: "businessCard", icon: "id-badge", status: "live", href: "/brand-center/templates/business-card-team" },
+  { key: "businessCard", icon: "id-badge", status: "live", href: "/brand-center/templates/business-card" },
   { key: "staffCard", icon: "id-badge", status: "planned" },
   { key: "signature", icon: "signature", status: "planned" },
   { key: "badge", icon: "ticket", status: "planned" },

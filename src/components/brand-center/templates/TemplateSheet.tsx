@@ -13,8 +13,9 @@
             the job. The <svg> is sized in mm, so the browser's PDF is 1:1.
    --------------------------------------------------------------------------- */
 
-import type { CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 import type { TemplateDef, TemplateValues } from "@/lib/brand-center/templates/types";
+import { cardArabic } from "./fonts";
 
 /** Paper around the trim on a print page: bleed + crop marks + the slug. */
 export const PRINT_MARGIN = 12;
@@ -31,28 +32,30 @@ export default function TemplateSheet({ def, values, pageId, qr, mode, guides = 
   def: TemplateDef; values: TemplateValues; pageId: string; qr: boolean[][] | null;
   mode: "screen" | "print"; guides?: boolean; slug?: string; className?: string; style?: CSSProperties;
 }) {
+  const uid = `s${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const page = def.pages.find((p) => p.id === pageId) ?? def.pages[0];
   const { w, h, outerW, outerH } = sheetSize(def, values, mode);
   const b = def.bleed;
   const off = mode === "print" ? PRINT_MARGIN - b : 0; // where the bleed box starts
   const trim = { x: off + b, y: off + b };
-  const body = page.draw(values, { w, h, bleed: b, qr });
+  const body = page.draw(values, { w, h, bleed: b, qr, uid: `${uid}-${page.id}` });
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${outerW} ${outerH}`}
       width={mode === "print" ? `${outerW}mm` : "100%"} height={mode === "print" ? `${outerH}mm` : undefined}
-      className={className} style={{ direction: "ltr", ...style }} role="img" aria-label={slug}>
+      className={`${cardArabic.variable}${className ? ` ${className}` : ""}`} style={{ direction: "ltr", ...style }} role="img" aria-label={slug}>
       {mode === "print" ? <rect x={0} y={0} width={outerW} height={outerH} fill="#FFFFFF" /> : null}
       <defs>
-        <clipPath id={`bleed-${page.id}`}><rect x={off} y={off} width={w + b * 2} height={h + b * 2} /></clipPath>
+        <clipPath id={`${uid}-bleed`}><rect x={off} y={off} width={w + b * 2} height={h + b * 2} /></clipPath>
       </defs>
-      <g clipPath={`url(#bleed-${page.id})`}>
+      <g clipPath={`url(#${uid}-bleed)`}>
         <g transform={`translate(${off} ${off})`}>{body}</g>
       </g>
 
       {mode === "screen" && guides ? (
         <g pointerEvents="none">
-          <path fillRule="evenodd" fill="#FFFFFF" fillOpacity={0.32}
+          {/* A mid grey, so the bleed reads on black cards and white ones alike. */}
+          <path fillRule="evenodd" fill="#8E8E93" fillOpacity={0.5}
             d={`M0 0H${outerW}V${outerH}H0Z M${trim.x} ${trim.y}h${w}v${h}h-${w}Z`} />
           <rect x={trim.x} y={trim.y} width={w} height={h} fill="none" stroke="#0066FF" strokeWidth={0.2} />
           <rect x={trim.x + def.safe} y={trim.y + def.safe} width={w - def.safe * 2} height={h - def.safe * 2}

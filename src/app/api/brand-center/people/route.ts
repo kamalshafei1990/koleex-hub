@@ -2,11 +2,13 @@ import "server-only";
 
 /* GET /api/brand-center/people — who a fill-in template (business card,
    badge, signature …) can be filled for, with only the fields a template
-   prints: name, other-script name, position, department, work email, mobile.
+   prints: name, other-script name, position (with its Chinese and Arabic
+   titles), department, work email, mobile, and the profile photo (the
+   management card's portrait).
      · Brand Center "create" right → every active employee of the tenant;
      · anyone else who can open Brand Center → only themselves, so each
        employee can make their own card without seeing anyone else's data.
-   No photos, no ids beyond the row key, nothing about pay or status. */
+   No ids beyond the row key, nothing about pay or status. */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -15,7 +17,8 @@ import { brandCenterGate } from "@/lib/server/brand-center/access";
 
 export const dynamic = "force-dynamic";
 
-type Person = { id: string; full_name: string | null; name_alt: string | null; email: string | null; phone: string | null; mobile: string | null };
+type Person = { id: string; full_name: string | null; name_alt: string | null; email: string | null; phone: string | null; mobile: string | null; avatar_url: string | null };
+type Position = { id: string; title: string | null; title_zh: string | null; title_ar: string | null };
 
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
@@ -44,9 +47,9 @@ export async function GET(req: Request) {
   if (!personIds.length) return NextResponse.json({ scope: all ? "all" : "self", people: [] });
 
   const [people, assigns, positions, departments] = await Promise.all([
-    supabaseServer.from("people").select("id, full_name, name_alt, email, phone, mobile").in("id", personIds),
+    supabaseServer.from("people").select("id, full_name, name_alt, email, phone, mobile, avatar_url").in("id", personIds),
     supabaseServer.from("koleex_assignments").select("person_id, position_id, department_id").in("person_id", personIds).eq("is_active", true),
-    supabaseServer.from("koleex_positions").select("id, title"),
+    supabaseServer.from("koleex_positions").select("id, title, title_zh, title_ar"),
     supabaseServer.from("koleex_departments").select("id, name"),
   ]);
   const err = people.error ?? assigns.error ?? positions.error ?? departments.error;
@@ -56,18 +59,22 @@ export async function GET(req: Request) {
   }
   const personById = new Map(((people.data ?? []) as Person[]).map((p) => [p.id, p]));
   const assignByPerson = new Map((assigns.data ?? []).map((a) => [a.person_id as string, a]));
-  const titleById = new Map((positions.data ?? []).map((p) => [p.id as string, p.title as string]));
+  const positionById = new Map(((positions.data ?? []) as Position[]).map((p) => [p.id, p]));
   const deptById = new Map((departments.data ?? []).map((d) => [d.id as string, d.name as string]));
 
   const rows = (emps ?? []).flatMap((e) => {
     const p = e.person_id ? personById.get(e.person_id) : undefined;
     if (!p?.full_name) return [];
     const a = assignByPerson.get(p.id);
+    const pos = a?.position_id ? positionById.get(a.position_id) : undefined;
     return [{
       id: e.id as string,
       name: p.full_name,
       nameAlt: p.name_alt ?? null,
-      title: (a?.position_id && titleById.get(a.position_id)) || null,
+      title: pos?.title?.trim() || null,
+      titleZh: pos?.title_zh || null,
+      titleAr: pos?.title_ar || null,
+      photo: p.avatar_url || null,
       department: (a?.department_id && deptById.get(a.department_id)) || null,
       email: (e.work_email as string | null) || p.email || null,
       mobile: p.mobile || (e.work_phone as string | null) || p.phone || null,

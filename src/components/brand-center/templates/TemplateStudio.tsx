@@ -2,13 +2,14 @@
 
 /* ---------------------------------------------------------------------------
    Brand Center — a template's studio: /brand-center/templates/<id>
-   (plan steps C6 + C9).
+   (plan steps C6 + C9; the owner's round of 28/09/2026).
 
-   Pick an employee (or "my details") → the slots fill from Employees → edit
-   any of them → see every side at its real proportions → Print / Save as
-   PDF at the real size with bleed and crop marks, or take each side as SVG.
-   The design is locked: only the slots change. Nothing is saved; the one
-   request is the people list, and it only returns what a card prints.
+   Pick a style → pick an employee (or "my details") → the slots fill from
+   Employees in the card's language (name, translated title, photo) → edit
+   any of them → every side at its real proportions → Print / Save as PDF at
+   the real size with bleed and crop marks. The design is locked: only the
+   slots and the approved styles change. Nothing is saved; pictures chosen
+   here stay in this browser.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +19,7 @@ import { brandCenterTemplatesT } from "@/lib/translations/brand-center-templates
 import { bc, type BcPerson } from "@/lib/brand-center/client";
 import { templateById } from "@/lib/brand-center/templates/registry";
 import { qrModules } from "@/lib/brand-center/templates/qr";
-import type { FieldDef, TemplateValues } from "@/lib/brand-center/templates/types";
+import type { FieldDef, TemplateDef, TemplateValues } from "@/lib/brand-center/templates/types";
 import PageHeader from "@/components/ui/PageHeader";
 import BrandCenterIcon from "@/components/icons/BrandCenterIcon";
 import Toggle from "@/components/kds/Toggle";
@@ -26,10 +27,37 @@ import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
 import { FIELD, fill } from "../ui";
 import TemplateSheet from "./TemplateSheet";
 import { printTemplate } from "./print";
+import { readImage } from "./image-input";
 
 const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
-
+type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
+
+const ARABIC = /[\u0600-\u06FF]/;
+const CJK = /[\u2E80-\u9FFF]/;
+
+/** A mobile in the book's international format (ch. 91: "+86 130 7380
+ *  0720") when it is a Chinese or Egyptian mobile; anything else as typed. */
+function formatMobile(raw: string): string {
+  const d = raw.replace(/[^\d+]/g, "");
+  let m = d.match(/^(?:\+|00)?86(1\d{2})(\d{4})(\d{4})$/);
+  if (m) return `+86 ${m[1]} ${m[2]} ${m[3]}`;
+  m = d.match(/^(?:\+|00)?20(1\d)(\d{4})(\d{4})$/);
+  if (m) return `+20 ${m[1]} ${m[2]} ${m[3]}`;
+  return raw.trim();
+}
+
+/** The name as in the passport (ch. 91) — no "Mr.", "Dr." or "Eng." before it. */
+const HONORIFIC = /^(?:mr|mrs|ms|miss|dr|eng|prof)\.?\s+/i;
+
+/** What a person puts on a card in a language: the other-script name only
+ *  when it is in that language's script, the position's translated title. */
+function personValues(p: BcPerson, lang: unknown): TemplateValues {
+  const alt = p.nameAlt ?? "";
+  const name = (lang === "zh" && CJK.test(alt)) || (lang === "ar" && ARABIC.test(alt)) ? alt : p.name.replace(HONORIFIC, "");
+  const title = (lang === "zh" ? p.titleZh : lang === "ar" ? p.titleAr : null) || p.title || "";
+  return { name, title, mobile: p.mobile ? formatMobile(p.mobile) : "", email: p.email ?? "" };
+}
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -38,8 +66,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   const [person, setPerson] = useState<BcPerson | null>(null);
   const [people, setPeople] = useState<People>({ state: "loading" });
   const [guides, setGuides] = useState(true);
-  const [needName, setNeedName] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -62,44 +89,52 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   }
 
   const size = def.size(values);
-  const set = (key: string, v: string | boolean) => { setValues((o) => ({ ...o, [key]: v })); if (key === "name") setNeedName(false); };
-  const nameFor = (p: BcPerson, lang: unknown) => (lang !== "en" && p.nameAlt ? p.nameAlt : p.name);
+  const fillName = def.fillName?.(values, t) ?? "";
+  const heading = fillName ? `${t(def.nameKey)} — ${fillName}` : t(def.nameKey);
+  const set = (key: string, v: string | boolean) => { setBlocked(null); setValues((o) => ({ ...o, [key]: v })); };
   const choose = (p: BcPerson | null) => {
     setPerson(p);
-    setNeedName(false);
+    setBlocked(null);
     if (!p) return;
-    setValues((o) => ({ ...o, name: nameFor(p, o.lang), title: p.title ?? "", mobile: p.mobile ?? "", email: p.email ?? "" }));
+    setValues((o) => ({
+      ...o,
+      ...personValues(p, o.lang),
+      /* The Hub photo, unless a picture was chosen on this computer. */
+      ...(typeof o.photo === "string" && o.photo.startsWith("data:") ? {} : { photo: p.photo ?? "" }),
+    }));
   };
-  const setLang = (lang: string) => setValues((o) => ({ ...o, lang, ...(person ? { name: nameFor(person, lang) } : {}) }));
-  const clear = () => { setPerson(null); setValues({ ...def.defaults }); };
+  const setLang = (lang: string) => setValues((o) => {
+    const next = def.relang ? def.relang(o, lang) : { ...o, lang };
+    return person ? { ...next, ...personValues(person, lang) } : next;
+  });
+  const clear = () => { setPerson(null); setBlocked(null); setValues({ ...def.defaults, style: values.style, lang: values.lang }); };
 
-  const who = typeof values.name === "string" && values.name.trim() ? values.name.trim() : "";
-  const fileBase = `${templateId}${who ? `-${who.normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}` : ""}`;
-  const slug = `${t(def.nameKey)} · ${size.w} × ${size.h} mm + ${def.bleed} mm bleed${who ? ` · ${who}` : ""}`;
+  const who = typeof values.name === "string" ? values.name.trim() : "";
+  const slug = `${heading} · ${size.w} × ${size.h} mm + ${def.bleed} mm bleed${who ? ` · ${who}` : ""}`;
+  const fileBase = [def.id, typeof values.style === "string" ? values.style : "", who.normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()]
+    .filter(Boolean).join("-");
 
   const print = () => {
-    if (!who) { setNeedName(true); return; }
-    printTemplate({ templateId, values, fileName: fileBase, slug });
+    const missing = def.check?.(values) ?? (who ? null : "studio.needName");
+    if (missing) { setBlocked(missing); return; }
+    printTemplate({ templateId: def.id, values, fileName: fileBase, slug });
   };
-  const downloadSvg = (pageId: string) => {
-    if (!who) { setNeedName(true); return; }
-    const svg = printRef.current?.querySelector(`[data-page="${pageId}"] svg`);
-    if (!svg) return;
-    const text = `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(svg)}`;
-    const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = `${fileBase}-${pageId}.svg`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+
+  const shown = def.fields.filter((f) => f.when?.(values) ?? true);
+  const styleField = shown.find((f) => f.key === "style");
+  const vertical = size.h > size.w;
 
   return (
     <div className="min-h-full">
       <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-8">
-        <PageHeader title={t(def.nameKey)} subtitle={fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
+        <PageHeader title={heading} subtitle={fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
           icon={<BrandCenterIcon size={16} />} showTabs={false} backHref="/brand-center" backLabel={t("back.center")} />
 
-        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[400px_minmax(0,1fr)] lg:items-start">
+        {styleField && styleField.kind === "choice" ? (
+          <StylePicker t={t} def={def} values={values} field={styleField} onPick={(s) => set("style", s)} />
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[400px_minmax(0,1fr)] lg:items-start">
           <aside data-kx-pane className={`${CARD} px-4 py-4`}>
             <FillFrom t={t} people={people} person={person} onChoose={choose} />
 
@@ -108,15 +143,16 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
               <button type="button" onClick={clear} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("studio.clear")}</button>
             </div>
             <div className="mt-2 grid gap-3">
-              {def.fields.map((f) => (
-                <Field key={f.key} t={t} f={f} value={values[f.key]} onChange={(v) => (f.key === "lang" ? setLang(String(v)) : set(f.key, v))} />
+              {shown.filter((f) => f.key !== "style").map((f) => (
+                <Field key={f.key} t={t} f={f} value={values[f.key]} personPhoto={person?.photo ?? null}
+                  onChange={(v) => (f.key === "lang" ? setLang(String(v)) : set(f.key, v))} />
               ))}
             </div>
           </aside>
 
           <section data-kx-pane className={`${CARD} px-4 py-4`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("studio.preview")}</h2>
+              <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{heading}</h2>
               <label className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
                 {t("studio.guides")}
                 <Toggle checked={guides} onChange={setGuides} label={t("studio.guides")} />
@@ -124,10 +160,10 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
             </div>
             {guides ? <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("studio.guidesHint")}</p> : null}
 
-            <div className="mt-4 grid gap-5 xl:grid-cols-2">
+            <div className={`mt-4 grid gap-5 ${vertical ? "grid-cols-2" : "xl:grid-cols-2"}`}>
               {def.pages.map((p) => (
                 <figure key={p.id} className="m-0">
-                  <div className="mx-auto w-full max-w-[560px] overflow-hidden rounded-[6px] shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+                  <div className={`mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_10px_30px_rgba(0,0,0,0.35)] ${vertical ? "max-w-[300px]" : "max-w-[560px]"}`}>
                     <TemplateSheet def={def} values={values} pageId={p.id} qr={qr} mode="screen" guides={guides} slug={t(`tpl.page.${p.id}`)} />
                   </div>
                   <figcaption className="mt-2 text-center text-[11.5px] text-[var(--text-dim)]">{t(`tpl.page.${p.id}`)}</figcaption>
@@ -140,31 +176,18 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
                 className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)]">
                 {t("studio.print")}
               </button>
-              {def.pages.map((p) => (
-                <button key={p.id} type="button" onClick={() => downloadSvg(p.id)}
-                  className="rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                  {fill(t("studio.svg"), { page: t(`tpl.page.${p.id}`) })}
-                </button>
-              ))}
-              {needName ? <span role="alert" className="text-[12px] text-red-500">{t("studio.needName")}</span> : null}
+              {blocked ? <span role="alert" className="text-[12px] text-red-500">{t(blocked)}</span> : null}
             </div>
             <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t("studio.printHint")}</p>
 
-            <div className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-3">
-              <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("studio.spec")}</p>
-              <ul className="mt-1.5 grid gap-1 text-[12px] text-[var(--text-secondary)]">
-                {["front", "back", "paper", "edges", "never"].map((k) => <li key={k}>{t(`studio.spec.${k}`)}</li>)}
-              </ul>
-            </div>
-
-            {/* The print-size sides, off screen — what "SVG" downloads. */}
-            <div ref={printRef} aria-hidden className="pointer-events-none fixed -left-[10000px] top-0">
-              {def.pages.map((p) => (
-                <div key={p.id} data-page={p.id}>
-                  <TemplateSheet def={def} values={values} pageId={p.id} qr={qr} mode="print" slug={`${slug} · ${t(`tpl.page.${p.id}`)}`} />
-                </div>
-              ))}
-            </div>
+            {def.specKeys ? (
+              <div className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-3">
+                <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("studio.spec")}</p>
+                <ul className="mt-1.5 grid gap-1 text-[12px] text-[var(--text-secondary)]">
+                  {def.specKeys(values).map((k) => <li key={k}>{t(k)}</li>)}
+                </ul>
+              </div>
+            ) : null}
           </section>
         </div>
       </div>
@@ -172,7 +195,34 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   );
 }
 
-function FillFrom({ t, people, person, onChoose }: { t: (k: string) => string; people: People; person: BcPerson | null; onChoose: (p: BcPerson | null) => void }) {
+/** The approved styles as small fronts of this very card. */
+function StylePicker({ t, def, values, field, onPick }: { t: T; def: TemplateDef; values: TemplateValues; field: Extract<FieldDef, { kind: "choice" }>; onPick: (v: string) => void }) {
+  return (
+    <section data-kx-pane className={`${CARD} mt-5 px-4 py-4`} aria-label={t(field.labelKey)}>
+      <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t(field.labelKey)}</h2>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7" role="radiogroup" aria-label={t(field.labelKey)}>
+        {field.options.map((o) => {
+          const v = { ...values, style: o.value };
+          const tall = def.size(v).h > def.size(v).w;
+          const on = values.style === o.value;
+          return (
+            <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onPick(o.value)}
+              className={`flex flex-col items-center gap-2 rounded-xl border px-2 py-2.5 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"}`}>
+              <span className="flex h-[74px] w-full items-center justify-center">
+                <span className={`block overflow-hidden rounded-[3px] shadow-[0_4px_12px_rgba(0,0,0,0.35)] ${tall ? "w-[42px]" : "w-[112px]"}`}>
+                  <TemplateSheet def={def} values={v} pageId="front" qr={null} mode="screen" slug={t(o.labelKey)} />
+                </span>
+              </span>
+              <span className="text-center text-[11.5px] font-medium leading-tight">{t(o.labelKey)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FillFrom({ t, people, person, onChoose }: { t: T; people: People; person: BcPerson | null; onChoose: (p: BcPerson | null) => void }) {
   return (
     <div>
       <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("studio.fillFrom")}</h2>
@@ -204,7 +254,7 @@ function FillFrom({ t, people, person, onChoose }: { t: (k: string) => string; p
   );
 }
 
-function Field({ t, f, value, onChange }: { t: (k: string) => string; f: FieldDef; value: string | boolean | undefined; onChange: (v: string | boolean) => void }) {
+function Field({ t, f, value, onChange, personPhoto }: { t: T; f: FieldDef; value: string | boolean | undefined; onChange: (v: string | boolean) => void; personPhoto: string | null }) {
   const id = `bc-tpl-${f.key}`;
   if (f.kind === "switch") {
     return (
@@ -229,11 +279,46 @@ function Field({ t, f, value, onChange }: { t: (k: string) => string; f: FieldDe
       </div>
     );
   }
+  if (f.kind === "image") return <ImageField t={t} f={f} value={typeof value === "string" ? value : ""} onChange={onChange} personPhoto={f.fromPerson ? personPhoto : null} />;
   return (
     <label htmlFor={id} className="block">
       <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
       <input id={id} dir="auto" value={typeof value === "string" ? value : ""} maxLength={f.max} placeholder={f.placeholder}
         onChange={(e) => onChange(e.target.value)} className={`${FIELD} mt-1`} />
     </label>
+  );
+}
+
+function ImageField({ t, f, value, onChange, personPhoto }: { t: T; f: Extract<FieldDef, { kind: "image" }>; value: string; onChange: (v: string) => void; personPhoto: string | null }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setFailed(false);
+    const url = await readImage(file, f.fromPerson ? "photo" : "graphic");
+    setBusy(false);
+    if (url) onChange(url); else setFailed(true);
+  };
+  const small = "rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50";
+  return (
+    <div>
+      <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
+      <div className="mt-1 flex items-center gap-3">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {value ? <img src={value} alt="" className="h-full w-full object-cover" /> : null}
+        </span>
+        <span className="flex flex-wrap gap-1.5">
+          <button type="button" className={small} disabled={busy} onClick={() => input.current?.click()}>{value ? t("studio.replace") : t("studio.upload")}</button>
+          {personPhoto && value !== personPhoto ? <button type="button" className={small} onClick={() => onChange(personPhoto)}>{t("studio.usePhoto")}</button> : null}
+          {value ? <button type="button" className={small} onClick={() => onChange("")}>{t("studio.remove")}</button> : null}
+        </span>
+        <input ref={input} id={`bc-tpl-${f.key}`} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+      </div>
+      {f.hintKey ? <p className="mt-1 text-[11px] leading-4 text-[var(--text-dim)]">{t(f.hintKey)}</p> : null}
+      {failed ? <p role="alert" className="mt-1 text-[11.5px] text-red-500">{t("studio.imageError")}</p> : null}
+    </div>
   );
 }

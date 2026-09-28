@@ -101,9 +101,9 @@ export function BusinessCard({ side, w = 270, name = "Full Name", title = "Job T
         <p className="font-semibold" style={{ fontSize: w * 0.047 }}>{name}</p>
         <p className="text-[#98989D]" style={{ fontSize: w * 0.034 }}>{title}</p>
       </div>
-      <div className="leading-[1.5] text-[#F5F5F7]" style={{ ...MONO, fontSize: w * 0.029 }}>
-        <p>M {KOLEEX_COMPANY.mobile} · WhatsApp</p>
-        <p>{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</p>
+      <div className="leading-[1.5] text-[#F5F5F7]" style={{ fontSize: w * 0.029 }}>
+        <p><b className="font-semibold">Mob:</b> {KOLEEX_COMPANY.mobile} · WhatsApp</p>
+        <p><b className="font-semibold">Email:</b> {KOLEEX_COMPANY.email} · <b className="font-semibold">Web:</b> {KOLEEX_COMPANY.web}</p>
       </div>
     </div>
   );

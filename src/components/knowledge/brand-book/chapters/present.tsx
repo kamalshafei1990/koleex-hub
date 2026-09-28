@@ -197,8 +197,8 @@ function PortraitCard({ side, w = 300 }: { side: "front" | "back"; w?: number })
       <div className="absolute bottom-0 rounded-t-full bg-[#48484A]" style={{ left: 48 * u, width: 100 * u, height: 70 * u }} />
       <div className="absolute rounded-full bg-[#8E8E93]" style={{ left: 74 * u, top: 34 * u, width: 48 * u, height: 48 * u }} />
       <div className="absolute" style={{ right: 16 * u, top: 14 * u }}><Wordmark color="#FFFFFF" width={70 * u} /></div>
-      <div className="absolute space-y-[2px] text-[#F5F5F7]" style={{ left: 172 * u, top: 50 * u, fontSize: 6.5 * u, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}>
-        <p>+86 130 7380 0720</p><p>name@koleexgroup.com</p><p>{KOLEEX_COMPANY.web}</p>
+      <div className="absolute space-y-[2px] text-[#F5F5F7]" style={{ left: 172 * u, top: 50 * u, fontSize: 6.5 * u }}>
+        <p><b className="font-semibold">Mob:</b> +86 130 7380 0720</p><p><b className="font-semibold">Email:</b> name@koleexgroup.com</p><p><b className="font-semibold">Web:</b> {KOLEEX_COMPANY.web}</p>
       </div>
       <div className="absolute flex items-baseline gap-2" style={{ left: 16 * u, bottom: 12 * u }}>
         <span className="font-semibold" style={{ fontSize: 17 * u }}>Full Name</span>
@@ -241,7 +241,7 @@ export function BusinessCards() {
           ["Size", "90 × 54 mm (owner decision), 3 mm bleed on every side, 4 mm safe margin"],
           ["Board", "Black board, soft-touch matte, 600–700 g/m² (thick enough for painted edges)"],
           ["Front", "The logo 40 mm wide, centered — white foil and raised (emboss), nothing else"],
-          ["Back", "Black; logo white 25 mm top-left; name white Inter SemiBold 9 pt; title gray 7 pt; contacts white 6.5 pt monospace — white foil or white print"],
+          ["Back", "Black; logo white 25 mm top-left; name white Inter SemiBold 9 pt; title gray 7 pt; contacts white Inter 6.5 pt with SemiBold labels — Add, Mob, Email, Web (owner decision 28/09/2026) — white foil or white print"],
           ["Edges", "Painted silver (Pantone 877 C) all around"],
           ["Second version", "White both sides — raised black logo, black text, the same silver edges (ch. 47)"],
           ["Never", "Silver or gold foil on the logo, spot gloss, colored edges"],
@@ -262,7 +262,7 @@ export function BusinessCards() {
           ["Portrait", "Black and white, the team portrait of ch. 66"],
           ["Front", "Logo top-right; contacts on the right; the name large at the bottom, the title Light beside it"],
           ["Back", "The horizontal lockup (ch. 43); QR codes on a white strip so every phone reads them"],
-          ["Never", "Italics, a dot or slash inside the name, labels such as “Add:” or “Mob:”"],
+          ["Never", "Italics, a dot or slash inside the name"],
         ]} />
       </Section>
 
