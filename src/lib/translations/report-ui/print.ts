@@ -25,4 +25,13 @@ export const reportPrintT: Translations = {
   "print.status.returned":  { en: "Returned", zh: "已退回", ar: "مُعاد للمراجعة" },
   "print.button":       { en: "Print", zh: "打印", ar: "اطبع" },
   "print.attachments":  { en: "Photos and files", zh: "照片和文件", ar: "الصور والملفات" },
+  /* The copy the customer receives, and its blank paper form (28 Sep 2026). */
+  "print.copy.SR":       { en: "Service report", zh: "服务报告", ar: "تقرير خدمة" },
+  "print.copy.IR":       { en: "Installation report", zh: "安装报告", ar: "تقرير تركيب" },
+  "print.copy.no":       { en: "Report no.", zh: "报告编号", ar: "رقم التقرير" },
+  "print.copy.date":     { en: "Date", zh: "日期", ar: "التاريخ" },
+  "print.copy.customer": { en: "Customer", zh: "客户", ar: "العميل" },
+  "print.copy.machine":  { en: "Machine · serial no.", zh: "机器 · 序列号", ar: "الآلة · الرقم التسلسلي" },
+  "print.copy.tech":     { en: "Technician", zh: "技术员", ar: "الفني" },
+  "print.blank.name":    { en: "Name", zh: "姓名", ar: "الاسم" },
 };

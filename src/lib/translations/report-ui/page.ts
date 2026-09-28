@@ -125,6 +125,12 @@ export const reportPageT: Translations = {
   "reader.editDraft":   { en: "Edit draft", zh: "编辑草稿", ar: "عدّل المسودة" },
   "reader.newVersion":  { en: "Edit as a new version", zh: "作为新版本编辑", ar: "عدّل كنسخة جديدة" },
   "reader.print":       { en: "Print or PDF", zh: "打印或 PDF", ar: "طباعة أو PDF" },
+  /* A report the customer receives (the technician's service report, 28
+     Sep 2026): the customer's copy carries its number, never the internal
+     part; the blank form is the paper to fill by hand on site. */
+  "reader.customerCopy": { en: "Customer copy", zh: "客户副本", ar: "نسخة العميل" },
+  "reader.customerCopyHint": { en: "Save it as PDF and send it to the customer.", zh: "另存为 PDF 发给客户。", ar: "احفظها PDF وابعتها للعميل." },
+  "reader.blankForm":   { en: "Blank form", zh: "空白表格", ar: "فورم فاضي" },
   "reader.approvedBy":  { en: "Approved", zh: "已批准", ar: "اتوافق عليه" },
   "reader.returnedBy":  { en: "Returned", zh: "已退回", ar: "اترجع" },
   "reader.superseded":  { en: "A newer version replaces this report.", zh: "此报告已被新版本替换。", ar: "فيه نسخة أحدث من التقرير ده." },

@@ -571,6 +571,11 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
             </div>
           )}
         </div>
+        {tpl?.customerCopy && (
+          <button type="button" onClick={() => printReport(detail.report.id, lang, "blank")} className={`${CARD} flex w-full items-center justify-center gap-2 p-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}>
+            <RrIcon name="print" size={14} />{t("reader.blankForm")}
+          </button>
+        )}
       </aside>
     </div>
   );
@@ -581,8 +586,9 @@ function Composer({ t, lang, detail, blocks, onSent }: { t: T; lang: string; det
 /* The house print recipe: the /print route in an off-screen iframe (never
    visibility:hidden — some browsers skip invisible frames), printed once it
    says it is ready. Printing this window instead would drag the Hub layout
-   into the print pass. */
-function printReport(id: string, lang: string) {
+   into the print pass. `mode`: the customer's copy, or the blank paper form
+   of the report's type (a template with `customerCopy`). */
+function printReport(id: string, lang: string, mode?: "customer" | "blank") {
   const FRAME_ID = "koleex-report-print-frame";
   let frame = document.getElementById(FRAME_ID) as HTMLIFrameElement | null;
   if (!frame) {
@@ -604,7 +610,7 @@ function printReport(id: string, lang: string) {
     ready();
   };
   f.addEventListener("load", onLoad);
-  f.src = `/reports/${encodeURIComponent(id)}/print?lang=${lang}&_t=${Date.now()}`;
+  f.src = `/reports/${encodeURIComponent(id)}/print?lang=${lang}${mode === "customer" ? "&copy=customer" : mode === "blank" ? "&blank=1" : ""}&_t=${Date.now()}`;
 }
 
 function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; detail: ReportDetail; blocks: BlocksModule | null; onChange: () => Promise<void> }) {
@@ -896,9 +902,25 @@ function Reader({ t, lang, detail, blocks, onChange }: { t: T; lang: string; det
           </div>
         )}
 
-        <button type="button" onClick={() => printReport(report.id, lang)} className={`${CARD} flex w-full items-center justify-center gap-2 p-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}>
-          <RrIcon name="print" size={14} />{t("reader.print")}
-        </button>
+        {tpl?.customerCopy && report.docNo && (
+          <div className={`${CARD} space-y-2 p-4`}>
+            <button type="button" onClick={() => printReport(report.id, lang, "customer")}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] text-[13px] font-semibold text-[var(--text-inverted)]">
+              <RrIcon name="document" size={14} />{t("reader.customerCopy")} · <span className="tabular-nums">{report.docNo}</span>
+            </button>
+            <p className="text-center text-[11px] text-[var(--text-dim)]">{t("reader.customerCopyHint")}</p>
+          </div>
+        )}
+        <div className={`grid gap-3 ${tpl?.customerCopy ? "grid-cols-2" : "grid-cols-1"}`}>
+          <button type="button" onClick={() => printReport(report.id, lang)} className={`${CARD} flex w-full items-center justify-center gap-2 p-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}>
+            <RrIcon name="print" size={14} />{t("reader.print")}
+          </button>
+          {tpl?.customerCopy && (
+            <button type="button" onClick={() => printReport(report.id, lang, "blank")} className={`${CARD} flex w-full items-center justify-center gap-2 p-3 text-[12.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}>
+              <RrIcon name="print" size={14} />{t("reader.blankForm")}
+            </button>
+          )}
+        </div>
       </aside>
 
       {follow && followMod && (follow.kind === "forward"

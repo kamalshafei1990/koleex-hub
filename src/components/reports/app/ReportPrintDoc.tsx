@@ -31,9 +31,9 @@ import { reportFileUrl, sizeLabel } from "@/lib/reports/attachments";
 import { dmyTime, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import type { Lang, Translations } from "@/lib/i18n";
 
-const C = { black: "#0A0A0A", ink: "#1A1A1A", soft: "#4B5563", ghost: "#9CA3AF", border: "#E5E7EB", surface: "#F5F5F5" } as const;
+export const C = { black: "#0A0A0A", ink: "#1A1A1A", soft: "#4B5563", ghost: "#9CA3AF", border: "#E5E7EB", surface: "#F5F5F5" } as const;
 
-function Cell({ label, children, first }: { label: string; children: React.ReactNode; first?: boolean }) {
+export function Cell({ label, children, first }: { label: string; children: React.ReactNode; first?: boolean }) {
   return (
     <div style={{ borderInlineStart: first ? "none" : `1px solid ${C.border}`, minWidth: 0 }}>
       <div style={{ background: C.black, color: "#fff", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", height: 22, lineHeight: "22px", padding: "0 12px" }}>{label}</div>
@@ -75,17 +75,22 @@ function domMeasurer(plain: HTMLElement, bullet: HTMLElement, bulletText: HTMLEl
 }
 
 /** `words`: the Reports dictionary with this report's own section words
- *  (Phase 4C — the print page loads them with the report). */
-export default function ReportPrintDoc({ detail, words, lang, onReady }: { detail: ReportDetail; words: Translations; lang: Lang; onReady?: () => void }) {
+ *  (Phase 4C — the print page loads them with the report). `copy="customer"`
+ *  (owner, 28/09/2026): the copy that leaves the company — the report's
+ *  number, the customer and the machine in the head; the links, the people
+ *  it was sent to, its status and the review never print on it. */
+export default function ReportPrintDoc({ detail, words, lang, onReady, copy }: { detail: ReportDetail; words: Translations; lang: Lang; onReady?: () => void; copy?: "customer" }) {
   const t = (key: string) => words[key]?.[lang] ?? words[key]?.en ?? key;
   const { recipients, comments, attachments } = detail;
   /* A draft's numbers blocks (4B) as the server computed them just now; a
      sent report carries them frozen in its sections. */
   /* A builder type (4E) comes with its report, as the report was started with it. */
   /* The type comes with the report (5C: the print carries no catalog). */
-  const tpl = detail.template?.def ?? null;
+  const fullTpl = detail.template?.def ?? null;
+  const customer = copy === "customer" && !!fullTpl?.customerCopy;
+  const tpl = useMemo(() => (customer && fullTpl ? { ...fullTpl, sections: fullTpl.sections.filter((x) => x.kind !== "links") } : fullTpl), [customer, fullTpl]);
   const report = useMemo(() => ({ ...detail.report, sections: withBlockData(detail.report.sections, detail.blockData), tpl }), [detail.report, detail.blockData, tpl]);
-  const decision = report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
+  const decision = !customer && report.decidedBy ? [...comments].reverse().find((c) => c.kind === "approved" || c.kind === "returned") ?? null : null;
   const note = decision?.body.trim() ?? "";
   const dir = lang === "ar" ? "rtl" : "ltr";
   const font = lang === "zh" ? '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", Inter, system-ui, sans-serif' : lang === "ar" ? '"Noto Naskh Arabic", "Geeza Pro", Inter, system-ui, sans-serif' : "Inter, system-ui, sans-serif";
@@ -120,7 +125,7 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
       const plain = plainRef.current, bullet = bulletRef.current, bulletText = bulletTextRef.current;
       if (cancelled || !plain || !bullet || !bulletText) return;
       const m = domMeasurer(plain, bullet, bulletText);
-      const reviewPx = report.decidedBy ? LINE_PX + (note ? m.height({ text: note, bullet: false }) : 0) : 0;
+      const reviewPx = !customer && report.decidedBy ? LINE_PX + (note ? m.height({ text: note, bullet: false }) : 0) : 0;
       setSheets(paginateReport(report, reviewPx, m, att, t));
     })();
     return () => { cancelled = true; };
@@ -140,10 +145,16 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
     void Promise.race([Promise.all(loaded), cap]).then(() => { if (!cancelled) onReady?.(); });
     return () => { cancelled = true; };
   }, [sheets, onReady]);
-  const name = t(`tpl.${report.templateKey}.name`);
+  const name = customer ? t(`print.copy.${fullTpl?.customerCopy}`) : t(`tpl.${report.templateKey}.name`);
   const to = recipients.filter((r) => r.role === "to").map((r) => r.name).join(", ");
   const cc = recipients.filter((r) => r.role === "cc").map((r) => r.name).join(", ");
-  const customTitle = !!(tpl?.customTitle && report.title.trim());
+  const customTitle = !customer && !!(tpl?.customTitle && report.title.trim());
+  /* The customer copy's head: who it was for and which machine. */
+  const customerName = report.sections.flatMap((x) => x.links ?? []).find((l) => l.type === "customer")?.label ?? "—";
+  const machineRows = report.sections.find((x) => x.id === "machines")?.rows ?? [];
+  const machine = machineRows[0] ? [machineRows[0].model, machineRows[0].serial].filter(Boolean).join(" · ") + (machineRows.length > 1 ? ` +${machineRows.length - 1}` : "") : "—";
+  /* The legal name of the day the report was sent (lib/legal-name). */
+  const madeAt = report.submittedAt ?? report.createdAt;
 
   const probes = (
     <div aria-hidden style={{ position: "absolute", left: -10000, top: 0, visibility: "hidden", pointerEvents: "none", fontFamily: font }}>
@@ -165,11 +176,19 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
                 <div style={{ textAlign: "end" }}>
                   <div style={{ fontSize: 20, fontWeight: 800, color: C.black, letterSpacing: lang === "en" ? "0.08em" : "0.04em", textTransform: "uppercase", lineHeight: "26px" }}>{name}</div>
                   <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.soft, lineHeight: "16px" }}>
-                    {[report.confidential ? t("print.confidential") : "", report.version > 1 ? `${t("print.version")} ${report.version}` : ""].filter(Boolean).join(" · ")}
+                    {customer ? "" : [report.confidential ? t("print.confidential") : "", report.version > 1 ? `${t("print.version")} ${report.version}` : ""].filter(Boolean).join(" · ")}
                   </div>
                 </div>
               </div>
-              <DocumentBrandStrips />
+              <DocumentBrandStrips madeAt={madeAt} />
+              {customer ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr 1.4fr", border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+                  <Cell label={t("print.copy.no")} first><span style={{ fontVariantNumeric: "tabular-nums" }}>{report.docNo ?? "—"}</span></Cell>
+                  <Cell label={t("print.copy.date")}><span style={{ fontVariantNumeric: "tabular-nums" }}>{periodLabel(report.periodStart, report.periodEnd)}</span></Cell>
+                  <Cell label={t("print.copy.customer")}>{customerName}</Cell>
+                  <Cell label={t("print.copy.machine")}>{machine}</Cell>
+                </div>
+              ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr 1fr", border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
                 <Cell label={t("print.period")} first><span style={{ fontVariantNumeric: "tabular-nums" }}>{periodLabel(report.periodStart, report.periodEnd)}</span></Cell>
                 <Cell label={t("print.from")}>{report.author.name}</Cell>
@@ -179,6 +198,7 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
                   {report.submittedAt ? <><br /><span style={{ color: C.soft, fontVariantNumeric: "tabular-nums" }}>{t("print.sent")} {dmyTime(report.submittedAt)}</span></> : null}
                 </Cell>
               </div>
+              )}
               {customTitle && (
                 <div dir="auto" style={{ fontSize: 15, fontWeight: 700, color: C.black, lineHeight: "20px", height: 40, marginBottom: 12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{report.title}</div>
               )}
@@ -187,7 +207,7 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "18px 0 14px", height: 64, boxSizing: "border-box", borderBottom: `1px solid ${C.border}`, marginBottom: 12 }}>
               <KoleexWordmark height={18} />
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: C.soft, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {name} · {report.author.name} · {periodLabel(report.periodStart, report.periodEnd)}
+                {customer ? `${name} · ${report.docNo ?? "—"}` : `${name} · ${report.author.name}`} · {periodLabel(report.periodStart, report.periodEnd)}
               </div>
             </div>
           )}
@@ -238,7 +258,7 @@ export default function ReportPrintDoc({ detail, words, lang, onReady }: { detai
             </CardView>
           ))}
 
-          {sheet.review && report.decidedBy && (
+          {!customer && sheet.review && report.decidedBy && (
             <CardView head={t("print.review")}>
               <div style={{ fontSize: 10.5, lineHeight: `${LINE_PX}px`, color: C.ink }}>
                 <b>{report.status === "approved" ? t("print.approvedBy") : t("print.returnedBy")}</b> {report.decidedBy.name}

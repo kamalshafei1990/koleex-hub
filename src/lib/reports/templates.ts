@@ -254,6 +254,10 @@ export interface ReportTemplateDef {
    *  one knew how to do — the suggestions from earlier reports, the facts
    *  from the apps, Koleex AI's summary — for the sections it kept. */
   base?: string;
+  /** Leaves the company as a customer copy (owner, 28/09/2026): the house
+   *  sheet with a number minted when the report is first sent — the prefix
+   *  (SR-2026-0001 a service report, IR- an installation). */
+  customerCopy?: "SR" | "IR";
 }
 
 /* The built-in types themselves live in ./catalog.ts (Phase 5C): the

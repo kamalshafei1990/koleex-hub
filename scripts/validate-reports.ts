@@ -97,6 +97,10 @@
  *      which period (the one that just ended, from 07:00 in the writer's own
  *      time), claimed once, only for someone who may start the type, never
  *      sent by itself, the notice gone when the report is sent or deleted.
+ *   §39 the technician's report the customer receives — its number (SR-/IR-,
+ *      minted on the first send, kept by a new version), the customer's copy
+ *      (never the links, the people it went to, its status or the review),
+ *      the blank paper form on ONE sheet.
  *   §38 compliance by month — each report counted in the month its deadline
  *      falls in; on time, late, missing, pending (out of the rate); the
  *      board's scope; the months from counting's start; the house paper.
@@ -208,6 +212,7 @@ import { COST_KINDS, OPS_KINDS, currencyOrder, dmy, fmtAmount, moneyLines, quick
 import { monthTallies, rateOf, statMonths } from "../src/lib/reports/compliance-stats";
 import { statCell } from "../src/components/reports/numbers/stats-paper";
 import * as NP from "../src/lib/reports/numbers-print";
+import { BLANK_BODY_PX, BLANK_ROWS, blankFormPx, blankRows } from "../src/lib/reports/blank-form";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -1661,7 +1666,7 @@ console.log("\n§17 sales & customers: choices, numbers from the apps, quotation
     (c) => (c.includes('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);') ? [] : ["days waiting count from the typed date"]),
     (src) => src.replace('if (h[i]?.status === "sent" && day(h[i]?.at)) return day(h[i].at);', ""));
   rule("sending freezes the numbers the server computes, before the report is marked sent", `${API}/[id]/submit/route.ts`,
-    (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections })'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
+    (c) => { const a = c.indexOf("const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));"); const b = c.indexOf('.update({ status: "submitted", submitted_at: now, updated_at: now, sections'); return a > 0 && b > a ? [] : ["a sent report can carry no numbers, or typed ones"]; },
     (src) => src.replace("const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));", "const sections = typed;"));
   rule("moving the draft to another period asks for its numbers again", `${API}/[id]/carry/route.ts`,
     (c) => (c.includes("loadReportData(loaded.row, auth, date, to)") && c.includes("return NextResponse.json({ carry, appFeed, blockData }") ? [] : ["the numbers stay on the old period"]),
@@ -3607,6 +3612,68 @@ console.log("\n§38 compliance by month — counted where each deadline falls, t
   expect(CTX.includes('{view === "months" ? <MonthStats t={t} lang={lang} /> : (') && CTX.includes("const res = await fetchComplianceStats(6);") && CTX.includes("printPaper(`/reports/compliance/print?months=6&lang=${lang}`)"),
     "the Compliance tab switches between the week and the months, loads the months only when asked, and prints them on the house paper");
   expect(code(read("src/app/reports/compliance/print/page.tsx")).includes("return { paper: statsPaper(t, res.data) };"), "…the paper reads the same API with the reader's own session");
+}
+
+/* ── §39 the report the customer receives (28 Sep 2026) ────────────────── */
+console.log("\n§39 the technician's report — its number, the customer's copy, the blank form");
+{
+  const API = "src/app/api/work-reports";
+  const copyTypes = REPORT_TEMPLATES.filter((x) => x.customerCopy);
+  eq(copyTypes.map((x) => `${x.key}:${x.customerCopy}`).sort(), ["installation:IR", "service_visit:SR"], "the service visit (SR) and the installation (IR) go to the customer");
+  const sv = reportTemplate("service_visit")!;
+  expect(["machines", "time", "next_service", "tech_sign", "customer_sign"].every((id) => sv.sections.some((x) => x.id === id)),
+    "the service visit asks for the machine and its serial, the time on site, the next service and both signatures");
+  eq(sv.sections.find((x) => x.id === "time")?.columns?.map((c) => c.id), ["day", "arrived", "left"], "…the time on site: the day, arrived, left");
+  for (const tpl of copyTypes) {
+    const printable = tpl.sections.filter((x) => x.kind !== "links").map((x) => x.id).sort();
+    const laid = blankRows(tpl).flat().map((x) => x.id).sort();
+    eq(laid, printable, `${tpl.key}: the blank form lays out every section once (the links are the head's)`);
+    expect(!!BLANK_ROWS[tpl.key] && BLANK_ROWS[tpl.key].every((r) => r.length >= 1 && r.length <= 2), `${tpl.key}: its own rows, one or two sections each`);
+    expect(blankFormPx(tpl) <= BLANK_BODY_PX, `${tpl.key}: the blank form fits ONE sheet (${blankFormPx(tpl)} of ${BLANK_BODY_PX} px)`);
+    const words = [`print.copy.${tpl.customerCopy}`, ...tpl.sections.flatMap((x) => [`tpl.${tpl.key}.s.${x.id}`, ...(x.columns ?? []).map((c) => `tpl.${tpl.key}.s.${x.id}.c.${c.id}`)])]
+      .filter((k) => { const e = reportsT[k]; return !e?.en || !e.zh || !e.ar; });
+    expect(words.length === 0, `${tpl.key}: the copy's title, its sections and their columns speak en / zh / ar`, words.join(", "));
+  }
+  const tooTall = { ...sv, key: "x_unlaid", sections: [...sv.sections, ...Array.from({ length: 6 }, (_, i) => ({ id: `extra${i}`, kind: "text" as const }))] };
+  expect(blankFormPx(tooTall) > BLANK_BODY_PX, "…and a form that would not fit is caught");
+
+  /* The number. */
+  const SUB = `${API}/[id]/submit/route.ts`;
+  rule("the number is minted when the report is sent, in the same conditional write", SUB,
+    (c) => (c.includes("...(docNo ? { doc_no: docNo } : {}) })") && c.includes("let docNo = await docNoFor(row, tpl);") ? [] : ["a sent report carries no number"]),
+    (src) => src.replace("...(docNo ? { doc_no: docNo } : {}) })", "})"));
+  rule("a number someone just took is refused by the index, and the next one is taken", SUB,
+    (c) => (/for \(let skip = 1; docNo && isTakenNumber\(result\.error\) && skip <= 3; skip\+\+\)/.test(c) ? [] : ["two sends at once fail instead of numbering on"]),
+    (src) => src.replace("isTakenNumber(result.error)", "false"));
+  const DN = "src/lib/server/reports/doc-no.ts";
+  rule("a number is kept, and a new version keeps its first version's", DN,
+    (c) => (c.includes("if (row.doc_no) return row.doc_no;") && c.includes("if (prev) return prev;") ? [] : ["a revised report gets a new number"]),
+    (src) => src.replace("if (prev) return prev;", ""));
+  rule("the number reads PREFIX-YEAR-NNNN, the year Taizhou's, one count per company", DN,
+    (c) => (c.includes("const prefix = `${tpl.customerCopy}-${yearInTaizhou(new Date())}-`;") && c.includes('padStart(4, "0")') && c.includes('timeZone: "Asia/Shanghai"') && c.includes('if (row.tenant_id) q = q.eq("tenant_id", row.tenant_id);') ? [] : ["the number's shape or its count is wrong"]),
+    (src) => src.replace('padStart(4, "0")', 'padStart(3, "0")'));
+  const MIG = migration("supabase/migrations/20260928_reports_customer_copy_no.sql");
+  expect(/ADD COLUMN IF NOT EXISTS doc_no text/.test(MIG) && /CREATE UNIQUE INDEX IF NOT EXISTS work_reports_tenant_doc_no_version_key\s+ON work_reports \(tenant_id, doc_no, version\)\s+WHERE doc_no IS NOT NULL/.test(MIG) && !/DROP|DELETE|UPDATE/i.test(MIG),
+    "the migration only adds: the column and the index that refuses a taken number");
+  expect(code(read("src/lib/server/reports/core.ts")).includes(", doc_no") && code(read(`${API}/[id]/route.ts`)).includes("docNo: row.doc_no ?? null"), "the report is read with its number");
+
+  /* The customer's copy. */
+  const PD = "src/components/reports/app/ReportPrintDoc.tsx";
+  rule("the customer's copy never prints the links block", PD,
+    (c) => (c.includes('sections: fullTpl.sections.filter((x) => x.kind !== "links")') ? [] : ["the links print on the customer's copy"]),
+    (src) => src.replace('fullTpl.sections.filter((x) => x.kind !== "links")', "fullTpl.sections"));
+  rule("…nor the review, the people it went to or its status", PD,
+    (c) => (c.includes("const decision = !customer && report.decidedBy") && c.includes("{!customer && sheet.review && report.decidedBy && (") && /\{customer \? \(\s*<div[^]*?print\.copy\.no[^]*?\) : \(/.test(c) ? [] : ["internal parts print on the customer's copy"]),
+    (src) => src.replace("{!customer && sheet.review && report.decidedBy && (", "{sheet.review && report.decidedBy && ("));
+  rule("the customer's copy prints the legal name of the day it was sent", PD,
+    (c) => (c.includes("<DocumentBrandStrips madeAt={madeAt} />") && c.includes("const madeAt = report.submittedAt ?? report.createdAt;") ? [] : ["the copy prints today's legal name on an old report"]),
+    (src) => src.replace("<DocumentBrandStrips madeAt={madeAt} />", "<DocumentBrandStrips />"));
+  const PP = code(read("src/app/reports/[id]/print/page.tsx"));
+  expect(PP.includes('const copy = tpl?.customerCopy ? (search.get("blank") === "1" ? "blank" : search.get("copy") === "customer" ? "customer" : null) : null;'),
+    "the print route offers the copy and the blank form only for a type that goes to the customer");
+  const RV = code(read("src/components/reports/app/ReportView.tsx"));
+  expect(RV.includes("{tpl?.customerCopy && report.docNo && (") && RV.includes('printReport(report.id, lang, "customer")') && RV.includes('printReport(detail.report.id, lang, "blank")'),
+    "the reader offers the customer's copy once the report has its number; the blank form from the draft and the sent report");
 }
 
 console.log(failed ? `\n✗ validate:reports — ${failed} failed\n` : "\n✓ validate:reports — all rules hold\n");

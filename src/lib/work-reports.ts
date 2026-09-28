@@ -77,6 +77,8 @@ export interface ReportDetail {
     version: number; previousId: string | null; superseded: boolean; newerId: string | null;
     submittedAt: string | null; decidedAt: string | null; decidedBy: ReportPerson | null;
     createdAt: string; updatedAt: string;
+    /** The customer copy's number (SR-2026-0001) once sent; null otherwise. */
+    docNo?: string | null;
   };
   recipients: ReportRecipient[];
   comments: ReportComment[];

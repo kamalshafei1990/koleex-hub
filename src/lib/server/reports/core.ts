@@ -21,7 +21,7 @@ import type { ReportTemplateDef, ReportSectionValue } from "@/lib/reports/templa
 import { MGMT_MODULE, OFFICE_MODULE, PAYROLL_MODULE } from "@/lib/reports/report-data";
 
 export const REPORT_COLS =
-  "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at, template_snapshot";
+  "id, tenant_id, template_key, author_account_id, title, period_start, period_end, period_key, sections, status, confidential, review_required, version, previous_id, superseded, submitted_at, decided_at, decided_by, created_at, updated_at, template_snapshot, doc_no";
 /** Lists never carry `sections` — that is the report's whole text. A report
  *  of a builder type (4E) brings only its type's name, icon and period
  *  (`tpl_head`, from its snapshot — the name it was written under). */
@@ -53,6 +53,8 @@ export interface ReportRow {
   updated_at: string;
   /** A builder type's copy, as the report was started with it (4E); null for a built-in. */
   template_snapshot: unknown;
+  /** The customer copy's number (SR-2026-0001), minted when first sent; null otherwise. */
+  doc_no: string | null;
 }
 
 export interface RecipientRow {

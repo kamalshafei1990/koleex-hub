@@ -800,10 +800,11 @@ export function Manuals() {
         <Specs rows={[
           ["Sheet", "The house sheet, 210 × 270 mm, like every KOLEEX document (ch. 94)"],
           ["Filled in", "Koleex Hub, on the technician's phone or tablet; the customer signs on the screen and receives the PDF by WhatsApp or e-mail"],
-          ["Paper", "A printed blank for places without a connection — photographed into the Hub the same day"],
+          ["Paper", "The blank form printed from the Hub (Reports → the report → Blank form), one sheet, for places without a connection — entered into the Hub the same day"],
+          ["Number", "SR-2026-0001 for a service visit, IR-2026-0001 for an installation — given by the Hub when the report is sent; a revised version keeps it"],
           ["Contents", "Report no., date, customer, machine and serial; the problem, the work done, parts used, time on site, the next service; two signatures"],
         ]} />
-        <Note>The Hub form for this report is built separately; until then the printed blank is used.</Note>
+        <Note>In Koleex Hub: Reports → Service visit or Installation. Once sent, “Customer copy” prints the PDF the technician sends — without the internal links, the people it went to, its status or the review.</Note>
       </Section>
 
       <Section id="manual-specs" title="Specifications">

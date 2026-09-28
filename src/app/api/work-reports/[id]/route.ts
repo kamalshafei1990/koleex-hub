@@ -134,7 +134,7 @@ export async function GET(req: Request, { params }: Params) {
       version: row.version, previousId: row.previous_id, superseded: row.superseded,
       newerId: row.superseded ? ((newerRes.data as { id?: string } | null)?.id ?? null) : null,
       submittedAt: row.submitted_at, decidedAt: row.decided_at, decidedBy: row.decided_by ? person(row.decided_by) : null,
-      createdAt: row.created_at, updatedAt: row.updated_at,
+      createdAt: row.created_at, updatedAt: row.updated_at, docNo: row.doc_no ?? null,
     },
     recipients: recipients.map((r) => toClientRecipient(r, person)),
     comments: ((commentsRes.data ?? []) as Array<{ id: string; account_id: string; body: string; kind: string; created_at: string }>)

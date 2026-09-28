@@ -22,6 +22,7 @@ import { notifyReportSubmitted, settleOwedReport } from "@/lib/server/reports/no
 import { markRequestSent } from "@/lib/server/reports/events";
 import { loadReportData } from "@/lib/server/reports/report-data";
 import { withBlockData } from "@/lib/reports/report-data";
+import { docNoFor, isTakenNumber } from "@/lib/server/reports/doc-no";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const sections = withBlockData(typed, await loadReportData(row, auth, null, null, { freeze: true }));
 
   const now = new Date().toISOString();
-  const { data: sent, error } = await supabaseServer.from("work_reports")
-    .update({ status: "submitted", submitted_at: now, updated_at: now, sections })
+  /* A customer copy's number (SR-/IR-), minted on the first send; a number
+     someone took a moment ago is refused by the index — take the next. */
+  const send = (docNo: string | null) => supabaseServer.from("work_reports")
+    .update({ status: "submitted", submitted_at: now, updated_at: now, sections, ...(docNo ? { doc_no: docNo } : {}) })
     .eq("id", row.id).eq("status", "draft").select(REPORT_COLS).maybeSingle();
+  let docNo = await docNoFor(row, tpl);
+  let result = await send(docNo);
+  for (let skip = 1; docNo && isTakenNumber(result.error) && skip <= 3; skip++) {
+    docNo = await docNoFor({ ...row, doc_no: null, previous_id: null }, tpl, skip);
+    result = await send(docNo);
+  }
+  const { data: sent, error } = result;
   if (error) {
     console.error("[api/work-reports submit]", error.message);
     return NextResponse.json({ error: "Could not send the report." }, { status: 500 });
@@ -75,5 +85,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   after(() => notifyReportSubmitted(report, ids, authorName));
   /* What was owed is sent: its reminders, escalation and request settle. */
   after(() => settleOwedReport(report));
-  return NextResponse.json({ ok: true, submittedAt: now });
+  return NextResponse.json({ ok: true, submittedAt: now, docNo: report.doc_no ?? null });
 }

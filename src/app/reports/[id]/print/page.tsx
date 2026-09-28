@@ -6,11 +6,15 @@
    dealt it onto sheets (onReady), never on a timer — and ?auto=1 prints
    itself (the reader drives it through a hidden iframe). The Hub shell skips any /print route
    and the Reports layout does too, so nothing but paper is on the page.
-   The GET is the reader's own: who may not read the report cannot print it. */
+   The GET is the reader's own: who may not read the report cannot print it.
+   A report the customer receives (its type has `customerCopy`) also prints
+   as ?copy=customer — the copy the technician sends as a PDF — and as
+   ?blank=1, its type's empty paper form (the report only lends its type). */
 
 import { use, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ReportPrintDoc from "@/components/reports/app/ReportPrintDoc";
+import ReportBlankForm from "@/components/reports/app/ReportBlankForm";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import { fetchReport, periodLabel, type ReportDetail } from "@/lib/work-reports";
 import { reportCommonT } from "@/lib/translations/report-ui/common";
@@ -40,12 +44,18 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
     return () => { cancelled = true; };
   }, [id]);
 
+  const tpl = data?.detail.template?.def ?? null;
+  const copy = tpl?.customerCopy ? (search.get("blank") === "1" ? "blank" : search.get("copy") === "customer" ? "customer" : null) : null;
+
   useEffect(() => {
     if (!data) return;
     const { report } = data.detail;
     const name = data.words[`tpl.${report.templateKey}.name`]?.[lang] ?? report.templateKey;
-    document.title = `${name} — ${report.author.name} — ${periodLabel(report.periodStart, report.periodEnd).replace(/\//g, "-")}`;
-  }, [data, lang]);
+    /* The file name the PDF is saved under: the customer's copy by its number. */
+    const copyName = tpl?.customerCopy ? data.words[`print.copy.${tpl.customerCopy}`]?.[lang] : undefined;
+    document.title = copy === "blank" ? `${copyName ?? name}` : copy === "customer" ? `${copyName ?? name} ${report.docNo ?? ""}`.trim()
+      : `${name} — ${report.author.name} — ${periodLabel(report.periodStart, report.periodEnd).replace(/\//g, "-")}`;
+  }, [data, lang, copy, tpl]);
 
   const auto = search.get("auto") === "1";
   const onReady = useCallback(() => {
@@ -68,7 +78,9 @@ export default function ReportPrintPage({ params }: { params: Promise<{ id: stri
       <style>{"@media screen { .kx-report-print-scroll { height: 100vh; overflow-y: auto; } }"}</style>
       <div className="kx-report-print-scroll">
         <div className="quot-print-root" style={{ background: "#fff", minHeight: "100vh", padding: 0 }}>
-          <ReportPrintDoc detail={data.detail} words={data.words} lang={lang} onReady={onReady} />
+          {copy === "blank" && tpl
+            ? <ReportBlankForm tpl={tpl} words={data.words} lang={lang} onReady={onReady} />
+            : <ReportPrintDoc detail={data.detail} words={data.words} lang={lang} onReady={onReady} copy={copy === "customer" ? "customer" : undefined} />}
         </div>
       </div>
     </>
