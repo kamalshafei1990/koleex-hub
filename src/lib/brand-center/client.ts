@@ -51,3 +51,42 @@ export const bc = {
   editDesign: (id: string, b: Record<string, unknown>) => send<{ ok: true }>(`/api/brand-center/designs/${id}`, "PATCH", b),
   retireDesign: (id: string) => call<{ ok: true }>(`/api/brand-center/designs/${id}`, { method: "DELETE" }),
 };
+
+/* ── files (plan step C5) ──────────────────────────────────────────────── */
+
+/** Mirrors the server's DIRECT_UPLOAD_OVER: up to this size the file goes
+ *  through our route (reliable on every line), above it straight to storage. */
+const THROUGH_US_MAX = 4.2 * 1024 * 1024;
+
+export type UploadError = "too_big" | "direct_blocked" | "failed";
+
+/** Upload one file to a design. Answers the saved file row, or why not. */
+export async function uploadDesignFile(designId: string, file: File): Promise<{ ok: true; file: BcFile } | { ok: false; error: UploadError }> {
+  const url = `/api/brand-center/designs/${designId}/files`;
+  if (file.size > 500 * 1024 * 1024) return { ok: false, error: "too_big" };
+  if (file.size <= THROUGH_US_MAX) {
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const r = await fetch(url, { method: "POST", body: form });
+      const body = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true, file: (body as { file: BcFile }).file } : { ok: false, error: "failed" };
+    } catch { return { ok: false, error: "failed" }; }
+  }
+  /* Large: sign → PUT to storage → register. The PUT is the one hop with
+     nothing of ours in it; when it fails we say so plainly. */
+  const sign = await send<{ path: string; token: string; signedUrl: string }>(url, "POST", { action: "sign", fileName: file.name, size: file.size, mime: file.type });
+  if (!sign.ok) return { ok: false, error: "failed" };
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+  const target = /^https?:\/\//i.test(sign.data.signedUrl) ? sign.data.signedUrl
+    : `${base}/storage/v1${sign.data.signedUrl.startsWith("/") ? "" : "/"}${sign.data.signedUrl}`;
+  try {
+    const put = await fetch(target, { method: "PUT", body: file, headers: file.type ? { "Content-Type": file.type } : {} });
+    if (!put.ok) return { ok: false, error: "direct_blocked" };
+  } catch { return { ok: false, error: "direct_blocked" }; }
+  const reg = await send<{ file: BcFile }>(url, "POST", { action: "register", path: sign.data.path, fileName: file.name, size: file.size, mime: file.type });
+  return reg.ok ? { ok: true, file: reg.data.file } : { ok: false, error: "failed" };
+}
+
+export const deleteDesignFile = (id: string) => call<{ ok: true }>(`/api/brand-center/files/${id}`, { method: "DELETE" });
+export const fileDownloadHref = (id: string) => `/api/brand-center/files/${id}`;

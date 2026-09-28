@@ -2,13 +2,14 @@
 
 /* Brand Center item — its designs (owner: "maybe later I need to add my own
    designs"). Any number per item, or per some of its choices; one is the
-   default. With the rights: add, make default, put in use, retire. Files
-   of a design arrive with the file step (C5). */
+   default. With the rights: add, make default, put in use, retire, and add
+   or remove the design's files (DesignFiles). */
 
 import { useState } from "react";
 import { bc, type BcDesign, type BcType } from "@/lib/brand-center/client";
 import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
-import { FIELD, StatusChip, fill } from "./ui";
+import { FIELD, StatusChip } from "./ui";
+import DesignFiles from "./DesignFiles";
 
 type T = (k: string) => string;
 const KINDS = ["print_file", "editable", "logo_pack", "mockup", "photo", "vendor_brief", "template", "other"] as const;
@@ -47,7 +48,6 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
               <span dir="auto" className="text-[12px] text-[var(--text-dim)]">
                 {d.option_ids.length ? d.option_ids.map((id) => optionLabel.get(id)).filter(Boolean).join(" · ") : t("des.whole")}
               </span>
-              <span className="text-[11.5px] text-[var(--text-dim)] tabular-nums">{fill(t("des.files"), { n: d.files?.length ?? 0 })}</span>
               {canEdit && (
                 <span className="ms-auto flex flex-wrap gap-1.5">
                   {!d.is_default && d.status !== "retired" && <Small busy={busy === `def-${d.id}`} onClick={() => void run(`def-${d.id}`, () => bc.editDesign(d.id, { isDefault: true }))}>{t("des.makeDefault")}</Small>}
@@ -55,6 +55,7 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
                   {d.status !== "retired" && <Small busy={busy === `ret-${d.id}`} onClick={() => void run(`ret-${d.id}`, () => bc.retireDesign(d.id))}>{t("des.retire")}</Small>}
                 </span>
               )}
+              <DesignFiles t={t} designId={d.id} files={d.files ?? []} canEdit={canEdit} onChanged={onChanged} />
             </li>
           ))}
         </ul>

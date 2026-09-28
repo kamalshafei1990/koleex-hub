@@ -58,3 +58,29 @@ export async function loadItem(tenantId: string, itemId: string) {
     designs: (designs.data ?? []).map((d) => ({ ...d, files: (files.data ?? []).filter((f) => f.design_id === d.id) })),
   };
 }
+
+/* ── files (plan step C5) ──────────────────────────────────────────────── */
+
+export const BRAND_BUCKET = "brand-center";
+/** Files at or under this go through our own route (reliable on every line);
+ *  larger ones are PUT straight to storage with a signed token. Just under
+ *  the platform's 4.5 MB request cap. */
+export const DIRECT_UPLOAD_OVER = 4.2 * 1024 * 1024;
+export const MAX_FILE_BYTES = 500 * 1024 * 1024;
+
+export function purposeOf(fileName: string): "print_pdf" | "pdf" | "svg" | "png" | "jpg" | "dxf" | "ai" | "other" {
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  if (ext === "pdf") return /print|cmyk|bleed|press/i.test(fileName) ? "print_pdf" : "pdf";
+  if (ext === "svg") return "svg";
+  if (ext === "png") return "png";
+  if (ext === "jpg" || ext === "jpeg") return "jpg";
+  if (ext === "dxf") return "dxf";
+  if (ext === "ai" || ext === "eps") return "ai";
+  return "other";
+}
+
+/** A storage path under <tenant>/<item>/<design>/ with a safe file name. */
+export function filePath(tenantId: string, itemId: string, designId: string, fileName: string): string {
+  const safe = fileName.normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-120) || "file";
+  return `${tenantId}/${itemId}/${designId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}-${safe}`;
+}
