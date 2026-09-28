@@ -30,6 +30,7 @@ import { useEffect } from "react";
 import { useCurrentAccount } from "@/lib/identity";
 import { withDefaults } from "@/lib/access-control";
 import { syncOrbStyleFromAccount } from "@/components/ai-orb/orb-style";
+import { syncHomeLayoutFromAccount } from "@/lib/home/home-layout";
 import type {
   DisplayPrefs,
   TextSizePref,
@@ -209,6 +210,7 @@ export function DisplayPreferencesApplier() {
        a display save in the last few seconds must not stop the orb from
        following a choice made on another device. */
     syncOrbStyleFromAccount(account.preferences?.orb);
+    syncHomeLayoutFromAccount(account.preferences?.home_layout);
     /* A just-made local choice outranks a possibly-stale server snapshot. */
     if (Date.now() < localWriteUntil) return;
     const d = withDefaults(account.preferences).display;

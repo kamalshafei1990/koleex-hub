@@ -41,7 +41,8 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
-import { launcherColumns } from "@/lib/home/app-bands";
+import { launcherColumns, packAppBands } from "@/lib/home/app-bands";
+import { useHomeLayout } from "@/lib/home/home-layout";
 import TodayStrip from "@/components/home/TodayStrip";
 import {
   HOME_APPS_NONE, MY_APPS_MAX, MY_APPS_SEED, cacheHomeApps, readCachedHomeApps, readHomeAppsPref,
@@ -1195,6 +1196,10 @@ export default function HomePage() {
      count actually changes. */
   const wide = useSyncExternalStore(subscribeWide, readWide, () => false);
   const iconPx = wide ? 30 : 34;
+  /* Which launcher (Settings → Display, owner 28/09/2026): "classic" tile
+     groups by default, or "today" — the Today strip and department cards. */
+  const homeLayout = useHomeLayout();
+  const todayLayout = homeLayout === "today";
   const launcherRef = useRef<HTMLDivElement | null>(null);
   const [cols, setCols] = useState<number>(estimateLauncherColumns);
   useLayoutEffect(() => {
@@ -1209,6 +1214,11 @@ export default function HomePage() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const bands = useMemo(
+    () => (wide && !todayLayout ? packAppBands(groupedApps.map((g) => g.apps.length), cols) : null),
+    [wide, todayLayout, groupedApps, cols],
+  );
 
   /* ── My apps (lib/home/my-apps.ts) ──
      1. the device's copy, read in the initialiser, so a returning visit
@@ -1578,7 +1588,7 @@ export default function HomePage() {
 
         {/* ── Today (owner pick 28/09/2026: Home sample 2) ── what needs the
             person first; opens the app behind each number. */}
-        {!isSearchOrFilter && visibleRegistry.length > 0 && (
+        {todayLayout && !isSearchOrFilter && visibleRegistry.length > 0 && (
           <TodayStrip
             apps={launcherApps}
             t={t}
@@ -1678,6 +1688,7 @@ export default function HomePage() {
                 as fifty identical tiles. Cards flow in columns — one on a
                 phone, two from 640 px, three from 1024 px. Apps not live yet
                 stay listed, dimmed and marked Soon. */}
+            {todayLayout ? (
             <div className="columns-1 sm:columns-2 lg:columns-3 gap-3">
               {groupedApps.map((group) => (
                 <section
@@ -1699,6 +1710,57 @@ export default function HomePage() {
                 </section>
               ))}
             </div>
+            ) : bands ? (
+              /* Every group a closed block on ONE column grid: groups in a band
+                 share the header line and the row count, so every tile lines
+                 up with the tiles above and below it. */
+              <div>
+                {bands.map((band, bi) => (
+                  <div
+                    key={bi}
+                    className="grid gap-x-3 items-start mb-7 last:mb-0"
+                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                  >
+                    {band.groups.map(({ index, span }) => {
+                      const group = groupedApps[index];
+                      return (
+                        <div key={group.id} className="min-w-0" style={{ gridColumn: `span ${span} / span ${span}` }}>
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <span className={`min-w-0 truncate text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                              {t(group.tKey, group.label)}
+                            </span>
+                            <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                          </div>
+                          <div
+                            className={`${introMotion ? "kx-grid " : ""}grid gap-3`}
+                            style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
+                          >
+                            {group.apps.map((app) => renderCard(app, "catalog"))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Phones: the stack of groups, three columns, as it was. */
+              <div className="space-y-7">
+                {groupedApps.map((group) => (
+                  <div key={group.id}>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                        {t(group.tKey, group.label)}
+                      </span>
+                      <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                    </div>
+                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 gap-3`}>
+                      {group.apps.map((app) => renderCard(app, "catalog"))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
         </div>

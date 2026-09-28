@@ -16,6 +16,7 @@ import { SettingsCard, ControlRow, Segmented, SwitchRow, AppearancePreview } fro
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import { getSkin, setSkin, DEFAULT_SKIN, type Skin } from "@/lib/appearance";
+import { setHomeLayout, useHomeLayout, type HomeLayout } from "@/lib/home/home-layout";
 
 /* The shipped defaults for everything this screen edits. Region formats are
    deliberately absent — those belong to Language & region. */
@@ -66,6 +67,15 @@ export default function DisplayTab({ account, onChanged }: {
   function pickSkin(v: Skin) {
     setSkinState(v);
     setSkin(v);   // writes storage + data-kx-skin + "skinchange"
+  }
+
+  /* Home's launcher (owner, 28/09/2026): Classic by default, Today as the
+     alternative. Applies at once on this device; saved on the account so
+     every device follows. */
+  const homeLayout = useHomeLayout();
+  function pickHomeLayout(v: HomeLayout) {
+    setHomeLayout(v);
+    void updateAccountPreferences(account.id, { home_layout: v }).then((ok) => { if (ok) onChanged(); });
   }
 
   function pickTheme(t: ThemePreference) {
@@ -156,6 +166,16 @@ export default function DisplayTab({ account, onChanged }: {
             />
           </div>
         </div>
+        <ControlRow label={t("display.home")} hint={t("display.home.hint")}>
+          <Segmented<HomeLayout>
+            value={homeLayout}
+            onChange={pickHomeLayout}
+            options={[
+              { value: "classic", label: t("display.home.classic") },
+              { value: "today", label: t("display.home.today") },
+            ]}
+          />
+        </ControlRow>
         <ControlRow label={t("display.textSize")} hint={t("display.textSize.hint")}>
           <Segmented<TextSizePref>
             value={d.text_size}

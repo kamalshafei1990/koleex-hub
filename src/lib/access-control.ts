@@ -394,6 +394,10 @@ export interface AccountPreferences {
      it once from their own usage; "usage" = seeded; "user" = edited). Shape
      and rules live in lib/home/my-apps.ts. */
   home_apps?: { pins: string[]; source: "none" | "usage" | "user" };
+  /* Which Home launcher this person sees: "classic" (the tile groups, the
+     default) or "today" (the Today strip and department cards). Values and
+     the store live in lib/home/home-layout.ts. */
+  home_layout?: "classic" | "today";
 }
 
 /**
@@ -460,6 +464,7 @@ export const DEFAULT_PREFERENCES: Required<
   orb: "aura",
   ai_model: "auto",
   home_apps: { pins: [], source: "none" },
+  home_layout: "classic",
 };
 
 /** Merge stored preferences with frontend defaults for display. */
@@ -541,6 +546,9 @@ export function withDefaults(
     /* Same passthrough again. Without this line every Settings save would
        erase the person's My apps row and Home would re-seed it from usage. */
     home_apps: p.home_apps ?? DEFAULT_PREFERENCES.home_apps,
+    /* And the Home layout: a language change must not put Home back to
+       the classic launcher. */
+    home_layout: p.home_layout === "today" ? "today" : DEFAULT_PREFERENCES.home_layout,
   };
 }
 
