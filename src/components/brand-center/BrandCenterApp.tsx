@@ -91,7 +91,8 @@ export default function BrandCenterApp() {
             ) : (
               <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {sections.map((s) => (
-                  <li key={s.id} className={`${CARD} flex items-start gap-3 px-4 py-3.5`}>
+                  <li key={s.id}>
+                    <Link href={`/brand-center/${s.id}`} className={`${CARD} flex h-full items-start gap-3 px-4 py-3.5 transition-colors hover:border-[var(--border-strong)]`}>
                     <span className="mt-0.5 text-[var(--text-dim)]" aria-hidden><RrIcon name={SECTION_ICON[s.id] ?? "box-open"} size={17} /></span>
                     <div className="min-w-0 flex-1">
                       <p className="flex items-baseline gap-2 text-[14px] font-semibold text-[var(--text-primary)]">
@@ -102,11 +103,11 @@ export default function BrandCenterApp() {
                         {fill(t("library.items"), s.items)} · {fill(t("library.types"), s.types)} · {fill(t("library.groups"), s.groups)}
                       </p>
                     </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
-            <p className="mt-3 text-[12px] text-[var(--text-dim)]">{t("library.soon")}</p>
           </section>
         )}
 
