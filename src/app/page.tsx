@@ -41,7 +41,8 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
-import { launcherColumns, packAppBands } from "@/lib/home/app-bands";
+import { launcherColumns } from "@/lib/home/app-bands";
+import TodayStrip from "@/components/home/TodayStrip";
 import {
   HOME_APPS_NONE, MY_APPS_MAX, MY_APPS_SEED, cacheHomeApps, readCachedHomeApps, readHomeAppsPref,
   saveHomeApps, seedPins, type HomeAppsPref,
@@ -518,6 +519,117 @@ const AppCard = memo(function AppCard({
   );
 });
 
+/* ── App row (department cards, owner pick 28/09/2026: sample 2) ──
+   The same app, badge and edit rules as AppCard, laid out as a row: icon,
+   name, count. Apps that are not live yet stay on the list, dimmed and
+   marked Soon (owner: "don't hide the non active apps"). */
+const AppRow = memo(function AppRow({
+  app,
+  t,
+  isCurrentApp,
+  appUnread,
+  dk,
+  onPrefetch,
+  edit = null,
+  pinned = false,
+  pinFull = false,
+  onPin,
+}: {
+  app: AppDef;
+  t: (key: string, fb: string) => string;
+  isCurrentApp: boolean;
+  appUnread: number;
+  dk: boolean;
+  onPrefetch: (app: AppDef) => void;
+  edit?: "catalog" | null;
+  pinned?: boolean;
+  pinFull?: boolean;
+  onPin?: (id: string) => void;
+}) {
+  const Icon = app.icon;
+  const label = t(app.tKey, app.name);
+  const isAi = app.id === "ai";
+  const appBadges = useAppBadges();
+  /* One number per app, as on the tiles: unread first, open work after. */
+  const count = appUnread > 0 ? appUnread : appBadges[app.id] ?? 0;
+
+  const rowCls = `relative flex items-center gap-2.5 min-w-0 h-11 px-2 rounded-xl text-start transition-colors outline-none focus-visible:ring-2 ${
+    dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
+  } ${
+    app.active
+      ? `tile-hover-neon cursor-pointer ${dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.04]"} ${isCurrentApp ? (dk ? "bg-white/[0.06]" : "bg-black/[0.05]") : ""}`
+      : "cursor-default"
+  }`;
+  const body = (
+    <>
+      <span
+        className={`relative grid place-items-center shrink-0 h-8 w-8 rounded-[9px] border ${
+          dk ? "bg-white/[0.04] border-white/[0.06]" : "bg-black/[0.03] border-black/[0.06]"
+        } ${app.active ? (dk ? "text-white" : "text-black") : dk ? "text-white/20" : "text-black/20"}`}
+      >
+        {isAi ? (
+          (() => {
+            const AnimatedIcon = Icon as React.ComponentType<{ size?: number; animated?: boolean; scaleClass?: string }>;
+            return <AnimatedIcon size={28} animated scaleClass="scale-100" />;
+          })()
+        ) : (
+          <BoundIcon semanticKey={`app.${app.id}`} className="h-[18px] w-[18px]" fallback={<Icon size={18} />} />
+        )}
+      </span>
+      <span
+        className={`kx-app-label min-w-0 truncate text-[13px] font-medium ${
+          app.active ? (dk ? "text-white/90" : "text-black/90") : dk ? "text-white/25" : "text-black/30"
+        }`}
+      >
+        {label}
+      </span>
+      {!app.active ? (
+        <span className={`ms-auto shrink-0 text-[10px] font-semibold uppercase tracking-wider ${dk ? "text-white/25" : "text-black/30"}`}>
+          {t("home.soon", "Soon")}
+        </span>
+      ) : edit === "catalog" ? (
+        <span
+          aria-hidden
+          className={`ms-auto grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
+            pinned
+              ? "bg-[#567FB2] border-[#7FA9D6]/70 text-white"
+              : dk ? "bg-white/[0.08] border-white/20 text-white/85" : "bg-black/[0.05] border-black/15 text-black/70"
+          }`}
+        >
+          {pinned ? <CheckIcon size={13} /> : <PlusIcon size={13} />}
+        </span>
+      ) : count > 0 ? (
+        <span className="ms-auto shrink-0 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none">
+          {count > 99 ? "99+" : count}
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (edit === "catalog" && app.active) {
+    const blocked = !pinned && pinFull;
+    const pinText = (pinned ? t("home.unpinApp", "Remove {name} from My apps") : t("home.pinApp", "Add {name} to My apps")).replace("{name}", label);
+    return (
+      <button
+        type="button"
+        data-app-tile={app.id}
+        aria-pressed={pinned}
+        aria-label={blocked ? t("home.myAppsFull", "My apps is full — remove one to add another") : pinText}
+        disabled={blocked}
+        onClick={() => onPin?.(app.id)}
+        className={`${rowCls} w-full ${blocked ? "opacity-60" : ""}`}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <AppLaunchLink app={app} onPreload={onPrefetch} aria-label={label} className={rowCls}>
+      {body}
+    </AppLaunchLink>
+  );
+});
+
 /* CompactCard (favorites row / recent strip) deleted 2026-08-10 — the owner
    removed both zones and the component had zero call sites left. */
 
@@ -807,13 +919,13 @@ export default function HomePage() {
      Mirrors the NotificationBell source of truth (fetchMyChannels +
      subscribeToMyChannels + the "discuss:unread-changed" event) so the
      home badge stays in lock-step with the bell and the in-app sidebar. */
-  const [discussUnread, setDiscussUnread] = useState(0);
+  const [discussUnread, setDiscussUnread] = useState<number | null>(null);
   /* Unread task assignments → notification badge on the To-do app tile.
      Sourced from inbox_messages (category "task") which the todo
      assignment fan-out writes, so the count = "tasks assigned to me I
      haven't read". Kept live via inbox realtime + the inbox recount
      event + a slow poll, mirroring the Discuss badge below. */
-  const [todoUnread, setTodoUnread] = useState(0);
+  const [todoUnread, setTodoUnread] = useState<number | null>(null);
 
   /* WS1: the two decorative unread-badge effects below (each a fetch + realtime
      subscription) are gated behind first idle so the app grid becomes
@@ -1097,10 +1209,6 @@ export default function HomePage() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const bands = useMemo(
-    () => (wide ? packAppBands(groupedApps.map((g) => g.apps.length), cols) : null),
-    [wide, groupedApps, cols],
-  );
 
   /* ── My apps (lib/home/my-apps.ts) ──
      1. the device's copy, read in the initialiser, so a returning visit
@@ -1294,6 +1402,25 @@ export default function HomePage() {
 
 
 
+  const unreadFor = (id: string) =>
+    id === "discuss" ? discussUnread ?? 0 : id === "todo" ? todoUnread ?? 0 : OWN_TILE_NUMBER.has(id) ? 0 : unreadByApp[id] ?? 0;
+  const renderRow = (app: AppDef) => (
+    <AppRow
+      key={app.id}
+      app={app}
+      t={t}
+      isCurrentApp={currentAppId === app.id}
+      appUnread={unreadFor(app.id)}
+      dk={dk}
+      onPrefetch={prefetchApp}
+      edit={editingApps ? "catalog" : null}
+      pinned={pinnedSet.has(app.id)}
+      pinFull={pinIds.length >= MY_APPS_MAX}
+      onPin={togglePin}
+    />
+  );
+  const launcherApps = useMemo(() => new Map(visibleRegistry.map((a) => [a.id, a])), [visibleRegistry]);
+
   /* One tile, three contexts: the My apps row ("mine"), the groups below
      ("catalog") and search results (null). Edit mode only applies to the
      first two. */
@@ -1303,7 +1430,7 @@ export default function HomePage() {
       app={app}
       t={t}
       isCurrentApp={currentAppId === app.id}
-      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : OWN_TILE_NUMBER.has(app.id) ? 0 : unreadByApp[app.id] ?? 0}
+      appUnread={unreadFor(app.id)}
       appUnreadNoun={app.id === "todo" ? "task" : app.id === "discuss" ? "message" : "notification"}
       dk={dk}
       onPrefetch={prefetchApp}
@@ -1449,6 +1576,23 @@ export default function HomePage() {
             widgets — the grid below is untouched for them. */}
         {HOME_DASHBOARD_ON && <HomeDashboard />}
 
+        {/* ── Today (owner pick 28/09/2026: Home sample 2) ── what needs the
+            person first; opens the app behind each number. */}
+        {!isSearchOrFilter && visibleRegistry.length > 0 && (
+          <TodayStrip
+            apps={launcherApps}
+            t={t}
+            lang={lang}
+            dk={dk}
+            ready={badgesReady}
+            accountId={account?.id ?? null}
+            todoOpen={todoUnread}
+            discussUnread={discussUnread}
+            notifUnread={tileCounts.published ? tileCounts.count : null}
+            onPrefetch={prefetchApp}
+          />
+        )}
+
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
             render a calm loading skeleton or a Retry banner instead
@@ -1528,57 +1672,33 @@ export default function HomePage() {
               )}
             </section>
 
-            {bands ? (
-              /* Every group a closed block on ONE column grid: groups in a band
-                 share the header line and the row count, so every tile lines
-                 up with the tiles above and below it. */
-              <div>
-                {bands.map((band, bi) => (
-                  <div
-                    key={bi}
-                    className="grid gap-x-3 items-start mb-7 last:mb-0"
-                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-                  >
-                    {band.groups.map(({ index, span }) => {
-                      const group = groupedApps[index];
-                      return (
-                        <div key={group.id} className="min-w-0" style={{ gridColumn: `span ${span} / span ${span}` }}>
-                          <div className="flex items-center gap-2.5 mb-3">
-                            <span className={`min-w-0 truncate text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                              {t(group.tKey, group.label)}
-                            </span>
-                            <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
-                          </div>
-                          <div
-                            className={`${introMotion ? "kx-grid " : ""}grid gap-3`}
-                            style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
-                          >
-                            {group.apps.map((app) => renderCard(app, "catalog"))}
-                          </div>
-                        </div>
-                      );
-                    })}
+            {/* ── Departments (owner pick 28/09/2026: Home sample 2) ──
+                Every group is one card and every app in it a row, so the
+                whole catalogue reads by department at a glance instead of
+                as fifty identical tiles. Cards flow in columns — one on a
+                phone, two from 640 px, three from 1024 px. Apps not live yet
+                stay listed, dimmed and marked Soon. */}
+            <div className="columns-1 sm:columns-2 lg:columns-3 gap-3">
+              {groupedApps.map((group) => (
+                <section
+                  key={group.id}
+                  aria-label={t(group.tKey, group.label)}
+                  className={`break-inside-avoid mb-3 rounded-2xl border p-2 pt-3 kx-glass ${
+                    dk ? "bg-[#0c0c0c] border-white/[0.06]" : "bg-[#f8f8f8] border-black/[0.06]"
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between gap-2 px-2 mb-1.5">
+                    <span className={`min-w-0 truncate text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/45" : "text-black/45"}`}>
+                      {t(group.tKey, group.label)}
+                    </span>
+                    <span className={`shrink-0 text-[11px] tabular-nums ${dk ? "text-white/25" : "text-black/30"}`}>{group.apps.length}</span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              /* Phones: the stack of groups, three columns, as it was. */
-              <div className="space-y-7">
-                {groupedApps.map((group) => (
-                  <div key={group.id}>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                        {t(group.tKey, group.label)}
-                      </span>
-                      <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
-                    </div>
-                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 gap-3`}>
-                      {group.apps.map((app) => renderCard(app, "catalog"))}
-                    </div>
+                  <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-2 gap-x-1`}>
+                    {group.apps.map((app) => renderRow(app))}
                   </div>
-                ))}
-              </div>
-            )}
+                </section>
+              ))}
+            </div>
           </>
         )}
         </div>

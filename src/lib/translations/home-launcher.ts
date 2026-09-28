@@ -15,4 +15,13 @@ export const homeLauncherT: Translations = {
   "home.unpinApp": { en: "Remove {name} from My apps", zh: "\u4ece\u6211\u7684\u5e94\u7528\u4e2d\u79fb\u9664 {name}", ar: "\u0623\u0632\u0644 {name} \u0645\u0646 \u062a\u0637\u0628\u064a\u0642\u0627\u062a\u064a" },
   "home.myAppsFull": { en: "My apps is full \u2014 remove one to add another", zh: "\u6211\u7684\u5e94\u7528\u5df2\u6ee1\uff0c\u8bf7\u5148\u79fb\u9664\u4e00\u4e2a", ar: "\u062a\u0637\u0628\u064a\u0642\u0627\u062a\u064a \u0645\u0645\u062a\u0644\u0626\u0629 \u2014 \u0623\u0632\u0644 \u062a\u0637\u0628\u064a\u0642\u064b\u0627 \u0644\u0625\u0636\u0627\u0641\u0629 \u0622\u062e\u0631" },
   "home.moveApp": { en: "{name}, {pos} of {total}. Use the arrow keys to move it.", zh: "{name}\uff0c\u7b2c {pos} \u4e2a\uff0c\u5171 {total} \u4e2a\u3002\u4f7f\u7528\u65b9\u5411\u952e\u79fb\u52a8\u3002", ar: "{name}\u060c {pos} \u0645\u0646 {total}. \u0627\u0633\u062a\u062e\u062f\u0645 \u0645\u0641\u0627\u062a\u064a\u062d \u0627\u0644\u0623\u0633\u0647\u0645 \u0644\u062a\u062d\u0631\u064a\u0643\u0647." },
+  /* Today strip + department cards (owner pick, 28/09/2026: sample 2). */
+  "home.today": { en: "Today", zh: "今天", ar: "اليوم" },
+  "home.tomorrow": { en: "Tomorrow", zh: "明天", ar: "غدًا" },
+  "home.tasksOpen": { en: "open tasks on you", zh: "项待你处理的任务", ar: "مهام مفتوحة عليك" },
+  "home.msgsUnread": { en: "unread messages", zh: "条未读消息", ar: "رسائل غير مقروءة" },
+  "home.notifsUnread": { en: "unread notifications", zh: "条未读通知", ar: "إشعارات غير مقروءة" },
+  "home.nothingScheduled": { en: "Nothing scheduled", zh: "暂无安排", ar: "لا توجد مواعيد" },
+  "home.nextThreeDays": { en: "in the next 3 days", zh: "未来 3 天内", ar: "خلال الأيام الثلاثة القادمة" },
+  "home.soon": { en: "Soon", zh: "即将推出", ar: "قريبًا" },
 };
