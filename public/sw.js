@@ -171,6 +171,13 @@ async function badgeFromPush(payload) {
   if (payload.kind === "discuss_message") parts.discuss = (parts.discuss | 0) + 1;
   await writeBadgeParts(parts);
   await paintBadge(parts);
+  /* An open Hub knows better than this guess (a Discuss message read on
+     screen as it arrived never raised the bell): ask it to put its own
+     reading back on the icon. */
+  try {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const w of wins) w.postMessage({ type: "kx-icon-badge-painted" });
+  } catch { /* no open window — the guess stands until the Hub opens */ }
 }
 
 self.addEventListener("message", (event) => {
