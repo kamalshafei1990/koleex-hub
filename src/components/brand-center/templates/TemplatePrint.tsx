@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { brandCenterTemplatesT } from "@/lib/translations/brand-center-templates";
 import { templateById } from "@/lib/brand-center/templates/registry";
-import { qrModules } from "@/lib/brand-center/templates/qr";
+import { qrCodes } from "@/lib/brand-center/templates/qr";
 import TemplateSheet, { sheetSize } from "./TemplateSheet";
 import { readPrintJob } from "./print";
 
@@ -22,7 +22,7 @@ export default function TemplatePrint() {
   const { t } = useTranslation(brandCenterTemplatesT);
   const [job] = useState(readPrintJob);
   const def = job ? templateById(job.templateId) : null;
-  const qr = useMemo(() => (def && job ? qrModules(def.qrText?.(job.values)) : null), [def, job]);
+  const qrs = useMemo(() => (def && job ? qrCodes(def.qrRequests?.(job.values)) : {}), [def, job]);
 
   useEffect(() => {
     if (!def || !job) return;
@@ -53,7 +53,7 @@ export default function TemplatePrint() {
       `}</style>
       {def.pages.map((p) => (
         <div key={p.id} className="kx-brand-page">
-          <TemplateSheet def={def} values={job.values} pageId={p.id} qr={qr} mode="print"
+          <TemplateSheet def={def} values={job.values} pageId={p.id} qrs={qrs} mode="print"
             slug={`${job.slug} · ${t(`tpl.page.${p.id}`)}`} />
         </div>
       ))}

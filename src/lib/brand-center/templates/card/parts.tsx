@@ -1,33 +1,28 @@
 /* ---------------------------------------------------------------------------
-   Business card — the shared drawing parts (brand book ch. 91, 43, 44, 57).
-
-   Everything in mm. Type: Inter for Latin (owner 28/09: contacts too, no
-   monospace), Noto Sans Arabic, and the book's Chinese stack (PingFang SC /
-   Noto Sans SC) — one stack, so a Chinese name with a Latin email picks the
-   right face per letter. Contacts carry labels (owner 28/09: "Add:", "Mob:"
-   like his card), in the card's language.
+   Business card — the drawing parts every style is built from (brand book
+   ch. 91, 43, 44, 57). Everything in mm; text in the fill's typeface
+   (fontOf); Arabic mirrors text placement, never the marks' shapes.
    --------------------------------------------------------------------------- */
 
+import type { ReactNode } from "react";
 import { KoleexLogoPaths } from "@/components/layout/KoleexLogo";
-import { PT, type TemplateValues } from "../types";
+import { PT } from "../types";
+import { measure } from "../measure";
+import type { QrItem } from "./model";
+import { isPictureQr } from "./model";
 
 export const INK = "#000000";
 export const WHITE = "#FFFFFF";
-/** Secondary text on black / on white (the book's greys). */
+/** Secondary text on black / on white, and hairlines (the book's greys). */
 export const GREY_ON_INK = "#98989D";
 export const GREY_ON_WHITE = "#6E6E73";
 export const LIGHT_ON_INK = "#D1D1D6";
+export const HAIRLINE_ON_WHITE = "#D2D2D7";
+export const HAIRLINE_ON_INK = "#3A3A3C";
 
 const LOGO_W = 719.83;
 const LOGO_H = 107.57;
 export const logoHeight = (width: number) => (width * LOGO_H) / LOGO_W;
-
-export const FONT =
-  "var(--font-inter), Inter, var(--font-bc-ar), 'Noto Sans Arabic', 'PingFang SC', 'Noto Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif";
-
-export type Lang = "en" | "zh" | "ar";
-export const langOf = (v: TemplateValues): Lang => (v.lang === "zh" || v.lang === "ar" ? v.lang : "en");
-export const str = (v: TemplateValues, k: string): string => (typeof v[k] === "string" ? (v[k] as string).trim() : "");
 
 /* ── marks ─────────────────────────────────────────────────────────────── */
 
@@ -35,15 +30,14 @@ export function Logo({ x, y, width, fill }: { x: number; y: number; width: numbe
   return <g transform={`translate(${x} ${y}) scale(${width / LOGO_W})`} fill={fill}><KoleexLogoPaths /></g>;
 }
 
-/** The horizontal group lockup (ch. 43): logo, hairline, and
- *  KOLEEX / INTERNATIONAL / GROUP in Inter Light — the book's own drawing
- *  (a 1190 × 160 box), scaled to `width`. */
-export function GroupLockup({ x, y, width, fill }: { x: number; y: number; width: number; fill: string }) {
+/** The horizontal group lockup (ch. 43): logo, hairline, KOLEEX /
+ *  INTERNATIONAL / GROUP — drawn in the book's 1190 × 160 box. */
+export function GroupLockup({ x, y, width, fill, font, weight = 300 }: { x: number; y: number; width: number; fill: string; font: string; weight?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${width / 1190})`} fill={fill}>
       <g transform={`translate(0 26) scale(${720 / LOGO_W})`}><KoleexLogoPaths /></g>
       <rect x={786} y={0} width={3} height={160} />
-      <text style={{ fontFamily: FONT, fontWeight: 300, fontSize: 40, letterSpacing: 1 }}>
+      <text style={{ fontFamily: font, fontWeight: weight, fontSize: 40, letterSpacing: 1 }}>
         <tspan x={846} y={42}>KOLEEX</tspan>
         <tspan x={846} y={99}>INTERNATIONAL</tspan>
         <tspan x={846} y={156}>GROUP</tspan>
@@ -53,129 +47,182 @@ export function GroupLockup({ x, y, width, fill }: { x: number; y: number; width
 }
 export const lockupHeight = (width: number) => (width * 160) / 1190;
 
-/** The QR on a white square (quiet zone included), dark modules. */
-export function Qr({ modules, x, y, size }: { modules: boolean[][]; x: number; y: number; size: number }) {
-  const pad = size * 0.08;
-  const cell = (size - pad * 2) / modules.length;
-  let d = "";
-  modules.forEach((row, r) => row.forEach((on, c) => {
-    if (on) d += `M${(x + pad + c * cell).toFixed(3)} ${(y + pad + r * cell).toFixed(3)}h${cell.toFixed(3)}v${cell.toFixed(3)}h-${cell.toFixed(3)}z`;
-  }));
-  return (
-    <g>
-      <rect x={x} y={y} width={size} height={size} rx={0.6} fill={WHITE} />
-      <path d={d} fill={INK} shapeRendering="crispEdges" />
-    </g>
-  );
+/** One stroke of the X (ch. 57), as a parallelogram from (x, top) with
+ *  horizontal ends: `width` across, leaning `lean` mm right per mm down. */
+export function Stroke({ x, top, bottom, width, lean, fill = WHITE }: { x: number; top: number; bottom: number; width: number; lean: number; fill?: string }) {
+  const dx = (bottom - top) * lean;
+  return <polygon points={`${x},${top} ${x + width},${top} ${x + width + dx},${bottom} ${x + dx},${bottom}`} fill={fill} />;
 }
 
 /* ── text ──────────────────────────────────────────────────────────────── */
 
 const CJK = /[\u2E80-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/;
-/** Estimated width of a line in mm (Inter / CJK / Arabic averages). Used
- *  only to wrap and to condense a line that would cross its box. */
-export function textWidth(text: string, size: number, weight = 400): number {
+
+/** Width of a line in mm: measured in the typeface when one is given (in
+ *  the browser), otherwise estimated from average advances. */
+export function textWidth(text: string, size: number, weight = 400, font?: string, italic = false): number {
+  if (font) {
+    const m = measure(text, size, weight, font, italic);
+    if (m !== null) return m;
+  }
   let em = 0;
   for (const ch of text) em += CJK.test(ch) ? 1 : /[\u0600-\u06FF]/.test(ch) ? 0.5 : /[A-Z0-9@%&]/.test(ch) ? 0.64 : ch === " " ? 0.28 : 0.52;
   return em * size * (weight >= 600 ? 1.05 : weight <= 300 ? 0.97 : 1);
 }
 
-/** Condense a line to `max` mm when it would run past it. */
-export function fit(text: string, size: number, max: number, weight = 400) {
-  return textWidth(text, size, weight) > max ? { textLength: max, lengthAdjust: "spacingAndGlyphs" as const } : {};
+export function fit(text: string, size: number, max: number, weight = 400, font?: string, italic = false) {
+  return max > 0 && textWidth(text, size, weight, font, italic) > max ? { textLength: max, lengthAdjust: "spacingAndGlyphs" as const } : {};
 }
 
 /** Word-wrap to lines of at most `max` mm (CJK wraps between characters). */
-export function wrap(text: string, size: number, max: number, maxLines = 2, weight = 400): string[] {
-  const units = CJK.test(text) && !/\s/.test(text) ? Array.from(text) : text.split(/\s+/).filter(Boolean);
-  const join = CJK.test(text) && !/\s/.test(text) ? "" : " ";
+export function wrap(text: string, size: number, max: number, maxLines = 2, weight = 400, font?: string, italic = false): string[] {
+  const cjk = CJK.test(text) && !/\s/.test(text);
+  const units = cjk ? Array.from(text) : text.split(/\s+/).filter(Boolean);
+  const join = cjk ? "" : " ";
   const lines: string[] = [];
   let cur = "";
   for (const u of units) {
     const next = cur ? cur + join + u : u;
-    if (cur && textWidth(next, size, weight) > max) { lines.push(cur); cur = u; } else cur = next;
+    if (cur && textWidth(next, size, weight, font, italic) > max) { lines.push(cur); cur = u; } else cur = next;
   }
   if (cur) lines.push(cur);
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(join)];
 }
 
-/** A line of text placed from its logical start: the left edge in English
- *  and Chinese, the right edge in Arabic (direction does the mirroring). */
-export function Line({ x, y, rtl, children, size, weight = 400, fill, max, anchor = "start", spacing }: {
+/** A line of text from its logical start: left, or right in Arabic. */
+export function Line({ x, y, rtl, children, size, weight = 400, fill, max, anchor = "start", font, italic, spacing }: {
   x: number; y: number; rtl: boolean; children: string; size: number; weight?: number; fill: string; max?: number;
-  anchor?: "start" | "middle" | "end"; spacing?: number;
+  anchor?: "start" | "middle" | "end"; font: string; italic?: boolean; spacing?: number;
 }) {
   return (
-    <text x={x} y={y} direction={rtl ? "rtl" : "ltr"} textAnchor={anchor} fill={fill} {...(max ? fit(children, size, max, weight) : {})}
-      style={{ fontFamily: FONT, fontSize: size, fontWeight: weight, letterSpacing: spacing }}>{children}</text>
+    <text x={x} y={y} direction={rtl ? "rtl" : "ltr"} textAnchor={anchor} fill={fill} {...(max ? fit(children, size, max, weight, font, italic) : {})}
+      style={{ fontFamily: font, fontSize: size, fontWeight: weight, fontStyle: italic ? "italic" : undefined, letterSpacing: spacing }}>{children}</text>
   );
 }
 
-/* ── contacts ──────────────────────────────────────────────────────────── */
+export interface PrintRow { label: string; value: string; rtlValue: boolean }
 
-const LABELS: Record<Lang, Record<string, string>> = {
-  en: { add: "Add:", mob: "Mob:", tel: "Tel:", email: "Email:", web: "Web:", wechat: "WeChat:" },
-  zh: { add: "地址：", mob: "手机：", tel: "电话：", email: "邮箱：", web: "网址：", wechat: "微信：" },
-  ar: { add: "العنوان:", mob: "الجوال:", tel: "الهاتف:", email: "البريد:", web: "الموقع:", wechat: "ويتشات:" },
-};
-export const label = (lang: Lang, key: string) => LABELS[lang][key] ?? key;
-
-export interface Row { label: string; value: string; ltrValue: boolean }
-
-/** The contact lines of a fill, in the order of the owner's card:
- *  address, mobile (+ WhatsApp), WeChat, email, website. */
-export function contactRows(v: TemplateValues, opts: { address?: boolean } = {}): Row[] {
-  const lang = langOf(v);
-  const rows: Row[] = [];
-  const address = str(v, "address");
-  if (opts.address !== false && address) rows.push({ label: label(lang, "add"), value: address, ltrValue: !/[\u0600-\u06FF]/.test(address) });
-  const mobile = str(v, "mobile");
-  if (mobile) rows.push({ label: label(lang, "mob"), value: `${mobile}${v.whatsapp ? " · WhatsApp" : ""}`, ltrValue: true });
-  const wechat = str(v, "wechat");
-  if (wechat) rows.push({ label: label(lang, "wechat"), value: wechat, ltrValue: true });
-  const email = str(v, "email");
-  if (email) rows.push({ label: label(lang, "email"), value: email, ltrValue: true });
-  const web = str(v, "web");
-  if (web) rows.push({ label: label(lang, "web"), value: web, ltrValue: true });
-  return rows;
-}
-
-const isAddress = (r: Row) => Object.values(LABELS).some((l) => l.add === r.label);
-
-/** Labels in one column, values in the next (so the values line up); the
- *  address may wrap, every other line is condensed to the width if needed. */
-function layoutContacts(rows: Row[], size: number, width: number, maxAddressLines: number) {
-  const labelW = Math.max(0, ...rows.map((r) => textWidth(r.label + " ", size, 600)));
-  const room = width - labelW;
-  const lines = rows.flatMap((r) =>
-    (isAddress(r) ? wrap(r.value, size, room, maxAddressLines) : [r.value]).map((text, i) => ({ label: i ? "" : r.label, text, ltr: r.ltrValue })),
-  );
-  return { labelW, room, lines };
-}
-
-/** Contact rows from `x` (the logical start: left, or right in Arabic),
- *  the first baseline at `y` (align "top") or the last one (align "bottom"). */
-export function Contacts({ rows, x, y, align, width, rtl, size, fill, labelFill, gap = 1.42, maxAddressLines = 2 }: {
-  rows: Row[]; x: number; y: number; align: "top" | "bottom"; width: number; rtl: boolean; size: number;
-  fill: string; labelFill?: string; gap?: number; maxAddressLines?: number;
+/** Contact lines with the labels in their own column, so the values line
+ *  up; the address may wrap. `y` is the first baseline (align "top") or the
+ *  last (align "bottom"). */
+export function ColumnRows({ rows, x, y, align, width, rtl, size, fill, labelFill, font, lead = 1.42, maxWrap = 2 }: {
+  rows: PrintRow[]; x: number; y: number; align: "top" | "bottom"; width: number; rtl: boolean; size: number;
+  fill: string; labelFill?: string; font: string; lead?: number; maxWrap?: number;
 }) {
-  const lead = size * gap;
-  const { labelW, room, lines } = layoutContacts(rows, size, width, maxAddressLines);
-  const top = align === "top" ? y : y - (lines.length - 1) * lead;
+  const { labelW, room, lines } = layoutColumns(rows, size, width, maxWrap, font);
+  const step = size * lead;
+  const top = align === "top" ? y : y - (lines.length - 1) * step;
   const vx = rtl ? x - labelW : x + labelW;
   return (
     <g>
-      {lines.map((l, i) => {
-        const yy = top + i * lead;
+      {lines.map((l, i) => (
+        <g key={i}>
+          {l.label ? (
+            <text x={x} y={top + i * step} direction={rtl ? "rtl" : "ltr"} textAnchor="start" fill={labelFill ?? fill}
+              style={{ fontFamily: font, fontSize: size, fontWeight: 600 }}>{l.label}</text>
+          ) : null}
+          <text x={vx} y={top + i * step} direction={l.rtl ? "rtl" : "ltr"} textAnchor={rtl && !l.rtl ? "end" : "start"} fill={fill}
+            {...fit(l.text, size, room, 400, font)} style={{ fontFamily: font, fontSize: size, fontWeight: 400 }}>{l.text}</text>
+        </g>
+      ))}
+    </g>
+  );
+}
+function layoutColumns(rows: PrintRow[], size: number, width: number, maxWrap: number, font?: string) {
+  const labelW = rows.some((r) => r.label) ? Math.max(...rows.map((r) => (r.label ? textWidth(r.label, size, 600, font) + size * 0.6 : 0))) : 0;
+  const room = width - labelW;
+  const lines = rows.flatMap((r) =>
+    (textWidth(r.value, size, 400, font) > room ? wrap(r.value, size, room, maxWrap, 400, font) : [r.value]).map((text, i) => ({ label: i ? "" : r.label, text, rtl: r.rtlValue })),
+  );
+  return { labelW, room, lines };
+}
+export function columnRowsSpan(rows: PrintRow[], size: number, width: number, lead = 1.42, maxWrap = 2, font?: string): number {
+  return Math.max(0, layoutColumns(rows, size, width, maxWrap, font).lines.length - 1) * size * lead;
+}
+
+/** Contact lines as "Label value" on one line each (the owner's card), or
+ *  centred. Each line is condensed to the width if needed. */
+export function InlineRows({ rows, x, y, width, rtl, size, fill, labelFill, font, lead = 2, anchor = "start", labelWeight = 700 }: {
+  rows: PrintRow[]; x: number; y: number; width: number; rtl: boolean; size: number; fill: string; labelFill?: string; font: string;
+  lead?: number; anchor?: "start" | "middle"; labelWeight?: number;
+}) {
+  return (
+    <g>
+      {rows.map((r, i) => {
+        const text = r.label ? `${r.label} ${r.value}` : r.value;
         return (
-          <g key={i}>
-            {l.label ? (
-              <text x={x} y={yy} direction={rtl ? "rtl" : "ltr"} textAnchor="start" fill={labelFill ?? fill}
-                style={{ fontFamily: FONT, fontSize: size, fontWeight: 600 }}>{l.label}</text>
+          <text key={i} x={x} y={y + i * size * lead} direction={rtl ? "rtl" : "ltr"} textAnchor={anchor} fill={fill}
+            {...fit(text, size, width, 400, font)} style={{ fontFamily: font, fontSize: size }}>
+            {r.label ? <tspan fontWeight={labelWeight} fill={labelFill ?? fill}>{r.label} </tspan> : null}
+            <tspan fontWeight={400} direction={r.rtlValue ? "rtl" : "ltr"} unicodeBidi="embed">{r.value}</tspan>
+          </text>
+        );
+      })}
+    </g>
+  );
+}
+
+/* ── QR codes ──────────────────────────────────────────────────────────── */
+
+/** A generated QR (dark modules on white, quiet zone included); with
+ *  `logo`, the KOLEEX logo on a white plate in the middle (level H). */
+export function Qr({ modules, x, y, size, logo }: { modules: boolean[][]; x: number; y: number; size: number; logo?: boolean }) {
+  const pad = size * 0.08;
+  const cell = (size - pad * 2) / modules.length;
+  let d = "";
+  modules.forEach((row, r) => row.forEach((on, c) => {
+    if (on) d += `M${(x + pad + c * cell).toFixed(3)} ${(y + pad + r * cell).toFixed(3)}h${cell.toFixed(3)}v${cell.toFixed(3)}h-${cell.toFixed(3)}z`;
+  }));
+  const pw = size * 0.44;
+  const ph = logoHeight(pw * 0.78) + size * 0.07;
+  return (
+    <g>
+      <rect x={x} y={y} width={size} height={size} rx={size * 0.04} fill={WHITE} />
+      <path d={d} fill={INK} shapeRendering="crispEdges" />
+      {logo ? (
+        <g>
+          <rect x={x + (size - pw) / 2} y={y + (size - ph) / 2} width={pw} height={ph} fill={WHITE} />
+          <Logo x={x + (size - pw * 0.78) / 2} y={y + (size - logoHeight(pw * 0.78)) / 2} width={pw * 0.78} fill={INK} />
+        </g>
+      ) : null}
+    </g>
+  );
+}
+
+export interface Zone { x: number; y: number; w: number; h: number; dir: "row" | "column"; align: "start" | "center" | "end" }
+
+/** The QR codes of one side laid out in a zone: in a row or a column, as
+ *  large as fits up to `max` mm, a caption under each when it has one. */
+export function QrZone({ items, codes, zone, max, captionFill, font, gap = 2.5 }: {
+  items: QrItem[]; codes: Record<string, boolean[][]>; zone: Zone; max: number; captionFill: string; font: string; gap?: number;
+}) {
+  const shown = items.filter((q) => (isPictureQr(q) ? !!q.image : !!codes[q.id]));
+  if (!shown.length) return null;
+  const n = shown.length;
+  const capH = shown.some((q) => q.caption.trim()) ? 2.4 : 0;
+  const along = zone.dir === "row" ? zone.w : zone.h;
+  const across = zone.dir === "row" ? zone.h - capH : zone.w;
+  const size = Math.max(6, Math.min(max, (along - gap * (n - 1) - (zone.dir === "column" ? capH * n : 0)) / n, across));
+  const step = size + gap + (zone.dir === "column" ? capH : 0);
+  const total = n * size + (n - 1) * gap + (zone.dir === "column" ? n * capH : 0);
+  const startAlong = zone.align === "start" ? 0 : zone.align === "end" ? along - total : (along - total) / 2;
+  return (
+    <g>
+      {shown.map((q, i) => {
+        const a = startAlong + i * step;
+        const qx = zone.dir === "row" ? zone.x + a : zone.x + (zone.w - size) / 2;
+        const qy = zone.dir === "row" ? zone.y + (zone.h - capH - size) : zone.y + a;
+        const body: ReactNode = isPictureQr(q)
+          ? <image href={q.image} x={qx} y={qy} width={size} height={size} preserveAspectRatio="xMidYMid meet" />
+          : <Qr modules={codes[q.id]} x={qx} y={qy} size={size} logo={q.logo} />;
+        return (
+          <g key={q.id}>
+            {body}
+            {q.caption.trim() ? (
+              <text x={qx + size / 2} y={qy + size + 1.9} textAnchor="middle" fill={captionFill}
+                {...fit(q.caption.trim(), 4.5 * PT, size + gap)} style={{ fontFamily: font, fontSize: 4.5 * PT }}>{q.caption.trim()}</text>
             ) : null}
-            <text x={vx} y={yy} direction={l.ltr ? "ltr" : "rtl"} textAnchor={rtl && l.ltr ? "end" : "start"} fill={fill}
-              {...fit(l.text, size, room)} style={{ fontFamily: FONT, fontSize: size, fontWeight: 400 }}>{l.text}</text>
           </g>
         );
       })}
@@ -183,9 +230,49 @@ export function Contacts({ rows, x, y, align, width, rtl, size, fill, labelFill,
   );
 }
 
-/** Distance from the first baseline to the last of a Contacts block. */
-export function contactsSpan(rows: Row[], size: number, width: number, gap = 1.42, maxAddressLines = 2): number {
-  return Math.max(0, layoutContacts(rows, size, width, maxAddressLines).lines.length - 1) * size * gap;
+/* ── the portrait ──────────────────────────────────────────────────────── */
+
+/** A photo in a box, black and white, zoomed (1–3) and moved (x / y
+ *  −100…100) by the person, its edges melting into the black when `soft`. */
+export function Photo({ href, box, zoom, px, py, soft, uid }: {
+  href: string; box: { x: number; y: number; w: number; h: number }; zoom: number; px: number; py: number; soft: boolean; uid: string;
+}) {
+  const zw = box.w * zoom;
+  const zh = box.h * zoom;
+  /* Centred across, hung from the top; x / y move it up to half the box. */
+  const ix = box.x + (box.w - zw) / 2 + (px / 100) * box.w * 0.5;
+  const iy = box.y + (py / 100) * box.h * 0.5;
+  return (
+    <g>
+      <defs>
+        <clipPath id={`${uid}-photo`}><rect x={box.x} y={box.y} width={box.w} height={box.h} /></clipPath>
+        <filter id={`${uid}-bw`} colorInterpolationFilters="sRGB">
+          <feColorMatrix type="saturate" values="0" />
+          <feComponentTransfer><feFuncR type="linear" slope="1.1" intercept="-0.04" /><feFuncG type="linear" slope="1.1" intercept="-0.04" /><feFuncB type="linear" slope="1.1" intercept="-0.04" /></feComponentTransfer>
+        </filter>
+        <radialGradient id={`${uid}-fade`} cx="0.5" cy="0.5" r="0.56" gradientTransform="translate(0.5 0.5) scale(1 1.3) translate(-0.5 -0.5)">
+          <stop offset="0.52" stopColor="#FFFFFF" />
+          <stop offset="0.94" stopColor="#000000" />
+        </radialGradient>
+        <mask id={`${uid}-mask`} maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill={`url(#${uid}-fade)`} /></mask>
+      </defs>
+      <g clipPath={`url(#${uid}-photo)`}>
+        <g mask={soft ? `url(#${uid}-mask)` : undefined}>
+          <image href={href} x={ix} y={iy} width={zw} height={zh} preserveAspectRatio="xMidYMin slice" filter={`url(#${uid}-bw)`} />
+        </g>
+      </g>
+    </g>
+  );
 }
 
-export const SIZE = { name: 9 * PT, title: 7 * PT, contact: 6.5 * PT, small: 5.5 * PT };
+/** Where a portrait goes when there is none yet (the book's silhouette). */
+export function PhotoPlaceholder({ box, label, font }: { box: { x: number; y: number; w: number; h: number }; label: string; font: string }) {
+  const cx = box.x + box.w / 2;
+  return (
+    <g>
+      <rect x={box.x + box.w * 0.2} y={box.y + box.h * 0.55} width={box.w * 0.6} height={box.h * 0.45} rx={box.w * 0.26} fill="#48484A" />
+      <circle cx={cx} cy={box.y + box.h * 0.36} r={box.w * 0.17} fill="#8E8E93" />
+      <text x={cx} y={box.y + box.h * 0.37} textAnchor="middle" fill={INK} style={{ fontFamily: font, fontSize: 5.5 * PT, fontWeight: 600 }}>{label}</text>
+    </g>
+  );
+}

@@ -262,7 +262,8 @@ export function BusinessCards() {
           ["Portrait", "Black and white, the team portrait of ch. 66"],
           ["Front", "Logo top-right; contacts on the right; the name large at the bottom, the title Light beside it"],
           ["Back", "The horizontal lockup (ch. 43); QR codes on a white strip so every phone reads them"],
-          ["Never", "Italics, a dot or slash inside the name"],
+          ["Never", "Italics, a dot or slash inside the name — except on the Classic card below"],
+          ["Classic", "The owner's own card, kept as a style exactly as printed (owner decision 29/09/2026): Helvetica, the square dot between the names, a slash and the title in italics, the white bar over the lines, his logo | rule | KOLEEX INTERNATIONAL GROUP back with the white QR strip. Brand Center → Templates → Business card"],
         ]} />
       </Section>
 

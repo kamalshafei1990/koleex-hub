@@ -13,9 +13,23 @@
             the job. The <svg> is sized in mm, so the browser's PDF is 1:1.
    --------------------------------------------------------------------------- */
 
-import { useId, type CSSProperties } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import type { TemplateDef, TemplateValues } from "@/lib/brand-center/templates/types";
+import { forgetMeasures } from "@/lib/brand-center/templates/measure";
 import { cardArabic } from "./fonts";
+
+/** Re-draw once a font finishes loading: text is placed by measured widths. */
+function useFontsLoaded() {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const fonts = typeof document !== "undefined" ? document.fonts : undefined;
+    if (!fonts) return;
+    const redraw = () => { forgetMeasures(); bump((n) => n + 1); };
+    fonts.addEventListener("loadingdone", redraw);
+    void fonts.ready.then(redraw);
+    return () => fonts.removeEventListener("loadingdone", redraw);
+  }, []);
+}
 
 /** Paper around the trim on a print page: bleed + crop marks + the slug. */
 export const PRINT_MARGIN = 12;
@@ -28,17 +42,18 @@ export function sheetSize(def: TemplateDef, values: TemplateValues, mode: "scree
   return { w, h, outerW: w + pad * 2, outerH: h + pad * 2 };
 }
 
-export default function TemplateSheet({ def, values, pageId, qr, mode, guides = false, slug, className, style }: {
-  def: TemplateDef; values: TemplateValues; pageId: string; qr: boolean[][] | null;
+export default function TemplateSheet({ def, values, pageId, qrs, mode, guides = false, slug, className, style }: {
+  def: TemplateDef; values: TemplateValues; pageId: string; qrs: Record<string, boolean[][]>;
   mode: "screen" | "print"; guides?: boolean; slug?: string; className?: string; style?: CSSProperties;
 }) {
   const uid = `s${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  useFontsLoaded();
   const page = def.pages.find((p) => p.id === pageId) ?? def.pages[0];
   const { w, h, outerW, outerH } = sheetSize(def, values, mode);
   const b = def.bleed;
   const off = mode === "print" ? PRINT_MARGIN - b : 0; // where the bleed box starts
   const trim = { x: off + b, y: off + b };
-  const body = page.draw(values, { w, h, bleed: b, qr, uid: `${uid}-${page.id}` });
+  const body = page.draw(values, { w, h, bleed: b, qrs, uid: `${uid}-${page.id}` });
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${outerW} ${outerH}`}

@@ -4,24 +4,43 @@
    A template is a LOCKED design with slots. Everything is drawn in
    millimetres at the real size, so the same drawing is the preview on
    screen and the print file: trim size + bleed around it (+ crop marks
-   outside the bleed when printed). Nobody can move the logo or change a
-   colour; people only fill the slots — and pick among the approved styles.
+   outside the bleed when printed). The marks and colours are the brand's;
+   people fill the slots, pick among the approved styles, and adjust what
+   each style allows (owner, 29/09/2026: "everything editable").
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
 
-type Shown = { /** Only when this is true for the current fill (e.g. one style). */ when?: (v: TemplateValues) => boolean };
+export type TemplateScalar = string | boolean | number;
+/** One entry of a list slot (a contact line, a QR code). */
+export type TemplateItem = Record<string, TemplateScalar>;
+export type TemplateValue = TemplateScalar | TemplateItem[];
+export type TemplateValues = Record<string, TemplateValue>;
 
-export type FieldDef = Shown & (
-  | { key: string; kind: "text"; labelKey: string; max: number; placeholder?: string; multiline?: boolean }
-  | { key: string; kind: "choice"; labelKey: string; options: Array<{ value: string; labelKey: string }> }
-  | { key: string; kind: "switch"; labelKey: string }
+type Common = {
+  key: string;
+  labelKey: string;
+  /** The studio section this slot sits in (words key `tpl.group.<group>`). */
+  group?: string;
+  /** Only when this is true for the current fill (e.g. one style). */
+  when?: (v: TemplateValues) => boolean;
+};
+
+export type FieldDef = Common & (
+  | { kind: "text"; max: number; placeholder?: string }
+  | { kind: "choice"; options: Array<{ value: string; labelKey: string }> }
+  | { kind: "switch" }
+  | { kind: "range"; min: number; max: number; step: number; unit?: "%" | "x" }
   /** A picture chosen on this computer (stays in the browser) or the
    *  person's Hub photo — the value is a data: or https: URL. */
-  | { key: string; kind: "image"; labelKey: string; hintKey?: string; fromPerson?: "photo" }
+  | { kind: "image"; hintKey?: string; fromPerson?: "photo" }
+  /** A job title from the title library, or typed. */
+  | { kind: "title"; langKey: string }
+  /** The contact lines: label + value each, add / remove / reorder / hide. */
+  | { kind: "rows"; langKey: string }
+  /** QR codes: each on the front or the back, generated or a picture. */
+  | { kind: "qrs"; langKey: string }
 );
-
-export type TemplateValues = Record<string, string | boolean>;
 
 export interface TemplatePage {
   /** e.g. "front", "back" — also the words key `tpl.page.<id>` */
@@ -34,11 +53,13 @@ export interface TemplatePage {
 export interface DrawContext {
   /** Trim size and bleed, in mm. */
   w: number; h: number; bleed: number;
-  /** The QR's modules for this fill (null when off). */
-  qr: boolean[][] | null;
+  /** Generated QR codes of this fill, by the QR entry's id. */
+  qrs: Record<string, boolean[][]>;
   /** A prefix for ids inside the drawing (clip paths, masks) — unique per sheet. */
   uid: string;
 }
+
+export interface QrRequest { id: string; text: string; level: "M" | "H" }
 
 export interface TemplateDef {
   id: string;
@@ -54,14 +75,16 @@ export interface TemplateDef {
   fields: FieldDef[];
   defaults: TemplateValues;
   pages: TemplatePage[];
-  /** Text encoded in the QR code, or null for no QR. */
-  qrText?: (v: TemplateValues) => string | null;
+  /** The QR codes to generate for this fill. */
+  qrRequests?: (v: TemplateValues) => QrRequest[];
   /** Words keys of the print notes shown under the preview, for this fill. */
   specKeys?: (v: TemplateValues) => string[];
   /** A short name of this fill for the file name and the slug. */
   fillName?: (v: TemplateValues, t: (k: string) => string) => string;
-  /** The fill after switching its language (e.g. the address's default). */
+  /** The fill after switching its language (labels, the address's default). */
   relang?: (v: TemplateValues, lang: string) => TemplateValues;
+  /** The fill after picking another style (its own defaults, e.g. typeface). */
+  restyle?: (v: TemplateValues, style: string) => TemplateValues;
   /** What is still missing before it can print (a words key), or null. */
   check?: (v: TemplateValues) => string | null;
 }

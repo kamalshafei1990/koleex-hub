@@ -1,15 +1,16 @@
 /* ---------------------------------------------------------------------------
-   Business card (brand book ch. 91; plan steps C9 + the owner's round of
-   28/09/2026): seven approved styles, three languages, labelled contacts,
-   filled from Employees. The drawing lives in ./card; this file is the
-   template: its slots, defaults, sizes, QR and print checks.
+   Business card (brand book ch. 91; plan step C9 and the owner's rounds of
+   28–29/09/2026): thirteen approved styles — his own card among them —
+   three languages, labelled contact lines he can edit, add and hide, any
+   number of QR codes on either side, a title library, a portrait he can
+   zoom and move. The drawing lives in ./card; this file is the template:
+   its slots, defaults, sizes, QR codes and print checks.
    --------------------------------------------------------------------------- */
 
-import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
-import type { TemplateDef, TemplateValues } from "./types";
-import { str } from "./card/parts";
-import { STYLES, drawBack, drawFront, specKeysFor, styleOf } from "./card/styles";
+import type { TemplateDef, TemplateItem, TemplateValues, QrRequest } from "./types";
+import { asLang, defaultRows, qrsOf, relangRows, rowsOf, str, isPictureQr, list } from "./card/model";
+import { PORTRAIT_STYLES, STYLES, VERTICAL_STYLES, drawBack, drawFront, specKeysFor, styleOf } from "./card/styles";
 
 const SIZES: Record<string, { w: number; h: number }> = {
   "90x54": { w: 90, h: 54 },
@@ -17,18 +18,15 @@ const SIZES: Record<string, { w: number; h: number }> = {
   "89x51": { w: 89, h: 51 },
 };
 
-/** The address as a card prints it — Room 206 (owner 28/09: the Hub's
- *  record is right, the old card's "No. 205" was not). Editable per card. */
-export const CARD_ADDRESS: Record<string, string> = {
-  en: "Room 206, Building 88, West Feiyue Park, Taizhou, Zhejiang, China",
-  zh: "浙江省台州市椒江区飞跃科创园西区88幢206室",
-  ar: "Room 206, Building 88, West Feiyue Park, Taizhou, Zhejiang, China",
-};
-
 const isStyle = (...styles: string[]) => (v: TemplateValues) => styles.includes(styleOf(v));
+const QR = (id: string, kind: string, side: string, logo = false): TemplateItem => ({ id, kind, side, caption: "", link: "", image: "", logo });
+/** The QR codes of the owner's card: his WeChat code over the KOLEEX code. */
+const CLASSIC_QRS = [QR("wechat", "wechat", "back"), QR("contact", "contact", "back", true)];
+const DEFAULT_QRS = [QR("contact", "contact", "back")];
+const sameQrs = (a: TemplateItem[], b: TemplateItem[]) => JSON.stringify(a.map((q) => [q.kind, q.side, q.logo, q.caption, q.link, q.image])) === JSON.stringify(b.map((q) => [q.kind, q.side, q.logo, q.caption, q.link, q.image]));
 
-/** vCard 3.0 — what a phone saves when it reads the contact QR. The company
- *  is the everyday name (a card is not a formal document) or the dealer. */
+/** vCard 3.0 from the card's own lines — what a phone saves from the
+ *  contact QR. The company is the everyday name, or the dealer. */
 function vcard(v: TemplateValues): string | null {
   const esc = (s: string) => s.replace(/([,;\\])/g, "\\$1").replace(/\n/g, " ");
   const name = str(v, "name");
@@ -38,29 +36,39 @@ function vcard(v: TemplateValues): string | null {
   const org = styleOf(v) === "dealer" && str(v, "dealerName") ? str(v, "dealerName") : EVERYDAY_NAME_EN;
   const out = ["BEGIN:VCARD", "VERSION:3.0", `N:${n}`, `FN:${esc(name)}`, `ORG:${esc(org)}`];
   if (str(v, "title")) out.push(`TITLE:${esc(str(v, "title"))}`);
-  if (str(v, "mobile")) out.push(`TEL;TYPE=CELL:${str(v, "mobile").replace(/[^\d+]/g, "")}`);
-  if (styleOf(v) === "technician" && str(v, "hotline")) out.push(`TEL;TYPE=WORK:${str(v, "hotline").replace(/[^\d+]/g, "")}`);
-  if (str(v, "email")) out.push(`EMAIL;TYPE=WORK:${esc(str(v, "email"))}`);
-  if (str(v, "web")) out.push(`URL:${esc(str(v, "web").startsWith("http") ? str(v, "web") : `https://${str(v, "web")}`)}`);
-  if (str(v, "address")) out.push(`ADR;TYPE=WORK:;;${esc(str(v, "address"))};;;;`);
-  if (str(v, "wechat")) out.push(`NOTE:WeChat ${esc(str(v, "wechat"))}`);
+  const digits = (s: string) => s.replace(/[^\d+]/g, "");
+  for (const r of rowsOf(v).filter((x) => x.on && x.value.trim())) {
+    if (r.kind === "mobile" || r.kind === "whatsapp") out.push(`TEL;TYPE=CELL:${digits(r.value)}`);
+    else if (r.kind === "tel") out.push(`TEL;TYPE=WORK:${digits(r.value)}`);
+    else if (r.kind === "fax") out.push(`TEL;TYPE=FAX:${digits(r.value)}`);
+    else if (r.kind === "email") out.push(`EMAIL;TYPE=WORK:${esc(r.value.trim())}`);
+    else if (r.kind === "web") out.push(`URL:${esc(r.value.startsWith("http") ? r.value.trim() : `https://${r.value.trim()}`)}`);
+    else if (r.kind === "address") out.push(`ADR;TYPE=WORK:;;${esc(r.value.trim())};;;;`);
+    else if (r.kind === "wechat") out.push(`NOTE:WeChat ${esc(r.value.trim())}`);
+  }
+  if (styleOf(v) === "technician" && str(v, "hotline")) out.push(`TEL;TYPE=WORK:${digits(str(v, "hotline"))}`);
   out.push("END:VCARD");
   return out.join("\n");
 }
 
-function qrText(v: TemplateValues): string | null {
-  switch (v.qr) {
-    case "none": return null;
-    case "whatsapp": {
-      const digits = str(v, "mobile").replace(/\D/g, "");
-      return digits ? `https://wa.me/${digits}` : null;
-    }
-    case "web": {
-      const web = str(v, "web");
-      return web ? (web.startsWith("http") ? web : `https://${web}`) : null;
-    }
-    default: return vcard(v);
+const firstRow = (v: TemplateValues, kind: string) => rowsOf(v).find((r) => r.kind === kind && r.on && r.value.trim())?.value.trim() ?? "";
+
+function qrRequests(v: TemplateValues): QrRequest[] {
+  const out: QrRequest[] = [];
+  for (const q of qrsOf(v)) {
+    if (isPictureQr(q)) continue;
+    let text: string | null = null;
+    if (q.kind === "contact") text = vcard(v);
+    else if (q.kind === "whatsapp") {
+      const d = (firstRow(v, "whatsapp") || firstRow(v, "mobile")).replace(/\D/g, "");
+      text = d ? `https://wa.me/${d}` : null;
+    } else if (q.kind === "web") {
+      const w = firstRow(v, "web");
+      text = w ? (w.startsWith("http") ? w : `https://${w}`) : null;
+    } else if (q.kind === "link") text = q.link.trim() || null;
+    if (text) out.push({ id: q.id, text, level: q.logo ? "H" : "M" });
   }
+  return out;
 }
 
 export const businessCard: TemplateDef = {
@@ -69,58 +77,92 @@ export const businessCard: TemplateDef = {
   nameKey: "tpl.card",
   size: (v) => {
     const s = SIZES[typeof v.size === "string" ? v.size : ""] ?? SIZES["90x54"];
-    return styleOf(v) === "vertical" ? { w: s.h, h: s.w } : s;
+    return VERTICAL_STYLES.includes(styleOf(v)) ? { w: s.h, h: s.w } : s;
   },
   bleed: 3,
   safe: 4,
   fields: [
-    { key: "style", kind: "choice", labelKey: "tpl.f.style", options: STYLES.map((s) => ({ value: s, labelKey: `tpl.style.${s}` })) },
-    { key: "lang", kind: "choice", labelKey: "tpl.f.lang", options: [
+    { key: "style", kind: "choice", labelKey: "tpl.f.style", group: "look", options: STYLES.map((s) => ({ value: s, labelKey: `tpl.style.${s}` })) },
+    { key: "lang", kind: "choice", labelKey: "tpl.f.lang", group: "look", options: [
       { value: "en", labelKey: "tpl.lang.en" }, { value: "zh", labelKey: "tpl.lang.zh" }, { value: "ar", labelKey: "tpl.lang.ar" },
-    ] },
-    { key: "photo", kind: "image", labelKey: "tpl.f.photo", hintKey: "tpl.f.photoHint", fromPerson: "photo", when: isStyle("management") },
-    { key: "dealerName", kind: "text", labelKey: "tpl.f.dealerName", max: 60, when: isStyle("dealer") },
-    { key: "dealerLogo", kind: "image", labelKey: "tpl.f.dealerLogo", hintKey: "tpl.f.dealerLogoHint", when: isStyle("dealer") },
-    { key: "name", kind: "text", labelKey: "tpl.f.name", max: 40 },
-    { key: "title", kind: "text", labelKey: "tpl.f.title", max: 60 },
-    { key: "hotline", kind: "text", labelKey: "tpl.f.hotline", max: 24, when: isStyle("technician") },
-    { key: "mobile", kind: "text", labelKey: "tpl.f.mobile", max: 24 },
-    { key: "whatsapp", kind: "switch", labelKey: "tpl.f.whatsapp" },
-    { key: "wechat", kind: "text", labelKey: "tpl.f.wechat", max: 40 },
-    { key: "email", kind: "text", labelKey: "tpl.f.email", max: 60 },
-    { key: "web", kind: "text", labelKey: "tpl.f.web", max: 40 },
-    { key: "address", kind: "text", labelKey: "tpl.f.address", max: 120 },
-    { key: "qr", kind: "choice", labelKey: "tpl.f.qr", options: [
-      { value: "contact", labelKey: "tpl.qr.contact" }, { value: "whatsapp", labelKey: "tpl.qr.whatsapp" },
-      { value: "web", labelKey: "tpl.qr.web" }, { value: "none", labelKey: "tpl.qr.none" },
-    ] },
-    { key: "wechatQr", kind: "image", labelKey: "tpl.f.wechatQr", hintKey: "tpl.f.wechatQrHint", when: isStyle("management") },
-    { key: "size", kind: "choice", labelKey: "tpl.f.size", options: [
+    ], when: (v) => styleOf(v) !== "bilingual" },
+    { key: "lang2", kind: "choice", labelKey: "tpl.f.lang2", group: "look", options: [
+      { value: "zh", labelKey: "tpl.lang.zh" }, { value: "ar", labelKey: "tpl.lang.ar" },
+    ], when: isStyle("bilingual") },
+    { key: "size", kind: "choice", labelKey: "tpl.f.size", group: "look", options: [
       { value: "90x54", labelKey: "tpl.size.90x54" }, { value: "85x55", labelKey: "tpl.size.85x55" }, { value: "89x51", labelKey: "tpl.size.89x51" },
     ] },
+    { key: "font", kind: "choice", labelKey: "tpl.f.font", group: "look", options: [
+      { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
+    ] },
+    { key: "scale", kind: "range", labelKey: "tpl.f.scale", group: "look", min: 80, max: 140, step: 5, unit: "%" },
+
+    { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 40 },
+    { key: "nameSep", kind: "choice", labelKey: "tpl.f.nameSep", group: "person", options: [
+      { value: "dot", labelKey: "tpl.sep.dot" }, { value: "space", labelKey: "tpl.sep.space" },
+    ], when: isStyle("classic") },
+    { key: "title", kind: "title", labelKey: "tpl.f.title", group: "person", langKey: "lang" },
+    { key: "name2", kind: "text", labelKey: "tpl.f.name2", group: "person", max: 40, when: isStyle("bilingual") },
+    { key: "title2", kind: "title", labelKey: "tpl.f.title2", group: "person", langKey: "lang2", when: isStyle("bilingual") },
+    { key: "hotline", kind: "text", labelKey: "tpl.f.hotline", group: "person", max: 24, when: isStyle("technician") },
+    { key: "dealerName", kind: "text", labelKey: "tpl.f.dealerName", group: "person", max: 60, when: isStyle("dealer") },
+    { key: "dealerLogo", kind: "image", labelKey: "tpl.f.dealerLogo", group: "person", hintKey: "tpl.f.dealerLogoHint", when: isStyle("dealer") },
+
+    { key: "rows", kind: "rows", labelKey: "tpl.f.rows", group: "contacts", langKey: "lang" },
+    { key: "labels", kind: "switch", labelKey: "tpl.f.labels", group: "contacts" },
+    { key: "whatsapp", kind: "switch", labelKey: "tpl.f.whatsapp", group: "contacts" },
+
+    { key: "photo", kind: "image", labelKey: "tpl.f.photo", group: "photo", hintKey: "tpl.f.photoHint", fromPerson: "photo", when: isStyle(...PORTRAIT_STYLES) },
+    { key: "photoZoom", kind: "range", labelKey: "tpl.f.photoZoom", group: "photo", min: 100, max: 300, step: 5, unit: "%", when: (v) => isStyle(...PORTRAIT_STYLES)(v) && !!str(v, "photo") },
+    { key: "photoX", kind: "range", labelKey: "tpl.f.photoX", group: "photo", min: -100, max: 100, step: 2, when: (v) => isStyle(...PORTRAIT_STYLES)(v) && !!str(v, "photo") },
+    { key: "photoY", kind: "range", labelKey: "tpl.f.photoY", group: "photo", min: -100, max: 100, step: 2, when: (v) => isStyle(...PORTRAIT_STYLES)(v) && !!str(v, "photo") },
+    { key: "soft", kind: "switch", labelKey: "tpl.f.soft", group: "photo", when: isStyle(...PORTRAIT_STYLES) },
+
+    { key: "stroke", kind: "switch", labelKey: "tpl.f.stroke", group: "details", when: isStyle(...PORTRAIT_STYLES) },
+    { key: "bar", kind: "switch", labelKey: "tpl.f.bar", group: "details", when: isStyle("classic") },
+    { key: "slash", kind: "switch", labelKey: "tpl.f.slash", group: "details", when: isStyle("classic") },
+    { key: "italic", kind: "switch", labelKey: "tpl.f.italic", group: "details", when: isStyle("classic") },
+
+    { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    style: "team-black", lang: "en", size: "90x54", qr: "contact", whatsapp: true,
-    name: "", title: "", mobile: "", wechat: "", email: "", web: KOLEEX_COMPANY.web, address: CARD_ADDRESS.en,
-    hotline: "", photo: "", wechatQr: "", dealerName: "", dealerLogo: "",
+    style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100,
+    name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "",
+    rows: defaultRows("en"), labels: true, whatsapp: true,
+    photo: "", photoZoom: 100, photoX: 0, photoY: 0, soft: true,
+    stroke: true, bar: true, slash: true, italic: true,
+    qrs: DEFAULT_QRS,
   },
   pages: [
     { id: "front", draw: drawFront },
     { id: "back", draw: drawBack },
   ],
-  qrText,
+  qrRequests,
   specKeys: specKeysFor,
   fillName: (v, t) => t(`tpl.style.${styleOf(v)}`),
-  /* The address follows the language while it is still a default. */
-  relang: (v, lang) => ({
-    ...v,
-    lang,
-    ...(Object.values(CARD_ADDRESS).includes(str(v, "address")) ? { address: CARD_ADDRESS[lang] ?? CARD_ADDRESS.en } : {}),
-  }),
+  relang: (v, lang) => ({ ...v, lang, rows: relangRows(list(v, "rows"), asLang(lang)) }),
+  /* A style brings its own typeface; the owner's card also brings its two
+     QR codes while the list is still the untouched default (and back). */
+  restyle: (v, style) => {
+    const qrs = list(v, "qrs");
+    const next: TemplateValues = { ...v, style };
+    if (style === "classic") {
+      next.font = "helvetica";
+      if (sameQrs(qrs, DEFAULT_QRS)) next.qrs = CLASSIC_QRS;
+    } else {
+      if (styleOf(v) === "classic" && v.font === "helvetica") next.font = "inter";
+      if (sameQrs(qrs, CLASSIC_QRS)) next.qrs = DEFAULT_QRS;
+    }
+    return next;
+  },
   check: (v) => {
     if (!str(v, "name")) return "studio.needName";
-    if (styleOf(v) === "management" && !str(v, "photo")) return "studio.needPhoto";
+    if (PORTRAIT_STYLES.includes(styleOf(v)) && !str(v, "photo")) return "studio.needPhoto";
     if (styleOf(v) === "dealer" && (!str(v, "dealerLogo") || !str(v, "dealerName"))) return "studio.needDealer";
+    for (const q of qrsOf(v)) {
+      if (q.kind === "link" && !q.link.trim()) return "studio.needQrLink";
+      if (isPictureQr(q) && !q.image) return "studio.needQrImage";
+    }
     return null;
   },
 };
