@@ -18,25 +18,28 @@ import "server-only";
         see it — each account claimed first (claimComments);
      5. insights: each Page's and Instagram account's numbers per day
         (28/09/2026) — every run while the 180 days of history come in, then
-        every 6 hours — each account claimed first (claimInsights).
+        every 6 hours — each account claimed first (claimInsights);
+     6. comments on OLDER posts (29/09/2026): every post's comment count
+        once a day, and the posts whose count grew are read — every run while
+        a backlog remains — each account claimed first (claimCommentScan).
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { publishPost } from "@/lib/server/marketing/publish";
-import { COMMENTS_REFRESH_MS, refreshRecentComments, syncAccount } from "@/lib/server/marketing/sync";
+import { COMMENTS_REFRESH_MS, COMMENT_SCAN_MS, refreshRecentComments, scanOlderComments, syncAccount } from "@/lib/server/marketing/sync";
 import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insights";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -123,6 +126,27 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       if (left() < 12_000) { out.stoppedEarly = true; break; }
       const r = await syncInsights(a.tenant_id, a.id, { budgetMs: Math.min(25_000, left() - 5_000) });
       if (r.ok && !r.skipped) out.insights++;
+    }
+  }
+
+  /* 6. Comments on older posts: once a day per account, every run while a
+        backlog remains (scanOlderComments decides; claimCommentScan keeps
+        two runs off one account). */
+  if (left() > 10_000) {
+    const staleLong = new Date(Date.now() - COMMENT_SCAN_MS).toISOString();
+    const staleShort = new Date(Date.now() - 4 * 60_000).toISOString();
+    let sQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
+      .in("status", ["connected", "error"])
+      .or(`sync_state->>comments_scan_full.is.null,sync_state->>comments_scan_full.neq.true,sync_state->>comments_scan_at.lt.${staleLong}`)
+      .or(`sync_state->>comments_scan_at.is.null,sync_state->>comments_scan_at.lt.${staleShort}`);
+    if (opts.tenantId) sQ = sQ.eq("tenant_id", opts.tenantId);
+    const { data: sAccs, error: sErr } = await sQ.order("updated_at", { ascending: true }).limit(2);
+    if (sErr) throw new Error(`marketing accounts: ${sErr.message}`);
+    for (const a of (sAccs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 10_000) { out.stoppedEarly = true; break; }
+      const r = await scanOlderComments(a.tenant_id, a.id, { budgetMs: Math.min(20_000, left() - 5_000) });
+      if (r.ok && !r.skipped) out.olderComments++;
     }
   }
   return out;

@@ -134,6 +134,49 @@ export async function facebookPostViews(postId: string, token: string): Promise<
 
 type FbComment = { id: string; message?: string; created_time?: string; is_hidden?: boolean; from?: { id?: string; name?: string; picture?: { data?: { url?: string } } }; parent?: { id?: string } };
 
+/** Every post's comment count, replies included, since a date — a hundred
+ *  posts a call — so a new comment on an OLDER post is noticed without
+ *  reading every post's comments. */
+export interface CommentCount { external_id: string; posted_at: string | null; count: number }
+const COUNT_PAGES_MAX = 20;
+
+export async function facebookCommentCounts(pageId: string, token: string, since: string): Promise<CommentCount[]> {
+  const out: CommentCount[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < COUNT_PAGES_MAX; page++) {
+    const params: Record<string, string> = {
+      fields: "id,created_time,comments.filter(stream).limit(0).summary(true)",
+      limit: "100",
+      since: String(Math.floor(Date.parse(since) / 1000)),
+    };
+    if (after) params.after = after;
+    const b = await metaGet<{ data?: Array<{ id: string; created_time?: string; comments?: { summary?: { total_count?: number } } }> } & Paging>(metaGraphUrl(`${pageId}/published_posts`, params), token);
+    for (const p of b.data ?? []) out.push({ external_id: p.id, posted_at: p.created_time ?? null, count: num(p.comments?.summary?.total_count) ?? 0 });
+    after = nextCursor(b);
+    if (!after) break;
+  }
+  return out;
+}
+
+export async function instagramCommentCounts(igId: string, token: string, since: string): Promise<CommentCount[]> {
+  const out: CommentCount[] = [];
+  const from = Date.parse(since);
+  let after: string | null = null;
+  for (let page = 0; page < COUNT_PAGES_MAX; page++) {
+    const params: Record<string, string> = { fields: "id,timestamp,comments_count", limit: "100" };
+    if (after) params.after = after;
+    const b = await metaGet<{ data?: Array<{ id: string; timestamp?: string; comments_count?: number }> } & Paging>(metaGraphUrl(`${igId}/media`, params), token);
+    let older = false;
+    for (const m of b.data ?? []) {
+      if (m.timestamp && Date.parse(m.timestamp) < from) { older = true; continue; }
+      out.push({ external_id: m.id, posted_at: m.timestamp ?? null, count: num(m.comments_count) ?? 0 });
+    }
+    after = nextCursor(b);
+    if (!after || older) break;
+  }
+  return out;
+}
+
 export async function facebookComments(pageId: string, postId: string, token: string): Promise<RemoteComment[]> {
   const b = await metaGet<{ data?: FbComment[] }>(metaGraphUrl(`${postId}/comments`, {
     fields: "id,message,created_time,is_hidden,from{id,name,picture},parent{id}",

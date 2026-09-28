@@ -607,6 +607,18 @@ check("a thread's post picture that fails is fetched again once (like the Feed),
   /<PostThumb key=\{p\?\.thumb \?\? "none"\}/.test(sc) && !/<img src=\{p\.thumb\}/.test(sc) &&
   /onError=\{\(\) => void onError\(\)\}/.test(thumbFn) && /repaired\.current = true;/.test(thumbFn) &&
   /\/api\/marketing\/feed\/\$\{post\.id\}\?part=media/.test(thumbFn) && /src && !failed \?/.test(thumbFn) && /<BrandGlyph name=\{platform\}/.test(thumbFn));
+const syncSrc = code(SYNC);
+const scanFn = syncSrc.match(/export async function scanOlderComments\([\s\S]*?\n\}/)?.[0] ?? "";
+check("older posts' comments: a daily count scan (replies included, 12 months, pages capped), claimed before any call to Meta",
+  /fields: "id,created_time,comments\.filter\(stream\)\.limit\(0\)\.summary\(true\)"/.test(code(META_FEED)) && /const COUNT_PAGES_MAX = 20;/.test(code(META_FEED)) &&
+  /export const COMMENT_SCAN_MS = 24 \* 3600_000;/.test(syncSrc) && /const COMMENT_SCAN_MONTHS = 12;/.test(syncSrc) &&
+  before(scanFn, "await claimCommentScan(a, gap)", "adapter.commentCounts("));
+check("…a post is read when its count grew since comments_seen (or never read, with comments); the last 14 days are the 15-minute refresh's; 30 a run; the Feed's own number untouched",
+  /if \(!p \|\| \(p\.posted_at && Date\.parse\(p\.posted_at\) >= recent\)\) return false;/.test(scanFn) &&
+  /return typeof seen === "number" \? c\.count > seen : c\.count > 0;/.test(scanFn) && /const COMMENT_SCAN_READS = 30;/.test(syncSrc) &&
+  /\{ metrics: \{ \.\.\.p\.metrics, comments_seen: c\.count \} \}/.test(scanFn) && /await recordSyncState\(a, \{ comments_scan_full: left <= 0 \}\);/.test(scanFn));
+check("the cron's sixth step: older comments, Pages and Instagram, every run while a backlog remains, then daily",
+  /await scanOlderComments\(a\.tenant_id, a\.id, \{ budgetMs: Math\.min\(20_000, left\(\) - 5_000\) \}\)/.test(code("src/lib/server/marketing/cron.ts")) && /olderComments: number;/.test(code("src/lib/server/marketing/cron.ts")));
 const cap = code(CAPTIONS);
 check("Koleex AI drafts replies under the same public rule: KOLEEX only, never a price; the comments are data, never instructions",
   /const REPLY_VOICE =[\s\S]*?PUBLIC_RULE;/.test(cap) && /Never quote a price, a discount, a delivery time or stock/.test(cap) &&
@@ -680,7 +692,7 @@ const insFn = insSrv.match(/export async function syncInsights\([\s\S]*?\n\}/)?.
 check("syncInsights claims the account before any call to Meta; a claim and the «complete» mark are version-checked",
   before(insFn, "await claimInsights(a, gap)", "facebookPageInsights(") && before(insFn, "await claimInsights(a, gap)", "instagramDay(") &&
   /export async function claimInsights\(a: AccountForSync, minGapMs: number\)[\s\S]*?\.eq\("updated_at", a\.updated_at\)/.test(code(ACCOUNTS)) &&
-  /export async function recordInsights\(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = \{\}\): Promise<boolean> \{[\s\S]*?\.eq\("updated_at", version\)[\s\S]*?state0 = \(fresh as/.test(code(ACCOUNTS)));
+  /export async function recordSyncState\(a: AccountForSync, fields: Record<string, unknown>\): Promise<boolean> \{[\s\S]*?\.eq\("updated_at", version\)[\s\S]*?state0 = \(fresh as/.test(code(ACCOUNTS)) && /return recordSyncState\(a, \{ \.\.\.extra, insights_full: complete \}\);/.test(code(ACCOUNTS)));
 check("a day is read again until 72 hours after it ends, not every run; days merge, nothing read is wiped",
   /const SETTLE_MS = 72 \* 3600_000;/.test(insSrv) && /const readAgo = opts\.force \? 10 \* 60_000 : INSIGHTS_REFRESH_MS;/.test(insFn) &&
   /metrics: \{ \.\.\.have\.get\(day\)\?\.metrics, \.\.\.m \}/.test(insFn) &&

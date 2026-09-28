@@ -277,17 +277,16 @@ export async function claimInsights(a: AccountForSync, minGapMs: number): Promis
   return true;
 }
 
-/** After an Insights refresh: whether every wanted day is in (then the next
- *  refresh waits hours, not minutes), and what it read for the account (the
- *  audience). Version-checked; if something changed the account meanwhile
- *  (a Feed sync opened by a screen), the fields are merged onto its FRESH
- *  sync_state and written again — never over the other writer's. false when
- *  it still could not be written (the next refresh comes sooner). */
-export async function recordInsights(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = {}): Promise<boolean> {
+/** Write fields into an account's sync_state — version-checked; if something
+ *  changed the account meanwhile (a Feed sync opened by a screen), the fields
+ *  are merged onto its FRESH sync_state and written again (twice at most),
+ *  never over the other writer's. false when it still could not land (the
+ *  next run comes sooner). */
+export async function recordSyncState(a: AccountForSync, fields: Record<string, unknown>): Promise<boolean> {
   let state0 = a.sync_state, version = a.updated_at;
   for (let attempt = 0; attempt < 3; attempt++) {
     const now = new Date().toISOString();
-    const state = { ...state0, ...extra, insights_full: complete };
+    const state = { ...state0, ...fields };
     const { data, error } = await supabaseServer
       .from("marketing_accounts")
       .update({ sync_state: state, updated_at: now })
@@ -303,6 +302,33 @@ export async function recordInsights(a: AccountForSync, complete: boolean, extra
     version = (fresh as { updated_at: string }).updated_at;
   }
   return false;
+}
+
+/** After an Insights refresh: whether every wanted day is in (then the next
+ *  refresh waits hours, not minutes), and what it read for the account (the
+ *  audience). */
+export async function recordInsights(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = {}): Promise<boolean> {
+  return recordSyncState(a, { ...extra, insights_full: complete });
+}
+
+/** Mark a scan of the older posts' comment counts as started — the same rules
+ *  as claimComments, on sync_state.comments_scan_at. true = this caller runs it. */
+export async function claimCommentScan(a: AccountForSync, minGapMs: number): Promise<boolean> {
+  const last = typeof a.sync_state.comments_scan_at === "string" ? Date.parse(a.sync_state.comments_scan_at) || 0 : 0;
+  if (last && Date.now() - last < minGapMs) return false;
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, comments_scan_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
 }
 
 /** After a sync: the account's status, audience and where the history

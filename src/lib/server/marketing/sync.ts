@@ -29,19 +29,22 @@ import "server-only";
    so two screens opening together start one run, and a failing account
    waits its turn like a healthy one. Comments on the last 14 days' posts
    refresh on their own, every 15 minutes (refreshRecentComments, claimed
-   with claimComments).
+   with claimComments). Comments on OLDER posts (within 12 months) are found
+   by a daily scan of every post's comment count (scanOlderComments, claimed
+   with claimCommentScan): a post whose count grew is read.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
+import { allRowsOrThrow } from "@/lib/server/all-rows";
 import { MetaError } from "@/lib/server/marketing/meta";
 import { postInteractions } from "@/lib/marketing/insights";
 import {
-  facebookAudience, facebookComments, facebookPostMedia, facebookPostViews, facebookPosts,
-  instagramAudience, instagramComments, instagramInsights, instagramMedia, instagramMediaItem,
-  type PostPage, type RemoteComment, type RemoteMedia, type RemotePost,
+  facebookAudience, facebookCommentCounts, facebookComments, facebookPostMedia, facebookPostViews, facebookPosts,
+  instagramAudience, instagramCommentCounts, instagramComments, instagramInsights, instagramMedia, instagramMediaItem,
+  type CommentCount, type PostPage, type RemoteComment, type RemoteMedia, type RemotePost,
 } from "@/lib/server/marketing/meta-feed";
-import { claimComments, claimSync, loadAccountForSync, recordSync, type AccountForSync } from "@/lib/server/marketing/accounts";
+import { claimCommentScan, claimComments, claimSync, loadAccountForSync, recordSync, recordSyncState, type AccountForSync } from "@/lib/server/marketing/accounts";
 import type { MarketingAccountView, MarketingPlatform } from "@/lib/marketing/spaces";
 
 export const SYNC_STALE_MS = 10 * 60_000;
@@ -70,6 +73,7 @@ interface Adapter {
   media(postId: string, token: string): Promise<RemoteMedia[]>;
   insights(postId: string, token: string): Promise<Record<string, number> | null>;
   comments(a: AccountForSync, postId: string, token: string): Promise<RemoteComment[]>;
+  commentCounts(a: AccountForSync, token: string, since: string): Promise<CommentCount[]>;
 }
 
 const ADAPTERS: Partial<Record<MarketingPlatform, Adapter>> = {
@@ -79,6 +83,7 @@ const ADAPTERS: Partial<Record<MarketingPlatform, Adapter>> = {
     media: (id, t) => facebookPostMedia(id, t),
     insights: (id, t) => facebookPostViews(id, t),
     comments: (a, id, t) => facebookComments(a.external_id!, id, t),
+    commentCounts: (a, t, since) => facebookCommentCounts(a.external_id!, t, since),
   },
   instagram: {
     audience: (a, t) => instagramAudience(a.external_id!, t),
@@ -86,6 +91,7 @@ const ADAPTERS: Partial<Record<MarketingPlatform, Adapter>> = {
     media: (id, t) => instagramMediaItem(id, t),
     insights: (id, t) => instagramInsights(id, t),
     comments: (a, id, t) => instagramComments(id, a.handle, t),
+    commentCounts: (a, t, since) => instagramCommentCounts(a.external_id!, t, since),
   },
 };
 
@@ -422,4 +428,67 @@ export async function refreshRecentComments(
     }
   }
   return { ok: true, comments: rows.length ? await saveComments(a, rows) : 0 };
+}
+
+/** Once a day per account the scan runs; while a backlog remains, every run. */
+export const COMMENT_SCAN_MS = 24 * 3600_000;
+const COMMENT_SCAN_BACKLOG_MS = 4 * 60_000;
+const COMMENT_SCAN_MONTHS = 12;
+/** Older posts whose comments are read per run. */
+const COMMENT_SCAN_READS = 30;
+
+/** Comments on OLDER posts — older than the 15-minute refresh's 14 days,
+ *  within 12 months: every post's comment count from Meta (a few calls),
+ *  then the posts whose count grew since their comments were last read — or
+ *  that were never read and have comments — are read, newest first.
+ *  metrics.comments_seen keeps the count at that read (the Feed's own
+ *  "comments" number is left as it is). */
+export async function scanOlderComments(
+  tenantId: string, accountId: string, opts: { budgetMs: number },
+): Promise<{ ok: boolean; skipped?: "unavailable" | "fresh"; read?: number; left?: number }> {
+  const started = Date.now();
+  const a = await loadAccountForSync(tenantId, accountId);
+  const adapter = a ? ADAPTERS[a.platform] : undefined;
+  if (!a || !adapter || a.connection !== "api" || !a.token || !a.external_id || a.status === "disconnected" || a.status === "expired") {
+    return { ok: false, skipped: "unavailable" };
+  }
+  const gap = a.sync_state.comments_scan_full === true ? COMMENT_SCAN_MS : COMMENT_SCAN_BACKLOG_MS;
+  if (!(await claimCommentScan(a, gap))) return { ok: true, skipped: "fresh" };
+  const token = a.token;
+  const since = new Date(Date.now() - COMMENT_SCAN_MONTHS * 31 * 86_400_000).toISOString();
+  const recent = Date.now() - COMMENTS_POST_DAYS * 86_400_000;
+  try {
+    const counts = await adapter.commentCounts(a, token, since);
+    const posts = await allRowsOrThrow<{ id: string; external_id: string; posted_at: string | null; metrics: Record<string, number> | null }>(
+      "marketing older comments",
+      supabaseServer.from("marketing_remote_posts").select("id, external_id, posted_at, metrics").eq("account_id", a.id).gte("posted_at", since).order("posted_at", { ascending: false }).order("id"),
+    );
+    const byExt = new Map(posts.map((p) => [p.external_id, p]));
+    const due = counts.filter((c) => {
+      const p = byExt.get(c.external_id);
+      if (!p || (p.posted_at && Date.parse(p.posted_at) >= recent)) return false;
+      const seen = p.metrics?.comments_seen;
+      return typeof seen === "number" ? c.count > seen : c.count > 0;
+    });
+    let read = 0;
+    for (const c of due) {
+      if (read >= COMMENT_SCAN_READS || Date.now() - started > opts.budgetMs - 3_000) break;
+      const p = byExt.get(c.external_id)!;
+      const comments = await adapter.comments(a, c.external_id, token);
+      if (comments.length) await saveComments(a, comments.map((comment) => ({ remotePostId: p.id, comment })));
+      const { error } = await supabaseServer.from("marketing_remote_posts").update({ metrics: { ...p.metrics, comments_seen: c.count } }).eq("id", p.id);
+      if (error) throw new Error(`marketing posts: ${error.message}`);
+      read++;
+    }
+    const left = due.length - read;
+    await recordSyncState(a, { comments_scan_full: left <= 0 });
+    return { ok: true, read, left };
+  } catch (e) {
+    if (e instanceof MetaError && e.code === 190) {
+      await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
+      return { ok: false };
+    }
+    console.warn(`[marketing/sync] older comments of ${a.id}: left for later: ${text(e)}`);
+    return { ok: false };
+  }
 }
