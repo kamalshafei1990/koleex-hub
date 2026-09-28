@@ -19,18 +19,28 @@ import "server-only";
    Days merge into what is stored: a metric a run could not read is never
    wiped. An expired key marks the account "expired" (Accounts asks to
    reconnect); any other failure keeps what was read and tries again later.
+     · the audience (countries, cities; Instagram also age and gender), a
+       Meta snapshot read once a day into sync_state.insights_audience;
+     · the views of the last 12 months' posts the Feed has without them
+       (it reads only the newest), 40 a run, newest first — a post Meta
+       has no views for is marked views_na, so it is not asked again. The
+       account is complete once its days AND its posts' views are in.
 
    loadInsights reads the stored days and summarizes a period for the
-   screen (lib/marketing/insights.summarize).
+   screen (lib/marketing/insights.summarize), with the audience, the top
+   posts by views and the formats.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { MetaError } from "@/lib/server/marketing/meta";
+import { allRowsOrThrow } from "@/lib/server/all-rows";
 import { claimInsights, listAccounts, loadAccountForSync, recordInsights, recordSync } from "@/lib/server/marketing/accounts";
-import { facebookPageInsights, instagramDay, instagramReach } from "@/lib/server/marketing/meta-insights";
+import { facebookDemographics, facebookPageInsights, instagramDay, instagramDemographics, instagramReach, stopsRun } from "@/lib/server/marketing/meta-insights";
+import { facebookPostViews, instagramInsights } from "@/lib/server/marketing/meta-feed";
 import {
-  addDays, metaDayStart, metaYesterday, summarize,
-  type DayMetrics, type InsightKey, type InsightPeriod, type PeriodSummary,
+  POST_FORMATS, addDays, formatOf, metaDayStart, metaYesterday, postInteractions, summarize,
+  type AudienceSnapshot, type DayMetrics, type FormatStat, type InsightKey, type InsightPeriod, type PeriodSummary,
+  type PostViewsCoverage, type TopPost,
 } from "@/lib/marketing/insights";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 
@@ -44,6 +54,28 @@ const BACKFILL_GAP_MS = 4 * 60_000;
 const SETTLE_MS = 72 * 3600_000;
 /** Instagram days per run (three calls each). */
 const IG_DAYS_PER_RUN = 12;
+/** The audience is a snapshot: once a day is plenty. */
+const AUDIENCE_MS = 24 * 3600_000;
+/** Older posts' views read per run, and how far back. */
+const POST_VIEWS_PER_RUN = 40;
+const POST_MONTHS = 12;
+
+interface PostRow { id: string; external_id: string; message: string | null; media: Array<{ kind?: string; url?: string }> | null; permalink: string | null; posted_at: string | null; metrics: Record<string, number> | null }
+
+/** The last 12 months' posts of an account (the Feed's), newest first. */
+async function recentPosts(accountId: string): Promise<PostRow[]> {
+  const since = new Date(Date.now() - POST_MONTHS * 31 * 86_400_000).toISOString();
+  return allRowsOrThrow<PostRow>("marketing insights posts", supabaseServer
+    .from("marketing_remote_posts")
+    .select("id, external_id, message, media, permalink, posted_at, metrics")
+    .eq("account_id", accountId)
+    .gte("posted_at", since)
+    .order("posted_at", { ascending: false })
+    .order("id"));
+}
+
+/** Views not asked yet: neither a figure nor Meta's "none". */
+const viewsMissing = (m: Record<string, number> | null) => typeof m?.views !== "number" && m?.views_na !== 1;
 
 const text = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
@@ -131,6 +163,43 @@ export async function syncInsights(
     console.warn(`[marketing/insights] ${a.id}: kept what was read: ${text(e)}`);
   }
 
+  // The audience, once a day.
+  let audience: AudienceSnapshot | null = null;
+  const audienceAt = (a.sync_state.insights_audience as { at?: string } | undefined)?.at;
+  if ((!audienceAt || Date.now() - (Date.parse(audienceAt) || 0) > AUDIENCE_MS) && inBudget(6_000)) {
+    try {
+      const d = a.platform === "facebook" ? await facebookDemographics(ext, token) : await instagramDemographics(ext, token);
+      if (d) audience = { ages: [], genders: [], ...d, at: new Date().toISOString() };
+    } catch (e) {
+      if (e instanceof MetaError && e.code === 190) {
+        await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
+        return { ok: false };
+      }
+      console.warn(`[marketing/insights] ${a.id}: audience left for later: ${text(e)}`);
+    }
+  }
+
+  // Older posts' views, a few a run.
+  let postsLeft = 0;
+  try {
+    const missing = (await recentPosts(a.id)).filter((p) => viewsMissing(p.metrics));
+    postsLeft = missing.length;
+    for (const post of missing.slice(0, POST_VIEWS_PER_RUN)) {
+      if (!inBudget(4_000)) break;
+      const got = a.platform === "facebook" ? await facebookPostViews(post.external_id, token) : await instagramInsights(post.external_id, token);
+      const metrics = typeof got?.views === "number" ? { ...post.metrics, ...got } : { ...post.metrics, ...(got ?? {}), views_na: 1 };
+      const { error } = await supabaseServer.from("marketing_remote_posts").update({ metrics }).eq("id", post.id);
+      if (error) throw new Error(`marketing posts: ${error.message}`);
+      postsLeft--;
+    }
+  } catch (e) {
+    if (e instanceof MetaError && e.code === 190) {
+      await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
+      return { ok: false };
+    }
+    if (!stopsRun(e)) console.warn(`[marketing/insights] ${a.id}: post views left for later: ${text(e)}`);
+  }
+
   const now = new Date().toISOString();
   const rows = [...fetched].map(([day, m]) => ({
     account_id: a.id,
@@ -145,7 +214,8 @@ export async function syncInsights(
     const { error } = await supabaseServer.from("marketing_insight_days").upsert(rows.slice(i, i + 200), { onConflict: "account_id,day" });
     if (error) throw new Error(`marketing insight days: ${error.message}`);
   }
-  await recordInsights(a, wanted.every((d) => dayFetched.has(d))).catch((e) => console.warn(`[marketing/insights] ${a.id}: ${text(e)}`));
+  const complete = wanted.every((d) => dayFetched.has(d)) && postsLeft <= 0;
+  await recordInsights(a, complete, audience ? { insights_audience: audience } : {}).catch((e) => console.warn(`[marketing/insights] ${a.id}: ${text(e)}`));
   return { ok: true, days: dayFetched.size };
 }
 
@@ -153,6 +223,41 @@ export interface AccountInsights extends PeriodSummary {
   account: MarketingAccountView;
   /** When the Hub last read this account's numbers. */
   synced_at: string | null;
+  audience: AudienceSnapshot | null;
+  /** The last 12 months' posts: the five with the most views, and the formats. */
+  top: TopPost[];
+  formats: FormatStat[];
+  postViews: PostViewsCoverage;
+}
+
+/** The top posts by views and the formats, from the last 12 months' posts. */
+export function postsSummary(posts: PostRow[]): { top: TopPost[]; formats: FormatStat[]; postViews: PostViewsCoverage } {
+  const shaped = posts.map((p) => {
+    const m = p.metrics ?? {};
+    const text = p.message?.trim() || null;
+    return {
+      id: p.id,
+      excerpt: text ? Array.from(text).slice(0, 90).join("") : null,
+      thumb: p.media?.[0]?.url ?? null,
+      permalink: p.permalink,
+      posted_at: p.posted_at,
+      format: formatOf(p.media),
+      views: typeof m.views === "number" ? m.views : null,
+      interactions: postInteractions(m),
+    };
+  });
+  const top = shaped.filter((p): p is typeof p & { views: number } => p.views !== null).sort((x, y) => y.views - x.views).slice(0, 5);
+  const formats = POST_FORMATS.map((format) => {
+    const of = shaped.filter((p) => p.format === format);
+    const seen = of.filter((p) => p.views !== null);
+    return {
+      format,
+      posts: of.length,
+      avgViews: seen.length ? Math.round(seen.reduce((n, p) => n + (p.views ?? 0), 0) / seen.length) : null,
+      avgInteractions: of.length ? Math.round((of.reduce((n, p) => n + p.interactions, 0) / of.length) * 10) / 10 : 0,
+    };
+  }).filter((f) => f.posts > 0);
+  return { top, formats, postViews: { have: posts.filter((p) => !viewsMissing(p.metrics)).length, total: posts.length } };
 }
 
 /** The connected Pages and Instagram accounts of a space, summarized. */
@@ -163,13 +268,24 @@ export async function loadInsights(
     a.connection === "api" && (a.platform === "facebook" || a.platform === "instagram") && a.status !== "disconnected" && (!accountId || a.id === accountId));
   const end = metaYesterday();
   const from = addDays(end, -(period * 2 - 1));
+  const { data: states, error: sErr } = accounts.length
+    ? await supabaseServer.from("marketing_accounts").select("id, audience:sync_state->insights_audience").eq("tenant_id", tenantId).in("id", accounts.map((a) => a.id))
+    : { data: [], error: null };
+  if (sErr) throw new Error(`marketing accounts: ${sErr.message}`);
+  const audienceOf = new Map(((states ?? []) as Array<{ id: string; audience: AudienceSnapshot | null }>).map((r) => [r.id, r.audience]));
   const out = await Promise.all(accounts.map(async (account) => {
-    const stored = await storedDays(account.id, from, end);
+    const [stored, posts] = await Promise.all([storedDays(account.id, from, end), recentPosts(account.id)]);
     const rows = new Map([...stored].map(([d, r]) => [d, r.metrics]));
     // A day counts once its own numbers were read (a reach-only day has no time).
     const counted = new Set([...stored.values()].filter((r) => Date.parse(r.synced_at) > 0).map((r) => r.day));
     const synced = [...stored.values()].reduce<string | null>((m, r) => (!m || r.synced_at > m ? r.synced_at : m), null);
-    return { account, synced_at: synced && Date.parse(synced) > 0 ? synced : null, ...summarize(rows, end, period, counted) };
+    return {
+      account,
+      synced_at: synced && Date.parse(synced) > 0 ? synced : null,
+      audience: audienceOf.get(account.id) ?? null,
+      ...postsSummary(posts),
+      ...summarize(rows, end, period, counted),
+    };
   }));
   return { period, end, accounts: out };
 }

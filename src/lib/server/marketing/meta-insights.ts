@@ -9,7 +9,10 @@ import "server-only";
    Facebook Page — /{page}/insights, period=day, up to 90 days a call. Each
    value's end_time closes Meta's day, so it belongs to the day before.
    Viewers are unique people: the rolling week and 28 days come from
-   period=week / days_28 and are stored on the window's last day.
+   period=week / days_28 and are stored on the window's last day. Views
+   are also split by is_from_followers and is_from_ads (Meta answers only
+   the non-zero parts, so a missing part is 0); an answer in a shape this
+   code does not know is logged once, never guessed at.
 
    Instagram — /{ig-user}/insights with metric_type=total_value answers ONE
    total for since..until, so a day is one window. A breakdown only fits
@@ -27,7 +30,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { MetaError, metaGet, metaGraphUrl } from "@/lib/server/marketing/meta";
-import { addDays, metaDayStart, type DayMetrics, type InsightKey } from "@/lib/marketing/insights";
+import { addDays, metaDayStart, topEntries, totalOf, type AudiencePart, type AudienceSnapshot, type DayMetrics, type InsightKey } from "@/lib/marketing/insights";
 
 interface GraphBreakdown { dimension_keys?: string[]; results?: Array<{ dimension_values?: string[]; value?: unknown }> }
 interface GraphMetric {
@@ -56,6 +59,37 @@ function warnRefused(where: string, what: string, e: unknown): void {
   console.warn(`[marketing/insights] Meta refused ${what} for ${where}: ${e instanceof Error ? e.message : String(e)}`);
 }
 
+/** An answer in a shape this code does not know: logged once, then left out. */
+function warnShape(where: string, what: string, sample: unknown): void {
+  const key = `${where}|${what}|shape`;
+  if (warned.has(key) || warned.size > 500) return;
+  warned.add(key);
+  console.warn(`[marketing/insights] unknown answer for ${what} (${where}): ${JSON.stringify(sample).slice(0, 600)}`);
+}
+
+const TRUE_KEY = /^(true|1|yes)$/i;
+const FALSE_KEY = /^(false|0|no)$/i;
+
+/** A day-by-day breakdown: each value an object keyed by the breakdown's
+ *  values ({"true": 12, "false": 300}). null when the answer has another shape. */
+export function breakdownByDay(m: GraphMetric | undefined): Array<{ day: string; yes: number; no: number }> | null {
+  const out: Array<{ day: string; yes: number; no: number }> = [];
+  for (const v of m?.values ?? []) {
+    const day = v.end_time ? fbValueDay(v.end_time) : null;
+    if (!day) continue;
+    if (!v.value || typeof v.value !== "object" || Array.isArray(v.value)) return null;
+    let yes = 0, no = 0;
+    for (const [k, n] of Object.entries(v.value as Record<string, unknown>)) {
+      const x = num(n);
+      if (x === null) continue;
+      if (TRUE_KEY.test(k)) yes += x;
+      else if (FALSE_KEY.test(k)) no += x;
+    }
+    out.push({ day, yes, no });
+  }
+  return out;
+}
+
 /** Facebook Page metrics per day → the Hub's names. */
 export const FB_DAY_METRICS: Readonly<Record<string, InsightKey>> = {
   page_media_view: "views",
@@ -70,6 +104,13 @@ export const FB_DAY_METRICS: Readonly<Record<string, InsightKey>> = {
 /** Unique viewers over a rolling window (period → the Hub's name). */
 export const FB_VIEWERS_METRIC = "page_total_media_view_unique";
 export const FB_VIEWER_WINDOWS: ReadonlyArray<readonly ["week" | "days_28", InsightKey]> = [["week", "viewers_7d"], ["days_28", "viewers_28d"]];
+
+/** Views split two ways: breakdown → the Hub's name for its "true" part and,
+ *  when both parts are kept, its "false" part. */
+export const FB_VIEW_SPLITS: ReadonlyArray<readonly [string, InsightKey, InsightKey | null]> = [
+  ["is_from_followers", "views_followers", "views_others"],
+  ["is_from_ads", "views_ads", null],
+];
 
 /** Instagram totals without a breakdown → the Hub's names. */
 export const IG_TOTALS: Readonly<Record<string, InsightKey>> = {
@@ -130,8 +171,45 @@ export async function facebookPageInsights(pageId: string, token: string, from: 
         if (m.name === FB_VIEWERS_METRIC) for (const v of m.values ?? []) put(v.end_time, key, v.value);
       }
     }
+    for (const [breakdown, yesKey, noKey] of FB_VIEW_SPLITS) {
+      try {
+        const [m] = await readEach(`${pageId}/insights`, token, ["page_media_view"], { ...window, period: "day", breakdown });
+        const split = breakdownByDay(m);
+        if (!split) { warnShape(pageId, `page_media_view by ${breakdown}`, m); continue; }
+        for (const { day, yes, no } of split) {
+          if (day < from || day > to) continue;
+          days.set(day, { ...days.get(day), [yesKey]: yes, ...(noKey ? { [noKey]: no } : {}) });
+        }
+      } catch (e) {
+        if (stopsRun(e)) throw e;
+        warnRefused(pageId, `page_media_view by ${breakdown}`, e);
+      }
+    }
   }
   return days;
+}
+
+const objectOf = (v: unknown): Record<string, number> => {
+  const out: Record<string, number> = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) for (const [k, n] of Object.entries(v)) { const x = num(n); if (x !== null) out[k] = x; }
+  return out;
+};
+
+/** A Page's audience by country and city (Meta's lifetime snapshot). Meta
+ *  no longer gives a Page's age and gender. null when it gives neither. */
+export async function facebookDemographics(pageId: string, token: string): Promise<Pick<AudienceSnapshot, "countries" | "cities" | "totals"> | null> {
+  for (const [country, city] of [["page_fans_country", "page_fans_city"], ["page_follows_country", "page_follows_city"]]) {
+    const data = await readEach(`${pageId}/insights`, token, [country, city], { period: "lifetime" }).catch((e) => {
+      if (stopsRun(e)) throw e;
+      warnRefused(pageId, `${country}, ${city}`, e);
+      return [] as GraphMetric[];
+    });
+    const last = (name: string) => { const m = data.find((x) => x.name === name); return objectOf(m?.values?.[(m.values?.length ?? 1) - 1]?.value); };
+    const c = last(country), ci = last(city);
+    const countries = topEntries(c), cities = topEntries(ci);
+    if (countries.length || cities.length) return { countries, cities, totals: { countries: totalOf(c), cities: totalOf(ci) } };
+  }
+  return null;
 }
 
 const results = (m: GraphMetric | undefined) =>
@@ -195,3 +273,24 @@ export async function instagramReach(igId: string, token: string, from: string, 
   });
   return num(m?.total_value?.value);
 }
+
+/** An Instagram account's followers by country, city, age and gender (Meta
+ *  gives them for accounts with 100 followers or more). null when none. */
+export async function instagramDemographics(igId: string, token: string): Promise<Omit<AudienceSnapshot, "at"> | null> {
+  const out: Omit<AudienceSnapshot, "at"> = { countries: [], cities: [], ages: [], genders: [], totals: {} };
+  const parts: ReadonlyArray<readonly [string, AudiencePart]> = [["country", "countries"], ["city", "cities"], ["age", "ages"], ["gender", "genders"]];
+  for (const [breakdown, key] of parts) {
+    try {
+      const [m] = await readEach(`${igId}/insights`, token, ["follower_demographics"], { period: "lifetime", metric_type: "total_value", breakdown });
+      const values: Record<string, number> = {};
+      for (const r of results(m)) if (r.key && r.value !== null) values[r.key] = r.value;
+      out[key] = topEntries(values);
+      out.totals[key] = totalOf(values);
+    } catch (e) {
+      if (stopsRun(e)) throw e;
+      warnRefused(igId, `follower_demographics by ${breakdown}`, e);
+    }
+  }
+  return out.countries.length || out.cities.length || out.ages.length || out.genders.length ? out : null;
+}
+

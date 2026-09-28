@@ -39,7 +39,7 @@ export function metaDayStart(day: string): number {
 
 /** What the Hub stores per account per day (marketing_insight_days.metrics). */
 export const INSIGHT_KEYS = [
-  "views", "views_followers", "views_others", "viewers_7d", "viewers_28d", "reach_7d", "reach_28d",
+  "views", "views_followers", "views_others", "views_ads", "viewers_7d", "viewers_28d", "reach_7d", "reach_28d",
   "follows", "unfollows", "visits", "interactions", "likes", "comments", "shares", "saves",
   "link_taps", "video_views", "watch_ms",
 ] as const;
@@ -48,7 +48,7 @@ export type DayMetrics = Partial<Record<InsightKey, number>>;
 
 /** Counts that add up across days. */
 export const ADDITIVE_KEYS = [
-  "views", "views_followers", "views_others", "follows", "unfollows", "visits", "interactions",
+  "views", "views_followers", "views_others", "views_ads", "follows", "unfollows", "visits", "interactions",
   "likes", "comments", "shares", "saves", "link_taps", "video_views", "watch_ms",
 ] as const satisfies readonly InsightKey[];
 
@@ -72,6 +72,8 @@ export interface MetricView {
   before: number | null;
   /** Day by day, oldest first (counts only; empty for unique figures). */
   series: Array<number | null>;
+  /** The period before, day by day (for the large chart); absent for unique figures. */
+  seriesBefore?: Array<number | null>;
 }
 
 export interface PeriodSummary {
@@ -102,7 +104,7 @@ export function summarize(rows: ReadonlyMap<string, DayMetrics>, end: string, pe
     if (series.every((v) => v === null)) return null;
     const now = series.reduce<number>((n, v) => n + (v ?? 0), 0);
     const before = fullBefore ? previous.reduce<number>((n, d) => n + (day(d)?.[key] ?? 0), 0) : null;
-    return { now, before, series };
+    return { now, before, series, seriesBefore: previous.map((d) => day(d)?.[key] ?? null) };
   };
   for (const key of ADDITIVE_KEYS) {
     const m = count(key);
@@ -111,10 +113,12 @@ export function summarize(rows: ReadonlyMap<string, DayMetrics>, end: string, pe
 
   const f = metrics.follows, u = metrics.unfollows;
   if (f && u) {
+    const net = (a: Array<number | null>, b: Array<number | null>) => a.map((v, i) => (v === null && b[i] === null ? null : (v ?? 0) - (b[i] ?? 0)));
     metrics.net_follows = {
       now: f.now - u.now,
       before: f.before !== null && u.before !== null ? f.before - u.before : null,
-      series: f.series.map((v, i) => (v === null && u.series[i] === null ? null : (v ?? 0) - (u.series[i] ?? 0))),
+      series: net(f.series, u.series),
+      seriesBefore: net(f.seriesBefore ?? [], u.seriesBefore ?? []),
     };
   }
 
@@ -135,3 +139,69 @@ export function changePct(m: Pick<MetricView, "now" | "before">): number | null 
   if (m.before === null || m.before === 0) return null;
   return ((m.now - m.before) / Math.abs(m.before)) * 100;
 }
+
+/* ── Posts: the top ones and the formats (from the posts the Feed keeps) ── */
+
+/** A post's interactions — the ONE rule, also the Feed's (sync.engagementOf). */
+export function postInteractions(m: Record<string, number>): number {
+  if (typeof m.total_interactions === "number") return m.total_interactions;
+  return (m.reactions ?? m.likes ?? 0) + (m.comments ?? 0) + (m.shares ?? 0) + (m.saved ?? 0);
+}
+
+export type PostFormat = "photo" | "video" | "album" | "text";
+export const POST_FORMATS: readonly PostFormat[] = ["photo", "video", "album", "text"];
+
+/** A post's format from its media (as the Feed keeps it). */
+export function formatOf(media: ReadonlyArray<{ kind?: string }> | null | undefined): PostFormat {
+  const list = media ?? [];
+  if (list.length > 1) return "album";
+  if (list.length === 0) return "text";
+  return list[0].kind === "video" ? "video" : "photo";
+}
+
+export interface TopPost {
+  id: string;
+  excerpt: string | null;
+  thumb: string | null;
+  permalink: string | null;
+  posted_at: string | null;
+  format: PostFormat;
+  views: number;
+  interactions: number;
+}
+
+export interface FormatStat {
+  format: PostFormat;
+  posts: number;
+  /** Over the posts whose views the Hub has; null when none. */
+  avgViews: number | null;
+  avgInteractions: number;
+}
+
+/** The last 12 months' posts: views known for how many (Meta is asked a few at a time). */
+export interface PostViewsCoverage { have: number; total: number }
+
+/* ── The audience (Meta's snapshot, refreshed once a day) ── */
+
+export type AudienceEntry = [key: string, value: number];
+export type AudiencePart = "countries" | "cities" | "ages" | "genders";
+export interface AudienceSnapshot {
+  at: string;
+  countries: AudienceEntry[];
+  cities: AudienceEntry[];
+  /** Instagram only: Meta no longer gives a Page's age and gender. */
+  ages: AudienceEntry[];
+  genders: AudienceEntry[];
+  /** Everyone in each part (the lists keep the top 10), so a share is of the whole. */
+  totals: Partial<Record<AudiencePart, number>>;
+}
+
+/** Largest first, the top n. */
+export function topEntries(values: Record<string, number>, n = 10): AudienceEntry[] {
+  return Object.entries(values).filter(([, v]) => typeof v === "number" && v > 0).sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+
+/** The whole of a part, before its list is cut to the top n. */
+export const totalOf = (values: Record<string, number>): number =>
+  Object.values(values).reduce((n, v) => n + (typeof v === "number" && v > 0 ? v : 0), 0);
+

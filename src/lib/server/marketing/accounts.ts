@@ -281,9 +281,9 @@ export async function claimInsights(a: AccountForSync, minGapMs: number): Promis
  *  refresh waits hours, not minutes). Only if nothing changed the account
  *  since the claim — a Feed sync's newer sync_state is never overwritten;
  *  a skipped write only brings the next refresh sooner. */
-export async function recordInsights(a: AccountForSync, complete: boolean): Promise<void> {
+export async function recordInsights(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = {}): Promise<void> {
   const now = new Date().toISOString();
-  const state = { ...a.sync_state, insights_full: complete };
+  const state = { ...a.sync_state, ...extra, insights_full: complete };
   const { error } = await supabaseServer
     .from("marketing_accounts")
     .update({ sync_state: state, updated_at: now })

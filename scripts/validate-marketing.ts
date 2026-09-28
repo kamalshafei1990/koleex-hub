@@ -680,7 +680,7 @@ const insFn = insSrv.match(/export async function syncInsights\([\s\S]*?\n\}/)?.
 check("syncInsights claims the account before any call to Meta; a claim and the «complete» mark are version-checked",
   before(insFn, "await claimInsights(a, gap)", "facebookPageInsights(") && before(insFn, "await claimInsights(a, gap)", "instagramDay(") &&
   /export async function claimInsights\(a: AccountForSync, minGapMs: number\)[\s\S]*?\.eq\("updated_at", a\.updated_at\)/.test(code(ACCOUNTS)) &&
-  /export async function recordInsights\(a: AccountForSync, complete: boolean\)[\s\S]*?\.eq\("updated_at", a\.updated_at\);/.test(code(ACCOUNTS)));
+  /export async function recordInsights\(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = \{\}\)[\s\S]*?\.eq\("updated_at", a\.updated_at\);/.test(code(ACCOUNTS)));
 check("a day is read again until 72 hours after it ends, not every run; days merge, nothing read is wiped",
   /const SETTLE_MS = 72 \* 3600_000;/.test(insSrv) && /const readAgo = opts\.force \? 10 \* 60_000 : INSIGHTS_REFRESH_MS;/.test(insFn) &&
   /metrics: \{ \.\.\.have\.get\(day\)\?\.metrics, \.\.\.m \}/.test(insFn) &&
@@ -706,6 +706,22 @@ const insMissing = Object.entries(insT).filter(([, v]) => !["en", "zh", "ar"].ev
 check(`the Insights screen: never sideways, session copy guarded, speaks en/zh/ar (${Object.keys(insT).length} phrases)`,
   !/overflow-x-(auto|scroll)/.test(insScreen) && insMissing.length === 0 &&
   /try \{\s*const raw = sessionStorage\.getItem\(key\);/.test(insScreen) && /try \{ sessionStorage\.setItem\(key, JSON\.stringify\(data\)\); \} catch/.test(insScreen));
+check("Facebook views split by is_from_followers and is_from_ads; a missing part is 0; an unknown answer is logged, never guessed",
+  /\["is_from_followers", "views_followers", "views_others"\]/.test(mi) && /\["is_from_ads", "views_ads", null\]/.test(mi) &&
+  /if \(!split\) \{ warnShape\(pageId, `page_media_view by \$\{breakdown\}`, m\); continue; \}/.test(mi) &&
+  /if \(!v\.value \|\| typeof v\.value !== "object" \|\| Array\.isArray\(v\.value\)\) return null;/.test(mi));
+check("the audience is Meta's snapshot, once a day, kept through the version-checked «complete» write; shares are of everyone, not of the top 10",
+  /const AUDIENCE_MS = 24 \* 3600_000;/.test(insSrv) && /recordInsights\(a, complete, audience \? \{ insights_audience: audience \} : \{\}\)/.test(insSrv) &&
+  /out\.totals\[key\] = totalOf\(values\);/.test(mi) && /const total = audience\.totals\[part\] \|\|/.test(insScreen));
+check("older posts' views: 40 a run, the last 12 months only; a post Meta has none for is marked views_na and not asked again",
+  /const POST_VIEWS_PER_RUN = 40;/.test(insSrv) && /const POST_MONTHS = 12;/.test(insSrv) &&
+  /const viewsMissing = \(m: Record<string, number> \| null\) => typeof m\?\.views !== "number" && m\?\.views_na !== 1;/.test(insSrv) &&
+  /\{ \.\.\.post\.metrics, \.\.\.\(got \?\? \{\}\), views_na: 1 \}/.test(insSrv) && /const complete = wanted\.every\(\(d\) => dayFetched\.has\(d\)\) && postsLeft <= 0;/.test(insSrv));
+check("ONE interactions rule for a post: the Feed's engagementOf is the Insights' postInteractions",
+  /return postInteractions\(m\);/.test(code(SYNC)) && /export function postInteractions\(m: Record<string, number>\): number \{/.test(insLib));
+check("the screen: a card opens a large chart with the period before; a copy kept by an older version is not painted",
+  /aria-expanded=\{!!open\}/.test(insScreen) && /function DetailChart\(/.test(insScreen) && /strokeDasharray="4 4"/.test(insScreen) &&
+  /data\.accounts\.every\(\(a\) => Array\.isArray\(a\.top\) && Array\.isArray\(a\.formats\)\)/.test(insScreen));
 const mhSrc = code("src/components/marketing/MarketingHeader.tsx");
 check("the Insights tab follows Feed; Comments stays last",
   /\{ key: SPACE_HOME\[space\][^\n]*\n\s*\{ key: SPACE_INSIGHTS\[space\]/.test(mhSrc) && /\{ key: SPACE_COMMENTS\[space\][^\n]*\n\s*\]\}/.test(mhSrc));

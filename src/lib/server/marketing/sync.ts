@@ -35,6 +35,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { MetaError } from "@/lib/server/marketing/meta";
+import { postInteractions } from "@/lib/marketing/insights";
 import {
   facebookAudience, facebookComments, facebookPostMedia, facebookPostViews, facebookPosts,
   instagramAudience, instagramComments, instagramInsights, instagramMedia, instagramMediaItem,
@@ -106,8 +107,7 @@ export function isStale(
 /** A post's engagement: Instagram's own total when Meta gives it, else the
  *  sum of what people did. */
 export function engagementOf(m: Record<string, number>): number {
-  if (typeof m.total_interactions === "number") return m.total_interactions;
-  return (m.reactions ?? m.likes ?? 0) + (m.comments ?? 0) + (m.shares ?? 0) + (m.saved ?? 0);
+  return postInteractions(m); // the ONE rule, shared with the Insights tab
 }
 
 const text = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);

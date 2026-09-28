@@ -328,8 +328,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      window — which grew 552 → 574 KB with it; its budget still holds. */
   "social-marketing/comments": { chunks: 10, kbytes: 613 },
   /* Insights (28/09/2026): measured 9 chunks / 541 KB, +12% headroom. The
-     lines are inline SVG — no chart library came with it. */
-  "social-marketing/insights": { chunks: 10, kbytes: 606 },
+     lines are inline SVG — no chart library came with it. Its second part
+     the same night (the large chart, top posts, audience, formats — still
+     inline SVG) measured 10 chunks / 559 KB: +12% → 11 / 626. */
+  "social-marketing/insights": { chunks: 11, kbytes: 626 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

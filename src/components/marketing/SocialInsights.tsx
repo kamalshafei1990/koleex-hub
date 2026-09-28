@@ -9,6 +9,9 @@
    account's numbers are over 6 hours old or its history is still coming
    in. The last answer per period is kept for the session, so coming back
    paints at once instead of flashing a skeleton.
+   A card opens a large chart of its figure with the period before. Under the
+   cards: the top posts of the last 12 months by views, the audience (Meta's
+   daily snapshot) and the formats — average views and interactions per post.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -17,6 +20,8 @@ import MarketingHeader from "@/components/marketing/MarketingHeader";
 import Button from "@/components/kds/Button";
 import EmptyState from "@/components/kds/EmptyState";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import TrendingDownIcon from "@/components/icons/ui/TrendingDownIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
@@ -24,9 +29,19 @@ import { useTranslation } from "@/lib/i18n";
 import { INSIGHTS_T } from "@/lib/marketing/insights-i18n";
 import { compact, dmyHm } from "@/lib/marketing/format";
 import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
-import { INSIGHT_PERIODS, addDays, changePct, type InsightPeriod, type MetricView, type PeriodSummary } from "@/lib/marketing/insights";
+import {
+  INSIGHT_PERIODS, addDays, changePct,
+  type AudiencePart, type AudienceSnapshot, type FormatStat, type InsightPeriod, type MetricView, type PeriodSummary, type PostViewsCoverage, type TopPost,
+} from "@/lib/marketing/insights";
 
-type AccountInsights = PeriodSummary & { account: MarketingAccountView; synced_at: string | null };
+type AccountInsights = PeriodSummary & {
+  account: MarketingAccountView;
+  synced_at: string | null;
+  audience: AudienceSnapshot | null;
+  top: TopPost[];
+  formats: FormatStat[];
+  postViews: PostViewsCoverage;
+};
 type InsightsResponse = { period: InsightPeriod; end: string; accounts: AccountInsights[] };
 type T = (key: string) => string;
 
@@ -37,7 +52,9 @@ const cacheKey = (space: MarketingSpace, period: InsightPeriod) => `kx.mkt.insig
 function readCache(key: string): InsightsResponse | null {
   try {
     const raw = sessionStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as InsightsResponse) : null;
+    const data = raw ? (JSON.parse(raw) as InsightsResponse) : null;
+    // A copy kept by an older version of this screen lacks the newer parts.
+    return data && data.accounts.every((a) => Array.isArray(a.top) && Array.isArray(a.formats)) ? data : null;
   } catch {
     return null;
   }
@@ -52,7 +69,7 @@ const dmy = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice
 const figure = (n: number) => (Math.abs(n) < 10_000 ? Math.round(n).toLocaleString("en-US") : compact(n));
 
 export default function SocialInsights({ space }: { space: MarketingSpace }) {
-  const { t } = useTranslation(INSIGHTS_T);
+  const { t, lang } = useTranslation(INSIGHTS_T);
   const router = useRouter();
   const [period, setPeriod] = useState<InsightPeriod>(28);
   const [account, setAccount] = useState<string | null>(null);
@@ -167,7 +184,7 @@ export default function SocialInsights({ space }: { space: MarketingSpace }) {
               <span dir="ltr" className="tabular-nums">{dmy(addDays(data.end, -(period - 1)))} – {dmy(data.end)}</span>
               {" · "}{t("vsBefore").replace("{n}", String(period))}
             </p>
-            {shown.map((a) => <AccountBlock key={a.account.id} a={a} period={period} t={t} />)}
+            {shown.map((a) => <AccountBlock key={a.account.id} a={a} period={period} t={t} lang={lang} />)}
             <p className="text-[11px] leading-relaxed text-[var(--text-dim)]">
               {t("metaDay")}{period === 90 ? ` ${t("unique90")}` : ""}
             </p>
@@ -194,10 +211,12 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 }
 
 interface Row { label: string; value: string; pct?: number | null }
+type ChartKey = "views" | "follows" | "visits" | "interactions" | "video_views" | "link_taps";
 
-function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPeriod; t: T }) {
+function AccountBlock({ a, period, t, lang }: { a: AccountInsights; period: InsightPeriod; t: T; lang: string }) {
   const m = a.metrics;
   const platform = a.account.platform;
+  const [open, setOpen] = useState<ChartKey | null>(null);
   const count = (v: MetricView | undefined) => (v ? figure(v.now) : "");
   const row = (key: string, v: MetricView | undefined): Row | null => (v ? { label: t(`m.${key}`), value: count(v), pct: changePct(v) } : null);
   const duration = (ms: number) => {
@@ -207,7 +226,19 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
   // Each part of the two Meta split the views into — they always add up to 100%.
   const split = (m.views_followers?.now ?? 0) + (m.views_others?.now ?? 0);
   const share = (part: MetricView | undefined) => (part && split > 0 ? `${((part.now / split) * 100).toFixed(1)}%` : null);
+  const splitRows: Array<Row | null> = [
+    share(m.views_followers) ? { label: t("fromFollowers"), value: share(m.views_followers) as string } : null,
+    share(m.views_others) ? { label: t("fromOthers"), value: share(m.views_others) as string } : null,
+  ];
   const collecting = a.days > 0 && (a.days < period || a.daysBefore < period);
+  const toggle = (k: ChartKey) => setOpen((o) => (o === k ? null : k));
+  const card = (k: ChartKey, label: string, rows: Array<Row | null> = [], hint?: string) => (
+    <Card label={label} hint={hint} m={m[k]} value={count(m[k])} rows={rows} t={t} open={open === k} onToggle={() => toggle(k)} />
+  );
+  const chartLabel: Record<ChartKey, string> = {
+    views: t("m.views"), follows: t("m.follows"), visits: t("m.visits"),
+    interactions: platform === "facebook" ? t("m.engagement") : t("m.interactions"), video_views: t("m.video_views"), link_taps: t("m.link_taps"),
+  };
 
   return (
     <section aria-label={a.account.name} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 md:p-4">
@@ -225,7 +256,10 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
             <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]">{a.account.name}</span>
             <span className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-muted)]">
               <BrandGlyph name={platform} size={12} />
-              <span className="truncate">{t(`kind.${platform}`)}{a.account.handle ? ` · @${a.account.handle}` : ""}</span>
+              <span className="truncate">
+                {t(`kind.${platform}`)}{a.account.handle ? ` · @${a.account.handle}` : ""}
+                {typeof a.account.audience === "number" ? ` · ${t("followers").replace("{n}", a.account.audience.toLocaleString("en-US"))}` : ""}
+              </span>
             </span>
           </span>
         </span>
@@ -247,60 +281,65 @@ function AccountBlock({ a, period, t }: { a: AccountInsights; period: InsightPer
         <div className="mt-3 grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {platform === "facebook" ? (
             <>
-              <Card label={t("m.views")} m={m.views} value={count(m.views)} rows={[row("viewers", m.viewers)]} t={t} />
-              <Card label={t("m.follows")} m={m.follows} value={count(m.follows)} rows={[row("unfollows", m.unfollows), row("net_follows", m.net_follows)]} t={t} />
-              <Card label={t("m.visits")} m={m.visits} value={count(m.visits)} t={t} />
-              <Card label={t("m.engagement")} hint={t("hint.engagement")} m={m.interactions} value={count(m.interactions)} t={t} />
-              <Card
-                label={t("m.video_views")}
-                m={m.video_views}
-                value={count(m.video_views)}
-                rows={[m.watch_ms ? { label: t("m.watch_ms"), value: duration(m.watch_ms.now), pct: changePct(m.watch_ms) } : null]}
-                t={t}
-              />
+              {card("views", t("m.views"), [row("viewers", m.viewers), ...splitRows, m.views_ads ? { label: t("fromAds"), value: count(m.views_ads), pct: changePct(m.views_ads) } : null])}
+              {card("follows", t("m.follows"), [row("unfollows", m.unfollows), row("net_follows", m.net_follows)])}
+              {card("visits", t("m.visits"))}
+              {card("interactions", t("m.engagement"), [], t("hint.engagement"))}
+              {card("video_views", t("m.video_views"), [m.watch_ms ? { label: t("m.watch_ms"), value: duration(m.watch_ms.now), pct: changePct(m.watch_ms) } : null])}
             </>
           ) : (
             <>
-              <Card
-                label={t("m.views")}
-                m={m.views}
-                value={count(m.views)}
-                rows={[
-                  share(m.views_followers) ? { label: t("fromFollowers"), value: share(m.views_followers) as string } : null,
-                  share(m.views_others) ? { label: t("fromOthers"), value: share(m.views_others) as string } : null,
-                ]}
-                t={t}
-              />
+              {card("views", t("m.views"), splitRows)}
               <Card label={t("m.reach")} m={m.reach} value={count(m.reach)} t={t} />
-              <Card label={t("m.follows")} m={m.follows} value={count(m.follows)} rows={[row("unfollows", m.unfollows), row("net_follows", m.net_follows)]} t={t} />
-              <Card
-                label={t("m.interactions")}
-                m={m.interactions}
-                value={count(m.interactions)}
-                rows={[row("likes", m.likes), row("comments", m.comments), row("shares", m.shares), row("saves", m.saves)]}
-                t={t}
-              />
-              <Card label={t("m.link_taps")} m={m.link_taps} value={count(m.link_taps)} t={t} />
+              {card("follows", t("m.follows"), [row("unfollows", m.unfollows), row("net_follows", m.net_follows)])}
+              {card("interactions", t("m.interactions"), [row("likes", m.likes), row("comments", m.comments), row("shares", m.shares), row("saves", m.saves)])}
+              {card("link_taps", t("m.link_taps"))}
             </>
+          )}
+          {open && m[open] && (
+            <DetailChart label={chartLabel[open]} m={m[open] as MetricView} start={a.start} period={period} t={t} onClose={() => setOpen(null)} />
           )}
         </div>
       )}
+
+      <div className="mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+        <TopPosts a={a} t={t} />
+        <AudienceBlock audience={a.audience} platform={platform} t={t} lang={lang} />
+      </div>
+      {a.formats.length > 0 && <Formats formats={a.formats} t={t} />}
     </section>
   );
 }
 
-function Card({ label, hint, m, value, rows = [], t }: { label: string; hint?: string; m: MetricView | undefined; value: string; rows?: Array<Row | null>; t: T }) {
+function Card({ label, hint, m, value, rows = [], t, open, onToggle }: {
+  label: string; hint?: string; m: MetricView | undefined; value: string; rows?: Array<Row | null>; t: T; open?: boolean; onToggle?: () => void;
+}) {
   if (!m) return null;
   const list = rows.filter((r): r is Row => r !== null);
+  const head = (
+    <>
+      <span className="flex min-w-0 flex-col text-start">
+        <span className="text-[12px] font-medium text-[var(--text-muted)]">{label}</span>
+        {hint && <span className="text-[11px] leading-4 text-[var(--text-dim)]">{hint}</span>}
+      </span>
+      <Sparkline values={m.series} />
+    </>
+  );
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex min-w-0 flex-col">
-          <span className="text-[12px] font-medium text-[var(--text-muted)]">{label}</span>
-          {hint && <span className="text-[11px] leading-4 text-[var(--text-dim)]">{hint}</span>}
-        </span>
-        <Sparkline values={m.series} />
-      </div>
+    <div className={`flex min-w-0 flex-col gap-2 rounded-xl border p-3.5 ${open ? "border-[#567FB2]" : "border-[var(--border-subtle)]"}`}>
+      {onToggle && m.series.length > 1 ? (
+        <button
+          type="button"
+          aria-expanded={!!open}
+          aria-label={t("chart.show").replace("{label}", label)}
+          onClick={onToggle}
+          className="-m-1 flex items-start justify-between gap-3 rounded-lg p-1 hover:bg-[var(--bg-surface-subtle)]"
+        >
+          {head}
+        </button>
+      ) : (
+        <div className="flex items-start justify-between gap-3">{head}</div>
+      )}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span dir="ltr" className="text-[24px] font-semibold leading-7 tabular-nums text-[var(--text-primary)]">{value}</span>
         <Change pct={changePct(m)} t={t} />
@@ -318,6 +357,183 @@ function Card({ label, hint, m, value, rows = [], t }: { label: string; hint?: s
           ))}
         </dl>
       )}
+    </div>
+  );
+}
+
+/** A figure day by day, large: this period, and faintly the period before. */
+function DetailChart({ label, m, start, period, t, onClose }: { label: string; m: MetricView; start: string; period: InsightPeriod; t: T; onClose: () => void }) {
+  const now = m.series, before = m.seriesBefore ?? [];
+  const known = [...now, ...before].filter((v): v is number => v !== null);
+  const max = Math.max(1, ...known);
+  const last = Math.max(1, now.length - 1);
+  const y = (v: number) => 96 - (v / max) * 92;
+  const lines = (s: Array<number | null>) => {
+    const out: string[] = [];
+    let pts: string[] = [];
+    s.forEach((v, i) => {
+      if (v === null) { if (pts.length > 1) out.push(pts.join(" ")); pts = []; return; }
+      pts.push(`${i},${y(v).toFixed(2)}`);
+    });
+    if (pts.length > 1) out.push(pts.join(" "));
+    return out;
+  };
+  const mid = Math.floor((now.length - 1) / 2);
+  return (
+    <div className="col-span-full rounded-xl border border-[#567FB2] p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</span>
+        <button type="button" onClick={onClose} aria-label={t("chart.close")} className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]">
+          <CrossIcon size={14} />
+        </button>
+      </div>
+      <div dir="ltr" className="relative mt-3 h-44 ps-10">
+        <span className="absolute start-0 top-0 text-[10px] tabular-nums text-[var(--text-dim)]">{figure(max)}</span>
+        <span className="absolute start-0 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-[var(--text-dim)]">{figure(max / 2)}</span>
+        <span className="absolute bottom-0 start-0 text-[10px] tabular-nums text-[var(--text-dim)]">0</span>
+        <svg viewBox={`0 0 ${last} 100`} preserveAspectRatio="none" aria-hidden="true" className="h-full w-full overflow-visible">
+          {[4, 50, 96].map((g) => <line key={g} x1={0} x2={last} y1={g} y2={g} stroke="currentColor" strokeWidth={1} vectorEffect="non-scaling-stroke" className="text-[var(--border-subtle)]" />)}
+          {lines(before).map((p, i) => <polyline key={`b${i}`} points={p} fill="none" stroke="currentColor" strokeWidth={1.25} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" className="text-[var(--text-dim)]" />)}
+          {lines(now).map((p, i) => <polyline key={`n${i}`} points={p} fill="none" stroke="#567FB2" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
+          {now.map((v, i) => (
+            <rect key={i} x={i - 0.5} y={0} width={1} height={100} fill="transparent">
+              <title>{`${dmy(addDays(start, i))}: ${v === null ? "—" : figure(v)}`}</title>
+            </rect>
+          ))}
+        </svg>
+      </div>
+      <div dir="ltr" className="mt-1 flex justify-between ps-10 text-[10px] tabular-nums text-[var(--text-dim)]">
+        <span>{dmy(start)}</span><span>{dmy(addDays(start, mid))}</span><span>{dmy(addDays(start, now.length - 1))}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-[var(--text-muted)]">
+        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-[#567FB2]" />{t("chart.now")}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-[var(--text-dim)]" />{t("chart.before").replace("{n}", String(period))}</span>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] p-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</h3>
+        {hint && <span className="text-[11px] text-[var(--text-dim)]">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TopPosts({ a, t }: { a: AccountInsights; t: T }) {
+  const reading = a.postViews.have < a.postViews.total;
+  return (
+    <Section title={t("top")} hint={t("top.hint")}>
+      {a.top.length === 0 ? (
+        <p className="text-[12px] text-[var(--text-muted)]">{t("top.none")}</p>
+      ) : (
+        <ol className="flex flex-col divide-y divide-[var(--border-subtle)]">
+          {a.top.map((p) => (
+            <li key={p.id} className="flex min-w-0 items-center gap-2.5 py-2 first:pt-0 last:pb-0">
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-surface-subtle)]">
+                {p.thumb && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                )}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span dir="auto" className="line-clamp-1 text-[12px] text-[var(--text-primary)]">{p.excerpt ?? "—"}</span>
+                <span className="flex flex-wrap gap-x-2 text-[11px] text-[var(--text-dim)]">
+                  {p.posted_at && <span dir="ltr" className="tabular-nums">{dmy(p.posted_at.slice(0, 10))}</span>}
+                  <span>{t("p.views").replace("{n}", figure(p.views))}</span>
+                  <span>{t("p.interactions").replace("{n}", figure(p.interactions))}</span>
+                </span>
+              </span>
+              {p.permalink && (
+                <a href={p.permalink} target="_blank" rel="noopener noreferrer" aria-label={t("openPost")} className="shrink-0 rounded-md p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                  <ExternalLinkIcon size={14} />
+                </a>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      {reading && (
+        <p className="text-[11px] text-[var(--text-dim)]">
+          {t("top.reading").replace("{n}", String(a.postViews.have)).replace("{total}", String(a.postViews.total))}
+        </p>
+      )}
+    </Section>
+  );
+}
+
+function AudienceBlock({ audience, platform, t, lang }: { audience: AudienceSnapshot | null; platform: string; t: T; lang: string }) {
+  if (!audience) {
+    return <Section title={t("audience")}><p className="text-[12px] text-[var(--text-muted)]">{t("a.none")}</p></Section>;
+  }
+  let regions: Intl.DisplayNames | null = null;
+  try { regions = new Intl.DisplayNames([lang], { type: "region" }); } catch { /* an old browser: the codes stay */ }
+  const name = (part: AudiencePart, key: string) =>
+    part === "countries" ? (regions?.of(key) ?? key) : part === "genders" ? t(`g.${key}`) : key;
+  const parts: AudiencePart[] = ["countries", "cities", "ages", "genders"];
+  return (
+    <Section title={t("audience")}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {parts.filter((p) => audience[p].length > 0).map((part) => {
+          const total = audience.totals[part] || audience[part].reduce((n, [, v]) => n + v, 0);
+          return (
+            <div key={part} className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-[var(--text-muted)]">{t(`a.${part}`)}</span>
+              {audience[part].slice(0, 5).map(([key, v]) => {
+                const pct = total > 0 ? (v / total) * 100 : 0;
+                return (
+                  <div key={key} className="flex min-w-0 flex-col gap-0.5">
+                    <div className="flex items-center justify-between gap-2 text-[12px]">
+                      <span dir="auto" className="min-w-0 truncate text-[var(--text-primary)]">{name(part, key)}</span>
+                      <span dir="ltr" className="shrink-0 tabular-nums text-[var(--text-muted)]">{pct.toFixed(1)}%</span>
+                    </div>
+                    <span className="h-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                      <span className="block h-full rounded-full bg-[#567FB2]" style={{ width: `${Math.min(100, pct)}%` }} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {platform === "facebook" && <p className="text-[11px] text-[var(--text-dim)]">{t("a.pageNote")}</p>}
+    </Section>
+  );
+}
+
+function Formats({ formats, t }: { formats: FormatStat[]; t: T }) {
+  const best = Math.max(1, ...formats.map((f) => f.avgViews ?? 0));
+  return (
+    <div className="mt-3">
+      <Section title={t("formats")} hint={t("formats.hint")}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {formats.map((f) => (
+            <div key={f.format} className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t(`f.${f.format}`)}</span>
+                <span className="text-[11px] text-[var(--text-dim)]">{t("f.posts").replace("{n}", String(f.posts))}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-[12px]">
+                <span className="text-[var(--text-muted)]">{t("f.avgViews")}</span>
+                <span dir="ltr" className="tabular-nums text-[var(--text-primary)]">{f.avgViews === null ? "—" : figure(f.avgViews)}</span>
+              </div>
+              <span className="h-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                <span className="block h-full rounded-full bg-[#567FB2]" style={{ width: `${f.avgViews === null ? 0 : Math.min(100, (f.avgViews / best) * 100)}%` }} />
+              </span>
+              <div className="flex items-center justify-between gap-2 text-[12px]">
+                <span className="text-[var(--text-muted)]">{t("f.avgInteractions")}</span>
+                <span dir="ltr" className="tabular-nums text-[var(--text-primary)]">{f.avgInteractions.toLocaleString("en-US")}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
     </div>
   );
 }
