@@ -23,10 +23,13 @@ import "server-only";
    when none of the newest page is known yet the history is walked again —
    resumably, like the first import — until the gap is closed.
 
-   Nothing runs on a timer yet: the Feed asks for a refresh when it opens
-   (stale after 10 minutes) and "Refresh" forces one (once a minute). A run
-   CLAIMS the account first (claimSync), so two screens opening together
-   start one run, and a failing account waits its turn like a healthy one.
+   The Feed asks for a refresh when it opens (stale after 10 minutes),
+   "Refresh" forces one (once a minute), and the marketing cron refreshes
+   every account every 3 hours. A run CLAIMS the account first (claimSync),
+   so two screens opening together start one run, and a failing account
+   waits its turn like a healthy one. Comments on the last 14 days' posts
+   refresh on their own, every 15 minutes (refreshRecentComments, claimed
+   with claimComments).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -37,11 +40,15 @@ import {
   instagramAudience, instagramComments, instagramInsights, instagramMedia, instagramMediaItem,
   type PostPage, type RemoteComment, type RemoteMedia, type RemotePost,
 } from "@/lib/server/marketing/meta-feed";
-import { claimSync, loadAccountForSync, recordSync, type AccountForSync } from "@/lib/server/marketing/accounts";
+import { claimComments, claimSync, loadAccountForSync, recordSync, type AccountForSync } from "@/lib/server/marketing/accounts";
 import type { MarketingAccountView, MarketingPlatform } from "@/lib/marketing/spaces";
 
 export const SYNC_STALE_MS = 10 * 60_000;
 export const SYNC_MIN_GAP_MS = 60_000;
+/* Comments: the posts of the last 14 days (the newest 8), every 15 minutes. */
+export const COMMENTS_REFRESH_MS = 15 * 60_000;
+const COMMENTS_POST_DAYS = 14;
+const COMMENTS_POSTS_MAX = 8;
 
 /* Meta's rate-limit codes (app, user, page, API-specific, Instagram). */
 const RATE_LIMIT_CODES = new Set([4, 17, 32, 613, 80001, 80002]);
@@ -374,4 +381,45 @@ export async function refreshPost(tenantId: string, postId: string, parts: { eng
     }
     throw e;
   }
+}
+
+/** The comments of an account's recent posts — the last 14 days, the newest
+ *  8 — unless they were refreshed less than `minGapMs` ago (claimed first,
+ *  so two runs never both call Meta). A post Meta refuses is skipped; an
+ *  expired key marks the account "expired" and stops. */
+export async function refreshRecentComments(
+  tenantId: string, accountId: string, opts: { minGapMs: number; budgetMs: number },
+): Promise<{ ok: boolean; skipped?: "unavailable" | "fresh"; comments?: number }> {
+  const started = Date.now();
+  const a = await loadAccountForSync(tenantId, accountId);
+  const adapter = a ? ADAPTERS[a.platform] : undefined;
+  if (!a || !adapter || a.connection !== "api" || !a.token || !a.external_id || a.status === "disconnected" || a.status === "expired") {
+    return { ok: false, skipped: "unavailable" };
+  }
+  if (!(await claimComments(a, opts.minGapMs))) return { ok: true, skipped: "fresh" };
+  const since = new Date(Date.now() - COMMENTS_POST_DAYS * 86_400_000).toISOString();
+  const { data: posts, error } = await supabaseServer
+    .from("marketing_remote_posts")
+    .select("id, external_id")
+    .eq("tenant_id", tenantId)
+    .eq("account_id", a.id)
+    .gte("posted_at", since)
+    .order("posted_at", { ascending: false })
+    .limit(COMMENTS_POSTS_MAX);
+  if (error) throw new Error(`marketing posts: ${error.message}`);
+  const token = a.token;
+  const rows: Array<{ remotePostId: string; comment: RemoteComment }> = [];
+  for (const p of (posts ?? []) as Array<{ id: string; external_id: string }>) {
+    if (Date.now() - started > opts.budgetMs - 3_000) break;
+    try {
+      for (const comment of await adapter.comments(a, p.external_id, token)) rows.push({ remotePostId: p.id, comment });
+    } catch (e) {
+      if (e instanceof MetaError && e.code === 190) {
+        await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
+        return { ok: false };
+      }
+      console.warn(`[marketing/sync] comments of ${p.id}: left out: ${text(e)}`);
+    }
+  }
+  return { ok: true, comments: rows.length ? await saveComments(a, rows) : 0 };
 }

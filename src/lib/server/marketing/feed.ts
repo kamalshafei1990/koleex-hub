@@ -12,6 +12,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { namesOf } from "@/lib/server/marketing/posts";
 import { feedAccount, listFeedAccounts, type FeedAccount } from "@/lib/server/marketing/accounts";
 import { isStale } from "@/lib/server/marketing/sync";
 import type { FeedColumn, FeedComment, FeedMedia, FeedPost, FeedResponse, FeedWeek, PostDetail } from "@/lib/marketing/feed-types";
@@ -155,15 +156,18 @@ export async function postAccountId(tenantId: string, postId: string): Promise<s
   return (data as { account_id: string } | null)?.account_id ?? null;
 }
 
-export async function loadPostDetail(tenantId: string, postId: string): Promise<PostDetail | null> {
+/** A post with its comments. Hidden comments only for `withHidden` — the
+ *  people who may hide them. What the caller may do is the route's to add. */
+export async function loadPostDetail(tenantId: string, postId: string, opts: { withHidden: boolean }): Promise<Omit<PostDetail, "canReply" | "canHide"> | null> {
   const [{ data: post, error }, { data: comments, error: cErr }] = await Promise.all([
     supabaseServer.from("marketing_remote_posts").select(POST_COLUMNS).eq("tenant_id", tenantId).eq("id", postId).maybeSingle(),
     supabaseServer
       .from("marketing_comments")
-      .select("id, external_id, parent_external_id, author_name, author_avatar_url, message, commented_at, is_ours")
+      .select("id, external_id, parent_external_id, author_name, author_avatar_url, message, commented_at, is_ours, hidden, replied_by, handled_at")
       .eq("tenant_id", tenantId)
       .eq("remote_post_id", postId)
-      .eq("hidden", false)
+      .in("hidden", opts.withHidden ? [false, true] : [false])
+      .not("external_id", "like", "pending:%")
       .order("commented_at", { ascending: true })
       .limit(300),
   ]);
@@ -171,8 +175,11 @@ export async function loadPostDetail(tenantId: string, postId: string): Promise<
   if (cErr) throw new Error(`marketing comments: ${cErr.message}`);
   if (!post) return null;
   const row = post as PostRow;
+  type C = Omit<FeedComment, "replied_by_name"> & { replied_by: string | null };
+  const list = (comments ?? []) as C[];
+  const names = await namesOf(list.map((c) => c.replied_by).filter((x): x is string => !!x));
   return {
     post: { ...toFeedPost(row), message: row.message, media: Array.isArray(row.media) ? row.media : [] },
-    comments: (comments ?? []) as FeedComment[],
+    comments: list.map(({ replied_by, ...c }) => ({ ...c, replied_by_name: replied_by ? names.get(replied_by) || null : null })),
   };
 }

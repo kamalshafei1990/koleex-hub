@@ -319,6 +319,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   /* The calendar (27/09/2026): measured 9 chunks / 543 KB, +12% headroom.
      A plain month grid — no calendar library came with it. */
   "social-marketing/calendar": { chunks: 10, kbytes: 608 },
+  /* Comments (28/09/2026): measured 9 chunks / 547 KB, +12% headroom. The
+     thread (reply, Koleex AI drafts, hide) is shared with the Feed's post
+     window — which grew 552 → 574 KB with it; its budget still holds. */
+  "social-marketing/comments": { chunks: 10, kbytes: 613 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

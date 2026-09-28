@@ -44,6 +44,9 @@ export interface PageTab {
   onClick?: () => void;
   /** Force-mark this tab as active (useful for state-based apps). */
   active?: boolean;
+  /** A count beside the label (things waiting — e.g. comments to answer);
+   *  nothing is drawn for 0 or undefined. */
+  badge?: number;
 }
 
 export interface PageHeaderProps {
@@ -608,6 +611,15 @@ function SlidingPillNav({
     firstPlaceRef.current = false;
   }, [placePill, tabs.length, tabWidth]);
 
+  /* A count arriving beside a label changes that tab's width: the pill
+     follows at once — a correction, not a move, so it does not glide. */
+  const badgeSig = tabs.map((t) => t.badge ?? 0).join(",");
+  const firstBadgeRef = useRef(true);
+  useLayoutEffect(() => {
+    if (firstBadgeRef.current) { firstBadgeRef.current = false; return; }
+    placePill(true);
+  }, [badgeSig, placePill]);
+
   /* THE RESIZE WATCHER IS MOUNTED ONCE AND ONLY REACTS TO A REAL WIDTH
      CHANGE. Both halves matter, and getting either wrong kills the glide
      silently: a ResizeObserver fires an initial callback the moment it
@@ -851,6 +863,11 @@ function SlidingPillNav({
               </span>
             )}
             <span>{tab.label}</span>
+            {!!tab.badge && tab.badge > 0 && (
+              <span className="min-w-5 rounded-full bg-[#567FB2] px-1.5 text-center text-[11px] font-semibold leading-[18px] tabular-nums text-white">
+                {tab.badge > 99 ? "99+" : tab.badge}
+              </span>
+            )}
           </>
         );
         const baseProps = {

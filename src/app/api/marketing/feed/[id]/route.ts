@@ -6,13 +6,16 @@ import "server-only";
    first (numbers, comments, and the picture links, which Meta expires after
    some days); ?part=media refreshes the pictures only — what a Feed card
    asks when its picture stops loading. A failed refresh still returns what
-   the Hub has. Needs "view" on the space of the post's account. */
+   the Hub has. Needs "view" on the space of the post's account; says whether
+   the caller may reply ("edit") and hide (approvers — the only ones sent
+   hidden comments). */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { accountSpace } from "@/lib/server/marketing/accounts";
 import { loadPostDetail, postAccountId } from "@/lib/server/marketing/feed";
 import { refreshPost } from "@/lib/server/marketing/sync";
+import { canApprovePosts } from "@/lib/server/marketing/approvals";
 import { SPACE_MODULE } from "@/lib/marketing/spaces";
 
 export const dynamic = "force-dynamic";
@@ -35,9 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     await refreshPost(auth.tenant_id, id, { engagement: !mediaOnly }).catch((e) => {
       console.warn("[api/marketing/feed/id] refresh:", e instanceof Error ? e.message : String(e));
     });
-    const detail = await loadPostDetail(auth.tenant_id, id);
+    const [canHide, cannotReply] = await Promise.all([canApprovePosts(auth, space), requireModuleAction(auth, SPACE_MODULE[space], "edit")]);
+    const detail = await loadPostDetail(auth.tenant_id, id, { withHidden: canHide });
     if (!detail) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-    return NextResponse.json(detail, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ ...detail, canReply: cannotReply === null, canHide }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     console.error("[api/marketing/feed/id]", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Could not load the post." }, { status: 500 });

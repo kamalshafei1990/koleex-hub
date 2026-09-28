@@ -33,6 +33,12 @@ export const SPACE_CALENDAR: Record<MarketingSpace, string> = {
   ceo: "/ceo-brand/calendar",
 };
 
+/** Each space's Comments tab. */
+export const SPACE_COMMENTS: Record<MarketingSpace, string> = {
+  company: "/social-marketing/comments",
+  ceo: "/ceo-brand/comments",
+};
+
 /** The accounts page each space returns to after connecting an account. */
 export const SPACE_ROUTE: Record<MarketingSpace, string> = {
   company: "/social-marketing/accounts",

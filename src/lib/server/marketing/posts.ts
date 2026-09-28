@@ -123,7 +123,7 @@ async function spaceAccounts(tenantId: string, space: MarketingSpace): Promise<M
 }
 
 /** Display names of accounts (people's full names, else the username). */
-async function namesOf(ids: string[]): Promise<Map<string, string>> {
+export async function namesOf(ids: string[]): Promise<Map<string, string>> {
   const want = [...new Set(ids.filter((i) => UUID_RE.test(i)))];
   const out = new Map<string, string>();
   if (!want.length) return out;

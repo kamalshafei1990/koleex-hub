@@ -234,6 +234,29 @@ export async function claimSync(a: AccountForSync): Promise<boolean> {
   return true;
 }
 
+/** Mark a refresh of the recent posts' comments as started — unless one
+ *  started less than `minGapMs` ago, or anything else changed the account
+ *  since it was read (the same version check as claimSync). true = this
+ *  caller runs it. A Feed sync finishing later may write its older
+ *  sync_state over comments_at: the next refresh then only comes sooner. */
+export async function claimComments(a: AccountForSync, minGapMs: number): Promise<boolean> {
+  const last = typeof a.sync_state.comments_at === "string" ? Date.parse(a.sync_state.comments_at) || 0 : 0;
+  if (last && Date.now() - last < minGapMs) return false;
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, comments_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
+}
+
 /** After a sync: the account's status, audience and where the history
  *  import stopped. */
 export async function recordSync(id: string, patch: {

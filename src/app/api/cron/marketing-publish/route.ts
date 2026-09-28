@@ -2,8 +2,9 @@ import "server-only";
 
 /* GET /api/cron/marketing-publish — every 5 minutes (vercel.json), between
    the other crons' minutes: publishes the scheduled posts whose time has
-   come, carries on posts still publishing, and refreshes Feed accounts not
-   refreshed for 3 hours (lib/server/marketing/cron).
+   come, carries on posts still publishing, refreshes Feed accounts not
+   refreshed for 3 hours, and brings in new comments on recent posts every
+   15 minutes (lib/server/marketing/cron).
 
    Guarded by CRON_SECRET, and CLOSED when it is unset (like the reminder
    crons): this route publishes to Koleex's public pages and must never be

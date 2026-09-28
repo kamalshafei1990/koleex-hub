@@ -37,6 +37,8 @@ export interface RemoteComment {
   message: string | null;
   commented_at: string | null;
   is_ours: boolean;
+  /** Hidden on the platform (by the page, from the Hub or there). */
+  hidden: boolean;
 }
 export interface PostPage { posts: RemotePost[]; after: string | null }
 
@@ -130,11 +132,11 @@ export async function facebookPostViews(postId: string, token: string): Promise<
   }
 }
 
-type FbComment = { id: string; message?: string; created_time?: string; from?: { id?: string; name?: string; picture?: { data?: { url?: string } } }; parent?: { id?: string } };
+type FbComment = { id: string; message?: string; created_time?: string; is_hidden?: boolean; from?: { id?: string; name?: string; picture?: { data?: { url?: string } } }; parent?: { id?: string } };
 
 export async function facebookComments(pageId: string, postId: string, token: string): Promise<RemoteComment[]> {
   const b = await metaGet<{ data?: FbComment[] }>(metaGraphUrl(`${postId}/comments`, {
-    fields: "id,message,created_time,from{id,name,picture},parent{id}",
+    fields: "id,message,created_time,is_hidden,from{id,name,picture},parent{id}",
     filter: "stream",
     order: "reverse_chronological",
     limit: "50",
@@ -148,6 +150,7 @@ export async function facebookComments(pageId: string, postId: string, token: st
     message: c.message ?? null,
     commented_at: c.created_time ?? null,
     is_ours: !!c.from?.id && c.from.id === pageId,
+    hidden: c.is_hidden === true,
   }));
 }
 
@@ -224,11 +227,11 @@ export async function instagramInsights(mediaId: string, token: string): Promise
   }
 }
 
-type IgComment = { id: string; text?: string; timestamp?: string; username?: string; from?: { id?: string; username?: string }; replies?: { data?: IgComment[] } };
+type IgComment = { id: string; text?: string; timestamp?: string; username?: string; hidden?: boolean; from?: { id?: string; username?: string }; replies?: { data?: IgComment[] } };
 
 export async function instagramComments(mediaId: string, handle: string | null, token: string): Promise<RemoteComment[]> {
   const b = await metaGet<{ data?: IgComment[] }>(metaGraphUrl(`${mediaId}/comments`, {
-    fields: "id,text,timestamp,username,from{id,username},replies{id,text,timestamp,username,from{id,username}}",
+    fields: "id,text,timestamp,username,hidden,from{id,username},replies{id,text,timestamp,username,hidden,from{id,username}}",
     limit: "50",
   }), token);
   const out: RemoteComment[] = [];
@@ -243,6 +246,7 @@ export async function instagramComments(mediaId: string, handle: string | null, 
       message: c.text ?? null,
       commented_at: c.timestamp ?? null,
       is_ours: !!handle && !!user && user.toLowerCase() === handle.toLowerCase(),
+      hidden: c.hidden === true,
     });
   };
   for (const c of b.data ?? []) {

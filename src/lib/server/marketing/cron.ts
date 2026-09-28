@@ -12,24 +12,27 @@ import "server-only";
         every screen closed;
      3. the Feed: accounts not refreshed for 3 hours are refreshed (owner,
         27/09/2026), a few per run, so numbers and followers stay current and
-        the week-on-week change has a snapshot every day.
+        the week-on-week change has a snapshot every day;
+     4. comments: the last 14 days' posts of every account, every 15 minutes
+        (28/09/2026), so a question waits minutes, not hours, for the team to
+        see it — each account claimed first (claimComments).
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { publishPost } from "@/lib/server/marketing/publish";
-import { syncAccount } from "@/lib/server/marketing/sync";
+import { COMMENTS_REFRESH_MS, refreshRecentComments, syncAccount } from "@/lib/server/marketing/sync";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -79,6 +82,22 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       if (left() < 15_000) { out.stoppedEarly = true; break; }
       const r = await syncAccount(a.tenant_id, a.id, { budgetMs: Math.min(30_000, left() - 5_000) });
       if (r.ok && !r.skipped) out.refreshed++;
+    }
+  }
+
+  /* 4. Comments on recent posts, every 15 minutes per account. */
+  if (left() > 10_000) {
+    const stale = new Date(Date.now() - COMMENTS_REFRESH_MS).toISOString();
+    let cQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("status", ["connected", "error"])
+      .or(`sync_state->>comments_at.is.null,sync_state->>comments_at.lt.${stale}`);
+    if (opts.tenantId) cQ = cQ.eq("tenant_id", opts.tenantId);
+    const { data: cAccs, error: cErr } = await cQ.order("updated_at", { ascending: true }).limit(5);
+    if (cErr) throw new Error(`marketing accounts: ${cErr.message}`);
+    for (const a of (cAccs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 10_000) { out.stoppedEarly = true; break; }
+      const r = await refreshRecentComments(a.tenant_id, a.id, { minGapMs: COMMENTS_REFRESH_MS, budgetMs: Math.min(20_000, left() - 5_000) });
+      if (r.ok && !r.skipped) out.comments++;
     }
   }
   return out;

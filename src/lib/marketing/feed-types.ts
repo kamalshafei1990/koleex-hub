@@ -4,6 +4,7 @@
    --------------------------------------------------------------------------- */
 
 import type { MarketingAccountView } from "@/lib/marketing/spaces";
+import type { CommentView } from "@/lib/marketing/comment-types";
 
 export interface FeedMedia { kind: "image" | "video"; url: string }
 
@@ -47,18 +48,16 @@ export interface FeedResponse {
   manual: number;
 }
 
-export interface FeedComment {
-  id: string;
-  external_id: string;
-  parent_external_id: string | null;
-  author_name: string | null;
-  author_avatar_url: string | null;
-  message: string | null;
-  commented_at: string | null;
-  is_ours: boolean;
+/** A comment in a post's panel: the comment view, and — on a thread's first
+ *  comment — when it was marked «No reply needed». */
+export interface FeedComment extends CommentView {
+  handled_at: string | null;
 }
 
 export interface PostDetail {
   post: FeedPost & { message: string | null; media: FeedMedia[] };
   comments: FeedComment[];
+  /** What the caller may do with the comments (set by the route). */
+  canReply: boolean;
+  canHide: boolean;
 }

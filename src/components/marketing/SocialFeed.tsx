@@ -50,6 +50,8 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 import { compact, dmyHm } from "@/lib/marketing/format";
 import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import type { FeedColumn, FeedComment, FeedPost, FeedResponse, PostDetail } from "@/lib/marketing/feed-types";
+import CommentThread, { type ThreadState } from "@/components/marketing/CommentThread";
+import { groupThreads, needsReply } from "@/lib/marketing/comment-types";
 
 const T: Translations = {
   "loadError":      { en: "Could not load the Feed.", zh: "无法加载动态。", ar: "تعذّر تحميل الـFeed." },
@@ -380,6 +382,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
             key={opened.post.id}
             post={opened.post}
             platform={platformOf(opened.account)}
+            accountName={opened.account.name}
             t={t}
             onLoaded={(d) => {
               updatePost(opened.post, { metrics: d.post.metrics, thumb: d.post.thumb, media_count: d.post.media_count });
@@ -607,44 +610,17 @@ function PostCard({ post, platform, t, broken, onOpen, onThumbError }: {
   );
 }
 
-function threadsOf(list: FeedComment[]): Array<{ c: FeedComment; replies: FeedComment[] }> {
-  const ids = new Set(list.map((c) => c.external_id));
-  const replies = new Map<string, FeedComment[]>();
-  const top: FeedComment[] = [];
-  for (const c of list) {
-    if (c.parent_external_id && ids.has(c.parent_external_id)) replies.set(c.parent_external_id, [...(replies.get(c.parent_external_id) ?? []), c]);
-    else top.push(c);
-  }
-  return top.map((c) => ({ c, replies: replies.get(c.external_id) ?? [] }));
+/* A post's comments as threads, «Needs a reply» decided by the shared rule. */
+function toThreads(list: FeedComment[]): ThreadState[] {
+  return groupThreads(list).map(({ first, replies }) => ({
+    first, replies, handled_at: first.handled_at, handled_by_name: null,
+    needs_reply: needsReply(first, replies),
+  }));
 }
 
-function CommentRow({ c, t }: { c: FeedComment; t: Tr }) {
-  const [bad, setBad] = useState(false);
-  const name = c.author_name ?? t("someone");
-  return (
-    <div className="flex gap-2.5">
-      {c.author_avatar_url && !bad ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.author_avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-7 w-7 shrink-0 rounded-full bg-[var(--bg-surface-subtle)] object-cover" />
-      ) : (
-        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] text-[11px] font-semibold text-[var(--text-muted)]">
-          {Array.from(name)[0]?.toUpperCase() ?? "?"}
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-[12px] font-semibold text-[var(--text-primary)]">{name}</span>
-          {c.is_ours && <StatusPill tone="brand">{t("ours")}</StatusPill>}
-          {c.commented_at && <span className="text-[11px] tabular-nums text-[var(--text-dim)]">{dmyHm(c.commented_at)}</span>}
-        </div>
-        {c.message && <p dir="auto" className="mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-[18px] text-[var(--text-muted)]">{c.message}</p>}
-      </div>
-    </div>
-  );
-}
-
-function PostDetailView({ post, platform, t, onLoaded }: { post: FeedPost; platform: Platform; t: Tr; onLoaded: (d: PostDetail) => void }) {
+function PostDetailView({ post, platform, accountName, t, onLoaded }: { post: FeedPost; platform: Platform; accountName: string; t: Tr; onLoaded: (d: PostDetail) => void }) {
   const [detail, setDetail] = useState<PostDetail | null>(null);
+  const [threads, setThreads] = useState<ThreadState[]>([]);
   const [failed, setFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const loaded = useRef(onLoaded);
@@ -657,6 +633,7 @@ function PostDetailView({ post, platform, t, onLoaded }: { post: FeedPost; platf
       .then((d) => {
         if (!alive) return;
         setDetail(d);
+        setThreads(toThreads(d.comments));
         loaded.current(d);
       }, () => { if (alive) setFailed(true); });
     return () => { alive = false; };
@@ -669,7 +646,6 @@ function PostDetailView({ post, platform, t, onLoaded }: { post: FeedPost; platf
   const metrics = full?.metrics ?? post.metrics;
   const numbers = ALL_METRICS[platform].filter((k) => typeof metrics[k] === "number").map((k): [string, number] => [k, metrics[k]]);
   const pname = t(`pname.${platform}`);
-  const threads = detail ? threadsOf(detail.comments) : [];
 
   return (
     <div className={`grid gap-5 ${media.length ? "md:grid-cols-2" : ""}`}>
@@ -742,15 +718,16 @@ function PostDetailView({ post, platform, t, onLoaded }: { post: FeedPost; platf
           ) : threads.length === 0 ? (
             <p className="text-[12px] text-[var(--text-dim)]">{t("noComments")}</p>
           ) : (
-            <ul className="flex flex-col gap-3">
-              {threads.map(({ c, replies }) => (
-                <li key={c.id}>
-                  <CommentRow c={c} t={t} />
-                  {replies.length > 0 && (
-                    <ul className="ms-4 mt-2 flex flex-col gap-2 border-s border-[var(--border-subtle)] ps-3">
-                      {replies.map((r) => <li key={r.id}><CommentRow c={r} t={t} /></li>)}
-                    </ul>
-                  )}
+            <ul className="flex flex-col gap-4">
+              {threads.map((th) => (
+                <li key={th.first.id}>
+                  <CommentThread
+                    thread={th}
+                    accountName={accountName}
+                    canReply={detail.canReply}
+                    canHide={detail.canHide}
+                    onChange={(next) => setThreads((list) => list.map((x) => (x.first.id === th.first.id ? next : x)))}
+                  />
                 </li>
               ))}
             </ul>
