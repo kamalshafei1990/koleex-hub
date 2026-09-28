@@ -32,16 +32,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
 
   let itemsQ = supabaseServer.from("brand_items")
     .select("id, group_id, key, name, name_i18n, use_text, use_i18n, importance, decision, status, note, owner_note, rules, roles, sort")
-    .eq("section_id", section.id).order("sort");
+    .eq("section_id", section.id);
   if (!all) itemsQ = itemsQ.neq("status", "retired");
   let designsQ = supabaseServer.from("brand_designs")
     .select("id, item_id, option_ids, name, name_i18n, kind, status, is_default, notes, updated_at")
     .eq("tenant_id", t);
   if (!all) designsQ = designsQ.neq("status", "retired");
 
+  /* Paged reads (allRows, 1000 rows a page) keep the screen's order and end
+     on the key, so a tie never moves a row between pages. */
   const [groups, items] = await Promise.all([
     supabaseServer.from("brand_groups").select("id, name, name_i18n, sort").eq("section_id", section.id).order("sort"),
-    allRows<{ id: string }>(itemsQ, "brand items"),
+    allRows<{ id: string }>(itemsQ.order("sort").order("id"), "brand items"),
   ]);
   if (groups.error || items.error) {
     console.error("[api/brand-center/section]", (groups.error ?? items.error)?.message);
@@ -53,9 +55,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
   const itemIds = new Set(ids);
   const none = { data: [], error: null };
   const [types, options, designs] = ids.length ? await Promise.all([
-    allRows<{ id: string; item_id: string }>(supabaseServer.from("brand_item_types").select("id, item_id, key, label, label_i18n, sort").in("item_id", ids).order("sort"), "brand types"),
-    allRows<{ type_id: string }>(supabaseServer.from("brand_item_options").select("id, item_id, type_id, key, label, label_i18n, recommended, chosen, sort").in("item_id", ids).order("sort"), "brand options"),
-    allRows<{ item_id: string }>(designsQ.in("item_id", ids), "brand designs"),
+    allRows<{ id: string; item_id: string }>(supabaseServer.from("brand_item_types").select("id, item_id, key, label, label_i18n, sort").in("item_id", ids).order("sort").order("id"), "brand types"),
+    allRows<{ type_id: string }>(supabaseServer.from("brand_item_options").select("id, item_id, type_id, key, label, label_i18n, recommended, chosen, sort").in("item_id", ids).order("sort").order("id"), "brand options"),
+    /* Designs in the order they were added. */
+    allRows<{ item_id: string }>(designsQ.in("item_id", ids).order("created_at").order("id"), "brand designs"),
   ]) : [none, none, none];
   if (types.error || options.error || designs.error) {
     console.error("[api/brand-center/section]", (types.error ?? options.error ?? designs.error)?.message);

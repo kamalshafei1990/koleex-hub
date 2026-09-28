@@ -18,11 +18,13 @@ export async function GET() {
   if (deny) return deny;
 
   const t = auth.tenant_id;
+  /* The paged reads are counted, not shown: their key alone keeps allRows'
+     1000-row pages stable (no row counted twice or missed). */
   const [sections, groups, items, types] = await Promise.all([
     supabaseServer.from("brand_sections").select("id, key, no, name, name_i18n, icon").eq("tenant_id", t).order("no"),
-    allRows<{ section_id: string }>(supabaseServer.from("brand_groups").select("section_id").eq("tenant_id", t), "brand groups"),
-    allRows<{ id: string; section_id: string }>(supabaseServer.from("brand_items").select("id, section_id").eq("tenant_id", t).neq("status", "retired"), "brand items"),
-    allRows<{ item_id: string }>(supabaseServer.from("brand_item_types").select("item_id").eq("tenant_id", t), "brand types"),
+    allRows<{ section_id: string }>(supabaseServer.from("brand_groups").select("section_id").eq("tenant_id", t).order("id"), "brand groups"),
+    allRows<{ id: string; section_id: string }>(supabaseServer.from("brand_items").select("id, section_id").eq("tenant_id", t).neq("status", "retired").order("id"), "brand items"),
+    allRows<{ item_id: string }>(supabaseServer.from("brand_item_types").select("item_id").eq("tenant_id", t).order("id"), "brand types"),
   ]);
   const err = sections.error ?? groups.error ?? items.error ?? types.error;
   if (err) {
