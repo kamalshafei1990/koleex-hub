@@ -67,25 +67,65 @@ function warnShape(where: string, what: string, sample: unknown): void {
   console.warn(`[marketing/insights] unknown answer for ${what} (${where}): ${JSON.stringify(sample).slice(0, 600)}`);
 }
 
+const objectOf = (v: unknown): Record<string, number> => {
+  const out: Record<string, number> = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) for (const [k, n] of Object.entries(v)) { const x = num(n); if (x !== null) out[k] = x; }
+  return out;
+};
+
 const TRUE_KEY = /^(true|1|yes)$/i;
 const FALSE_KEY = /^(false|0|no)$/i;
 
-/** A day-by-day breakdown: each value an object keyed by the breakdown's
- *  values ({"true": 12, "false": 300}). null when the answer has another shape. */
-export function breakdownByDay(m: GraphMetric | undefined): Array<{ day: string; yes: number; no: number }> | null {
-  const out: Array<{ day: string; yes: number; no: number }> = [];
+/** A day-by-day breakdown, in either shape Meta uses: one entry per part,
+ *  tagged with the breakdown ({"value": 18, "is_from_followers": "0"} — the
+ *  live answer, 28/09/2026), or one entry per day keyed by the parts
+ *  ({"value": {"1": 12, "0": 300}}). null when the answer has another shape. */
+export function breakdownByDay(m: GraphMetric | undefined, breakdown: string): Array<{ day: string; yes: number; no: number }> | null {
+  const byDay = new Map<string, { yes: number; no: number }>();
   for (const v of m?.values ?? []) {
     const day = v.end_time ? fbValueDay(v.end_time) : null;
     if (!day) continue;
-    if (!v.value || typeof v.value !== "object" || Array.isArray(v.value)) return null;
-    let yes = 0, no = 0;
-    for (const [k, n] of Object.entries(v.value as Record<string, unknown>)) {
-      const x = num(n);
+    const cell = byDay.get(day) ?? { yes: 0, no: 0 };
+    const tag = (v as Record<string, unknown>)[breakdown];
+    if (tag !== undefined && tag !== null) {
+      const x = num(v.value);
       if (x === null) continue;
-      if (TRUE_KEY.test(k)) yes += x;
-      else if (FALSE_KEY.test(k)) no += x;
+      const k = String(tag);
+      if (TRUE_KEY.test(k)) cell.yes += x;
+      else if (FALSE_KEY.test(k)) cell.no += x;
+      else return null;
+    } else if (v.value && typeof v.value === "object" && !Array.isArray(v.value)) {
+      for (const [k, n] of Object.entries(v.value as Record<string, unknown>)) {
+        const x = num(n);
+        if (x === null) continue;
+        if (TRUE_KEY.test(k)) cell.yes += x;
+        else if (FALSE_KEY.test(k)) cell.no += x;
+      }
+    } else {
+      return null;
     }
-    out.push({ day, yes, no });
+    byDay.set(day, cell);
+  }
+  return [...byDay].map(([day, c]) => ({ day, ...c }));
+}
+
+/** A demographic snapshot's counts, in either shape: the last value an
+ *  object ({"EG": 2527, …}), or one entry per key tagged with the
+ *  dimension ({"value": 2527, "country": "EG"}) — the last day only. */
+export function countsOf(m: GraphMetric | undefined): Record<string, number> | null {
+  const values = m?.values ?? [];
+  if (!values.length) return null;
+  const last = values[values.length - 1];
+  if (last.value && typeof last.value === "object" && !Array.isArray(last.value)) return objectOf(last.value);
+  const lastEnd = last.end_time;
+  const out: Record<string, number> = {};
+  for (const v of values) {
+    if (lastEnd && v.end_time !== lastEnd) continue;
+    const tags = Object.entries(v as Record<string, unknown>).filter(([k]) => k !== "value" && k !== "end_time" && k !== "start_time");
+    const x = num(v.value);
+    if (tags.length !== 1 || x === null) return null;
+    const key = String(tags[0][1]);
+    out[key] = (out[key] ?? 0) + x;
   }
   return out;
 }
@@ -174,7 +214,7 @@ export async function facebookPageInsights(pageId: string, token: string, from: 
     for (const [breakdown, yesKey, noKey] of FB_VIEW_SPLITS) {
       try {
         const [m] = await readEach(`${pageId}/insights`, token, ["page_media_view"], { ...window, period: "day", breakdown });
-        const split = breakdownByDay(m);
+        const split = breakdownByDay(m, breakdown);
         if (!split) { warnShape(pageId, `page_media_view by ${breakdown}`, m); continue; }
         for (const { day, yes, no } of split) {
           if (day < from || day > to) continue;
@@ -189,12 +229,6 @@ export async function facebookPageInsights(pageId: string, token: string, from: 
   return days;
 }
 
-const objectOf = (v: unknown): Record<string, number> => {
-  const out: Record<string, number> = {};
-  if (v && typeof v === "object" && !Array.isArray(v)) for (const [k, n] of Object.entries(v)) { const x = num(n); if (x !== null) out[k] = x; }
-  return out;
-};
-
 /** A Page's audience by country and city (Meta's lifetime snapshot). Meta
  *  no longer gives a Page's age and gender. null when it gives neither. */
 export async function facebookDemographics(pageId: string, token: string): Promise<Pick<AudienceSnapshot, "countries" | "cities" | "totals"> | null> {
@@ -204,10 +238,16 @@ export async function facebookDemographics(pageId: string, token: string): Promi
       warnRefused(pageId, `${country}, ${city}`, e);
       return [] as GraphMetric[];
     });
-    const last = (name: string) => { const m = data.find((x) => x.name === name); return objectOf(m?.values?.[(m.values?.length ?? 1) - 1]?.value); };
-    const c = last(country), ci = last(city);
+    const read = (name: string) => {
+      const m = data.find((x) => x.name === name);
+      const counts = countsOf(m);
+      if (m && !counts && (m.values?.length ?? 0) > 0) warnShape(pageId, name, m);
+      return counts ?? {};
+    };
+    const c = read(country), ci = read(city);
     const countries = topEntries(c), cities = topEntries(ci);
     if (countries.length || cities.length) return { countries, cities, totals: { countries: totalOf(c), cities: totalOf(ci) } };
+    if (data.length) warnShape(pageId, `${country}, ${city} (nothing counted)`, data);
   }
   return null;
 }
@@ -284,6 +324,7 @@ export async function instagramDemographics(igId: string, token: string): Promis
       const [m] = await readEach(`${igId}/insights`, token, ["follower_demographics"], { period: "lifetime", metric_type: "total_value", breakdown });
       const values: Record<string, number> = {};
       for (const r of results(m)) if (r.key && r.value !== null) values[r.key] = r.value;
+      if (m && !Object.keys(values).length) warnShape(igId, `follower_demographics by ${breakdown}`, m);
       out[key] = topEntries(values);
       out.totals[key] = totalOf(values);
     } catch (e) {

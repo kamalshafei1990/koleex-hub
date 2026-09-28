@@ -278,18 +278,31 @@ export async function claimInsights(a: AccountForSync, minGapMs: number): Promis
 }
 
 /** After an Insights refresh: whether every wanted day is in (then the next
- *  refresh waits hours, not minutes). Only if nothing changed the account
- *  since the claim — a Feed sync's newer sync_state is never overwritten;
- *  a skipped write only brings the next refresh sooner. */
-export async function recordInsights(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = {}): Promise<void> {
-  const now = new Date().toISOString();
-  const state = { ...a.sync_state, ...extra, insights_full: complete };
-  const { error } = await supabaseServer
-    .from("marketing_accounts")
-    .update({ sync_state: state, updated_at: now })
-    .eq("id", a.id)
-    .eq("updated_at", a.updated_at);
-  if (error) throw new Error(`marketing accounts: ${error.message}`);
+ *  refresh waits hours, not minutes), and what it read for the account (the
+ *  audience). Version-checked; if something changed the account meanwhile
+ *  (a Feed sync opened by a screen), the fields are merged onto its FRESH
+ *  sync_state and written again — never over the other writer's. false when
+ *  it still could not be written (the next refresh comes sooner). */
+export async function recordInsights(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = {}): Promise<boolean> {
+  let state0 = a.sync_state, version = a.updated_at;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const now = new Date().toISOString();
+    const state = { ...state0, ...extra, insights_full: complete };
+    const { data, error } = await supabaseServer
+      .from("marketing_accounts")
+      .update({ sync_state: state, updated_at: now })
+      .eq("id", a.id)
+      .eq("updated_at", version)
+      .select("id");
+    if (error) throw new Error(`marketing accounts: ${error.message}`);
+    if (data && data.length) { a.sync_state = state; a.updated_at = now; return true; }
+    const { data: fresh, error: fErr } = await supabaseServer.from("marketing_accounts").select("sync_state, updated_at").eq("id", a.id).maybeSingle();
+    if (fErr) throw new Error(`marketing accounts: ${fErr.message}`);
+    if (!fresh) return false;
+    state0 = (fresh as { sync_state: Record<string, unknown> | null }).sync_state ?? {};
+    version = (fresh as { updated_at: string }).updated_at;
+  }
+  return false;
 }
 
 /** After a sync: the account's status, audience and where the history

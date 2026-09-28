@@ -680,7 +680,7 @@ const insFn = insSrv.match(/export async function syncInsights\([\s\S]*?\n\}/)?.
 check("syncInsights claims the account before any call to Meta; a claim and the «complete» mark are version-checked",
   before(insFn, "await claimInsights(a, gap)", "facebookPageInsights(") && before(insFn, "await claimInsights(a, gap)", "instagramDay(") &&
   /export async function claimInsights\(a: AccountForSync, minGapMs: number\)[\s\S]*?\.eq\("updated_at", a\.updated_at\)/.test(code(ACCOUNTS)) &&
-  /export async function recordInsights\(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = \{\}\)[\s\S]*?\.eq\("updated_at", a\.updated_at\);/.test(code(ACCOUNTS)));
+  /export async function recordInsights\(a: AccountForSync, complete: boolean, extra: Record<string, unknown> = \{\}\): Promise<boolean> \{[\s\S]*?\.eq\("updated_at", version\)[\s\S]*?state0 = \(fresh as/.test(code(ACCOUNTS)));
 check("a day is read again until 72 hours after it ends, not every run; days merge, nothing read is wiped",
   /const SETTLE_MS = 72 \* 3600_000;/.test(insSrv) && /const readAgo = opts\.force \? 10 \* 60_000 : INSIGHTS_REFRESH_MS;/.test(insFn) &&
   /metrics: \{ \.\.\.have\.get\(day\)\?\.metrics, \.\.\.m \}/.test(insFn) &&
@@ -709,7 +709,7 @@ check(`the Insights screen: never sideways, session copy guarded, speaks en/zh/a
 check("Facebook views split by is_from_followers and is_from_ads; a missing part is 0; an unknown answer is logged, never guessed",
   /\["is_from_followers", "views_followers", "views_others"\]/.test(mi) && /\["is_from_ads", "views_ads", null\]/.test(mi) &&
   /if \(!split\) \{ warnShape\(pageId, `page_media_view by \$\{breakdown\}`, m\); continue; \}/.test(mi) &&
-  /if \(!v\.value \|\| typeof v\.value !== "object" \|\| Array\.isArray\(v\.value\)\) return null;/.test(mi));
+  /const tag = \(v as Record<string, unknown>\)\[breakdown\];/.test(mi) && /const split = breakdownByDay\(m, breakdown\);/.test(mi) && /export function countsOf\(m: GraphMetric \| undefined\)/.test(mi));
 check("the audience is Meta's snapshot, once a day, kept through the version-checked «complete» write; shares are of everyone, not of the top 10",
   /const AUDIENCE_MS = 24 \* 3600_000;/.test(insSrv) && /recordInsights\(a, complete, audience \? \{ insights_audience: audience \} : \{\}\)/.test(insSrv) &&
   /out\.totals\[key\] = totalOf\(values\);/.test(mi) && /const total = audience\.totals\[part\] \|\|/.test(insScreen));

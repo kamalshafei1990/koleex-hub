@@ -128,6 +128,23 @@ export async function syncInsights(
   const token = a.token;
   const ext = a.external_id;
   const inBudget = (reserve: number) => Date.now() - started < opts.budgetMs - reserve;
+
+  // The audience, once a day — first: a few calls, before the days take the budget.
+  let audience: AudienceSnapshot | null = null;
+  const audienceAt = (a.sync_state.insights_audience as { at?: string } | undefined)?.at;
+  if ((!audienceAt || Date.now() - (Date.parse(audienceAt) || 0) > AUDIENCE_MS) && inBudget(6_000)) {
+    try {
+      const d = a.platform === "facebook" ? await facebookDemographics(ext, token) : await instagramDemographics(ext, token);
+      if (d) audience = { ages: [], genders: [], ...d, at: new Date().toISOString() };
+    } catch (e) {
+      if (e instanceof MetaError && e.code === 190) {
+        await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
+        return { ok: false };
+      }
+      console.warn(`[marketing/insights] ${a.id}: audience left for later: ${text(e)}`);
+    }
+  }
+
   try {
     if (a.platform === "facebook") {
       if (wanted.length) {
@@ -161,22 +178,6 @@ export async function syncInsights(
     }
     // A rate limit or any other failure: keep what was read, try again later.
     console.warn(`[marketing/insights] ${a.id}: kept what was read: ${text(e)}`);
-  }
-
-  // The audience, once a day.
-  let audience: AudienceSnapshot | null = null;
-  const audienceAt = (a.sync_state.insights_audience as { at?: string } | undefined)?.at;
-  if ((!audienceAt || Date.now() - (Date.parse(audienceAt) || 0) > AUDIENCE_MS) && inBudget(6_000)) {
-    try {
-      const d = a.platform === "facebook" ? await facebookDemographics(ext, token) : await instagramDemographics(ext, token);
-      if (d) audience = { ages: [], genders: [], ...d, at: new Date().toISOString() };
-    } catch (e) {
-      if (e instanceof MetaError && e.code === 190) {
-        await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
-        return { ok: false };
-      }
-      console.warn(`[marketing/insights] ${a.id}: audience left for later: ${text(e)}`);
-    }
   }
 
   // Older posts' views, a few a run.
@@ -215,7 +216,8 @@ export async function syncInsights(
     if (error) throw new Error(`marketing insight days: ${error.message}`);
   }
   const complete = wanted.every((d) => dayFetched.has(d)) && postsLeft <= 0;
-  await recordInsights(a, complete, audience ? { insights_audience: audience } : {}).catch((e) => console.warn(`[marketing/insights] ${a.id}: ${text(e)}`));
+  const recorded = await recordInsights(a, complete, audience ? { insights_audience: audience } : {}).catch((e) => { console.warn(`[marketing/insights] ${a.id}: ${text(e)}`); return false; });
+  if (!recorded) console.warn(`[marketing/insights] ${a.id}: the account kept changing; its state waits for the next refresh`);
   return { ok: true, days: dayFetched.size };
 }
 
