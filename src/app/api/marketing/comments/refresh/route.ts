@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   if (denied) return denied;
   try {
     const started = Date.now();
-    const accounts = (await listAccounts(auth.tenant_id, space)).filter((a) => a.connection === "api").slice(0, 10);
+    const accounts = (await listAccounts(auth.tenant_id, space))
+      .filter((a) => a.connection === "api" && (a.platform === "facebook" || a.platform === "instagram")).slice(0, 10);
     let refreshed = 0;
     for (const a of accounts) {
       const left = 45_000 - (Date.now() - started);

@@ -1,8 +1,10 @@
 "use client";
 
 /* ComposerPreview — how the post will look on each account it goes to: a
-   Facebook post (name, text, photo grid) or an Instagram post (square
-   picture, caption under it), and a plain card for hand-shared accounts.
+   Facebook post (name, text, photo grid), an Instagram post (square
+   picture, caption under it) or a LinkedIn post (name, three lines of text
+   before "see more", pictures only), and a plain card for hand-shared
+   accounts.
    A close likeness to judge text length and picture order — not the
    platforms' exact rendering. */
 
@@ -39,19 +41,12 @@ function Tile({ m, className }: { m: PostMedia; className: string }) {
   );
 }
 
-function FacebookPreview({ a, text, media, t }: { a: MarketingAccountView; text: string; media: PostMedia[]; t: Tr }) {
+/* Up to four pictures as Facebook and LinkedIn lay them out: one wide, two
+   side by side, or one on top of two with the rest counted. */
+function PhotoGrid({ media }: { media: PostMedia[] }) {
   const shown = media.slice(0, 4);
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-      <div className="flex items-center gap-2.5 p-3">
-        <Avatar a={a} />
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{a.name}</div>
-          <div className="text-[11px] text-[var(--text-dim)]">{t("pv.justNow")}</div>
-        </div>
-        <span className="ms-auto"><BrandGlyph name="facebook" size={14} /></span>
-      </div>
-      {text.trim() && <p dir="auto" className="line-clamp-6 whitespace-pre-wrap break-words px-3 pb-3 text-[13px] leading-5 text-[var(--text-primary)]">{text}</p>}
+    <>
       {shown.length === 1 && <Tile m={shown[0]} className="aspect-[4/3] w-full" />}
       {shown.length === 2 && (
         <div className="grid grid-cols-2 gap-0.5">{shown.map((m, i) => <Tile key={i} m={m} className="aspect-square" />)}</div>
@@ -69,6 +64,42 @@ function FacebookPreview({ a, text, media, t }: { a: MarketingAccountView; text:
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function FacebookPreview({ a, text, media, t }: { a: MarketingAccountView; text: string; media: PostMedia[]; t: Tr }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <div className="flex items-center gap-2.5 p-3">
+        <Avatar a={a} />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{a.name}</div>
+          <div className="text-[11px] text-[var(--text-dim)]">{t("pv.justNow")}</div>
+        </div>
+        <span className="ms-auto"><BrandGlyph name="facebook" size={14} /></span>
+      </div>
+      {text.trim() && <p dir="auto" className="line-clamp-6 whitespace-pre-wrap break-words px-3 pb-3 text-[13px] leading-5 text-[var(--text-primary)]">{text}</p>}
+      <PhotoGrid media={media} />
+    </div>
+  );
+}
+
+/* LinkedIn shows three lines before "see more"; a video does not go from the
+   Hub yet (the rules say so), so only the pictures are drawn. */
+function LinkedInPreview({ a, text, media, t }: { a: MarketingAccountView; text: string; media: PostMedia[]; t: Tr }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <div className="flex items-center gap-2.5 p-3">
+        <Avatar a={a} size={36} />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{a.name}</div>
+          <div className="text-[11px] text-[var(--text-dim)]">{t("pv.justNow")}</div>
+        </div>
+        <span className="ms-auto"><BrandGlyph name="linkedin" size={14} /></span>
+      </div>
+      {text.trim() && <p dir="auto" className="line-clamp-3 whitespace-pre-wrap break-words px-3 pb-3 text-[13px] leading-5 text-[var(--text-primary)]">{text}</p>}
+      <PhotoGrid media={media.filter((m) => m.kind === "image")} />
     </div>
   );
 }
@@ -133,7 +164,8 @@ export default function ComposerPreview({ items, media, t }: {
       {items.map(({ account, text }) =>
         account.connection === "assisted" ? <HandPreview key={account.id} a={account} text={text} media={media} t={t} />
           : account.platform === "instagram" ? <InstagramPreview key={account.id} a={account} text={text} media={media} t={t} />
-            : <FacebookPreview key={account.id} a={account} text={text} media={media} t={t} />,
+            : account.platform === "linkedin" ? <LinkedInPreview key={account.id} a={account} text={text} media={media} t={t} />
+              : <FacebookPreview key={account.id} a={account} text={text} media={media} t={t} />,
       )}
     </div>
   );

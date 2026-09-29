@@ -50,6 +50,7 @@ import { weekPlansStep } from "@/lib/server/marketing/week-plan";
 import { AD_SCAN_MS, scanAdComments } from "@/lib/server/marketing/ad-comments";
 import { MESSAGES_REFRESH_MS, syncMessages } from "@/lib/server/marketing/messages";
 import { refreshInstagramLoginKeys } from "@/lib/server/marketing/instagram-login";
+import { expireLinkedInKeys } from "@/lib/server/marketing/accounts";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
@@ -96,8 +97,10 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
   }
 
   /* 10. Instagram Login keys (the CEO's Instagram) are refreshed while they
-         still have 20 of their 60 days — before any step uses them. */
+         still have 20 of their 60 days — before any step uses them; LinkedIn
+         keys past their 60 days (no refresh exists) mark the account expired. */
   if (left() > 12_000) {
+    await expireLinkedInKeys(opts.tenantId).catch((e) => console.warn(`[marketing/cron] linkedin keys: ${e instanceof Error ? e.message : String(e)}`));
     out.igKeys = await refreshInstagramLoginKeys({ tenantId: opts.tenantId }).catch((e) => {
       console.warn(`[marketing/cron] instagram keys: ${e instanceof Error ? e.message : String(e)}`);
       return 0;
@@ -126,6 +129,7 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
   if (left() > 15_000) {
     const stale = new Date(Date.now() - FEED_REFRESH_MS).toISOString();
     let accQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
       .in("status", ["connected", "error"])
       .or(`last_synced_at.is.null,last_synced_at.lt.${stale}`)
       .or(`sync_state->>last_attempt_at.is.null,sync_state->>last_attempt_at.lt.${stale}`);
@@ -143,6 +147,7 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
   if (left() > 10_000) {
     const stale = new Date(Date.now() - COMMENTS_REFRESH_MS).toISOString();
     let cQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
       .in("status", ["connected", "error"])
       .or(`sync_state->>comments_at.is.null,sync_state->>comments_at.lt.${stale}`);
     if (opts.tenantId) cQ = cQ.eq("tenant_id", opts.tenantId);

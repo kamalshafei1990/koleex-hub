@@ -75,7 +75,7 @@ export type MarketingPlatform = "facebook" | "instagram" | "linkedin" | "youtube
                 the platform's approval), so the tile says what is missing;
    · "manual" — no API for posting (WeChat, WhatsApp, Douyin): the account is
                 added by name and link, and posts go out with one-tap sharing. */
-export type PlatformFlow = "meta" | "instagram" | "soon" | "manual";
+export type PlatformFlow = "meta" | "instagram" | "linkedin" | "soon" | "manual";
 export const PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
   facebook: "meta",
   instagram: "meta",
@@ -92,12 +92,13 @@ export const MANUAL_PLATFORMS = PLATFORM_ORDER.filter((p) => PLATFORM_FLOW[p] ==
 /** CEO Brand's own accounts (owner, 29/09/2026): Facebook = his Public
  *  Figure PAGE, signed in like Koleex's (a personal profile has had no
  *  posting API since 2018); Instagram signs in with Instagram Login (a
- *  Creator account, no Facebook Page); WeChat and Douyin are shared by hand;
- *  LinkedIn (the member's profile) comes next. */
+ *  Creator account, no Facebook Page); LinkedIn signs in with Share on
+ *  LinkedIn (his profile, publishing only); WeChat and Douyin are shared by
+ *  hand. */
 export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
   facebook: "meta",
   instagram: "instagram",
-  linkedin: "soon",
+  linkedin: "linkedin",
   youtube: "soon",
   tiktok: "soon",
   x: "soon",
@@ -111,6 +112,9 @@ export const platformFlow = (space: MarketingSpace, platform: MarketingPlatform)
 /** What the connect flow tells the app page when it comes back (?connect=). */
 export type ConnectResult = "ok" | "cancelled" | "expired" | "failed" | "setup" | "denied";
 export const CONNECT_RESULTS: readonly ConnectResult[] = ["ok", "cancelled", "expired", "failed", "setup", "denied"];
+/** Which sign-in came back (&via=): LinkedIn's banner speaks of LinkedIn —
+ *  publishing only, no Feed — where Meta's speaks of pages and the Feed. */
+export type ConnectVia = "linkedin";
 
 /** A connected account as the screens see it — never its access key. */
 export interface MarketingAccountView {
@@ -144,4 +148,6 @@ export interface MarketingSetup {
   cron: boolean;
   /** The Meta app's Instagram product keys (Business Login for Instagram). */
   instagram: boolean;
+  /** The LinkedIn app's keys (Share on LinkedIn). */
+  linkedin: boolean;
 }

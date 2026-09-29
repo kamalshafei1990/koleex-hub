@@ -88,9 +88,10 @@ async function windowRows<R extends { external_id: string; parent_external_id: s
   return rows;
 }
 
-/** The space's accounts that can have comments (connected by API). */
+/** The space's accounts that can have comments (Meta's, connected by API —
+ *  LinkedIn sends none back). */
 async function commentAccounts(tenantId: string, space: MarketingSpace): Promise<MarketingAccountView[]> {
-  return (await listAccounts(tenantId, space)).filter((a) => a.connection === "api");
+  return (await listAccounts(tenantId, space)).filter((a) => a.connection === "api" && (a.platform === "facebook" || a.platform === "instagram"));
 }
 
 /** How many threads wait for a reply — the number on the Comments tab. */

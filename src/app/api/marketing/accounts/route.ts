@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
-import { addManualAccount, adsStates, listAccounts, marketingSetup, messagesStates } from "@/lib/server/marketing/accounts";
+import { addManualAccount, adsStates, linkedinStates, listAccounts, marketingSetup, messagesStates } from "@/lib/server/marketing/accounts";
 import { SPACE_MODULE, asSpace } from "@/lib/marketing/spaces";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,10 @@ export async function GET(req: NextRequest) {
   const denied = await requireModuleAction(auth, SPACE_MODULE[space], "view");
   if (denied) return denied;
   try {
-    const [accounts, ads, messages] = await Promise.all([listAccounts(auth.tenant_id, space), adsStates(auth.tenant_id, space), messagesStates(auth.tenant_id, space)]);
-    return NextResponse.json({ accounts, ads, messages, setup: marketingSetup() }, { headers: { "Cache-Control": "private, no-store" } });
+    const [accounts, ads, messages, linkedin] = await Promise.all([
+      listAccounts(auth.tenant_id, space), adsStates(auth.tenant_id, space), messagesStates(auth.tenant_id, space), linkedinStates(auth.tenant_id, space),
+    ]);
+    return NextResponse.json({ accounts, ads, messages, linkedin, setup: marketingSetup() }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     console.error("[api/marketing/accounts]", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Could not load the connected accounts." }, { status: 500 });

@@ -46,6 +46,8 @@ export interface FeedResponse {
   columns: FeedColumn[];
   /** Accounts of the space shared by hand (no posts to read). */
   manual: number;
+  /** Accounts the Hub only publishes to (LinkedIn: nothing comes back). */
+  publishOnly: number;
 }
 
 /** A comment in a post's panel: the comment view, and — on a thread's first

@@ -17,6 +17,7 @@ import { PLATFORM_ORDER, platformFlow, type MarketingAccountView, type Marketing
 import { FACEBOOK_ADS_SCOPES, instagramAdsGranted, type AdsState } from "@/lib/marketing/ads";
 import { messageScopesFor } from "@/lib/marketing/message-types";
 import { isInstagramLogin, type InstagramLoginProfile } from "@/lib/marketing/instagram-login";
+import { linkedinConfig, type LinkedInProfile } from "@/lib/server/marketing/linkedin";
 
 const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, audience, updated_at";
 
@@ -48,10 +49,11 @@ function toFeedAccount({ sync_state, ...view }: FeedAccountRow): FeedAccount {
   return { ...view, last_attempt_at: typeof at === "string" ? at : null };
 }
 
-/** The Feed's accounts — the ones read by API (an account shared by hand has
- *  no posts to read) — and how many of the space's accounts are shared by
- *  hand. */
-export async function listFeedAccounts(tenantId: string, space: MarketingSpace): Promise<{ accounts: FeedAccount[]; manual: number }> {
+/** The Feed's accounts — the ones whose posts the Hub reads (Meta's: an
+ *  account shared by hand has no posts to read, and LinkedIn sends nothing
+ *  back) — and how many of the space's accounts are shared by hand or only
+ *  published to. */
+export async function listFeedAccounts(tenantId: string, space: MarketingSpace): Promise<{ accounts: FeedAccount[]; manual: number; publishOnly: number }> {
   const { data, error } = await supabaseServer
     .from("marketing_accounts")
     .select(FEED_ACCOUNT_COLUMNS)
@@ -63,12 +65,13 @@ export async function listFeedAccounts(tenantId: string, space: MarketingSpace):
     .limit(200);
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   const rows = (data ?? []) as unknown as FeedAccountRow[];
-  const accounts = rows.filter((r) => r.connection === "api").map(toFeedAccount);
-  return { accounts, manual: rows.length - accounts.length };
+  const accounts = rows.filter((r) => r.connection === "api" && (r.platform === "facebook" || r.platform === "instagram")).map(toFeedAccount);
+  const manual = rows.filter((r) => r.connection === "assisted").length;
+  return { accounts, manual, publishOnly: rows.length - accounts.length - manual };
 }
 
 /** One Feed account; null when it is not this tenant's, is shared by hand,
- *  or was removed. */
+ *  is only published to (LinkedIn), or was removed. */
 export async function feedAccount(tenantId: string, id: string): Promise<FeedAccount | null> {
   const { data, error } = await supabaseServer
     .from("marketing_accounts")
@@ -78,7 +81,7 @@ export async function feedAccount(tenantId: string, id: string): Promise<FeedAcc
     .maybeSingle();
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   const row = data as unknown as FeedAccountRow | null;
-  if (!row || row.connection !== "api" || row.status === "disconnected") return null;
+  if (!row || row.connection !== "api" || (row.platform !== "facebook" && row.platform !== "instagram") || row.status === "disconnected") return null;
   return toFeedAccount(row);
 }
 
@@ -103,6 +106,7 @@ export function marketingSetup(): MarketingSetup {
     meta: metaAppConfig() !== null,
     cron: !!(process.env.CRON_SECRET ?? "").trim(),
     instagram: instagramLoginConfig() !== null,
+    linkedin: linkedinConfig() !== null,
   };
 }
 
@@ -236,6 +240,52 @@ export async function saveInstagramLoginAccount(input: {
   const { data, error } = await supabaseServer.from("marketing_accounts").insert(row).select("id").single();
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   return (data as { id: string }).id;
+}
+
+/** Save the signed-in LinkedIn member on a space — refreshed in place when
+ *  connected before. Publishing only; its key ends after 60 days (no
+ *  refresh for a self-serve app — the member signs in again). */
+export async function saveLinkedInAccount(input: {
+  tenantId: string; space: MarketingSpace; connectedBy: string;
+  profile: LinkedInProfile; token: string; expiresAt: string | null; scopes: string[];
+}): Promise<string> {
+  /* Only a space whose LinkedIn signs in (CEO Brand); Koleex's company page
+     needs LinkedIn's own approval first. */
+  if (platformFlow(input.space, "linkedin") !== "linkedin") throw new Error("LinkedIn does not sign in on this space.");
+  const now = new Date().toISOString();
+  const p = input.profile;
+  const row = {
+    tenant_id: input.tenantId, space: input.space, platform: "linkedin", connection: "api",
+    external_id: p.id, name: p.name || "LinkedIn", handle: null, avatar_url: p.picture, profile_url: null,
+    token_encrypted: encryptToken(input.token), token_expires_at: input.expiresAt,
+    user_token_encrypted: null, user_token_expires_at: null,
+    scopes: input.scopes, status: "connected", last_error: null, connected_by: input.connectedBy, updated_at: now,
+  };
+  const { data: existing, error: rErr } = await supabaseServer.from("marketing_accounts").select("id, space")
+    .eq("tenant_id", input.tenantId).eq("platform", "linkedin").eq("external_id", p.id).maybeSingle();
+  if (rErr) throw new Error(`marketing accounts: ${rErr.message}`);
+  if (existing) {
+    const e = existing as { id: string; space: string };
+    /* Never moved between spaces (the same rule as saveMetaAccounts). */
+    if (e.space !== input.space) throw new Error("This LinkedIn member is already connected on another space.");
+    const { error } = await supabaseServer.from("marketing_accounts").update(row).eq("id", e.id);
+    if (error) throw new Error(`marketing accounts: ${error.message}`);
+    return e.id;
+  }
+  const { data, error } = await supabaseServer.from("marketing_accounts").insert(row).select("id").single();
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  return (data as { id: string }).id;
+}
+
+/** LinkedIn keys past their 60 days: the account is marked expired, and the
+ *  Accounts tab asks the member to sign in again (no refresh exists). */
+export async function expireLinkedInKeys(tenantId?: string): Promise<number> {
+  let q = supabaseServer.from("marketing_accounts").update({ status: "expired", last_error: "LinkedIn's key ran out after 60 days — sign in again.", updated_at: new Date().toISOString() })
+    .eq("platform", "linkedin").eq("connection", "api").eq("status", "connected").lt("token_expires_at", new Date().toISOString());
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data, error } = await q.select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  return (data ?? []).length;
 }
 
 /** An Instagram Login key refreshed before its 60 days end (cron): the new
@@ -498,6 +548,29 @@ export async function messagesStates(tenantId: string, space: MarketingSpace): P
   for (const r of (data ?? []) as Array<{ id: string; platform: string; scopes: string[] | null; sync_state: Record<string, unknown> | null }>) {
     const missing = messageScopesFor(r.platform, r.scopes ?? []).filter((x) => !(r.scopes ?? []).includes(x));
     out[r.id] = { ready: missing.length === 0, missing, error: typeof r.sync_state?.messages_error === "string" ? r.sync_state.messages_error : null };
+  }
+  return out;
+}
+
+/** A LinkedIn account's line on the Accounts tab: publishing only, the day
+ *  its key ends (60 days, no refresh: the member signs in again) and whether
+ *  that day has passed (told by the server: the screen reads no clock while
+ *  it draws). The date only — never the key. */
+export async function linkedinStates(tenantId: string, space: MarketingSpace): Promise<Record<string, { endsAt: string | null; ended: boolean }>> {
+  if (platformFlow(space, "linkedin") !== "linkedin") return {};
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select("id, token_expires_at")
+    .eq("tenant_id", tenantId)
+    .eq("space", space)
+    .eq("platform", "linkedin")
+    .eq("connection", "api")
+    .neq("status", "disconnected");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  const out: Record<string, { endsAt: string | null; ended: boolean }> = {};
+  const now = Date.now();
+  for (const r of (data ?? []) as Array<{ id: string; token_expires_at: string | null }>) {
+    out[r.id] = { endsAt: r.token_expires_at, ended: !!r.token_expires_at && Date.parse(r.token_expires_at) <= now };
   }
   return out;
 }

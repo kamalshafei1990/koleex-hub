@@ -120,13 +120,13 @@ function toColumn(a: FeedAccount, week: FeedWeek | null, page: { posts: FeedPost
 }
 
 export async function loadFeed(tenantId: string, space: MarketingSpace): Promise<FeedResponse> {
-  const { accounts, manual } = await listFeedAccounts(tenantId, space);
+  const { accounts, manual, publishOnly } = await listFeedAccounts(tenantId, space);
   const [weeks, pages] = await Promise.all([
     weeksOf(tenantId, accounts.map((a) => a.id)),
     Promise.all(accounts.map((a) => postsPage(tenantId, a.id, null))),
   ]);
   const now = Date.now();
-  return { columns: accounts.map((a, i) => toColumn(a, weeks.get(a.id) ?? null, pages[i], now)), manual };
+  return { columns: accounts.map((a, i) => toColumn(a, weeks.get(a.id) ?? null, pages[i], now)), manual, publishOnly };
 }
 
 /** One column again, after its account was refreshed. */

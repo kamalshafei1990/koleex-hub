@@ -933,7 +933,7 @@ const commentsScreen = code("src/components/marketing/SocialComments.tsx");
 check("the screens: «Ad» on the thread, and each account's ads status on the Accounts tab",
   /\{p\?\.is_ad && <StatusPill tone="brand" className="shrink-0">\{t\("ad"\)\}<\/StatusPill>\}/.test(commentsScreen) &&
   /\{a\.connection === "api" && ads\[a\.id\] && <AdsLine state=\{ads\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
-  /await Promise\.all\(\[listAccounts\(auth\.tenant_id, space\), adsStates\(auth\.tenant_id, space\)[,\]]/.test(code(LIST)) && /return NextResponse\.json\(\{ accounts, ads,/.test(code(LIST)));
+  /await Promise\.all\(\[\s*listAccounts\(auth\.tenant_id, space\), adsStates\(auth\.tenant_id, space\)[,\]]/.test(code(LIST)) && /return NextResponse\.json\(\{ accounts, ads,/.test(code(LIST)));
 
 /* The account's sync state holds every step's marks (the Feed's history,
    insights, the comment scans, the ads scan): until 29/09/2026 the Feed
@@ -1064,7 +1064,7 @@ check("the Messages tab is last, its number on the first frame; the Accounts tab
   /\.\.\.\(withMessages \? \[\{ key: SPACE_MESSAGES\[space\], label: t\("tab\.messages"\), icon: <MessageSquareIcon size=\{14\} \/>, badge: waiting \?\? undefined \}\] : \[\]\),\s*\]/.test(mh) &&
   /const waiting = useWaitingCount\("messages", space, withMessages\);/.test(mh) &&
   /\{a\.connection === "api" && msgs\[a\.id\] && <MessagesLine state=\{msgs\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
-  /messagesStates\(auth\.tenant_id, space\)\]\);/.test(code(LIST)) &&
+  /messagesStates\(auth\.tenant_id, space\)[,\]]/.test(code(LIST)) &&
   /out\[r\.id\] = \{ ready: missing\.length === 0, missing, error: [^}]*\};/.test(acc) && !/token/.test(acc.slice(acc.indexOf("export async function messagesStates("), acc.indexOf("\nexport ", acc.indexOf("export async function messagesStates(") + 1))));
 
 console.log("\n16. CEO Brand (the CEO's own accounts on the Social engine)");
@@ -1089,8 +1089,8 @@ check("a Facebook sign-in NEVER moves an account between spaces (Koleex's Page s
 check("CEO Brand is live for super admins only until the CEO opens it to his assistant",
   /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true,\s*superAdminOnly: true \}/.test(code("src/lib/navigation.ts")));
 const sp = code("src/lib/marketing/spaces.ts");
-check("the CEO's accounts: his Public Figure PAGE signs in like Koleex's (a personal profile has no API), Instagram with Instagram Login, LinkedIn waits; the Accounts tab asks per space",
-  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "meta",\s*instagram: "instagram",\s*linkedin: "soon",/.test(sp) &&
+check("the CEO's accounts: his Public Figure PAGE signs in like Koleex's (a personal profile has no API), Instagram with Instagram Login, LinkedIn with Share on LinkedIn; the Accounts tab asks per space",
+  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "meta",\s*instagram: "instagram",\s*linkedin: "linkedin",/.test(sp) &&
   /\(space === "ceo" \? CEO_PLATFORM_FLOW : PLATFORM_FLOW\)\[platform\]/.test(sp) &&
   /const flow = platformFlow\(space, p\);/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   !/PLATFORM_FLOW\[/.test(code("src/components/marketing/ConnectedAccounts.tsx")));
@@ -1130,6 +1130,84 @@ check("the Accounts tab: «Sign in with Instagram» on the CEO's space once its 
   /instagram: instagramLoginConfig\(\) !== null,/.test(acc) &&
   /export const INSTAGRAM_LOGIN_MESSAGE_SCOPES = \["instagram_business_manage_messages"\] as const;/.test(msgTypes) &&
   /if \(isInstagramLogin\(scopes\)\) continue;/.test(acc));
+
+console.log("\n18. LinkedIn (the CEO's own profile — publishing only)");
+const liLib = code("src/lib/marketing/linkedin.ts");
+const liSrv = code("src/lib/server/marketing/linkedin.ts");
+const liStart = code("src/app/api/marketing/connect/linkedin/start/route.ts");
+const liCb = code("src/app/api/marketing/connect/linkedin/callback/route.ts");
+const fnOf = (src: string, head: string) => { const at = src.indexOf(head); return at < 0 ? "" : src.slice(at, src.indexOf("\nexport ", at + 1) < 0 ? undefined : src.indexOf("\nexport ", at + 1)); };
+const words = (src: string, keys: string[]) => keys.every((k) => new RegExp(`"${k.replace(/\./g, "\\.")}":\\s*\\{ en: "[^"]+", zh: "[^"]+", ar: "[^"]+" \\}`).test(src));
+check("the sign-in asks for exactly openid, profile and w_member_social, back to the Hub's own URL",
+  /export const LINKEDIN_SCOPES = \["openid", "profile", "w_member_social"\] as const;/.test(liLib) &&
+  /new URL\("https:\/\/www\.linkedin\.com\/oauth\/v2\/authorization"\)/.test(liSrv) &&
+  /url\.searchParams\.set\("scope", LINKEDIN_SCOPES\.join\(" "\)\);/.test(liSrv) &&
+  /export const LINKEDIN_REDIRECT_URI = `\$\{MARKETING_ORIGIN\}\/api\/marketing\/connect\/linkedin\/callback`;/.test(liSrv) &&
+  /path: "\/api\/marketing\/connect\/linkedin"/.test(liSrv));
+check("connect: the caller's right, a space whose LinkedIn signs in and a fresh state before the sign-in; on return the state (timing-safe) and the right BEFORE anything is exchanged; Share on LinkedIn's permission required; the cookie cleared either way",
+  before(liStart, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "linkedinLoginUrl(cfg, state)") &&
+  before(liStart, 'if (platformFlow(space, "linkedin") !== "linkedin") return back("denied");', "linkedinLoginUrl(cfg, state)") &&
+  /res\.cookies\.set\(LINKEDIN_STATE_COOKIE, state, LINKEDIN_STATE_COOKIE_OPTIONS\);/.test(liStart) &&
+  before(liCb, 'if (!state || !expected || !sameState(state, expected)) return back("expired");', "await exchangeLinkedInCode(cfg, code)") &&
+  before(liCb, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "await exchangeLinkedInCode(cfg, code)") &&
+  /crypto\.timingSafeEqual\(x, y\)/.test(liCb) &&
+  before(liCb, 'if (!key.scopes.includes("w_member_social")) return back("failed");', "await saveLinkedInAccount(") &&
+  /res\.cookies\.set\(LINKEDIN_STATE_COOKIE, "", \{ \.\.\.LINKEDIN_STATE_COOKIE_OPTIONS, maxAge: 0 \}\);/.test(liCb) &&
+  /\?connect=\$\{result\}\$\{extra\}&via=linkedin`/.test(liCb) && /\?connect=\$\{result\}&via=linkedin`/.test(liStart));
+check("the key travels only in the Authorization header (never a URL), the secret only in the token request's body; a 401 reads as an expired key; no key is logged",
+  /body: new URLSearchParams\(\{ grant_type: "authorization_code", code, client_id: cfg\.clientId, client_secret: cfg\.clientSecret, redirect_uri: LINKEDIN_REDIRECT_URI \}\)\.toString\(\)/.test(liSrv) &&
+  !/access_token=|oauth2_access_token|searchParams\.set\("(access_token|client_secret)"/.test(liSrv) &&
+  (liSrv.match(/Authorization: `Bearer \$\{token\}`/g) ?? []).length >= 3 &&
+  /res\.status === 401 \? 190 : res\.status/.test(liSrv) && !/console\.(log|error|warn)\([^;]*\b(token|key\.token)\b/.test(liSrv + liCb));
+const saveLiFn = fnOf(acc, "export async function saveLinkedInAccount(");
+check("saved with its key ENCRYPTED, only on a space whose LinkedIn signs in (CEO Brand — Koleex's company page needs LinkedIn's approval), never moved between spaces, refreshed in place",
+  /if \(platformFlow\(input\.space, "linkedin"\) !== "linkedin"\) throw new Error/.test(saveLiFn) && /token_encrypted: encryptToken\(input\.token\)/.test(saveLiFn) &&
+  /\.eq\("platform", "linkedin"\)\.eq\("external_id", p\.id\)\.maybeSingle\(\)/.test(saveLiFn) && /if \(e\.space !== input\.space\) throw new Error/.test(saveLiFn) &&
+  /export const PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "meta",\s*instagram: "meta",\s*linkedin: "soon",/.test(sp) &&
+  /linkedin: linkedinConfig\(\) !== null,/.test(acc));
+const expFn = fnOf(acc, "export async function expireLinkedInKeys(");
+const liStFn = fnOf(acc, "export async function linkedinStates(");
+check("its 60 days (no refresh exists): the cron marks the account expired once its key has ended; the Accounts tab gets the day and whether it passed — the date only",
+  /\.eq\("platform", "linkedin"\)\.eq\("connection", "api"\)\.eq\("status", "connected"\)\.lt\("token_expires_at", new Date\(\)\.toISOString\(\)\)/.test(expFn) && /status: "expired"/.test(expFn) &&
+  /await expireLinkedInKeys\(opts\.tenantId\)\.catch\(/.test(cronSrc) &&
+  /if \(platformFlow\(space, "linkedin"\) !== "linkedin"\) return \{\};/.test(liStFn) && /\.select\("id, token_expires_at"\)/.test(liStFn) &&
+  /out\[r\.id\] = \{ endsAt: r\.token_expires_at, ended: [^}]*\};/.test(liStFn) && !/token_encrypted/.test(liStFn) &&
+  /linkedinStates\(auth\.tenant_id, space\),?\s*\]\);/.test(code(LIST)) && /return NextResponse\.json\(\{ accounts, ads, messages, linkedin, setup/.test(code(LIST)));
+check("publishing: words and pictures to /v2/ugcPosts (Rest.li 2.0.0), each picture registered as a feed-share image then uploaded, the URN from X-RestLi-Id; no video yet; no Feed row (nothing comes back)",
+  /fetch\("https:\/\/api\.linkedin\.com\/v2\/ugcPosts"/.test(liSrv) && /"X-Restli-Protocol-Version": "2\.0\.0"/.test(liSrv) &&
+  /recipes: \["urn:li:digitalmediaRecipe:feedshare-image"\]/.test(liSrv) && /method: "PUT"/.test(liSrv) &&
+  /res\.headers\.get\("x-restli-id"\)/.test(liSrv) &&
+  /return \{ done: true, externalId: urn, feedId: null, permalink: `https:\/\/www\.linkedin\.com\/feed\/update\/\$\{urn\}\/` \};/.test(liSrv) &&
+  /if \(m\.kind !== "image"\) throw new MetaError/.test(liSrv) &&
+  /: account\.platform === "linkedin"\s*\? await publishToLinkedIn\(account\.external_id, account\.token, body, media\)/.test(code("src/lib/server/marketing/publish.ts")));
+const rulesSrc = code("src/lib/marketing/post-rules.ts");
+check("the composer: up to 3,000 characters, up to 9 pictures, no video yet — each explained in en / zh / ar; its own counter and preview",
+  /export const LI_TEXT_MAX = 3000;/.test(liLib) && /export const LI_IMAGES_MAX = 9;/.test(liLib) &&
+  /if \(charCount\(text\) > LI_TEXT_MAX\) out\.push\(\{ code: "li_text_long" \}\);/.test(rulesSrc) &&
+  /if \(media\.some\(\(m\) => m\.kind === "video"\)\) out\.push\(\{ code: "li_video" \}\);/.test(rulesSrc) &&
+  /if \(media\.filter\(\(m\) => m\.kind === "image"\)\.length > LI_IMAGES_MAX\) out\.push\(\{ code: "li_too_many_images" \}\);/.test(rulesSrc) &&
+  words(code("src/lib/marketing/posts-i18n.ts"), ["rule.li_text_long", "rule.li_video", "rule.li_too_many_images", "c.liCount"]) &&
+  /li \? t\("c\.liCount"\)/.test(code("src/components/marketing/PostComposer.tsx")) && /\(li && n > LI_TEXT_MAX\)/.test(code("src/components/marketing/PostComposer.tsx")) &&
+  /account\.platform === "linkedin" \? <LinkedInPreview/.test(code("src/components/marketing/ComposerPreview.tsx")));
+const cronAccQs = cronSrc.match(/\.from\("marketing_accounts"\)\.select\("id, tenant_id"\)\.eq\("connection", "api"\)[^;]*/g) ?? [];
+check(`LinkedIn is left out of everything that READS (it sends nothing back): the Feed (which says why), the comments, their refresh, every cron step (${cronAccQs.length} queries)`,
+  /const accounts = rows\.filter\(\(r\) => r\.connection === "api" && \(r\.platform === "facebook" \|\| r\.platform === "instagram"\)\)\.map\(toFeedAccount\);/.test(acc) &&
+  /if \(!row \|\| row\.connection !== "api" \|\| \(row\.platform !== "facebook" && row\.platform !== "instagram"\) \|\| row\.status === "disconnected"\) return null;/.test(acc) &&
+  (code("src/components/marketing/SocialFeed.tsx").match(/\{feed\.publishOnly > 0 && </g) ?? []).length === 2 &&
+  /\(await listAccounts\(tenantId, space\)\)\.filter\(\(a\) => a\.connection === "api" && \(a\.platform === "facebook" \|\| a\.platform === "instagram"\)\)/.test(code("src/lib/server/marketing/comments.ts")) &&
+  /\.filter\(\(a\) => a\.connection === "api" && \(a\.platform === "facebook" \|\| a\.platform === "instagram"\)\)\.slice\(0, 10\)/.test(code("src/app/api/marketing/comments/refresh/route.ts")) &&
+  cronAccQs.length >= 6 && cronAccQs.every((q) => /\.in\("platform", \["facebook", "instagram"\]\)/.test(q)));
+const caSrc = code("src/components/marketing/ConnectedAccounts.tsx");
+const liLine = caSrc.slice(caSrc.indexOf("function LinkedInLine("), caSrc.indexOf("\nfunction ", caSrc.indexOf("function LinkedInLine(") + 1));
+check("the Accounts tab: «Sign in with LinkedIn» on CEO Brand once its keys are in Vercel; the card says publishing only and the day to sign in again (told by the server); the banner speaks of LinkedIn",
+  /\(flow === "linkedin" && !liReady\)/.test(caSrc) && /const liReady = !!setup\?\.tokenKey && !!setup\?\.linkedin;/.test(caSrc) &&
+  /else if \(flow === "linkedin"\) signInWithLinkedIn\(\);/.test(caSrc) &&
+  /window\.location\.href = `\/api\/marketing\/connect\/linkedin\/start\?space=\$\{space\}`;/.test(caSrc) &&
+  /\{ key: "linkedin" as const, label: t\("setup\.linkedin"\) \}/.test(caSrc) &&
+  /a\.connection === "api" && a\.platform === "linkedin" \? \(\s*<LinkedInLine state=\{liStates\[a\.id\]\} expired=\{a\.status === "expired"\} t=\{t\} \/>/.test(caSrc) &&
+  /r\.via === "linkedin" && \(r\.code === "ok" \|\| r\.code === "failed" \|\| r\.code === "setup"\) \? `result\.li\.\$\{r\.code\}`/.test(caSrc) &&
+  words(caSrc, ["add.signInLi", "add.needsLiKeys", "note.liLogin", "setup.linkedin", "kind.linkedin", "li.only", "li.until", "li.ended", "li.again", "result.li.ok", "result.li.failed", "result.li.setup"]) &&
+  liLine.length > 100 && !/Date\.now\(\)/.test(liLine) && words(code("src/components/marketing/SocialFeed.tsx"), ["publishOnly.note"]));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

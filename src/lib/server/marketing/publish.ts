@@ -27,6 +27,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { MetaError } from "@/lib/server/marketing/meta";
 import { publishToFacebook, publishToInstagram, type PublishStep } from "@/lib/server/marketing/meta-publish";
+import { publishToLinkedIn } from "@/lib/server/marketing/linkedin";
 import { loadAccountForSync, recordSync } from "@/lib/server/marketing/accounts";
 import { later, notifyPublishOutcome } from "@/lib/server/marketing/notify";
 import { targetIssues } from "@/lib/marketing/post-rules";
@@ -155,7 +156,9 @@ export async function publishPost(tenantId: string, postId: string, opts: { budg
         ? await publishToFacebook(account.external_id, account.token, body, media)
         : account.platform === "instagram"
           ? await publishToInstagram(account.external_id, account.token, body, media, t.publish_state ?? {}, deadline - 3_000)
-          : (() => { throw new MetaError("Publishing to this platform is not available yet.", null); })();
+          : account.platform === "linkedin"
+            ? await publishToLinkedIn(account.external_id, account.token, body, media)
+            : (() => { throw new MetaError("Publishing to this platform is not available yet.", null); })();
       if (!step.done) {
         await finishTarget(t.id, { status: "publishing", publish_state: step.state, next_attempt_at: new Date(Date.now() + step.retryInMs).toISOString() });
         continue;

@@ -11,7 +11,11 @@
        /api/marketing/connect/meta/start, which comes back with
        ?connect=<result>, shown once as a banner and then removed from the
        address bar);
-     · LinkedIn, YouTube, TikTok, X — "coming soon", with what is missing;
+     · Instagram on CEO Brand — Instagram Login (a Creator account);
+     · LinkedIn on CEO Brand — sign in with LinkedIn (his own profile,
+       publishing only: its card says so, and the day to sign in again);
+     · LinkedIn on Social Marketing, YouTube, TikTok, X — "coming soon",
+       with what is missing;
      · WeChat, WhatsApp, Douyin — added by hand (no posting API).
    "Remove" deletes the account's access key and takes it off the list; its
    history stays. Access keys never reach this screen.
@@ -30,10 +34,11 @@ import { dmyHm } from "@/lib/marketing/format";
 import type { AdsState } from "@/lib/marketing/ads";
 import {
   CONNECT_RESULTS, PLATFORM_ORDER, platformFlow,
-  type ConnectResult, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
+  type ConnectResult, type ConnectVia, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
 } from "@/lib/marketing/spaces";
 
 type MessagesState = { ready: boolean; missing: string[]; error: string | null };
+type LinkedInState = { endsAt: string | null; ended: boolean };
 
 const T: Translations = {
   "accounts.title":   { en: "Connected accounts", zh: "已连接的账号", ar: "الحسابات المربوطة" },
@@ -49,6 +54,9 @@ const T: Translations = {
   "add.signInIg":     { en: "Sign in with Instagram", zh: "使用 Instagram 登录", ar: "تسجيل الدخول بـ Instagram" },
   "add.needsIgKeys":  { en: "Needs the Instagram app keys in Vercel.", zh: "需要在 Vercel 中设置 Instagram 应用密钥。", ar: "يحتاج مفاتيح تطبيق Instagram في Vercel." },
   "note.igLogin":     { en: "A Creator or Business account, no Facebook Page needed: the Hub publishes and reads the comments and numbers.", zh: "创作者或商业账号，无需 Facebook 主页：Hub 负责发布并读取评论和数据。", ar: "حساب Creator أو Business دون صفحة Facebook: يتولى الـ Hub النشر وقراءة التعليقات والأرقام." },
+  "add.signInLi":     { en: "Sign in with LinkedIn", zh: "使用 LinkedIn 登录", ar: "تسجيل الدخول بـ LinkedIn" },
+  "add.needsLiKeys":  { en: "Needs the LinkedIn app keys in Vercel.", zh: "需要在 Vercel 中设置 LinkedIn 应用密钥。", ar: "يحتاج مفاتيح تطبيق LinkedIn في Vercel." },
+  "note.liLogin":     { en: "Your own profile: the Hub publishes words and pictures. LinkedIn sends no posts or numbers back; sign in again every 60 days.", zh: "您的个人主页：Hub 发布文字和图片。LinkedIn 不回传帖子或数据；每 60 天需重新登录。", ar: "حسابك الشخصي: ينشر الـ Hub النصوص والصور. لا يرسل LinkedIn المنشورات أو الأرقام؛ أعد تسجيل الدخول كل 60 يومًا." },
   "add.close":        { en: "Close", zh: "关闭", ar: "إغلاق" },
   "pname.facebook":   { en: "Facebook", zh: "Facebook", ar: "Facebook" },
   "pname.instagram":  { en: "Instagram", zh: "Instagram", ar: "Instagram" },
@@ -76,6 +84,11 @@ const T: Translations = {
   "manual.failed":    { en: "Could not add the account. Try again.", zh: "无法添加该账号，请重试。", ar: "تعذّرت إضافة الحساب. حاول مرة أخرى." },
   "kind.facebook":    { en: "Facebook Page", zh: "Facebook 主页", ar: "صفحة Facebook" },
   "kind.instagram":   { en: "Instagram account", zh: "Instagram 账号", ar: "حساب Instagram" },
+  "kind.linkedin":    { en: "LinkedIn profile", zh: "LinkedIn 个人主页", ar: "حساب LinkedIn شخصي" },
+  "li.only":          { en: "Publishing only", zh: "仅发布", ar: "للنشر فقط" },
+  "li.until":         { en: "Publishing only · sign in again by {date}", zh: "仅发布 · 请在 {date} 前重新登录", ar: "للنشر فقط · أعد تسجيل الدخول قبل {date}" },
+  "li.ended":         { en: "Publishing only · the key ended on {date}: sign in with LinkedIn again", zh: "仅发布 · 密钥已于 {date} 失效：请重新使用 LinkedIn 登录", ar: "للنشر فقط · انتهى المفتاح في {date}: سجّل الدخول بـ LinkedIn مرة أخرى" },
+  "li.again":         { en: "Publishing only · LinkedIn refused the key: sign in with LinkedIn again", zh: "仅发布 · LinkedIn 拒绝了密钥：请重新使用 LinkedIn 登录", ar: "للنشر فقط · رفض LinkedIn المفتاح: سجّل الدخول بـ LinkedIn مرة أخرى" },
   "badge.manual":     { en: "Shared by hand", zh: "手动分享", ar: "مشاركة يدوية" },
   "status.connected":    { en: "Connected", zh: "已连接", ar: "مربوط" },
   "status.expired":      { en: "Key expired", zh: "密钥已过期", ar: "انتهى المفتاح" },
@@ -102,6 +115,7 @@ const T: Translations = {
   "setup.tokenKey":   { en: "Encryption key for the accounts' access keys", zh: "账号访问密钥的加密密钥", ar: "مفتاح تشفير مفاتيح الوصول للحسابات" },
   "setup.meta":       { en: "Meta app keys (App ID, App Secret, Configuration ID)", zh: "Meta 应用密钥（App ID、App Secret、Configuration ID）", ar: "مفاتيح تطبيق Meta (App ID وApp Secret وConfiguration ID)" },
   "setup.instagram":  { en: "Instagram app keys (Instagram App ID, App Secret)", zh: "Instagram 应用密钥（Instagram App ID、App Secret）", ar: "مفاتيح تطبيق Instagram (Instagram App ID وApp Secret)" },
+  "setup.linkedin":   { en: "LinkedIn app keys (Client ID, Client Secret)", zh: "LinkedIn 应用密钥（Client ID、Client Secret）", ar: "مفاتيح تطبيق LinkedIn (Client ID وClient Secret)" },
   "setup.cron":       { en: "Key that protects scheduled publishing", zh: "保护定时发布的密钥", ar: "مفتاح حماية النشر المجدول" },
   "setup.cronNote":   { en: "Needed before scheduled posts, not for adding accounts.", zh: "定时发布前需要，添加账号时不需要。", ar: "مطلوب قبل النشر المجدول، وليس لإضافة الحسابات." },
   "setup.ok":         { en: "In place", zh: "已设置", ar: "جاهز" },
@@ -117,6 +131,9 @@ const T: Translations = {
   "result.failed":    { en: "The sign-in did not finish adding the accounts. Try again; if it happens again, check the Meta app settings.", zh: "登录未能完成账号添加。请重试；如仍失败，请检查 Meta 应用设置。", ar: "لم يُكمل تسجيل الدخول إضافة الحسابات. حاول مرة أخرى، وإذا تكرر راجع إعدادات تطبيق Meta." },
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
+  "result.li.ok":     { en: "LinkedIn is connected. Posts can publish to it now — LinkedIn sends no posts or numbers back to the Hub.", zh: "LinkedIn 已连接。现在可以向其发布帖子——LinkedIn 不会向 Hub 回传帖子或数据。", ar: "تم ربط LinkedIn. يمكن النشر عليه الآن — ولا يرسل LinkedIn المنشورات أو الأرقام إلى الـ Hub." },
+  "result.li.failed": { en: "The sign-in did not finish connecting LinkedIn. Try again; if it happens again, check the LinkedIn app's products and redirect URL.", zh: "登录未能完成 LinkedIn 连接。请重试；如仍失败，请检查 LinkedIn 应用的产品和重定向网址。", ar: "لم يُكمل تسجيل الدخول ربط LinkedIn. حاول مرة أخرى، وإذا تكرر راجع منتجات تطبيق LinkedIn ورابط إعادة التوجيه." },
+  "result.li.setup":  { en: "The LinkedIn app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 LinkedIn 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق LinkedIn أو مفتاح التشفير في Vercel بعد." },
 };
 
 
@@ -137,8 +154,9 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const [setup, setSetup] = useState<MarketingSetup | null>(null);
   const [ads, setAds] = useState<Record<string, AdsState>>({});
   const [msgs, setMsgs] = useState<Record<string, MessagesState>>({});
+  const [liStates, setLiStates] = useState<Record<string, LinkedInState>>({});
   const [loadError, setLoadError] = useState(false);
-  const [result, setResult] = useState<{ code: ConnectResult; n: number } | null>(null);
+  const [result, setResult] = useState<{ code: ConnectResult; n: number; via: ConnectVia | null } | null>(null);
   const [adding, setAdding] = useState(false);
   const [manual, setManual] = useState<MarketingPlatform | null>(null);
   const [form, setForm] = useState({ name: "", handle: "", link: "" });
@@ -153,10 +171,13 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     try {
       const res = await fetch(`/api/marketing/accounts?space=${space}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; messages?: Record<string, MessagesState>; setup: MarketingSetup };
+      const body = (await res.json()) as {
+        accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; messages?: Record<string, MessagesState>; linkedin?: Record<string, LinkedInState>; setup: MarketingSetup;
+      };
       setAccounts(body.accounts);
       setAds(body.ads ?? {});
       setMsgs(body.messages ?? {});
+      setLiStates(body.linkedin ?? {});
       setSetup(body.setup);
     } catch {
       setLoadError(true);
@@ -174,9 +195,10 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     const params = new URLSearchParams(window.location.search);
     const code = params.get("connect") as ConnectResult | null;
     if (!code || !CONNECT_RESULTS.includes(code)) return;
-    setResult({ code, n: Number(params.get("accounts")) || 0 });
+    setResult({ code, n: Number(params.get("accounts")) || 0, via: params.get("via") === "linkedin" ? "linkedin" : null });
     params.delete("connect");
     params.delete("accounts");
+    params.delete("via");
     const rest = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
   }, []);
@@ -195,6 +217,10 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const igReady = !!setup?.tokenKey && !!setup?.instagram;
   const signInWithInstagram = () => {
     window.location.href = `/api/marketing/connect/instagram/start?space=${space}`;
+  };
+  const liReady = !!setup?.tokenKey && !!setup?.linkedin;
+  const signInWithLinkedIn = () => {
+    window.location.href = `/api/marketing/connect/linkedin/start?space=${space}`;
   };
 
   const addManual = async () => {
@@ -241,11 +267,16 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     { key: "tokenKey", label: t("setup.tokenKey") },
     { key: "meta", label: t("setup.meta") },
     { key: "cron", label: t("setup.cron"), note: t("setup.cronNote") },
-    /* The CEO's Instagram signs in with Instagram Login — its own keys. */
-    ...(space === "ceo" ? [{ key: "instagram" as const, label: t("setup.instagram") }] : []),
+    /* The CEO's Instagram signs in with Instagram Login, his LinkedIn with
+       LinkedIn's app — each with its own keys. */
+    ...(space === "ceo" ? [{ key: "instagram" as const, label: t("setup.instagram") }, { key: "linkedin" as const, label: t("setup.linkedin") }] : []),
   ];
   const kindOf = (a: MarketingAccountView) =>
-    a.platform === "facebook" || a.platform === "instagram" ? t(`kind.${a.platform}`) : t(`pname.${a.platform}`);
+    a.platform === "facebook" || a.platform === "instagram" || (a.platform === "linkedin" && a.connection === "api") ? t(`kind.${a.platform}`) : t(`pname.${a.platform}`);
+  /* LinkedIn's sign-in speaks of LinkedIn (publishing only, no Feed). */
+  const resultKey = (r: { code: ConnectResult; n: number; via: ConnectVia | null }) =>
+    r.via === "linkedin" && (r.code === "ok" || r.code === "failed" || r.code === "setup") ? `result.li.${r.code}`
+      : r.code === "ok" ? (r.n === 1 ? "result.okOne" : r.n === 0 ? "result.none" : "result.ok") : `result.${r.code}`;
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
@@ -260,7 +291,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
               : "border-[#F59E0B]/35 bg-[#F59E0B]/10 text-[var(--text-primary)]"
           }`}
         >
-          <span>{t(result.code === "ok" ? (result.n === 1 ? "result.okOne" : result.n === 0 ? "result.none" : "result.ok") : `result.${result.code}`).replace("{n}", String(result.n))}</span>
+          <span>{t(resultKey(result)).replace("{n}", String(result.n))}</span>
           <button type="button" onClick={() => setResult(null)} className="shrink-0 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             {t("dismiss")}
           </button>
@@ -319,7 +350,9 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                     <div className="mt-0.5 truncate text-[12px] text-[var(--text-dim)]">
                       {kindOf(a)}{a.handle ? ` · @${a.handle}` : ""}
                     </div>
-                    {a.connection === "api" && (
+                    {a.connection === "api" && a.platform === "linkedin" ? (
+                      <LinkedInLine state={liStates[a.id]} expired={a.status === "expired"} t={t} />
+                    ) : a.connection === "api" && (
                       <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">
                         {a.last_synced_at ? t("lastSync").replace("{when}", dmyHm(a.last_synced_at)) : t("notSynced")}
                       </div>
@@ -370,11 +403,13 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {PLATFORM_ORDER.map((p) => {
             const flow = platformFlow(space, p);
-            const disabled = flow === "soon" || (flow === "meta" && !metaReady) || (flow === "instagram" && !igReady);
+            const disabled = flow === "soon" || (flow === "meta" && !metaReady) || (flow === "instagram" && !igReady) || (flow === "linkedin" && !liReady);
             const selected = manual === p;
             const note = flow === "manual" ? t("note.manual") : flow === "meta" && !metaReady ? t("add.needsKeys")
-              : flow === "instagram" ? (igReady ? t("note.igLogin") : t("add.needsIgKeys")) : t(`note.${p}`);
-            const action = flow === "meta" ? t("add.signIn") : flow === "instagram" ? t("add.signInIg") : flow === "manual" ? t("add.manual") : t("add.soon");
+              : flow === "instagram" ? (igReady ? t("note.igLogin") : t("add.needsIgKeys"))
+              : flow === "linkedin" ? (liReady ? t("note.liLogin") : t("add.needsLiKeys")) : t(`note.${p}`);
+            const action = flow === "meta" ? t("add.signIn") : flow === "instagram" ? t("add.signInIg") : flow === "linkedin" ? t("add.signInLi")
+              : flow === "manual" ? t("add.manual") : t("add.soon");
             return (
               <li key={p}>
                 <button
@@ -384,6 +419,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                   onClick={() => {
                     if (flow === "meta") signInWithMeta();
                     else if (flow === "instagram") signInWithInstagram();
+                    else if (flow === "linkedin") signInWithLinkedIn();
                     else if (flow === "manual") { setManual(p); setFormError(null); }
                   }}
                   className={`flex h-full w-full flex-col items-start gap-2 rounded-xl border p-3 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -465,6 +501,17 @@ function AdsLine({ state, t }: { state: AdsState; t: (k: string) => string }) {
   else if (state.error) line = t("ads.refused").replace("{why}", state.error.slice(0, 120));
   else line = state.findUntil ? t("ads.until").replace("{date}", dmyHm(state.findUntil).slice(0, 10)) : t("ads.on");
   return <div className={`mt-0.5 text-[11px] ${state.ready && !state.error ? "text-[var(--text-dim)]" : "text-[#F59E0B]"}`}>{line}</div>;
+}
+
+/* A LinkedIn profile, in one line: publishing only (LinkedIn sends nothing
+   back), and the day its key ends — or that it has (or LinkedIn refused it
+   earlier), and to sign in again. */
+function LinkedInLine({ state, expired, t }: { state: LinkedInState | undefined; expired: boolean; t: (k: string) => string }) {
+  const ends = state?.endsAt ?? null;
+  const date = ends ? dmyHm(ends).slice(0, 10) : "";
+  const line = state?.ended ? t("li.ended").replace("{date}", date) : expired ? t("li.again")
+    : ends ? t("li.until").replace("{date}", date) : t("li.only");
+  return <div className={`mt-0.5 text-[11px] ${state?.ended || expired ? "text-[#F59E0B]" : "text-[var(--text-dim)]"}`}>{line}</div>;
 }
 
 /* Private messages, in one line: on, what to add in Meta, or Meta's refusal. */

@@ -65,6 +65,7 @@ const T: Translations = {
   "empty.hint":     { en: "Add a Facebook Page or an Instagram account, and its posts and numbers appear here, the earlier ones too.", zh: "添加 Facebook 主页或 Instagram 账号后，其帖子和数据（包括以往的帖子）会显示在这里。", ar: "أضف صفحة Facebook أو حساب Instagram، وستظهر هنا منشوراته وأرقامه، ومنها المنشورات السابقة." },
   "empty.action":   { en: "Add account", zh: "添加账号", ar: "إضافة حساب" },
   "manual.note":    { en: "Accounts shared by hand (WeChat, WhatsApp, Douyin) have no posts to read, so they are not in the Feed.", zh: "手动分享的账号（微信、WhatsApp、抖音）没有可读取的帖子，因此不在动态中显示。", ar: "الحسابات التي تُشارك يدويًا (WeChat وWhatsApp وDouyin) ليس لها منشورات يمكن قراءتها، لذلك لا تظهر في الـFeed." },
+  "publishOnly.note": { en: "LinkedIn is for publishing only: it sends no posts or numbers back, so it is not in the Feed. Each post keeps its LinkedIn link.", zh: "LinkedIn 仅用于发布：它不会回传帖子或数据，因此不在动态中显示。每条帖子都保留其 LinkedIn 链接。", ar: "LinkedIn للنشر فقط: لا يرسل المنشورات أو الأرقام، لذلك لا يظهر في الـFeed. ويحتفظ كل منشور برابطه على LinkedIn." },
   "chips.label":    { en: "Accounts", zh: "账号", ar: "الحسابات" },
   "followers":      { en: "followers", zh: "位粉丝", ar: "متابع" },
   "thisWeek":       { en: "this week", zh: "本周", ar: "هذا الأسبوع" },
@@ -315,6 +316,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
               action={<Button type="button" onClick={() => router.push(SPACE_ROUTE[space])}>{t("empty.action")}</Button>}
             />
             {feed.manual > 0 && <p className="text-center text-[12px] text-[var(--text-dim)]">{t("manual.note")}</p>}
+            {feed.publishOnly > 0 && <p className="text-center text-[12px] text-[var(--text-dim)]">{t("publishOnly.note")}</p>}
           </div>
         ) : (
           <div className="@container flex flex-col gap-4">
@@ -367,6 +369,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
             </div>
 
             {feed.manual > 0 && <p className="text-[12px] text-[var(--text-dim)]">{t("manual.note")}</p>}
+            {feed.publishOnly > 0 && <p className="text-[12px] text-[var(--text-dim)]">{t("publishOnly.note")}</p>}
           </div>
         )}
       </div>

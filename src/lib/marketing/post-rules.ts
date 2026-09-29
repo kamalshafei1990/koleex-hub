@@ -8,11 +8,14 @@
      videos publish as Reels, 3 seconds to 15 minutes.
    · Facebook: text, up to 10 photos, or ONE video on its own (a video
      cannot share a post with photos through the API).
+   · LinkedIn (the CEO's profile, lib/marketing/linkedin): words up to 3,000
+     characters, or words with up to 9 pictures; no video from the Hub yet.
    Hand-shared accounts (WeChat, WhatsApp, Douyin) only need something to
    share. An account whose key expired cannot be published to.
    --------------------------------------------------------------------------- */
 
 import type { MarketingAccountView } from "@/lib/marketing/spaces";
+import { LI_IMAGES_MAX, LI_TEXT_MAX } from "@/lib/marketing/linkedin";
 import type { PostMedia } from "@/lib/marketing/post-types";
 
 export const MAX_MEDIA = 10;
@@ -33,7 +36,8 @@ export const DECISION_NOTE_MAX = 500;
 export type IssueCode =
   | "empty" | "too_many_media" | "account_expired"
   | "fb_video_alone" | "fb_text_long"
-  | "ig_needs_media" | "ig_caption_long" | "ig_hashtags" | "ig_jpeg" | "ig_ratio" | "ig_video_length";
+  | "ig_needs_media" | "ig_caption_long" | "ig_hashtags" | "ig_jpeg" | "ig_ratio" | "ig_video_length"
+  | "li_text_long" | "li_video" | "li_too_many_images";
 
 export interface Issue {
   code: IssueCode;
@@ -67,6 +71,13 @@ export function targetIssues(
     if (!hasText && media.length === 0) out.push({ code: "empty" });
     if (media.some((m) => m.kind === "video") && media.length > 1) out.push({ code: "fb_video_alone" });
     if (charCount(text) > FB_TEXT_MAX) out.push({ code: "fb_text_long" });
+  }
+
+  if (account.platform === "linkedin") {
+    if (!hasText && media.length === 0) out.push({ code: "empty" });
+    if (charCount(text) > LI_TEXT_MAX) out.push({ code: "li_text_long" });
+    if (media.some((m) => m.kind === "video")) out.push({ code: "li_video" });
+    if (media.filter((m) => m.kind === "image").length > LI_IMAGES_MAX) out.push({ code: "li_too_many_images" });
   }
 
   if (account.platform === "instagram") {

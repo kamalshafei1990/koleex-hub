@@ -46,6 +46,7 @@ import { POSTS_T } from "@/lib/marketing/posts-i18n";
 import { POST_TONE, TARGET_TONE } from "@/lib/marketing/post-status";
 import { dayKey, dmyHm, fromShanghai, hm } from "@/lib/marketing/format";
 import { IG_CAPTION_MAX, IG_HASHTAGS_MAX, MAX_MEDIA, charCount, hashtagCount, targetIssues, type Issue } from "@/lib/marketing/post-rules";
+import { LI_TEXT_MAX } from "@/lib/marketing/linkedin";
 import { MediaPrepError, isPicture, isVideo, uploadPostMedia } from "@/lib/marketing/media-prep";
 import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import type { ComposerSetup, PostDetailResponse, PostMedia, PostStatus, PostTargetView } from "@/lib/marketing/post-types";
@@ -190,6 +191,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
   const approver = detail?.canApprove ?? setup?.canApprove ?? false;
   const issues = chosen.map((a) => ({ a, list: targetIssues(a, textFor(a.id), media) })).filter((x) => x.list.length > 0);
   const igChosen = chosen.some((a) => a.platform === "instagram" && a.connection === "api");
+  const liChosen = chosen.some((a) => a.platform === "linkedin" && a.connection === "api");
   const aiPlatforms = (["facebook", "instagram"] as const).filter((p) => chosen.some((a) => a.platform === p && a.connection === "api"));
   const stillUploading = uploading.some((u) => !u.error);
   const scheduledAt = later && day ? fromShanghai(day, time) : null;
@@ -483,7 +485,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
                 />
               )}
               <textarea dir="auto" rows={7} value={body} readOnly={!writing} onChange={(e) => { touch(); setBody(e.target.value); }} placeholder={t("c.textPlaceholder")} className={`${fieldCls} resize-y`} />
-              <Counters t={t} text={body} ig={igChosen} />
+              <Counters t={t} text={body} ig={igChosen} li={liChosen} />
 
               {chosen.filter((a) => a.id in overrides).map((a) => (
                 <div key={a.id} className="flex flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] p-3">
@@ -494,7 +496,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
                     )}
                   </div>
                   <textarea dir="auto" rows={5} value={overrides[a.id]} readOnly={!writing} onChange={(e) => { const v = e.target.value; touch(); setOverrides((o) => ({ ...o, [a.id]: v })); }} className={`${fieldCls} resize-y`} />
-                  <Counters t={t} text={overrides[a.id]} ig={a.platform === "instagram" && a.connection === "api"} />
+                  <Counters t={t} text={overrides[a.id]} ig={a.platform === "instagram" && a.connection === "api"} li={a.platform === "linkedin" && a.connection === "api"} />
                 </div>
               ))}
               {writing && chosen.some((a) => !(a.id in overrides)) && chosen.length > 1 && (
@@ -694,13 +696,17 @@ function When({ t, lang, day, time, onDay, onTime }: {
   );
 }
 
-function Counters({ t, text, ig }: { t: Tr; text: string; ig: boolean }) {
+function Counters({ t, text, ig, li }: { t: Tr; text: string; ig: boolean; li: boolean }) {
   const n = charCount(text);
   const h = hashtagCount(text);
-  const over = ig && (n > IG_CAPTION_MAX || h > IG_HASHTAGS_MAX);
+  const over = (ig && (n > IG_CAPTION_MAX || h > IG_HASHTAGS_MAX)) || (li && n > LI_TEXT_MAX);
+  const lines = [
+    ig ? t("c.igCount").replace("{n}", n.toLocaleString("en-US")).replace("{h}", String(h)) : null,
+    li ? t("c.liCount").replace("{n}", n.toLocaleString("en-US")) : null,
+  ].filter((x): x is string => !!x);
   return (
     <p className={`text-[11px] tabular-nums ${over ? "text-[#FF3333]" : "text-[var(--text-dim)]"}`}>
-      {ig ? t("c.igCount").replace("{n}", n.toLocaleString("en-US")).replace("{h}", String(h)) : t("c.chars").replace("{n}", n.toLocaleString("en-US"))}
+      {lines.length ? lines.join(" · ") : t("c.chars").replace("{n}", n.toLocaleString("en-US"))}
     </p>
   );
 }
