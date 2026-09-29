@@ -507,4 +507,15 @@ export const brandCenterTemplatesT: Translations = {
   "cert.spec.number": { en: "Record the number and the name in the certificates register before it is handed over.", zh: "颁发前将编号和姓名登记在证书登记簿中。", ar: "سجّل الرقم والاسم في سجل الشهادات قبل ما تتسلّم." },
   "cert.spec.warranty": { en: "Warranty: state the model, serial number, start date and terms — nothing it does not cover (ch. 99).", zh: "保修：写明型号、序列号、起始日期和条款 — 不写不在保修范围内的内容（第 99 章）。", ar: "الضمان: اكتب الموديل والرقم التسلسلي وتاريخ البدء والشروط — ومفيش حاجة مش مغطّاة (فصل 99)." },
   "cert.spec.legal":  { en: "The foot carries the legal name in force on the date of issue.", zh: "页脚使用签发日有效的法定名称。", ar: "تحت بيتكتب الاسم القانوني الساري يوم الإصدار." },
+
+  /* ── certificates, round 2 (owner 30/09: "really made by a professional designer") ── */
+  "cert.style.classic":   { en: "Classic — the book", zh: "经典 — 品牌手册", ar: "كلاسيك — زي الكتاب" },
+  "cert.style.guilloche": { en: "Guilloche — security lines", zh: "扭索纹 — 防伪线", ar: "جيلوش — خطوط أمان" },
+  "cert.style.monolith":  { en: "Monolith — black column", zh: "黑色立柱", ar: "عمود أسود" },
+  "cert.style.editorial": { en: "Editorial", zh: "杂志风", ar: "تحريري" },
+  "cert.style.swiss":     { en: "Swiss grid", zh: "瑞士网格", ar: "شبكة سويسرية" },
+  "cert.style.corners":   { en: "Corners", zh: "四角", ar: "زوايا" },
+  "cert.weight.medium":   { en: "Medium", zh: "中等", ar: "متوسط" },
+  "cert.f.mark":          { en: "The large K mark", zh: "大号 K 标志", ar: "حرف K الكبير" },
+  "cert.spec.guilloche":  { en: "Guilloche: 0.09 mm lines — print at 100% on a laser or offset press; they are also a light security feature.", zh: "扭索纹：0.09 毫米细线 — 用激光或胶印按 100% 印刷；同时具有轻度防伪作用。", ar: "الجيلوش: خطوط 0.09 مم — اطبع 100% ليزر أو أوفست؛ وهي كمان علامة أمان خفيفة." },
 };

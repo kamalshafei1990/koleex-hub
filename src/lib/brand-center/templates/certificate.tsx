@@ -22,12 +22,22 @@ import { EVERYDAY_NAME_EN, legalNameEn } from "@/lib/legal-name";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import type { DrawContext, QrRequest, TemplateDef, TemplateItem, TemplateValue, TemplateValues } from "./types";
 import { LANGS, asLang, fontOf, isPictureQr, list, num, qrsOf, rowsOf, str, type Lang } from "./card/model";
-import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrap, wrapBalanced } from "./card/parts";
+import { Dots, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrap, wrapBalanced } from "./card/parts";
 import { nameIn } from "./person";
 
-export const CERT_STYLES = ["book", "frame", "black", "band", "side", "dots", "minimal", "award"] as const;
+export const CERT_STYLES = ["classic", "guilloche", "black", "monolith", "editorial", "swiss", "dots", "award", "corners"] as const;
 type Style = (typeof CERT_STYLES)[number];
-const styleOf = (v: TemplateValues): Style => ((CERT_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as Style) : "book");
+/** The first styles' names (30/09/2026), for fills saved with them. */
+const OLD_STYLES: Record<string, Style> = { book: "classic", frame: "corners", band: "swiss", side: "monolith", minimal: "editorial" };
+const styleOf = (v: TemplateValues): Style => {
+  const s = OLD_STYLES[String(v.style)] ?? String(v.style);
+  return (CERT_STYLES as readonly string[]).includes(s) ? (s as Style) : "classic";
+};
+/** What each style's designer set: the name's weight. */
+const STYLE_LOOK: Record<Style, { nameWeight: "light" | "regular" | "medium" | "bold" }> = {
+  classic: { nameWeight: "light" }, guilloche: { nameWeight: "light" }, black: { nameWeight: "light" }, monolith: { nameWeight: "light" },
+  editorial: { nameWeight: "bold" }, swiss: { nameWeight: "medium" }, dots: { nameWeight: "light" }, award: { nameWeight: "bold" }, corners: { nameWeight: "light" },
+};
 
 export const CERT_KINDS = ["training", "dealer", "agency", "installation", "warranty", "appreciation", "employee"] as const;
 type Kind = (typeof CERT_KINDS)[number];
@@ -102,10 +112,13 @@ const numberFor = (kind: Kind) => `${PREFIX[kind]}-${new Date().getFullYear()}-0
 
 /* ── reading the fill ──────────────────────────────────────────────────── */
 
+const WEIGHTS: Record<string, number> = { light: 300, regular: 400, medium: 500, bold: 700 };
+
 function read(v: TemplateValues, ctx: DrawContext) {
   const lang = asLang(v.lang);
   const w = ctx.w, h = ctx.h;
   const foot = v.foot === "none" ? "none" : v.foot === "everyday" ? "everyday" : "legal";
+  const style = styleOf(v);
   return {
     b: ctx.bleed, w, h, W: w + ctx.bleed * 2, H: h + ctx.bleed * 2, tall: h > w,
     /** mm per mm of an A4's short side: everything grows with the paper */
@@ -121,6 +134,8 @@ function read(v: TemplateValues, ctx: DrawContext) {
     ],
     seal: v.seal === "silver" ? "silver" : v.seal === "emboss" ? "emboss" : "none",
     foot, footName: foot === "legal" ? legalNameEn(issued(v)) : EVERYDAY_NAME_EN,
+    nameWeight: WEIGHTS[String(v.nameWeight)] ?? WEIGHTS[STYLE_LOOK[style].nameWeight],
+    mark: v.mark !== false,
     qrs: qrsOf(v),
   };
 }
@@ -128,153 +143,260 @@ type R = ReturnType<typeof read>;
 
 /* ── type ──────────────────────────────────────────────────────────────── */
 
-function Txt({ r, x, y, size, children, fill, weight = 400, anchor = "middle", max, spacing, ltr }: {
+const ARABIC = /[\u0600-\u06FF]/;
+const NOT_LATIN = /[\u0600-\u06FF\u2E80-\u9FFF]/;
+/** Capitals with air — the headings and every small label. Chinese and
+ *  Arabic keep their own shapes. */
+const caps = (s: string) => (NOT_LATIN.test(s) ? s : s.toUpperCase());
+
+function Txt({ r, x, y, size, children, fill, weight = 400, anchor = "middle", align, max, spacing, ltr }: {
   r: R; x: number; y: number; size: number; children: string; fill: string; weight?: number;
-  anchor?: "start" | "middle" | "end"; max?: number; spacing?: number; ltr?: boolean;
+  anchor?: "start" | "middle" | "end";
+  /** The side of x the text sits on, whatever its direction (an Arabic
+   *  line's "start" is its right edge). Wins over `anchor`. */
+  align?: "left" | "right" | "center";
+  max?: number; spacing?: number; ltr?: boolean;
 }) {
   /* letter-spacing would break the joins of Arabic letters */
   const spaced = spacing && !ARABIC.test(children) ? spacing : undefined;
+  const dir = ltr ? "ltr" : r.rtl ? "rtl" : "ltr";
+  const a = align === "center" ? "middle" : align === "left" ? (dir === "ltr" ? "start" : "end") : align === "right" ? (dir === "ltr" ? "end" : "start") : anchor;
   return (
-    <text x={x} y={y} textAnchor={anchor} direction={ltr ? "ltr" : r.rtl ? "rtl" : "ltr"} fill={fill}
+    <text x={x} y={y} textAnchor={a} direction={dir} fill={fill}
       {...(max ? fit(children, size, max, weight, r.font) : {})}
       style={{ fontFamily: r.font, fontSize: size, fontWeight: weight, letterSpacing: spaced, unicodeBidi: "plaintext", fontVariantNumeric: "tabular-nums" }}>{children}</text>
   );
 }
-/** Capitals with air — the heading and every small label. Chinese and
- *  Arabic keep their own shapes. */
-const ARABIC = /[\u0600-\u06FF]/;
-const NOT_LATIN = /[\u0600-\u06FF\u2E80-\u9FFF]/;
-const caps = (s: string) => (NOT_LATIN.test(s) ? s : s.toUpperCase());
+/** Width of a line with its letter-spacing. */
+const tracked = (r: R, text: string, size: number, weight: number, spacing: number) =>
+  textWidth(text, size, weight, r.font) + (ARABIC.test(text) ? 0 : text.length * spacing);
 
-interface Look { ink: string; sub: string; faint: string; nameFill?: string; accent: string; silverDefs?: boolean }
+interface Look { ink: string; sub: string; faint: string; line: string; nameFill?: string; paper: string }
+const LIGHT: Look = { ink: INK, sub: "#3A3A3C", faint: "#8E8E93", line: "#C7C7CC", paper: WHITE };
+const DARK: Look = { ink: WHITE, sub: "#C7C7CC", faint: "#8E8E93", line: "#48484A", paper: INK };
 
-/** The body: the heading, the words before the name, the name (as large as
- *  it fits), the name in its own script, the organisation, the statement,
- *  the facts. Measured first, then placed between `top` and `bottom`. */
-function Body({ r, x, top, bottom, width, align, look }: { r: R; x: number; top: number; bottom: number; width: number; align: "middle" | "start"; look: Look }) {
-  const u = r.u;
-  const lay = (y0: number) => {
-    const nodes: ReactNode[] = [];
-    let y = y0;
-    const anchor = align;
-    if (r.heading) {
-      const s = (NOT_LATIN.test(r.heading) ? 6.2 : 4.2) * u;
-      y += s;
-      nodes.push(<Txt key="h" r={r} x={x} y={y} size={s} fill={look.sub} weight={600} anchor={anchor} max={width} spacing={s * 0.32}>{caps(r.heading)}</Txt>);
-      y += 9 * u;
-    }
-    if (r.pre) { const s = 4.4 * u; y += s; nodes.push(<Txt key="p" r={r} x={x} y={y} size={s} fill={look.sub} anchor={anchor} max={width}>{r.pre}</Txt>); y += 5 * u; }
-    /* the name: one line up to 16 mm, two balanced lines below 10 mm */
-    const max = 16 * u * r.k, min = 10 * u * r.k;
-    const w1 = textWidth(r.name, max, 700, r.font);
-    let size = max, lines = [r.name];
-    if (w1 > width) {
-      size = (max * width) / w1;
-      if (size < min && /\s/.test(r.name)) { size = max * 0.8; lines = wrapBalanced(r.name, size, width, 700, r.font); const wd = Math.max(...lines.map((l) => textWidth(l, size, 700, r.font))); if (wd > width) size = (size * width) / wd; }
-    }
-    lines.forEach((l, i) => { y += i === 0 ? size * 0.9 : size * 1.1; nodes.push(<Txt key={`n${i}`} r={r} x={x} y={y} size={size} fill={look.nameFill ?? look.ink} weight={700} anchor={anchor} max={width}>{l}</Txt>); });
-    if (r.name2 && r.name2 !== r.name) { const s = 6.5 * u; y += s * 1.5; nodes.push(<Txt key="n2" r={r} x={x} y={y} size={s} fill={look.ink} anchor={anchor} max={width}>{r.name2}</Txt>); }
-    if (r.org) { const s = 5 * u; y += s * 1.6; nodes.push(<Txt key="o" r={r} x={x} y={y} size={s} fill={look.ink} weight={500} anchor={anchor} max={width}>{r.org}</Txt>); }
-    if (r.statement) {
-      const s = 4.6 * u;
-      const sw = Math.min(width, (r.tall ? 0.86 : 0.64) * r.w);
-      y += 7 * u;
-      wrap(r.statement, s, sw, 3, 400, r.font).forEach((l, i) => { y += i === 0 ? s : s * 1.45; nodes.push(<Txt key={`s${i}`} r={r} x={x} y={y} size={s} fill={look.sub} anchor={anchor} max={sw}>{l}</Txt>); });
-    }
-    if (r.facts.length) {
-      y += 11 * u;
-      const f = Facts({ r, x, y, width, align, look });
-      nodes.push(<g key="facts">{f.node}</g>);
-      y = f.bottom;
-    }
-    return { nodes, bottom: y };
-  };
-  const probe = lay(0).bottom;
-  const y0 = top + Math.max(0, (bottom - top - probe) * 0.5);
-  const done = lay(y0);
-  return { node: <g>{done.nodes}</g>, bottom: done.bottom };
+/** A small label in spaced capitals. */
+function Label({ r, x, y, text, anchor, align, look, size, fill, ltr }: { r: R; x: number; y: number; text: string; anchor?: "start" | "middle" | "end"; align?: "left" | "right" | "center"; look: Look; size?: number; fill?: string; ltr?: boolean }) {
+  const s = size ?? 2.4 * r.u;
+  return <Txt r={r} x={x} y={y} size={s} fill={fill ?? look.faint} weight={600} anchor={anchor} align={align} spacing={s * 0.24} ltr={ltr}>{caps(text)}</Txt>;
 }
 
-/** The facts: small capitals over the values, in columns; two rows when
- *  they do not fit across. */
-function Facts({ r, x, y, width, align, look }: { r: R; x: number; y: number; width: number; align: "middle" | "start"; look: Look }) {
-  const u = r.u;
-  const ls = 2.7 * u, vs = 4.2 * u, gap = 12 * u;
-  const cells = r.facts.map((f) => ({ label: caps(f.label.trim()), value: f.value.trim(), w: 0 }));
-  for (const c of cells) c.w = Math.max(textWidth(c.label, ls, 600, r.font) + c.label.length * ls * 0.18, textWidth(c.value, vs, 500, r.font), 18 * u);
-  const rows: (typeof cells)[] = [];
-  let cur: typeof cells = [], used = 0;
-  for (const c of cells) {
-    if (cur.length && used + gap + c.w > width) { rows.push(cur); cur = []; used = 0; }
-    used += (cur.length ? gap : 0) + c.w; cur.push(c);
+/** The title as a designer sets it: spaced capitals between two hairlines
+ *  (centred), or after one (from the start edge). */
+function HeadingMark({ r, x, y, align, look, size }: { r: R; x: number; y: number; align: "middle" | "start"; look: Look; size?: number }) {
+  if (!r.heading) return null;
+  const s = size ?? (NOT_LATIN.test(r.heading) ? 5.2 : 3.2) * r.u;
+  const sp = s * 0.3;
+  const tw = tracked(r, caps(r.heading), s, 600, sp);
+  const rule = 12 * r.u, gap = 5 * r.u;
+  const lineY = y - s * 0.34;
+  if (align === "middle") {
+    return (
+      <g>
+        <rect x={x - tw / 2 - gap - rule} y={lineY} width={rule} height={0.2} fill={look.ink} />
+        <rect x={x + tw / 2 + gap} y={lineY} width={rule} height={0.2} fill={look.ink} />
+        <Txt r={r} x={x} y={y} size={s} fill={look.ink} weight={600} spacing={sp}>{caps(r.heading)}</Txt>
+      </g>
+    );
   }
-  if (cur.length) rows.push(cur);
-  const nodes: ReactNode[] = [];
-  let yy = y;
-  rows.forEach((row, ri) => {
-    const total = row.reduce((a, c) => a + c.w, 0) + gap * (row.length - 1);
-    let cx = align === "middle" ? x - total / 2 : r.rtl ? x - total : x;
-    const ordered = r.rtl ? [...row].reverse() : row;
-    for (const c of ordered) {
-      const mid = cx + c.w / 2;
-      const anchor = align === "middle" ? "middle" : r.rtl ? "end" : "start";
-      const tx = align === "middle" ? mid : r.rtl ? cx + c.w : cx;
-      nodes.push(
-        <g key={`${ri}-${c.label}`}>
-          <Txt r={r} x={tx} y={yy + ls} size={ls} fill={look.faint} weight={600} anchor={anchor} max={c.w} spacing={ls * 0.18}>{c.label}</Txt>
-          <Txt r={r} x={tx} y={yy + ls + 2.2 * u + vs} size={vs} fill={look.ink} weight={500} anchor={anchor} max={c.w}>{c.value}</Txt>
-        </g>,
-      );
-      cx += c.w + gap;
-    }
-    yy += ls + 2.2 * u + vs + (ri < rows.length - 1 ? 7 * u : 0);
-  });
-  return { node: <g>{nodes}</g>, bottom: yy };
-}
-
-/** The signatures, the date and the number on one line: the value (or a
- *  scanned signature) over a rule, the label under it. */
-function SignRow({ r, x0, x1, y, look, align = "middle" }: { r: R; x0: number; x1: number; y: number; look: Look; align?: "middle" | "start" }) {
-  const u = r.u;
-  const L = LABELS[r.lang];
-  type Block = { key: string; value?: string; image?: string; label: string; name?: string; strong?: boolean };
-  const blocks: Block[] = [
-    ...r.sigs.map((s, i) => ({ key: `sig${i}`, image: s.image, name: s.name, label: s.role, strong: true })),
-    { key: "date", value: r.date, label: L.date },
-    { key: "no", value: r.number, label: L.number },
-  ];
-  const n = blocks.length;
-  const bw = Math.min(60 * u, ((x1 - x0) - (n - 1) * 10 * u) / n);
-  const span = align === "middle" ? x1 - x0 : n * bw + (n - 1) * 12 * u;
-  const step = n > 1 ? (span - bw) / (n - 1) : 0;
-  const ordered = r.rtl ? [...blocks].reverse() : blocks;
-  const start = align === "middle" ? x0 : r.rtl ? x1 - span : x0;
+  const ruleX = r.rtl ? x - rule : x;
+  const tx = r.rtl ? x - rule - gap : x + rule + gap;
   return (
     <g>
-      {ordered.map((bk, i) => {
-        const bx = start + i * step;
-        const cx = bx + bw / 2;
-        return (
-          <g key={bk.key}>
-            {bk.image ? <image href={bk.image} x={bx + 4 * u} y={y - 17 * u} width={bw - 8 * u} height={15.5 * u} preserveAspectRatio="xMidYMax meet" /> : null}
-            {bk.value ? <Txt r={r} x={cx} y={y - 2 * u} size={4 * u} fill={look.ink} weight={500} max={bw} ltr>{bk.value}</Txt> : null}
-            <rect x={bx} y={y} width={bw} height={bk.strong ? 0.3 : 0.2} fill={bk.strong ? look.ink : look.faint} />
-            {bk.name ? <Txt r={r} x={cx} y={y + 5.2 * u} size={3.6 * u} fill={look.ink} weight={600} max={bw}>{bk.name}</Txt> : null}
-            {bk.label ? <Txt r={r} x={cx} y={y + (bk.name ? 9.8 * u : 5.2 * u)} size={3 * u} fill={look.sub} max={bw}>{bk.label}</Txt> : null}
-          </g>
-        );
-      })}
+      <rect x={ruleX} y={lineY} width={rule} height={0.2} fill={look.ink} />
+      <Txt r={r} x={tx} y={y} size={s} fill={look.ink} weight={600} anchor="start" spacing={sp}>{caps(r.heading)}</Txt>
     </g>
   );
 }
 
-/** A silver foil seal: the group's name around the rim, the logo inside. */
+/** The name: one line up to `max`, two balanced lines below `min`. */
+function heroFit(r: R, max: number, min: number, width: number) {
+  const wt = r.nameWeight;
+  const w1 = textWidth(r.name, max, wt, r.font);
+  if (w1 <= width) return { lines: [r.name], size: max };
+  let size = (max * width) / w1;
+  let lines = [r.name];
+  if (size < min && /\s/.test(r.name)) {
+    size = max * 0.78;
+    lines = wrapBalanced(r.name, size, width, wt, r.font);
+    const wd = Math.max(...lines.map((l) => textWidth(l, size, wt, r.font)));
+    if (wd > width) size = (size * width) / wd;
+  }
+  return { lines, size };
+}
+
+/** The hairline grid (facts, signatures): a rule over the row, hairlines
+ *  between the cells, a spaced label and a value in each; a scanned
+ *  signature stands on the rule. Returns its foot. */
+interface Cell { label: string; value: string; image?: string; strong?: boolean; ltr?: boolean }
+function Grid({ r, x, y, width, cells, look, align }: { r: R; x: number; y: number; width: number; cells: Cell[]; look: Look; align: "middle" | "start" }) {
+  const u = r.u;
+  if (!cells.length) return { node: null as ReactNode, bottom: y };
+  const n = cells.length;
+  const cw = width / n;
+  const hgt = 13 * u;
+  const ordered = r.rtl ? [...cells].reverse() : cells;
+  const pad = 4 * u;
+  return {
+    bottom: y + hgt,
+    node: (
+      <g>
+        <rect x={x} y={y} width={width} height={0.2} fill={look.line} />
+        {ordered.map((c, i) => {
+          const cx0 = x + i * cw;
+          const first = r.rtl ? i === n - 1 : i === 0;
+          const tx = align === "middle" ? cx0 + cw / 2 : r.rtl ? cx0 + cw - (first ? 0 : pad) : cx0 + (first ? 0 : pad);
+          const al = align === "middle" ? "center" : r.rtl ? "right" : "left";
+          return (
+            <g key={`${i}-${c.label}`}>
+              {i > 0 ? <rect x={cx0} y={y + 2.2 * u} width={0.15} height={hgt - 2.2 * u} fill={look.line} /> : null}
+              {c.image ? <image href={c.image} x={cx0 + pad} y={y - 16 * u} width={cw - pad * 2} height={15 * u} preserveAspectRatio={align === "middle" ? "xMidYMax meet" : r.rtl ? "xMaxYMax meet" : "xMinYMax meet"} /> : null}
+              <Label r={r} x={tx} y={y + 5.6 * u} text={c.label} align={al} look={look} size={2.2 * u} />
+              <Txt r={r} x={tx} y={y + 11.4 * u} size={3.7 * u} fill={look.ink} weight={c.strong ? 600 : 500} align={al} max={cw - pad * 1.5} ltr={c.ltr}>{c.value || " "}</Txt>
+            </g>
+          );
+        })}
+      </g>
+    ),
+  };
+}
+const signCells = (r: R): Cell[] => [
+  ...r.sigs.map((s) => ({ label: s.role || " ", value: s.name, image: s.image, strong: true })),
+  { label: LABELS[r.lang].date, value: r.date, ltr: true },
+  { label: LABELS[r.lang].number, value: r.number, ltr: true },
+];
+
+/** The body in reading order — pre, name, name in its own script, the
+ *  organisation, the statement, the facts — measured, then placed. */
+interface BodyOpts { x: number; width: number; align: "middle" | "start"; look: Look; max: number; min: number; preAsLabel?: boolean; statementW?: number; factsW?: number }
+function Body({ r, top, bottom, o }: { r: R; top: number; bottom: number; o: BodyOpts }) {
+  const u = r.u;
+  const anchor = o.align;
+  const lay = (y0: number) => {
+    const nodes: ReactNode[] = [];
+    let y = y0;
+    if (r.pre) {
+      if (o.preAsLabel) { y += 2.6 * u; nodes.push(<Label key="pre" r={r} x={o.x} y={y} text={r.pre} anchor={anchor} look={o.look} size={2.6 * u} />); y += 6 * u; }
+      else { y += 4.2 * u; nodes.push(<Txt key="pre" r={r} x={o.x} y={y} size={4.2 * u} fill={o.look.sub} anchor={anchor} max={o.width}>{r.pre}</Txt>); y += 4 * u; }
+    }
+    const hero = heroFit(r, o.max * r.k, o.min * r.k, o.width);
+    hero.lines.forEach((l, i) => {
+      y += i === 0 ? hero.size * 0.92 : hero.size * 1.08;
+      nodes.push(<Txt key={`n${i}`} r={r} x={o.x} y={y} size={hero.size} fill={o.look.nameFill ?? o.look.ink} weight={r.nameWeight} anchor={anchor} max={o.width} spacing={hero.size >= 14 * u && r.nameWeight <= 400 ? -hero.size * 0.012 : undefined}>{l}</Txt>);
+    });
+    y += hero.size * 0.12;
+    if (r.name2 && r.name2 !== r.name) { const s = 6 * u; y += s * 1.5; nodes.push(<Txt key="n2" r={r} x={o.x} y={y} size={s} fill={o.look.ink} weight={300} anchor={anchor} max={o.width}>{r.name2}</Txt>); }
+    if (r.org) { const s = 4.4 * u; y += s * 1.9; nodes.push(<Txt key="org" r={r} x={o.x} y={y} size={s} fill={o.look.ink} weight={500} anchor={anchor} max={o.width}>{r.org}</Txt>); }
+    if (r.statement) {
+      const s = 4.1 * u;
+      const sw = o.statementW ?? o.width;
+      y += 6.5 * u;
+      wrap(r.statement, s, sw, 3, 400, r.font).forEach((l, i) => { y += i === 0 ? s : s * 1.55; nodes.push(<Txt key={`s${i}`} r={r} x={o.x} y={y} size={s} fill={o.look.sub} anchor={anchor} max={sw}>{l}</Txt>); });
+    }
+    if (r.facts.length) {
+      y += 10 * u;
+      const fw = Math.min(o.factsW ?? o.width, r.facts.length * 62 * u);
+      const gx = o.align === "middle" ? o.x - fw / 2 : r.rtl ? o.x - fw : o.x;
+      const grid = Grid({ r, x: gx, y, width: fw, cells: r.facts.map((f) => ({ label: f.label.trim(), value: f.value.trim() })), look: o.look, align: o.align });
+      nodes.push(<g key="facts">{grid.node}</g>);
+      y = grid.bottom;
+    }
+    return { nodes, bottom: y };
+  };
+  const height = lay(0).bottom;
+  return { node: <g>{lay(top + Math.max(0, (bottom - top - height) * 0.5)).nodes}</g>, fits: height <= bottom - top };
+}
+
+/** The foot: a hairline and, in small capitals, the legal name in force on
+ *  the day of issue with its Chinese name — the house lockup set as fine
+ *  print — or the everyday name. Returns the line's y. */
+function Foot({ r, x0, x1, look }: { r: R; x0: number; x1: number; look: Look }) {
+  const u = r.u;
+  const y = r.b + r.h - 13 * u;
+  if (r.foot === "none") return { node: null as ReactNode, top: r.b + r.h - 8 * u };
+  const s = 2.2 * u;
+  const tagline = KOLEEX_COMPANY.tagline.replace(/\.$/, "");
+  const room = x1 - x0;
+  return {
+    top: y,
+    node: (
+      <g>
+        <rect x={x0} y={y} width={room} height={0.15} fill={look.line} />
+        <Txt r={r} x={x0} y={y + 5 * u} size={s} fill={look.faint} weight={600} anchor="start" spacing={s * 0.12} ltr max={room * (room > 200 * u ? 0.4 : 0.56)}>{r.footName}</Txt>
+        {room > 200 * u ? <Txt r={r} x={(x0 + x1) / 2} y={y + 5 * u} size={s} fill={look.faint} weight={600} spacing={s * 0.3} ltr>{tagline}</Txt> : null}
+        <Txt r={r} x={x1} y={y + 5 * u} size={s} fill={look.faint} weight={500} anchor="end" ltr max={room * (room > 200 * u ? 0.3 : 0.4)}>{r.foot === "legal" ? KOLEEX_COMPANY.zh : KOLEEX_COMPANY.web}</Txt>
+      </g>
+    ),
+  };
+}
+
+/* ── ornaments ─────────────────────────────────────────────────────────── */
+
+/** A guilloche band — interlaced waves along each side between hairlines,
+ *  a rosette in each corner: the fine line-work of certificates and
+ *  banknotes, in one grey. */
+function Guilloche({ x0, y0, x1, y1, T, color }: { x0: number; y0: number; x1: number; y1: number; T: number; color: string }) {
+  const waves = 8;
+  const amp = T * 0.38;
+  const lambda = T * 1.5;
+  const paths: string[] = [];
+  const side = (ax: number, ay: number, bx: number, by: number, nx: number, ny: number) => {
+    const len = Math.hypot(bx - ax, by - ay);
+    const dx = (bx - ax) / len, dy = (by - ay) / len;
+    const steps = Math.ceil(len / (lambda / 16));
+    for (let k = 0; k < waves; k++) {
+      const ph = (k / waves) * Math.PI * 2;
+      let d = "";
+      for (let i = 0; i <= steps; i++) {
+        const s = (i / steps) * len;
+        const off = amp * Math.sin((s / lambda) * Math.PI * 2 + ph);
+        const px = ax + dx * s + nx * off, py = ay + dy * s + ny * off;
+        d += `${i ? "L" : "M"}${px.toFixed(2)} ${py.toFixed(2)}`;
+      }
+      paths.push(d);
+    }
+  };
+  const c = T / 2;
+  side(x0 + T, y0 + c, x1 - T, y0 + c, 0, 1);
+  side(x0 + T, y1 - c, x1 - T, y1 - c, 0, 1);
+  side(x0 + c, y0 + T, x0 + c, y1 - T, 1, 0);
+  side(x1 - c, y0 + T, x1 - c, y1 - T, 1, 0);
+  return (
+    <g fill="none" stroke={color}>
+      <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} strokeWidth={0.3} />
+      <rect x={x0 + T} y={y0 + T} width={x1 - x0 - 2 * T} height={y1 - y0 - 2 * T} strokeWidth={0.2} />
+      {paths.map((d, i) => <path key={i} d={d} strokeWidth={0.09} />)}
+      {[[x0 + c, y0 + c], [x1 - c, y0 + c], [x0 + c, y1 - c], [x1 - c, y1 - c]].map(([cx, cy]) => (
+        <Rosette key={`${cx}-${cy}`} cx={cx} cy={cy} r0={T * 0.2} r1={T * 0.48} color={color} rings={5} lobes={8} width={0.07} />
+      ))}
+    </g>
+  );
+}
+/** Wavy rings between r0 and r1 — a rosette of fine lines. */
+function Rosette({ cx, cy, r0, r1, color, rings = 7, lobes = 12, width = 0.09 }: { cx: number; cy: number; r0: number; r1: number; color: string; rings?: number; lobes?: number; width?: number }) {
+  const out: string[] = [];
+  const rm = (r0 + r1) / 2, a = (r1 - r0) / 2;
+  for (let k = 0; k < rings; k++) {
+    const ph = (k / rings) * Math.PI * 2 / lobes;
+    let d = "";
+    for (let i = 0; i <= 240; i++) {
+      const t = (i / 240) * Math.PI * 2;
+      const rr = rm + a * Math.sin(lobes * (t + ph));
+      d += `${i ? "L" : "M"}${(cx + rr * Math.cos(t)).toFixed(2)} ${(cy + rr * Math.sin(t)).toFixed(2)}`;
+    }
+    out.push(`${d}Z`);
+  }
+  return <g fill="none" stroke={color} strokeWidth={width}>{out.map((d, i) => <path key={i} d={d} />)}</g>;
+}
+
+/** The silver foil seal: guilloche rings, the tagline and the group's name
+ *  around the rim, the logo on a clear centre. */
 function Seal({ r, cx, cy, rad, dark }: { r: R; cx: number; cy: number; rad: number; dark: boolean }) {
   if (r.seal !== "silver") return null;
   const id = `${r.uid}-seal`;
-  const rt = rad * 0.76;
+  const rt = rad * 0.84;
   const ring = `M ${cx - rt} ${cy} a ${rt} ${rt} 0 1 1 ${rt * 2} 0 a ${rt} ${rt} 0 1 1 ${-rt * 2} 0`;
-  const lw = rad * 0.92;
+  const lw = rad * 0.86;
   const words = `${KOLEEX_COMPANY.tagline.replace(/\.$/, "")}  ·  KOLEEX INTERNATIONAL GROUP  ·  `;
   return (
     <g>
@@ -283,225 +405,265 @@ function Seal({ r, cx, cy, rad, dark }: { r: R; cx: number; cy: number; rad: num
         <path id={`${id}-p`} d={ring} />
       </defs>
       <circle cx={cx} cy={cy} r={rad} fill={`url(#${id}-g)`} />
-      <circle cx={cx} cy={cy} r={rad * 0.95} fill="none" stroke="#8E8E93" strokeWidth={0.2} />
-      <circle cx={cx} cy={cy} r={rad * 0.58} fill={dark ? INK : WHITE} stroke="#8E8E93" strokeWidth={0.2} />
-      <text fill="#3A3A3C" style={{ fontFamily: r.font, fontSize: rad * 0.13, fontWeight: 600, letterSpacing: rad * 0.02 }}>
-        <textPath href={`#${id}-p`} textLength={2 * Math.PI * rt * 0.98} lengthAdjust="spacing">{words}</textPath>
+      <circle cx={cx} cy={cy} r={rad * 0.97} fill="none" stroke="#8E8E93" strokeWidth={0.15} />
+      <circle cx={cx} cy={cy} r={rad * 0.74} fill="none" stroke="#8E8E93" strokeWidth={0.15} />
+      <Rosette cx={cx} cy={cy} r0={rad * 0.56} r1={rad * 0.72} color="#8E8E93" rings={6} lobes={18} width={0.07} />
+      <circle cx={cx} cy={cy} r={rad * 0.54} fill={dark ? INK : WHITE} stroke="#8E8E93" strokeWidth={0.15} />
+      <text fill="#3A3A3C" style={{ fontFamily: r.font, fontSize: rad * 0.11, fontWeight: 600 }}>
+        <textPath href={`#${id}-p`} textLength={2 * Math.PI * rt * 0.985} lengthAdjust="spacing">{words}</textPath>
       </text>
       <Logo x={cx - lw / 2} y={cy - logoHeight(lw) / 2} width={lw} fill={dark ? WHITE : INK} />
     </g>
   );
 }
 
-/** The foot: the black strip with the legal name (English and Chinese) and
- *  the grey tagline — the house strips of every Koleex document — or the
- *  everyday name. Returns its top. */
-function Foot({ r, dark }: { r: R; dark: boolean }) {
-  const u = r.u;
-  if (r.foot === "none") return { node: null as ReactNode, top: r.b + r.h };
-  const s = 2.9 * u;
-  if (dark) {
-    /* inside the black card's silver frame (10 mm in) */
-    const top = r.b + r.h - 26 * u;
-    return {
-      top,
-      node: (
-        <g>
-          <rect x={r.b + 30 * u} y={top} width={r.w - 60 * u} height={0.2} fill="#48484A" />
-          <Txt r={r} x={r.b + r.w / 2} y={top + 6 * u} size={s} fill={GREY_ON_INK} weight={600} spacing={s * 0.06} ltr max={r.w - 40 * u}>
-            {r.foot === "legal" ? `${r.footName}   ${KOLEEX_COMPANY.zh}` : r.footName}
-          </Txt>
-          <Txt r={r} x={r.b + r.w / 2} y={top + 10.5 * u} size={s * 0.9} fill="#636366" weight={600} spacing={s * 0.3} ltr>{KOLEEX_COMPANY.tagline}</Txt>
-        </g>
-      ),
-    };
-  }
-  const bh = 8 * u, gh = 6 * u;
-  const top = r.b + r.h - bh - gh;
-  const pad = 14 * u;
-  return {
-    top,
-    node: (
-      <g>
-        <rect x={0} y={top} width={r.W} height={bh} fill={INK} />
-        {r.foot === "legal" ? (
-          <>
-            <Txt r={r} x={r.b + pad} y={top + bh / 2 + s * 0.36} size={s} fill={WHITE} weight={600} anchor="start" spacing={s * 0.05} ltr max={r.w * 0.55}>{r.footName}</Txt>
-            <Txt r={r} x={r.b + r.w - pad} y={top + bh / 2 + s * 0.36} size={s} fill={WHITE} weight={600} anchor="end" ltr max={r.w * 0.38}>{KOLEEX_COMPANY.zh}</Txt>
-          </>
-        ) : (
-          <>
-            <Txt r={r} x={r.b + pad} y={top + bh / 2 + s * 0.36} size={s} fill={WHITE} weight={600} anchor="start" spacing={s * 0.05} ltr>{r.footName}</Txt>
-            <Txt r={r} x={r.b + r.w - pad} y={top + bh / 2 + s * 0.36} size={s} fill={WHITE} anchor="end" ltr>{KOLEEX_COMPANY.web}</Txt>
-          </>
-        )}
-        <rect x={0} y={top + bh} width={r.W} height={r.H - top - bh} fill="#F5F5F7" />
-        <Txt r={r} x={r.b + r.w / 2} y={top + bh + gh / 2 + s * 0.34} size={s * 0.9} fill={GREY_ON_WHITE} weight={600} spacing={s * 0.32} ltr>{KOLEEX_COMPANY.tagline}</Txt>
-      </g>
-    ),
-  };
+/** The K of the wordmark, unaltered, as a large quiet mark. */
+const K_PATH = "M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z";
+function KMark({ x, y, height, fill }: { x: number; y: number; height: number; fill: string }) {
+  return <path d={K_PATH} fill={fill} transform={`translate(${x} ${y}) scale(${height / 107.57})`} />;
 }
 
-/** QR codes (a link to check the certificate, the website …) in a corner. */
+/** QR codes (a link to check the certificate, the website …). */
 function Codes({ r, x, y, size, look }: { r: R; x: number; y: number; size: number; look: Look }) {
   if (!r.qrs.length) return null;
   const n = r.qrs.length;
-  return <QrZone items={r.qrs} codes={r.codes} font={r.font} captionFill={look.sub} max={size} zone={{ x, y, w: n * size + (n - 1) * 3 * r.u, h: size + 3 * r.u, dir: "row", align: "start" }} />;
+  return <QrZone items={r.qrs} codes={r.codes} font={r.font} captionFill={look.faint} max={size} zone={{ x, y, w: n * size + (n - 1) * 3 * r.u, h: size + 3 * r.u, dir: "row", align: "start" }} />;
 }
 
-/* ── the eight styles ──────────────────────────────────────────────────── */
-
-const LIGHT: Look = { ink: INK, sub: GREY_ON_WHITE, faint: "#8E8E93", accent: INK };
+/* ── the nine styles ───────────────────────────────────────────────────── */
 
 function page(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
   const { b, w, h, W, H, u, tall } = r;
-  const cx = b + w / 2;
   const style = styleOf(v);
-  const sealR = 17 * u;
-  const qrSize = 18 * u;
+  const M = (tall ? 18 : 20) * u;
+  const cx = b + w / 2;
+  const x0 = b + M, x1 = b + w - M;
+  const sealR = 15 * u;
+  const qr = 16 * u;
 
-  if (style === "black") {
-    /* Black card, silver print: the white logo, silver heading and name. */
-    const look: Look = { ink: WHITE, sub: "#AEAEB2", faint: "#8E8E93", nameFill: `url(#${r.uid}-silver)`, accent: WHITE };
-    const foot = Foot({ r, dark: true });
-    const lw = (tall ? 0.34 : 0.2) * w;
-    const logoY = b + 22 * u;
-    const signY = foot.top - 18 * u;
-    const reserve = tall && r.seal === "silver" ? 2 * sealR + 22 * u : 26 * u;
-    const body = Body({ r, x: cx, top: logoY + logoHeight(lw) + 12 * u, bottom: signY - reserve, width: w * 0.78, align: "middle", look });
-    return (
-      <>
-        <rect x={0} y={0} width={W} height={H} fill={INK} />
-        <defs><linearGradient id={`${r.uid}-silver`} x1="0" y1="0" x2="1" y2="1">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient></defs>
-        <rect x={b + 10 * u} y={b + 10 * u} width={w - 20 * u} height={h - 20 * u} fill="none" stroke={`url(#${r.uid}-silver)`} strokeWidth={0.35} />
-        <Logo x={cx - lw / 2} y={logoY} width={lw} fill={WHITE} />
-        {body.node}
-        <SignRow r={r} x0={b + (tall ? 20 : 48) * u} x1={b + w - (tall ? 20 : 48) * u} y={signY} look={look} />
-        <Seal r={r} cx={tall ? cx : b + w - 34 * u} cy={tall ? signY - 36 * u : b + 34 * u} rad={sealR} dark />
-        <Codes r={r} x={b + 16 * u} y={b + 16 * u} size={qrSize} look={look} />
-        {foot.node}
-      </>
-    );
+  /* ── the centred family: classic, guilloche, black, corners, award ── */
+  if (style === "classic" || style === "guilloche" || style === "black" || style === "corners" || style === "award") {
+    const dark = style === "black";
+    const look: Look = dark ? { ...DARK, nameFill: `url(#${r.uid}-silver)` } : LIGHT;
+    const framed = style === "guilloche" || style === "black";
+    const inset = 7 * u, T = 8 * u;
+    const fx0 = framed ? b + inset + T + 12 * u : x0, fx1 = framed ? b + w - inset - T - 12 * u : x1;
+    /* inside a frame (or the corners) the foot moves up with it */
+    const lift = framed ? inset + T + 2 * u : style === "corners" ? 6 * u : 0;
+    const foot = Foot({ r: { ...r, h: r.h - lift }, x0: fx0, x1: fx1, look });
+    const footTop = foot.top;
+    const footNode = foot.node;
+    const gridW = Math.min(fx1 - fx0, (tall ? 0.86 : 0.7) * w);
+    const gridY = footTop - 22 * u;
+    const award = style === "award";
+    const lw = award ? (tall ? 0.22 : 0.12) * w : (tall ? 0.3 : 0.17) * w;
+    const logoY = b + (framed ? inset + T + 12 : 20) * u;
+    const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={look.paper} />];
+    nodes.push(<defs key="defs"><linearGradient id={`${r.uid}-silver`} x1="0" y1="0" x2="1" y2="1">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient></defs>);
+    if (framed) nodes.push(<Guilloche key="g" x0={b + inset} y0={b + inset} x1={b + w - inset} y1={b + h - inset} T={T} color={dark ? "#636366" : "#AEAEB2"} />);
+    if (style === "corners") {
+      const ci = 8 * u, arm = 16 * u, t = 0.5;
+      for (const [px, py, sx, sy] of [[b + ci, b + ci, 1, 1], [b + w - ci, b + ci, -1, 1], [b + ci, b + h - ci, 1, -1], [b + w - ci, b + h - ci, -1, -1]] as Array<[number, number, number, number]>) {
+        nodes.push(<rect key={`ch${px}${py}`} x={sx > 0 ? px : px - arm} y={sy > 0 ? py : py - t} width={arm} height={t} fill={INK} />);
+        nodes.push(<rect key={`cv${px}${py}`} x={sx > 0 ? px : px - t} y={sy > 0 ? py : py - arm} width={t} height={arm} fill={INK} />);
+      }
+    }
+    /* the award's rosette sits behind everything — decided once the words are placed */
+    const rosetteAt = nodes.length;
+    nodes.push(null);
+    nodes.push(<Logo key="logo" x={cx - lw / 2} y={logoY} width={lw} fill={dark ? WHITE : INK} />);
+    let top = logoY + logoHeight(lw) + 14 * u;
+    if (award && r.heading) {
+      const s = (NOT_LATIN.test(r.heading) ? 12 : 10) * u;
+      const lines = wrapBalanced(caps(r.heading), s, w * 0.8, 200, r.font);
+      lines.forEach((l, i) => nodes.push(<Txt key={`ah${i}`} r={r} x={cx} y={top + s + i * s * 1.2} size={s} fill={INK} weight={200} spacing={s * 0.14} max={w * 0.86}>{l}</Txt>));
+      top += s + (lines.length - 1) * s * 1.2 + 6 * u;
+      nodes.push(<rect key="arule" x={cx - 24 * u} y={top} width={48 * u} height={0.7 * u} fill={`url(#${r.uid}-silver)`} />);
+      top += 10 * u;
+    } else if (r.heading) {
+      nodes.push(<HeadingMark key="hm" r={r} x={cx} y={top} align="middle" look={look} />);
+      top += 10 * u;
+    }
+    const bodyOpts: BodyOpts = { x: cx, width: w * (tall ? 0.8 : 0.7), align: "middle", look, max: (award ? 17 : 20) * u, min: 11 * u, preAsLabel: award, statementW: w * (tall ? 0.78 : 0.56), factsW: gridW };
+    let sealBelow = award || tall;
+    let body = Body({ r, top, bottom: gridY - (sealBelow && r.seal === "silver" ? (award ? 2.85 * sealR + 18 * u : 2 * sealR + 26 * u) : 18 * u), o: bodyOpts });
+    if (sealBelow && r.seal === "silver" && !body.fits) {
+      /* the words need the room: the seal goes to the top corner */
+      sealBelow = false;
+      body = Body({ r, top, bottom: gridY - 18 * u, o: bodyOpts });
+    }
+    if (award && r.seal === "silver" && sealBelow) nodes[rosetteAt] = <Rosette key="ar" cx={cx} cy={gridY - sealR - 12 * u} r0={sealR * 1.08} r1={sealR * 1.85} color="#D8D8DD" rings={9} lobes={28} width={0.08} />;
+    nodes.push(<g key="body">{body.node}</g>);
+    const grid = Grid({ r, x: cx - gridW / 2, y: gridY, width: gridW, cells: signCells(r), look, align: "middle" });
+    nodes.push(<g key="grid">{grid.node}</g>);
+    if (sealBelow) nodes.push(<Seal key="seal" r={r} cx={cx} cy={gridY - sealR - 12 * u} rad={sealR} dark={dark} />);
+    else nodes.push(<Seal key="seal" r={r} cx={fx1 - sealR} cy={logoY + logoHeight(lw) / 2 + (framed ? 4 * u : 0)} rad={sealR} dark={dark} />);
+    nodes.push(<Codes key="qr" r={r} x={fx0} y={logoY} size={qr} look={look} />);
+    nodes.push(<g key="foot">{footNode}</g>);
+    return <>{nodes}</>;
   }
 
-  if (style === "side" && !tall) {
-    /* A black panel on the start side with the logo and the kind; the
-       certificate left-aligned on white. */
-    const pw = 0.3 * w;
-    const panelX = r.rtl ? b + w - pw : 0;
-    const panelW = r.rtl ? W - panelX : b + pw;
-    const colX = r.rtl ? b + 16 * u : b + pw + 18 * u;
-    const colW = w - pw - 34 * u;
-    const start = r.rtl ? colX + colW : colX;
-    const foot = Foot({ r, dark: false });
-    const signY = foot.top - 24 * u;
-    const lw = pw - 30 * u;
-    const pcx = panelX + panelW / 2;
-    const body = Body({ r, x: start, top: b + 18 * u, bottom: signY - 24 * u, width: colW, align: "start", look: LIGHT });
-    return (
-      <>
-        <rect x={0} y={0} width={W} height={H} fill={WHITE} />
-        <rect x={panelX} y={0} width={panelW} height={foot.top} fill={INK} />
-        <Logo x={pcx - lw / 2} y={b + 24 * u} width={lw} fill={WHITE} />
-        <Seal r={r} cx={pcx} cy={foot.top - 40 * u} rad={sealR} dark />
-        {body.node}
-        <SignRow r={r} x0={colX} x1={colX + colW} y={signY} look={LIGHT} align="start" />
-        <Codes r={r} x={pcx - qrSize / 2} y={b + 24 * u + logoHeight(lw) + 16 * u} size={qrSize} look={{ ...LIGHT, sub: GREY_ON_INK }} />
-        {foot.node}
-      </>
-    );
+  /* ── monolith: a black column with the K, the certificate on white ── */
+  if (style === "monolith") {
+    const dark = DARK;
+    const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
+    if (!tall) {
+      const pw = 0.36 * w;
+      const px = r.rtl ? b + w - pw : 0;
+      const pW = r.rtl ? W - px : b + pw;
+      const pin = r.rtl ? b + w - 16 * u : b + 16 * u;
+      const pAlign = r.rtl ? "right" : "left";
+      nodes.push(<rect key="panel" x={px} y={0} width={pW} height={H} fill={INK} />);
+      if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={px} y={0} width={pW} height={H} /></clipPath></defs><KMark x={px + pW * 0.08} y={b + h * 0.36} height={h * 0.9} fill="#161618" /></g>);
+      const lw = pw * 0.5;
+      nodes.push(<Logo key="logo" x={r.rtl ? pin - lw : pin} y={b + 20 * u} width={lw} fill={WHITE} />);
+      if (r.heading) {
+        const s = (NOT_LATIN.test(r.heading) ? 5 : 3) * u;
+        const lines = wrap(caps(r.heading), s, pw - 32 * u, 3, 600, r.font);
+        const y0 = b + h - 34 * u - (lines.length - 1) * s * 1.6;
+        nodes.push(<rect key="hr" x={r.rtl ? pin - 10 * u : pin} y={y0 - s - 5 * u} width={10 * u} height={0.25} fill={WHITE} />);
+        lines.forEach((l, i) => nodes.push(<Txt key={`h${i}`} r={r} x={pin} y={y0 + i * s * 1.6} size={s} fill={WHITE} weight={600} align={pAlign} spacing={s * 0.28}>{l}</Txt>));
+      }
+      nodes.push(<Label key="no" r={r} x={pin} y={b + h - 22 * u} text={r.number} align={pAlign} look={dark} size={2.4 * u} ltr />);
+      const cx0 = r.rtl ? b + M : b + pw + 22 * u;
+      const cx1 = r.rtl ? b + w - pw - 22 * u : b + w - M;
+      const start = r.rtl ? cx1 : cx0;
+      const foot = Foot({ r, x0: cx0, x1: cx1, look: LIGHT });
+      const gridY = foot.top - 22 * u;
+      const body = Body({ r, top: b + 20 * u, bottom: gridY - 16 * u, o: { x: start, width: cx1 - cx0, align: "start", look: LIGHT, max: 19 * u, min: 11 * u, preAsLabel: true, statementW: (cx1 - cx0) * 0.92 } });
+      nodes.push(<g key="body">{body.node}</g>);
+      nodes.push(<g key="grid">{Grid({ r, x: cx0, y: gridY, width: cx1 - cx0, cells: signCells(r).filter((c) => c.label !== LABELS[r.lang].number), look: LIGHT, align: "start" }).node}</g>);
+      nodes.push(<Seal key="seal" r={r} cx={r.rtl ? px : b + pw} cy={b + h * 0.5} rad={sealR} dark />);
+      nodes.push(<Codes key="qr" r={r} x={r.rtl ? cx0 : cx1 - qr * r.qrs.length} y={b + 20 * u} size={qr} look={LIGHT} />);
+      nodes.push(<g key="foot">{foot.node}</g>);
+      return <>{nodes}</>;
+    }
+    /* portrait: the black block across the top */
+    const ph = 0.3 * h;
+    nodes.push(<rect key="panel" x={0} y={0} width={W} height={b + ph} fill={INK} />);
+    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={0} y={0} width={W} height={b + ph} /></clipPath></defs><KMark x={b + w * 0.52} y={b + ph * 0.12} height={ph * 1.3} fill="#161618" /></g>);
+    const lw = 0.34 * w;
+    const start = r.rtl ? x1 : x0;
+    nodes.push(<Logo key="logo" x={r.rtl ? x1 - lw : x0} y={b + 20 * u} width={lw} fill={WHITE} />);
+    if (r.heading) nodes.push(<HeadingMark key="hm" r={r} x={start} y={b + ph - 14 * u} align="start" look={dark} />);
+    const foot = Foot({ r, x0, x1, look: LIGHT });
+    const gridY = foot.top - 22 * u;
+    const body = Body({ r, top: b + ph + 14 * u, bottom: gridY - (r.seal === "silver" ? 2 * sealR + 22 * u : 16 * u), o: { x: start, width: x1 - x0, align: "start", look: LIGHT, max: 18 * u, min: 11 * u, preAsLabel: true } });
+    nodes.push(<g key="body">{body.node}</g>);
+    nodes.push(<g key="grid">{Grid({ r, x: x0, y: gridY, width: x1 - x0, cells: signCells(r), look: LIGHT, align: "start" }).node}</g>);
+    nodes.push(<Seal key="seal" r={r} cx={r.rtl ? x0 + sealR : x1 - sealR} cy={b + ph} rad={sealR} dark />);
+    nodes.push(<g key="foot">{foot.node}</g>);
+    return <>{nodes}</>;
   }
 
-  if (style === "minimal") {
-    /* Swiss: the logo and the heading on the top line, the name large from
-       the start edge, a hairline, the facts; signatures at the foot. */
-    const m = 20 * u;
-    const start = r.rtl ? b + w - m : b + m;
-    const foot = Foot({ r, dark: false });
-    const signY = foot.top - 22 * u;
-    const lw = (tall ? 0.3 : 0.17) * w;
-    const bodyR = { ...r, heading: "" };
-    const body = Body({ r: bodyR, x: start, top: b + m + logoHeight(lw) + 16 * u, bottom: signY - 26 * u, width: w - 2 * m, align: "start", look: LIGHT });
-    return (
-      <>
-        <rect x={0} y={0} width={W} height={H} fill={WHITE} />
-        <Logo x={r.rtl ? b + w - m - lw : b + m} y={b + m} width={lw} fill={INK} />
-        {r.heading ? <Txt r={r} x={r.rtl ? b + m : b + w - m} y={b + m + logoHeight(lw) * 0.85} size={3.6 * u} fill={INK} weight={600} anchor={r.rtl ? "start" : "end"} spacing={3.6 * u * 0.3} max={w * 0.45}>{caps(r.heading)}</Txt> : null}
-        <rect x={b + m} y={b + m + logoHeight(lw) + 7 * u} width={w - 2 * m} height={0.25} fill={INK} />
-        {body.node}
-        <SignRow r={r} x0={b + m} x1={b + w - m} y={signY} look={LIGHT} align="start" />
-        <Seal r={r} cx={r.rtl ? b + m + sealR : b + w - m - sealR} cy={signY - sealR - 12 * u} rad={sealR} dark={false} />
-        <Codes r={r} x={r.rtl ? b + m : b + w - m - qrSize * r.qrs.length} y={signY - qrSize - 14 * u} size={qrSize} look={LIGHT} />
-        {foot.node}
-      </>
-    );
-  }
-
-  /* The centred family: book, frame, band, dots, award (and side on a
-     portrait page, which becomes a band). */
-  const foot = Foot({ r, dark: false });
-  const signY = foot.top - (style === "frame" ? 30 : tall ? 26 : 22) * u;
-  const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
-  let top: number;
-  let look = LIGHT;
-  let bodyR = r;
-  const lwBook = (tall ? 0.32 : 0.2) * w;
-
-  if (style === "band" || (style === "side" && tall)) {
-    const bandH = (tall ? 0.16 : 0.22) * h;
-    const lw = (tall ? 0.3 : 0.18) * w;
-    nodes.push(<rect key="band" x={0} y={0} width={W} height={b + bandH} fill={INK} />);
-    nodes.push(<Logo key="logo" x={r.rtl ? b + w - 18 * u - lw : b + 18 * u} y={b + bandH / 2 - logoHeight(lw) / 2} width={lw} fill={WHITE} />);
-    if (r.heading) nodes.push(<Txt key="head" r={r} x={r.rtl ? b + 18 * u : b + w - 18 * u} y={b + bandH / 2 + 1.5 * u} size={4.2 * u} fill={WHITE} weight={600} anchor={r.rtl ? "start" : "end"} spacing={4.2 * u * 0.3} max={w * 0.5}>{caps(r.heading)}</Txt>);
-    bodyR = { ...r, heading: "" };
-    top = b + bandH + 14 * u;
-  } else if (style === "dots") {
-    const bandH = (tall ? 0.2 : 0.26) * h;
-    const lw = (tall ? 0.3 : 0.2) * w;
-    const lh = logoHeight(lw);
-    const ly = b + bandH / 2 - lh / 2 + 2 * u;
-    const px = lw / 2 + lh * 1.2, py = lh * 1.2;
-    nodes.push(<rect key="band" x={0} y={0} width={W} height={b + bandH} fill={INK} />);
-    nodes.push(<Dots key="dots" area={{ x: 0, y: 0, w: W, h: b + bandH }} pitch={3.2 * u} r={0.55 * u} fill="#4D4D50" origin={{ x: cx, y: ly + lh / 2 }} uid={`${r.uid}-d`} />);
-    nodes.push(<rect key="panel" x={cx - px} y={ly + lh / 2 - py - lh / 2} width={px * 2} height={py * 2 + lh} fill={INK} />);
-    nodes.push(<Logo key="logo" x={cx - lw / 2} y={ly} width={lw} fill={WHITE} />);
-    top = b + bandH + 12 * u;
-  } else if (style === "award") {
-    /* An honour: the heading large and spaced, the name huge in silver-grey
-       over a silver rule, the seal in the middle of the foot. */
-    look = { ...LIGHT, nameFill: INK };
-    nodes.push(<defs key="defs"><linearGradient id={`${r.uid}-silver`} x1="0" y1="0" x2="1" y2="0">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient></defs>);
-    const lw = (tall ? 0.24 : 0.13) * w;
-    nodes.push(<Logo key="logo" x={cx - lw / 2} y={b + 20 * u} width={lw} fill={INK} />);
+  /* ── editorial: the title as the headline, a quiet K, a strict grid ── */
+  if (style === "editorial") {
+    const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
+    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-eclip)`}><defs><clipPath id={`${r.uid}-eclip`}><rect x={0} y={0} width={W} height={H} /></clipPath></defs><KMark x={r.rtl ? b - h * 0.42 : b + w - h * 0.62} y={b + h * 0.18} height={h * 0.95} fill="#F4F4F6" /></g>);
+    const start = r.rtl ? x1 : x0;
+    nodes.push(<rect key="bar" x={r.rtl ? x1 - 26 * u : x0} y={b + M} width={26 * u} height={1.6 * u} fill={INK} />);
+    nodes.push(<Label key="no" r={r} x={r.rtl ? x0 : x1} y={b + M + 1.8 * u} text={`№ ${r.number}`} align={r.rtl ? "left" : "right"} look={LIGHT} size={2.4 * u} ltr />);
+    let top = b + M + 14 * u;
     if (r.heading) {
-      const s = 9 * u;
-      nodes.push(<Txt key="head" r={r} x={cx} y={b + 20 * u + logoHeight(lw) + 22 * u} size={s} fill={INK} weight={300} spacing={s * 0.22} max={w * 0.86}>{caps(r.heading)}</Txt>);
-      nodes.push(<rect key="rule" x={cx - 30 * u} y={b + 20 * u + logoHeight(lw) + 29 * u} width={60 * u} height={0.8 * u} fill={`url(#${r.uid}-silver)`} />);
+      const s = (NOT_LATIN.test(r.heading) ? 13 : 12) * u;
+      const lines = wrap(r.heading, s, (tall ? 0.8 : 0.62) * w, 2, 250, r.font);
+      lines.forEach((l, i) => nodes.push(<Txt key={`h${i}`} r={r} x={start} y={top + s * 0.9 + i * s * 1.08} size={s} fill={INK} weight={250} anchor="start" spacing={-s * 0.015}>{l}</Txt>));
+      top += s * 0.9 + (lines.length - 1) * s * 1.08 + 12 * u;
     }
-    bodyR = { ...r, heading: "" };
-    top = b + 20 * u + logoHeight(lw) + 34 * u;
-  } else {
-    /* book and frame: the logo centred at the top (ch. 99) */
-    if (style === "frame") {
-      nodes.push(<rect key="f1" x={b + 9 * u} y={b + 9 * u} width={w - 18 * u} height={foot.top - b - 18 * u + (r.foot === "none" ? 9 * u : 0)} fill="none" stroke={INK} strokeWidth={0.5} />);
-      nodes.push(<rect key="f2" x={b + 11.5 * u} y={b + 11.5 * u} width={w - 23 * u} height={foot.top - b - 23 * u + (r.foot === "none" ? 9 * u : 0)} fill="none" stroke={INK} strokeWidth={0.2} />);
-    }
-    nodes.push(<Logo key="logo" x={cx - lwBook / 2} y={b + (style === "frame" ? 26 : 22) * u} width={lwBook} fill={INK} />);
-    top = b + (style === "frame" ? 26 : 22) * u + logoHeight(lwBook) + 14 * u;
+    const foot = Foot({ r, x0, x1, look: LIGHT });
+    const gridY = foot.top - 22 * u;
+    const lw = (tall ? 0.26 : 0.14) * w;
+    const gridW = x1 - x0 - lw - 14 * u;
+    const body = Body({ r, top, bottom: gridY - 16 * u, o: { x: start, width: (tall ? 0.86 : 0.58) * w, align: "start", look: LIGHT, max: 14 * u, min: 9 * u, preAsLabel: true, statementW: (tall ? 0.84 : 0.52) * w, factsW: (tall ? 0.86 : 0.58) * w } });
+    nodes.push(<g key="body">{body.node}</g>);
+    nodes.push(<g key="grid">{Grid({ r, x: r.rtl ? x1 - gridW : x0, y: gridY, width: gridW, cells: signCells(r).filter((c) => c.label !== LABELS[r.lang].number), look: LIGHT, align: "start" }).node}</g>);
+    nodes.push(<Logo key="logo" x={r.rtl ? x0 : x1 - lw} y={gridY + 13 * u - logoHeight(lw)} width={lw} fill={INK} />);
+    nodes.push(<Seal key="seal" r={r} cx={r.rtl ? x0 + sealR + 4 * u : x1 - sealR - 4 * u} cy={gridY - sealR - 14 * u} rad={sealR} dark={false} />);
+    nodes.push(<Codes key="qr" r={r} x={r.rtl ? x0 : x1 - qr * r.qrs.length} y={b + M + 8 * u} size={qr} look={LIGHT} />);
+    nodes.push(<g key="foot">{foot.node}</g>);
+    return <>{nodes}</>;
   }
 
-  const bodyW = w * (tall ? 0.8 : 0.72);
-  const sealCentred = style === "award" || tall;
-  const reserve = sealCentred && r.seal === "silver" ? 2 * sealR + 22 * u : 24 * u;
-  const body = Body({ r: bodyR, x: cx, top, bottom: signY - reserve, width: bodyW, align: "middle", look });
+  /* ── swiss: a black band, two columns on a grid, the facts as a list ── */
+  if (style === "swiss") {
+    const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
+    const bandH = (tall ? 26 : 30) * u;
+    nodes.push(<rect key="band" x={0} y={0} width={W} height={b + bandH} fill={INK} />);
+    const lw = (tall ? 0.28 : 0.15) * w;
+    nodes.push(<Logo key="logo" x={r.rtl ? x1 - lw : x0} y={b + bandH / 2 - logoHeight(lw) / 2} width={lw} fill={WHITE} />);
+    if (r.heading) {
+      const s = (NOT_LATIN.test(r.heading) ? 4.6 : 3) * u;
+      nodes.push(<Txt key="head" r={r} x={r.rtl ? x0 : x1} y={b + bandH / 2 + s * 0.36} size={s} fill={WHITE} weight={600} anchor={r.rtl ? "start" : "end"} spacing={s * 0.3} max={w * 0.5}>{caps(r.heading)}</Txt>);
+    }
+    const foot = Foot({ r, x0, x1, look: LIGHT });
+    const gridY = foot.top - 22 * u;
+    const colGap = 12 * u;
+    const leftW = tall ? x1 - x0 : (x1 - x0) * 0.62;
+    const rightW = tall ? 0 : x1 - x0 - leftW - colGap;
+    const start = r.rtl ? x1 : x0;
+    const bodyR = r.facts.length && !tall ? { ...r, facts: [] } : r;
+    const body = Body({ r: bodyR, top: b + bandH + 16 * u, bottom: gridY - 16 * u, o: { x: start, width: leftW, align: "start", look: LIGHT, max: 17 * u, min: 10 * u, preAsLabel: true, statementW: leftW * 0.95 } });
+    nodes.push(<g key="body">{body.node}</g>);
+    if (!tall && r.facts.length) {
+      /* the facts down the right column, a hairline over each */
+      const fx = r.rtl ? x0 : x0 + leftW + colGap;
+      const fAlign = r.rtl ? "right" : "left";
+      const fX = r.rtl ? fx + rightW : fx;
+      const fTop = b + bandH + 16 * u;
+      r.facts.forEach((f, i) => {
+        const y = fTop + i * 17 * u;
+        nodes.push(<rect key={`fl${i}`} x={fx} y={y} width={rightW} height={0.2} fill={LIGHT.line} />);
+        nodes.push(<Label key={`fk${i}`} r={r} x={fX} y={y + 5.6 * u} text={f.label.trim()} align={fAlign} look={LIGHT} size={2.2 * u} />);
+        nodes.push(<Txt key={`fv${i}`} r={r} x={fX} y={y + 11.6 * u} size={3.9 * u} fill={INK} weight={500} align={fAlign} max={rightW}>{f.value.trim()}</Txt>);
+      });
+    }
+    nodes.push(<g key="grid">{Grid({ r, x: x0, y: gridY, width: x1 - x0, cells: signCells(r), look: LIGHT, align: "start" }).node}</g>);
+    nodes.push(<Seal key="seal" r={r} cx={r.rtl ? x0 + sealR : x1 - sealR} cy={gridY - sealR - 12 * u} rad={sealR} dark={false} />);
+    nodes.push(<Codes key="qr" r={r} x={r.rtl ? x1 - qr * r.qrs.length : x0} y={gridY - qr - 14 * u} size={qr} look={LIGHT} />);
+    nodes.push(<g key="foot">{foot.node}</g>);
+    return <>{nodes}</>;
+  }
+
+  /* ── dots: the dots field (ch. 57) with the K cut out of it ── */
+  const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
+  const fw = tall ? W : 0.4 * w + b;
+  const fh = tall ? 0.28 * h + b : H;
+  const fx = tall ? 0 : r.rtl ? 0 : W - fw;
+  const fy = tall ? H - fh : 0;
+  const kh = tall ? fh * 0.78 : h * 0.62;
+  const kw = (kh * 116.59) / 107.57;
+  const kx = fx + (fw - kw) / 2, ky = fy + (fh - kh) / 2;
+  nodes.push(
+    <g key="dots">
+      <defs>
+        <mask id={`${r.uid}-kmask`} maskUnits="userSpaceOnUse" x={fx} y={fy} width={fw} height={fh}>
+          <rect x={fx} y={fy} width={fw} height={fh} fill="#FFFFFF" />
+          {r.mark ? <path d={K_PATH} fill="#000000" transform={`translate(${kx} ${ky}) scale(${kh / 107.57})`} /> : null}
+        </mask>
+      </defs>
+      <g mask={`url(#${r.uid}-kmask)`}>
+        <Dots area={{ x: fx, y: fy, w: fw, h: fh }} pitch={3 * u} r={0.55 * u} fill="#C7C7CC" origin={{ x: fx + fw / 2, y: fy + fh / 2 }} uid={`${r.uid}-dd`} />
+      </g>
+    </g>,
+  );
+  const cx0 = tall ? x0 : r.rtl ? b + fw - b + 18 * u : x0;
+  const cx1 = tall ? x1 : r.rtl ? x1 : b + w - (fw - b) - 18 * u;
+  const start = r.rtl ? cx1 : cx0;
+  const lw = (tall ? 0.3 : 0.16) * w;
+  nodes.push(<Logo key="logo" x={r.rtl ? cx1 - lw : cx0} y={b + M} width={lw} fill={INK} />);
+  const foot = Foot({ r, x0: cx0, x1: cx1, look: LIGHT });
+  const footTop = tall ? fy - 6 * u : foot.top;
+  const gridY = footTop - 22 * u;
+  let top = b + M + logoHeight(lw) + 16 * u;
+  if (r.heading) { nodes.push(<HeadingMark key="hm" r={r} x={start} y={top} align="start" look={LIGHT} />); top += 10 * u; }
+  const body = Body({ r, top, bottom: gridY - 16 * u, o: { x: start, width: cx1 - cx0, align: "start", look: LIGHT, max: 18 * u, min: 10 * u, preAsLabel: true, statementW: (cx1 - cx0) * 0.95 } });
   nodes.push(<g key="body">{body.node}</g>);
-  const sx = tall ? 20 : style === "award" ? 40 : 48;
-  nodes.push(<SignRow key="sign" r={r} x0={b + sx * u} x1={b + w - sx * u} y={signY} look={look} />);
-  if (sealCentred) nodes.push(<Seal key="seal" r={r} cx={cx} cy={signY - sealR - 12 * u} rad={sealR} dark={false} />);
-  else nodes.push(<Seal key="seal" r={r} cx={b + w - 38 * u} cy={b + (style === "band" || style === "dots" ? h * 0.26 + 26 * u : 36 * u)} rad={sealR} dark={false} />);
-  nodes.push(<Codes key="qr" r={r} x={b + (style === "frame" ? 20 : 16) * u} y={foot.top - qrSize - (style === "frame" ? 18 : 12) * u} size={qrSize} look={look} />);
-  nodes.push(<g key="foot">{foot.node}</g>);
+  nodes.push(<g key="grid">{Grid({ r, x: cx0, y: gridY, width: cx1 - cx0, cells: signCells(r), look: LIGHT, align: "start" }).node}</g>);
+  nodes.push(<Seal key="seal" r={r} cx={tall ? x1 - sealR : fx + fw / 2 + (r.rtl ? b / 2 : -b / 2)} cy={tall ? fy + fh / 2 : b + h - 34 * u} rad={sealR} dark={false} />);
+  nodes.push(<Codes key="qr" r={r} x={r.rtl ? cx0 : cx1 - qr * r.qrs.length} y={b + M} size={qr} look={LIGHT} />);
+  if (!tall) nodes.push(<g key="foot">{foot.node}</g>);
+  else nodes.push(<g key="foot">{Foot({ r: { ...r, h: r.h - (fh - b) + 2 * u }, x0, x1, look: LIGHT }).node}</g>);
   return <>{nodes}</>;
 }
 
@@ -521,7 +683,7 @@ function rekind(v: TemplateValues, value: TemplateValue): TemplateValues {
     sig1Role: W.sig1, sig2Role: W.sig2, sig2On: !!W.sig2,
     number: keepNumber ? oldNumber : numberFor(kind),
     foot: FORMAL.includes(kind) ? "legal" : "everyday",
-    style: kind === "appreciation" || kind === "employee" ? (styleOf(v) === "book" ? "award" : styleOf(v)) : styleOf(v),
+    style: kind === "appreciation" || kind === "employee" ? (styleOf(v) === "classic" ? "award" : styleOf(v)) : styleOf(v),
   };
 }
 /** Another language: every text still at a default moves with it. */
@@ -575,6 +737,10 @@ export const certificate: TemplateDef = {
       { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
     ] },
     { key: "scale", kind: "range", labelKey: "evb.f.scale", group: "look", min: 70, max: 130, step: 5, unit: "%" },
+    { key: "nameWeight", kind: "choice", labelKey: "sig.f.nameWeight", group: "look", options: [
+      { value: "light", labelKey: "sig.weight.light" }, { value: "regular", labelKey: "sig.weight.regular" }, { value: "medium", labelKey: "cert.weight.medium" }, { value: "bold", labelKey: "sig.weight.bold" },
+    ] },
+    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => isStyle("monolith", "editorial", "dots")(v) },
 
     { key: "heading", kind: "text", labelKey: "cert.f.heading", group: "words", max: 60 },
     { key: "pre", kind: "text", labelKey: "cert.f.pre", group: "words", max: 80 },
@@ -602,7 +768,7 @@ export const certificate: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    kind: "training", style: "book", size: "a4-land", lang: "en", font: "inter", scale: 100,
+    kind: "training", style: "classic", size: "a4-land", lang: "en", font: "inter", scale: 100, nameWeight: "light", mark: true,
     heading: START.heading, pre: START.pre, name: "", name2: "", org: "", statement: START.statement, facts: factRows("training", "en"),
     date: today(), number: numberFor("training"),
     sig1Name: "", sig1Role: START.sig1, sig1Image: "", sig2On: true, sig2Name: "", sig2Role: START.sig2, sig2Image: "",
@@ -613,10 +779,13 @@ export const certificate: TemplateDef = {
   qrRequests,
   fromPerson: (p: BcPerson, v: TemplateValues) => ({ name: nameIn(p, asLang(v.lang)) }),
   rekey: { kind: rekind },
+  /* a style brings its designer's weight for the name */
+  restyle: (v, style) => ({ ...v, style, nameWeight: STYLE_LOOK[OLD_STYLES[style] ?? (CERT_STYLES.includes(style as Style) ? (style as Style) : "classic")].nameWeight }),
   relang: (v, lang) => relang(v, lang),
   specKeys: (v) => [
     "cert.spec.paper",
     ...(isStyle("black")(v) ? ["cert.spec.black"] : []),
+    ...(isStyle("guilloche", "black")(v) ? ["cert.spec.guilloche"] : []),
     ...(v.seal === "silver" ? ["cert.spec.seal"] : v.seal === "emboss" ? ["cert.spec.emboss"] : []),
     "cert.spec.number",
     ...(kindOf(v) === "warranty" ? ["cert.spec.warranty"] : []),
