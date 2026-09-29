@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { brandCenterLibraryT } from "@/lib/translations/brand-center-library";
 import { brandCenterTemplatesT } from "@/lib/translations/brand-center-templates";
-import { bc, type BcPerson, type BcProduct, type BcProductHit } from "@/lib/brand-center/client";
+import { bc, type BcPerson, type BcProduct, type BcProductHit, type StyleStatus } from "@/lib/brand-center/client";
 import { templateById } from "@/lib/brand-center/templates/registry";
 import { qrCodes } from "@/lib/brand-center/templates/qr";
 import type { FieldDef, TemplateDef, TemplateValue, TemplateValues } from "@/lib/brand-center/templates/types";
@@ -58,6 +58,21 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 
   const wantsPeople = def?.usesPeople !== false;
   const wantsProducts = def?.usesProducts === true;
+  /* The owner's approval of each style (30/09/2026): everyone sees the
+     approved ones; drafts and retired ones only those who manage Brand Center. */
+  const [styles, setStyles] = useState<{ canManage: boolean; statuses: Record<string, StyleStatus> } | null>(null);
+  useEffect(() => {
+    if (!def) return;
+    let alive = true;
+    void bc.styles(def.id).then((res) => {
+      if (!alive) return;
+      const got = res.ok ? res.data : { canManage: false, statuses: {} };
+      setStyles(got);
+      setValues((o) => onApprovedStyle(def, o, got));
+    });
+    return () => { alive = false; };
+  }, [def]);
+  const statusOf = (style: string): StyleStatus => styles?.statuses[style] ?? "approved";
   /* A post makes its photo ready whenever the photo changes: what it was
      shot on (white, black, a cut-out, a scene — the choice stays editable)
      and a copy no larger than a post needs. The product's own slots that
@@ -136,7 +151,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
       const pictures = list(o, "qrs").filter((q) => typeof q.image === "string" && q.image);
       next.qrs = list(next, "qrs").map((q) => (q.image ? q : { ...q, image: pictures.find((p) => p.kind === q.kind)?.image ?? "" }));
       if (person && !(typeof saved.name === "string" && saved.name)) next = { ...next, ...(def.fromPerson ? def.fromPerson(person, next) : {}) };
-      return next;
+      return styles ? onApprovedStyle(def, next, styles) : next;
     });
   };
   const choose = (p: BcPerson | null) => {
@@ -219,7 +234,13 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
           icon={<BrandCenterIcon size={16} />} showTabs={false} backHref="/brand-center" backLabel={t("back.center")} />
 
         {styleField && styleField.kind === "choice" ? (
-          <StylePicker t={t} def={def} values={values} field={styleField} qrs={qrs} onPick={(s) => setMany({ style: s })} />
+          <StylePicker t={t} def={def} values={values} field={styleField} qrs={qrs} onPick={(s) => setMany({ style: s })}
+            canManage={styles?.canManage === true} statusOf={statusOf}
+            onStatus={async (style, status) => {
+              setStyles((o) => (o ? { ...o, statuses: { ...o.statuses, [style]: status } } : o));
+              const res = await bc.setStyle({ templateId: def.id, style, status });
+              if (!res.ok) setBlocked("studio.stSaveError");
+            }} />
         ) : null}
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-start">
@@ -347,31 +368,83 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 }
 
 /** The approved styles as small copies of this very card — both sides. */
-function StylePicker({ t, def, values, field, qrs, onPick }: {
+const STATUSES: StyleStatus[] = ["approved", "draft", "retired"];
+
+/** Someone who only uses the templates never lands on a style they cannot
+ *  pick (a draft default, a saved fill in a retired style): the first
+ *  approved style instead. Those who manage Brand Center see every style. */
+function onApprovedStyle(def: TemplateDef, v: TemplateValues, s: { canManage: boolean; statuses: Record<string, StyleStatus> }): TemplateValues {
+  if (s.canManage) return v;
+  const field = def.fields.find((f) => f.key === "style");
+  if (!field || field.kind !== "choice") return v;
+  const approved = field.options.map((o) => o.value).filter((x) => (s.statuses[x] ?? "approved") === "approved");
+  if (!approved.length || approved.includes(String(v.style))) return v;
+  return def.restyle ? def.restyle(v, approved[0]) : { ...v, style: approved[0] };
+}
+const FILTERS = ["all", "approved", "draft", "retired"] as const;
+
+/** The approved styles as small copies of this very card — both sides. The
+ *  owner (Brand Center "edit") also sees the drafts and the retired ones and
+ *  sets each style's standing under its card. */
+function StylePicker({ t, def, values, field, qrs, onPick, canManage, statusOf, onStatus }: {
   t: T; def: TemplateDef; values: TemplateValues; field: Extract<FieldDef, { kind: "choice" }>; qrs: Record<string, boolean[][]>; onPick: (v: string) => void;
+  canManage: boolean; statusOf: (style: string) => StyleStatus; onStatus: (style: string, status: StyleStatus) => void;
 }) {
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const options = field.options.filter((o) => {
+    const st = statusOf(o.value);
+    if (!canManage) return st === "approved";
+    return filter === "all" ? st !== "retired" : st === filter;
+  });
+  const count = (f: (typeof FILTERS)[number]) => field.options.filter((o) => (f === "all" ? statusOf(o.value) !== "retired" : statusOf(o.value) === f)).length;
   return (
     <section data-kx-pane className={`${CARD} mt-5 px-4 py-4`} aria-label={t(field.labelKey)}>
-      <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t(field.labelKey)}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t(field.labelKey)}</h2>
+        {canManage ? (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("studio.stManage")}>
+            {FILTERS.map((f) => (
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
+                className={`rounded-lg border px-2.5 py-1 text-[11.5px] ${filter === f ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+                {t(`studio.stFilter.${f}`)} <span className="tabular-nums opacity-70">{count(f)}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {canManage ? <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("studio.stHint")}</p> : null}
+      {!options.length ? <p className="mt-3 text-[12px] text-[var(--text-dim)]">{t("studio.noStyles")}</p> : null}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-7" role="radiogroup" aria-label={t(field.labelKey)}>
-        {field.options.map((o) => {
+        {options.map((o) => {
           const v = def.restyle ? def.restyle(values, o.value) : { ...values, style: o.value };
           const tall = def.size(v).h > def.size(v).w;
           const on = values.style === o.value;
+          const st = statusOf(o.value);
           return (
-            <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onPick(o.value)}
-              className={`flex flex-col items-center gap-2 rounded-xl border px-2 py-2.5 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"}`}>
-              {def.html ? <HtmlThumb html={def.html.render(v, { variant: "full", base: window.location.origin, preview: true })} rtl={v.lang === "ar"} /> : (
-              <span className="flex h-[64px] w-full items-center justify-center gap-1.5">
-                {def.pages.filter((p) => !def.pagesFor || def.pagesFor(v).includes(p.id)).map((p) => (
-                  <span key={p.id} className={`block overflow-hidden rounded-[2px] shadow-[0_3px_10px_rgba(0,0,0,0.35)] ${tall ? "w-[34px]" : "w-[82px]"}`}>
-                    <TemplateSheet def={def} values={v} pageId={p.id} qrs={qrs} mode="screen" slug={`${t(o.labelKey)} — ${t(`tpl.page.${p.id}`)}`} />
-                  </span>
-                ))}
-              </span>
-              )}
-              <span className="text-center text-[11.5px] font-medium leading-tight">{t(o.labelKey)}</span>
-            </button>
+            <div key={o.value} className="flex flex-col gap-1.5">
+              <button type="button" role="radio" aria-checked={on} onClick={() => onPick(o.value)}
+                className={`relative flex flex-col items-center gap-2 rounded-xl border px-2 py-2.5 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"} ${st === "approved" ? "" : "opacity-70"}`}>
+                {canManage && st !== "approved" ? (
+                  <span className="absolute end-1.5 top-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">{t(`studio.st.${st}`)}</span>
+                ) : null}
+                {def.html ? <HtmlThumb html={def.html.render(v, { variant: "full", base: window.location.origin, preview: true })} rtl={v.lang === "ar"} /> : (
+                <span className="flex h-[64px] w-full items-center justify-center gap-1.5">
+                  {def.pages.filter((p) => !def.pagesFor || def.pagesFor(v).includes(p.id)).map((p) => (
+                    <span key={p.id} className={`block overflow-hidden rounded-[2px] shadow-[0_3px_10px_rgba(0,0,0,0.35)] ${tall ? "w-[34px]" : "w-[82px]"}`}>
+                      <TemplateSheet def={def} values={v} pageId={p.id} qrs={qrs} mode="screen" slug={`${t(o.labelKey)} — ${t(`tpl.page.${p.id}`)}`} />
+                    </span>
+                  ))}
+                </span>
+                )}
+                <span className="text-center text-[11.5px] font-medium leading-tight">{t(o.labelKey)}</span>
+              </button>
+              {canManage ? (
+                <select aria-label={`${t("studio.stManage")} — ${t(o.labelKey)}`} value={st} onChange={(e) => onStatus(o.value, e.target.value as StyleStatus)}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-transparent px-1.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                  {STATUSES.map((x) => <option key={x} value={x}>{t(`studio.st.${x}`)}</option>)}
+                </select>
+              ) : null}
+            </div>
           );
         })}
       </div>
