@@ -4,8 +4,9 @@
    badges beside the first six, 54 × 86 mm, each on one idea:
 
      p-guilloche   black, a silver guilloche band at the foot
-     p-monolith    a black block with the K, the portrait on its edge
-     p-knockout    the dots field with the K cut out of it
+     p-monolith    a black block with a dark underprint, the portrait on
+                   its edge
+     p-knockout    the dots field, the logo in a framed clear window
      p-editorial   white, the name as a light headline
      p-underprint  a round portrait on the spirograph underprint
      p-medallion   black, the foil medallion over the portrait
@@ -20,7 +21,7 @@ import type { DrawContext, TemplateValues } from "./types";
 import { PT } from "./types";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced } from "./card/parts";
 import { asLang, fontOf, num, qrsOf, str } from "./card/model";
-import { FoilSeal, KMark, K_PATH, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, MicroLine, Underprint } from "./ornaments";
 
 export const ID_PREMIUM = ["p-guilloche", "p-monolith", "p-knockout", "p-editorial", "p-underprint", "p-medallion"] as const;
 type P = (typeof ID_PREMIUM)[number];
@@ -139,7 +140,7 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       );
     }
     case "p-monolith": {
-      /* a black block with the K; the portrait on its edge */
+      /* a black block with a dark underprint; the portrait on its edge */
       const block = b + h * 0.42;
       const box = { x: r.rtl ? r.x0 : r.x1 - 20, y: block - 14, w: 20, h: 25 };
       const lw = 20;
@@ -152,7 +153,7 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <rect x={0} y={0} width={W} height={block} fill={INK} />
           <g clipPath={`url(#${r.uid}-iblk)`}>
             <defs><clipPath id={`${r.uid}-iblk`}><rect x={0} y={0} width={W} height={block} /></clipPath></defs>
-            <KMark x={r.rtl ? b + w * 0.4 : b - 2} y={b + 4} height={block * 1.05} fill="#1A1A1C" />
+            <Underprint cx={r.rtl ? b + w * 0.3 : b + w * 0.7} cy={block * 0.55} R={block * 0.75} color="#1C1C1E" />
           </g>
           <Logo x={r.rtl ? r.x1 - lw : r.x0} y={b + 5.5} width={lw} fill={WHITE} />
           {r.role ? <Txt r={r} x={r.rtl ? r.x0 : r.x1} y={b + 5.5 + logoHeight(lw) * 0.85} size={4.6 * PT} fill={WHITE} weight={700} align={r.rtl ? "left" : "right"} ltr spacing={4.6 * PT * 0.3}>{r.role}</Txt> : null}
@@ -164,13 +165,10 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       );
     }
     case "p-knockout": {
-      /* the dots field across the top with the K cut out */
+      /* the dots field across the top; the full logo in a framed window */
       const field = b + h * 0.28;
-      const kh = h * 0.23;
-      const kw = (kh * 116.59) / 107.57;
-      const kx = r.rtl ? b + 4 : b + w - kw - 4, ky = b + (h * 0.28 - kh) / 2 + 1;
-      const lw = 22;
-      const lx = r.rtl ? r.x1 - lw : r.x0, ly = field - 5 - logoHeight(lw);
+      const lw = 26;
+      const lx = cx - lw / 2, ly = b + (h * 0.28 - logoHeight(lw)) / 2 + 1.5;
       const box = { x: cx - 10, y: field + 3, w: 20, h: 25 };
       const p = Person({ r, x: cx, y: box.y + box.h + 3, width: w - 9, align: "center", dark: true });
       return (
@@ -179,11 +177,11 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <defs>
             <mask id={`${r.uid}-ikm`} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={field}>
               <rect x={0} y={0} width={W} height={field} fill="#FFFFFF" />
-              <path d={K_PATH} fill="#000000" transform={`translate(${kx} ${ky}) scale(${kh / 107.57})`} />
-              <rect x={lx - 2.5} y={ly - 2.5} width={lw + 5} height={logoHeight(lw) + 5} fill="#000000" />
+              <rect x={lx - 3} y={ly - 3} width={lw + 6} height={logoHeight(lw) + 6} fill="#000000" />
             </mask>
           </defs>
           <g mask={`url(#${r.uid}-ikm)`}><Dots area={{ x: 0, y: 0, w: W, h: field }} pitch={1.8} r={0.34} fill="#4D4D50" origin={{ x: cx, y: field / 2 }} uid={`${r.uid}-ikd`} /></g>
+          <rect x={lx - 3} y={ly - 3} width={lw + 6} height={logoHeight(lw) + 6} fill="none" stroke="#8E8E93" strokeWidth={0.2} />
           <Logo x={lx} y={ly} width={lw} fill={WHITE} />
           <Portrait v={v} r={r} box={box} radius={1.2} />
           {p.node}

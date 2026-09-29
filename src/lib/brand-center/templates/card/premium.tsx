@@ -6,9 +6,9 @@
 
      p-guilloche   black, a silver guilloche band along the foot; the back
                    on an underprint rosette
-     p-monolith    a black column with the K on white; contacts on black
-     p-knockout    the dots field with the K cut out of it
-     p-editorial   the name as a light headline; a quiet K on the back
+     p-monolith    a black column with a dark underprint, the name on white
+     p-knockout    the dots field with the logo in a framed clear window
+     p-editorial   the name as a light headline; an underprint on the back
      p-swiss       a black band, the contacts in a hairline grid
      p-underprint  the spirograph underprint around the logo
      p-medallion   the foil medallion as the mark
@@ -23,7 +23,7 @@ import type { ReactNode } from "react";
 import type { DrawContext, TemplateValues } from "../types";
 import { PT } from "../types";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced, type PrintRow } from "./parts";
-import { FoilSeal, KMark, K_PATH, MicroLine, Underprint } from "../ornaments";
+import { FoilSeal, MicroLine, Underprint } from "../ornaments";
 import { fontOf, langOf, num, printedRows, qrsOf, str } from "./model";
 
 export const PREMIUM_STYLES = ["p-guilloche", "p-monolith", "p-knockout", "p-editorial", "p-swiss", "p-underprint", "p-medallion", "p-foil-line"] as const;
@@ -212,7 +212,7 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
           <rect x={colX} y={0} width={colWW} height={H} fill={INK} />
           <g clipPath={`url(#${r.uid}-mcol)`}>
             <defs><clipPath id={`${r.uid}-mcol`}><rect x={colX} y={0} width={colWW} height={H} /></clipPath></defs>
-            <KMark x={colX + colWW * 0.18} y={b + h * 0.28} height={h * 0.95} fill="#1A1A1C" />
+            <Underprint cx={colX + colWW / 2} cy={b + h * 0.66} R={colWW * 0.95} color="#1C1C1E" />
           </g>
           <Logo x={r.rtl ? pin - lw : pin} y={r.y0} width={lw} fill={WHITE} />
           <g transform={`translate(0 ${y0})`}>{nb.node}</g>
@@ -221,11 +221,7 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
       );
     }
     case "p-knockout": {
-      /* the K cut out of the dots; the logo on a clear panel */
-      const kh = h * 0.86;
-      const kw = (kh * 116.59) / 107.57;
-      const kx = r.rtl ? b + 6 : b + w - kw - 6;
-      const ky = b + (h - kh) / 2;
+      /* the dots field; the full logo in a clear window, framed in silver */
       const lw = 27;
       const lx = r.rtl ? r.x1 - lw : r.x0;
       const ly = r.y1 - logoHeight(lw);
@@ -235,13 +231,13 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
           <defs>
             <mask id={`${r.uid}-kmask`} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
               <rect x={0} y={0} width={W} height={H} fill="#FFFFFF" />
-              <path d={K_PATH} fill="#000000" transform={`translate(${kx} ${ky}) scale(${kh / 107.57})`} />
               <rect x={lx - 3} y={ly - 3} width={lw + 6} height={logoHeight(lw) + 6} fill="#000000" />
             </mask>
           </defs>
           <g mask={`url(#${r.uid}-kmask)`}>
             <Dots area={{ x: 0, y: 0, w: W, h: H }} pitch={1.8} r={0.34} fill="#4D4D50" origin={{ x: cx, y: r.cy }} uid={`${r.uid}-kd`} />
           </g>
+          <rect x={lx - 3} y={ly - 3} width={lw + 6} height={logoHeight(lw) + 6} fill="none" stroke="#8E8E93" strokeWidth={0.2} />
           <Logo x={lx} y={ly} width={lw} fill={WHITE} />
           <QrZone items={r.front} codes={r.codes} font={r.font} captionFill={GREY_ON_INK} max={10} zone={{ x: r.rtl ? r.x0 : r.x1 - 10, y: r.y0, w: 10, h: 12, dir: "row", align: "end" }} />
         </>
@@ -343,7 +339,7 @@ export function drawPremiumBack(v: TemplateValues, ctx: DrawContext): ReactNode 
           {bg(r, INK)}
           <g clipPath={`url(#${r.uid}-kb)`}>
             <defs><clipPath id={`${r.uid}-kb`}><rect x={0} y={0} width={W} height={r.H} /></clipPath></defs>
-            <KMark x={r.rtl ? b - h * 0.22 : b + w - h * 0.72} y={b + h * 0.08} height={h * 1.05} fill="#161618" />
+            <Underprint cx={r.rtl ? b + w * 0.18 : b + w * 0.82} cy={r.cy} R={h * 0.62} color="#1C1C1E" />
           </g>
           <Info r={r} x0={r.x0} x1={r.x1} dark qrs={r.back} withLogo />
         </>

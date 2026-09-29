@@ -439,13 +439,13 @@ function drawStyle(v: TemplateValues, c: Ctx): string {
       /* the foil medallion, a hairline, the words and the logo */
       return table(c, `<tr>${cell(c, ornament(c, "medallion", 72, 72), `padding-${E(c)}:${g(c, 18)}px`)}${hairline(c)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 18)}px`)}</tr>`, base);
     case "p-knockout":
-      /* the dots field with the K cut out of it, the logo on its panel */
+      /* the dots field, the full logo in a framed clear window */
       return table(c, `<tr>${cell(c, ornament(c, "knockout", 192, 120, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
     case "p-underprint":
-      /* the K on the spirograph underprint */
-      return table(c, `<tr>${cell(c, ornament(c, "underprint", 120, 120), `padding-${E(c)}:${g(c, 16)}px`)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 4)}px`)}</tr>`, base);
+      /* the full logo across the spirograph underprint */
+      return table(c, `<tr>${cell(c, ornament(c, "underprint", 150, 120), `padding-${E(c)}:${g(c, 16)}px`)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 4)}px`)}</tr>`, base);
     case "p-monolith":
-      /* a black column with the K and the logo */
+      /* a black column on a dark underprint, with the logo */
       return table(c, `<tr>${cell(c, ornament(c, "monolith", 120, 150, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
     case "p-guilloche":
       /* the logo, the name, a guilloche band, the contacts */

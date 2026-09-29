@@ -516,7 +516,7 @@ export const brandCenterTemplatesT: Translations = {
   "cert.style.swiss":     { en: "Swiss grid", zh: "瑞士网格", ar: "شبكة سويسرية" },
   "cert.style.corners":   { en: "Corners", zh: "四角", ar: "زوايا" },
   "cert.weight.medium":   { en: "Medium", zh: "中等", ar: "متوسط" },
-  "cert.f.mark":          { en: "The large K mark", zh: "大号 K 标志", ar: "حرف K الكبير" },
+  "cert.f.mark": { en: "Background texture (underprint)", zh: "背景底纹", ar: "خلفية طباعة الأمان" },
   "cert.spec.guilloche":  { en: "Guilloche: 0.09 mm lines — print at 100% on a laser or offset press; they are also a light security feature.", zh: "扭索纹：0.09 毫米细线 — 用激光或胶印按 100% 印刷；同时具有轻度防伪作用。", ar: "الجيلوش: خطوط 0.09 مم — اطبع 100% ليزر أو أوفست؛ وهي كمان علامة أمان خفيفة." },
 
   /* ── certificates, round 3 (owner 30/09: "not bad but even better") ── */
@@ -532,7 +532,7 @@ export const brandCenterTemplatesT: Translations = {
   /* ── business cards: the premium set (owner 30/09) ── */
   "tpl.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
   "tpl.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色立柱", ar: "بريميوم — عمود أسود" },
-  "tpl.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "tpl.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "tpl.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
   "tpl.style.p-swiss":      { en: "Premium — Swiss grid", zh: "高级 — 瑞士网格", ar: "بريميوم — شبكة سويسرية" },
   "tpl.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
@@ -540,15 +540,15 @@ export const brandCenterTemplatesT: Translations = {
   "tpl.style.p-foil-line":  { en: "Premium — silver line", zh: "高级 — 银线", ar: "بريميوم — خط فضي" },
   "spec.pGuilloche": { en: "The guilloche band in silver foil (Pantone 877 C) or light grey ink — 0.08 mm lines.", zh: "扭索纹带用银色烫印（Pantone 877 C）或浅灰墨印刷 — 线宽 0.08 毫米。", ar: "شريط الجيلوش سلفر فويل (Pantone 877 C) أو حبر رمادي فاتح — خطوط 0.08 مم." },
   "spec.pMicro":     { en: "The short rule under the title is microtext — the group's name in 1-point capitals; print at 600 dpi or finer.", zh: "职位下的短线是微缩文字 — 1 磅大写的集团名称；请以 600 dpi 或更高精度印刷。", ar: "الخط القصير تحت المسمى كلام ميكرو — اسم المجموعة بحروف 1 بوينت؛ اطبع 600 dpi أو أدق." },
-  "spec.pKnockout":  { en: "Dots printed grey (K 70) on black board; the K and the logo's panel are the board itself.", zh: "黑卡上印灰色圆点（K 70）；K 与标志区域为卡纸本色。", ar: "النقط رمادي (K 70) على كرتون أسود؛ حرف K ومكان اللوجو هما لون الكرتون نفسه." },
+  "spec.pKnockout": { en: "Dots printed grey (K 70) on black board; the logo's window is the board itself, framed by a silver hairline.", zh: "黑卡上印灰色圆点（K 70）；标志视窗为卡纸本色，并以银色细线框出。", ar: "النقط رمادي (K 70) على كرتون أسود؛ وشباك اللوجو لون الكرتون نفسه وحواليه خط فضي رفيع." },
   "spec.pUnderprint": { en: "The underprint in the lightest grey (K 12) — fine lines, 0.1 mm.", zh: "底纹用最浅的灰色（K 12）印刷 — 细线 0.1 毫米。", ar: "الطباعة الخلفية أفتح رمادي (K 12) — خطوط رفيعة 0.1 مم." },
   "spec.pMedallion": { en: "The medallion in silver foil (Pantone 877 C); the K in its centre is the black board.", zh: "徽章用银色烫印（Pantone 877 C）；中心的 K 为黑卡本色。", ar: "الميدالية سلفر فويل (Pantone 877 C)؛ وحرف K في نصها هو لون الكرتون الأسود." },
   "spec.pFoilLine":  { en: "The line and the name in silver foil (Pantone 877 C).", zh: "线条和姓名用银色烫印（Pantone 877 C）。", ar: "الخط والاسم سلفر فويل (Pantone 877 C)." },
 
   /* ── staff ID badge: the premium set (owner 30/09) ── */
   "tpl.idStyle.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
-  "tpl.idStyle.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
-  "tpl.idStyle.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "tpl.idStyle.p-monolith": { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
+  "tpl.idStyle.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "tpl.idStyle.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
   "tpl.idStyle.p-underprint": { en: "Premium — round portrait", zh: "高级 — 圆形肖像", ar: "بريميوم — صورة دايرية" },
   "tpl.idStyle.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
@@ -557,13 +557,13 @@ export const brandCenterTemplatesT: Translations = {
   "evb.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
   "evb.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
   "evb.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
-  "evb.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "evb.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "evb.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
   "evb.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
 
   /* ── email signature: the premium set (owner 30/09) ── */
   "sig.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
-  "sig.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "sig.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "sig.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
   "sig.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色立柱", ar: "بريميوم — عمود أسود" },
   "sig.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },

@@ -26,7 +26,7 @@ import { Dots, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrap, wrapB
 import { nameIn } from "./person";
 import { LABELS, PLACEHOLDER, SILVER, issued } from "./certificate-common";
 import { V1_STYLES, pageV1 } from "./certificate-v1";
-import { FoilSeal, Guilloche, KMark, K_PATH, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, Guilloche, MicroLine, Underprint } from "./ornaments";
 
 /** The redesign (owner 30/09/2026: "made by a professional designer"). */
 const NEW_STYLES = ["classic", "guilloche", "black", "monolith", "editorial", "swiss", "dots", "award", "corners"] as const;
@@ -436,7 +436,7 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     return <>{nodes}</>;
   }
 
-  /* ── monolith: a black column with the K, the certificate on white ── */
+  /* ── monolith: a black column on a dark underprint, the certificate on white ── */
   if (style === "monolith") {
     const dark = DARK;
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
@@ -447,7 +447,7 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
       const pin = r.rtl ? b + w - 16 * u : b + 16 * u;
       const pAlign = r.rtl ? "right" : "left";
       nodes.push(<rect key="panel" x={px} y={0} width={pW} height={H} fill={INK} />);
-      if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={px} y={0} width={pW} height={H} /></clipPath></defs><KMark x={px + pW * 0.08} y={b + h * 0.36} height={h * 0.9} fill="#161618" /></g>);
+      if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={px} y={0} width={pW} height={H} /></clipPath></defs><Underprint cx={px + pW / 2} cy={b + h * 0.6} R={pW * 0.78} color="#1C1C1E" /></g>);
       const lw = pw * 0.5;
       nodes.push(<Logo key="logo" x={r.rtl ? pin - lw : pin} y={b + 20 * u} width={lw} fill={WHITE} />);
       if (r.heading) {
@@ -474,7 +474,7 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     /* portrait: the black block across the top */
     const ph = 0.3 * h;
     nodes.push(<rect key="panel" x={0} y={0} width={W} height={b + ph} fill={INK} />);
-    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={0} y={0} width={W} height={b + ph} /></clipPath></defs><KMark x={b + w * 0.52} y={b + ph * 0.12} height={ph * 1.3} fill="#161618" /></g>);
+    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={0} y={0} width={W} height={b + ph} /></clipPath></defs><Underprint cx={b + w * 0.78} cy={b + ph * 0.5} R={ph * 0.95} color="#1C1C1E" /></g>);
     const lw = 0.34 * w;
     const start = r.rtl ? x1 : x0;
     nodes.push(<Logo key="logo" x={r.rtl ? x1 - lw : x0} y={b + 20 * u} width={lw} fill={WHITE} />);
@@ -492,7 +492,7 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
   /* ── editorial: the title as the headline, a quiet K, a strict grid ── */
   if (style === "editorial") {
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
-    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-eclip)`}><defs><clipPath id={`${r.uid}-eclip`}><rect x={0} y={0} width={W} height={H} /></clipPath></defs><KMark x={r.rtl ? b - h * 0.42 : b + w - h * 0.62} y={b + h * 0.18} height={h * 0.95} fill="#F4F4F6" /></g>);
+    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-eclip)`}><defs><clipPath id={`${r.uid}-eclip`}><rect x={0} y={0} width={W} height={H} /></clipPath></defs><Underprint cx={r.rtl ? b + h * 0.12 : b + w - h * 0.12} cy={b + h * 0.58} R={h * 0.56} color="#EDEDF0" /></g>);
     const start = r.rtl ? x1 : x0;
     nodes.push(<rect key="bar" x={r.rtl ? x1 - 26 * u : x0} y={b + M} width={26 * u} height={1.6 * u} fill={INK} />);
     nodes.push(<Label key="no" r={r} x={r.rtl ? x0 : x1} y={b + M + 1.8 * u} text={`№ ${r.number}`} align={r.rtl ? "left" : "right"} look={LIGHT} size={2.4 * u} ltr />);
@@ -557,28 +557,13 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     return <>{nodes}</>;
   }
 
-  /* ── dots: the dots field (ch. 57) with the K cut out of it ── */
+  /* ── dots: the dots field (ch. 57) beside the words ── */
   const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
   const fw = tall ? W : 0.4 * w + b;
   const fh = tall ? 0.28 * h + b : H;
   const fx = tall ? 0 : r.rtl ? 0 : W - fw;
   const fy = tall ? H - fh : 0;
-  const kh = tall ? fh * 0.78 : h * 0.62;
-  const kw = (kh * 116.59) / 107.57;
-  const kx = fx + (fw - kw) / 2, ky = fy + (fh - kh) / 2;
-  nodes.push(
-    <g key="dots">
-      <defs>
-        <mask id={`${r.uid}-kmask`} maskUnits="userSpaceOnUse" x={fx} y={fy} width={fw} height={fh}>
-          <rect x={fx} y={fy} width={fw} height={fh} fill="#FFFFFF" />
-          {r.mark ? <path d={K_PATH} fill="#000000" transform={`translate(${kx} ${ky}) scale(${kh / 107.57})`} /> : null}
-        </mask>
-      </defs>
-      <g mask={`url(#${r.uid}-kmask)`}>
-        <Dots area={{ x: fx, y: fy, w: fw, h: fh }} pitch={3 * u} r={0.55 * u} fill="#C7C7CC" origin={{ x: fx + fw / 2, y: fy + fh / 2 }} uid={`${r.uid}-dd`} />
-      </g>
-    </g>,
-  );
+  nodes.push(<Dots key="dots" area={{ x: fx, y: fy, w: fw, h: fh }} pitch={3 * u} r={0.55 * u} fill="#C7C7CC" origin={{ x: fx + fw / 2, y: fy + fh / 2 }} uid={`${r.uid}-dd`} />);
   const cx0 = tall ? x0 : r.rtl ? b + fw - b + 18 * u : x0;
   const cx1 = tall ? x1 : r.rtl ? x1 : b + w - (fw - b) - 18 * u;
   const start = r.rtl ? cx1 : cx0;
@@ -672,7 +657,7 @@ export const certificate: TemplateDef = {
     { key: "nameWeight", kind: "choice", labelKey: "sig.f.nameWeight", group: "look", when: (v) => !isV1(v), options: [
       { value: "light", labelKey: "sig.weight.light" }, { value: "regular", labelKey: "sig.weight.regular" }, { value: "medium", labelKey: "cert.weight.medium" }, { value: "bold", labelKey: "sig.weight.bold" },
     ] },
-    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => !isV1(v) && isStyle("monolith", "editorial", "dots")(v) },
+    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => !isV1(v) && isStyle("monolith", "editorial")(v) },
     { key: "silverName", kind: "switch", labelKey: "cert.f.silverName", group: "look", when: (v) => !isV1(v) && !isStyle("black")(v) },
 
     { key: "heading", kind: "text", labelKey: "cert.f.heading", group: "words", max: 60 },

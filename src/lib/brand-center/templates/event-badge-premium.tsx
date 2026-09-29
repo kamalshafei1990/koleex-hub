@@ -5,8 +5,8 @@
 
      p-guilloche   black, a silver guilloche band over the status
      p-underprint  white, the spirograph underprint behind the name
-     p-monolith    a black block with the K and the event
-     p-knockout    the dots field with the K cut out of it
+     p-monolith    a black block with a dark underprint and the event
+     p-knockout    the dots field, the logo in a framed clear window
      p-medallion   black, the foil medallion, the name in silver
      p-editorial   the first name as a light headline
 
@@ -20,7 +20,7 @@ import type { DrawContext, TemplateValues } from "./types";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, LIGHT_ON_INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced } from "./card/parts";
 import { asLang, fontOf, num, qrsOf, str } from "./card/model";
-import { FoilSeal, KMark, K_PATH, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, MicroLine, Underprint } from "./ornaments";
 
 export const EVB_PREMIUM = ["p-guilloche", "p-underprint", "p-monolith", "p-knockout", "p-medallion", "p-editorial"] as const;
 type P = (typeof EVB_PREMIUM)[number];
@@ -205,7 +205,7 @@ export function drawEvbPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <rect x={0} y={0} width={W} height={block} fill={INK} />
           <g clipPath={`url(#${r.uid}-eblk)`}>
             <defs><clipPath id={`${r.uid}-eblk`}><rect x={0} y={0} width={W} height={block} /></clipPath></defs>
-            <KMark x={r.rtl ? b - 2 : b + w * 0.38} y={b + 6 * u} height={block * 1.1} fill="#1A1A1C" />
+            <Underprint cx={r.rtl ? b + w * 0.22 : b + w * 0.78} cy={block * 0.5} R={block * 0.8} color="#1C1C1E" />
           </g>
           <Logo x={r.rtl ? r.x1 - lw : r.x0} y={b + 14 * u} width={lw} fill={WHITE} />
           {r.event ? <Txt r={r} x={start} y={block - 9 * u} size={3.2 * u} fill={WHITE} weight={600} align={align} spacing={3.2 * u * 0.28} max={w - 14 * u}>{caps(r.event)}</Txt> : null}
@@ -220,11 +220,9 @@ export function drawEvbPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
     case "p-knockout": {
       const role = RoleBand({ r, dark: true });
       const field = b + (tall ? 0.4 : 0.44) * h;
-      const kh = field - b - 8 * u;
-      const kw = (kh * 116.59) / 107.57;
-      const kx = r.rtl ? b + 6 * u : b + w - kw - 6 * u, ky = b + 4 * u;
-      const lw = 0.34 * w;
-      const lx = r.rtl ? r.x1 - lw : r.x0, ly = field - 6 * u - logoHeight(lw);
+      /* the full logo in a framed clear window, below the lanyard slot */
+      const lw = 0.44 * w;
+      const lx = cx - lw / 2, ly = b + 11 * u + (field - b - 11 * u - logoHeight(lw)) / 2;
       const ev = eventLine(r);
       const evY = role.top - 5 * u;
       const p = Person({ r, x: cx, top: field + 8 * u, bottom: evY - 10 * u, width: w - 12 * u, align: "center", dark: true, max: 10 * u });
@@ -234,11 +232,11 @@ export function drawEvbPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <defs>
             <mask id={`${r.uid}-ekm`} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={field}>
               <rect x={0} y={0} width={W} height={field} fill="#FFFFFF" />
-              <path d={K_PATH} fill="#000000" transform={`translate(${kx} ${ky}) scale(${kh / 107.57})`} />
-              <rect x={lx - 3 * u} y={ly - 3 * u} width={lw + 6 * u} height={logoHeight(lw) + 6 * u} fill="#000000" />
+              <rect x={lx - 4 * u} y={ly - 4 * u} width={lw + 8 * u} height={logoHeight(lw) + 8 * u} fill="#000000" />
             </mask>
           </defs>
           <g mask={`url(#${r.uid}-ekm)`}><Dots area={{ x: 0, y: 0, w: W, h: field }} pitch={2.2 * u} r={0.42 * u} fill="#4D4D50" origin={{ x: cx, y: field / 2 }} uid={`${r.uid}-ekd`} /></g>
+          <rect x={lx - 4 * u} y={ly - 4 * u} width={lw + 8 * u} height={logoHeight(lw) + 8 * u} fill="none" stroke="#8E8E93" strokeWidth={0.2} />
           <Logo x={lx} y={ly} width={lw} fill={WHITE} />
           {p.node}
           <Codes r={r} top={p.bottom + 4 * u} bottom={evY - 4 * u} fill={GREY_ON_INK} />

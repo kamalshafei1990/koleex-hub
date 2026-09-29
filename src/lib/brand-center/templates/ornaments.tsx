@@ -2,12 +2,12 @@
    Brand Center — the fine ornaments every template may use (the owner,
    30/09/2026: designs "really made by a professional designer"): the
    guilloche band and rosette, the underprint of spirograph curves,
-   microtext lines, the foil medallion seal, and the K of the wordmark as a
-   quiet mark. All in mm, one colour each; the K is never altered.
+   microtext lines and the foil medallion seal. All in mm, one colour
+   each. The logo is only ever used whole — never the K alone.
    --------------------------------------------------------------------------- */
 
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
-import { INK, WHITE, textWidth } from "./card/parts";
+import { INK, textWidth } from "./card/parts";
 
 /* ── the ornaments ─────────────────────────────────────────────────────────── */
 
@@ -115,8 +115,9 @@ export function Underprint({ cx, cy, R, color }: { cx: number; cy: number; R: nu
 }
 
 /** The seal, a foil medallion: a scalloped silver rim, the tagline and the
- *  group's name around it, a guilloche band, and the K of the wordmark on
- *  a clear centre. */
+ *  group's name around it, a guilloche band, and fine line-work at the
+ *  centre. Never a piece of the logo (owner, 30/09/2026: "I only use the
+ *  full logo"). */
 export function FoilSeal({ uid, font, cx, cy, rad, dark }: { uid: string; font: string; cx: number; cy: number; rad: number; dark: boolean }) {
   const id = `${uid}-seal-${Math.round(cx * 10)}-${Math.round(cy * 10)}`;
   const rt = rad * 0.8;
@@ -128,8 +129,6 @@ export function FoilSeal({ uid, font, cx, cy, rad, dark }: { uid: string; font: 
     rim += `${i ? "L" : "M"}${(cx + rr * Math.cos(t)).toFixed(2)} ${(cy + rr * Math.sin(t)).toFixed(2)}`;
   }
   const words = `${KOLEEX_COMPANY.tagline.replace(/\.$/, "")}  ·  KOLEEX INTERNATIONAL GROUP  ·  `;
-  const kh = rad * 0.46;
-  const kw = (kh * 116.59) / 107.57;
   return (
     <g>
       <defs>
@@ -146,14 +145,9 @@ export function FoilSeal({ uid, font, cx, cy, rad, dark }: { uid: string; font: 
       <circle cx={cx} cy={cy} r={rad * 0.7} fill="none" stroke="#8E8E93" strokeWidth={0.18} />
       <Rosette cx={cx} cy={cy} r0={rad * 0.5} r1={rad * 0.68} color="#8E8E93" rings={8} lobes={24} width={0.06} />
       <circle cx={cx} cy={cy} r={rad * 0.48} fill={dark ? INK : "#F7F7F9"} stroke="#8E8E93" strokeWidth={0.18} />
-      <path d={K_PATH} fill={dark ? WHITE : "#1C1C1E"} transform={`translate(${cx - kw / 2} ${cy - kh / 2}) scale(${kh / 107.57})`} />
+      <Rosette cx={cx} cy={cy} r0={rad * 0.1} r1={rad * 0.42} color={dark ? "#8E8E93" : "#6E6E73"} rings={10} lobes={14} width={0.06} />
     </g>
   );
 }
 
-/** The K of the wordmark, unaltered, as a large quiet mark. */
-export const K_PATH = "M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z";
-export function KMark({ x, y, height, fill }: { x: number; y: number; height: number; fill: string }) {
-  return <path d={K_PATH} fill={fill} transform={`translate(${x} ${y}) scale(${height / 107.57})`} />;
-}
 
