@@ -33,7 +33,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { allRows } from "@/lib/server/all-rows";
 import { MetaError } from "@/lib/server/marketing/meta";
-import { isNotAllowedYet, isWindowClosed, pageConversations, sendMessage, type RemoteConversation } from "@/lib/server/marketing/meta-messages";
+import { customerPicture, isNotAllowedYet, isWindowClosed, pageConversations, sendMessage, type RemoteConversation } from "@/lib/server/marketing/meta-messages";
+import { stopsRun } from "@/lib/server/marketing/meta-insights";
 import { claimMessages, listAccounts, loadAccountForSync, recordSync, recordSyncState, type AccountForSync } from "@/lib/server/marketing/accounts";
 import { later, notifyMessageWaiting, settleMessage } from "@/lib/server/marketing/notify";
 import { namesOf } from "@/lib/server/marketing/posts";
@@ -56,12 +57,16 @@ const PAGE = 30;
 const WINDOW_DAYS = 90;
 const WINDOW_ROWS = 3000;
 const MESSAGES_SHOWN = 60;
+/** Customers' pictures read per read (newest conversations first), and how
+ *  long one is kept before it is read again — Meta's links expire. */
+const AVATARS_PER_RUN = 12;
+const AVATAR_TTL_MS = 2 * 86_400_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const CONV_COLUMNS = "id, tenant_id, account_id, external_id, customer_external_id, customer_name, customer_username, last_message_at, last_customer_at, last_from_us, snippet, handled_at, handled_by, notified_at";
+const CONV_COLUMNS = "id, tenant_id, account_id, external_id, customer_external_id, customer_name, customer_username, customer_avatar_url, last_message_at, last_customer_at, last_from_us, snippet, handled_at, handled_by, notified_at";
 type ConvRow = {
   id: string; tenant_id: string; account_id: string; external_id: string; customer_external_id: string | null;
-  customer_name: string | null; customer_username: string | null; last_message_at: string | null; last_customer_at: string | null;
+  customer_name: string | null; customer_username: string | null; customer_avatar_url: string | null; last_message_at: string | null; last_customer_at: string | null;
   last_from_us: boolean; snippet: string | null; handled_at: string | null; handled_by: string | null; notified_at: string | null;
 };
 const MSG_COLUMNS = "id, conversation_id, external_id, from_us, text, attachments, sent_at, sent_by";
@@ -168,6 +173,31 @@ async function applyRule(a: AccountForSync): Promise<number> {
   return changed;
 }
 
+/** Customers' pictures, a few per read, newest conversations first; read
+ *  again once Meta's link may have expired. A customer Meta refuses is tried
+ *  again after the same wait; an expired key or a rate limit stops the pass. */
+async function refreshAvatars(a: AccountForSync & { token: string }): Promise<number> {
+  const stale = new Date(Date.now() - AVATAR_TTL_MS).toISOString();
+  const { data, error } = await supabaseServer.from("marketing_conversations").select("id, customer_external_id")
+    .eq("account_id", a.id).not("customer_external_id", "is", null)
+    .or(`customer_avatar_at.is.null,customer_avatar_at.lt.${stale}`)
+    .order("last_message_at", { ascending: false }).order("id").limit(AVATARS_PER_RUN);
+  if (error) throw new Error(`marketing conversations: ${error.message}`);
+  let read = 0;
+  for (const c of (data ?? []) as Array<{ id: string; customer_external_id: string }>) {
+    const patch: Record<string, unknown> = { customer_avatar_at: new Date().toISOString() };
+    try {
+      patch.customer_avatar_url = await customerPicture(a.token, c.customer_external_id);
+    } catch (e) {
+      if (stopsRun(e)) break;
+    }
+    const { error: uErr } = await supabaseServer.from("marketing_conversations").update(patch).eq("id", c.id);
+    if (uErr) throw new Error(`marketing conversations: ${uErr.message}`);
+    read++;
+  }
+  return read;
+}
+
 /** One account's conversations — see the header. */
 export async function syncMessages(tenantId: string, accountId: string, opts: { minGapMs?: number } = {}): Promise<MessagesSyncOutcome> {
   const a = await loadAccountForSync(tenantId, accountId);
@@ -201,6 +231,7 @@ export async function syncMessages(tenantId: string, accountId: string, opts: { 
       later(() => notifyMessageWaiting(tenantId, c.id));
       notified++;
     }
+    await refreshAvatars(a as AccountForSync & { token: string }).catch((e) => console.warn(`[marketing/messages] pictures ${a.id}: ${text(e)}`));
     const newest = remote.reduce<string | null>((m, r) => later_(m, r.updated_at), readTo);
     await recordSyncState(a, { messages_read_to: newest, messages_error: null, ...(first ? { messages_since: now } : {}), ...(ruleDue ? { messages_rule: MESSAGES_RULE } : {}) });
     return { ok: true, conversations: saved.length, notified, settled: ended.length };
@@ -237,7 +268,7 @@ function view(c: ConvRow, account: MarketingAccountView, names: Map<string, stri
   const needs = conversationNeedsReply(c);
   return {
     id: c.id, account,
-    customer: { name: c.customer_name, username: c.customer_username },
+    customer: { name: c.customer_name, username: c.customer_username, avatar_url: c.customer_avatar_url },
     snippet: c.snippet, last_message_at: c.last_message_at, last_customer_at: c.last_customer_at, last_from_us: c.last_from_us,
     needs_reply: needs,
     handled_at: c.handled_at, handled_by_name: c.handled_by ? names.get(c.handled_by) || null : null,

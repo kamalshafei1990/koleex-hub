@@ -207,7 +207,7 @@ export default function SocialMessages({ space }: { space: MarketingSpace }) {
                         aria-current={openId === c.id ? "true" : undefined}
                         className={`flex w-full min-w-0 items-start gap-3 rounded-xl border p-3 text-start transition-colors ${openId === c.id ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]"}`}
                       >
-                        <Initial name={who(c, t)} />
+                        <Avatar name={who(c, t)} url={c.customer.avatar_url} />
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="flex min-w-0 items-center gap-1.5">
                             <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]"><bdi>{who(c, t)}</bdi></span>
@@ -323,7 +323,7 @@ function ConversationPane({ id, t, onBack, onChanged }: { id: string; t: Tr; onB
         <Button type="button" variant="iconSecondary" aria-label={t("back")} onClick={onBack} className="lg:hidden">
           <AngleLeftIcon size={14} className="rtl:rotate-180" />
         </Button>
-        <Initial name={who(c, t)} />
+        <Avatar name={who(c, t)} url={c.customer.avatar_url} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]"><bdi>{who(c, t)}</bdi></span>
           <span className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-muted)]">
@@ -432,6 +432,17 @@ function Attachment({ a, t }: { a: MessageAttachment; t: Tr }) {
       <PaperclipIcon size={12} />{a.name || t("openFile")}
     </a>
   );
+}
+
+/* The customer's picture from Meta; its first letter while there is none or
+   once Meta's link has expired. */
+function Avatar({ name, url }: { name: string; url: string | null }) {
+  const [bad, setBad] = useState(false);
+  if (url && !bad) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-9 w-9 shrink-0 rounded-full bg-[var(--bg-surface-subtle)] object-cover" />;
+  }
+  return <Initial name={name} />;
 }
 
 function Initial({ name }: { name: string }) {

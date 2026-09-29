@@ -100,6 +100,14 @@ export async function pageConversations(token: string, platform: MessagePlatform
   return out;
 }
 
+/** A customer's picture — the profile API of a Messenger PSID or an
+ *  Instagram IGSID, with the Page key. Meta's links expire; null when Meta
+ *  shares none. */
+export async function customerPicture(token: string, customerId: string): Promise<string | null> {
+  const b = await metaGet<{ profile_pic?: string }>(metaGraphUrl(customerId, { fields: "profile_pic" }), token);
+  return typeof b.profile_pic === "string" && b.profile_pic.startsWith("https://") ? b.profile_pic : null;
+}
+
 /** Answer a customer; Meta's id of the message sent. */
 export async function sendMessage(token: string, recipientId: string, text: string): Promise<string> {
   const body = await metaPost<{ message_id?: string }>(metaGraphUrl("me/messages"), token, {

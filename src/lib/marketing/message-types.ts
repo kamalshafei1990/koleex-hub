@@ -37,7 +37,8 @@ export interface MessageView {
 export interface ConversationView {
   id: string;
   account: MarketingAccountView;
-  customer: { name: string | null; username: string | null };
+  /** avatar_url: Meta's picture of the customer (its link may have expired). */
+  customer: { name: string | null; username: string | null; avatar_url: string | null };
   snippet: string | null;
   last_message_at: string | null;
   last_customer_at: string | null;
