@@ -5,13 +5,15 @@
    computer has (ch. 92: Arial / Helvetica, Tahoma for Arabic, PingFang /
    Microsoft YaHei for Chinese), pictures from our own domain.
 
-   The content is the book's: name, title, logo, one phone, one email, the
-   website. It comes in seven approved layouts (owner 29/09/2026: "more
-   styles, everything editable"), three languages and an optional second
-   one, with the reply version the book asks for. The event banner is shown
-   only while there is an event. The logo is a picture on its own white
-   (or black) tile: a mail app in dark mode flips colours but not pictures,
-   so the logo is never drawn black on black.
+   Owner, 29/09/2026: "same as the business cards and the ID badge — be a
+   professional designer; perfect, professional and editable designs come
+   first, a small break of the book is fine". So: sixteen layouts — the
+   book's own first — with a portrait, the dots pattern, an accent colour,
+   rules as hairlines or dots, and the type, spacing and links adjustable.
+   Three languages and an optional second one, the reply version the book
+   asks for, and the event banner while there is an event. The logo is a
+   picture on its own white (or black) tile: a mail app in dark mode flips
+   colours but not pictures, so the logo is never drawn black on black.
    --------------------------------------------------------------------------- */
 
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
@@ -24,32 +26,60 @@ import { LANGS, asLang, list, num, rowKind, rowsOf, str, type Lang, type RowKind
  *  from mainland China (ch. 93). */
 export const SIGNATURE_HOST = "https://hub.koleexgroup.com";
 const ASSETS = "/brand/email";
+const KOLEEX_SITE = "https://www.koleexgroup.com";
 
-export const SIG_STYLES = ["standard", "logo-first", "divider", "logo-right", "outline", "black", "compact"] as const;
+export const SIG_STYLES = [
+  "standard", "logo-first", "divider", "logo-right", "portrait", "portrait-top", "accent-bar", "editorial",
+  "columns", "dots-black", "dots-white", "band", "outline", "black", "centered", "compact",
+] as const;
 type Style = (typeof SIG_STYLES)[number];
 const styleOf = (v: TemplateValues): Style => ((SIG_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as Style) : "standard");
+const PHOTO_STYLES: Style[] = ["portrait", "portrait-top"];
+const DOTS_STYLES: Style[] = ["dots-black", "dots-white"];
+
+const oneOf = <T extends string>(list: readonly T[], x: unknown, d: T): T => ((list as readonly string[]).includes(String(x)) ? (x as T) : d);
 
 /** Where the company's name goes: after the title (the book), on its own
  *  line, under the logo as the group lockup (ch. 43), or nowhere. */
 const COMPANY_AT = ["title", "line", "logo", "off"] as const;
 type CompanyAt = (typeof COMPANY_AT)[number];
-const companyAt = (v: TemplateValues): CompanyAt => ((COMPANY_AT as readonly string[]).includes(String(v.companyAt)) ? (v.companyAt as CompanyAt) : "title");
+const companyAt = (v: TemplateValues): CompanyAt => oneOf(COMPANY_AT, v.companyAt, "title");
 
 /** How the contact lines sit: the book (each phone on its line, email and
  *  website together), one per line, or all on one line. */
 const LAYOUTS = ["book", "lines", "one"] as const;
 type Layout = (typeof LAYOUTS)[number];
-const layoutOf = (v: TemplateValues): Layout => ((LAYOUTS as readonly string[]).includes(String(v.contactLayout)) ? (v.contactLayout as Layout) : "book");
+const layoutOf = (v: TemplateValues): Layout => oneOf(LAYOUTS, v.contactLayout, "book");
 
-/** What each style brings when it is picked. */
-const STYLE_DEFAULTS: Record<Style, { companyAt: CompanyAt; contactLayout: Layout }> = {
-  standard: { companyAt: "title", contactLayout: "book" },
-  "logo-first": { companyAt: "line", contactLayout: "one" },
-  divider: { companyAt: "line", contactLayout: "lines" },
-  "logo-right": { companyAt: "line", contactLayout: "lines" },
-  outline: { companyAt: "line", contactLayout: "lines" },
-  black: { companyAt: "line", contactLayout: "lines" },
-  compact: { companyAt: "title", contactLayout: "one" },
+/** The one colour a signature may add: black (the book), a quiet grey, or
+ *  Hub Blue (the brand's third colour) — for hairlines, bars and rules. */
+const ACCENTS = ["black", "grey", "blue"] as const;
+type Accent = (typeof ACCENTS)[number];
+const HUB_BLUE = "#567FB2";
+const WEIGHTS = ["bold", "regular", "light"] as const;
+const SPACINGS = ["tight", "normal", "airy"] as const;
+const RULES = ["solid", "dots"] as const;
+const LINK_COLOURS = ["grey", "ink", "accent"] as const;
+const SHAPES = ["circle", "rounded", "square"] as const;
+
+/** What each style brings when it is picked — its designer's settings. */
+const STYLE_DEFAULTS: Record<Style, { companyAt: CompanyAt; contactLayout: Layout; accent: Accent; nameSize: number; nameWeight: (typeof WEIGHTS)[number]; titleCaps: boolean }> = {
+  standard:       { companyAt: "title", contactLayout: "book",  accent: "black", nameSize: 13, nameWeight: "bold",  titleCaps: false },
+  "logo-first":   { companyAt: "line",  contactLayout: "one",   accent: "grey",  nameSize: 16, nameWeight: "bold",  titleCaps: false },
+  divider:        { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  "logo-right":   { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  portrait:       { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 16, nameWeight: "bold",  titleCaps: false },
+  "portrait-top": { companyAt: "title", contactLayout: "one",   accent: "grey",  nameSize: 16, nameWeight: "bold",  titleCaps: false },
+  "accent-bar":   { companyAt: "line",  contactLayout: "lines", accent: "blue",  nameSize: 16, nameWeight: "bold",  titleCaps: false },
+  editorial:      { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 22, nameWeight: "light", titleCaps: true },
+  columns:        { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  "dots-black":   { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  "dots-white":   { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  band:           { companyAt: "line",  contactLayout: "book",   accent: "black", nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  outline:        { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  black:          { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 15, nameWeight: "bold",  titleCaps: false },
+  centered:       { companyAt: "line",  contactLayout: "one",   accent: "grey",  nameSize: 16, nameWeight: "bold",  titleCaps: false },
+  compact:        { companyAt: "title", contactLayout: "one",   accent: "grey",  nameSize: 13, nameWeight: "bold",  titleCaps: false },
 };
 
 /* ── words that are part of the signature ──────────────────────────────── */
@@ -89,9 +119,11 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const ARABIC = /[\u0600-\u06FF]/;
 const CJK = /[\u2E80-\u9FFF\uFF00-\uFFEF]/;
 const LATIN = "Arial, Helvetica, sans-serif";
+/** A light name needs a face that has a light weight (Mac mail apps). */
+const LATIN_LIGHT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 /** The book's email fonts, chosen by the script of the words. */
-const fontFor = (s: string) =>
-  ARABIC.test(s) ? "Tahoma, Arial, sans-serif" : CJK.test(s) ? "'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', Arial, sans-serif" : LATIN;
+const fontFor = (s: string, light = false) =>
+  ARABIC.test(s) ? "Tahoma, Arial, sans-serif" : CJK.test(s) ? "'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', Arial, sans-serif" : light ? LATIN_LIGHT : LATIN;
 
 const INK = "#000000";
 const GREY = "#6E6E73";
@@ -100,11 +132,20 @@ const RULE = "#D2D2D7";
 interface Ctx {
   lang: Lang; rtl: boolean; size: number; base: string; preview: boolean;
   fg: string; soft: string; link: string;
+  /** The accent: hairlines, bars, rules; `frame` for a frame's border. */
+  line: string; frame: string; dots: boolean;
   /** Logo width in px (the letters, not the tile). */
   logoW: number;
+  /** Spacing factor (tight, normal, airy). */
+  k: number;
+  nameSize: number; nameWeight: number; titleCaps: boolean;
+  /** Where a tap on the logo goes, or null. */
+  logoHref: string | null;
 }
 const S = (c: Ctx) => (c.rtl ? "right" : "left");
 const E = (c: Ctx) => (c.rtl ? "left" : "right");
+/** A gap in px, by the spacing chosen. */
+const g = (c: Ctx, px: number) => Math.max(0, Math.round(px * c.k));
 /** The white margin inside a logo tile, in px on screen (5 % of the logo). */
 const tilePad = (w: number) => Math.round(w * 0.05);
 /** x of the book: the logo's height (logo width ÷ 6.69). */
@@ -112,10 +153,13 @@ const xOf = (w: number) => Math.round((w * 107.57) / 719.83);
 
 /** Words in their own font; a Latin value inside an Arabic line keeps its
  *  left-to-right order. */
-function words(text: string, c: Ctx, style = ""): string {
+function words(text: string, c: Ctx, style = "", light = false): string {
   const ltrInRtl = c.rtl && !ARABIC.test(text);
-  return `<span${ltrInRtl ? ' dir="ltr"' : ""} style="font-family:${fontFor(text)};${style}">${esc(text)}</span>`;
+  return `<span${ltrInRtl ? ' dir="ltr"' : ""} style="font-family:${fontFor(text, light)};${style}">${esc(text)}</span>`;
 }
+
+const linked = (c: Ctx, html: string) =>
+  c.logoHref ? `<a href="${esc(c.logoHref)}" style="text-decoration:none;border:0;outline:none">${html}</a>` : html;
 
 function logoImg(c: Ctx, onBlack: boolean, group: boolean): string {
   const w = group ? Math.max(c.logoW, 160) : c.logoW;
@@ -123,7 +167,26 @@ function logoImg(c: Ctx, onBlack: boolean, group: boolean): string {
   const th = Math.round((tw * (group ? 156 : 120)) / 528);
   const file = `${group ? "koleex-group" : "koleex-logo"}-${onBlack ? "white-on-black" : "black-on-white"}.png`;
   const alt = group ? "KOLEEX INTERNATIONAL GROUP" : "KOLEEX";
-  return `<img src="${c.base}${ASSETS}/${file}" width="${tw}" height="${th}" alt="${alt}" style="display:block;width:${tw}px;height:${th}px;max-width:none;border:0;outline:none;text-decoration:none">`;
+  return linked(c, `<img src="${c.base}${ASSETS}/${file}" width="${tw}" height="${th}" alt="${alt}" style="display:block;width:${tw}px;height:${th}px;max-width:none;border:0;outline:none;text-decoration:none">`);
+}
+/** The dots field (ch. 57): an even grey grid, the logo on a clear panel. */
+function dotsImg(c: Ctx, black: boolean): string {
+  const w = Math.round(c.logoW * 1.92);
+  const h = Math.round(w * 0.625);
+  return linked(c, `<img src="${c.base}${ASSETS}/koleex-dots-${black ? "black" : "white"}.png" width="${w}" height="${h}" alt="KOLEEX" style="display:block;width:${w}px;height:${h}px;max-width:none;border:0;outline:none;border-radius:6px">`);
+}
+/** The portrait: the Hub photo (square), cut as a circle, a rounded square
+ *  or square. Empty in the studio: the initials on grey. */
+function photoHtml(v: TemplateValues, c: Ctx): string {
+  const size = Math.min(120, Math.max(56, num(v, "photoSize", 84)));
+  const shape = oneOf(SHAPES, v.photoShape, "circle");
+  const radius = shape === "circle" ? "50%" : shape === "rounded" ? `${Math.round(size * 0.16)}px` : "0";
+  const src = str(v, "photo");
+  if (src) {
+    return `<img src="${esc(src)}" width="${size}" height="${size}" alt="${esc(str(v, "name"))}" style="display:block;width:${size}px;height:${size}px;max-width:none;border:0;border-radius:${radius};object-fit:cover">`;
+  }
+  const initials = (str(v, "name") || PLACEHOLDER[c.lang].name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate"><tr><td width="${size}" height="${size}" bgcolor="#E5E5EA" style="width:${size}px;height:${size}px;background:#E5E5EA;border-radius:${radius};text-align:center;vertical-align:middle;font-family:${LATIN};font-size:${Math.round(size * 0.32)}px;color:#8E8E93">${esc(initials)}</td></tr></table>`;
 }
 
 /** `mark`: "(WhatsApp)" after the mobile — kept apart from the number, so
@@ -131,6 +194,7 @@ function logoImg(c: Ctx, onBlack: boolean, group: boolean): string {
 interface Contact { kind: RowKind; label: string; value: string; mark: string; href: string | null }
 function contactsOf(v: TemplateValues, lang: Lang): Contact[] {
   const digits = (s: string) => s.replace(/[^\d+]/g, "");
+  const url = (s: string) => (/^https?:\/\//.test(s) ? s : `https://${s}`);
   return rowsOf(v)
     .filter((r) => r.on && r.value.trim())
     .map((r) => {
@@ -140,8 +204,8 @@ function contactsOf(v: TemplateValues, lang: Lang): Contact[] {
       if (r.kind === "mobile" || r.kind === "tel") href = `tel:${digits(value)}`;
       else if (r.kind === "whatsapp") href = `https://wa.me/${digits(value).replace(/^\+/, "")}`;
       else if (r.kind === "email" && /@/.test(value)) href = `mailto:${value}`;
-      else if (r.kind === "web") href = /^https?:\/\//.test(value) ? value : `https://${value}`;
-      else if (r.kind === "linkedin" && /linkedin\.com/i.test(value)) href = /^https?:\/\//.test(value) ? value : `https://${value}`;
+      else if (r.kind === "web") href = url(value);
+      else if ((r.kind === "linkedin" || r.kind === "custom") && /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(value)) href = url(value);
       return { kind: r.kind, label: r.label.trim(), value, mark, href };
     });
 }
@@ -159,31 +223,35 @@ function contactLines(cs: Contact[], layout: Layout): Contact[][] {
   }
   return out;
 }
-function contactHtml(x: Contact, c: Ctx): string {
+/** A link row may show its label only ("LinkedIn") when "links as words"
+ *  is on — the label becomes the link. */
+function contactHtml(x: Contact, c: Ctx, asWords = false): string {
+  if (asWords && x.href && x.label.length > 1 && (x.kind === "linkedin" || x.kind === "custom" || x.kind === "whatsapp" || x.kind === "wechat")) {
+    return `<a href="${esc(x.href)}" style="color:${c.link};text-decoration:none">${words(x.label, c, `color:${c.link}`)}</a>`;
+  }
   const label = x.label ? `${words(x.label, c, `color:${c.fg}`)}&nbsp;` : "";
-  const value = words(x.value, c, `color:${c.link}`);
+  /* a number never breaks between its groups */
+  const phone = x.kind === "mobile" || x.kind === "tel" || x.kind === "fax" || x.kind === "whatsapp";
+  const value = words(x.value, c, `color:${c.link}`).replace(/ (?=[^<>]*<\/span>$)/g, phone ? "&nbsp;" : " ");
   const body = x.href ? `<a href="${esc(x.href)}" style="color:${c.link};text-decoration:none">${value}</a>` : value;
   /* the Chinese mark brings its own full-width space */
   const mark = x.mark ? `${c.lang === "zh" ? "" : "&nbsp;"}${words(x.mark, c, `color:${c.link}`)}` : "";
-  return `${label}${body}${mark}`;
+  return `<span style="white-space:nowrap">${label}${body}${mark}</span>`;
 }
 const DOT = (c: Ctx) => `<span style="color:${c.soft}">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`;
-function lineHtml(line: Contact[], c: Ctx): string {
-  return line.map((x) => contactHtml(x, c)).join(DOT(c));
-}
 
 /** One text line as a table row — the only spacing every mail app keeps. */
-function row(inner: string, c: Ctx, style = "", padSide = 0): string {
+function row(inner: string, c: Ctx, style = "", padSide = 0, align?: string): string {
   const pad = padSide ? `padding-${S(c)}:${padSide}px;` : "";
-  return `<tr><td style="${pad}text-align:${S(c)};${style}">${inner}</td></tr>`;
+  return `<tr><td style="${pad}text-align:${align ?? S(c)};${style}">${inner}</td></tr>`;
 }
-const table = (c: Ctx, inner: string, style = "") =>
-  `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${c.rtl ? ' dir="rtl"' : ""} style="border-collapse:collapse;${style}">${inner}</table>`;
+const table = (c: Ctx, inner: string, style = "", attrs = "") =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${c.rtl ? ' dir="rtl"' : ""}${attrs} style="border-collapse:collapse;${style}">${inner}</table>`;
 
 /** The name, the second-language name, the title (with the company after
  *  it, as in the book), the second title, the company line. `reply`: the
  *  short version — the name, the title and the company on one line. */
-function whoRows(v: TemplateValues, c: Ctx, o: { nameSize: number; pad?: number; inline?: boolean; reply?: boolean }): string {
+function whoRows(v: TemplateValues, c: Ctx, o: { pad?: number; inline?: boolean; reply?: boolean; align?: string; nameSize?: number } = {}): string {
   const ph = PLACEHOLDER[c.lang];
   const name = str(v, "name") || (c.preview ? ph.name : "");
   const title = str(v, "title") || (c.preview ? ph.title : "");
@@ -194,39 +262,60 @@ function whoRows(v: TemplateValues, c: Ctx, o: { nameSize: number; pad?: number;
   const at = o.reply && at0 !== "off" ? "title" : at0;
   const company = str(v, "company");
   const soft = `color:${c.soft}`;
-  const titleLine = [title ? words(title, c, soft) : "", at === "title" && company ? words(company, c, soft) : ""].filter(Boolean).join(DOT(c));
-  const nameHtml = name ? words(name, c, `font-size:${o.nameSize}px;font-weight:700;color:${c.fg}`) : "";
+  const caps = c.titleCaps && !o.reply ? `text-transform:uppercase;letter-spacing:0.08em;font-size:${Math.max(10, c.size - 2)}px;` : "";
+  const titleLine = [title ? words(title, c, caps + soft) : "", at === "title" && company ? words(company, c, caps + soft) : ""].filter(Boolean).join(DOT(c));
+  const nameSize = o.nameSize ?? c.nameSize;
+  const light = c.nameWeight < 400;
+  const nameHtml = name ? words(name, c, `font-size:${nameSize}px;font-weight:${c.nameWeight};color:${c.fg};${nameSize >= 20 ? "letter-spacing:-0.01em;" : ""}`, light) : "";
   const out: string[] = [];
   if (o.inline) {
-    /* compact: the name and the title on one line */
-    out.push(row([nameHtml, titleLine].filter(Boolean).join(DOT(c)), c, "", o.pad));
+    /* compact and the reply: the name and the title on one line */
+    out.push(row([nameHtml, titleLine].filter(Boolean).join(DOT(c)), c, "", o.pad, o.align));
     if (o.reply) return out.join("");
-    if (name2 || title2) out.push(row([name2 ? words(name2, c, `color:${c.fg}`) : "", title2 ? words(title2, c, soft) : ""].filter(Boolean).join(DOT(c)), c, "", o.pad));
+    if (name2 || title2) out.push(row([name2 ? words(name2, c, `color:${c.fg}`) : "", title2 ? words(title2, c, soft) : ""].filter(Boolean).join(DOT(c)), c, "", o.pad, o.align));
   } else {
-    if (nameHtml) out.push(row(nameHtml, c, "line-height:1.35", o.pad));
-    if (name2 && name2 !== name) out.push(row(words(name2, c, `color:${c.fg}`), c, "", o.pad));
-    if (titleLine) out.push(row(titleLine, c, "", o.pad));
-    if (title2 && title2 !== title) out.push(row(words(title2, c, soft), c, "", o.pad));
+    if (nameHtml) out.push(row(nameHtml, c, `line-height:1.3;${c.titleCaps ? `padding-bottom:${g(c, 3)}px;` : ""}`, o.pad, o.align));
+    if (name2 && name2 !== name) out.push(row(words(name2, c, `color:${c.fg}`), c, "", o.pad, o.align));
+    if (titleLine) out.push(row(titleLine, c, "", o.pad, o.align));
+    if (title2 && title2 !== title) out.push(row(words(title2, c, soft), c, "", o.pad, o.align));
   }
-  if (at === "line" && company) out.push(row(words(company, c, soft), c, "", o.pad));
+  if (at === "line" && company) out.push(row(words(company, c, caps + soft), c, "", o.pad, o.align));
   return out.join("");
 }
 
-function contactRows(v: TemplateValues, c: Ctx, o: { pad?: number; top: number; layout?: Layout }): string {
+function contactRows(v: TemplateValues, c: Ctx, o: { pad?: number; top: number; layout?: Layout; align?: string }): string {
   const lines = contactLines(contactsOf(v, c.lang), o.layout ?? layoutOf(v));
   if (!lines.length) return "";
   const small = Math.max(11, c.size - 1);
-  return lines.map((l, i) => row(lineHtml(l, c), c, `font-size:${small}px;color:${c.soft};${i === 0 ? `padding-top:${o.top}px;` : ""}`, o.pad)).join("");
+  const asWords = v.linkWords === true;
+  return lines.map((l, i) => row(l.map((x) => contactHtml(x, c, asWords)).join(DOT(c)), c,
+    `font-size:${small}px;color:${c.soft};${i === 0 ? `padding-top:${o.top}px;` : ""}`, o.pad, o.align)).join("");
 }
-function noteRow(v: TemplateValues, c: Ctx, pad = 0): string {
+function noteRow(v: TemplateValues, c: Ctx, pad = 0, align?: string): string {
   const note = str(v, "note");
-  return note ? row(words(note, c, "color:#98989D"), c, "font-size:11px;padding-top:12px", pad) : "";
+  return note ? row(words(note, c, "color:#98989D"), c, `font-size:11px;padding-top:${g(c, 12)}px`, pad, align) : "";
 }
-/** A 1 px line the full height of its row (ch. 43: the hairline). */
-const hairline = (color: string) =>
-  `<td width="1" bgcolor="${color}" style="width:1px;min-width:1px;background:${color};font-size:0;line-height:0">&nbsp;</td>`;
+/** A line the full height of its row (ch. 43's hairline) — or a column of
+ *  dots, the brand's pattern. */
+function hairline(c: Ctx, color = c.line, width = 1): string {
+  return c.dots
+    ? `<td style="width:0;padding:0;border-${S(c)}:2px dotted ${color};font-size:0;line-height:0">&nbsp;</td>`
+    : `<td width="${width}" bgcolor="${color}" style="width:${width}px;min-width:${width}px;background:${color};font-size:0;line-height:0">&nbsp;</td>`;
+}
+/** A horizontal rule, full width of its table, or `width` px. */
+function rule(c: Ctx, o: { top: number; bottom: number; pad?: number; width?: number; weight?: number; color?: string; center?: boolean }): string {
+  const color = o.color ?? c.line;
+  const w = o.width ? ` width="${o.width}"` : ' width="100%"';
+  const weight = o.weight ?? 1;
+  const cell = c.dots
+    ? `<td style="border-top:2px dotted ${color};font-size:0;line-height:0;height:0">&nbsp;</td>`
+    : `<td height="${weight}" bgcolor="${color}" style="height:${weight}px;background:${color};font-size:0;line-height:0">&nbsp;</td>`;
+  const mid = o.center ? ' align="center"' : "";
+  return `<tr><td${mid} style="${o.center ? "text-align:center;" : ""}padding-top:${o.top}px;padding-bottom:${o.bottom}px;${o.pad ? `padding-${S(c)}:${o.pad}px;` : ""}"><table role="presentation" cellpadding="0" cellspacing="0" border="0"${w}${mid} style="border-collapse:collapse${o.width ? `;width:${o.width}px` : ""}${o.center ? ";margin:0 auto" : ""}"><tr>${cell}</tr></table></td></tr>`;
+}
+const cell = (c: Ctx, inner: string, style = "", attrs = "") => `<td valign="middle"${attrs} style="vertical-align:middle;${style}">${inner}</td>`;
 
-/* ── the seven layouts ─────────────────────────────────────────────────── */
+/* ── the sixteen layouts ───────────────────────────────────────────────── */
 
 function drawStyle(v: TemplateValues, c: Ctx): string {
   const style = styleOf(v);
@@ -235,55 +324,139 @@ function drawStyle(v: TemplateValues, c: Ctx): string {
   const pad = tilePad(w);
   const x = xOf(w);
   const base = `font-family:${LATIN};font-size:${c.size}px;line-height:1.5;color:${c.fg};`;
+  const logoRow = (top: number, bottom = 0, dark = false) =>
+    `<tr><td style="padding-top:${top}px;padding-bottom:${bottom}px;text-align:${S(c)}" align="${S(c)}">${logoImg(c, dark, group)}</td></tr>`;
+  /* the words beside a picture: who, the contacts, the note */
+  const textBlock = (o: { top?: number; logoAfter?: boolean; nameSize?: number } = {}) => table(c, [
+    whoRows(v, c, { nameSize: o.nameSize }),
+    contactRows(v, c, { top: o.top ?? g(c, 6) }),
+    noteRow(v, c),
+    o.logoAfter ? `<tr><td style="padding-top:${Math.max(0, g(c, 12) - pad)}px;text-align:${S(c)}" align="${S(c)}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-${S(c)}:-${pad}px"><tr><td>${logoImg(c, false, group)}</td></tr></table></td></tr>` : "",
+  ].join(""));
 
-  if (style === "standard") {
-    /* The book (ch. 93): name, title · company, the logo, the contacts. */
-    return table(c, [
-      whoRows(v, c, { nameSize: c.size, pad }),
-      `<tr><td style="padding-top:${Math.max(0, 8 - pad)}px;text-align:${S(c)}" align="${S(c)}">${logoImg(c, false, group)}</td></tr>`,
-      contactRows(v, c, { pad, top: Math.max(0, 8 - pad) }),
-      noteRow(v, c, pad),
-    ].join(""), base);
+  switch (style) {
+    case "standard":
+      /* The book (ch. 93): name, title · company, the logo, the contacts. */
+      return table(c, [
+        whoRows(v, c, { pad }),
+        logoRow(Math.max(0, g(c, 8) - pad)),
+        contactRows(v, c, { pad, top: Math.max(0, g(c, 8) - pad) }),
+        noteRow(v, c, pad),
+      ].join(""), base);
+
+    case "logo-first":
+      /* Letterhead: the logo, clear space x, the name; a rule; the contacts. */
+      return table(c, [
+        logoRow(0, Math.max(0, g(c, x) - pad)),
+        whoRows(v, c, { pad }),
+        rule(c, { top: g(c, 10), bottom: g(c, 2), pad }),
+        contactRows(v, c, { pad, top: g(c, 6) }),
+        noteRow(v, c, pad),
+      ].join(""), base);
+
+    case "divider":
+    case "logo-right":
+    case "compact": {
+      /* The logo, a hairline, the words (ch. 43's horizontal lockup, grown
+         into a signature); mirrored with the logo after the words; compact
+         keeps two lines. */
+      const compact = style === "compact";
+      const text = table(c, [
+        whoRows(v, c, { inline: compact }),
+        contactRows(v, c, { top: compact ? 0 : g(c, 6) }),
+        noteRow(v, c),
+      ].join(""));
+      const logoCell = (start: boolean) => cell(c, logoImg(c, false, group), `padding-${start ? E(c) : S(c)}:${Math.max(0, g(c, x) - pad)}px`);
+      const textCell = (start: boolean) => cell(c, text, `padding-${start ? E(c) : S(c)}:${g(c, x)}px`);
+      const cells = style === "logo-right" ? `${textCell(true)}${hairline(c)}${logoCell(false)}` : `${logoCell(true)}${hairline(c)}${textCell(false)}`;
+      return table(c, `<tr>${cells}</tr>`, base);
+    }
+
+    case "portrait":
+      /* The portrait, a hairline, the words, the logo under them. */
+      return table(c, `<tr>${cell(c, photoHtml(v, c), `padding-${E(c)}:${g(c, 18)}px`)}${hairline(c)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 18)}px`)}</tr>`, base);
+
+    case "portrait-top": {
+      /* A profile: the portrait beside the name, a rule, the contacts and the
+         logo under it. */
+      const head = table(c, `<tr>${cell(c, photoHtml(v, c), `padding-${E(c)}:${g(c, 14)}px`)}${cell(c, table(c, whoRows(v, c)))}</tr>`);
+      return table(c, [
+        `<tr><td>${head}</td></tr>`,
+        rule(c, { top: g(c, 12), bottom: 0 }),
+        contactRows(v, c, { top: g(c, 8) }),
+        noteRow(v, c),
+        `<tr><td style="padding-top:${Math.max(0, g(c, 10) - pad)}px;text-align:${S(c)}" align="${S(c)}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-${S(c)}:-${pad}px"><tr><td>${logoImg(c, false, group)}</td></tr></table></td></tr>`,
+      ].join(""), base);
+    }
+
+    case "accent-bar":
+      /* A bar of the accent colour beside the words; the logo at the foot. */
+      return table(c, `<tr>${hairline(c, c.line, 3)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 16)}px`)}</tr>`, base);
+
+    case "editorial": {
+      /* A large light name, the title in spaced capitals, a short rule, the
+         contacts, the logo. */
+      return table(c, [
+        whoRows(v, c, { pad }),
+        rule(c, { top: g(c, 12), bottom: g(c, 10), pad, width: 32, weight: 2 }),
+        contactRows(v, c, { pad, top: 0 }),
+        noteRow(v, c, pad),
+        logoRow(Math.max(0, g(c, 14) - pad)),
+      ].join(""), base);
+    }
+
+    case "columns": {
+      /* The logo on top; the person on one side of a hairline, the contacts
+         on the other. */
+      const who = table(c, whoRows(v, c));
+      const contacts = table(c, contactRows(v, c, { top: 0, layout: v.contactLayout === "one" ? "lines" : layoutOf(v) }) + noteRow(v, c));
+      const cols = table(c, `<tr>${cell(c, who, `padding-${E(c)}:${g(c, 18)}px;vertical-align:top`)}${hairline(c)}${cell(c, contacts, `padding-${S(c)}:${g(c, 18)}px;vertical-align:top`)}</tr>`);
+      return table(c, [logoRow(0, Math.max(0, g(c, 12) - pad)), `<tr><td style="padding-${S(c)}:${pad}px">${cols}</td></tr>`].join(""), base);
+    }
+
+    case "dots-black":
+    case "dots-white": {
+      /* The dots field with the logo on its clear panel, then the words. */
+      const black = style === "dots-black";
+      return table(c, `<tr>${cell(c, dotsImg(c, black), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
+    }
+
+    case "band": {
+      /* A black band — the white logo and the website — over the words, in
+         a light frame: the business card on screen. */
+      const web = contactsOf(v, c.lang).find((y) => y.kind === "web");
+      const bandRow = table(c, `<tr>${cell(c, logoImg(c, true, group))}${web ? cell(c, `<a href="${esc(web.href ?? KOLEEX_SITE)}" style="color:#D2D2D7;text-decoration:none">${words(web.value, c, "color:#D2D2D7")}</a>`, `text-align:${E(c)};font-size:${Math.max(11, c.size - 2)}px`, ` align="${E(c)}"`) : ""}</tr>`, "", ' width="100%"');
+      const body = table(c, [whoRows(v, c), contactRows(v, c, { top: g(c, 8) }), noteRow(v, c)].join(""));
+      return table(c, [
+        `<tr><td bgcolor="#000000" style="background:#000000;padding:${g(c, 16) - pad}px ${20 - pad}px;border-radius:8px 8px 0 0">${bandRow}</td></tr>`,
+        `<tr><td style="padding:${g(c, 16)}px 20px ${g(c, 18)}px;border:1px solid ${RULE};border-top:0;border-radius:0 0 8px 8px">${body}</td></tr>`,
+      ].join(""), `${base}border-collapse:separate;width:100%;max-width:440px`, ' width="440"');
+    }
+
+    case "outline": {
+      /* A thin frame: the words, and the logo in the top corner. */
+      const text = table(c, [whoRows(v, c), contactRows(v, c, { top: g(c, 8) }), noteRow(v, c)].join(""));
+      const inner = `<tr><td valign="top" style="vertical-align:top;padding-${E(c)}:32px">${text}</td><td valign="top" align="${E(c)}" style="vertical-align:top;text-align:${E(c)}">${logoImg(c, false, group)}</td></tr>`;
+      return table(c, `<tr><td style="padding:${g(c, 18)}px 22px;border:1px solid ${c.frame};border-radius:8px">${table(c, inner)}</td></tr>`, `${base}border-collapse:separate`);
+    }
+
+    case "centered":
+      /* Everything on the centre line — reads well on a phone. */
+      return table(c, [
+        `<tr><td align="center" style="text-align:center;padding-bottom:${Math.max(0, g(c, 12) - pad)}px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;margin:0 auto"><tr><td>${logoImg(c, false, group)}</td></tr></table></td></tr>`,
+        whoRows(v, c, { align: "center" }),
+        rule(c, { top: g(c, 10), bottom: g(c, 8), width: 40, center: true }),
+        contactRows(v, c, { top: 0, align: "center" }),
+        noteRow(v, c, 0, "center"),
+      ].join(""), base);
+
+    default: {
+      /* black: the team card's colours — the white logo on black, white name. */
+      const text = [whoRows(v, c, { pad }), contactRows(v, c, { pad, top: g(c, 8) }), noteRow(v, c, pad)].join("");
+      const inner = table(c, `${logoRow(0, Math.max(0, g(c, x) - pad), true)}${text}`);
+      return table(c, `<tr><td bgcolor="#000000" style="background:#000000;padding:${g(c, 22) - pad}px ${26 - pad}px ${g(c, 22)}px;border-radius:8px">${inner}</td></tr>`, base);
+    }
   }
-  if (style === "logo-first") {
-    /* Letterhead: the logo, clear space x, the name; a rule; the contacts. */
-    const rule = `<tr><td style="padding:10px 0 2px;padding-${S(c)}:${pad}px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse"><tr><td height="1" bgcolor="${RULE}" style="height:1px;background:${RULE};font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>`;
-    return table(c, [
-      `<tr><td style="padding-bottom:${Math.max(0, x - pad)}px;text-align:${S(c)}" align="${S(c)}">${logoImg(c, false, group)}</td></tr>`,
-      whoRows(v, c, { nameSize: c.size + 3, pad }),
-      rule,
-      contactRows(v, c, { pad, top: 6 }),
-      noteRow(v, c, pad),
-    ].join(""), base);
-  }
-  if (style === "divider" || style === "logo-right" || style === "compact") {
-    /* The logo, a hairline, the words (ch. 43's horizontal lockup, grown
-       into a signature); mirrored with the logo after the words; compact
-       keeps two lines and a light rule. */
-    const compact = style === "compact";
-    const text = table(c, [
-      whoRows(v, c, { nameSize: compact ? c.size : c.size + 2, inline: compact }),
-      contactRows(v, c, { top: compact ? 0 : 6 }),
-      noteRow(v, c),
-    ].join(""));
-    const logoCell = (side: "start" | "end") =>
-      `<td valign="middle" style="vertical-align:middle;padding-${side === "start" ? E(c) : S(c)}:${Math.max(0, x - pad)}px">${logoImg(c, false, group)}</td>`;
-    const textCell = (side: "start" | "end") =>
-      `<td valign="middle" style="vertical-align:middle;padding-${side === "end" ? S(c) : E(c)}:${x}px">${text}</td>`;
-    const line = hairline(compact ? RULE : c.fg);
-    const cells = style === "logo-right" ? `${textCell("start")}${line}${logoCell("end")}` : `${logoCell("start")}${line}${textCell("end")}`;
-    return table(c, `<tr>${cells}</tr>`, base);
-  }
-  if (style === "outline") {
-    /* A thin frame: the words, and the logo in the top corner. */
-    const text = table(c, [whoRows(v, c, { nameSize: c.size + 2 }), contactRows(v, c, { top: 8 }), noteRow(v, c)].join(""));
-    const inner = `<tr><td valign="top" style="vertical-align:top;padding-${E(c)}:32px">${text}</td><td valign="top" align="${E(c)}" style="vertical-align:top;text-align:${E(c)}">${logoImg(c, false, group)}</td></tr>`;
-    return table(c, `<tr><td style="padding:18px 22px;border:1px solid ${RULE};border-radius:8px">${table(c, inner)}</td></tr>`, `${base}border-collapse:separate`);
-  }
-  /* black: the team card's colours — the white logo on black, white name. */
-  const text = [whoRows(v, c, { nameSize: c.size + 2, pad }), contactRows(v, c, { pad, top: 8 }), noteRow(v, c, pad)].join("");
-  const inner = table(c, `<tr><td style="padding-bottom:${Math.max(0, x - pad)}px;text-align:${S(c)}" align="${S(c)}">${logoImg(c, true, group)}</td></tr>${text}`);
-  return table(c, `<tr><td bgcolor="#000000" style="background:#000000;padding:${22 - pad}px ${26 - pad}px 22px;border-radius:8px">${inner}</td></tr>`, base);
 }
 
 /** The event banner (ch. 93): black, 600 wide, the context header — logo |
@@ -294,7 +467,7 @@ function drawBanner(v: TemplateValues, c: Ctx): string {
   const sub = str(v, "bannerSub");
   const link = str(v, "bannerLink");
   if (!event && !main && !sub) return "";
-  const bc: Ctx = { ...c, fg: "#FFFFFF", soft: "#D2D2D7", link: "#FFFFFF", logoW: 100 };
+  const bc: Ctx = { ...c, fg: "#FFFFFF", soft: "#D2D2D7", link: "#FFFFFF", logoW: 100, logoHref: null };
   const pad = tilePad(100), x = xOf(100);
   const header = `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${c.rtl ? ' dir="rtl"' : ""} style="border-collapse:collapse"><tr>`
     + `<td valign="middle" style="vertical-align:middle">${logoImg(bc, true, false)}</td>`
@@ -313,12 +486,27 @@ function drawBanner(v: TemplateValues, c: Ctx): string {
 
 function ctxOf(v: TemplateValues, base: string, preview: boolean): Ctx {
   const lang = asLang(v.lang);
-  const black = styleOf(v) === "black";
+  const style = styleOf(v);
+  const black = style === "black";
+  const accent = oneOf(ACCENTS, v.accent, STYLE_DEFAULTS[style].accent);
+  const fg = black ? "#FFFFFF" : INK;
+  const soft = black ? "#A1A1A6" : GREY;
+  const line = accent === "blue" ? HUB_BLUE : accent === "grey" ? (black ? "#48484A" : "#C7C7CC") : fg;
+  const linkColour = oneOf(LINK_COLOURS, v.linkColor, "grey");
+  const link = linkColour === "ink" ? fg : linkColour === "accent" && accent !== "grey" ? line : black ? "#D2D2D7" : GREY;
+  const web = contactsOf(v, lang).find((x) => x.kind === "web");
   return {
     lang, rtl: lang === "ar", base, preview,
     size: Math.min(15, Math.max(12, num(v, "size", 13))),
-    fg: black ? "#FFFFFF" : INK, soft: black ? "#A1A1A6" : GREY, link: black ? "#D2D2D7" : GREY,
+    fg, soft, link, line,
+    frame: accent === "blue" ? HUB_BLUE : accent === "black" ? INK : RULE,
+    dots: v.ruleStyle === "dots",
     logoW: Math.min(160, Math.max(100, num(v, "logoW", 120))),
+    k: v.spacing === "tight" ? 0.7 : v.spacing === "airy" ? 1.4 : 1,
+    nameSize: Math.min(26, Math.max(12, num(v, "nameSize", STYLE_DEFAULTS[style].nameSize))),
+    nameWeight: v.nameWeight === "light" ? 300 : v.nameWeight === "regular" ? 400 : 700,
+    titleCaps: v.titleCaps === true,
+    logoHref: v.logoLink === false ? null : web?.href ?? KOLEEX_SITE,
   };
 }
 
@@ -326,7 +514,7 @@ function ctxOf(v: TemplateValues, base: string, preview: boolean): Ctx {
 export function signatureHtml(v: TemplateValues, o: { variant: string; base: string; preview?: boolean }): string {
   const c = ctxOf(v, o.base, o.preview === true);
   if (o.variant === "reply") {
-    const plain: Ctx = { ...c, fg: INK, soft: GREY, link: GREY };
+    const plain: Ctx = { ...c, fg: INK, soft: GREY, link: GREY, nameWeight: 700 };
     const phone = contactsOf(v, c.lang).find((x) => x.kind === "mobile" || x.kind === "tel" || x.kind === "whatsapp");
     return table(plain, [
       whoRows(v, plain, { nameSize: c.size, inline: true, reply: true }),
@@ -373,7 +561,9 @@ export function signatureText(v: TemplateValues, variant: string): string {
 
 const isStyle = (...styles: Style[]) => (v: TemplateValues) => styles.includes(styleOf(v));
 const PERSONAL_ROWS = ["mobile", "email", "whatsapp", "wechat", "linkedin"];
-const PERSONAL_KEYS = ["name", "name2", "title", "title2", "titleKey", "title2Key"];
+const PERSONAL_KEYS = ["name", "name2", "title", "title2", "titleKey", "title2Key", "photo"];
+const choice = <T extends string>(key: string, labelKey: string, group: string, values: readonly T[], words: string, when?: (v: TemplateValues) => boolean) =>
+  ({ key, kind: "choice" as const, labelKey, group, options: values.map((value) => ({ value, labelKey: `${words}.${value}` })), ...(when ? { when } : {}) });
 
 function sigFromPerson(p: BcPerson, v: TemplateValues): TemplateValues {
   const lang = asLang(v.lang);
@@ -390,6 +580,7 @@ function sigFromPerson(p: BcPerson, v: TemplateValues): TemplateValues {
     name: nameIn(p, lang), title: titleOf(p, lang), titleKey: p.title ?? "",
     name2: nameIn(p, lang2), title2: titleOf(p, lang2), title2Key: p.title ?? "",
     rows: rows as TemplateItem[],
+    ...(typeof v.photo === "string" && v.photo.startsWith("data:") ? {} : { photo: p.photo ?? "" }),
   };
 }
 
@@ -408,12 +599,14 @@ export const emailSignature: TemplateDef = {
     host: SIGNATURE_HOST,
   },
   fields: [
-    { key: "style", kind: "choice", labelKey: "tpl.f.style", group: "look", options: SIG_STYLES.map((s) => ({ value: s, labelKey: `sig.style.${s}` })) },
+    choice("style", "tpl.f.style", "look", SIG_STYLES, "sig.style"),
     { key: "lang", kind: "choice", labelKey: "sig.f.lang", group: "look", options: [
       { value: "en", labelKey: "tpl.lang.en" }, { value: "zh", labelKey: "tpl.lang.zh" }, { value: "ar", labelKey: "tpl.lang.ar" },
     ] },
+    choice("accent", "sig.f.accent", "look", ACCENTS, "sig.accent"),
+    choice("ruleStyle", "sig.f.ruleStyle", "look", RULES, "sig.rule", (v) => !isStyle("standard", "black", "band", "dots-black", "dots-white")(v) || v.ruleStyle === "dots"),
     { key: "logoW", kind: "range", labelKey: "sig.f.logoW", group: "look", min: 100, max: 160, step: 10 },
-    { key: "size", kind: "range", labelKey: "sig.f.size", group: "look", min: 12, max: 15, step: 1 },
+    { key: "logoLink", kind: "switch", labelKey: "sig.f.logoLink", group: "look" },
     { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 60 },
     { key: "title", kind: "title", labelKey: "tpl.f.title", group: "person", langKey: "lang" },
     { key: "second", kind: "switch", labelKey: "sig.f.second", group: "person" },
@@ -422,11 +615,21 @@ export const emailSignature: TemplateDef = {
     ] },
     { key: "name2", kind: "text", labelKey: "sig.f.name2", group: "person", max: 60, when: (v) => v.second === true },
     { key: "title2", kind: "title", labelKey: "sig.f.title2", group: "person", langKey: "lang2", when: (v) => v.second === true },
-    { key: "companyAt", kind: "choice", labelKey: "sig.f.companyAt", group: "brand", options: COMPANY_AT.map((a) => ({ value: a, labelKey: `sig.at.${a}` })) },
+    { key: "photo", kind: "image", labelKey: "tpl.f.photo", group: "photo", hintKey: "sig.f.photoHint", fromPerson: "photo", when: isStyle(...PHOTO_STYLES) },
+    choice("photoShape", "sig.f.photoShape", "photo", SHAPES, "sig.shape", isStyle(...PHOTO_STYLES)),
+    { key: "photoSize", kind: "range", labelKey: "sig.f.photoSize", group: "photo", min: 56, max: 120, step: 4, when: isStyle(...PHOTO_STYLES) },
+    { key: "nameSize", kind: "range", labelKey: "sig.f.nameSize", group: "type", min: 12, max: 26, step: 1 },
+    choice("nameWeight", "sig.f.nameWeight", "type", WEIGHTS, "sig.weight"),
+    { key: "size", kind: "range", labelKey: "sig.f.size", group: "type", min: 12, max: 15, step: 1 },
+    { key: "titleCaps", kind: "switch", labelKey: "sig.f.titleCaps", group: "type" },
+    choice("spacing", "sig.f.spacing", "type", SPACINGS, "sig.spacing"),
+    choice("companyAt", "sig.f.companyAt", "brand", COMPANY_AT, "sig.at"),
     { key: "company", kind: "text", labelKey: "tpl.f.company", group: "brand", max: 60, hintKey: "sig.f.companyHint", when: (v) => companyAt(v) === "title" || companyAt(v) === "line" },
     { key: "rows", kind: "rows", labelKey: "tpl.f.rows", group: "contacts", langKey: "lang", labels: SIG_LABELS },
     { key: "whatsapp", kind: "switch", labelKey: "tpl.f.whatsapp", group: "contacts" },
-    { key: "contactLayout", kind: "choice", labelKey: "sig.f.contactLayout", group: "contacts", options: LAYOUTS.map((l) => ({ value: l, labelKey: `sig.layout.${l}` })) },
+    choice("contactLayout", "sig.f.contactLayout", "contacts", LAYOUTS, "sig.layout"),
+    choice("linkColor", "sig.f.linkColor", "contacts", LINK_COLOURS, "sig.link"),
+    { key: "linkWords", kind: "switch", labelKey: "sig.f.linkWords", group: "contacts" },
     { key: "note", kind: "text", labelKey: "sig.f.note", group: "details", max: 160, hintKey: "sig.f.noteHint" },
     { key: "bannerOn", kind: "switch", labelKey: "sig.f.bannerOn", group: "banner" },
     { key: "bannerEvent", kind: "text", labelKey: "sig.f.bannerEvent", group: "banner", max: 40, placeholder: "CISMA 2025", when: (v) => v.bannerOn === true },
@@ -435,41 +638,54 @@ export const emailSignature: TemplateDef = {
     { key: "bannerLink", kind: "text", labelKey: "sig.f.bannerLink", group: "banner", max: 200, hintKey: "sig.f.bannerLinkHint", when: (v) => v.bannerOn === true },
   ],
   defaults: {
-    style: "standard", lang: "en", logoW: 120, size: 13,
+    style: "standard", lang: "en", accent: "black", ruleStyle: "solid", logoW: 120, logoLink: true,
     name: "", title: "", titleKey: "", second: false, lang2: "zh", name2: "", title2: "", title2Key: "",
+    photo: "", photoShape: "circle", photoSize: 84,
+    nameSize: 13, nameWeight: "bold", size: 13, titleCaps: false, spacing: "normal",
     companyAt: "title", company: EVERYDAY_NAME_EN,
-    rows: sigRows("en"), whatsapp: true, contactLayout: "book",
+    rows: sigRows("en"), whatsapp: true, contactLayout: "book", linkColor: "grey", linkWords: false,
     note: "",
     bannerOn: false, bannerEvent: "", bannerMain: "", bannerSub: "", bannerLink: "",
   },
   fromPerson: sigFromPerson,
   fillName: (v, t) => t(`sig.style.${styleOf(v)}`),
   relang: (v, lang) => ({ ...v, lang, rows: relangSigRows(list(v, "rows"), asLang(lang)) }),
-  /* A style brings its own contact layout and company place; the group
-     lockup under the logo, or no company, stays as chosen. */
+  /* A style brings its designer's settings (contact layout, company place,
+     accent, the name's size and weight, title capitals); the group lockup
+     under the logo, or no company, stays as chosen. */
   restyle: (v, style) => {
-    const d = STYLE_DEFAULTS[(SIG_STYLES as readonly string[]).includes(style) ? (style as Style) : "standard"];
+    const d = STYLE_DEFAULTS[oneOf(SIG_STYLES, style, "standard")];
     const keep = companyAt(v) === "logo" || companyAt(v) === "off";
-    return { ...v, style, contactLayout: d.contactLayout, companyAt: keep ? companyAt(v) : d.companyAt };
+    return {
+      ...v, style, contactLayout: d.contactLayout, companyAt: keep ? companyAt(v) : d.companyAt,
+      accent: d.accent, nameSize: d.nameSize, nameWeight: d.nameWeight, titleCaps: d.titleCaps,
+    };
   },
   specKeys: (v) => [
     "sig.spec.content",
     "sig.spec.fonts",
     "sig.spec.logo",
     ...(companyAt(v) === "logo" ? ["sig.spec.group"] : []),
-    ...(isStyle("black")(v) ? ["sig.spec.black"] : []),
+    ...(isStyle(...PHOTO_STYLES)(v) ? ["sig.spec.photo"] : []),
+    ...(isStyle(...DOTS_STYLES)(v) || v.ruleStyle === "dots" ? ["sig.spec.dots"] : []),
+    ...(isStyle("black", "band")(v) ? ["sig.spec.black"] : []),
     ...(v.bannerOn === true ? ["sig.spec.banner"] : []),
     "sig.spec.reply",
   ],
   forSaving: (v, keepPerson) => {
-    if (keepPerson) return { ...v };
     const out: TemplateValues = { ...v };
+    if (typeof out.photo === "string" && out.photo.startsWith("data:")) out.photo = "";
+    if (keepPerson) return out;
     for (const k of PERSONAL_KEYS) out[k] = "";
     out.rows = list(v, "rows").map((r) => (PERSONAL_ROWS.includes(String(r.kind)) ? { ...r, value: "" } : r));
     return out;
   },
   check: (v) => {
     if (!str(v, "name")) return "studio.needName";
+    if (isStyle(...PHOTO_STYLES)(v)) {
+      if (!str(v, "photo")) return "sig.needPhoto";
+      if (str(v, "photo").startsWith("data:")) return "sig.needHostedPhoto";
+    }
     if (v.bannerOn === true && !str(v, "bannerEvent") && !str(v, "bannerMain")) return "sig.needBanner";
     return null;
   },

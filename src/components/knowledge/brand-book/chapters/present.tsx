@@ -409,8 +409,8 @@ export function EmailSignature() {
       n={93}
       lead={
         <p>
-          Everyone at KOLEEX signs emails the same way: name, title, logo, one phone, one email, the
-          website. Nothing else.
+          Every KOLEEX signature carries the same things: name, title, logo, one phone, one email, the
+          website — and, if you wish, your portrait. Nothing else.
         </p>
       }
       toc={[
@@ -437,6 +437,7 @@ export function EmailSignature() {
           `The company is written ${EVERYDAY_NAME_EN} — after the title, on its own line, or under a 160 px logo as the group lockup (ch. 43).`,
           "One phone number, in international format, marked WhatsApp if it is.",
           "The logo as a picture, 120 px wide (100 px at least), on its own white tile so dark mode never draws it black on black — from our own domain.",
+          "A portrait only from your Hub profile photo: recent, sharp, head and shoulders on a plain background.",
           "No quotes, animated images, social icon rows or legal disclaimers longer than one line.",
           "No banner — except the event banner below, while there is something to announce.",
           "Replies and forwards use a short version: name, title, phone.",
@@ -466,8 +467,8 @@ export function EmailSignature() {
       <Section id="sig-code" title="Copy it">
         <P>
           Make yours in Brand Center → Templates → Email signature: filled from Employees, in English, Chinese or
-          Arabic, in seven approved layouts that all carry this same content, with the reply version and the event
-          banner. Or paste this into the signature settings of your email app, then change the name, title and phone.
+          Arabic, in sixteen layouts — this one first — with a portrait, the dots pattern (ch. 57) and an accent
+          colour as options, the reply version and the event banner. Or paste this into the signature settings of your email app, then change the name, title and phone.
         </P>
         <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">

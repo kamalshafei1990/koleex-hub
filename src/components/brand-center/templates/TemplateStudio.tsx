@@ -38,7 +38,7 @@ const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const GROUPS = ["look", "job", "person", "company", "brand", "contacts", "photo", "details", "banner", "back", "qr"];
+const GROUPS = ["look", "type", "job", "person", "company", "brand", "contacts", "photo", "details", "banner", "back", "qr"];
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
