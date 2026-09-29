@@ -888,6 +888,9 @@ const fbAdsFn = metaAds.slice(metaAds.indexOf("export async function facebookAdP
 check("Facebook: the Page's ad posts with the Page key, the inline-created (dark) ones included, of any age (an old post boosted now)",
   /metaGraphUrl\(`\$\{pageId\}\/ads_posts`, params\), token\)/.test(fbAdsFn) && /include_inline_create: "true",/.test(fbAdsFn) && !/since/.test(fbAdsFn) &&
   /found = await facebookAdPosts\(a\.external_id, a\.token\);/.test(adsSrc));
+check("Instagram: archived ads are listed too (Meta leaves them out unless asked), deleted ones never",
+  /const AD_STATUSES = JSON\.stringify\(\[[^\]]*"ARCHIVED"[^\]]*\]\);/.test(metaAds) && !/"DELETED"/.test(metaAds) &&
+  /effective_status: AD_STATUSES, limit: "100"/.test(metaAds));
 check("Instagram: the ad account read with the person's key; the media with the Page key, only this account's",
   /await adAccounts\(a\.userToken!\)/.test(adsSrc) && /await instagramAdMediaIds\(act, a\.userToken!, since\)/.test(adsSrc) &&
   /await instagramAdMedia\(a\.external_id!, a\.token!, \[\.\.\.ids\]\)/.test(adsSrc) && /const mine = \(m: IgAdMedia \| undefined\) => !!m && m\.owner\?\.id === igId;/.test(metaAds));

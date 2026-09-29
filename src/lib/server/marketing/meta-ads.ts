@@ -77,13 +77,18 @@ export async function adAccounts(userToken: string): Promise<string[]> {
   return (b.data ?? []).map((a) => a.id).filter((id): id is string => typeof id === "string" && /^act_\d+$/.test(id));
 }
 
+/** Every ad status but deleted — ARCHIVED too: Meta leaves archived ads out
+ *  unless they are asked for by name, and an ad that ended still has
+ *  comments to answer (owner, 29/09/2026). */
+const AD_STATUSES = JSON.stringify(["ACTIVE", "PAUSED", "ARCHIVED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "DISAPPROVED", "PREAPPROVED", "PENDING_BILLING_INFO"]);
+
 /** The Instagram media of an ad account's ads made since `since`. */
 export async function instagramAdMediaIds(adAccountId: string, userToken: string, since: string): Promise<string[]> {
   const ids = new Set<string>();
   const from = Date.parse(since);
   let after: string | null = null;
   for (let page = 0; page < PAGES_MAX; page++) {
-    const params: Record<string, string> = { fields: "id,created_time,creative{effective_instagram_media_id}", limit: "100" };
+    const params: Record<string, string> = { fields: "id,created_time,creative{effective_instagram_media_id}", effective_status: AD_STATUSES, limit: "100" };
     if (after) params.after = after;
     const b = await metaGet<{ data?: Array<{ created_time?: string; creative?: { effective_instagram_media_id?: string } }> } & Paging>(
       metaGraphUrl(`${adAccountId}/ads`, params), userToken,
