@@ -111,8 +111,6 @@ const T: Translations = {
   "result.failed":    { en: "Facebook did not finish adding the accounts. Try again; if it happens again, check the Meta app settings.", zh: "Facebook 未能完成账号添加。请重试；如仍失败，请检查 Meta 应用设置。", ar: "لم يُكمل Facebook إضافة الحسابات. حاول مرة أخرى، وإذا تكرر راجع إعدادات تطبيق Meta." },
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
-  "next.title":       { en: "Coming next, on these accounts", zh: "接下来将基于这些账号推出", ar: "القادم على هذه الحسابات" },
-  "next.messages":    { en: "Replies to Messenger and Instagram messages, once Meta approves", zh: "回复 Messenger 和 Instagram 私信（待 Meta 批准后）", ar: "الرد على رسائل Messenger وInstagram، بعد موافقة Meta" },
 };
 
 
@@ -350,13 +348,6 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                   )}
                 </li>
               ))}
-            </ul>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
-            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("next.title")}</h2>
-            <ul className="mt-3 flex list-disc flex-col gap-2 ps-5 text-[12px] leading-relaxed text-[var(--text-muted)]">
-              <li>{t("next.messages")}</li>
             </ul>
           </div>
         </aside>
