@@ -20,30 +20,18 @@
 
 import type { ReactNode } from "react";
 import type { BcProduct } from "@/lib/brand-center/client";
-import type { DrawContext, FieldDef, TemplateDef, TemplateValues } from "./types";
-import { GREY_ON_INK, GREY_ON_WHITE, INK, Logo, WHITE, logoHeight, textWidth, wrapBalanced } from "./card/parts";
-import { FONTS, asLang, num, str, type Lang } from "./card/model";
-import { Pattern, patternOf, patternOptions } from "./patterns";
+import type { DrawContext, TemplateDef, TemplateValues } from "./types";
+import { GREY_ON_INK, GREY_ON_WHITE, INK, Logo, WHITE, logoHeight, textWidth } from "./card/parts";
+import { asLang, str, type Lang } from "./card/model";
+import { Pattern, patternOptions } from "./patterns";
+import {
+  Edge, Floor, Foot, HUB_BLUE, Label, POST_LOOK, POST_PX, Photo, STAGE, TopLogo, Txt, caps, choice, endAlign, hasFoot, headline,
+  oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box,
+} from "./post-kit";
 
 export const POST_STYLES = ["book-dark", "book-light", "stage", "split", "pattern", "pattern-dark", "figures", "feature", "editorial", "launch", "factory"] as const;
 type Style = (typeof POST_STYLES)[number];
-const SIZES = ["feed", "square", "story", "wide", "landscape"] as const;
-type Size = (typeof SIZES)[number];
-const PX: Record<Size, { w: number; h: number }> = {
-  feed: { w: 1080, h: 1350 }, square: { w: 1080, h: 1080 }, story: { w: 1080, h: 1920 }, wide: { w: 1200, h: 627 }, landscape: { w: 1920, h: 1080 },
-};
-const PHOTO_ON = ["white", "black", "cutout", "scene"] as const;
-type PhotoOn = (typeof PHOTO_ON)[number];
-
-const oneOf = <T extends string>(all: readonly T[], x: unknown, d: T): T => ((all as readonly string[]).includes(String(x)) ? (x as T) : d);
 const styleOf = (v: TemplateValues): Style => oneOf(POST_STYLES, v.style, "book-dark");
-const sizeOf = (v: TemplateValues): Size => oneOf(SIZES, v.size, "feed");
-
-const ARABIC = /[؀-ۿ]/;
-const NOT_LATIN = /[؀-ۿ⺀-鿿]/;
-const caps = (s: string) => (NOT_LATIN.test(s) ? s : s.toUpperCase());
-const STAGE = "#F5F5F7";
-const HUB_BLUE = "#567FB2";
 
 /** The words a fill starts with, by language (the call to action names what happens — ch. 89). */
 const CTA: Record<Lang, string> = { en: "Request a quotation", zh: "索取报价", ar: "اطلب عرض سعر" };
@@ -56,154 +44,17 @@ const TAG: Record<(typeof TAGS)[number], Record<Lang, string>> = {
 };
 
 function read(v: TemplateValues, ctx: DrawContext) {
-  const W = ctx.w, H = ctx.h;
-  const size = sizeOf(v);
-  const lang = asLang(v.lang);
-  const u = Math.min(W, H * 1.25) / 1080;
-  const story = size === "story", wide = size === "wide" || size === "landscape";
-  const M = 72 * u;
   return {
-    W, H, u, M, size, story, wide, lang, rtl: lang === "ar", font: FONTS.inter, uid: ctx.uid,
-    top: story ? 250 : M, bottom: H - (story ? 340 : M),
-    label: str(v, "label"), headline: str(v, "headline"), headline2: str(v, "headline2"),
-    model: str(v, "model"), cta: str(v, "cta"), web: v.web === false ? "" : str(v, "webText") || "koleexgroup.com",
+    ...readPost(v, ctx),
+    model: str(v, "model"),
     facts: str(v, "facts").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 4).map((l) => {
       const [a, ...b] = l.split(/\s*[|｜]\s*|\s+[—–]\s+/);
       return { value: a.trim(), label: b.join(" ").trim() };
     }),
-    photo: str(v, "photo"), photoOn: oneOf(PHOTO_ON, v.photoOn, "white"), photoScale: num(v, "photoScale", 100) / 100,
-    edge: v.edge !== false, logoEnd: v.logoAt === "end", pattern: patternOf(v.pattern, "scan-edge"),
     tag: oneOf(TAGS, v.tag, "new"),
   };
 }
 type R = ReturnType<typeof read>;
-type Box = { x: number; y: number; w: number; h: number };
-
-/** A box given from the start side, placed for the page's direction. */
-const place = (r: R, b: Box): Box => (r.rtl ? { ...b, x: r.W - b.x - b.w } : b);
-/** x of a start-side position. */
-const sx = (r: R, x: number) => (r.rtl ? r.W - x : x);
-const startAlign = (r: R) => (r.rtl ? "right" : "left") as "left" | "right";
-const endAlign = (r: R) => (r.rtl ? "left" : "right") as "left" | "right";
-/** Arabic has no Bold in the brand's face (Noto Sans Arabic 300/400/600). */
-const wt = (text: string, w: number) => (ARABIC.test(text) && w > 600 ? 600 : w);
-
-function Txt({ r, x, y, size, children, fill, weight = 400, align = "left", spacing, tabular }: {
-  r: R; x: number; y: number; size: number; children: string; fill: string; weight?: number; align?: "left" | "right" | "center"; spacing?: number;
-  /** figures in columns (Inter's tabular forms also widen the hyphen, so never for a model) */
-  tabular?: boolean;
-}) {
-  const dir = r.rtl ? "rtl" : "ltr";
-  const anchor = align === "center" ? "middle" : align === "left" ? (dir === "ltr" ? "start" : "end") : (dir === "ltr" ? "end" : "start");
-  const spaced = spacing && !NOT_LATIN.test(children) ? spacing : undefined;
-  return (
-    <text x={x} y={y} textAnchor={anchor} direction={dir} fill={fill}
-      style={{ fontFamily: r.font, fontSize: size, fontWeight: wt(children, weight), letterSpacing: spaced, unicodeBidi: "plaintext", fontVariantNumeric: tabular ? "tabular-nums" : undefined }}>{children}</text>
-  );
-}
-
-/** The small label: capitals, grey, spaced; smaller when `max` is short. */
-function Label({ r, x, y, fill, align, text, size, max }: { r: R; x: number; y: number; fill: string; align: "left" | "right" | "center"; text?: string; size?: number; max?: number }) {
-  const t = text ?? r.label;
-  if (!t) return null;
-  /* Arabic and Chinese have no capitals to carry a small label: a size up */
-  let s = (size ?? 24 * r.u) * (ARABIC.test(t) ? 1.25 : NOT_LATIN.test(t) ? 1.12 : 1);
-  const shown = caps(t);
-  const spaced = NOT_LATIN.test(shown) ? 0 : 0.2;
-  const width = (z: number) => textWidth(shown, z, 600, r.font) + z * spaced * shown.length;
-  const room = max ?? r.W - 2 * r.M;
-  if (width(s) > room) s = Math.max(s * 0.7, (s * room) / width(s));
-  return <Txt r={r} x={x} y={y} size={s} fill={fill} weight={600} align={align} spacing={s * 0.2}>{shown}</Txt>;
-}
-
-/** The two-line headline — Bold, then Light — as large as `size` allows in
- *  `width` (each part wraps to two lines at most). */
-function headline(r: R, o: { x: number; y: number; width: number; size: number; fill: string; fill2?: string; align: "left" | "right" | "center"; one?: string; two?: string }) {
-  const one = o.one ?? r.headline, two = o.two ?? r.headline2;
-  const parts = [{ text: one, w: 700 }, { text: two, w: 300 }].filter((p) => p.text);
-  let size = o.size;
-  const linesOf = (s: number) => parts.flatMap((p) => wrapBalanced(p.text, s, o.width, wt(p.text, p.w), r.font).map((l) => ({ l, w: p.w, first: p === parts[0] })));
-  let lines = linesOf(size);
-  const widest = () => Math.max(0, ...lines.map((x) => textWidth(x.l, size, wt(x.l, x.w), r.font)));
-  for (let i = 0; i < 6 && (widest() > o.width || lines.length > 4); i++) { size *= 0.9; lines = linesOf(size); }
-  const lh = size * 1.08;
-  const nodes = lines.map((x, i) => (
-    <Txt key={i} r={r} x={o.x} y={o.y + size * 0.8 + i * lh} size={size} weight={x.w} fill={x.first || !o.fill2 ? o.fill : o.fill2} align={o.align} spacing={-size * 0.015}>{x.l}</Txt>
-  ));
-  return { node: <g>{nodes}</g>, bottom: o.y + (lines.length ? size * 0.8 + (lines.length - 1) * lh + size * 0.25 : 0), size };
-}
-
-/** The photo in its box. On a ground of its own colour it melts in; on the
- *  other ground it sits on a rounded panel of its own colour; a cut-out
- *  stands on any ground; a scene (its own background) fills a rounded frame. */
-function Photo({ r, box, ground, panelRadius = 28, align = "center", src }: { r: R; box: Box; ground: "light" | "dark"; panelRadius?: number; align?: "center" | "bottom"; src?: string }) {
-  const href = src ?? r.photo;
-  const id = `${r.uid}-ph${Math.round(box.x)}${Math.round(box.y)}`;
-  if (!href) {
-    const c = ground === "dark" ? "#48484A" : "#C7C7CC";
-    return (
-      <g>
-        <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={panelRadius * r.u} fill="none" stroke={c} strokeWidth={2 * r.u} strokeDasharray={`${10 * r.u} ${8 * r.u}`} />
-        <Txt r={r} x={box.x + box.w / 2} y={box.y + box.h / 2} size={26 * r.u} fill={c} align="center" weight={500}>{r.lang === "zh" ? "产品照片" : r.lang === "ar" ? "صورة المنتج" : "Product photo"}</Txt>
-      </g>
-    );
-  }
-  const on: PhotoOn = r.photoOn;
-  const scene = on === "scene";
-  const needsPanel = scene || (on === "white" && ground === "dark") || (on === "black" && ground === "light");
-  const blend = on === "cutout" || needsPanel ? undefined : on === "white" ? "multiply" : "screen";
-  const pad = needsPanel && !scene ? Math.min(box.w, box.h) * 0.06 : 0;
-  const k = scene ? Math.max(1, r.photoScale) : r.photoScale;
-  const iw = (box.w - pad * 2) * k, ih = (box.h - pad * 2) * k;
-  const ix = box.x + (box.w - iw) / 2;
-  const iy = align === "bottom" ? box.y + box.h - pad - ih : box.y + (box.h - ih) / 2;
-  return (
-    <g>
-      {needsPanel ? (
-        <>
-          <defs><clipPath id={id}><rect x={box.x} y={box.y} width={box.w} height={box.h} rx={panelRadius * r.u} /></clipPath></defs>
-          <rect x={box.x} y={box.y} width={box.w} height={box.h} rx={panelRadius * r.u} fill={on === "white" ? WHITE : on === "black" ? INK : "#1C1C1E"} />
-        </>
-      ) : null}
-      <g clipPath={needsPanel ? `url(#${id})` : undefined}>
-        <image href={href} x={ix} y={iy} width={iw} height={ih} preserveAspectRatio={scene ? "xMidYMid slice" : align === "bottom" ? "xMidYMax meet" : "xMidYMid meet"}
-          style={blend ? { mixBlendMode: blend } : undefined} />
-      </g>
-    </g>
-  );
-}
-
-/** The KOLEEX edge (ch. 57/80): 1 % of the width, full height, the start side. */
-function Edge({ r, fill }: { r: R; fill: string }) {
-  if (!r.edge) return null;
-  const w = Math.max(2, Math.round(r.W * 0.01));
-  return <rect x={r.rtl ? r.W - w : 0} y={0} width={w} height={r.H} fill={fill} />;
-}
-
-/** The logo at the top (start, or end when the picture needs the start). */
-function TopLogo({ r, fill, y, width }: { r: R; fill: string; y?: number; width?: number }) {
-  const lw = width ?? 220 * r.u;
-  const atEnd = r.logoEnd !== r.rtl; // the physical right side
-  return <Logo x={atEnd ? r.W - r.M - lw : r.M} y={y ?? r.top} width={lw} fill={fill} />;
-}
-
-/** The foot: the call to action at the start, the website at the end. */
-function Foot({ r, y, fill, dim, x0, x1 }: { r: R; y: number; fill: string; dim: string; x0?: number; x1?: number }) {
-  const s = 26 * r.u;
-  const a = x0 ?? r.M, b = x1 ?? r.W - r.M;
-  const cta = r.cta ? `${r.cta}${r.rtl ? " ←" : " →"}` : "";
-  /* too narrow for both on one line: the website goes above the call */
-  const stacked = Boolean(cta && r.web) && textWidth(cta, s, 600, r.font) + textWidth(r.web, s, 400, r.font) + 40 * r.u > b - a;
-  return (
-    <g>
-      {cta ? <Txt r={r} x={r.rtl ? b : a} y={y} size={s} fill={fill} weight={600} align={startAlign(r)}>{cta}</Txt> : null}
-      {r.web ? (stacked
-        ? <Txt r={r} x={r.rtl ? b : a} y={y - s * 1.5} size={s} fill={dim} align={startAlign(r)}>{r.web}</Txt>
-        : <Txt r={r} x={r.rtl ? a : b} y={y} size={s} fill={dim} align={endAlign(r)}>{r.web}</Txt>) : null}
-    </g>
-  );
-}
-const hasFoot = (r: R) => Boolean(r.cta || r.web);
 
 /* ── the styles ────────────────────────────────────────────────────────── */
 
@@ -544,22 +395,6 @@ function drawPost(v: TemplateValues, ctx: DrawContext): ReactNode {
   }
 }
 
-/** A soft floor shadow under the machine (the studio stage). */
-function Floor({ r, cx, y, w }: { r: R; cx: number; y: number; w: number }) {
-  const id = `${r.uid}-floor`;
-  return (
-    <g>
-      <defs>
-        <radialGradient id={id}>
-          <stop offset="0%" stopColor="#000000" stopOpacity={0.16} />
-          <stop offset="100%" stopColor="#000000" stopOpacity={0} />
-        </radialGradient>
-      </defs>
-      <ellipse cx={cx} cy={y} rx={w / 2} ry={w * 0.06} fill={`url(#${id})`} />
-    </g>
-  );
-}
-
 /** The figures: a hairline over the grid, a hairline between the cells,
  *  the number Light and large, its label in grey capitals. */
 function Figures({ r, facts, box, cols }: { r: R; facts: Array<{ value: string; label: string }>; box: Box; cols: number }) {
@@ -585,8 +420,6 @@ function Figures({ r, facts, box, cols }: { r: R; facts: Array<{ value: string; 
 
 /* ── the template ──────────────────────────────────────────────────────── */
 
-const choice = <T extends string>(key: string, labelKey: string, group: string, values: readonly T[], words: string, when?: (v: TemplateValues) => boolean): FieldDef =>
-  ({ key, kind: "choice", labelKey, group, options: values.map((value) => ({ value, labelKey: `${words}.${value}` })), ...(when ? { when } : {}) });
 const isStyle = (...s: Style[]) => (v: TemplateValues) => s.includes(styleOf(v));
 
 /** The product's words in a language (English when not translated). */
@@ -642,17 +475,14 @@ export const productPost: TemplateDef = {
   digital: true,
   usesPeople: false,
   usesProducts: true,
-  size: (v) => PX[sizeOf(v)],
+  size: (v) => POST_PX[postSizeOf(v)],
   bleed: 0,
   safe: 72,
-  safeFor: (v) => (sizeOf(v) === "story" ? { top: 250, right: 72, bottom: 340, left: 72 } : { top: 72, right: 72, bottom: 72, left: 72 }),
+  safeFor: postSafe,
   marks: false,
   fields: [
     choice("style", "tpl.f.style", "look", POST_STYLES, "post.style"),
-    choice("size", "post.f.size", "look", SIZES, "post.size"),
-    { key: "lang", kind: "choice", labelKey: "post.f.lang", group: "look", options: [
-      { value: "en", labelKey: "tpl.lang.en" }, { value: "zh", labelKey: "tpl.lang.zh" }, { value: "ar", labelKey: "tpl.lang.ar" },
-    ] },
+    ...POST_LOOK,
     { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(false), when: isStyle("pattern", "pattern-dark") },
     { key: "edge", kind: "switch", labelKey: "post.f.edge", group: "look", when: isStyle("book-dark", "book-light", "feature") },
     choice("logoAt", "post.f.logoAt", "look", ["start", "end"] as const, "post.logoAt", isStyle("book-dark", "book-light", "split", "figures", "feature", "editorial", "launch", "factory")),
@@ -664,9 +494,7 @@ export const productPost: TemplateDef = {
     { key: "facts", kind: "text", labelKey: "post.f.facts", group: "words", max: 160, lines: 4, placeholder: "5,000 | stitches per minute", hintKey: "post.f.factsHint", when: isStyle("figures") },
     { key: "cta", kind: "text", labelKey: "post.f.cta", group: "words", max: 40, hintKey: "post.f.ctaHint" },
     { key: "web", kind: "switch", labelKey: "post.f.web", group: "words" },
-    { key: "photo", kind: "image", labelKey: "post.f.photo", group: "picture", hintKey: "post.f.photoHint" },
-    choice("photoOn", "post.f.photoOn", "photo", PHOTO_ON, "post.photoOn"),
-    { key: "photoScale", kind: "range", labelKey: "post.f.photoScale", group: "picture", min: 60, max: 130, step: 5, unit: "%" },
+    ...photoFields(),
   ],
   defaults: {
     style: "book-dark", size: "feed", lang: "en", pattern: "scan-edge", edge: true, logoAt: "start", tag: "new",
@@ -683,7 +511,7 @@ export const productPost: TemplateDef = {
   },
   restyle: (v, style) => keepEdits(v, { ...v, style }, asLang(v.lang), asLang(v.lang)),
   specKeys: (v) => [
-    `post.spec.size.${sizeOf(v)}`,
+    `post.spec.size.${postSizeOf(v)}`,
     "post.spec.text",
     "post.spec.photo",
     "post.spec.price",

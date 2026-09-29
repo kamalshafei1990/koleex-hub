@@ -18,7 +18,9 @@ const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "live" | "buildi
   { key: "badge", icon: "ticket", status: "live", href: "/brand-center/templates/event-badge" },
   { key: "certificate", icon: "award", status: "live", href: "/brand-center/templates/certificate" },
   { key: "productPost", icon: "megaphone", status: "live", href: "/brand-center/templates/product-post" },
-  { key: "occasionPost", icon: "calendar", status: "planned" },
+  { key: "eventPost", icon: "ticket", status: "live", href: "/brand-center/templates/event-post" },
+  { key: "occasionPost", icon: "calendar", status: "live", href: "/brand-center/templates/occasion-post" },
+  { key: "hiringPost", icon: "briefcase", status: "live", href: "/brand-center/templates/hiring-post" },
 ];
 
 const ROLES: Array<{ key: string; icon: RrIconName }> = [
