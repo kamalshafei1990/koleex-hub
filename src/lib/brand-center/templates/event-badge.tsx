@@ -20,6 +20,7 @@ import { asLang, fontOf, isPictureQr, list, num, qrsOf, str, type QrItem } from 
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, HAIRLINE_ON_WHITE, INK, LIGHT_ON_INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced, type Zone } from "./card/parts";
 import { nameIn, titleOf } from "./person";
 import { EVB_PREMIUM, drawEvbPremium, evbPremiumDark, isEvbPremium } from "./event-badge-premium";
+import { patternOptions } from "./patterns";
 
 /** The first ten, then the premium set (owner 30/09/2026) beside them. */
 export const EVB_STYLES = ["book", "black", "photo", "big-name", "event", "dots", "split", "minimal", "silver", "landscape", ...EVB_PREMIUM] as const;
@@ -514,6 +515,7 @@ export const eventBadge: TemplateDef = {
       { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
     ] },
     { key: "scale", kind: "range", labelKey: "evb.f.scale", group: "look", min: 70, max: 130, step: 5, unit: "%" },
+    { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(), when: (v) => ["p-monolith", "p-underprint"].includes(String(v.style)) },
 
     { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 40 },
     { key: "name2", kind: "text", labelKey: "evb.f.name2", group: "person", max: 40, hintKey: "evb.f.name2Hint" },
@@ -543,7 +545,7 @@ export const eventBadge: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    style: "book", size: "86x120", lang: "en", font: "inter", scale: 100,
+    style: "book", size: "86x120", lang: "en", font: "inter", scale: 100, pattern: "scan-edge",
     name: "", name2: "", title: "", titleKey: "", email: "", staffNo: "", companyOn: true, company: EVERYDAY_NAME_EN, langs: "",
     role: "", roleColor: "black", event: "", dates: "", booth: "",
     photo: "", photoShape: "circle", photoZoom: 100, photoX: 0, photoY: 0, bw: true,

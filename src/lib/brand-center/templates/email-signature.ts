@@ -19,6 +19,7 @@
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import type { BcPerson } from "@/lib/brand-center/client";
 import { formatMobile, nameIn, titleOf } from "./person";
+import { patternOf, patternOptions } from "./patterns";
 import type { TemplateDef, TemplateItem, TemplateValues } from "./types";
 import { LANGS, asLang, list, num, rowKind, rowsOf, str, type Lang, type RowKind } from "./card/model";
 
@@ -182,6 +183,12 @@ function dotsImg(c: Ctx, black: boolean): string {
   const h = Math.round(w * 0.625);
   return linked(c, `<img src="${c.base}${ASSETS}/koleex-dots-${black ? "black" : "white"}.png" width="${w}" height="${h}" alt="KOLEEX" style="display:block;width:${w}px;height:${h}px;max-width:none;border:0;outline:none;border-radius:6px">`);
 }
+/** The pattern of the two pattern styles: a picture per pattern and side
+ *  (`koleex-sig-up|mono-<pattern>-l|r.png`) — a signature always has one. */
+const sigPattern = (v: TemplateValues) => {
+  const p = patternOf(v.pattern, "scan-edge");
+  return p === "none" ? "scan-edge" : p;
+};
 /** A premium ornament (rendered from the shared ornaments into a PNG on our
  *  domain — email apps cannot draw SVG). */
 function ornament(c: Ctx, name: string, w: number, h: number, radius = 0, link = true): string {
@@ -442,11 +449,11 @@ function drawStyle(v: TemplateValues, c: Ctx): string {
       /* the dots field, the full logo in a framed clear window */
       return table(c, `<tr>${cell(c, ornament(c, "knockout", 192, 120, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
     case "p-underprint":
-      /* the full logo across the spirograph underprint */
-      return table(c, `<tr>${cell(c, ornament(c, "underprint", 150, 120), `padding-${E(c)}:${g(c, 16)}px`)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 4)}px`)}</tr>`, base);
+      /* the KOLEEX pattern as tall as the words, its edge to the outside; the words and the logo */
+      return table(c, `<tr>${cell(c, ornament(c, `up-${sigPattern(v)}-${c.rtl ? "r" : "l"}`, 100, 150), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock({ logoAfter: true }))}</tr>`, base);
     case "p-monolith":
-      /* a black column on a dark underprint, with the logo */
-      return table(c, `<tr>${cell(c, ornament(c, "monolith", 120, 150, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
+      /* a black column: the logo on clean ground over the KOLEEX pattern */
+      return table(c, `<tr>${cell(c, ornament(c, `mono-${sigPattern(v)}-${c.rtl ? "r" : "l"}`, 120, 150, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
     case "p-guilloche":
       /* the logo, the name, a guilloche band, the contacts */
       return table(c, [
@@ -639,6 +646,7 @@ export const emailSignature: TemplateDef = {
     { key: "lang", kind: "choice", labelKey: "sig.f.lang", group: "look", options: [
       { value: "en", labelKey: "tpl.lang.en" }, { value: "zh", labelKey: "tpl.lang.zh" }, { value: "ar", labelKey: "tpl.lang.ar" },
     ] },
+    { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(false), when: isStyle("p-underprint", "p-monolith") },
     choice("accent", "sig.f.accent", "look", ACCENTS, "sig.accent"),
     choice("ruleStyle", "sig.f.ruleStyle", "look", RULES, "sig.rule", (v) => !isStyle("standard", "black", "band", "dots-black", "dots-white")(v) || v.ruleStyle === "dots"),
     { key: "logoW", kind: "range", labelKey: "sig.f.logoW", group: "look", min: 100, max: 160, step: 10 },
@@ -674,7 +682,7 @@ export const emailSignature: TemplateDef = {
     { key: "bannerLink", kind: "text", labelKey: "sig.f.bannerLink", group: "banner", max: 200, hintKey: "sig.f.bannerLinkHint", when: (v) => v.bannerOn === true },
   ],
   defaults: {
-    style: "standard", lang: "en", accent: "black", ruleStyle: "solid", logoW: 120, logoLink: true,
+    style: "standard", lang: "en", pattern: "scan-edge", accent: "black", ruleStyle: "solid", logoW: 120, logoLink: true,
     name: "", title: "", titleKey: "", second: false, lang2: "zh", name2: "", title2: "", title2Key: "",
     photo: "", photoShape: "circle", photoSize: 84,
     nameSize: 13, nameWeight: "bold", size: 13, titleCaps: false, spacing: "normal",

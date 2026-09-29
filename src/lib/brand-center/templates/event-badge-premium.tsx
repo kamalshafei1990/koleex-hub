@@ -4,8 +4,8 @@
    badges beside the first ten, each on one idea:
 
      p-guilloche   black, a silver guilloche band over the status
-     p-underprint  white, the spirograph underprint behind the name
-     p-monolith    a black block with a dark underprint and the event
+     p-underprint  white, the KOLEEX pattern across the top
+     p-monolith    a black block carrying the pattern and the event
      p-knockout    the dots field, the logo in a framed clear window
      p-medallion   black, the foil medallion, the name in silver
      p-editorial   the first name as a light headline
@@ -20,7 +20,8 @@ import type { DrawContext, TemplateValues } from "./types";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, LIGHT_ON_INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced } from "./card/parts";
 import { asLang, fontOf, num, qrsOf, str } from "./card/model";
-import { FoilSeal, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, MicroLine } from "./ornaments";
+import { Pattern, patternOf } from "./patterns";
 
 export const EVB_PREMIUM = ["p-guilloche", "p-underprint", "p-monolith", "p-knockout", "p-medallion", "p-editorial"] as const;
 type P = (typeof EVB_PREMIUM)[number];
@@ -47,6 +48,7 @@ function read(v: TemplateValues, ctx: DrawContext) {
     role: str(v, "role").toUpperCase(), roleColour: String(v.roleColor || "black"),
     event: str(v, "event"), dates: str(v, "dates"), booth: str(v, "booth"),
     front: qrsOf(v).filter((q) => q.side === "front"),
+    pattern: patternOf(v.pattern, "scan-edge"),
   };
 }
 type R = ReturnType<typeof read>;
@@ -182,7 +184,9 @@ export function drawEvbPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       return (
         <>
           <rect x={0} y={0} width={W} height={H} fill={WHITE} />
-          <Underprint cx={cx} cy={b + h * (tall ? 0.46 : 0.5)} R={0.46 * Math.min(w, h * 0.8)} color="#E3E3E8" />
+          {/* the pattern stood up: its edge on the top trim, across the badge's full width; the slot and the logo stay clear */}
+          <Pattern id={r.pattern} area={{ x0: 0, y0: b, w: W, h: top - 5 * u - b }} dark={false} mirror={r.rtl} up uid={`${r.uid}-eup`}
+            clear={[{ x: cx - lw / 2 - 3 * u, y: b + 11 * u, w: lw + 6 * u, h: logoHeight(lw) + 6 * u }, { x: cx - 8.5, y: b + 4, w: 17, h: 7 }]} />
           <Logo x={cx - lw / 2} y={b + 14 * u} width={lw} fill={INK} />
           {p.node}
           <Codes r={r} top={p.bottom + 4 * u} bottom={evY - 4 * u} fill={GREY_ON_WHITE} />
@@ -205,7 +209,9 @@ export function drawEvbPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <rect x={0} y={0} width={W} height={block} fill={INK} />
           <g clipPath={`url(#${r.uid}-eblk)`}>
             <defs><clipPath id={`${r.uid}-eblk`}><rect x={0} y={0} width={W} height={block} /></clipPath></defs>
-            <Underprint cx={r.rtl ? b + w * 0.22 : b + w * 0.78} cy={block * 0.5} R={block * 0.8} color="#1C1C1E" />
+            <Pattern id={r.pattern} area={{ x0: 0, y0: 0, w: W, h: block }} dark mirror={r.rtl} uid={`${r.uid}-emp`}
+              clear={[{ x: (r.rtl ? r.x1 - lw : r.x0) - 3 * u, y: b + 11 * u, w: lw + 6 * u, h: logoHeight(lw) + 6 * u },
+                ...(r.event || r.dates ? [{ x: r.rtl ? b + w * 0.4 : 0, y: block - 14 * u, w: b + w * 0.6, h: 12 * u }] : [])]} />
           </g>
           <Logo x={r.rtl ? r.x1 - lw : r.x0} y={b + 14 * u} width={lw} fill={WHITE} />
           {r.event ? <Txt r={r} x={start} y={block - 9 * u} size={3.2 * u} fill={WHITE} weight={600} align={align} spacing={3.2 * u * 0.28} max={w - 14 * u}>{caps(r.event)}</Txt> : null}

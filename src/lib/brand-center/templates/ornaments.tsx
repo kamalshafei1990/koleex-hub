@@ -1,9 +1,10 @@
 /* ---------------------------------------------------------------------------
    Brand Center — the fine ornaments every template may use (the owner,
    30/09/2026: designs "really made by a professional designer"): the
-   guilloche band and rosette, the underprint of spirograph curves,
-   microtext lines and the foil medallion seal. All in mm, one colour
-   each. The logo is only ever used whole — never the K alone.
+   guilloche band and rosette, microtext lines and the foil medallion
+   seal. All in mm, one colour each. The logo is only ever used whole —
+   never the K alone; the spirograph underprint went with it (owner: "this
+   circle has no meaning") — the KOLEEX pattern (./patterns) took its place.
    --------------------------------------------------------------------------- */
 
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
@@ -83,35 +84,6 @@ export function MicroLine({ uid, id, font, x, y, width, fill, size = 0.5 }: { ui
         style={{ fontFamily: font, fontSize: s, fontWeight: 500, letterSpacing: s * 0.04 }}>{text}</text>
     </g>
   );
-}
-
-/** The underprint: overlaid spirograph curves (hypotrochoids) around a
- *  clear centre, in the lightest grey — the security print under a
- *  banknote or a diploma. Cached: the same page draws the same curves. */
-const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-const UNDERPRINT = new Map<string, string[]>();
-export function underprint(cx: number, cy: number, R: number): string[] {
-  const key = `${cx.toFixed(1)}|${cy.toFixed(1)}|${R.toFixed(1)}`;
-  const hit = UNDERPRINT.get(key);
-  if (hit) return hit;
-  const curves: Array<[number, number, number, number]> = [[40, 9, 14, 0], [40, 9, 14, Math.PI / 40], [40, 9, 7, 0], [36, 11, 16, 0], [36, 11, 16, Math.PI / 36]];
-  const out = curves.map(([A, B, D, rot]) => {
-    const k = (A - B) / B, loops = B / gcd(A, B), n = 160 * loops, maxR = A - B + D;
-    let d = "";
-    for (let i = 0; i <= n; i++) {
-      const t = (i / n) * loops * 2 * Math.PI;
-      const x = (A - B) * Math.cos(t) + D * Math.cos(k * t), y = (A - B) * Math.sin(t) - D * Math.sin(k * t);
-      const xr = x * Math.cos(rot) - y * Math.sin(rot), yr = x * Math.sin(rot) + y * Math.cos(rot);
-      d += `${i ? "L" : "M"}${(cx + (xr / maxR) * R).toFixed(2)} ${(cy + (yr / maxR) * R).toFixed(2)}`;
-    }
-    return d;
-  });
-  if (UNDERPRINT.size > 40) UNDERPRINT.clear();
-  UNDERPRINT.set(key, out);
-  return out;
-}
-export function Underprint({ cx, cy, R, color }: { cx: number; cy: number; R: number; color: string }) {
-  return <g fill="none" stroke={color} strokeWidth={0.1}>{underprint(cx, cy, R).map((d, i) => <path key={i} d={d} />)}</g>;
 }
 
 /** The seal, a foil medallion: a scalloped silver rim, the tagline and the

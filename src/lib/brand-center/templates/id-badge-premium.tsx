@@ -4,14 +4,14 @@
    badges beside the first six, 54 × 86 mm, each on one idea:
 
      p-guilloche   black, a silver guilloche band at the foot
-     p-monolith    a black block with a dark underprint, the portrait on
-                   its edge
+     p-monolith    a black block carrying the KOLEEX pattern, the portrait
+                   on its edge
      p-knockout    the dots field, the logo in a framed clear window
      p-editorial   white, the name as a light headline
-     p-underprint  a round portrait on the spirograph underprint
+     p-underprint  a round portrait on the KOLEEX pattern
      p-medallion   black, the foil medallion over the portrait
 
-   The book's rules hold: the portrait 4 : 5 (round on the underprint),
+   The book's rules hold: the portrait 4 : 5 (round under the pattern),
    black and white or muted; the name, the title and the staff number and
    nothing personal beyond them.
    --------------------------------------------------------------------------- */
@@ -21,7 +21,8 @@ import type { DrawContext, TemplateValues } from "./types";
 import { PT } from "./types";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced } from "./card/parts";
 import { asLang, fontOf, num, qrsOf, str } from "./card/model";
-import { FoilSeal, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, MicroLine } from "./ornaments";
+import { Pattern, patternOf } from "./patterns";
 
 export const ID_PREMIUM = ["p-guilloche", "p-monolith", "p-knockout", "p-editorial", "p-underprint", "p-medallion"] as const;
 type P = (typeof ID_PREMIUM)[number];
@@ -44,6 +45,7 @@ function read(v: TemplateValues, ctx: DrawContext) {
     name: str(v, "name"), title: str(v, "title"), dept: str(v, "dept"),
     staff: str(v, "staffNo"), label: str(v, "idLabel") || "ID", valid: str(v, "valid"), role: str(v, "role").toUpperCase(),
     photo: str(v, "photo"), front: qrsOf(v).filter((q) => q.side === "front"),
+    pattern: patternOf(v.pattern, "scan-edge"),
   };
 }
 type R = ReturnType<typeof read>;
@@ -140,7 +142,7 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       );
     }
     case "p-monolith": {
-      /* a black block with a dark underprint; the portrait on its edge */
+      /* a black block carrying the KOLEEX pattern; the portrait on its edge */
       const block = b + h * 0.42;
       const box = { x: r.rtl ? r.x0 : r.x1 - 20, y: block - 14, w: 20, h: 25 };
       const lw = 20;
@@ -153,7 +155,8 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
           <rect x={0} y={0} width={W} height={block} fill={INK} />
           <g clipPath={`url(#${r.uid}-iblk)`}>
             <defs><clipPath id={`${r.uid}-iblk`}><rect x={0} y={0} width={W} height={block} /></clipPath></defs>
-            <Underprint cx={r.rtl ? b + w * 0.3 : b + w * 0.7} cy={block * 0.55} R={block * 0.75} color="#1C1C1E" />
+            <Pattern id={r.pattern} area={{ x0: 0, y0: 0, w: W, h: block }} dark mirror={r.rtl} uid={`${r.uid}-imp`}
+              clear={[{ x: (r.rtl ? r.x1 - lw : r.x0) - 2, y: b + 3.5, w: lw + 4, h: logoHeight(lw) + 4 }, ...(r.role ? [{ x: r.rtl ? r.x0 - 2 : r.x1 - 22, y: b + 3.5, w: 24, h: 6 }] : [])]} />
           </g>
           <Logo x={r.rtl ? r.x1 - lw : r.x0} y={b + 5.5} width={lw} fill={WHITE} />
           {r.role ? <Txt r={r} x={r.rtl ? r.x0 : r.x1} y={b + 5.5 + logoHeight(lw) * 0.85} size={4.6 * PT} fill={WHITE} weight={700} align={r.rtl ? "left" : "right"} ltr spacing={4.6 * PT * 0.3}>{r.role}</Txt> : null}
@@ -210,7 +213,7 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       );
     }
     case "p-underprint": {
-      /* a round portrait on the underprint, like a medal */
+      /* a round portrait on the KOLEEX pattern, like a medal */
       const d = 26;
       const pcy = b + 13 + d / 2 + 2;
       const lw = 18;
@@ -219,7 +222,9 @@ export function drawIdPremium(v: TemplateValues, ctx: DrawContext): ReactNode {
       return (
         <>
           <rect x={0} y={0} width={W} height={H} fill={WHITE} />
-          <Underprint cx={cx} cy={pcy} R={d * 0.98} color="#DCDCE1" />
+          {/* the pattern stood up: its edge on the top trim, across the badge's full width */}
+          <Pattern id={r.pattern} area={{ x0: 0, y0: b, w: W, h: pcy - b }} dark={false} mirror={r.rtl} up uid={`${r.uid}-iup`}
+            clear={[{ x: cx - lw / 2 - 2, y: b + 3, w: lw + 4, h: logoHeight(lw) + 4 }]} />
           <Logo x={cx - lw / 2} y={b + 5} width={lw} fill={INK} />
           <circle cx={cx} cy={pcy} r={d / 2 + 0.9} fill={WHITE} stroke="#AEAEB2" strokeWidth={0.2} />
           <Portrait v={v} r={r} box={box} radius={d / 2} />

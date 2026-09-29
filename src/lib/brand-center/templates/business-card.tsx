@@ -15,6 +15,8 @@ import { CARD_ADDRESS, LANGS, asLang, defaultRows, qrsOf, relangRows, rowsOf, st
 
 const KOLEEX_WEB = "www.koleexgroup.com";
 import { NO_COMPANY_BACK, NO_COMPANY_FRONT, PORTRAIT_STYLES, STYLES, VERTICAL_STYLES, drawBack, drawFront, specKeysFor, styleOf } from "./card/styles";
+import { PATTERN_CARD_STYLES } from "./card/premium";
+import { patternOptions } from "./patterns";
 
 const SIZES: Record<string, { w: number; h: number }> = {
   "90x54": { w: 90, h: 54 },
@@ -125,6 +127,7 @@ export const businessCard: TemplateDef = {
       { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
     ] },
     { key: "scale", kind: "range", labelKey: "tpl.f.scale", group: "look", min: 80, max: 140, step: 5, unit: "%" },
+    { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(), when: (v) => PATTERN_CARD_STYLES.includes(String(v.style)) },
 
     { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 40 },
     { key: "nameSep", kind: "choice", labelKey: "tpl.f.nameSep", group: "person", options: [
@@ -164,7 +167,7 @@ export const businessCard: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100,
+    style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100, pattern: "scan-edge",
     name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "", badgeRole: "Distributor", badgePlace: "", badgeYear: String(new Date().getFullYear()),
     company: "KOLEEX INTERNATIONAL GROUP", companyBack: true, companyFront: false,
     rows: defaultRows("en"), labels: true, whatsapp: true,

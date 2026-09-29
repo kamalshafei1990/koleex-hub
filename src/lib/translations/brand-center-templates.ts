@@ -516,7 +516,6 @@ export const brandCenterTemplatesT: Translations = {
   "cert.style.swiss":     { en: "Swiss grid", zh: "瑞士网格", ar: "شبكة سويسرية" },
   "cert.style.corners":   { en: "Corners", zh: "四角", ar: "زوايا" },
   "cert.weight.medium":   { en: "Medium", zh: "中等", ar: "متوسط" },
-  "cert.f.mark": { en: "Background texture (underprint)", zh: "背景底纹", ar: "خلفية طباعة الأمان" },
   "cert.spec.guilloche":  { en: "Guilloche: 0.09 mm lines — print at 100% on a laser or offset press; they are also a light security feature.", zh: "扭索纹：0.09 毫米细线 — 用激光或胶印按 100% 印刷；同时具有轻度防伪作用。", ar: "الجيلوش: خطوط 0.09 مم — اطبع 100% ليزر أو أوفست؛ وهي كمان علامة أمان خفيفة." },
 
   /* ── certificates, round 3 (owner 30/09: "not bad but even better") ── */
@@ -535,14 +534,14 @@ export const brandCenterTemplatesT: Translations = {
   "tpl.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "tpl.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
   "tpl.style.p-swiss":      { en: "Premium — Swiss grid", zh: "高级 — 瑞士网格", ar: "بريميوم — شبكة سويسرية" },
-  "tpl.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "tpl.style.p-underprint": { en: "Premium — KOLEEX pattern (white)", zh: "高级 — KOLEEX 图案（白）", ar: "بريميوم — نقشة KOLEEX (أبيض)" },
+  "tpl.style.p-pattern":    { en: "Premium — KOLEEX pattern (black)", zh: "高级 — KOLEEX 图案（黑）", ar: "بريميوم — نقشة KOLEEX (أسود)" },
   "tpl.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
   "tpl.style.p-foil-line":  { en: "Premium — silver line", zh: "高级 — 银线", ar: "بريميوم — خط فضي" },
   "spec.pGuilloche": { en: "The guilloche band in silver foil (Pantone 877 C) or light grey ink — 0.08 mm lines.", zh: "扭索纹带用银色烫印（Pantone 877 C）或浅灰墨印刷 — 线宽 0.08 毫米。", ar: "شريط الجيلوش سلفر فويل (Pantone 877 C) أو حبر رمادي فاتح — خطوط 0.08 مم." },
   "spec.pMicro":     { en: "The short rule under the title is microtext — the group's name in 1-point capitals; print at 600 dpi or finer.", zh: "职位下的短线是微缩文字 — 1 磅大写的集团名称；请以 600 dpi 或更高精度印刷。", ar: "الخط القصير تحت المسمى كلام ميكرو — اسم المجموعة بحروف 1 بوينت؛ اطبع 600 dpi أو أدق." },
   "spec.pKnockout": { en: "Dots printed grey (K 70) on black board; the logo's window is the board itself, framed by a silver hairline.", zh: "黑卡上印灰色圆点（K 70）；标志视窗为卡纸本色，并以银色细线框出。", ar: "النقط رمادي (K 70) على كرتون أسود؛ وشباك اللوجو لون الكرتون نفسه وحواليه خط فضي رفيع." },
-  "spec.pUnderprint": { en: "The underprint in the lightest grey (K 12) — fine lines, 0.1 mm.", zh: "底纹用最浅的灰色（K 12）印刷 — 细线 0.1 毫米。", ar: "الطباعة الخلفية أفتح رمادي (K 12) — خطوط رفيعة 0.1 مم." },
-  "spec.pMedallion": { en: "The medallion in silver foil (Pantone 877 C); the K in its centre is the black board.", zh: "徽章用银色烫印（Pantone 877 C）；中心的 K 为黑卡本色。", ar: "الميدالية سلفر فويل (Pantone 877 C)؛ وحرف K في نصها هو لون الكرتون الأسود." },
+  "spec.pMedallion": { en: "The medallion in silver foil (Pantone 877 C); the rosette at its centre is the black board.", zh: "徽章用银色烫印（Pantone 877 C）；中心的玫瑰纹为黑卡本色。", ar: "الميدالية سلفر فويل (Pantone 877 C)؛ والوردة اللي في نصها هي لون الكرتون الأسود." },
   "spec.pFoilLine":  { en: "The line and the name in silver foil (Pantone 877 C).", zh: "线条和姓名用银色烫印（Pantone 877 C）。", ar: "الخط والاسم سلفر فويل (Pantone 877 C)." },
 
   /* ── staff ID badge: the premium set (owner 30/09) ── */
@@ -555,7 +554,7 @@ export const brandCenterTemplatesT: Translations = {
 
   /* ── event badge: the premium set (owner 30/09) ── */
   "evb.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
-  "evb.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "evb.style.p-underprint": { en: "Premium — KOLEEX pattern", zh: "高级 — KOLEEX 图案", ar: "بريميوم — نقشة KOLEEX" },
   "evb.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
   "evb.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
   "evb.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
@@ -564,8 +563,26 @@ export const brandCenterTemplatesT: Translations = {
   /* ── email signature: the premium set (owner 30/09) ── */
   "sig.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
   "sig.style.p-knockout": { en: "Premium — dots window", zh: "高级 — 圆点视窗", ar: "بريميوم — شباك في النقط" },
-  "sig.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "sig.style.p-underprint": { en: "Premium — KOLEEX pattern", zh: "高级 — KOLEEX 图案", ar: "بريميوم — نقشة KOLEEX" },
   "sig.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色立柱", ar: "بريميوم — عمود أسود" },
   "sig.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
   "sig.spec.premium": { en: "The fine details are pictures from hub.koleexgroup.com — they show as soon as the mail app loads pictures, in China too.", zh: "精细装饰为 hub.koleexgroup.com 上的图片 — 邮箱加载图片后即显示，在中国同样可用。", ar: "التفاصيل الرفيعة صور من hub.koleexgroup.com — بتظهر أول ما برنامج الإيميل يحمّل الصور، وفي الصين كمان." },
+
+  /* The KOLEEX pattern — drawn from the Koleex AI (owner, 30/09/2026) */
+  "pat.field": { en: "KOLEEX pattern", zh: "KOLEEX 图案", ar: "نقشة KOLEEX" },
+  "pat.none": { en: "No pattern", zh: "无图案", ar: "من غير نقشة" },
+  "pat.scan": { en: "Scan", zh: "扫描", ar: "سكان" },
+  "pat.scan-edge": { en: "Scan at the edge", zh: "边缘扫描", ar: "سكان على الحافة" },
+  "pat.scan-large": { en: "Scan, large dots", zh: "大点扫描", ar: "سكان بنقط كبيرة" },
+  "pat.aura-circle": { en: "Aura circle", zh: "光环圆", ar: "دايرة الهالة" },
+  "pat.aura-circle-edge": { en: "Aura circle at the edge", zh: "边缘光环圆", ar: "دايرة الهالة على الحافة" },
+  "pat.aura-corner": { en: "Aura from the corner", zh: "角落光环", ar: "هالة من الركن" },
+  "pat.aura-lower": { en: "Aura from the lower corner", zh: "下角光环", ar: "هالة من الركن التحتاني" },
+  "pat.aura-edge": { en: "Aura edge (blue)", zh: "光环边（蓝）", ar: "حافة الهالة (أزرق)" },
+  "pat.aura-edge-white": { en: "Aura edge (white)", zh: "光环边（白）", ar: "حافة الهالة (أبيض)" },
+  "pat.aura-rising": { en: "Rising aura", zh: "升起的光环", ar: "هالة طالعة" },
+  "pat.aura-band": { en: "Aura band", zh: "光环带", ar: "شريط الهالة" },
+  "pat.lens-edge": { en: "Lens at the edge", zh: "边缘透镜", ar: "عدسة على الحافة" },
+  "pat.lens-corner": { en: "Lens from the corner", zh: "角落透镜", ar: "عدسة من الركن" },
+  "spec.pPattern": { en: "The KOLEEX pattern prints to the edges (3 mm bleed); its blue is Hub Blue, the logo keeps its clean ground.", zh: "KOLEEX 图案满版印刷（出血 3 毫米）；蓝色为 Hub 蓝，标志保持干净的底。", ar: "نقشة KOLEEX بتتطبع لحد الحواف (3 مم زيادة)؛ الأزرق هو Hub Blue، واللوجو على أرضية نضيفة." },
 };

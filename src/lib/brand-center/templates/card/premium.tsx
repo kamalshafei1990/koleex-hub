@@ -4,13 +4,14 @@
    added beside the first twenty-five, with the certificates' finishing
    details scaled to a card:
 
-     p-guilloche   black, a silver guilloche band along the foot; the back
-                   on an underprint rosette
-     p-monolith    a black column with a dark underprint, the name on white
+     p-pattern     the KOLEEX pattern on black, the card's full height
+     p-underprint  the KOLEEX pattern on white (the key kept from its first
+                   drawing)
+     p-guilloche   black, a silver guilloche band along the foot
+     p-monolith    a black column carrying the pattern, the name on white
      p-knockout    the dots field with the logo in a framed clear window
-     p-editorial   the name as a light headline; an underprint on the back
+     p-editorial   the name as a light headline
      p-swiss       a black band, the contacts in a hairline grid
-     p-underprint  the spirograph underprint around the logo
      p-medallion   the foil medallion as the mark
      p-foil-line   one silver hairline across black
 
@@ -23,10 +24,13 @@ import type { ReactNode } from "react";
 import type { DrawContext, TemplateValues } from "../types";
 import { PT } from "../types";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced, type PrintRow } from "./parts";
-import { FoilSeal, MicroLine, Underprint } from "../ornaments";
+import { FoilSeal, MicroLine } from "../ornaments";
+import { Pattern, patternOf } from "../patterns";
 import { fontOf, langOf, num, printedRows, qrsOf, str } from "./model";
 
-export const PREMIUM_STYLES = ["p-guilloche", "p-monolith", "p-knockout", "p-editorial", "p-swiss", "p-underprint", "p-medallion", "p-foil-line"] as const;
+export const PREMIUM_STYLES = ["p-pattern", "p-underprint", "p-guilloche", "p-monolith", "p-knockout", "p-editorial", "p-swiss", "p-medallion", "p-foil-line"] as const;
+/** The styles that carry the KOLEEX pattern (it has a field of its own). */
+export const PATTERN_CARD_STYLES = ["p-pattern", "p-underprint", "p-monolith"];
 type Premium = (typeof PREMIUM_STYLES)[number];
 export const isPremium = (v: TemplateValues) => (PREMIUM_STYLES as readonly string[]).includes(String(v.style));
 const styleOf = (v: TemplateValues): Premium => (isPremium(v) ? (v.style as Premium) : "p-guilloche");
@@ -46,6 +50,7 @@ function read(v: TemplateValues, ctx: DrawContext) {
     lang, rtl: lang === "ar", font: fontOf(v), k: num(v, "scale", 100) / 100, uid: ctx.uid, codes: ctx.qrs,
     name: str(v, "name"), title: str(v, "title"), rows: printedRows(v) as PrintRow[],
     front: all.filter((q) => q.side === "front"), back: all.filter((q) => q.side === "back"),
+    pattern: patternOf(v.pattern, "scan-edge"),
   };
 }
 type R = ReturnType<typeof read>;
@@ -212,7 +217,8 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
           <rect x={colX} y={0} width={colWW} height={H} fill={INK} />
           <g clipPath={`url(#${r.uid}-mcol)`}>
             <defs><clipPath id={`${r.uid}-mcol`}><rect x={colX} y={0} width={colWW} height={H} /></clipPath></defs>
-            <Underprint cx={colX + colWW / 2} cy={b + h * 0.66} R={colWW * 0.95} color="#1C1C1E" />
+            <Pattern id={r.pattern} area={{ x0: colX, y0: 0, w: colWW, h: H }} dark mirror={!r.rtl} uid={`${r.uid}-mp`}
+              clear={[{ x: (r.rtl ? pin - lw : pin) - 2.5, y: r.y0 - 2.5, w: lw + 5, h: logoHeight(lw) + 5 }]} />
           </g>
           <Logo x={r.rtl ? pin - lw : pin} y={r.y0} width={lw} fill={WHITE} />
           <g transform={`translate(0 ${y0})`}>{nb.node}</g>
@@ -274,14 +280,20 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
         </>
       );
     }
+    case "p-pattern":
     case "p-underprint": {
+      /* the KOLEEX pattern on the end half, the card's full height; the full
+         logo on the clean half (owner 30/09: "the same height as the card") */
+      const dark = styleOf(v) === "p-pattern";
       const lw = 30;
+      const half = b + w * 0.52;
+      const area = r.rtl ? { x0: 0, y0: 0, w: W - half, h: H } : { x0: half, y0: 0, w: W - half, h: H };
       return (
         <>
-          {bg(r, WHITE)}
-          <Underprint cx={r.rtl ? b + w * 0.26 : b + w * 0.74} cy={r.cy} R={h * 0.62} color="#DADADF" />
-          <Logo x={r.rtl ? r.x1 - lw : r.x0} y={r.y1 - logoHeight(lw)} width={lw} fill={INK} />
-          <QrZone items={r.front} codes={r.codes} font={r.font} captionFill={GREY_ON_WHITE} max={10} zone={{ x: r.rtl ? r.x1 - 10 : r.x0, y: r.y0, w: 10, h: 12, dir: "row", align: "start" }} />
+          {bg(r, dark ? INK : WHITE)}
+          <Pattern id={r.pattern} area={area} dark={dark} mirror={r.rtl} uid={`${r.uid}-pc`} />
+          <Logo x={r.rtl ? r.x1 - lw : r.x0} y={r.cy - logoHeight(lw) / 2} width={lw} fill={dark ? WHITE : INK} />
+          <QrZone items={r.front} codes={r.codes} font={r.font} captionFill={dark ? GREY_ON_INK : GREY_ON_WHITE} max={10} zone={{ x: r.rtl ? r.x1 - 10 : r.x0, y: r.y0, w: 10, h: 12, dir: "row", align: "start" }} />
         </>
       );
     }
@@ -322,25 +334,21 @@ export function drawPremiumFront(v: TemplateValues, ctx: DrawContext): ReactNode
 
 export function drawPremiumBack(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
-  const { b, w, h, W, cx } = r;
+  const { b, h, cx } = r;
   switch (styleOf(v)) {
     case "p-guilloche":
       return (
         <>
           {bg(r, INK)}
-          <Underprint cx={r.rtl ? b + w * 0.2 : b + w * 0.8} cy={r.cy} R={h * 0.62} color="#232326" />
           <Info r={r} x0={r.x0} x1={r.x1} dark qrs={r.back} withLogo />
         </>
       );
+    case "p-pattern":
     case "p-monolith":
     case "p-editorial":
       return (
         <>
           {bg(r, INK)}
-          <g clipPath={`url(#${r.uid}-kb)`}>
-            <defs><clipPath id={`${r.uid}-kb`}><rect x={0} y={0} width={W} height={r.H} /></clipPath></defs>
-            <Underprint cx={r.rtl ? b + w * 0.18 : b + w * 0.82} cy={r.cy} R={h * 0.62} color="#1C1C1E" />
-          </g>
           <Info r={r} x0={r.x0} x1={r.x1} dark qrs={r.back} withLogo />
         </>
       );
@@ -389,7 +397,8 @@ export function premiumSpecKeys(v: TemplateValues): string[] {
     case "p-monolith": case "p-editorial": return ["spec.twoTone", "spec.pMicro", "spec.whiteBoard", "spec.edges"];
     case "p-knockout": return ["spec.pKnockout", "spec.whitePrint", "spec.blackBoard", "spec.pMicro", "spec.edges"];
     case "p-swiss": return ["spec.twoTone", "spec.pMicro", "spec.whiteBoard", "spec.edges"];
-    case "p-underprint": return ["spec.pUnderprint", "spec.blackPrint", "spec.whiteBoard", "spec.pMicro", "spec.edges"];
+    case "p-underprint": return ["spec.pPattern", "spec.blackPrint", "spec.whiteBoard", "spec.edges"];
+    case "p-pattern": return ["spec.pPattern", "spec.whitePrint", "spec.blackBoard", "spec.edges"];
     case "p-medallion": return ["spec.pMedallion", "spec.silverName", "spec.blackBoard", "spec.pMicro", "spec.edges"];
     default: return ["spec.pFoilLine", "spec.silverName", "spec.blackBoard", "spec.pMicro", "spec.edges"];
   }

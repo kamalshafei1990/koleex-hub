@@ -21,6 +21,7 @@ import { CARD_ADDRESS, LANGS, asLang, fontOf, isPictureQr, list, num, qrsOf, str
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, lockupHeight, lockupLines, logoHeight, textWidth, wrapBalanced, type Zone } from "./card/parts";
 import { nameIn, titleOf } from "./person";
 import { ID_PREMIUM, drawIdPremium, idPremiumDark, isIdPremium } from "./id-badge-premium";
+import { patternOptions } from "./patterns";
 
 /** The first six, then the premium set (owner 30/09/2026) beside them. */
 export const ID_STYLES = ["standard", "black", "photo-full", "dots", "landscape", "minimal", ...ID_PREMIUM] as const;
@@ -346,6 +347,7 @@ export const idBadge: TemplateDef = {
       { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
     ] },
     { key: "scale", kind: "range", labelKey: "tpl.f.scale", group: "look", min: 80, max: 130, step: 5, unit: "%" },
+    { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(), when: (v) => ["p-monolith", "p-underprint"].includes(String(v.style)) },
 
     { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 40 },
     { key: "title", kind: "title", labelKey: "tpl.f.title", group: "person", langKey: "lang" },
@@ -371,7 +373,7 @@ export const idBadge: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    style: "standard", lang: "en", font: "inter", scale: 100,
+    style: "standard", lang: "en", font: "inter", scale: 100, pattern: "scan-edge",
     name: "", title: "", dept: "", staffNo: "", idLabel: "ID", valid: "", role: "",
     photo: "", photoZoom: 100, photoX: 0, photoY: 0, bw: false,
     back: true, companyBack: true, company: "KOLEEX INTERNATIONAL GROUP",

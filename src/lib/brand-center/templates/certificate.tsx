@@ -26,7 +26,8 @@ import { Dots, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrap, wrapB
 import { nameIn } from "./person";
 import { LABELS, PLACEHOLDER, SILVER, issued } from "./certificate-common";
 import { V1_STYLES, pageV1 } from "./certificate-v1";
-import { FoilSeal, Guilloche, MicroLine, Underprint } from "./ornaments";
+import { FoilSeal, Guilloche, MicroLine } from "./ornaments";
+import { Pattern, patternOf, patternOptions } from "./patterns";
 
 /** The redesign (owner 30/09/2026: "made by a professional designer"). */
 const NEW_STYLES = ["classic", "guilloche", "black", "monolith", "editorial", "swiss", "dots", "award", "corners"] as const;
@@ -126,7 +127,7 @@ function read(v: TemplateValues, ctx: DrawContext) {
     seal: v.seal === "silver" ? "silver" : v.seal === "emboss" ? "emboss" : "none",
     foot, footName: foot === "legal" ? legalNameEn(issued(v)) : EVERYDAY_NAME_EN,
     nameWeight: WEIGHTS[String(v.nameWeight)] ?? WEIGHTS[STYLE_LOOK[style].nameWeight],
-    mark: v.mark !== false,
+    pattern: patternOf(v.pattern, "scan-edge"),
     silverName: v.silverName === true,
     qrs: qrsOf(v),
   };
@@ -386,11 +387,6 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     const logoY = b + (framed ? inset + T + 12 : 20) * u;
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={look.paper} />];
     nodes.push(<defs key="defs"><linearGradient id={`${r.uid}-silver`} x1="0" y1="0" x2="1" y2="1">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient></defs>);
-    if (style !== "corners") {
-      /* the underprint behind the name (the award's sits behind its seal) */
-      const upR = (tall ? 0.36 : 0.3) * Math.min(w, h) * 1.2;
-      if (!award) nodes.push(<Underprint key="up" cx={cx} cy={b + h * (tall ? 0.42 : 0.47)} R={upR} color={dark ? "#1F1F21" : "#E6E6EA"} />);
-    }
     if (framed) nodes.push(<Guilloche key="g" x0={b + inset} y0={b + inset} x1={b + w - inset} y1={b + h - inset} T={T} color={dark ? "#636366" : "#AEAEB2"} />);
     if (style === "corners") {
       const ci = 8 * u, arm = 16 * u, t = 0.5;
@@ -399,9 +395,6 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
         nodes.push(<rect key={`cv${px}${py}`} x={sx > 0 ? px : px - t} y={sy > 0 ? py : py - arm} width={t} height={arm} fill={INK} />);
       }
     }
-    /* the award's rosette sits behind everything — decided once the words are placed */
-    const rosetteAt = nodes.length;
-    nodes.push(null);
     nodes.push(<Logo key="logo" x={cx - lw / 2} y={logoY} width={lw} fill={dark ? WHITE : INK} />);
     let top = logoY + logoHeight(lw) + 14 * u;
     if (award && r.heading) {
@@ -423,9 +416,6 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
       sealBelow = false;
       body = Body({ r, top, bottom: gridY - 18 * u, o: bodyOpts });
     }
-    if (award) nodes[rosetteAt] = sealBelow && r.seal === "silver"
-      ? <Underprint key="ar" cx={cx} cy={gridY - sealR - 12 * u} R={sealR * 2.4} color="#E3E3E8" />
-      : <Underprint key="ar" cx={cx} cy={b + h * 0.5} R={0.36 * Math.min(w, h)} color="#E6E6EA" />;
     nodes.push(<g key="body">{body.node}</g>);
     const grid = Grid({ r, x: cx - gridW / 2, y: gridY, width: gridW, cells: signCells(r), look, align: "middle" });
     nodes.push(<g key="grid">{grid.node}</g>);
@@ -436,7 +426,7 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     return <>{nodes}</>;
   }
 
-  /* ── monolith: a black column on a dark underprint, the certificate on white ── */
+  /* ── monolith: a black column carrying the KOLEEX pattern, the certificate on white ── */
   if (style === "monolith") {
     const dark = DARK;
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
@@ -447,8 +437,10 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
       const pin = r.rtl ? b + w - 16 * u : b + 16 * u;
       const pAlign = r.rtl ? "right" : "left";
       nodes.push(<rect key="panel" x={px} y={0} width={pW} height={H} fill={INK} />);
-      if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={px} y={0} width={pW} height={H} /></clipPath></defs><Underprint cx={px + pW / 2} cy={b + h * 0.6} R={pW * 0.78} color="#1C1C1E" /></g>);
       const lw = pw * 0.5;
+      nodes.push(<Pattern key="pat" id={r.pattern} area={{ x0: px, y0: 0, w: pW, h: H }} dark mirror={!r.rtl} uid={`${r.uid}-cmp`}
+        clear={[{ x: (r.rtl ? pin - lw : pin) - 4 * u, y: b + 16 * u, w: lw + 8 * u, h: logoHeight(lw) + 8 * u },
+          { x: r.rtl ? pin - pw * 0.8 : pin - 4 * u, y: b + h - 58 * u, w: pw * 0.8 + 4 * u, h: 42 * u }]} />);
       nodes.push(<Logo key="logo" x={r.rtl ? pin - lw : pin} y={b + 20 * u} width={lw} fill={WHITE} />);
       if (r.heading) {
         const s = (NOT_LATIN.test(r.heading) ? 5 : 3) * u;
@@ -474,8 +466,10 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     /* portrait: the black block across the top */
     const ph = 0.3 * h;
     nodes.push(<rect key="panel" x={0} y={0} width={W} height={b + ph} fill={INK} />);
-    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-pclip)`}><defs><clipPath id={`${r.uid}-pclip`}><rect x={0} y={0} width={W} height={b + ph} /></clipPath></defs><Underprint cx={b + w * 0.78} cy={b + ph * 0.5} R={ph * 0.95} color="#1C1C1E" /></g>);
     const lw = 0.34 * w;
+    nodes.push(<Pattern key="pat" id={r.pattern} area={{ x0: 0, y0: 0, w: W, h: b + ph }} dark mirror={r.rtl} uid={`${r.uid}-cmpp`}
+      clear={[{ x: (r.rtl ? x1 - lw : x0) - 4 * u, y: b + 16 * u, w: lw + 8 * u, h: logoHeight(lw) + 8 * u },
+        { x: r.rtl ? b + w * 0.4 : 0, y: b + ph - 22 * u, w: b + w * 0.6, h: 14 * u }]} />);
     const start = r.rtl ? x1 : x0;
     nodes.push(<Logo key="logo" x={r.rtl ? x1 - lw : x0} y={b + 20 * u} width={lw} fill={WHITE} />);
     if (r.heading) nodes.push(<HeadingMark key="hm" r={r} x={start} y={b + ph - 14 * u} align="start" look={dark} />);
@@ -489,10 +483,17 @@ function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
     return <>{nodes}</>;
   }
 
-  /* ── editorial: the title as the headline, a quiet K, a strict grid ── */
+  /* ── editorial: the title as the headline, the pattern down the edge, a strict grid ── */
   if (style === "editorial") {
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={WHITE} />];
-    if (r.mark) nodes.push(<g key="k" clipPath={`url(#${r.uid}-eclip)`}><defs><clipPath id={`${r.uid}-eclip`}><rect x={0} y={0} width={W} height={H} /></clipPath></defs><Underprint cx={r.rtl ? b + h * 0.12 : b + w - h * 0.12} cy={b + h * 0.58} R={h * 0.56} color="#EDEDF0" /></g>);
+    {
+      /* the band from the page's edge: the number and the logo keep clean ground */
+      const bandW = 0.26 * w + b;
+      const lwE = (tall ? 0.26 : 0.14) * w;
+      nodes.push(<Pattern key="pat" id={r.pattern} area={{ x0: r.rtl ? 0 : W - bandW, y0: 0, w: bandW, h: H }} dark={false} mirror={r.rtl} uid={`${r.uid}-cep`}
+        clear={[{ x: r.rtl ? x0 - 2 * u : x1 - 52 * u, y: b + M - 4 * u, w: 54 * u, h: 8 * u },
+          { x: r.rtl ? x0 - 3 * u : x1 - lwE - 3 * u, y: b + h - 58 * u, w: lwE + 6 * u, h: 30 * u }]} />);
+    }
     const start = r.rtl ? x1 : x0;
     nodes.push(<rect key="bar" x={r.rtl ? x1 - 26 * u : x0} y={b + M} width={26 * u} height={1.6 * u} fill={INK} />);
     nodes.push(<Label key="no" r={r} x={r.rtl ? x0 : x1} y={b + M + 1.8 * u} text={`№ ${r.number}`} align={r.rtl ? "left" : "right"} look={LIGHT} size={2.4 * u} ltr />);
@@ -657,7 +658,7 @@ export const certificate: TemplateDef = {
     { key: "nameWeight", kind: "choice", labelKey: "sig.f.nameWeight", group: "look", when: (v) => !isV1(v), options: [
       { value: "light", labelKey: "sig.weight.light" }, { value: "regular", labelKey: "sig.weight.regular" }, { value: "medium", labelKey: "cert.weight.medium" }, { value: "bold", labelKey: "sig.weight.bold" },
     ] },
-    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => !isV1(v) && isStyle("monolith", "editorial")(v) },
+    { key: "pattern", kind: "choice", labelKey: "pat.field", group: "look", options: patternOptions(), when: (v) => !isV1(v) && isStyle("monolith", "editorial")(v) },
     { key: "silverName", kind: "switch", labelKey: "cert.f.silverName", group: "look", when: (v) => !isV1(v) && !isStyle("black")(v) },
 
     { key: "heading", kind: "text", labelKey: "cert.f.heading", group: "words", max: 60 },
@@ -686,7 +687,7 @@ export const certificate: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    kind: "training", style: "classic", size: "a4-land", lang: "en", font: "inter", scale: 100, nameWeight: "light", mark: true, silverName: false,
+    kind: "training", style: "classic", size: "a4-land", lang: "en", font: "inter", scale: 100, nameWeight: "light", pattern: "scan-edge", silverName: false,
     heading: START.heading, pre: START.pre, name: "", name2: "", org: "", statement: START.statement, facts: factRows("training", "en"),
     date: today(), number: numberFor("training"),
     sig1Name: "", sig1Role: START.sig1, sig1Image: "", sig2On: true, sig2Name: "", sig2Role: START.sig2, sig2Image: "",
