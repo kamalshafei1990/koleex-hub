@@ -560,4 +560,12 @@ export const brandCenterTemplatesT: Translations = {
   "evb.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
   "evb.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
   "evb.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
+
+  /* ── email signature: the premium set (owner 30/09) ── */
+  "sig.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
+  "sig.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "sig.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "sig.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色立柱", ar: "بريميوم — عمود أسود" },
+  "sig.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
+  "sig.spec.premium": { en: "The fine details are pictures from hub.koleexgroup.com — they show as soon as the mail app loads pictures, in China too.", zh: "精细装饰为 hub.koleexgroup.com 上的图片 — 邮箱加载图片后即显示，在中国同样可用。", ar: "التفاصيل الرفيعة صور من hub.koleexgroup.com — بتظهر أول ما برنامج الإيميل يحمّل الصور، وفي الصين كمان." },
 };

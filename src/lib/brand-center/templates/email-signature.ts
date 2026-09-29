@@ -31,6 +31,8 @@ const KOLEEX_SITE = "https://www.koleexgroup.com";
 export const SIG_STYLES = [
   "standard", "logo-first", "divider", "logo-right", "portrait", "portrait-top", "accent-bar", "editorial",
   "columns", "dots-black", "dots-white", "band", "outline", "black", "centered", "compact",
+  /* the premium set (owner 30/09/2026), beside the first sixteen */
+  "p-medallion", "p-knockout", "p-underprint", "p-monolith", "p-guilloche",
 ] as const;
 type Style = (typeof SIG_STYLES)[number];
 const styleOf = (v: TemplateValues): Style => ((SIG_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as Style) : "standard");
@@ -80,6 +82,11 @@ const STYLE_DEFAULTS: Record<Style, { companyAt: CompanyAt; contactLayout: Layou
   black:          { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 15, nameWeight: "bold",  titleCaps: false },
   centered:       { companyAt: "line",  contactLayout: "one",   accent: "grey",  nameSize: 16, nameWeight: "bold",  titleCaps: false },
   compact:        { companyAt: "title", contactLayout: "one",   accent: "grey",  nameSize: 13, nameWeight: "bold",  titleCaps: false },
+  "p-medallion":  { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 20, nameWeight: "light", titleCaps: true },
+  "p-knockout":   { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 20, nameWeight: "light", titleCaps: true },
+  "p-underprint": { companyAt: "line",  contactLayout: "lines", accent: "grey",  nameSize: 20, nameWeight: "light", titleCaps: true },
+  "p-monolith":   { companyAt: "line",  contactLayout: "lines", accent: "black", nameSize: 20, nameWeight: "light", titleCaps: true },
+  "p-guilloche":  { companyAt: "line",  contactLayout: "one",   accent: "grey",  nameSize: 22, nameWeight: "light", titleCaps: true },
 };
 
 /* ── words that are part of the signature ──────────────────────────────── */
@@ -174,6 +181,12 @@ function dotsImg(c: Ctx, black: boolean): string {
   const w = Math.round(c.logoW * 1.92);
   const h = Math.round(w * 0.625);
   return linked(c, `<img src="${c.base}${ASSETS}/koleex-dots-${black ? "black" : "white"}.png" width="${w}" height="${h}" alt="KOLEEX" style="display:block;width:${w}px;height:${h}px;max-width:none;border:0;outline:none;border-radius:6px">`);
+}
+/** A premium ornament (rendered from the shared ornaments into a PNG on our
+ *  domain — email apps cannot draw SVG). */
+function ornament(c: Ctx, name: string, w: number, h: number, radius = 0, link = true): string {
+  const img = `<img src="${c.base}${ASSETS}/koleex-sig-${name}.png" width="${w}" height="${h}" alt="KOLEEX" style="display:block;width:${w}px;height:${h}px;max-width:none;border:0;outline:none${radius ? `;border-radius:${radius}px` : ""}">`;
+  return link ? linked(c, img) : img;
 }
 /** The portrait: the Hub photo (square), cut as a circle, a rounded square
  *  or square. Empty in the studio: the initials on grey. */
@@ -420,6 +433,29 @@ function drawStyle(v: TemplateValues, c: Ctx): string {
       const black = style === "dots-black";
       return table(c, `<tr>${cell(c, dotsImg(c, black), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
     }
+
+    /* ── the premium set: the certificates' ornaments as pictures ── */
+    case "p-medallion":
+      /* the foil medallion, a hairline, the words and the logo */
+      return table(c, `<tr>${cell(c, ornament(c, "medallion", 72, 72), `padding-${E(c)}:${g(c, 18)}px`)}${hairline(c)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 18)}px`)}</tr>`, base);
+    case "p-knockout":
+      /* the dots field with the K cut out of it, the logo on its panel */
+      return table(c, `<tr>${cell(c, ornament(c, "knockout", 192, 120, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
+    case "p-underprint":
+      /* the K on the spirograph underprint */
+      return table(c, `<tr>${cell(c, ornament(c, "underprint", 120, 120), `padding-${E(c)}:${g(c, 16)}px`)}${cell(c, textBlock({ logoAfter: true }), `padding-${S(c)}:${g(c, 4)}px`)}</tr>`, base);
+    case "p-monolith":
+      /* a black column with the K and the logo */
+      return table(c, `<tr>${cell(c, ornament(c, "monolith", 120, 150, 6), `padding-${E(c)}:${g(c, 20)}px`)}${cell(c, textBlock())}</tr>`, base);
+    case "p-guilloche":
+      /* the logo, the name, a guilloche band, the contacts */
+      return table(c, [
+        logoRow(0, Math.max(0, g(c, 12) - pad)),
+        whoRows(v, c, { pad }),
+        `<tr><td style="padding-top:${g(c, 12)}px;padding-bottom:${g(c, 8)}px;padding-${S(c)}:${pad}px">${ornament(c, "guilloche", 360, 14, 0, false)}</td></tr>`,
+        contactRows(v, c, { pad, top: 0 }),
+        noteRow(v, c, pad),
+      ].join(""), base);
 
     case "band": {
       /* A black band — the white logo and the website — over the words, in
@@ -669,6 +705,7 @@ export const emailSignature: TemplateDef = {
     ...(isStyle(...PHOTO_STYLES)(v) ? ["sig.spec.photo"] : []),
     ...(isStyle(...DOTS_STYLES)(v) || v.ruleStyle === "dots" ? ["sig.spec.dots"] : []),
     ...(isStyle("black", "band")(v) ? ["sig.spec.black"] : []),
+    ...(String(v.style).startsWith("p-") ? ["sig.spec.premium"] : []),
     ...(v.bannerOn === true ? ["sig.spec.banner"] : []),
     "sig.spec.reply",
   ],
