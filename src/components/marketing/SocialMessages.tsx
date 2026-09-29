@@ -28,7 +28,7 @@ import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import { useTranslation } from "@/lib/i18n";
 import { MESSAGES_T } from "@/lib/marketing/messages-i18n";
 import { dmyHm } from "@/lib/marketing/format";
-import { SPACE_ROUTE, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
+import { SPACE_ROUTE, accountLabel, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import {
   MESSAGE_MAX, canReplyNow, conversationNeedsReply, replyWindowEnd,
   type ConversationView, type MessageAttachment, type MessageFilter, type MessageView,
@@ -175,7 +175,7 @@ export default function SocialMessages({ space }: { space: MarketingSpace }) {
               <Chip on={account === null} onClick={() => { setAccount(null); setOpenId(null); }}>{t("allAccounts")}</Chip>
               {accounts.map((a) => (
                 <Chip key={a.id} on={account === a.id} onClick={() => { setAccount(a.id); setOpenId(null); }}>
-                  <BrandGlyph name={a.platform} size={13} /><span className="truncate">{a.name}</span>
+                  <BrandGlyph name={a.platform} size={13} /><span className="truncate">{accountLabel(a)}</span>
                 </Chip>
               ))}
             </div>
@@ -326,7 +326,7 @@ function ConversationPane({ id, t, onBack, onChanged }: { id: string; t: Tr; onB
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]">{who(c, t)}</span>
           <span className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-muted)]">
-            <BrandGlyph name={c.account.platform} size={12} className="shrink-0" /><span dir="auto" className="truncate">{platform} · {c.account.name}</span>
+            <BrandGlyph name={c.account.platform} size={12} className="shrink-0" /><span dir="auto" className="truncate">{platform} · {accountLabel(c.account)}</span>
           </span>
         </span>
         <span className="shrink-0">
@@ -352,7 +352,7 @@ function ConversationPane({ id, t, onBack, onChanged }: { id: string; t: Tr; onB
               rows={3}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={t("replyAs").replace("{account}", c.account.name)}
+              placeholder={t("replyAs").replace("{account}", accountLabel(c.account))}
               className="w-full resize-y rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[13px] leading-5 text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:border-[var(--border-focus)] focus:outline-none"
             />
             {ideas && (

@@ -22,7 +22,7 @@ import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import { useTranslation } from "@/lib/i18n";
 import { COMMENTS_T } from "@/lib/marketing/comments-i18n";
 import { dmyHm } from "@/lib/marketing/format";
-import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
+import { accountLabel, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import type { CommentFilter, CommentThread as Thread } from "@/lib/marketing/comment-types";
 import type { PostDetail } from "@/lib/marketing/feed-types";
 
@@ -165,7 +165,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
                     }`}
                   >
                     {a && <BrandGlyph name={a.platform} size={13} />}
-                    <span className="truncate">{a ? a.name : t("allAccounts")}</span>
+                    <span className="truncate">{a ? accountLabel(a) : t("allAccounts")}</span>
                   </button>
                 );
               })}
@@ -189,7 +189,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
                 <div className="mt-3">
                   <CommentThread
                     thread={th}
-                    accountName={th.account.name}
+                    accountName={accountLabel(th.account)}
                     canReply={data.canReply}
                     canHide={data.canHide}
                     onChange={(next) => changed(th.id, next)}
@@ -220,7 +220,7 @@ function ThreadHeader({ thread, t }: { thread: Thread; t: (k: string) => string 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
           <BrandGlyph name={thread.account.platform} size={12} />
-          <span className="truncate">{thread.account.name}</span>
+          <span className="truncate">{accountLabel(thread.account)}</span>
           {p?.is_ad && <StatusPill tone="brand" className="shrink-0">{t("ad")}</StatusPill>}
           {p?.posted_at && <span className="shrink-0 font-normal text-[var(--text-dim)]">· <span dir="ltr" className="tabular-nums">{dmyHm(p.posted_at)}</span></span>}
         </span>

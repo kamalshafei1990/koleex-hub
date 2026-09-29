@@ -112,6 +112,12 @@ export interface MarketingAccountView {
   updated_at: string;
 }
 
+/** How an account reads on a screen: an Instagram account by its @handle —
+ *  its display name is often the Page's, and the two would read the same —
+ *  every other account by its name. */
+export const accountLabel = (a: Pick<MarketingAccountView, "platform" | "name" | "handle">): string =>
+  a.platform === "instagram" && a.handle ? `@${a.handle}` : a.name;
+
 /** Which of the server's settings are in place — booleans only. */
 export interface MarketingSetup {
   tokenKey: boolean;
