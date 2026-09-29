@@ -89,12 +89,13 @@ export const PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
 };
 export const PLATFORM_ORDER: readonly MarketingPlatform[] = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "wechat", "whatsapp", "douyin"];
 export const MANUAL_PLATFORMS = PLATFORM_ORDER.filter((p) => PLATFORM_FLOW[p] === "manual");
-/** CEO Brand's personal accounts (owner, 29/09/2026): a personal Facebook
- *  profile has no posting API since 2018, so it is shared by hand like
- *  WeChat and Douyin; Instagram signs in with Instagram Login (a Creator
- *  account, no Facebook Page); LinkedIn (the member's profile) comes next. */
+/** CEO Brand's own accounts (owner, 29/09/2026): Facebook = his Public
+ *  Figure PAGE, signed in like Koleex's (a personal profile has had no
+ *  posting API since 2018); Instagram signs in with Instagram Login (a
+ *  Creator account, no Facebook Page); WeChat and Douyin are shared by hand;
+ *  LinkedIn (the member's profile) comes next. */
 export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
-  facebook: "manual",
+  facebook: "meta",
   instagram: "instagram",
   linkedin: "soon",
   youtube: "soon",

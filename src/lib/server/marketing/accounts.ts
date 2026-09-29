@@ -165,21 +165,36 @@ export async function saveMetaAccounts(input: {
   }
   if (rows.length === 0) return [];
 
-  const { data: existing, error: readErr } = await inChunks<{ id: string; platform: string; external_id: string }>(
+  const { data: existing, error: readErr } = await inChunks<{ id: string; platform: string; external_id: string; space: string; scopes: string[] | null }>(
     rows.map((r) => r.external_id),
     (chunk) => supabaseServer
       .from("marketing_accounts")
-      .select("id, platform, external_id")
+      .select("id, platform, external_id, space, scopes")
       .eq("tenant_id", input.tenantId)
       .in("platform", ["facebook", "instagram"])
       .in("external_id", chunk),
   );
   if (readErr) throw new Error(`marketing accounts: ${readErr.message}`);
+  /* The Facebook sign-in returns EVERY Page the person reaches — the CEO's
+     own Public Figure page and Koleex's alike (owner, 29/09/2026). An account
+     is one row per tenant (marketing_accounts_external_uq), so:
+       · one already connected on ANOTHER space is left exactly as it is —
+         never moved between Social Marketing and CEO Brand;
+       · an Instagram account connected with Instagram Login keeps its own
+         sign-in — the Page's linked account never overwrites it. */
+  const before = new Map((existing ?? []).map((e) => [`${e.platform}|${e.external_id}`, e]));
+  const kept = rows.filter((r) => {
+    const e = before.get(`${r.platform}|${r.external_id}`);
+    if (!e) return true;
+    if (e.space !== input.space) return false;
+    return !(r.platform === "instagram" && isInstagramLogin(e.scopes ?? []));
+  });
+  if (kept.length === 0) return [];
   const idOf = new Map((existing ?? []).map((e) => [`${e.platform}|${e.external_id}`, e.id]));
 
-  const fresh = rows.filter((r) => !idOf.has(`${r.platform}|${r.external_id}`));
+  const fresh = kept.filter((r) => !idOf.has(`${r.platform}|${r.external_id}`));
   const ids: string[] = [];
-  for (const r of rows) {
+  for (const r of kept) {
     const id = idOf.get(`${r.platform}|${r.external_id}`);
     if (!id) continue;
     const { error } = await supabaseServer.from("marketing_accounts").update(r).eq("id", id);

@@ -1072,11 +1072,17 @@ const ceoPages = ["page.tsx", "accounts/page.tsx", "calendar/page.tsx", "comment
 check(`every CEO Brand page is behind AuthGate on the CEO's space (${ceoPages.length} pages), inside the Aurora scope`,
   ceoPages.every((f) => /<AuthGate>[\s\S]*space="ceo"[\s\S]*<\/AuthGate>/.test(code(`src/app/ceo-brand/${f}`))) &&
   /<AuroraShell>\{children\}<\/AuroraShell>/.test(code("src/app/ceo-brand/layout.tsx")));
+const saveMetaFn = acc.slice(acc.indexOf("export async function saveMetaAccounts("), acc.indexOf("\nexport ", acc.indexOf("export async function saveMetaAccounts(") + 1));
+check("a Facebook sign-in NEVER moves an account between spaces (Koleex's Page stays in Social Marketing) and never overwrites an Instagram Login account",
+  /if \(e\.space !== input\.space\) return false;/.test(saveMetaFn) &&
+  /return !\(r\.platform === "instagram" && isInstagramLogin\(e\.scopes \?\? \[\]\)\);/.test(saveMetaFn) &&
+  /\.select\("id, platform, external_id, space, scopes"\)/.test(saveMetaFn) &&
+  /const fresh = kept\.filter\(/.test(saveMetaFn) && /for \(const r of kept\) \{/.test(saveMetaFn) && !/for \(const r of rows\) \{\s*const id = idOf/.test(saveMetaFn));
 check("CEO Brand is live for super admins only until the CEO opens it to his assistant",
   /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true,\s*superAdminOnly: true \}/.test(code("src/lib/navigation.ts")));
 const sp = code("src/lib/marketing/spaces.ts");
-check("the CEO's accounts: a personal Facebook profile is shared by hand (no API since 2018), Instagram signs in with Instagram Login, LinkedIn waits; the Accounts tab asks per space",
-  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "manual",\s*instagram: "instagram",\s*linkedin: "soon",/.test(sp) &&
+check("the CEO's accounts: his Public Figure PAGE signs in like Koleex's (a personal profile has no API), Instagram with Instagram Login, LinkedIn waits; the Accounts tab asks per space",
+  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "meta",\s*instagram: "instagram",\s*linkedin: "soon",/.test(sp) &&
   /\(space === "ceo" \? CEO_PLATFORM_FLOW : PLATFORM_FLOW\)\[platform\]/.test(sp) &&
   /const flow = platformFlow\(space, p\);/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   !/PLATFORM_FLOW\[/.test(code("src/components/marketing/ConnectedAccounts.tsx")));

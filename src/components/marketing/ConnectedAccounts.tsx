@@ -110,9 +110,11 @@ const T: Translations = {
   "retry":            { en: "Try again", zh: "重试", ar: "إعادة المحاولة" },
   "dismiss":          { en: "Dismiss", zh: "关闭", ar: "إغلاق" },
   "result.ok":        { en: "Added {n} accounts. Their posts are coming into the Feed now.", zh: "已添加 {n} 个账号。其帖子正在进入动态。", ar: "تمت إضافة {n} حساب. منشوراتها في طريقها إلى الـFeed الآن." },
-  "result.cancelled": { en: "Signing in was cancelled in Facebook's window.", zh: "已在 Facebook 窗口中取消登录。", ar: "أُلغي تسجيل الدخول من نافذة Facebook." },
+  "result.okOne":     { en: "Added 1 account. Its posts are coming into the Feed now.", zh: "已添加 1 个账号。其帖子正在进入动态。", ar: "تمت إضافة حساب واحد. منشوراته في طريقها إلى الـFeed الآن." },
+  "result.none":      { en: "Nothing new to add: the pages you chose are already connected (Koleex's stay in Social Marketing).", zh: "没有新账号可添加：所选主页已连接（Koleex 的主页保留在社交媒体营销中）。", ar: "لا جديد لإضافته: الصفحات التي اخترتها مربوطة بالفعل (صفحات Koleex تبقى في التسويق عبر السوشيال ميديا)." },
+  "result.cancelled": { en: "Signing in was cancelled.", zh: "登录已取消。", ar: "أُلغي تسجيل الدخول." },
   "result.expired":   { en: "Signing in took too long or the page was reloaded. Try again.", zh: "登录超时或页面已刷新，请重试。", ar: "استغرق تسجيل الدخول وقتًا طويلًا أو أُعيد تحميل الصفحة. حاول مرة أخرى." },
-  "result.failed":    { en: "Facebook did not finish adding the accounts. Try again; if it happens again, check the Meta app settings.", zh: "Facebook 未能完成账号添加。请重试；如仍失败，请检查 Meta 应用设置。", ar: "لم يُكمل Facebook إضافة الحسابات. حاول مرة أخرى، وإذا تكرر راجع إعدادات تطبيق Meta." },
+  "result.failed":    { en: "The sign-in did not finish adding the accounts. Try again; if it happens again, check the Meta app settings.", zh: "登录未能完成账号添加。请重试；如仍失败，请检查 Meta 应用设置。", ar: "لم يُكمل تسجيل الدخول إضافة الحسابات. حاول مرة أخرى، وإذا تكرر راجع إعدادات تطبيق Meta." },
   "result.setup":     { en: "The Meta app keys or the encryption key are not in Vercel yet.", zh: "Vercel 中尚未设置 Meta 应用密钥或加密密钥。", ar: "لم تُضف مفاتيح تطبيق Meta أو مفتاح التشفير في Vercel بعد." },
   "result.denied":    { en: "You don't have permission to add accounts here.", zh: "您没有在此添加账号的权限。", ar: "ليس لديك صلاحية إضافة حسابات هنا." },
 };
@@ -258,7 +260,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
               : "border-[#F59E0B]/35 bg-[#F59E0B]/10 text-[var(--text-primary)]"
           }`}
         >
-          <span>{t(`result.${result.code}`).replace("{n}", String(result.n))}</span>
+          <span>{t(result.code === "ok" ? (result.n === 1 ? "result.okOne" : result.n === 0 ? "result.none" : "result.ok") : `result.${result.code}`).replace("{n}", String(result.n))}</span>
           <button type="button" onClick={() => setResult(null)} className="shrink-0 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             {t("dismiss")}
           </button>
