@@ -38,7 +38,7 @@ const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const GROUPS = ["look", "type", "job", "person", "event", "company", "brand", "contacts", "photo", "details", "banner", "back", "qr"];
+const GROUPS = ["look", "type", "job", "words", "person", "event", "company", "brand", "contacts", "photo", "details", "issue", "banner", "back", "qr"];
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -91,7 +91,8 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
           next = { ...next, lang2: val };
           if (person) next = { ...next, name2: nameIn(person, lang2), title2: titleOf(person, lang2) };
           else if (typeof next.title2Key === "string" && next.title2Key) next = { ...next, title2: titleIn(next.title2Key, lang2) ?? next.title2 };
-        } else next[k] = val;
+        } else if (def.rekey?.[k]) next = def.rekey[k](next, val);
+        else next[k] = val;
       }
       return next;
     });

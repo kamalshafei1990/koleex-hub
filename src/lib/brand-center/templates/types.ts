@@ -28,7 +28,8 @@ type Common = {
 };
 
 export type FieldDef = Common & (
-  | { kind: "text"; max: number; placeholder?: string; hintKey?: string }
+  /** `lines` > 1: a box for a sentence or two. */
+  | { kind: "text"; max: number; placeholder?: string; hintKey?: string; lines?: number }
   | { kind: "choice"; options: Array<{ value: string; labelKey: string }> }
   | { kind: "switch" }
   | { kind: "range"; min: number; max: number; step: number; unit?: "%" | "x" }
@@ -40,7 +41,7 @@ export type FieldDef = Common & (
   /** The contact lines: label + value each, add / remove / reorder / hide.
    *  `labels`: the default label of each kind by language (the card's own
    *  when absent). */
-  | { kind: "rows"; langKey: string; labels?: Record<string, Record<string, string>> }
+  | { kind: "rows"; langKey: string; labels?: Record<string, Record<string, string>>; kinds?: string[] }
   /** QR codes: each on the front or the back, generated or a picture. */
   | { kind: "qrs"; langKey: string }
 );
@@ -110,6 +111,9 @@ export interface TemplateDef {
   relang?: (v: TemplateValues, lang: string) => TemplateValues;
   /** The fill after picking another style (its own defaults, e.g. typeface). */
   restyle?: (v: TemplateValues, style: string) => TemplateValues;
+  /** The fill after a slot changes that brings its own defaults (e.g. the
+   *  certificate's kind brings its wording), by slot key. */
+  rekey?: Record<string, (v: TemplateValues, value: TemplateValue) => TemplateValues>;
   /** The pages this fill shows and prints (e.g. no back side), by id. */
   pagesFor?: (v: TemplateValues) => string[];
   /** The slots a chosen employee fills (name, title, photo …). */

@@ -80,8 +80,13 @@ export function Field({ t, f, values, setMany, personPhoto }: { t: T; f: FieldDe
       return (
         <label htmlFor={id} className="block">
           <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
-          <input id={id} dir="auto" value={typeof value === "string" ? value : ""} maxLength={f.max} placeholder={f.placeholder}
-            onChange={(e) => set(e.target.value)} className={`${FIELD} mt-1`} />
+          {f.kind === "text" && (f.lines ?? 1) > 1 ? (
+            <textarea id={id} dir="auto" rows={f.lines} value={typeof value === "string" ? value : ""} maxLength={f.max} placeholder={f.placeholder}
+              onChange={(e) => set(e.target.value)} className={`${FIELD} mt-1 resize-y leading-5`} />
+          ) : (
+            <input id={id} dir="auto" value={typeof value === "string" ? value : ""} maxLength={f.max} placeholder={f.placeholder}
+              onChange={(e) => set(e.target.value)} className={`${FIELD} mt-1`} />
+          )}
           {f.hintKey ? <span className="mt-1 block text-[11px] leading-4 text-[var(--text-dim)]">{t(f.hintKey)}</span> : null}
         </label>
       );
@@ -179,7 +184,8 @@ function TitleField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { ki
 function RowsField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { kind: "rows" }>; values: TemplateValues; setMany: SetMany }) {
   const lang = asLang(values[f.langKey]);
   const rows = rowsOf(values, f.key);
-  const [adding, setAdding] = useState<RowKind>("tel");
+  const kinds = (f.kinds ?? ROW_KINDS) as readonly RowKind[];
+  const [adding, setAdding] = useState<RowKind>(kinds.includes("tel") ? "tel" : kinds[0]);
   const save = (next: typeof rows) => setMany({ [f.key]: next.map((r) => ({ ...r })) as TemplateItem[] });
   const patch = (i: number, p: Partial<(typeof rows)[number]>) => save(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const move = (i: number, d: -1 | 1) => { const next = [...rows]; const [x] = next.splice(i, 1); next.splice(i + d, 0, x); save(next); };
@@ -201,9 +207,11 @@ function RowsField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { kin
         ))}
       </ul>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <select aria-label={t("studio.rowKind")} value={adding} onChange={(e) => setAdding(e.target.value as RowKind)} className={`${FIELD} !w-auto !py-1 !text-[12px]`}>
-          {ROW_KINDS.map((k) => <option key={k} value={k}>{t(`row.${k}`)}</option>)}
-        </select>
+        {kinds.length > 1 ? (
+          <select aria-label={t("studio.rowKind")} value={adding} onChange={(e) => setAdding(e.target.value as RowKind)} className={`${FIELD} !w-auto !py-1 !text-[12px]`}>
+            {kinds.map((k) => <option key={k} value={k}>{t(`row.${k}`)}</option>)}
+          </select>
+        ) : null}
         <button type="button" className={SMALL} onClick={() => save([...rows, { id: newId("r"), kind: adding, label: (f.labels ?? ROW_LABELS)[lang]?.[adding] ?? "", value: "", on: true }])}>
           {t("studio.rowAdd")}
         </button>

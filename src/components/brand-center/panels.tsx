@@ -16,7 +16,7 @@ const TEMPLATES: Array<{ key: string; icon: RrIconName; status: "live" | "buildi
   { key: "staffCard", icon: "id-badge", status: "live", href: "/brand-center/templates/id-badge" },
   { key: "signature", icon: "signature", status: "live", href: "/brand-center/templates/email-signature" },
   { key: "badge", icon: "ticket", status: "live", href: "/brand-center/templates/event-badge" },
-  { key: "certificate", icon: "award", status: "planned" },
+  { key: "certificate", icon: "award", status: "live", href: "/brand-center/templates/certificate" },
   { key: "productPost", icon: "megaphone", status: "planned" },
   { key: "occasionPost", icon: "calendar", status: "planned" },
 ];
