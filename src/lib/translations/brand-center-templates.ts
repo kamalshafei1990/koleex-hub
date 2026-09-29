@@ -544,4 +544,20 @@ export const brandCenterTemplatesT: Translations = {
   "spec.pUnderprint": { en: "The underprint in the lightest grey (K 12) — fine lines, 0.1 mm.", zh: "底纹用最浅的灰色（K 12）印刷 — 细线 0.1 毫米。", ar: "الطباعة الخلفية أفتح رمادي (K 12) — خطوط رفيعة 0.1 مم." },
   "spec.pMedallion": { en: "The medallion in silver foil (Pantone 877 C); the K in its centre is the black board.", zh: "徽章用银色烫印（Pantone 877 C）；中心的 K 为黑卡本色。", ar: "الميدالية سلفر فويل (Pantone 877 C)؛ وحرف K في نصها هو لون الكرتون الأسود." },
   "spec.pFoilLine":  { en: "The line and the name in silver foil (Pantone 877 C).", zh: "线条和姓名用银色烫印（Pantone 877 C）。", ar: "الخط والاسم سلفر فويل (Pantone 877 C)." },
+
+  /* ── staff ID badge: the premium set (owner 30/09) ── */
+  "tpl.idStyle.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
+  "tpl.idStyle.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
+  "tpl.idStyle.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "tpl.idStyle.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
+  "tpl.idStyle.p-underprint": { en: "Premium — round portrait", zh: "高级 — 圆形肖像", ar: "بريميوم — صورة دايرية" },
+  "tpl.idStyle.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
+
+  /* ── event badge: the premium set (owner 30/09) ── */
+  "evb.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
+  "evb.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "evb.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色区块", ar: "بريميوم — كتلة سودا" },
+  "evb.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "evb.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
+  "evb.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
 };

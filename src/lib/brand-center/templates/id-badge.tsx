@@ -20,8 +20,10 @@ import { PT, type DrawContext, type QrRequest, type TemplateDef, type TemplateIt
 import { CARD_ADDRESS, LANGS, asLang, fontOf, isPictureQr, list, num, qrsOf, str, type Lang } from "./card/model";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, lockupHeight, lockupLines, logoHeight, textWidth, wrapBalanced, type Zone } from "./card/parts";
 import { nameIn, titleOf } from "./person";
+import { ID_PREMIUM, drawIdPremium, idPremiumDark, isIdPremium } from "./id-badge-premium";
 
-export const ID_STYLES = ["standard", "black", "photo-full", "dots", "landscape", "minimal"] as const;
+/** The first six, then the premium set (owner 30/09/2026) beside them. */
+export const ID_STYLES = ["standard", "black", "photo-full", "dots", "landscape", "minimal", ...ID_PREMIUM] as const;
 type IdStyle = (typeof ID_STYLES)[number];
 const styleOf = (v: TemplateValues): IdStyle => ((ID_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as IdStyle) : "standard");
 const landscape = (v: TemplateValues) => styleOf(v) === "landscape";
@@ -234,6 +236,7 @@ function minimalFront(v: TemplateValues, r: R): ReactNode {
 }
 
 function front(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isIdPremium(v)) return drawIdPremium(v, ctx);
   const r = read(v, ctx);
   switch (styleOf(v)) {
     case "black": return portraitFront(v, r, "black");
@@ -253,7 +256,7 @@ function front(v: TemplateValues, ctx: DrawContext): ReactNode {
 function back(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
   const { b, w, h, W, H } = r;
-  const dark = styleOf(v) === "black";
+  const dark = styleOf(v) === "black" || idPremiumDark(v);
   const ink = dark ? WHITE : INK, sub = dark ? GREY_ON_INK : GREY_ON_WHITE;
   const wide = landscape(v);
   const cx = b + w / 2;

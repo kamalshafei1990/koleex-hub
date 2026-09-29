@@ -19,8 +19,10 @@ import type { DrawContext, QrRequest, TemplateDef, TemplateItem, TemplateValues 
 import { asLang, fontOf, isPictureQr, list, num, qrsOf, str, type QrItem } from "./card/model";
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, HAIRLINE_ON_WHITE, INK, LIGHT_ON_INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, logoHeight, textWidth, wrapBalanced, type Zone } from "./card/parts";
 import { nameIn, titleOf } from "./person";
+import { EVB_PREMIUM, drawEvbPremium, evbPremiumDark, isEvbPremium } from "./event-badge-premium";
 
-export const EVB_STYLES = ["book", "black", "photo", "big-name", "event", "dots", "split", "minimal", "silver", "landscape"] as const;
+/** The first ten, then the premium set (owner 30/09/2026) beside them. */
+export const EVB_STYLES = ["book", "black", "photo", "big-name", "event", "dots", "split", "minimal", "silver", "landscape", ...EVB_PREMIUM] as const;
 type Style = (typeof EVB_STYLES)[number];
 const styleOf = (v: TemplateValues): Style => ((EVB_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as Style) : "book");
 const SIZES: Record<string, { w: number; h: number }> = { "86x120": { w: 86, h: 120 }, "100x140": { w: 100, h: 140 }, "105x148": { w: 105, h: 148 } };
@@ -159,6 +161,7 @@ function Portrait({ v, r, box, round }: { v: TemplateValues; r: R; box: { x: num
 /* ── the ten fronts ────────────────────────────────────────────────────── */
 
 function front(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isEvbPremium(v)) return drawEvbPremium(v, ctx);
   const r = read(v, ctx);
   const { b, w, h, W, H, u } = r;
   const cx = b + w / 2;
@@ -436,7 +439,7 @@ function back(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
   const { b, w, h, W, H, u } = r;
   const cx = b + w / 2;
-  const dark = styleOf(v) === "black" || styleOf(v) === "silver";
+  const dark = styleOf(v) === "black" || styleOf(v) === "silver" || evbPremiumDark(v);
   const ink = dark ? WHITE : INK, sub = dark ? GREY_ON_INK : GREY_ON_WHITE;
   const lw = 0.44 * Math.min(w, h * 0.8);
   let y = b + 14 * u + logoHeight(lw);
