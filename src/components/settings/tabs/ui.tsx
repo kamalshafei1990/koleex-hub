@@ -9,6 +9,8 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import KdsSelect from "@/components/kds/Select";
 import { useSkin } from "@/lib/appearance";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /** The ONE disclosure chevron for the Settings app — the master list, the
  *  admin link rows and the push link all draw this, so they can never drift
@@ -389,9 +391,51 @@ export function SelectControl<T extends string | number>({ value, onChange, opti
         if (match) onChange(match.value);
       }}
       options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+      /* On a phone ControlRow stacks and the wrapper spans the row, so the
+         trigger spans it too — sized to its label, the chevron (pinned to
+         the wrapper's end) floated off on its own. */
       wrapperClassName="shrink-0"
       panelWidthClassName="min-w-[11rem]"
-      triggerClassName="h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] ps-2.5 pe-7 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] text-start"
+      triggerClassName="max-sm:w-full h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] ps-2.5 pe-7 text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] text-start"
     />
+  );
+}
+
+/** The Save bar of a draft-and-save tab (Profile, Koleex AI).
+ *
+ *  Drawn only while there is something to save or to say. It used to be
+ *  drawn always, as a full-width strip with a gradient scrim: the pane's
+ *  scroller carries the dock's 8rem clearance (.kx-dock-pad), so a sticky
+ *  bottom-0 strip rested 128px up the screen, and a disabled Save sat over
+ *  the settings, fading the row beneath it, with nothing to save.
+ *
+ *  Now a compact card at the end of the pane, clear of the dock and the
+ *  report button, covering one row at most while it is up. */
+export function SaveBar({ dirty, saving, error, toast, onSave, labels }: {
+  dirty: boolean; saving: boolean; error: string | null; toast: string | null;
+  onSave: () => void;
+  labels: { save: string; saving: string; unsaved: string };
+}) {
+  if (!dirty && !saving && !error && !toast) return null;
+  const status = error
+    ? <span role="alert" className="text-[12px] text-[#FF6B6B] min-w-0">{error}</span>
+    : toast && !dirty
+      ? <span role="status" className="text-[12px] text-[var(--text-secondary)] flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>
+      : <span className="text-[12px] text-[var(--text-dim)]">{labels.unsaved}</span>;
+  return (
+    <div className="sticky bottom-3 z-20 flex justify-end pointer-events-none">
+      <div className="kx-save-card pointer-events-auto flex max-w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] ps-4 pe-1.5 py-1.5 shadow-lg">
+        {status}
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!dirty || saving}
+          className="h-9 shrink-0 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+        >
+          {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
+          {saving ? labels.saving : labels.save}
+        </button>
+      </div>
+    </div>
   );
 }

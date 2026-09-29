@@ -26,7 +26,6 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
@@ -40,7 +39,7 @@ import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
-import { SettingsCard, BodyPortal } from "@/components/settings/tabs/ui";
+import { SettingsCard, SaveBar, BodyPortal } from "@/components/settings/tabs/ui";
 import { useConfirm } from "@/components/kds/useConfirm";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -373,34 +372,10 @@ export default function ProfileTab({
         </div>
       </SettingsCard>
 
-      {/* Status + save. Core: gradient scrim from the solid page colour.
-          Aurora: --bg-primary is transparent under the kx-app remap, so the
-          gradient vanishes — the pane pattern supplies the scrim instead
-          (filterless host + real .kx-glass-bar child; globals lift the
-          content above it). */}
-      {/* No negative margin. `-mx-1 px-1` made this bar 4px wider than the
-          pane it lives in, which gave the pane 4px of horizontal scroll —
-          harmless with a mouse, but on an iPad it let the whole detail
-          column slide left and right under a finger. */}
-      <div className="kx-bar-host sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
-        <div aria-hidden className="kx-glass-bar" />
-        {/* pe-14 reserves the floating AI/Discuss dock's gutter (end-6 + a
-            32px handle): the bar is pinned to the viewport bottom, so at
-            justify-end the Save button sat exactly under the dock. */}
-        <div className="flex items-center justify-end gap-3 pe-14">
-          {error && <span className="text-[12px] text-red-400 flex-1">{error}</span>}
-          {toast && !error && <span className="text-[12px] text-emerald-400 flex-1 flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>}
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || saving}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
-          >
-            {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
-            {saving ? t("prof.saving") : t("prof.save")}
-          </button>
-        </div>
-      </div>
+      <SaveBar
+        dirty={dirty} saving={saving} error={error} toast={toast} onSave={save}
+        labels={{ save: t("prof.save"), saving: t("prof.saving"), unsaved: t("unsaved") }}
+      />
     </div>
   );
 }

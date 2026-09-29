@@ -31,7 +31,7 @@ import {
   type AiStyle,
   normalizeAiPersonalization,
 } from "@/lib/ai-personalization";
-import { ControlRow, Segmented, SelectControl, SettingsGroup, SwitchRow, SaveError, BodyPortal } from "@/components/settings/tabs/ui";
+import { ControlRow, Segmented, SelectControl, SettingsGroup, SwitchRow, SaveError, SaveBar, BodyPortal } from "@/components/settings/tabs/ui";
 import { useConfirm } from "@/components/kds/useConfirm";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -278,23 +278,10 @@ export default function AiTab({ account, onChanged }: {
       {account.is_super_admin && <ModelSwitchesSection t={t} lang={lang} />}
       {account.is_super_admin && <UsageSection t={t} />}
 
-      {/* Same bar as Profile: sticky, and clear of the floating dock's gutter. */}
-      <div className="kx-bar-host sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
-        <div aria-hidden className="kx-glass-bar" />
-        <div className="flex items-center justify-end gap-3 pe-14">
-          {error && <span className="text-[12px] text-[#FF3333] flex-1">{error}</span>}
-          {toast && !error && <span className="text-[12px] text-emerald-400 flex-1 flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>}
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || saving}
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
-          >
-            {saving ? <SpinnerIcon className="h-4 w-4" /> : <CheckIcon size={14} />}
-            {saving ? t("ai.saving") : t("ai.save")}
-          </button>
-        </div>
-      </div>
+      <SaveBar
+        dirty={dirty} saving={saving} error={error} toast={toast} onSave={save}
+        labels={{ save: t("ai.save"), saving: t("ai.saving"), unsaved: t("unsaved") }}
+      />
     </div>
   );
 }

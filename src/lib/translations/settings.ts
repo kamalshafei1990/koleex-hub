@@ -9,6 +9,7 @@ export const settingsT: Translations = {
   "title":                { en: "Settings", zh: "设置", ar: "الإعدادات" },
   "subtitle":             { en: "Your profile, preferences, and calendar defaults", zh: "您的资料、偏好和日历默认设置", ar: "ملفك الشخصي وتفضيلاتك وإعدادات التقويم" },
   "allSettings":          { en: "All settings", zh: "全部设置", ar: "كل الإعدادات" },
+  "unsaved":              { en: "Unsaved changes", zh: "有未保存的更改", ar: "فيه تغييرات لسه ماتحفظتش" },
   "saveFailed":           { en: "That change didn't save — it has been put back. Check your connection and try again.", zh: "该更改未能保存，已恢复原值。请检查网络后重试。", ar: "لم يُحفظ هذا التغيير وأُعيد كما كان. تحقّق من الاتصال وحاول مرة أخرى." },
   "hist.browser":         { en: "Browser", zh: "浏览器", ar: "المتصفح" },
   "confirm.cancel":       { en: "Cancel", zh: "取消", ar: "إلغاء" },
