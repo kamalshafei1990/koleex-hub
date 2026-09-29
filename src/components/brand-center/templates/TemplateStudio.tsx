@@ -44,9 +44,11 @@ type People = { state: "loading" } | { state: "error" } | { state: "ready"; scop
 
 const GROUPS = ["look", "type", "job", "words", "person", "event", "company", "brand", "contacts", "photo", "picture", "details", "issue", "banner", "back", "qr"];
 
-export default function TemplateStudio({ templateId }: { templateId: string }) {
+export default function TemplateStudio({ templateId, def: given }: { templateId: string;
+  /** A template read at run time (a designer's SVG, C18) instead of one of the registry's. */
+  def?: TemplateDef }) {
   const { t } = useTranslation(WORDS);
-  const def = templateById(templateId);
+  const def = given ?? templateById(templateId);
   const [values, setValues] = useState<TemplateValues>(() => ({ ...(def?.defaults ?? {}) }));
   const [person, setPerson] = useState<BcPerson | null>(null);
   const [people, setPeople] = useState<People>({ state: "loading" });
@@ -176,13 +178,13 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 
   const who = typeof values.name === "string" ? values.name.trim() : "";
   const slug = def.digital ? `${heading} · ${size.w} × ${size.h} px` : `${heading} · ${size.w} × ${size.h} mm + ${def.bleed} mm bleed${who ? ` · ${who}` : ""}`;
-  const fileBase = [def.id, typeof values.style === "string" ? values.style : "", (who || (def.digital ? fillName : "")).normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 48)]
+  const fileBase = [def.fileKey ?? def.id, typeof values.style === "string" ? values.style : "", (who || (def.digital ? fillName : "")).normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 48)]
     .filter(Boolean).join("-");
   const print = () => {
     /* What must be filled is the template's own rule (a proof sheet has no name). */
     const missing = def.check ? def.check(values) : null;
     if (missing) { setBlocked(missing); return; }
-    printTemplate({ templateId: def.id, values, fileName: fileBase, slug });
+    printTemplate({ templateId: def.id, values, fileName: fileBase, slug, ...(given ? { def: given } : {}) });
   };
   /* A post: the page as a picture of exactly its size (every page, one file each). */
   const download = async (type: "image/png" | "image/jpeg") => {

@@ -74,4 +74,7 @@ export const brandCenterLibraryT: Translations = {
   "kind.vendor_brief": { en: "Supplier brief", zh: "供应商说明", ar: "ورقة المورد" },
   "kind.template":     { en: "Fill-in template", zh: "可填写模板", ar: "قالب يتعبّى" },
   "kind.other":        { en: "Other", zh: "其他", ar: "تاني" },
+  /* ── designer templates (plan step C18) ── */
+  "svgt.fill":  { en: "Fill in", zh: "填写", ar: "املا التمبليت" },
+  "svgt.rules": { en: "Fill-in template: upload the artwork as SVG — the front, and a file named “back” for the back. Every named text layer becomes a field (name, title, email, mobile, staff and department fill from the employee); a shape named “photo” holds the photo. Artboard = the finished size, or 3 mm larger on each side with the bleed. Pictures embedded, fonts Inter or Helvetica Neue.", zh: "可填写模板：以 SVG 上传设计稿 — 正面，以及文件名含“back”的背面。每个已命名的文字图层都会成为一个字段（name、title、email、mobile、staff、department 会从所选员工自动填写）；名为“photo”的形状用于放置照片。画板 = 成品尺寸，或每边各加 3 毫米出血。图片需嵌入，字体用 Inter 或 Helvetica Neue。", ar: "تمبليت للملء: ارفع التصميم SVG — الوش، وملف اسمه فيه “back” للضهر. كل طبقة نص ليها اسم بتبقى خانة (name وtitle وemail وmobile وstaff وdepartment بيتملوا من بيانات الموظف)؛ والشكل اللي اسمه “photo” مكان الصورة. مساحة الرسم = المقاس النهائي، أو أكبر 3 مم من كل ناحية بالـbleed. الصور متضمنة جوه الملف، والخطوط Inter أو Helvetica Neue." },
 };

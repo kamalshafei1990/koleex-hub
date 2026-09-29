@@ -6,6 +6,7 @@
    or remove the design's files (DesignFiles). */
 
 import { useState } from "react";
+import Link from "next/link";
 import { bc, type BcDesign, type BcType } from "@/lib/brand-center/client";
 import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
 import { FIELD, StatusChip } from "./ui";
@@ -55,7 +56,12 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
                   {d.status !== "retired" && <Small busy={busy === `ret-${d.id}`} onClick={() => void run(`ret-${d.id}`, () => bc.retireDesign(d.id))}>{t("des.retire")}</Small>}
                 </span>
               )}
+              {/* a designer's template with its SVG: open it to fill in (C18) */}
+              {d.kind === "template" && (d.status === "active" || canEdit) && (d.files ?? []).some((f) => f.purpose === "svg") ? (
+                <Link href={`/brand-center/templates/svg-${d.id}`} className="rounded-lg bg-[var(--bg-inverted)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--text-inverted)]">{t("svgt.fill")}</Link>
+              ) : null}
               <DesignFiles t={t} designId={d.id} files={d.files ?? []} canEdit={canEdit} onChanged={onChanged} />
+              {canEdit && d.kind === "template" ? <p className="w-full text-[11.5px] leading-5 text-[var(--text-dim)]">{t("svgt.rules")}</p> : null}
             </li>
           ))}
         </ul>

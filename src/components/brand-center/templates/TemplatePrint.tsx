@@ -21,7 +21,7 @@ import { readPrintJob } from "./print";
 export default function TemplatePrint() {
   const { t } = useTranslation(brandCenterTemplatesT);
   const [job] = useState(readPrintJob);
-  const def = job ? templateById(job.templateId) : null;
+  const def = job ? (job.def ?? templateById(job.templateId)) : null;
   const qrs = useMemo(() => (def && job ? qrCodes(def.qrRequests?.(job.values)) : {}), [def, job]);
 
   useEffect(() => {

@@ -124,6 +124,9 @@ export interface TemplateDef {
   qrRequests?: (v: TemplateValues) => QrRequest[];
   /** Words keys of the print notes shown under the preview, for this fill. */
   specKeys?: (v: TemplateValues) => string[];
+  /** How this template's files start when its id says nothing (a
+   *  designer's template: its name); the id otherwise. */
+  fileKey?: string;
   /** A short name of this fill for the file name and the slug. */
   fillName?: (v: TemplateValues, t: (k: string) => string) => string;
   /** The fill after switching its language (labels, the address's default). */

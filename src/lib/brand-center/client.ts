@@ -68,6 +68,8 @@ export interface BcProduct extends BcProductHit {
 /** A template style's standing: approved = everyone's choice; draft = only
  *  those who manage Brand Center; retired = hidden, never deleted. */
 export type StyleStatus = "approved" | "draft" | "retired";
+/** One side of a designer's template: the SVG as uploaded (cleaned in the browser). */
+export interface BcSvgPage { fileId: string; fileName: string; svg: string; widthMm: number | null; heightMm: number | null }
 
 /** A saved fill of a template ("my templates"); pictures are never kept. */
 export interface BcSaved { id: string; account_id: string; template_id: string; name: string; fill: Record<string, unknown>; shared: boolean; mine: boolean; updated_at: string }
@@ -80,6 +82,8 @@ export const bc = {
   people: () => call<{ scope: "all" | "self"; people: BcPerson[] }>("/api/brand-center/people"),
   /** Which styles are approved, drafts or retired (no entry = approved). */
   styles: (template: string) => call<{ canManage: boolean; statuses: Record<string, StyleStatus> }>(`/api/brand-center/styles?template=${encodeURIComponent(template)}`),
+  /** A designer's template (C18): its SVG files, front then back. */
+  designTemplate: (designId: string) => call<{ design: { id: string; name: string }; pages: BcSvgPage[] }>(`/api/brand-center/designs/${designId}/template`),
   setStyle: (b: { templateId: string; style: string; status: StyleStatus }) => send<{ ok: true }>("/api/brand-center/styles", "PUT", b),
   products: (q: string) => call<{ products: BcProductHit[] }>(`/api/brand-center/products?q=${encodeURIComponent(q)}`),
   product: (id: string) => call<{ product: BcProduct }>(`/api/brand-center/products?id=${encodeURIComponent(id)}`),

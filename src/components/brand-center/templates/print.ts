@@ -5,9 +5,11 @@
    The fill travels by the parent window (same origin), never by the URL:
    a card carries a person's mobile and email. */
 
-import type { TemplateValues } from "@/lib/brand-center/templates/types";
+import type { TemplateDef, TemplateValues } from "@/lib/brand-center/templates/types";
 
-export interface PrintJob { templateId: string; values: TemplateValues; fileName: string; slug: string }
+/** `def` travels with the job when the template is not in the registry (a
+ *  designer's SVG, C18): the print page reads it from this same window. */
+export interface PrintJob { templateId: string; values: TemplateValues; fileName: string; slug: string; def?: TemplateDef }
 type Holder = Window & { __kxBrandPrint?: PrintJob; __quotation_pdf_ready__?: boolean };
 
 export function printTemplate(job: PrintJob) {
