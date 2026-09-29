@@ -103,6 +103,10 @@ export interface TemplateDef {
   /** The safe area of this fill when it is not `safe` on every side (a
    *  story keeps its top and bottom clear for the app's buttons). */
   safeFor?: (v: TemplateValues) => { top: number; right: number; bottom: number; left: number };
+  /** One fill in every size (plan step C16): the slot that holds the size
+   *  and its values — the studio shows them side by side and saves them
+   *  all at once. */
+  everySize?: { key: string; values: readonly string[] };
   /** The studio offers "Fill from Products" (active products only). */
   usesProducts?: boolean;
   /** The slots a chosen product fills (name, model, photo, highlights …). */

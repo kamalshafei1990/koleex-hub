@@ -22,7 +22,7 @@ import { asLang, num, str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Bands, Edge, Foot, FullPhoto, Label, POST_LOOK, POST_PX, Photo, TopLogo, Txt, caps, choice, hasFoot, headline, headlineAbove,
-  oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box, type PostR,
+  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box, type PostR,
 } from "./post-kit";
 
 export const EVENT_STYLES = ["bento", "book", "countdown", "photo", "pattern", "light"] as const;
@@ -372,6 +372,7 @@ export const eventPost: TemplateDef = {
   bleed: 0,
   safe: 72,
   safeFor: postSafe,
+  everySize: POST_EVERY_SIZE,
   marks: false,
   fields: [
     choice("style", "tpl.f.style", "look", EVENT_STYLES, "evp.style"),

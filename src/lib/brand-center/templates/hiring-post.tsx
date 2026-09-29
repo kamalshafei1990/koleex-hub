@@ -17,7 +17,7 @@ import { str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Bands, Edge, FullPhoto, Label, POST_LOOK, POST_PX, TopLogo, Txt, caps, choice, headline, headlineAbove,
-  oneOf, photoFields, postSafe, postSizeOf, readPost, startAlign, sx,
+  POST_EVERY_SIZE, oneOf, photoFields, postSafe, postSizeOf, readPost, startAlign, sx,
 } from "./post-kit";
 
 export const HIRE_STYLES = ["book", "light", "pattern", "photo", "big"] as const;
@@ -209,6 +209,7 @@ export const hiringPost: TemplateDef = {
   bleed: 0,
   safe: 72,
   safeFor: postSafe,
+  everySize: POST_EVERY_SIZE,
   marks: false,
   fields: [
     choice("style", "tpl.f.style", "look", HIRE_STYLES, "hire.style"),

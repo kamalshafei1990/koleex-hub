@@ -20,6 +20,8 @@ export const POST_PX: Record<PostSize, { w: number; h: number }> = {
 };
 export const oneOf = <T extends string>(all: readonly T[], x: unknown, d: T): T => ((all as readonly string[]).includes(String(x)) ? (x as T) : d);
 export const postSizeOf = (v: TemplateValues): PostSize => oneOf(POST_SIZES, v.size, "feed");
+/** One fill → every size (plan step C16). */
+export const POST_EVERY_SIZE = { key: "size", values: POST_SIZES };
 /** A story keeps its top 250 px and bottom 340 px clear for the app's buttons (ch. 82). */
 export const postSafe = (v: TemplateValues) => (postSizeOf(v) === "story" ? { top: 250, right: 72, bottom: 340, left: 72 } : { top: 72, right: 72, bottom: 72, left: 72 });
 

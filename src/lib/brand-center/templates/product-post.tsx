@@ -26,7 +26,7 @@ import { asLang, str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Edge, Floor, Foot, HUB_BLUE, Label, POST_LOOK, POST_PX, Photo, STAGE, TopLogo, Txt, caps, choice, endAlign, hasFoot, headline,
-  oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box,
+  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box,
 } from "./post-kit";
 
 export const POST_STYLES = ["book-dark", "book-light", "stage", "split", "pattern", "pattern-dark", "figures", "feature", "editorial", "launch", "factory"] as const;
@@ -479,6 +479,7 @@ export const productPost: TemplateDef = {
   bleed: 0,
   safe: 72,
   safeFor: postSafe,
+  everySize: POST_EVERY_SIZE,
   marks: false,
   fields: [
     choice("style", "tpl.f.style", "look", POST_STYLES, "post.style"),

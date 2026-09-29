@@ -34,6 +34,7 @@ import { printTemplate } from "./print";
 import SavedTemplates from "./SavedTemplates";
 import HtmlPreview from "./HtmlPreview";
 import { rasterize, saveBlob } from "./raster";
+import { zipStore } from "@/lib/zip-store";
 import { preparePhoto } from "./image-input";
 
 const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
@@ -53,6 +54,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   const [product, setProduct] = useState<BcProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const everyRef = useRef<HTMLDivElement>(null);
 
   const wantsPeople = def?.usesPeople !== false;
   const wantsProducts = def?.usesProducts === true;
@@ -184,6 +186,28 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
     if (failed) { console.error("[brand-center] the post could not be made into a picture"); setBlocked("studio.pictureError"); }
   };
 
+  /* One fill, every size (C16): each size drawn from this same fill, saved
+     at its exact pixels into one ZIP. */
+  const every = def.digital && def.everySize ? def.everySize : null;
+  const everyValues = every ? every.values.map((s) => ({ key: s, v: { ...values, [every.key]: s } as TemplateValues })) : [];
+  const downloadEvery = async (type: "image/png" | "image/jpeg") => {
+    const missing = def.check ? def.check(values) : null;
+    if (missing) { setBlocked(missing); return; }
+    const sheets = Array.from(everyRef.current?.querySelectorAll<SVGSVGElement>("svg[data-page]") ?? []);
+    if (!sheets.length) return;
+    setSaving(true);
+    const ext = type === "image/png" ? "png" : "jpg";
+    const files: Array<{ name: string; data: Blob }> = [];
+    for (const [i, svg] of sheets.entries()) {
+      const one = def.size(everyValues[i]?.v ?? values);
+      const blob = await rasterize(svg, one.w, one.h, type);
+      if (blob) files.push({ name: `${fileBase}-${one.w}x${one.h}.${ext}`, data: blob });
+    }
+    if (files.length) saveBlob(await zipStore(files), `${fileBase}-every-size.zip`);
+    setSaving(false);
+    if (files.length < sheets.length) { console.error("[brand-center] a size could not be made into a picture"); setBlocked("studio.pictureError"); }
+  };
+
   const shown = def.fields.filter((f) => f.when?.(values) ?? true);
   const styleField = shown.find((f) => f.key === "style");
   const vertical = size.h > size.w;
@@ -268,6 +292,34 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
               {blocked ? <span role="alert" className="text-[12px] text-red-500">{t(blocked)}</span> : null}
             </div>
             <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t(def.digital ? "studio.pngHint" : "studio.printHint")}</p>
+            {every ? (
+              <div className="mt-5 border-t border-[var(--border-faint)] pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("studio.everySize")}</h3>
+                  <span className="flex flex-wrap gap-2">
+                    <button type="button" disabled={saving} onClick={() => void downloadEvery("image/png")} className="rounded-xl border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--text-primary)] disabled:opacity-60">{t("studio.zipPng")}</button>
+                    <button type="button" disabled={saving} onClick={() => void downloadEvery("image/jpeg")} className="rounded-xl border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--text-primary)] disabled:opacity-60">{t("studio.zipJpg")}</button>
+                  </span>
+                </div>
+                <p className="mt-1 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t("studio.everyHint")}</p>
+                <div ref={everyRef} className="mt-3 flex flex-wrap items-end gap-3" role="radiogroup" aria-label={t("studio.everySize")}>
+                  {everyValues.map(({ key, v }) => {
+                    const one = def.size(v);
+                    const on = values[every.key] === key;
+                    const page = def.pages[0];
+                    return (
+                      <button key={key} type="button" role="radio" aria-checked={on} onClick={() => setMany({ [every.key]: key })}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"}`}>
+                        <span className="block overflow-hidden rounded-[3px] shadow-[0_3px_10px_rgba(0,0,0,0.3)]" style={{ height: 112, width: Math.round((112 * one.w) / one.h) }}>
+                          <TemplateSheet def={def} values={v} pageId={page.id} qrs={qrs} mode="screen" slug={`${one.w} × ${one.h}`} dataPage={key} />
+                        </span>
+                        <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">{one.w} × {one.h}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             {def.digital ? (
               /* the pages as they are saved: no guides, off screen */
               <div ref={exportRef} aria-hidden className="pointer-events-none fixed -left-[10000px] top-0 w-[540px]">

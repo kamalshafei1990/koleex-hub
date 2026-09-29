@@ -22,7 +22,7 @@ import { Pattern } from "./patterns";
 import { OBJECTS, OccasionObject, type OccasionObject as Obj } from "./occasion-objects";
 import {
   Edge, Label, POST_LOOK, POST_PX, TopLogo, Txt, caps, choice, endAlign, headline, headlineAbove,
-  oneOf, place, postSafe, postSizeOf, readPost, startAlign, sx,
+  POST_EVERY_SIZE, oneOf, place, postSafe, postSizeOf, readPost, startAlign, sx,
 } from "./post-kit";
 
 export const OCC_STYLES = ["object", "object-light", "aura", "type", "notice"] as const;
@@ -268,6 +268,7 @@ export const occasionPost: TemplateDef = {
   bleed: 0,
   safe: 72,
   safeFor: postSafe,
+  everySize: POST_EVERY_SIZE,
   marks: false,
   fields: [
     choice("style", "tpl.f.style", "look", OCC_STYLES, "occ.style"),
