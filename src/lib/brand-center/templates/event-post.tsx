@@ -22,7 +22,7 @@ import { asLang, num, str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Bands, Edge, Foot, FullPhoto, Label, POST_LOOK, POST_PX, Photo, TopLogo, Txt, caps, choice, hasFoot, headline, headlineAbove,
-  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box, type PostR,
+  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box, type PostR, NO_SHEET, captionOf, hashtags,
 } from "./post-kit";
 
 export const EVENT_STYLES = ["bento", "book", "countdown", "photo", "pattern", "light"] as const;
@@ -406,6 +406,11 @@ export const eventPost: TemplateDef = {
     photo: "", photoOn: "white", photoScale: 100,
   },
   fillName: (v) => [str(v, "event"), kindOf(v)].filter(Boolean).join(" "),
+  /* the same words as the post: its label, the two lines, the call */
+  caption: (v) => {
+    const r = read(v, NO_SHEET);
+    return captionOf([r.label, r.headline].filter(Boolean).join(" — "), r.headline2, str(v, "cta"), hashtags(r.event, "Garment machinery"));
+  },
   relang: (v, lang) => withCta({ ...v, lang }, kindOf(v), asLang(lang)),
   rekey: { kind: (v, value) => withCta({ ...v, kind: value }, oneOf(KINDS, value, "save"), asLang(v.lang)) },
   specKeys: (v) => [

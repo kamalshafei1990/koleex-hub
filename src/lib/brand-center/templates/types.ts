@@ -111,6 +111,10 @@ export interface TemplateDef {
   usesProducts?: boolean;
   /** The slots a chosen product fills (name, model, photo, highlights …). */
   fromProduct?: (p: BcProduct, v: TemplateValues) => TemplateValues;
+  /** A post's suggested caption when it goes to Social Marketing (plan
+   *  step C17), in the book's house style (ch. 80): the hook, the product
+   *  or the news, then three to five hashtags, #KOLEEX first. */
+  caption?: (v: TemplateValues) => string;
   fields: FieldDef[];
   defaults: TemplateValues;
   /** Set for a template that is HTML, not paper (then `pages` is empty). */

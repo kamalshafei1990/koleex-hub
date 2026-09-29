@@ -33,6 +33,7 @@ import { Field } from "./StudioFields";
 import { printTemplate } from "./print";
 import SavedTemplates from "./SavedTemplates";
 import HtmlPreview from "./HtmlPreview";
+import SendToSocial from "./SendToSocial";
 import { rasterize, saveBlob } from "./raster";
 import { zipStore } from "@/lib/zip-store";
 import { preparePhoto } from "./image-input";
@@ -313,6 +314,10 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
               {blocked ? <span role="alert" className="text-[12px] text-red-500">{t(blocked)}</span> : null}
             </div>
             <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t(def.digital ? "studio.pngHint" : "studio.printHint")}</p>
+            {def.digital ? (
+              <SendToSocial t={t} def={def} values={values} size={size} fileBase={fileBase} onBlocked={setBlocked}
+                sheets={() => Array.from(exportRef.current?.querySelectorAll<SVGSVGElement>("svg[data-page]") ?? [])} />
+            ) : null}
             {every ? (
               <div className="mt-5 border-t border-[var(--border-faint)] pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">

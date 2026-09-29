@@ -26,7 +26,7 @@ import { asLang, str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Edge, Floor, Foot, HUB_BLUE, Label, POST_LOOK, POST_PX, Photo, STAGE, TopLogo, Txt, caps, choice, endAlign, hasFoot, headline,
-  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box,
+  POST_EVERY_SIZE, oneOf, photoFields, place, postSafe, postSizeOf, readPost, startAlign, sx, type Box, captionOf, hashtags,
 } from "./post-kit";
 
 export const POST_STYLES = ["book-dark", "book-light", "stage", "split", "pattern", "pattern-dark", "figures", "feature", "editorial", "launch", "factory"] as const;
@@ -504,6 +504,13 @@ export const productPost: TemplateDef = {
   },
   fromProduct,
   fillName: (v) => str(v, "headline") || str(v, "model"),
+  /* the hook, then the machine by its name and KOLEEX model, its first point */
+  caption: (v) => {
+    const lang = asLang(v.lang);
+    const name = str(v, `p_name_${lang}`) || str(v, "p_name_en");
+    const machine = [name, str(v, "model")].filter(Boolean).join(" — ");
+    return captionOf([str(v, "headline"), str(v, "headline2")].filter(Boolean).join(" "), machine, lang === "en" ? str(v, "p_point") : "", hashtags("Garment machinery", str(v, "p_cat_en")));
+  },
   relang: (v, lang) => {
     const next = asLang(lang), prev = asLang(v.lang);
     const out = keepEdits(v, { ...v, lang: next }, prev, next);

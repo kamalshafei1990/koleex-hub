@@ -36,6 +36,23 @@ export const HUB_BLUE = "#567FB2";
 
 /* ── the fill, read once ───────────────────────────────────────────────── */
 
+/** A caption's hashtags (ch. 80): #KOLEEX, then up to four made from the
+ *  given words ("Spreading machines" → #SpreadingMachines); Latin only. */
+export function hashtags(...words: string[]): string {
+  const tags = ["#KOLEEX"];
+  for (const w of words) {
+    if (!w || /[^\x00-\x7F]/.test(w)) continue;
+    const tag = `#${w.split(/[^A-Za-z0-9]+/).filter(Boolean).map((x) => x[0].toUpperCase() + x.slice(1)).join("")}`;
+    if (tag.length > 1 && !tags.includes(tag)) tags.push(tag);
+  }
+  return tags.slice(0, 5).join(" ");
+}
+/** A caption from its parts: blank lines between them, empty parts left out. */
+export const captionOf = (...parts: string[]) => parts.map((p) => p.trim()).filter(Boolean).join("\n\n");
+
+/** Any page's reading without a sheet (a caption reads the same words). */
+export const NO_SHEET: DrawContext = { w: 1080, h: 1350, bleed: 0, qrs: {}, uid: "caption" };
+
 export function readPost(v: TemplateValues, ctx: DrawContext) {
   const W = ctx.w, H = ctx.h;
   const size = postSizeOf(v);

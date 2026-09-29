@@ -22,7 +22,7 @@ import { Pattern } from "./patterns";
 import { OBJECTS, OccasionObject, type OccasionObject as Obj } from "./occasion-objects";
 import {
   Edge, Label, POST_LOOK, POST_PX, TopLogo, Txt, caps, choice, endAlign, headline, headlineAbove,
-  POST_EVERY_SIZE, oneOf, place, postSafe, postSizeOf, readPost, startAlign, sx,
+  POST_EVERY_SIZE, oneOf, place, postSafe, postSizeOf, readPost, startAlign, sx, NO_SHEET, captionOf, hashtags,
 } from "./post-kit";
 
 export const OCC_STYLES = ["object", "object-light", "aura", "type", "notice"] as const;
@@ -295,6 +295,10 @@ export const occasionPost: TemplateDef = {
     label: "", headline: "", headline2: "", cta: "", web: true,
   },
   fillName: (v) => OCC[occOf(v)].name.en,
+  caption: (v) => {
+    const r = read(v, NO_SHEET);
+    return captionOf(r.headline, r.headline2, hashtags(OCC[r.occ].name.en));
+  },
   rekey: {
     /* a new occasion brings its own object (and a notice keeps its dates) */
     occasion: (v, value) => ({ ...v, occasion: value, object: "", red: false }),

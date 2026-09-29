@@ -17,7 +17,7 @@ import { str, type Lang } from "./card/model";
 import { Pattern, patternOptions } from "./patterns";
 import {
   Bands, Edge, FullPhoto, Label, POST_LOOK, POST_PX, TopLogo, Txt, caps, choice, headline, headlineAbove,
-  POST_EVERY_SIZE, oneOf, photoFields, postSafe, postSizeOf, readPost, startAlign, sx,
+  POST_EVERY_SIZE, oneOf, photoFields, postSafe, postSizeOf, readPost, startAlign, sx, NO_SHEET, captionOf, hashtags,
 } from "./post-kit";
 
 export const HIRE_STYLES = ["book", "light", "pattern", "photo", "big"] as const;
@@ -237,6 +237,11 @@ export const hiringPost: TemplateDef = {
     return v.qr !== false && url ? [{ id: "apply", text: url, level: "M" }] : [];
   },
   fillName: (v) => str(v, "title"),
+  /* the job, where, the work in a few lines, how to apply (ch. 125) */
+  caption: (v) => {
+    const r = read(v, NO_SHEET);
+    return captionOf(r.label, [r.headline, r.headline2].filter(Boolean).join(" — "), r.lines.map((l) => `· ${l}`).join("\n"), r.apply, hashtags("Hiring", "Careers"));
+  },
   specKeys: (v) => [
     `post.spec.size.${postSizeOf(v)}`,
     "hire.spec.words",
