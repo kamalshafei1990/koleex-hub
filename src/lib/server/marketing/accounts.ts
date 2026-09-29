@@ -13,7 +13,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { decryptToken, encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
 import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
-import { MANUAL_PLATFORMS, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
+import { PLATFORM_ORDER, platformFlow, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
 import { FACEBOOK_ADS_SCOPES, instagramAdsGranted, type AdsState } from "@/lib/marketing/ads";
 import { messageScopesFor } from "@/lib/marketing/message-types";
 
@@ -472,7 +472,9 @@ export async function addManualAccount(input: {
   profileUrl: unknown;
   createdBy: string;
 }): Promise<{ account: MarketingAccountView } | { error: string }> {
-  if (!(MANUAL_PLATFORMS as readonly string[]).includes(input.platform)) return { error: "This platform is not added by hand." };
+  if (!(PLATFORM_ORDER as readonly string[]).includes(input.platform) || platformFlow(input.space, input.platform as MarketingPlatform) !== "manual") {
+    return { error: "This platform is not added by hand." };
+  }
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name || name.length > 120) return { error: "Enter the account name (up to 120 characters)." };
   const handle = typeof input.handle === "string" ? input.handle.trim().replace(/^@+/, "").slice(0, 80) || null : null;

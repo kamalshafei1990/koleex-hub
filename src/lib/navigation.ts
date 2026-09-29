@@ -282,7 +282,11 @@ export const APP_REGISTRY: AppDef[] = [
      until the Feed and the composer land — then drop superAdminOnly and grant
      it from Roles (the marketing manager first). */
   { id: "social-marketing", tKey: "app.social-marketing", name: "Social Marketing",  icon: Share2Icon,    route: "/social-marketing", active: true,  superAdminOnly: true },
-  { id: "ceo-brand",        tKey: "app.ceo-brand",        name: "CEO Brand",         icon: CrownIcon,     route: "/ceo-brand",        active: false },
+  /* The CEO's personal accounts on the Social engine (owner, 29/09/2026):
+     super admins only until he opens it to his assistant — then drop
+     superAdminOnly and grant «CEO Brand» from Roles. Approving is «CEO Brand
+     Approvals», which super admins do NOT hold by default. */
+  { id: "ceo-brand",        tKey: "app.ceo-brand",        name: "CEO Brand",         icon: CrownIcon,     route: "/ceo-brand",        active: true,  superAdminOnly: true },
   { id: "email-marketing",  tKey: "app.email-marketing",  name: "Email Marketing",   icon: MailOpenIcon,  route: "/email-marketing",  active: false },
   { id: "sms-whatsapp",     tKey: "app.sms-whatsapp",     name: "SMS & WhatsApp",    icon: MessageSquareIcon, route: "/sms-whatsapp", active: false },
   { id: "marketing-automation", tKey: "app.marketing-automation", name: "Marketing Automation", icon: WorkflowIcon, route: "/marketing-automation", active: false },

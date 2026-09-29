@@ -215,8 +215,8 @@ check("disconnect: signed-in POST, then 'edit' on the ACCOUNT's own space",
 check("disconnect deletes the key (what the Data Deletion page promises)", /update\(\{ token_encrypted: null, token_expires_at: null, status: "disconnected"/.test(acc));
 check("a removed account leaves the list (its row and history stay)", /\.neq\("status", "disconnected"\)/.test(acc.slice(acc.indexOf("export async function listAccounts"), acc.indexOf("export function marketingSetup"))));
 const addFn = acc.slice(acc.indexOf("export async function addManualAccount"), acc.indexOf("export async function accountSpace"));
-check("adding by hand: only the no-API platforms, never a key, only an https link",
-  /if \(!\(MANUAL_PLATFORMS as readonly string\[\]\)\.includes\(input\.platform\)\)/.test(addFn) && !/token/.test(addFn) &&
+check("adding by hand: only the platforms the SPACE shares by hand (a known platform first), never a key, only an https link",
+  /if \(!\(PLATFORM_ORDER as readonly string\[\]\)\.includes\(input\.platform\) \|\| platformFlow\(input\.space, input\.platform as MarketingPlatform\) !== "manual"\)/.test(addFn) && !/token/.test(addFn) &&
   /url\.protocol !== "https:"/.test(addFn) && /connection: "assisted",/.test(addFn));
 const listRoute = code(LIST);
 const postFn = listRoute.slice(listRoute.indexOf("export async function POST"));
@@ -311,9 +311,13 @@ const pm = code("src/lib/permission-modules.ts");
 check("«Social Marketing Approvals» is a Roles capability under Social Marketing (closed by default)",
   /export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";/.test(pm) && /\{ name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" \},/.test(pm));
 const ap = code(APPROVALS);
-check("an approver = a super admin, or the capability — company space only; CEO Brand = super admins",
-  /if \(auth\.is_super_admin\) return true;/.test(ap) && /if \(space !== "company"\) return false;/.test(ap) &&
-  /return \(await requireModuleAccess\(auth, SOCIAL_APPROVALS_MODULE\)\) === null;/.test(ap) && !/department|dept/i.test(ap));
+check("an approver = a super admin, or the capability (company); CEO Brand = ONLY an account granted «CEO Brand Approvals» — no super admin bypass",
+  before(ap, 'if (space === "ceo") return holdsGrant(auth, CEO_APPROVALS_MODULE);', "if (auth.is_super_admin) return true;") &&
+  /return \(await requireModuleAccess\(auth, SOCIAL_APPROVALS_MODULE\)\) === null;/.test(ap) && !/department|dept/i.test(ap) &&
+  !/is_super_admin/.test(ap.slice(ap.indexOf("async function holdsGrant("))) &&
+  /return typeof own === "boolean" \? own : \(role\.data as \{ can_view\?: boolean \| null \} \| null\)\?\.can_view === true;/.test(ap) &&
+  /console\.error\("\[marketing\/approvals\.holdsGrant\]"[^;]*;\s*return false;/.test(ap) &&
+  /export const CEO_APPROVALS_MODULE = "CEO Brand Approvals";/.test(pm) && /\{ name: CEO_APPROVALS_MODULE, app: "CEO Brand" \},/.test(pm));
 const gt = code(GATE);
 const gateFn = gt.slice(gt.indexOf("export async function gatePost"), gt.indexOf("export function reply"));
 check("the posts door: signed in → valid id → this tenant's post → the action on the POST's space → approver",
@@ -1060,6 +1064,20 @@ check("the Messages tab is last, its number on the first frame; the Accounts tab
   /\{a\.connection === "api" && msgs\[a\.id\] && <MessagesLine state=\{msgs\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   /messagesStates\(auth\.tenant_id, space\)\]\);/.test(code(LIST)) &&
   /out\[r\.id\] = \{ ready: missing\.length === 0, missing, error: [^}]*\};/.test(acc) && !/token/.test(acc.slice(acc.indexOf("export async function messagesStates("), acc.indexOf("\nexport ", acc.indexOf("export async function messagesStates(") + 1))));
+
+console.log("\n16. CEO Brand (the CEO's own accounts on the Social engine)");
+const ceoPages = ["page.tsx", "accounts/page.tsx", "calendar/page.tsx", "comments/page.tsx", "insights/page.tsx", "messages/page.tsx", "plan/page.tsx", "posts/page.tsx", "posts/[id]/page.tsx"];
+check(`every CEO Brand page is behind AuthGate on the CEO's space (${ceoPages.length} pages), inside the Aurora scope`,
+  ceoPages.every((f) => /<AuthGate>[\s\S]*space="ceo"[\s\S]*<\/AuthGate>/.test(code(`src/app/ceo-brand/${f}`))) &&
+  /<AuroraShell>\{children\}<\/AuroraShell>/.test(code("src/app/ceo-brand/layout.tsx")));
+check("CEO Brand is live for super admins only until the CEO opens it to his assistant",
+  /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true,\s*superAdminOnly: true \}/.test(code("src/lib/navigation.ts")));
+const sp = code("src/lib/marketing/spaces.ts");
+check("the CEO's accounts: a personal Facebook profile is shared by hand (no API since 2018), Instagram and LinkedIn wait for their own sign-in; the Accounts tab asks per space",
+  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "manual",\s*instagram: "soon",\s*linkedin: "soon",/.test(sp) &&
+  /\(space === "ceo" \? CEO_PLATFORM_FLOW : PLATFORM_FLOW\)\[platform\]/.test(sp) &&
+  /const flow = platformFlow\(space, p\);/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
+  !/PLATFORM_FLOW\[/.test(code("src/components/marketing/ConnectedAccounts.tsx")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

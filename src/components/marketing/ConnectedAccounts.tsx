@@ -29,7 +29,7 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 import { dmyHm } from "@/lib/marketing/format";
 import type { AdsState } from "@/lib/marketing/ads";
 import {
-  CONNECT_RESULTS, PLATFORM_FLOW, PLATFORM_ORDER,
+  CONNECT_RESULTS, PLATFORM_ORDER, platformFlow,
   type ConnectResult, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
 } from "@/lib/marketing/spaces";
 
@@ -357,7 +357,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
         <p className="text-[12px] leading-relaxed text-[var(--text-muted)]">{t("add.hint")}</p>
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {PLATFORM_ORDER.map((p) => {
-            const flow = PLATFORM_FLOW[p];
+            const flow = platformFlow(space, p);
             const disabled = flow === "soon" || (flow === "meta" && !metaReady);
             const selected = manual === p;
             const note = flow === "manual" ? t("note.manual") : flow === "meta" && !metaReady ? t("add.needsKeys") : t(`note.${p}`);

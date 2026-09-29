@@ -63,10 +63,14 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    reading the company-wide numbers they carry. Social Marketing (owner's
    pick, 27 Sep 2026): "Social Marketing Approvals" — approving Koleex's
    posts and publishing them (the CEO or the marketing manager, either one
-   is enough; super admins always can). */
+   is enough; super admins always can). CEO Brand (owner's pick, 29 Sep
+   2026): "CEO Brand Approvals" — approving the CEO's own posts: ONLY an
+   account granted it, NOT the super admins by default (the CEO grants it to
+   himself; lib/server/marketing/approvals). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";
+export const CEO_APPROVALS_MODULE = "CEO Brand Approvals";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
@@ -75,6 +79,7 @@ export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = 
   { name: BANK_PROFIT_MODULE, app: "Finance" },
   { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
   { name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" },
+  { name: CEO_APPROVALS_MODULE, app: "CEO Brand" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */

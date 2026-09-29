@@ -75,7 +75,8 @@ export type MarketingPlatform = "facebook" | "instagram" | "linkedin" | "youtube
                 the platform's approval), so the tile says what is missing;
    · "manual" — no API for posting (WeChat, WhatsApp, Douyin): the account is
                 added by name and link, and posts go out with one-tap sharing. */
-export const PLATFORM_FLOW: Record<MarketingPlatform, "meta" | "soon" | "manual"> = {
+export type PlatformFlow = "meta" | "soon" | "manual";
+export const PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
   facebook: "meta",
   instagram: "meta",
   linkedin: "soon",
@@ -88,6 +89,23 @@ export const PLATFORM_FLOW: Record<MarketingPlatform, "meta" | "soon" | "manual"
 };
 export const PLATFORM_ORDER: readonly MarketingPlatform[] = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "wechat", "whatsapp", "douyin"];
 export const MANUAL_PLATFORMS = PLATFORM_ORDER.filter((p) => PLATFORM_FLOW[p] === "manual");
+/** CEO Brand's personal accounts (owner, 29/09/2026): a personal Facebook
+ *  profile has no posting API since 2018, so it is shared by hand like
+ *  WeChat and Douyin; Instagram (a Creator account, Instagram Login) and
+ *  LinkedIn (the member's profile) connect in the next steps. */
+export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
+  facebook: "manual",
+  instagram: "soon",
+  linkedin: "soon",
+  youtube: "soon",
+  tiktok: "soon",
+  x: "soon",
+  wechat: "manual",
+  whatsapp: "manual",
+  douyin: "manual",
+};
+export const platformFlow = (space: MarketingSpace, platform: MarketingPlatform): PlatformFlow =>
+  (space === "ceo" ? CEO_PLATFORM_FLOW : PLATFORM_FLOW)[platform];
 
 /** What the connect flow tells the app page when it comes back (?connect=). */
 export type ConnectResult = "ok" | "cancelled" | "expired" | "failed" | "setup" | "denied";
