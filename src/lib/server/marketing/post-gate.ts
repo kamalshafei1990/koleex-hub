@@ -16,7 +16,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export interface PostGate {
   auth: ServerAuthContext;
-  post: { space: MarketingSpace; created_by: string; status: PostStatus; version: number };
+  post: { space: MarketingSpace; created_by: string; status: PostStatus; version: number; shared: boolean };
   approver: boolean;
 }
 

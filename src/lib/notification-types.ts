@@ -169,6 +169,8 @@ export const NOTIFICATION_TYPES = {
   marketing_ceo_post_decided:     { app: "ceo-brand", activity: "marketing_activity", severity: "info", lifecycle: { kind: "supersede", key: "post_id" } },
   marketing_ceo_publish_failed:   { app: "ceo-brand", activity: "marketing_activity", severity: "warning", lifecycle: { kind: "clear", key: "post_id", when: "the accounts that failed are sent again (a newer failure replaces it first)" } },
   marketing_ceo_post_published:   { app: "ceo-brand", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
+  /* Quick capture (owner, 30/09/2026): the CEO spoke a draft; his assistant finishes and sends it. */
+  marketing_ceo_capture_ready:    { app: "ceo-brand", activity: "marketing_activity", severity: "action", lifecycle: { kind: "clear", key: "post_id", when: "the draft is sent to the CEO or deleted (a newer notice about it replaces it first)" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },

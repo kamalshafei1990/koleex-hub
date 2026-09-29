@@ -8,8 +8,13 @@
      · ContentCheckPanel — who confirmed, and what Koleex AI read in the words
        and each picture: nothing, what a picture may show, what it could not
        read. A warning for the CEO, never a block. Where the check stands is
-       the server's word (content_state), so nothing here reads a clock. */
+       the server's word (content_state), so nothing here reads a clock;
+     · CapturePanel — a quick capture's recording and what was said: who
+       recorded it and when, the words Koleex AI heard (or that it could not),
+       and the recording, played through a five-minute link the server signs
+       only when asked. */
 
+import { useState } from "react";
 import Button from "@/components/kds/Button";
 import Checkbox from "@/components/kds/Checkbox";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -17,6 +22,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
+import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
 import { JD_ALLOWED, JD_NOT_ALLOWED, type CheckReading, type JdFlag } from "@/lib/marketing/ceo-rules";
 import { dmyHm } from "@/lib/marketing/format";
 import type { PostView } from "@/lib/marketing/post-types";
@@ -126,6 +132,59 @@ export function ContentCheckPanel({ t, post, canCheck, busy, onCheck }: {
           </Button>
         )}
       </div>
+    </section>
+  );
+}
+
+export function CapturePanel({ t, post }: { t: Tr; post: PostView }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
+  const c = post.capture;
+  if (!c) return null;
+  const who = c.captured_by === post.created_by ? post.author : null;
+  const play = async () => {
+    setState("loading");
+    try {
+      const res = await fetch(`/api/marketing/posts/${post.id}/voice`, { cache: "no-store" });
+      const b = (await res.json().catch(() => ({}))) as { url?: string };
+      if (!res.ok || !b.url) throw new Error("no link");
+      setUrl(b.url);
+      setState("idle");
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <section className="mt-4 flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-[13px] text-[var(--text-primary)]">
+      <div className="flex items-center gap-2 font-semibold">
+        <MicrophoneIcon size={14} className="shrink-0 text-[var(--text-muted)]" />
+        {t("cp.title").replace("{name}", who || "—").replace("{when}", dmyHm(c.captured_at))}
+      </div>
+      {!c.transcript && c.audio_path && <p className="text-[12px] text-[#F59E0B]">{t("cp.unread")}</p>}
+      {!!c.transcript && !c.drafted && <p className="text-[12px] text-[#F59E0B]">{t("cp.asIs")}</p>}
+      {!!c.transcript && (
+        <details className="text-[12px]">
+          <summary className="cursor-pointer text-[var(--text-muted)]">{t("cp.said")}</summary>
+          <p dir="auto" className="mt-1 whitespace-pre-wrap">{c.transcript}</p>
+        </details>
+      )}
+      {!!c.typed && (
+        <details className="text-[12px]">
+          <summary className="cursor-pointer text-[var(--text-muted)]">{t("cp.typed")}</summary>
+          <p dir="auto" className="mt-1 whitespace-pre-wrap">{c.typed}</p>
+        </details>
+      )}
+      {c.audio_path && (url ? (
+        <audio controls autoPlay src={url} className="h-9 w-full" />
+      ) : (
+        <div>
+          <Button type="button" variant="secondary" disabled={state === "loading"} onClick={() => void play()}>
+            {state === "loading" ? <SpinnerIcon size={14} className="motion-safe:animate-spin" /> : <MicrophoneIcon size={14} />}
+            {state === "loading" ? t("cp.loading") : t("cp.play")}
+          </Button>
+        </div>
+      ))}
+      {state === "failed" && <p className="text-[12px] text-[#F59E0B]">{t("cp.noLink")}</p>}
     </section>
   );
 }

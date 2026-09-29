@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
+import { CaptureButton } from "@/components/marketing/QuickCapture";
 import Button from "@/components/kds/Button";
 import StatusPill from "@/components/kds/StatusPill";
 import EmptyState from "@/components/kds/EmptyState";
@@ -72,7 +73,9 @@ export default function SocialPosts({ space }: { space: MarketingSpace }) {
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
       <MarketingHeader
         space={space}
-        action={<Button type="button" onClick={newPost}>{t("list.new")}</Button>}
+        action={space === "ceo"
+          ? <div className="flex flex-wrap gap-2"><CaptureButton /><Button type="button" onClick={newPost}>{t("list.new")}</Button></div>
+          : <Button type="button" onClick={newPost}>{t("list.new")}</Button>}
       />
 
       <div className="mt-6 flex flex-col gap-4">

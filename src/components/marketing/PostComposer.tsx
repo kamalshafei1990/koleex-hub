@@ -26,7 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MarketingHeader, { forgetCeoKpis } from "@/components/marketing/MarketingHeader";
-import { ContentCheckPanel, JdRulesCard } from "@/components/marketing/CeoContentRules";
+import { CapturePanel, ContentCheckPanel, JdRulesCard } from "@/components/marketing/CeoContentRules";
 import ComposerPreview from "@/components/marketing/ComposerPreview";
 import CaptionAssistant from "@/components/marketing/CaptionAssistant";
 import Button from "@/components/kds/Button";
@@ -429,6 +429,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
           {approver && post.author ? t("b.waitingFrom").replace("{name}", post.author).replace("{when}", dmyHm(post.submitted_at)) : t("b.waiting").replace("{when}", dmyHm(post.submitted_at))}
         </p>
       )}
+      {space === "ceo" && post?.capture && <CapturePanel t={t} post={post} />}
       {space === "ceo" && post && (
         <ContentCheckPanel t={t} post={post} busy={busy === "check"} onCheck={() => void recheck()} canCheck={approver || !!detail?.canEdit} />
       )}

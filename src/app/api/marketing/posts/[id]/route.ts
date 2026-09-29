@@ -12,7 +12,7 @@ import "server-only";
 
 import { after, NextResponse, type NextRequest } from "next/server";
 import { requireModuleAction } from "@/lib/server/auth";
-import { EDITABLE, cleanInput, deletePost, isError, loadPost, updatePost } from "@/lib/server/marketing/posts";
+import { EDITABLE, cleanInput, deletePost, isError, loadPost, sharedDraft, updatePost } from "@/lib/server/marketing/posts";
 import { gatePost, readVersion, reply } from "@/lib/server/marketing/post-gate";
 import { settleDeleted, settleReview } from "@/lib/server/marketing/notify";
 import { SPACE_MODULE } from "@/lib/marketing/spaces";
@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       requireModuleAction(g.auth, SPACE_MODULE[post.space], "edit"),
       requireModuleAction(g.auth, SPACE_MODULE[post.space], "delete"),
     ]);
-    const open = EDITABLE.includes(post.status) && (mine || g.approver);
+    const open = EDITABLE.includes(post.status) && (mine || g.approver || sharedDraft(post));
     return NextResponse.json({
       post,
       canApprove: g.approver,

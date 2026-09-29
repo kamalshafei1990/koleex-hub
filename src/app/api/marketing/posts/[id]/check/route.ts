@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const g = await gatePost(req, id, "edit");
     if (g instanceof NextResponse) return g;
     if (g.post.space !== "ceo") return NextResponse.json({ error: "Only CEO Brand posts are checked." }, { status: 400 });
-    if (g.post.created_by !== g.auth.account_id && !g.approver) {
+    if (g.post.created_by !== g.auth.account_id && !g.approver && !g.post.shared) {
       return NextResponse.json({ error: "Only the author or an approver can check this post." }, { status: 403 });
     }
     const out = await runContentCheck(g.auth.tenant_id, id);

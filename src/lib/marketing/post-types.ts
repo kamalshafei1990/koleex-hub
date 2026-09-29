@@ -4,6 +4,7 @@
    --------------------------------------------------------------------------- */
 
 import type { ContentCheck, ContentState } from "@/lib/marketing/ceo-rules";
+import type { CaptureRecord } from "@/lib/marketing/capture";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 
 /* draft → in_review → approved → publishing → published / partly_published /
@@ -80,6 +81,8 @@ export interface PostView {
   /** CEO Brand: the JD's content check (lib/marketing/ceo-rules); null elsewhere or before it. */
   content_check: ContentCheck | null;
   content_state: ContentState;
+  /** CEO Brand quick capture: what was said, and where the recording is (lib/marketing/capture). */
+  capture: CaptureRecord | null;
 }
 
 export interface PostSummary {

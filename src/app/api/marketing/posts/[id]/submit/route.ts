@@ -1,7 +1,8 @@
 import "server-only";
 
 /* POST /api/marketing/posts/[id]/submit — send a draft (or a post sent back)
-   for approval: { version, confirmed? }. "edit"; the author or an approver.
+   for approval: { version, confirmed? }. "edit"; the author or an approver
+   (or any CEO Brand writer, for a quick capture — a shared draft).
    Refused with the reasons (422) while the post cannot go to one of its
    accounts. A CEO Brand post also needs `confirmed: true` — its sender
    confirms it shows none of the JD's not-allowed content (400 "confirm").
@@ -24,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const g = await gatePost(req, id, "edit");
     if (g instanceof NextResponse) return g;
-    if (g.post.created_by !== g.auth.account_id && !g.approver) {
+    if (g.post.created_by !== g.auth.account_id && !g.approver && !g.post.shared) {
       return NextResponse.json({ error: "Only the author or an approver can send this post." }, { status: 403 });
     }
     const v = await readVersion(req);

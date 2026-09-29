@@ -33,11 +33,19 @@ import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/space
 import { CEO_MONTHLY_APPROVED, CEO_WEEKLY_POSTS, contentState, type ContentCheck } from "@/lib/marketing/ceo-rules";
 import { planWeekStart, weekRange } from "@/lib/marketing/week-plan";
 import { contentSig } from "@/lib/server/marketing/content-check";
+import type { CaptureRecord } from "@/lib/marketing/capture";
 
 export const EDITABLE: readonly PostStatus[] = ["draft", "in_review", "rejected"];
+
+/** A CEO Brand quick capture is a SHARED draft: the CEO speaks it, whoever
+ *  writes for CEO Brand finishes and sends it (owner, 30/09/2026) — so
+ *  besides its author and the approvers, any CEO Brand writer may edit and
+ *  send it (never delete it). */
+export const sharedDraft = (p: { space: MarketingSpace; capture?: CaptureRecord | null }): boolean => p.space === "ceo" && !!p.capture;
 const LIST_COLUMNS = "id, space, status, body, media, created_by, submitted_at, decided_by, decided_at, decision_note, scheduled_at, published_at, version, created_at, updated_at";
-/* One post adds its content check (CEO Brand); the list does without. */
-const POST_COLUMNS = `${LIST_COLUMNS}, content_check`;
+/* One post adds its content check and its capture (CEO Brand); the list
+   does without. */
+const POST_COLUMNS = `${LIST_COLUMNS}, content_check, capture`;
 /* A scheduled time must leave the publisher (every 5 minutes) room to
    pick it up; and nothing is planned more than a year ahead. */
 export const SCHEDULE_LEAD_MS = 2 * 60_000;
@@ -65,6 +73,7 @@ type PostRow = {
   created_by: string; submitted_at: string | null; decided_by: string | null; decided_at: string | null;
   decision_note: string | null; scheduled_at: string | null; published_at: string | null; version: number; created_at: string; updated_at: string;
   content_check?: ContentCheck | null;
+  capture?: CaptureRecord | null;
 };
 type TargetRow = {
   id: string; post_id: string; account_id: string; body_override: string | null; status: TargetStatus;
@@ -174,6 +183,7 @@ export async function loadPost(tenantId: string, id: string): Promise<PostView |
     media,
     content_check: check,
     content_state: contentState(check, contentSig(row.body, overrides, media), Date.now()),
+    capture: row.capture ?? null,
     author: names.get(row.created_by) || null,
     decider: row.decided_by ? names.get(row.decided_by) || null : null,
     targets: targets
@@ -252,7 +262,7 @@ export async function updatePost(
   const row = await readPost(tenantId, id);
   if (!row) return { error: "Post not found.", status: 404 };
   if (!EDITABLE.includes(row.status)) return LOCKED;
-  if (row.created_by !== who.accountId && !who.approver) return { error: "Only the author or an approver can edit this post.", status: 403 };
+  if (row.created_by !== who.accountId && !who.approver && !sharedDraft(row)) return { error: "Only the author or an approver can edit this post.", status: 403 };
   const ok = await checkAccounts(tenantId, row.space, input);
   if (isError(ok)) return ok;
   const status: PostStatus = row.status === "rejected" || (row.status === "in_review" && !who.approver) ? "draft" : row.status;
@@ -390,9 +400,9 @@ export async function deletePost(tenantId: string, id: string, version: number, 
 }
 
 /** The space and author of a post — what a route checks before acting. */
-export async function postMeta(tenantId: string, id: string): Promise<{ space: MarketingSpace; created_by: string; status: PostStatus; version: number } | null> {
+export async function postMeta(tenantId: string, id: string): Promise<{ space: MarketingSpace; created_by: string; status: PostStatus; version: number; shared: boolean } | null> {
   const row = await readPost(tenantId, id);
-  return row ? { space: row.space, created_by: row.created_by, status: row.status, version: row.version } : null;
+  return row ? { space: row.space, created_by: row.created_by, status: row.status, version: row.version, shared: sharedDraft(row) } : null;
 }
 
 /** Failed accounts go back in line; the caller then publishes again. */

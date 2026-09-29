@@ -226,6 +226,15 @@ const T: Translations = {
   "ck.again":        { en: "Check again", zh: "重新检查", ar: "افحص مرة أخرى" },
   "ck.busy":         { en: "Koleex AI is already checking this post.", zh: "Koleex AI 正在检查此帖子。", ar: "Koleex AI يفحص هذا المنشور بالفعل." },
   "ck.hint":         { en: "A warning for the CEO — it never blocks a post.", zh: "仅供 CEO 参考——不会阻止发布。", ar: "تنبيه للمدير التنفيذي — لا يمنع النشر أبدًا." },
+  /* CEO Brand — a quick capture's recording and words (lib/marketing/capture). */
+  "cp.title":        { en: "Recorded by {name} · {when}", zh: "{name} 录制 · {when}", ar: "سجّله {name} · {when}" },
+  "cp.said":         { en: "What was said", zh: "所说内容", ar: "الكلام اللي اتقال" },
+  "cp.typed":        { en: "What was typed", zh: "输入的内容", ar: "الكلام اللي اتكتب" },
+  "cp.play":         { en: "Play the recording", zh: "播放录音", ar: "شغّل التسجيل" },
+  "cp.loading":      { en: "Opening the recording…", zh: "正在打开录音…", ar: "جارٍ فتح التسجيل…" },
+  "cp.noLink":       { en: "The recording could not be opened.", zh: "无法打开录音。", ar: "تعذّر فتح التسجيل." },
+  "cp.unread":       { en: "Koleex AI could not read the recording — listen to it and write the post.", zh: "Koleex AI 无法读取录音——请收听后撰写帖子。", ar: "تعذّر على Koleex AI قراءة التسجيل — اسمعه واكتب المنشور." },
+  "cp.asIs":         { en: "Koleex AI could not write the draft — the text below is what was said.", zh: "Koleex AI 无法撰写草稿——下方文字即所说内容。", ar: "تعذّر على Koleex AI كتابة المسودة — النص تحت هو الكلام اللي اتقال." },
 };
 
 export const POSTS_T = T;

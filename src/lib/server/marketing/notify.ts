@@ -238,12 +238,91 @@ export async function ceoApproverIds(tenantId: string): Promise<string[]> {
   return ids;
 }
 
+/** Who writes for CEO Brand — the CEO's assistant: active internal accounts
+ *  that may "edit" CEO Brand by their own override, else by their role; the
+ *  Super Admins left out (they are told nothing here: the CEO is the one
+ *  speaking). A failed read tells nobody. */
+export async function ceoWriterIds(tenantId: string): Promise<string[]> {
+  type Perm = { role_id?: string; account_id?: string; can_view?: boolean | null; can_edit?: boolean | null };
+  const APP = SPACE_MODULE.ceo;
+  const [roleGrants, accountGrants, supers] = await Promise.all([
+    supabaseServer.from("koleex_permissions").select("role_id").ilike("module_name", APP).eq("can_edit", true),
+    supabaseServer.from("account_permission_overrides").select("account_id").ilike("module_key", APP).eq("can_edit", true),
+    superAdminAccountIds(tenantId),
+  ]);
+  if (roleGrants.error || accountGrants.error) {
+    console.error("[marketing/notify.ceoWriters]", roleGrants.error?.message ?? accountGrants.error?.message);
+    return [];
+  }
+  const roles = [...new Set(((roleGrants.data ?? []) as Perm[]).map((p) => p.role_id!))];
+  const granted = [...new Set(((accountGrants.data ?? []) as Perm[]).map((p) => p.account_id!))];
+  const or = [roles.length ? `role_id.in.(${roles.join(",")})` : null, granted.length ? `id.in.(${granted.join(",")})` : null].filter(Boolean).join(",");
+  if (!or) return [];
+  const { data: accts, error } = await supabaseServer
+    .from("accounts")
+    .select("id, role_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .eq("user_type", "internal")
+    .or(or)
+    .limit(200);
+  if (error) {
+    console.error("[marketing/notify.ceoWriters]", error.message);
+    return [];
+  }
+  const superIds = new Set(supers);
+  const cands = ((accts ?? []) as Array<{ id: string; role_id: string | null }>).filter((c) => !superIds.has(c.id));
+  if (!cands.length) return [];
+  const roleIds = [...new Set(cands.map((c) => c.role_id).filter((r): r is string => !!r))];
+  const [rolePerms, overrides] = await Promise.all([
+    roleIds.length
+      ? supabaseServer.from("koleex_permissions").select("role_id, can_view, can_edit").in("role_id", roleIds).ilike("module_name", APP)
+      : Promise.resolve({ data: [] as Perm[], error: null }),
+    supabaseServer.from("account_permission_overrides").select("account_id, can_view, can_edit").in("account_id", cands.map((c) => c.id)).ilike("module_key", APP),
+  ]);
+  if (rolePerms.error || overrides.error) {
+    console.error("[marketing/notify.ceoWriters]", rolePerms.error?.message ?? overrides.error?.message);
+    return [];
+  }
+  const ids: string[] = [];
+  for (const c of cands) {
+    const rM = ((rolePerms.data ?? []) as Perm[]).find((r) => !!c.role_id && r.role_id === c.role_id) ?? null;
+    const oM = ((overrides.data ?? []) as Perm[]).find((r) => r.account_id === c.id) ?? null;
+    /* requireModuleAction(CEO Brand, "edit") */
+    if (oM?.can_view === false) continue;
+    const edit = typeof oM?.can_edit === "boolean" ? oM.can_edit : rM?.can_edit === true;
+    if (edit) ids.push(c.id);
+  }
+  return ids;
+}
+
+/** The CEO spoke a quick capture: whoever writes for CEO Brand hears the
+ *  draft is ready (one notice per post; sending it to the CEO or deleting
+ *  it clears it). */
+export const notifyCaptureReady = quiet("notifyCaptureReady", async (a: Actor, postId: string): Promise<void> => {
+  const post = await loadPost(a.tenant_id, postId);
+  if (!post || post.space !== "ceo" || !post.capture || post.status !== "draft") return;
+  await notifyLite({
+    tenantId: a.tenant_id,
+    recipients: await ceoWriterIds(a.tenant_id),
+    senderId: a.account_id,
+    tpl: { k: "marketing_ceo_capture_ready", p: { who: post.author || "—", text: excerpt(post.body) } },
+    link: postLink(post.space, post.id),
+    type: "marketing_ceo_capture_ready",
+    metadata: { source: "ceo-brand", post_id: post.id },
+    tag: `mkt-post:${post.id}`,
+    supersede: { type: "marketing_ceo_capture_ready", post_id: post.id },
+  });
+});
+
 /** Sent for approval: every approver but the sender is asked; an unread
  *  request about the same post is replaced. */
 export const notifyPostSubmitted = quiet("notifyPostSubmitted", async (a: Actor, postId: string): Promise<void> => {
   const post = await loadPost(a.tenant_id, postId);
   if (!post || post.status !== "in_review") return;
   const ceo = post.space === "ceo";
+  /* A capture sent on is no longer waiting on its writers. */
+  if (ceo && post.capture) await clearUnreadByMeta({ type: "marketing_ceo_capture_ready", post_id: post.id });
   const p = { who: post.author || "—", accounts: accountsLabel(post.targets), text: excerpt(post.body) };
   await notifyLite({
     tenantId: a.tenant_id,
@@ -269,7 +348,9 @@ export const notifyPostDecided = quiet("notifyPostDecided", async (a: Actor, pos
   const k = DECIDED_TPL[post.space][decision].k;
   await notifyLite({
     tenantId: a.tenant_id,
-    recipients: [post.created_by],
+    /* Its author — and whoever sent it, when that was someone else (a CEO
+       Brand capture: the CEO speaks it, his assistant sends it). */
+    recipients: [post.created_by, post.content_check?.confirmed_by],
     senderId: a.account_id,
     tpl: decision === "scheduled" ? { k, p: { when: dmyHm(post.scheduled_at), accounts } }
       : decision === "rejected" ? { k, p: { note: post.decision_note ?? undefined } }
@@ -297,7 +378,7 @@ export const notifyPublishOutcome = quiet("notifyPublishOutcome", async (tenantI
     const p = { accounts: accountsLabel(out.length ? out : post.targets) };
     await notifyLite({
       tenantId,
-      recipients: [post.created_by],
+      recipients: [post.created_by, post.content_check?.confirmed_by],
       senderId: null,
       tpl: ceo ? { k: "marketing_ceo_post_published", p } : { k: "marketing_post_published", p },
       link: postLink(post.space, post.id),
@@ -317,7 +398,7 @@ export const notifyPublishOutcome = quiet("notifyPublishOutcome", async (tenantI
   const some = { accounts: accountsLabel(failed), reason };
   await notifyLite({
     tenantId,
-    recipients: [post.created_by, post.decided_by],
+    recipients: [post.created_by, post.decided_by, post.content_check?.confirmed_by],
     senderId: actorId,
     tpl: to === "failed"
       ? (ceo ? { k: "marketing_ceo_publish_failed", p: all } : { k: "marketing_publish_failed", p: all })
@@ -344,7 +425,7 @@ export const settleReview = quiet("settleReview", async (tenantId: string, postI
 export const settleDeleted = quiet("settleDeleted", async (postId: string): Promise<void> => {
   await clearUnreadByMetaIn({ post_id: postId }, "type", [
     "marketing_approval_request", "marketing_post_decided", "marketing_publish_failed",
-    "marketing_ceo_approval_request", "marketing_ceo_post_decided", "marketing_ceo_publish_failed",
+    "marketing_ceo_approval_request", "marketing_ceo_post_decided", "marketing_ceo_publish_failed", "marketing_ceo_capture_ready",
   ]);
 });
 

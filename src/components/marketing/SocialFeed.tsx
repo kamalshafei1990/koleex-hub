@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState, type ComponentType } from "re
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
+import { CaptureButton } from "@/components/marketing/QuickCapture";
 import Button from "@/components/kds/Button";
 import StatusPill from "@/components/kds/StatusPill";
 import EmptyState from "@/components/kds/EmptyState";
@@ -295,7 +296,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      <MarketingHeader space={space} />
+      <MarketingHeader space={space} action={space === "ceo" ? <CaptureButton /> : undefined} />
 
       <div className="mt-6">
         {feed === null ? (

@@ -64,4 +64,7 @@ export const marketingTpl: Translations = {
 
   "marketing_ceo_post_published.s": { en: "Your CEO Brand post is live", zh: "你的 CEO 个人品牌帖子已发布", ar: "نُشر منشورك في براند المدير التنفيذي" },
   "marketing_ceo_post_published.b": { en: "Published on {accounts}.", zh: "已发布到 {accounts}。", ar: "نُشر على {accounts}." },
+
+  "marketing_ceo_capture_ready.s": { en: "{who} recorded a post — the draft is ready", zh: "{who} 录制了一条帖子——草稿已就绪", ar: "سجّل {who} منشورًا — المسودة جاهزة" },
+  "marketing_ceo_capture_ready.b": { en: "[[{text:free}]]", zh: "[[{text:free}]]", ar: "[[{text:free}]]" },
 };
