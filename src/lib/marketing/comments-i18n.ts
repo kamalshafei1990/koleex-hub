@@ -48,6 +48,7 @@ export const COMMENTS_T: Translations = {
   "err.duplicate":  { en: "This reply was just sent.", zh: "这条回复刚刚已发送。", ar: "هذا الرد أُرسل للتو." },
   "err.hidden":     { en: "This comment is hidden. Show it again to reply.", zh: "此评论已隐藏。请先重新显示再回复。", ar: "هذا التعليق مخفي. أظهره أولًا لترد عليه." },
   "err.expired":    { en: "The account's key has expired. Reconnect it in Accounts.", zh: "该账号的授权已过期。请在“账号”中重新连接。", ar: "انتهت صلاحية مفتاح الحساب. أعد ربطه من الحسابات." },
+  "err.removed":    { en: "Meta no longer shares this account with the Hub: sign in with Facebook again in Accounts and keep it selected.", zh: "Meta 已不再向 Hub 共享此账号：请在“账号”中重新使用 Facebook 登录，并保持选中它。", ar: "لم تعد Meta تشارك هذا الحساب مع الـ Hub: سجّل الدخول بـ Facebook من جديد من الحسابات واتركه محددًا." },
   "err.account":    { en: "This account is not connected any more.", zh: "该账号已不再连接。", ar: "هذا الحساب لم يعد مربوطًا." },
   "err.not_approver": { en: "Only an approver can hide comments.", zh: "只有审批人可以隐藏评论。", ar: "إخفاء التعليقات للموافقين فقط." },
   "err.failed":     { en: "It did not go through. Try again.", zh: "操作未成功，请重试。", ar: "لم تتم العملية. حاول مرة أخرى." },

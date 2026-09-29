@@ -1333,6 +1333,24 @@ check("the screen: «Quick capture» on CEO Brand's Feed and Posts only; two min
   /fetch\(`\/api\/marketing\/posts\/\$\{post\.id\}\/voice`/.test(panel20) && words(qc20, ["cap.title", "cap.hint", "cap.record", "cap.stop", "cap.make", "cap.making", "cap.mic"]) &&
   words(code("src/lib/marketing/posts-i18n.ts"), ["cp.title", "cp.said", "cp.play", "cp.unread", "cp.asIs"]));
 
+console.log("\n21. An account Meta took away is told as that (not as an expired key)");
+const sp21 = code("src/lib/marketing/spaces.ts");
+const cm21 = code("src/lib/server/marketing/comments.ts");
+const ms21 = code("src/lib/server/marketing/messages.ts");
+const ca21 = code("src/components/marketing/ConnectedAccounts.tsx");
+check("Meta's refusal for a Page a later sign-in left out is recognised (its message read as one line), and the account loader carries it",
+  /return \/impersonat\\w\* a user's page\|has not authorized application\|permission\\\(s\\\) must be granted\/i\.test\(\(error \?\? ""\)\.replace\(\/\\s\+\/g, " "\)\);/.test(sp21) &&
+  /\.select\("id, tenant_id, space, platform, connection, external_id, handle, status, last_error, /.test(acc));
+check("replies to comments and messages say \"Meta no longer shares this account — sign in again and keep it selected\" (code removed) when that is why, \"expired\" otherwise — before and after Meta refuses",
+  [cm21, ms21].every((src) =>
+    /if \(a\.status === "expired"\) return pageAccessRemoved\(a\.last_error\) \? REMOVED : EXPIRED;/.test(src) &&
+    /code: "removed" \} as const;/.test(src) && (src.match(/return pageAccessRemoved\((?:[^()]|\([^()]*\))*\) \? REMOVED : EXPIRED;/g) ?? []).length === 2) &&
+  words(code("src/lib/marketing/comments-i18n.ts"), ["err.removed"]) && words(code("src/lib/marketing/messages-i18n.ts"), ["err.removed"]));
+check("the Accounts tab warns before every Facebook sign-in to keep every Page selected, and says on a taken-away account how to bring it back",
+  /\{metaReady && <p [^>]*>\{t\("add\.keepAll"\)\}<\/p>\}/.test(ca21) &&
+  /a\.connection === "api" && a\.status === "expired" && pageAccessRemoved\(a\.last_error\) && \(\s*<div [^>]*>\{t\("removed\.line"\)\}<\/div>/.test(ca21) &&
+  words(ca21, ["add.keepAll", "removed.line"]));
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   for (const f of failures) console.log(`  ✗ ${f}`);

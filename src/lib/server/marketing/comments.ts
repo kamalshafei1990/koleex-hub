@@ -21,6 +21,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import crypto from "node:crypto";
+import { pageAccessRemoved } from "@/lib/marketing/spaces";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { allRows } from "@/lib/server/all-rows";
 import { inChunks } from "@/lib/server/in-chunks";
@@ -187,13 +188,21 @@ export async function loadComment(tenantId: string, id: string): Promise<(Row & 
 async function usableAccount(tenantId: string, accountId: string): Promise<Result<{ a: AccountForSync & { token: string } }>> {
   const a = await loadAccountForSync(tenantId, accountId);
   if (!a || a.connection !== "api" || !a.token || a.status === "disconnected") return { error: "This account is not connected any more.", status: 409, code: "account" };
-  if (a.status === "expired") return { error: "The account's key has expired. Reconnect it in Accounts.", status: 409, code: "expired" };
+  if (a.status === "expired") return pageAccessRemoved(a.last_error) ? REMOVED : EXPIRED;
   return { a: a as AccountForSync & { token: string } };
 }
 
-/** Meta refused: an expired key marks the account; the person reads why. */
+const EXPIRED = { error: "The account's key has expired. Reconnect it in Accounts.", status: 409, code: "expired" } as const;
+/* A later Facebook sign-in left it out: Meta no longer shares it. */
+const REMOVED = { error: "Meta no longer shares this account with the Hub: sign in with Facebook again in Accounts and keep it selected.", status: 409, code: "removed" } as const;
+
+/** Meta refused: an expired key (or an account taken away) marks the
+ *  account; the person reads why. */
 async function refused(a: AccountForSync, e: unknown): Promise<{ error: string; status: number; code: string }> {
-  if (e instanceof MetaError && e.code === 190) await recordSync(a.id, { status: "expired", last_error: e.message.slice(0, 300), synced: false }).catch(() => {});
+  if (e instanceof MetaError && e.code === 190) {
+    await recordSync(a.id, { status: "expired", last_error: e.message.slice(0, 300), synced: false }).catch(() => {});
+    return pageAccessRemoved(e.message) ? REMOVED : EXPIRED;
+  }
   if (e instanceof MetaError) return { error: e.message, status: 502, code: "platform" };
   throw e;
 }

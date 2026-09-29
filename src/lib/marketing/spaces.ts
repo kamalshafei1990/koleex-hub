@@ -151,3 +151,14 @@ export interface MarketingSetup {
   /** The LinkedIn app's keys (Share on LinkedIn). */
   linkedin: boolean;
 }
+
+/** Whether Meta's refusal means the account was taken away from the Hub —
+ *  not a key that ran out. It happens when a later Facebook sign-in leaves a
+ *  Page (or its Instagram account) unselected: Meta then refuses every call
+ *  for it (seen 29/09/2026 — the CEO's Page connected alone, Koleex's Page
+ *  stopped five minutes later). The cure is to sign in again with it
+ *  selected, which the screens say. */
+export function pageAccessRemoved(error: string | null | undefined): boolean {
+  /* Meta breaks its message over lines; read it as one. */
+  return /impersonat\w* a user's page|has not authorized application|permission\(s\) must be granted/i.test((error ?? "").replace(/\s+/g, " "));
+}

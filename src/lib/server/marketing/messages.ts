@@ -29,6 +29,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import crypto from "node:crypto";
+import { pageAccessRemoved } from "@/lib/marketing/spaces";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { allRows } from "@/lib/server/all-rows";
@@ -356,14 +357,18 @@ export async function conversationContext(c: ConvRow): Promise<Array<{ ours: boo
 async function usableAccount(tenantId: string, accountId: string): Promise<Result<{ a: AccountForSync & { token: string } }>> {
   const a = await loadAccountForSync(tenantId, accountId);
   if (!a || a.connection !== "api" || !a.token || a.status === "disconnected") return { error: "This account is not connected any more.", status: 409, code: "account" };
-  if (a.status === "expired") return { error: "The account's key has expired. Reconnect it in Accounts.", status: 409, code: "expired" };
+  if (a.status === "expired") return pageAccessRemoved(a.last_error) ? REMOVED : EXPIRED;
   return { a: a as AccountForSync & { token: string } };
 }
+
+const EXPIRED = { error: "The account's key has expired. Reconnect it in Accounts.", status: 409, code: "expired" } as const;
+/* A later Facebook sign-in left it out: Meta no longer shares it. */
+const REMOVED = { error: "Meta no longer shares this account with the Hub: sign in with Facebook again in Accounts and keep it selected.", status: 409, code: "removed" } as const;
 
 async function refused(a: AccountForSync, e: unknown): Promise<{ error: string; status: number; code: string }> {
   if (e instanceof MetaError && e.code === 190) {
     await recordSync(a.id, { status: "expired", last_error: text(e), synced: false }).catch(() => {});
-    return { error: "The account's key has expired. Reconnect it in Accounts.", status: 409, code: "expired" };
+    return pageAccessRemoved(text(e)) ? REMOVED : EXPIRED;
   }
   if (isWindowClosed(e)) return { error: "More than 24 hours have passed since the customer's last message: Meta allows answering only on the platform now.", status: 409, code: "window" };
   if (isNotAllowedYet(e)) return { error: "Meta has not allowed answering customers from the Hub yet — that needs Meta's review of the app.", status: 403, code: "not_allowed" };

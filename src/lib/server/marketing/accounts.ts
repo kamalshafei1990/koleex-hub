@@ -308,6 +308,8 @@ export interface AccountForSync {
   external_id: string | null;
   handle: string | null;
   status: MarketingAccountView["status"];
+  /** Meta's last refusal (why an account is expired). */
+  last_error: string | null;
   last_synced_at: string | null;
   sync_state: Record<string, unknown>;
   /** The row's version: a sync claims the account only if it is unchanged. */
@@ -324,7 +326,7 @@ export interface AccountForSync {
 export async function loadAccountForSync(tenantId: string, id: string): Promise<AccountForSync | null> {
   const { data, error } = await supabaseServer
     .from("marketing_accounts")
-    .select("id, tenant_id, space, platform, connection, external_id, handle, status, last_synced_at, sync_state, updated_at, scopes, token_encrypted, user_token_encrypted, user_token_expires_at")
+    .select("id, tenant_id, space, platform, connection, external_id, handle, status, last_error, last_synced_at, sync_state, updated_at, scopes, token_encrypted, user_token_encrypted, user_token_expires_at")
     .eq("tenant_id", tenantId)
     .eq("id", id)
     .maybeSingle();

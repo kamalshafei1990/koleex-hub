@@ -34,7 +34,7 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 import { dmyHm } from "@/lib/marketing/format";
 import type { AdsState } from "@/lib/marketing/ads";
 import {
-  CONNECT_RESULTS, PLATFORM_ORDER, platformFlow,
+  CONNECT_RESULTS, PLATFORM_ORDER, pageAccessRemoved, platformFlow,
   type ConnectResult, type ConnectVia, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
 } from "@/lib/marketing/spaces";
 
@@ -49,6 +49,8 @@ const T: Translations = {
   "add.title":        { en: "Add an account", zh: "添加账号", ar: "إضافة حساب" },
   "add.hint":         { en: "Pick a platform. The accounts you sign in to are added, and you can remove any of them later.", zh: "选择平台。您登录的账号会被添加，之后可随时移除。", ar: "اختر المنصة. تُضاف الحسابات التي تسجّل الدخول إليها، ويمكنك إزالة أي منها لاحقًا." },
   "add.signIn":       { en: "Sign in with Facebook", zh: "使用 Facebook 登录", ar: "تسجيل الدخول بـ Facebook" },
+  "add.keepAll":      { en: "In Meta's window, keep EVERY Page and Instagram account the Hub uses selected — Koleex's and the CEO's. One left out stops working here.", zh: "在 Meta 窗口中，请保持选中 Hub 使用的所有主页和 Instagram 账号——包括 Koleex 的和 CEO 的。漏选的账号将在此停止工作。", ar: "في نافذة Meta، اترك كل الصفحات وحسابات Instagram اللي الـ Hub بيستخدمها محددة — بتاعة كولكس وبتاعة المدير التنفيذي. أي واحدة تشيلها هتقف هنا." },
+  "removed.line":     { en: "Meta no longer shares this account with the Hub (a later Facebook sign-in left it out): sign in with Facebook again and keep it selected.", zh: "Meta 已不再向 Hub 共享此账号（之后的一次 Facebook 登录未选中它）：请重新使用 Facebook 登录，并保持选中它。", ar: "لم تعد Meta تشارك هذا الحساب مع الـ Hub (تسجيل دخول لاحق بـ Facebook لم يحدده): سجّل الدخول بـ Facebook من جديد واتركه محددًا." },
   "add.manual":       { en: "Add by hand", zh: "手动添加", ar: "إضافة يدوية" },
   "add.soon":         { en: "Coming soon", zh: "即将推出", ar: "قريبًا" },
   "add.needsKeys":    { en: "Needs the Meta app keys in Vercel.", zh: "需要在 Vercel 中设置 Meta 应用密钥。", ar: "يحتاج مفاتيح تطبيق Meta في Vercel." },
@@ -354,6 +356,9 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                     <div className="mt-0.5 truncate text-[12px] text-[var(--text-dim)]">
                       {kindOf(a)}{a.handle ? ` · @${a.handle}` : ""}
                     </div>
+                    {a.connection === "api" && a.status === "expired" && pageAccessRemoved(a.last_error) && (
+                      <div className="mt-0.5 text-[11px] text-[#F59E0B]">{t("removed.line")}</div>
+                    )}
                     {a.connection === "api" && a.platform === "linkedin" ? (
                       <LinkedInLine state={liStates[a.id]} expired={a.status === "expired"} t={t} />
                     ) : a.connection === "api" && (
@@ -406,6 +411,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
 
       <Modal open={adding} onClose={() => setAdding(false)} title={t("add.title")} maxWidth="max-w-2xl">
         <p className="text-[12px] leading-relaxed text-[var(--text-muted)]">{t("add.hint")}</p>
+        {metaReady && <p className="rounded-xl border border-[#F59E0B]/35 bg-[#F59E0B]/10 px-3 py-2 text-[12px] leading-relaxed text-[var(--text-primary)]">{t("add.keepAll")}</p>}
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {PLATFORM_ORDER.map((p) => {
             const flow = platformFlow(space, p);
