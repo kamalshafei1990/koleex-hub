@@ -322,7 +322,7 @@ function SettingsContent() {
     {
       id: "password", label: t("nav.password"), subtitle: t("nav.password.sub"),
       icon: <KeyIcon className="h-3.5 w-3.5" />,
-      node: <PasswordTab account={account} />,
+      node: <PasswordTab />,
     },
     {
       /* The id is "security" for historical reasons; the section is a LIST OF
@@ -336,14 +336,14 @@ function SettingsContent() {
     {
       id: "privacy", label: t("nav.privacy"), subtitle: t("nav.privacy.sub"),
       icon: <ShieldIcon className="h-3.5 w-3.5" />,
-      node: <PrivacyTab account={account} />,
+      node: <PrivacyTab />,
     },
     /* Super-admin-only sections. */
     ...(isSA ? [
       {
         id: "assets" as Tab, label: t("nav.assets"), subtitle: t("nav.assets.sub"),
         icon: <FileBadge2Icon className="h-3.5 w-3.5" />,
-        node: <StampSignatureTab account={account} />,
+        node: <StampSignatureTab />,
       },
       {
         /* Shield stays with Privacy & data, which is the one of the two that
@@ -351,7 +351,7 @@ function SettingsContent() {
            QA reporter, activity, roles, accounts — so it takes the toolbox. */
         id: "admin" as Tab, label: t("nav.admin"), subtitle: t("nav.admin.sub"),
         icon: <WrenchIcon className="h-3.5 w-3.5" />,
-        node: <AdminTab account={account} />,
+        node: <AdminTab />,
       },
     ] : []),
     {

@@ -2,7 +2,7 @@
 
 /* Settings → About. Read-only device / app / workspace info. */
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -20,21 +20,31 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
   );
 }
 
-export default function AboutTab({ account }: { account: AccountWithLinks; onChanged?: () => void }) {
-  const [device, setDevice] = useState({ browser: "—", installed: false });
-  const { t } = useTranslation(settingsT);
+/* The browser and install state never change while the page is open: read
+   once, cached, through useSyncExternalStore (the server snapshot keeps any
+   pre-render consistent) — no effect and no second render. */
+type Device = { browser: string; installed: boolean };
+const noopSubscribe = () => () => {};
+const SERVER_DEVICE: Device = { browser: "—", installed: false };
+const serverDevice = () => SERVER_DEVICE;
+let deviceCache: Device | null = null;
+function readDevice(): Device {
+  if (deviceCache) return deviceCache;
+  const ua = navigator.userAgent;
+  const browser =
+    /Edg\//.test(ua) ? "Edge" :
+    /Chrome\//.test(ua) ? "Chrome" :
+    /Safari\//.test(ua) ? "Safari" :
+    /Firefox\//.test(ua) ? "Firefox" : "";
+  const installed = window.matchMedia?.("(display-mode: standalone)")?.matches
+    || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  deviceCache = { browser, installed: !!installed };
+  return deviceCache;
+}
 
-  useEffect(() => {
-    const ua = navigator.userAgent;
-    const browser =
-      /Edg\//.test(ua) ? "Edge" :
-      /Chrome\//.test(ua) ? "Chrome" :
-      /Safari\//.test(ua) ? "Safari" :
-      /Firefox\//.test(ua) ? "Firefox" : "";
-    const installed = window.matchMedia?.("(display-mode: standalone)")?.matches
-      || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    setDevice({ browser, installed: !!installed });
-  }, []);
+export default function AboutTab({ account }: { account: AccountWithLinks; onChanged?: () => void }) {
+  const device = useSyncExternalStore(noopSubscribe, readDevice, serverDevice);
+  const { t } = useTranslation(settingsT);
 
   return (
     <div className="space-y-4">

@@ -34,7 +34,7 @@ import { getTheme } from "@/lib/display-prefs";
 import {
   DEFAULT_WALLPAPER_ID, MAX_UPLOAD_EDGE, PHOTO_ID, PHOTO_MIN_DIM, WALLPAPERS,
   announceWallpaper, backgroundCss, dimFor, fitStyle, getWallpaper, nameKeyFor,
-  asImage, effectiveTint, isShader, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
+  asImage, effectiveTint, isTintable, type Wallpaper, type WallpaperFit, type WallpaperGroup, type WallpaperPref } from "@/lib/wallpaper";
 import { useWallpaper } from "@/lib/useWallpaper";
 import { SHADER_WALLPAPERS } from "@/lib/wallpaper-shaders";
 import { SettingsCard, ControlRow, SelectControl, BodyPortal } from "./ui";

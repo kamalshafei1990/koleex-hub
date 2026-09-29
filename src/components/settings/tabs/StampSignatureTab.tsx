@@ -5,7 +5,6 @@
    Reuses GET/POST/DELETE /api/quotations/saved-assets (super-admin writes). */
 
 import { useEffect, useRef, useState } from "react";
-import type { AccountWithLinks } from "@/types/supabase";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -16,7 +15,7 @@ import { BodyPortal } from "./ui";
 type Kind = "stamp" | "signature";
 interface Assets { stampUrl: string | null; signatureUrl: string | null }
 
-export default function StampSignatureTab(_props: { account: AccountWithLinks }) {
+export default function StampSignatureTab() {
   const [assets, setAssets] = useState<Assets>({ stampUrl: null, signatureUrl: null });
   const { t } = useTranslation(settingsT);
   const [loading, setLoading] = useState(true);

@@ -5,7 +5,7 @@
    Instant-apply, iOS-style. The device/push management stays on the
    dedicated /settings/notifications page. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import BoundIcon from "@/components/common/BoundIcon";
 import Link from "next/link";
 import type { AccountWithLinks } from "@/types/supabase";
@@ -84,17 +84,19 @@ const ACTIVITY_GROUPS: { tKey: string; items: { key: ActivityKey; tKey: string }
   },
 ];
 
+const noopSubscribe = () => () => {};
+
 function PushEnableCard() {
   const { t } = useTranslation(settingsT);
-  const [supported, setSupported] = useState(false);
-  const [needsInstall, setNeedsInstall] = useState(false);
+  /* Fixed facts about this browser — read without an effect; the server
+     snapshot (false) keeps a pre-render consistent. */
+  const supported = useSyncExternalStore(noopSubscribe, isPushSupported, () => false);
+  const needsInstall = useSyncExternalStore(noopSubscribe, isIosNeedsInstall, () => false);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
-    setSupported(isPushSupported());
-    setNeedsInstall(isIosNeedsInstall());
     void (async () => {
       try {
         if ("serviceWorker" in navigator) {

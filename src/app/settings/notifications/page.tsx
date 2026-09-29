@@ -6,7 +6,7 @@
    devices, send a test, tune alert preferences, and review recent deliveries.
    Super-Admin only (normal users never see push controls). */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import { useSkin } from "@/lib/appearance";
@@ -54,6 +54,8 @@ interface HistoryRow {
   created_at: string;
 }
 
+const noopSubscribe = () => () => {};
+
 /* D/M/Y, the Hub's one date order — toLocaleString() printed M/D/Y. */
 const fmt = (ts: string | null): string => fmtDMYTime(ts);
 
@@ -63,9 +65,14 @@ export default function NotificationsSettingsPage() {
   const aurora = useSkin() === "aurora";
   const isSA = !!boot?.isSuperAdmin;
 
-  const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
-  const [supported, setSupported] = useState(false);
-  const [needsInstall, setNeedsInstall] = useState(false);
+  /* Fixed facts about this browser, read without an effect (the server
+     snapshot keeps a pre-render consistent). Permission can change on this
+     page — Enable asks for it — so the answer after that is kept here. */
+  const supported = useSyncExternalStore(noopSubscribe, isPushSupported, () => false);
+  const needsInstall = useSyncExternalStore(noopSubscribe, isIosNeedsInstall, () => false);
+  const permNow = useSyncExternalStore(noopSubscribe, permissionState, () => "default" as NotificationPermission | "unsupported");
+  const [permAfter, setPerm] = useState<NotificationPermission | "unsupported" | null>(null);
+  const perm = permAfter ?? permNow;
   const [devices, setDevices] = useState<Device[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -79,9 +86,6 @@ export default function NotificationsSettingsPage() {
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   useEffect(() => {
-    setSupported(isPushSupported());
-    setNeedsInstall(isIosNeedsInstall());
-    setPerm(permissionState());
     void currentEndpoint().then(setMyEndpoint);
   }, []);
 
@@ -96,9 +100,17 @@ export default function NotificationsSettingsPage() {
 
   useEffect(() => {
     if (!isSA) return;
-    void loadDevices();
-    void loadHistory();
-  }, [isSA, loadDevices, loadHistory]);
+    let alive = true;
+    fetch("/api/push/devices", { credentials: "include" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ devices: Device[] }>) : null))
+      .then((j) => { if (alive && j) setDevices(j.devices); })
+      .catch(() => {});
+    fetch("/api/push/history", { credentials: "include" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ history: HistoryRow[] }>) : null))
+      .then((j) => { if (alive && j) setHistory(j.history); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isSA]);
 
   const enable = async () => {
     setBusy(true);

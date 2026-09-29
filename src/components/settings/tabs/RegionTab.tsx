@@ -1,10 +1,9 @@
 "use client";
 
-/* Settings → Language & region. Date / time / number / units / currency
-   format, persisted in accounts.preferences.display. The format helpers live
-   in src/lib/display-prefs (formatDatePref/formatTimePref/formatNumberPref);
-   Login history already renders through them, and new date/number surfaces
-   should adopt them too. */
+/* Settings → Language & region: interface language (this device), time
+   format and first day of the week, persisted in accounts.preferences.display.
+   Dates are always D/M/Y. The format helpers live in src/lib/display-prefs
+   (formatDatePref / formatTimePref). */
 
 import { useEffect, useMemo, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";

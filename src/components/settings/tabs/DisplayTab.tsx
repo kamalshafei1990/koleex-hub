@@ -3,7 +3,7 @@
 /* Settings → Display & Accessibility. Edits accounts.preferences.display
    (jsonb) and applies instantly to <html> — no Save button, iOS-style. */
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { DisplayPrefs, TextSizePref, DensityPref } from "@/lib/access-control";
@@ -16,7 +16,7 @@ import { SettingsCard, ControlRow, Segmented, SwitchRow, AppearancePreview, Save
 import { usePrefSlice } from "./usePrefSlice";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
-import { getSkin, setSkin, DEFAULT_SKIN, type Skin } from "@/lib/appearance";
+import { setSkin, useSkin, type Skin } from "@/lib/appearance";
 import { setHomeLayout, useHomeLayout, type HomeLayout } from "@/lib/home/home-layout";
 
 /* The shipped defaults for everything this screen edits. Region formats are
@@ -32,6 +32,11 @@ const DEFAULT_DISPLAY: Partial<DisplayPrefs> = {
   reduce_transparency: false,
 };
 
+function subscribeThemeMode(onChange: () => void): () => void {
+  window.addEventListener("thememodechange", onChange);
+  return () => window.removeEventListener("thememodechange", onChange);
+}
+
 export default function DisplayTab({ account, onChanged }: {
   account: AccountWithLinks; onChanged: () => void;
 }) {
@@ -45,31 +50,16 @@ export default function DisplayTab({ account, onChanged }: {
   const [layoutFailed, setLayoutFailed] = useState(false);
 
   const { t } = useTranslation(settingsT);
-  const [theme, setThemeState] = useState<ThemePreference>("dark");
-  /* Same reason as useSkin: reading storage during the first render is a
-     hydration mismatch, so it starts at the default and settles in an effect.
-     The attribute on <html> is already right from the bootstrap. */
-  const [skin, setSkinState] = useState<Skin>(DEFAULT_SKIN);
-
-  /* Theme is the app's binary light/dark switch (localStorage). Read the
-     current value on mount and keep in sync if the header toggle changes it. */
-  useEffect(() => {
-    setThemeState(getThemePreference());
-    setSkinState(getSkin());
-    /* Listen for the MODE, not the resolved theme: while "Auto" is active the
-       resolved value flips with the OS, and reacting to that would silently
-       move the selection off Auto. */
-    const onModeChange = (e: Event) => {
-      const t = (e as CustomEvent<ThemePreference>).detail;
-      if (t === "light" || t === "dark" || t === "system") setThemeState(t);
-    };
-    window.addEventListener("thememodechange", onModeChange);
-    return () => window.removeEventListener("thememodechange", onModeChange);
-  }, []);
+  /* Read from the browser through useSyncExternalStore — the server snapshot
+     is the default, so hydration matches, and both follow a change made
+     elsewhere (the header toggle) with no effect. Listen for the MODE, not
+     the resolved theme: while "Auto" is active the resolved value flips with
+     the OS, and following that would silently move the selection off Auto. */
+  const theme = useSyncExternalStore(subscribeThemeMode, getThemePreference, () => "dark" as ThemePreference);
+  const skin = useSkin();
 
   function pickSkin(v: Skin) {
-    setSkinState(v);
-    setSkin(v);   // writes storage + data-kx-skin + "skinchange"
+    setSkin(v);   // writes storage + data-kx-skin + "skinchange" → useSkin
   }
 
   /* Home's launcher (owner, 28/09/2026): Classic by default, Today as the
@@ -88,7 +78,6 @@ export default function DisplayTab({ account, onChanged }: {
   }
 
   function pickTheme(t: ThemePreference) {
-    setThemeState(t);
     setTheme(t);   // resolves + data-theme + "themechange" (header syncs)
   }
 

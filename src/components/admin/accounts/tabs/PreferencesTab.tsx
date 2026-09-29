@@ -46,7 +46,13 @@ export default function PreferencesTab({ account, onChanged }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setPrefs(initial), [initial]);
+  /* Follow the account only while there are no unsaved edits, during render
+     (no stale frame, no effect-driven second render). */
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (JSON.stringify(prefs) === JSON.stringify(seenInitial)) setPrefs(initial);
+  }
 
   useEffect(() => {
     if (!toast) return;
