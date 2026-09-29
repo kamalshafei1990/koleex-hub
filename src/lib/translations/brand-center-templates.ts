@@ -528,4 +528,20 @@ export const brandCenterTemplatesT: Translations = {
   "cert.style.black-1": { en: "Black card — first design", zh: "黑卡 — 初版", ar: "الكارت الأسود — التصميم الأول" },
   "cert.style.dots-1":  { en: "Dots — first design", zh: "圆点 — 初版", ar: "نقط — التصميم الأول" },
   "cert.style.award-1": { en: "Award — first design", zh: "荣誉 — 初版", ar: "تكريم — التصميم الأول" },
+
+  /* ── business cards: the premium set (owner 30/09) ── */
+  "tpl.style.p-guilloche":  { en: "Premium — guilloche band", zh: "高级 — 扭索纹带", ar: "بريميوم — شريط جيلوش" },
+  "tpl.style.p-monolith":   { en: "Premium — monolith", zh: "高级 — 黑色立柱", ar: "بريميوم — عمود أسود" },
+  "tpl.style.p-knockout":   { en: "Premium — K in the dots", zh: "高级 — 圆点镂空 K", ar: "بريميوم — K في النقط" },
+  "tpl.style.p-editorial":  { en: "Premium — editorial", zh: "高级 — 杂志风", ar: "بريميوم — تحريري" },
+  "tpl.style.p-swiss":      { en: "Premium — Swiss grid", zh: "高级 — 瑞士网格", ar: "بريميوم — شبكة سويسرية" },
+  "tpl.style.p-underprint": { en: "Premium — underprint", zh: "高级 — 底纹", ar: "بريميوم — طباعة أمان" },
+  "tpl.style.p-medallion":  { en: "Premium — foil medallion", zh: "高级 — 烫印徽章", ar: "بريميوم — ميدالية فضي" },
+  "tpl.style.p-foil-line":  { en: "Premium — silver line", zh: "高级 — 银线", ar: "بريميوم — خط فضي" },
+  "spec.pGuilloche": { en: "The guilloche band in silver foil (Pantone 877 C) or light grey ink — 0.08 mm lines.", zh: "扭索纹带用银色烫印（Pantone 877 C）或浅灰墨印刷 — 线宽 0.08 毫米。", ar: "شريط الجيلوش سلفر فويل (Pantone 877 C) أو حبر رمادي فاتح — خطوط 0.08 مم." },
+  "spec.pMicro":     { en: "The short rule under the title is microtext — the group's name in 1-point capitals; print at 600 dpi or finer.", zh: "职位下的短线是微缩文字 — 1 磅大写的集团名称；请以 600 dpi 或更高精度印刷。", ar: "الخط القصير تحت المسمى كلام ميكرو — اسم المجموعة بحروف 1 بوينت؛ اطبع 600 dpi أو أدق." },
+  "spec.pKnockout":  { en: "Dots printed grey (K 70) on black board; the K and the logo's panel are the board itself.", zh: "黑卡上印灰色圆点（K 70）；K 与标志区域为卡纸本色。", ar: "النقط رمادي (K 70) على كرتون أسود؛ حرف K ومكان اللوجو هما لون الكرتون نفسه." },
+  "spec.pUnderprint": { en: "The underprint in the lightest grey (K 12) — fine lines, 0.1 mm.", zh: "底纹用最浅的灰色（K 12）印刷 — 细线 0.1 毫米。", ar: "الطباعة الخلفية أفتح رمادي (K 12) — خطوط رفيعة 0.1 مم." },
+  "spec.pMedallion": { en: "The medallion in silver foil (Pantone 877 C); the K in its centre is the black board.", zh: "徽章用银色烫印（Pantone 877 C）；中心的 K 为黑卡本色。", ar: "الميدالية سلفر فويل (Pantone 877 C)؛ وحرف K في نصها هو لون الكرتون الأسود." },
+  "spec.pFoilLine":  { en: "The line and the name in silver foil (Pantone 877 C).", zh: "线条和姓名用银色烫印（Pantone 877 C）。", ar: "الخط والاسم سلفر فويل (Pantone 877 C)." },
 };

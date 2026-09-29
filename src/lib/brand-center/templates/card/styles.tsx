@@ -33,6 +33,7 @@ import {
 } from "./parts";
 import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import { asLang, fontOf, langOf, num, printedRows, qrsOf, relangRows, rowsOf, str, type Lang } from "./model";
+import { PREMIUM_STYLES, drawPremiumBack, drawPremiumFront, isPremium, premiumSpecKeys } from "./premium";
 
 export const STYLES = [
   "classic", "management", "executive", "vertical-portrait",
@@ -40,6 +41,8 @@ export const STYLES = [
   "dots-field", "dots-field-white", "dots-wave", "dots-vertical",
   "split", "band", "rules", "grid", "centered", "centered-white",
   "vertical", "vertical-white", "sales", "light-white", "technician", "bilingual", "dealer",
+  /* the premium set (owner 30/09/2026), beside the first twenty-five */
+  ...PREMIUM_STYLES,
 ] as const;
 export type CardStyle = (typeof STYLES)[number];
 export const styleOf = (v: TemplateValues): CardStyle => ((STYLES as readonly string[]).includes(String(v.style)) ? (v.style as CardStyle) : "team-black");
@@ -47,8 +50,8 @@ export const PORTRAIT_STYLES: CardStyle[] = ["classic", "management", "vertical-
 /** Where the name with the logo has no place (ch. 43/44): the lockup backs
  *  carry it already; the portrait fronts' logos are under 40 mm (the logo
  *  alone); the dealer card is co-branded. */
-export const NO_COMPANY_BACK: CardStyle[] = ["classic", "management", "executive", "dealer"];
-export const NO_COMPANY_FRONT: CardStyle[] = ["classic", "management", "executive", "dealer", "vertical-portrait", "split", "name-first"];
+export const NO_COMPANY_BACK: CardStyle[] = ["classic", "management", "executive", "dealer", ...PREMIUM_STYLES];
+export const NO_COMPANY_FRONT: CardStyle[] = ["classic", "management", "executive", "dealer", "vertical-portrait", "split", "name-first", ...PREMIUM_STYLES];
 export const VERTICAL_STYLES: CardStyle[] = ["vertical", "vertical-white", "dots-vertical", "vertical-portrait"];
 
 const INSET = 5; // text and marks stay 1 mm inside the 4 mm safe margin
@@ -862,6 +865,7 @@ function verticalPortraitFront(v: TemplateValues, ctx: DrawContext): ReactNode {
 /* ── the style table ───────────────────────────────────────────────────── */
 
 export function drawFront(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isPremium(v)) return drawPremiumFront(v, ctx);
   const r = read(v, ctx);
   switch (styleOf(v)) {
     case "classic": return classicFront(v, ctx);
@@ -891,6 +895,7 @@ export function drawFront(v: TemplateValues, ctx: DrawContext): ReactNode {
 }
 
 export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isPremium(v)) return drawPremiumBack(v, ctx);
   const r = read(v, ctx);
   switch (styleOf(v)) {
     case "classic": return classicBack(v, ctx);
@@ -922,6 +927,7 @@ export function drawBack(v: TemplateValues, ctx: DrawContext): ReactNode {
 
 /** The words keys of the print notes for a style (studio "How it is printed"). */
 export function specKeysFor(v: TemplateValues): string[] {
+  if (isPremium(v)) return premiumSpecKeys(v);
   switch (styleOf(v)) {
     case "team-white": case "vertical-white": case "grid": case "rules": case "centered-white": case "light-white": case "name-first":
       return ["spec.whiteFront", "spec.blackPrint", "spec.whiteBoard", "spec.edges", "spec.never"];
