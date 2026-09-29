@@ -118,7 +118,7 @@ export default function HtmlPreview({ t, def, html, values, fileBase }: { t: T; 
 
       <details className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5">
         <summary className="cursor-pointer text-[12.5px] font-semibold text-[var(--text-secondary)]">{t("sig.how")}</summary>
-        <ul className="mt-2 grid gap-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+        <ul className="mt-2 grid [&>*]:min-w-0 gap-2 text-[12px] leading-5 text-[var(--text-secondary)]">
           {["gmail", "outlook", "outlookWin", "apple", "iphone", "foxmail"].map((k) => (
             <li key={k}><span className="font-semibold text-[var(--text-primary)]">{t(`sig.how.${k}`)}</span> — {t(`sig.how.${k}.steps`)}</li>
           ))}

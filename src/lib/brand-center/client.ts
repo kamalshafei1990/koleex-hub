@@ -49,6 +49,22 @@ export interface BcPerson {
   staffNo: string | null;
 }
 
+/** A product found by the post studio's search (GET /api/brand-center/products?q=);
+ *  `photo` is a small first-party thumbnail. */
+export interface BcProductHit { id: string; name: string; model: string | null; category: string | null; photo: string | null }
+/** A product a post can be made for (GET /api/brand-center/products?id=) —
+ *  active products only, and only what a post may show: never a price,
+ *  never a supplier (the model is the KOLEEX commercial code). */
+export interface BcProduct extends BcProductHit {
+  /** The name in Chinese / Arabic when translated. */
+  nameZh: string | null; nameAr: string | null;
+  categoryZh: string | null; categoryAr: string | null;
+  /** Short selling points, the product's own order. */
+  highlights: string[];
+  /** The feature highlights (title, text, a photo of the detail). */
+  features: Array<{ title: string; titleZh: string | null; titleAr: string | null; text: string | null; textZh: string | null; textAr: string | null; image: string | null }>;
+}
+
 /** A saved fill of a template ("my templates"); pictures are never kept. */
 export interface BcSaved { id: string; account_id: string; template_id: string; name: string; fill: Record<string, unknown>; shared: boolean; mine: boolean; updated_at: string }
 
@@ -58,6 +74,8 @@ export const bc = {
   editSaved: (id: string, b: { name?: string; fill?: Record<string, unknown>; shared?: boolean }) => send<{ saved: BcSaved }>(`/api/brand-center/saved/${id}`, "PATCH", b),
   deleteSaved: (id: string) => call<{ ok: true }>(`/api/brand-center/saved/${id}`, { method: "DELETE" }),
   people: () => call<{ scope: "all" | "self"; people: BcPerson[] }>("/api/brand-center/people"),
+  products: (q: string) => call<{ products: BcProductHit[] }>(`/api/brand-center/products?q=${encodeURIComponent(q)}`),
+  product: (id: string) => call<{ product: BcProduct }>(`/api/brand-center/products?id=${encodeURIComponent(id)}`),
   library: () => call<{ sections: BcSectionRow[] }>("/api/brand-center/library"),
   section: (key: string) => call<BcSectionData>(`/api/brand-center/sections/${encodeURIComponent(key)}`),
   item: (id: string) => call<BcItemData>(`/api/brand-center/items/${encodeURIComponent(id)}`),

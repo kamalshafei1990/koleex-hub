@@ -192,7 +192,7 @@ function RowsField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { kin
   return (
     <div>
       <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
-      <ul className="mt-1 grid gap-1.5">
+      <ul className="mt-1 grid [&>*]:min-w-0 gap-1.5">
         {rows.map((r, i) => (
           <li key={r.id} className={`grid grid-cols-[auto_84px_minmax(0,1fr)_auto] items-center gap-1.5 ${r.on ? "" : "opacity-55"}`}>
             <input type="checkbox" checked={r.on} onChange={(e) => patch(i, { on: e.target.checked })} aria-label={t("studio.rowShow")} className="h-3.5 w-3.5 accent-[var(--text-primary)]" />
@@ -231,7 +231,7 @@ function QrsField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { kind
   return (
     <div>
       <span className="text-[11.5px] text-[var(--text-dim)]">{t(f.labelKey)}</span>
-      <ul className="mt-1 grid gap-2">
+      <ul className="mt-1 grid [&>*]:min-w-0 gap-2">
         {qrs.map((q, i) => (
           <li key={q.id} className="rounded-xl border border-[var(--border-subtle)] px-2.5 py-2">
             <div className="flex flex-wrap items-center gap-1.5">

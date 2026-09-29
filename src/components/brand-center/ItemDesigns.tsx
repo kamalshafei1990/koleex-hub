@@ -38,7 +38,7 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
       {shown.length === 0 ? (
         <p className="mt-3 text-[12.5px] text-[var(--text-secondary)]">{t("des.none")}</p>
       ) : (
-        <ul className="mt-3 grid gap-2">
+        <ul className="mt-3 grid [&>*]:min-w-0 gap-2">
           {shown.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5">
               <span dir="auto" className="text-[13px] font-semibold text-[var(--text-primary)]">{d.name}</span>

@@ -10,7 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
-import type { BcPerson } from "@/lib/brand-center/client";
+import type { BcPerson, BcProduct } from "@/lib/brand-center/client";
 
 export type TemplateScalar = string | boolean | number;
 /** One entry of a list slot (a contact line, a QR code). */
@@ -96,6 +96,17 @@ export interface TemplateDef {
   marks?: boolean;
   /** The studio offers "Fill from Employees" (default true). */
   usesPeople?: boolean;
+  /** A picture, not paper (a social post): the size is in PIXELS, there is
+   *  no bleed and no crop marks, and the studio downloads a PNG or a JPEG of
+   *  exactly that size instead of printing. */
+  digital?: boolean;
+  /** The safe area of this fill when it is not `safe` on every side (a
+   *  story keeps its top and bottom clear for the app's buttons). */
+  safeFor?: (v: TemplateValues) => { top: number; right: number; bottom: number; left: number };
+  /** The studio offers "Fill from Products" (active products only). */
+  usesProducts?: boolean;
+  /** The slots a chosen product fills (name, model, photo, highlights …). */
+  fromProduct?: (p: BcProduct, v: TemplateValues) => TemplateValues;
   fields: FieldDef[];
   defaults: TemplateValues;
   /** Set for a template that is HTML, not paper (then `pages` is empty). */

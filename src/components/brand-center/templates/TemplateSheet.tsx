@@ -42,9 +42,11 @@ export function sheetSize(def: TemplateDef, values: TemplateValues, mode: "scree
   return { w, h, outerW: w + pad * 2, outerH: h + pad * 2 };
 }
 
-export default function TemplateSheet({ def, values, pageId, qrs, mode, guides = false, slug, className, style }: {
+export default function TemplateSheet({ def, values, pageId, qrs, mode, guides = false, slug, className, style, dataPage }: {
   def: TemplateDef; values: TemplateValues; pageId: string; qrs: Record<string, boolean[][]>;
   mode: "screen" | "print"; guides?: boolean; slug?: string; className?: string; style?: CSSProperties;
+  /** Marks the sheet for saving as a picture (a post's page id). */
+  dataPage?: string;
 }) {
   const uid = `s${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   useFontsLoaded();
@@ -59,7 +61,7 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${outerW} ${outerH}`}
       width={mode === "print" ? `${outerW}mm` : "100%"} height={mode === "print" ? `${outerH}mm` : undefined}
-      className={`${cardArabic.variable}${className ? ` ${className}` : ""}`} style={{ direction: "ltr", ...style }} role="img" aria-label={slug}>
+      className={`${cardArabic.variable}${className ? ` ${className}` : ""}`} style={{ direction: "ltr", ...style }} role="img" aria-label={slug} data-page={dataPage}>
       {mode === "print" ? <rect x={0} y={0} width={outerW} height={outerH} fill="#FFFFFF" /> : null}
       <defs>
         <clipPath id={`${uid}-bleed`}><rect x={off} y={off} width={w + b * 2} height={h + b * 2} /></clipPath>
@@ -68,16 +70,21 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
         <g transform={`translate(${off} ${off})`}>{body}</g>
       </g>
 
-      {mode === "screen" && guides ? (
-        <g pointerEvents="none">
-          {/* A mid grey, so the bleed reads on black cards and white ones alike. */}
-          <path fillRule="evenodd" fill="#8E8E93" fillOpacity={0.5}
-            d={`M0 0H${outerW}V${outerH}H0Z M${trim.x} ${trim.y}h${w}v${h}h-${w}Z`} />
-          <rect x={trim.x} y={trim.y} width={w} height={h} fill="none" stroke="#0066FF" strokeWidth={0.2} />
-          <rect x={trim.x + def.safe} y={trim.y + def.safe} width={w - def.safe * 2} height={h - def.safe * 2}
-            fill="none" stroke="#AAAAAA" strokeWidth={0.15} strokeDasharray="0.8 0.6" />
-        </g>
-      ) : null}
+      {mode === "screen" && guides ? (() => {
+        /* a post is in pixels: its lines are drawn eight times heavier */
+        const k = def.digital ? 8 : 1;
+        const sf = def.safeFor?.(values) ?? { top: def.safe, right: def.safe, bottom: def.safe, left: def.safe };
+        return (
+          <g pointerEvents="none">
+            {/* A mid grey, so the bleed reads on black cards and white ones alike. */}
+            <path fillRule="evenodd" fill="#8E8E93" fillOpacity={0.5}
+              d={`M0 0H${outerW}V${outerH}H0Z M${trim.x} ${trim.y}h${w}v${h}h-${w}Z`} />
+            <rect x={trim.x} y={trim.y} width={w} height={h} fill="none" stroke="#0066FF" strokeWidth={0.2 * k} />
+            <rect x={trim.x + sf.left} y={trim.y + sf.top} width={w - sf.left - sf.right} height={h - sf.top - sf.bottom}
+              fill="none" stroke="#AAAAAA" strokeWidth={0.15 * k} strokeDasharray={`${0.8 * k} ${0.6 * k}`} />
+          </g>
+        );
+      })() : null}
 
       {marks ? (
         <g stroke="#000000" strokeWidth={0.1} fill="none">

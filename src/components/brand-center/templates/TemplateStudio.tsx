@@ -12,11 +12,11 @@
    chosen here stay in this browser.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { brandCenterLibraryT } from "@/lib/translations/brand-center-library";
 import { brandCenterTemplatesT } from "@/lib/translations/brand-center-templates";
-import { bc, type BcPerson } from "@/lib/brand-center/client";
+import { bc, type BcPerson, type BcProduct, type BcProductHit } from "@/lib/brand-center/client";
 import { templateById } from "@/lib/brand-center/templates/registry";
 import { qrCodes } from "@/lib/brand-center/templates/qr";
 import type { FieldDef, TemplateDef, TemplateValue, TemplateValues } from "@/lib/brand-center/templates/types";
@@ -33,12 +33,14 @@ import { Field } from "./StudioFields";
 import { printTemplate } from "./print";
 import SavedTemplates from "./SavedTemplates";
 import HtmlPreview from "./HtmlPreview";
+import { rasterize, saveBlob } from "./raster";
+import { preparePhoto } from "./image-input";
 
 const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const GROUPS = ["look", "type", "job", "words", "person", "event", "company", "brand", "contacts", "photo", "details", "issue", "banner", "back", "qr"];
+const GROUPS = ["look", "type", "job", "words", "person", "event", "company", "brand", "contacts", "photo", "picture", "details", "issue", "banner", "back", "qr"];
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -48,8 +50,32 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   const [people, setPeople] = useState<People>({ state: "loading" });
   const [guides, setGuides] = useState(true);
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [product, setProduct] = useState<BcProduct | null>(null);
+  const [saving, setSaving] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const wantsPeople = def?.usesPeople !== false;
+  const wantsProducts = def?.usesProducts === true;
+  /* A post makes its photo ready whenever the photo changes: what it was
+     shot on (white, black, a cut-out, a scene — the choice stays editable)
+     and a copy no larger than a post needs. The product's own slots that
+     named the original name the copy too. */
+  const photo = typeof values.photo === "string" ? values.photo : "";
+  const readsGround = Boolean(def?.fields.some((f) => f.key === "photoOn"));
+  useEffect(() => {
+    if (!readsGround || !photo) return;
+    let alive = true;
+    void preparePhoto(photo).then((got) => {
+      if (!alive || !got) return;
+      setValues((o) => {
+        if (o.photo !== photo) return o;
+        const next: TemplateValues = { ...o, photoOn: got.ground };
+        if (got.url !== photo) for (const [k, val] of Object.entries(next)) if (val === photo) next[k] = got.url;
+        return next;
+      });
+    });
+    return () => { alive = false; };
+  }, [readsGround, photo]);
   useEffect(() => {
     if (!wantsPeople) return;
     let alive = true;
@@ -116,8 +142,13 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
     setBlocked(null);
     if (p) setValues((o) => ({ ...o, ...(def.fromPerson ? def.fromPerson(p, o) : {}) }));
   };
+  const chooseProduct = (p: BcProduct | null) => {
+    setProduct(p);
+    setBlocked(null);
+    if (p && def.fromProduct) setValues((o) => ({ ...o, ...def.fromProduct!(p, o) }));
+  };
   const clear = () => {
-    setPerson(null); setBlocked(null);
+    setPerson(null); setProduct(null); setBlocked(null);
     setValues(() => {
       const base: TemplateValues = { ...def.defaults, lang: values.lang, lang2: values.lang2 };
       const styled = def.restyle ? def.restyle(base, String(values.style)) : { ...base, style: values.style };
@@ -126,14 +157,31 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   };
 
   const who = typeof values.name === "string" ? values.name.trim() : "";
-  const slug = `${heading} · ${size.w} × ${size.h} mm + ${def.bleed} mm bleed${who ? ` · ${who}` : ""}`;
-  const fileBase = [def.id, typeof values.style === "string" ? values.style : "", who.normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()]
+  const slug = def.digital ? `${heading} · ${size.w} × ${size.h} px` : `${heading} · ${size.w} × ${size.h} mm + ${def.bleed} mm bleed${who ? ` · ${who}` : ""}`;
+  const fileBase = [def.id, typeof values.style === "string" ? values.style : "", (who || (def.digital ? fillName : "")).normalize("NFKD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 48)]
     .filter(Boolean).join("-");
   const print = () => {
     /* What must be filled is the template's own rule (a proof sheet has no name). */
     const missing = def.check ? def.check(values) : null;
     if (missing) { setBlocked(missing); return; }
     printTemplate({ templateId: def.id, values, fileName: fileBase, slug });
+  };
+  /* A post: the page as a picture of exactly its size (every page, one file each). */
+  const download = async (type: "image/png" | "image/jpeg") => {
+    const missing = def.check ? def.check(values) : null;
+    if (missing) { setBlocked(missing); return; }
+    const sheets = Array.from(exportRef.current?.querySelectorAll<SVGSVGElement>("svg[data-page]") ?? []);
+    if (!sheets.length) return;
+    setSaving(true);
+    let failed = false;
+    for (const svg of sheets) {
+      const blob = await rasterize(svg, size.w, size.h, type);
+      if (!blob) { failed = true; continue; }
+      const page = sheets.length > 1 ? `-${svg.dataset.page}` : "";
+      saveBlob(blob, `${fileBase}-${size.w}x${size.h}${page}.${type === "image/png" ? "png" : "jpg"}`);
+    }
+    setSaving(false);
+    if (failed) { console.error("[brand-center] the post could not be made into a picture"); setBlocked("studio.pictureError"); }
   };
 
   const shown = def.fields.filter((f) => f.when?.(values) ?? true);
@@ -143,7 +191,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   return (
     <div className="min-h-full">
       <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-8">
-        <PageHeader title={heading} subtitle={def.html ? t("sig.subtitle") : fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
+        <PageHeader title={heading} subtitle={def.html ? t("sig.subtitle") : def.digital ? fill(t("studio.sizePx"), { w: size.w, h: size.h, s: def.safe }) : fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
           icon={<BrandCenterIcon size={16} />} showTabs={false} backHref="/brand-center" backLabel={t("back.center")} />
 
         {styleField && styleField.kind === "choice" ? (
@@ -156,7 +204,8 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
               <SavedTemplates t={t} def={def} values={values} onApply={applySaved} />
             </div>
             {def.usesPeople !== false ? <FillFrom t={t} people={people} person={person} onChoose={choose} /> : null}
-            <div className={`${def.usesPeople !== false ? "mt-4 " : ""}flex justify-end`}>
+            {wantsProducts ? <FillFromProduct t={t} product={product} onChoose={chooseProduct} /> : null}
+            <div className={`${def.usesPeople !== false || wantsProducts ? "mt-4 " : ""}flex justify-end`}>
               <button type="button" onClick={clear} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("studio.clear")}</button>
             </div>
             {GROUPS.map((g) => {
@@ -184,16 +233,16 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{heading}</h2>
               <label className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-                {t("studio.guides")}
-                <Toggle checked={guides} onChange={setGuides} label={t("studio.guides")} />
+                {t(def.digital ? "studio.guidesPx" : "studio.guides")}
+                <Toggle checked={guides} onChange={setGuides} label={t(def.digital ? "studio.guidesPx" : "studio.guides")} />
               </label>
             </div>
-            {guides ? <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("studio.guidesHint")}</p> : null}
+            {guides ? <p className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t(def.digital ? "studio.guidesHintPx" : "studio.guidesHint")}</p> : null}
 
-            <div className={`mt-4 grid gap-5 ${vertical ? "grid-cols-2" : "xl:grid-cols-2"}`}>
+            <div className={`mt-4 grid gap-5 ${def.digital ? "grid-cols-1" : vertical ? "grid-cols-2" : "xl:grid-cols-2"}`}>
               {def.pages.filter((p) => !def.pagesFor || def.pagesFor(values).includes(p.id)).map((p) => (
                 <figure key={p.id} className="m-0">
-                  <div className={`mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_10px_30px_rgba(0,0,0,0.35)] ${vertical ? "max-w-[300px]" : "max-w-[560px]"}`}>
+                  <div className={`mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_10px_30px_rgba(0,0,0,0.35)] ${def.digital ? (vertical ? "max-w-[440px]" : "max-w-[640px]") : vertical ? "max-w-[300px]" : "max-w-[560px]"}`}>
                     <TemplateSheet def={def} values={values} pageId={p.id} qrs={qrs} mode="screen" guides={guides} slug={t(`tpl.page.${p.id}`)} />
                   </div>
                   <figcaption className="mt-2 text-center text-[11.5px] text-[var(--text-dim)]">{t(`tpl.page.${p.id}`)}</figcaption>
@@ -202,19 +251,38 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={print} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)]">
-                {t("studio.print")}
-              </button>
+              {def.digital ? (
+                <>
+                  <button type="button" disabled={saving} onClick={() => void download("image/png")} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">
+                    {t(saving ? "studio.saving" : "studio.png")}
+                  </button>
+                  <button type="button" disabled={saving} onClick={() => void download("image/jpeg")} className="rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] disabled:opacity-60">
+                    {t("studio.jpg")}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={print} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)]">
+                  {t("studio.print")}
+                </button>
+              )}
               {blocked ? <span role="alert" className="text-[12px] text-red-500">{t(blocked)}</span> : null}
             </div>
-            <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t("studio.printHint")}</p>
+            <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t(def.digital ? "studio.pngHint" : "studio.printHint")}</p>
+            {def.digital ? (
+              /* the pages as they are saved: no guides, off screen */
+              <div ref={exportRef} aria-hidden className="pointer-events-none fixed -left-[10000px] top-0 w-[540px]">
+                {def.pages.filter((p) => !def.pagesFor || def.pagesFor(values).includes(p.id)).map((p) => (
+                  <TemplateSheet key={p.id} def={def} values={values} pageId={p.id} qrs={qrs} mode="screen" slug={heading} dataPage={p.id} />
+                ))}
+              </div>
+            ) : null}
             </>
             )}
 
             {def.specKeys ? (
               <div className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-3">
-                <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t(def.html ? "sig.specTitle" : "studio.spec")}</p>
-                <ul className="mt-1.5 grid gap-1 text-[12px] text-[var(--text-secondary)]">
+                <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t(def.html ? "sig.specTitle" : def.digital ? "studio.specPx" : "studio.spec")}</p>
+                <ul className="mt-1.5 grid [&>*]:min-w-0 gap-1 text-[12px] text-[var(--text-secondary)]">
                   {def.specKeys(values).map((k) => <li key={k}>{t(k)}</li>)}
                 </ul>
               </div>
@@ -267,6 +335,74 @@ function HtmlThumb({ html, rtl }: { html: string; rtl: boolean }) {
       <span aria-hidden className={`pointer-events-none absolute top-2 block w-[760px] ${rtl ? "right-2 origin-top-right" : "left-2 origin-top-left"}`}
         style={{ transform: "scale(0.28)" }} dangerouslySetInnerHTML={{ __html: html }} />
     </span>
+  );
+}
+
+/** "Fill from Products": a search over the ACTIVE products (name or KOLEEX
+ *  model), then the chosen one in full. */
+function FillFromProduct({ t, product, onChoose }: { t: T; product: BcProduct | null; onChoose: (p: BcProduct | null) => void }) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<{ q: string; state: "loading" | "error" | "ready"; list: BcProductHit[] }>({ q: "", state: "ready", list: [] });
+  const [opening, setOpening] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const term = q.trim();
+  useEffect(() => {
+    if (!term) return;
+    let alive = true;
+    const timer = setTimeout(() => {
+      setHits((h) => ({ ...h, q: term, state: "loading" }));
+      void bc.products(term).then((res) => {
+        if (alive) setHits(res.ok ? { q: term, state: "ready", list: res.data.products } : { q: term, state: "error", list: [] });
+      });
+    }, 220);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [term]);
+  const open = async (hit: BcProductHit) => {
+    setOpening(hit.id); setFailed(false);
+    const res = await bc.product(hit.id);
+    setOpening(null);
+    if (!res.ok) { setFailed(true); return; }
+    onChoose(res.data.product);
+    setQ("");
+  };
+  return (
+    <div>
+      <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("studio.fillFromProduct")}</h2>
+      {product ? (
+        <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] px-2.5 py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {product.photo ? <img src={product.photo} alt="" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain" /> : null}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12.5px] font-medium text-[var(--text-primary)]">{product.name}</span>
+            {product.model ? <span className="block truncate text-[11.5px] text-[var(--text-dim)]">{product.model}</span> : null}
+          </span>
+          <button type="button" onClick={() => onChoose(null)} className="text-[11.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("studio.remove")}</button>
+        </div>
+      ) : null}
+      <input id="bc-studio-product" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("studio.productSearch")} aria-label={t("studio.productSearch")} className={`${FIELD} mt-2`} />
+      {term ? (
+        <ul role="listbox" aria-label={t("studio.fillFromProduct")} className="mt-1.5 max-h-[280px] overflow-y-auto rounded-xl border border-[var(--border-subtle)]">
+          {hits.state === "loading" || hits.q !== term ? (
+            <li className="px-3 py-2 text-[12px] text-[var(--text-dim)]">{t("studio.searching")}</li>
+          ) : hits.state === "error" ? (
+            <li className="px-3 py-2 text-[12px] text-[var(--text-dim)]">{t("studio.productsError")}</li>
+          ) : hits.list.length ? hits.list.map((p) => (
+            <li key={p.id} role="option" aria-selected={product?.id === p.id}>
+              <button type="button" disabled={opening !== null} onClick={() => void open(p)} className="flex w-full items-center gap-2.5 px-2.5 py-1.5 text-start hover:bg-[var(--bg-surface-subtle)] disabled:opacity-60">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {p.photo ? <img src={p.photo} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded bg-white object-contain" /> : <span className="h-8 w-8 shrink-0 rounded bg-[var(--bg-surface-subtle)]" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12.5px] text-[var(--text-primary)]">{p.name}</span>
+                  <span className="block truncate text-[11px] text-[var(--text-dim)]">{[p.model, p.category].filter(Boolean).join(" · ")}</span>
+                </span>
+                {opening === p.id ? <span className="text-[11px] text-[var(--text-dim)]">…</span> : null}
+              </button>
+            </li>
+          )) : <li className="px-3 py-2 text-[12px] text-[var(--text-dim)]">{t("studio.productNone")}</li>}
+        </ul>
+      ) : null}
+      {failed ? <p role="alert" className="mt-1 text-[11.5px] text-red-500">{t("studio.productsError")}</p> : null}
+    </div>
   );
 }
 
