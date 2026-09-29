@@ -362,6 +362,7 @@ export function ExhibitionKit() {
           "Black lanyard with the white logo repeated — worn instead of the fair’s own lanyard (ch. 122); badge 86 × 120 mm.",
           "Name large enough to read from 2 m; the languages the person speaks under the title.",
           "No personal phone numbers on badges.",
+          "Made in Brand Center → Templates → Event badge: this design and nine more, a status band in the lanyards’ colours (black staff, grey visitors, white VIP), and a back that repeats the front — a badge turns on its lanyard.",
         ]} />
       </Section>
     </Chapter>
