@@ -35,15 +35,10 @@ export const docsT: Translations = {
   /* ── KPI labels ── */
   "kpi.total":           { en: "Total",            zh: "总数",              ar: "الإجمالي" },
   "kpi.drafts":          { en: "Drafts",           zh: "草稿",              ar: "المسودات" },
-  "kpi.finalised":       { en: "Finalised",        zh: "已定稿",            ar: "المُعتمدة" },
   "kpi.totalValue":      { en: "Total value (USD)", zh: "总价值 (USD)",      ar: "القيمة الإجمالية (USD)" },
-  "kpi.totalBilled":     { en: "Total billed (USD)", zh: "开票总额 (USD)",    ar: "إجمالي الفوترة (USD)" },
   "kpi.expiringSoon":    { en: "{n} expiring within 7 days",
                            zh: "{n} 将在 7 天内到期",
                            ar: "{n} ينتهي خلال 7 أيام" },
-  "kpi.pastDue":         { en: "{n} past due date",
-                           zh: "{n} 已逾期",
-                           ar: "{n} متأخرة" },
 
   /* ── Toolbar buttons (editor) ── */
   "btn.back":            { en: "Back",             zh: "返回",              ar: "رجوع" },
@@ -52,7 +47,6 @@ export const docsT: Translations = {
   "btn.convertToInvoice":{ en: "Convert to Invoice", zh: "转为发票",         ar: "تحويل إلى فاتورة" },
   "btn.exportPDF":       { en: "Export PDF",       zh: "导出 PDF",          ar: "تصدير PDF" },
   "btn.print":           { en: "Print",            zh: "打印",              ar: "طباعة" },
-  "btn.recordPayment":   { en: "Record Payment",   zh: "记录付款",          ar: "تسجيل دفعة" },
 
   /* ── Status chip ── */
   "status.draft":        { en: "DRAFT",            zh: "草稿",              ar: "مسودة" },
@@ -75,23 +69,6 @@ export const docsT: Translations = {
     { en: "Save the quotation before converting.",
       zh: "请先保存报价单再进行转换。",
       ar: "احفظ عرض السعر قبل التحويل." },
-  "alert.saveFirstPayment":
-    { en: "Save the invoice first, then record a payment.",
-      zh: "请先保存发票再记录付款。",
-      ar: "احفظ الفاتورة أولًا ثم سجّل الدفعة." },
-  "prompt.payAmount":    { en: "Payment amount (USD). Open balance:",
-                           zh: "付款金额 (USD)。未结余额：",
-                           ar: "مبلغ الدفع (USD). الرصيد المستحق:" },
-  "prompt.payMethod":    { en: "Method (bank_transfer / cash / card / cheque / other)",
-                           zh: "付款方式 (bank_transfer / cash / card / cheque / other)",
-                           ar: "الطريقة (bank_transfer / cash / card / cheque / other)" },
-  "prompt.payRef":       { en: "Reference (optional)",
-                           zh: "参考号 (选填)",
-                           ar: "المرجع (اختياري)" },
-
-  /* ── Payment chip ── */
-  "paid.paid":           { en: "Paid",             zh: "已付",              ar: "مدفوع" },
-  "paid.balance":        { en: "Balance",          zh: "余额",              ar: "الرصيد" },
 
   /* ── Row actions on list ── */
   "list.delete":         { en: "Delete",           zh: "删除",              ar: "حذف" },
@@ -202,7 +179,6 @@ export const docsT: Translations = {
                            zh: "为保护对方的更改，您的保存未被应用。请先加载最新版本再保存，或将您的编辑另存为副本。",
                            ar: "لحماية تغييراته لم يُطبَّق حفظك. حمّل أحدث نسخة قبل الحفظ، أو احفظ تعديلاتك كنسخة منفصلة." },
   "conflict.saveCopy":   { en: "Save as copy",     zh: "另存为副本",        ar: "حفظ كنسخة" },
-  "conflict.working":    { en: "Working…",         zh: "处理中…",           ar: "جارٍ العمل…" },
   "conflict.loadLatest": { en: "Load latest version", zh: "加载最新版本",   ar: "تحميل أحدث نسخة" },
 
   /* ── Toasts ── */

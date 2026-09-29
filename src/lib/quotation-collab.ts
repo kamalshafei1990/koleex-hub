@@ -24,14 +24,14 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type CollabStatus = "viewing" | "editing";
 
-export interface CollabPeer {
+interface CollabPeer {
   id: string;
   name: string;
   status: CollabStatus;
   at: string; // ISO last-active
 }
 
-export interface SaveNotice {
+interface SaveNotice {
   by: string; // account id
   byName: string;
   version: number;

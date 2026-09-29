@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { ensureOrder } from "@/lib/server/orders";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";

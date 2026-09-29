@@ -38,7 +38,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 
-export interface DocTitleRow {
+interface DocTitleRow {
   id: string;
   code: string;
   label_en: string;

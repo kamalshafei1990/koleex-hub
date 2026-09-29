@@ -113,12 +113,12 @@ interface QuotationItem {
   sellValue?: number;
 }
 
-export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
+type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
 
 /** Every transition the UI's status menu allows. "expired" is mostly
  *  derived (validTill < today) but we also let the operator force-set
  *  it manually for quotes that never had a hard expiry on them. */
-export const QUOTE_STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
+const QUOTE_STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
   { value: "draft",    label: "Draft" },
   { value: "sent",     label: "Sent" },
   { value: "accepted", label: "Accepted" },

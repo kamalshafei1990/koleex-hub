@@ -71,7 +71,7 @@ const DOCS: Array<[string, RegExp, string]> = [
   ["src/lib/contracts/general-terms.ts", /"Seller" means \$\{legalNameEn\(\)\}/, "the contract's definition of Seller reads the same source"],
 ];
 for (const [file, re, label] of DOCS) check(re.test(read(file)), label);
-for (const caller of ["src/components/quotations/Quotations.tsx", "src/components/invoices-doc/InvoicesDoc.tsx", "src/components/invoices/InvoicesApp.tsx", "src/components/documents/DocumentsApp.tsx", "src/components/documents/PackingListDoc.tsx"]) {
+for (const caller of ["src/components/quotations/Quotations.tsx", "src/components/invoices-doc/InvoicesDoc.tsx", "src/components/documents/DocumentsApp.tsx", "src/components/documents/PackingListDoc.tsx"]) {
   check(/madeAt:/.test(read(caller)), `Excel export from ${caller.split("/").pop()} passes the creation date`);
 }
 

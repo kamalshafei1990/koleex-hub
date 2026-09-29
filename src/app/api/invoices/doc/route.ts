@@ -72,7 +72,8 @@ export async function GET(req: Request) {
      image-rich lines. /:id still returns the full doc. */
   const slim = (data ?? []).map((row) => {
     const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
-    const { items: _items, ...rest } = full;
+    const rest = { ...full };
+    delete rest.items;
     return { ...(row as Record<string, unknown>), doc: rest };
   });
 

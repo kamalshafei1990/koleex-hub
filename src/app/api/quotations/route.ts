@@ -177,10 +177,12 @@ export async function GET(req: Request) {
 
   const slim = matched.map((row) => {
     const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
-    const { items: _items, ...rest } = full;
+    const rest = { ...full };
+    delete rest.items;
     // Strip created_by (selected only for DS1a shadow eval) so the response
     // shape is byte-identical to before DS1a.
-    const { created_by: _createdBy, ...rowOut } = row as Record<string, unknown>;
+    const rowOut = { ...(row as Record<string, unknown>) };
+    delete rowOut.created_by;
     /* Column-level policy: the doc embeds supplier costs / pricing automation
        (standTablePrice, fxRate, default pricing) — can_view_private only. */
     return { ...rowOut, doc: sanitizeQuotationDoc(auth, rest) };

@@ -7,13 +7,13 @@
 // preorder starts empty: this is a real customer's order and it must not be
 // the default content of every document the team opens.
 
-export interface PreorderItem {
+interface PreorderItem {
   model: string;
   desc: string;
   q: [number, number, number, number];
   photo?: string | null;
 }
-export interface PreorderSection {
+interface PreorderSection {
   en: string;
   ar: string;
   items: PreorderItem[];

@@ -199,7 +199,7 @@ export interface Quotation {
 /* Currencies the quotation editor offers. USD stays the default — the
    selector simply lets the operator quote in the customer's currency.
    Symbol falls back to the code itself for anything unmapped. */
-export const QUOTE_CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "AED", "SAR", "EGP", "TRY"] as const;
+const QUOTE_CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "AED", "SAR", "EGP", "TRY"] as const;
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", CNY: "¥", JPY: "¥",
   AED: "AED", SAR: "SAR", EGP: "E£", TRY: "₺",

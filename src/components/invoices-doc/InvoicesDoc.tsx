@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
 import ReportsAboutCard from "@/components/reports/ReportsAboutCard";
 import { useToast } from "@/components/kds/useToast";
@@ -80,7 +79,7 @@ export type InvoiceStatus = "draft" | "sent" | "partially_paid" | "paid" | "over
 /** Every transition the UI's status menu allows. "expired" is mostly
  *  derived (validTill < today) but we also let the operator force-set
  *  it manually for quotes that never had a hard expiry on them. */
-export const INVOICE_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
+const INVOICE_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
   { value: "draft",          label: "Draft" },
   { value: "sent",           label: "Sent" },
   { value: "partially_paid", label: "Partially Paid" },
@@ -199,8 +198,6 @@ export interface Invoice {
    Constants
    ══════════════════════════════════════════════════════════ */
 
-const STORAGE_KEY = "koleex.invoices-doc.v1";
-const COUNTER_KEY = "koleex.invoices-doc.counter";
 
 /* Default terms shell for a fresh invoice. Mirrors the quotation
    shell so the same Quick Fill pickers land cleanly. */
@@ -1154,7 +1151,7 @@ export default function Quotations() {
         setDuplicatingId(null);
       }
     },
-    [duplicatingId],
+    [duplicatingId, showToast],
   );
 
   const handleDeleteFromList = useCallback(
@@ -1202,6 +1199,7 @@ export default function Quotations() {
   useEffect(() => {
     if (view === "editor" && current?.id) savedTitleRef.current = current.docTitleText;
     if (view !== "editor") savedTitleRef.current = undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the title ON DISK: taken when a document opens, not on every keystroke
   }, [view, current?.id]);
 
   /* Branch: keep the document on disk untouched and save the retitled version
@@ -1361,15 +1359,8 @@ export default function Quotations() {
         setTimeout(() => setSaveState("idle"), 4000);
       }
     },
-    [current]
+    []
   );
-
-  /* ── Convert current to invoice. Uses the server-side helper which
-        clones the doc JSON + mints a fresh INV<year>-NNNN number, then
-        takes the user straight to the Invoices app. ── */
-  const handleConvertToInvoice = useCallback(async () => {
-    /* No-op on the Invoice editor — already an invoice. */
-  }, []);
 
   /* ── Print ── */
   const handlePrint = useCallback(() => {
@@ -1598,7 +1589,7 @@ export default function Quotations() {
       showToast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       setTimeout(() => setPdfState("idle"), 2_000);
     }
-  }, [current, handleSave]);
+  }, [current, showToast]);
 
   /* ── Send by email ──
      Opens a print window so the operator can "Save as PDF" the
@@ -1690,7 +1681,7 @@ export default function Quotations() {
       try { win.close(); } catch { /* already closed */ }
       showToast(`Send failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
-  }, [current, handleSave]);
+  }, [current, handleSave, showToast]);
 
   /* ── Duplicate ──
      Clones the current quote into a fresh draft and drops the user
@@ -1881,7 +1872,7 @@ export default function Quotations() {
         showToast(`Upload failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       }
     },
-    [current],
+    [current, showToast],
   );
 
   const removeItem = useCallback(

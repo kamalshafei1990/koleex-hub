@@ -23,7 +23,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     .from("invoices")
     /* The `customers` table has `name` (NOT display_name) and singular
        email / phone / address columns. We alias `name AS display_name`
-       so every downstream consumer (InvoicesApp, ProjectsApp, etc.)
+       so every downstream consumer (InvoicesDoc, ProjectsApp, etc.)
        that reads `customer.display_name` keeps working without
        changes. The plural emails/phones/addresses fields don't exist
        on customers -- they live on the `people` table -- so we drop
