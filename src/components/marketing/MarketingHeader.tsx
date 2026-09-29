@@ -79,10 +79,11 @@ function publishCount(kind: WaitKind, space: MarketingSpace, n: number): void {
 export const publishCommentsCount = (space: MarketingSpace, n: number) => publishCount("comments", space, n);
 export const publishMessagesCount = (space: MarketingSpace, n: number) => publishCount("messages", space, n);
 
-function useWaitingCount(kind: WaitKind, space: MarketingSpace): number | null {
+function useWaitingCount(kind: WaitKind, space: MarketingSpace, enabled = true): number | null {
   /* Read in the initialiser: the kept number is on the first frame. */
   const [n, setN] = useState<number | null>(() => (typeof window === "undefined" ? null : readCount(kind, space)?.n ?? null));
   useEffect(() => {
+    if (!enabled) return;
     const onCount = (e: Event) => {
       const d = (e as CustomEvent<{ space: MarketingSpace; n: number }>).detail;
       if (d?.space === space) setN(d.n);
@@ -102,14 +103,16 @@ function useWaitingCount(kind: WaitKind, space: MarketingSpace): number | null {
       });
     }
     return () => { alive = false; window.removeEventListener(EVENT[kind], onCount); };
-  }, [kind, space]);
-  return n;
+  }, [kind, space, enabled]);
+  return enabled ? n : null;
 }
 
 export default function MarketingHeader({ space, action }: { space: MarketingSpace; action?: ReactNode }) {
   const { t } = useTranslation(T);
   const needs = useWaitingCount("comments", space);
-  const waiting = useWaitingCount("messages", space);
+  /* CEO Brand reads no private messages (owner, 29/09/2026): no tab there. */
+  const withMessages = space === "company";
+  const waiting = useWaitingCount("messages", space, withMessages);
   return (
     <PageHeader
       title={t(`title.${space}`)}
@@ -125,7 +128,7 @@ export default function MarketingHeader({ space, action }: { space: MarketingSpa
         { key: SPACE_CALENDAR[space], label: t("tab.calendar"), icon: <CalendarRawIcon size={14} /> },
         { key: SPACE_ROUTE[space], label: t("tab.accounts"), icon: <UsersIcon size={14} /> },
         { key: SPACE_COMMENTS[space], label: t("tab.comments"), icon: <CommentIcon size={14} />, badge: needs ?? undefined },
-        { key: SPACE_MESSAGES[space], label: t("tab.messages"), icon: <MessageSquareIcon size={14} />, badge: waiting ?? undefined },
+        ...(withMessages ? [{ key: SPACE_MESSAGES[space], label: t("tab.messages"), icon: <MessageSquareIcon size={14} />, badge: waiting ?? undefined }] : []),
       ]}
     />
   );

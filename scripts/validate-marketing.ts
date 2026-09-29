@@ -779,7 +779,7 @@ check("the screen: a card opens a large chart with the period before; a copy kep
   /data\.accounts\.every\(\(a\) => Array\.isArray\(a\.top\) && Array\.isArray\(a\.formats\)\)/.test(insScreen));
 const mhSrc = code("src/components/marketing/MarketingHeader.tsx");
 check("the Insights tab follows Feed; the replies' tabs stay last",
-  /\{ key: SPACE_HOME\[space\][^\n]*\n\s*\{ key: SPACE_INSIGHTS\[space\]/.test(mhSrc) && /\{ key: SPACE_COMMENTS\[space\][^\n]*\n\s*\{ key: SPACE_MESSAGES\[space\][^\n]*\n\s*\]\}/.test(mhSrc));
+  /\{ key: SPACE_HOME\[space\][^\n]*\n\s*\{ key: SPACE_INSIGHTS\[space\]/.test(mhSrc) && /\{ key: SPACE_COMMENTS\[space\][^\n]*\n\s*\.\.\.\(withMessages \? \[\{ key: SPACE_MESSAGES\[space\][^\n]*\n\s*\]\}/.test(mhSrc));
 
 console.log("\n13. The weekly plan");
 const planMigSql = readFileSync("supabase/migrations/20260929_marketing_week_plans.sql", "utf8").replace(/--[^\n]*/g, "");
@@ -981,7 +981,7 @@ check("an automatic reply (a Page message within 15 s of the customer's) is not 
   /export const AUTO_REPLY_MS = 15_000;/.test(msgTypes) &&
   /if \(!m\.by_person && customerAt && t >= customerAt && t - customerAt <= AUTO_REPLY_MS\) return;/.test(msgTypes) &&
   /const idx = lastCountedIndex\(rc\.messages\.map\(\(m\) => \(\{ from_us: m\.from_us, sent_at: m\.sent_at, by_person: byPerson\.has\(m\.external_id\) \}\)\)\);/.test(msgs) &&
-  /\.not\("sent_by", "is", null\)\.in\("external_id", chunk\)\)/.test(msgs) &&
+  /\.not\("sent_by", "is", null\)\.in\("external_id", chunk\), batchFor\(ours\)\)/.test(msgs) &&
   before(msgSyncFn, "if (ruleDue) await applyRule(a);", "await pageConversations(") &&
   /\.\.\.\(ruleDue \? \{ messages_rule: MESSAGES_RULE \} : \{\}\)/.test(msgSyncFn) && /const MESSAGES_RULE = 2;/.test(msgs));
 check("a reply sent while a read was under way stays the last word; the read overlaps the last minute (Meta's whole seconds)",
@@ -1061,14 +1061,22 @@ check("customers' pictures: two additive columns; a few per read (12), read agai
   /metaGraphUrl\(customerId, \{ fields: "profile_pic" \}\), token\)/.test(metaMsgs) &&
   /<img src=\{url\} alt="" loading="lazy" referrerPolicy="no-referrer" onError=\{\(\) => setBad\(true\)\}/.test(msgScreen));
 check("the Messages tab is last, its number on the first frame; the Accounts tab says each account's messages status (no key)",
-  /\{ key: SPACE_MESSAGES\[space\], label: t\("tab\.messages"\), icon: <MessageSquareIcon size=\{14\} \/>, badge: waiting \?\? undefined \},\s*\]/.test(mh) &&
-  /const waiting = useWaitingCount\("messages", space\);/.test(mh) &&
+  /\.\.\.\(withMessages \? \[\{ key: SPACE_MESSAGES\[space\], label: t\("tab\.messages"\), icon: <MessageSquareIcon size=\{14\} \/>, badge: waiting \?\? undefined \}\] : \[\]\),\s*\]/.test(mh) &&
+  /const waiting = useWaitingCount\("messages", space, withMessages\);/.test(mh) &&
   /\{a\.connection === "api" && msgs\[a\.id\] && <MessagesLine state=\{msgs\[a\.id\]\} t=\{t\} \/>\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   /messagesStates\(auth\.tenant_id, space\)\]\);/.test(code(LIST)) &&
   /out\[r\.id\] = \{ ready: missing\.length === 0, missing, error: [^}]*\};/.test(acc) && !/token/.test(acc.slice(acc.indexOf("export async function messagesStates("), acc.indexOf("\nexport ", acc.indexOf("export async function messagesStates(") + 1))));
 
 console.log("\n16. CEO Brand (the CEO's own accounts on the Social engine)");
-const ceoPages = ["page.tsx", "accounts/page.tsx", "calendar/page.tsx", "comments/page.tsx", "insights/page.tsx", "messages/page.tsx", "plan/page.tsx", "posts/page.tsx", "posts/[id]/page.tsx"];
+const ceoPages = ["page.tsx", "accounts/page.tsx", "calendar/page.tsx", "comments/page.tsx", "insights/page.tsx", "plan/page.tsx", "posts/page.tsx", "posts/[id]/page.tsx"];
+check("CEO Brand reads NO private messages (owner, 29/09/2026): no tab, no page, never read by the cron or a refresh, no Accounts line",
+  /const withMessages = space === "company";/.test(mh) && !existsSync("src/app/ceo-brand/messages/page.tsx") &&
+  /if \(!a \|\| a\.space !== "company" \|\|/.test(msgSyncFn) &&
+  /\.eq\("connection", "api"\)\.eq\("space", "company"\)\s*\.in\("platform", \["facebook", "instagram"\]\)\s*\.in\("status", \["connected", "error"\]\)\s*\.or\(`sync_state->>messages_at/.test(cronSrc) &&
+  /if \(space !== "company"\) return \{\};/.test(acc.slice(acc.indexOf("export async function messagesStates("))));
+check("Meta's long ids never make a long URL: each .in() batch of the messages read is sized by its longest id",
+  /Math\.max\(10, Math\.min\(150, Math\.floor\(4000 \/ Math\.max\(1, \.\.\.ids\.map\(\(x\) => x\.length\)\)\)\)\)/.test(msgs) &&
+  /\.in\("external_id", chunk\), batchFor\(exts\)\);/.test(msgs) && /\.in\("external_id", chunk\), batchFor\(ours\)\)/.test(msgs));
 check(`every CEO Brand page is behind AuthGate on the CEO's space (${ceoPages.length} pages), inside the Aurora scope`,
   ceoPages.every((f) => /<AuthGate>[\s\S]*space="ceo"[\s\S]*<\/AuthGate>/.test(code(`src/app/ceo-brand/${f}`))) &&
   /<AuroraShell>\{children\}<\/AuroraShell>/.test(code("src/app/ceo-brand/layout.tsx")));

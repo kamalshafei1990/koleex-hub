@@ -483,6 +483,8 @@ export async function adsStates(tenantId: string, space: MarketingSpace): Promis
 /** What the Accounts screen says about each Page's and Instagram account's
  *  private messages: ready, what to add in Meta, or Meta's last refusal. */
 export async function messagesStates(tenantId: string, space: MarketingSpace): Promise<Record<string, { ready: boolean; missing: string[]; error: string | null }>> {
+  /* CEO Brand reads no private messages (owner, 29/09/2026): no line there. */
+  if (space !== "company") return {};
   const { data, error } = await supabaseServer
     .from("marketing_accounts")
     .select("id, platform, scopes, sync_state")

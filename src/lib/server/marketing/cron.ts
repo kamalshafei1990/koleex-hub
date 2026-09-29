@@ -108,7 +108,7 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
         claims). Right after publishing: a customer is waiting. */
   if (left() > 12_000) {
     const staleMsgs = new Date(Date.now() - MESSAGES_REFRESH_MS).toISOString();
-    let mQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+    let mQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api").eq("space", "company")
       .in("platform", ["facebook", "instagram"])
       .in("status", ["connected", "error"])
       .or(`sync_state->>messages_at.is.null,sync_state->>messages_at.lt.${staleMsgs}`);

@@ -83,20 +83,27 @@ const later_ = (a: string | null | undefined, b: string | null | undefined) => (
 
 export interface MessagesSyncOutcome { ok: boolean; skipped?: "unavailable" | "fresh" | "no_permission"; conversations?: number; notified?: number; settled?: number }
 
+/* Meta's ids can be long — an Instagram message id passes 100 characters —
+   and every id of an .in() travels in the URL: each batch is sized by the
+   longest id so its URL stays short (150 ids of that length made a 15 KB
+   URL, refused as "Bad Request", 29/09/2026). */
+const batchFor = (ids: readonly string[]): number =>
+  Math.max(10, Math.min(150, Math.floor(4000 / Math.max(1, ...ids.map((x) => x.length)))));
+
 /** The conversations saved, and those whose told wait ended on the platform
  *  (answered there): their notice is cleared. */
 async function saveConversations(a: AccountForSync, remote: RemoteConversation[]): Promise<{ saved: ConvRow[]; ended: string[] }> {
   if (!remote.length) return { saved: [], ended: [] };
   const exts = remote.map((r) => r.external_id);
   const { data: existing, error: rErr } = await inChunks<ConvRow>(exts, (chunk) =>
-    supabaseServer.from("marketing_conversations").select(CONV_COLUMNS).eq("account_id", a.id).in("external_id", chunk));
+    supabaseServer.from("marketing_conversations").select(CONV_COLUMNS).eq("account_id", a.id).in("external_id", chunk), batchFor(exts));
   if (rErr) throw new Error(`marketing conversations: ${rErr.message}`);
   const prev = new Map((existing ?? []).map((c) => [c.external_id, c]));
   /* Our messages a person sent from the Hub count however fast they came. */
   const ours = remote.flatMap((rc) => rc.messages.filter((m) => m.from_us).map((m) => m.external_id));
   const { data: hubSent, error: hErr } = ours.length
     ? await inChunks<{ external_id: string }>(ours, (chunk) =>
-      supabaseServer.from("marketing_messages").select("external_id").eq("account_id", a.id).not("sent_by", "is", null).in("external_id", chunk))
+      supabaseServer.from("marketing_messages").select("external_id").eq("account_id", a.id).not("sent_by", "is", null).in("external_id", chunk), batchFor(ours))
     : { data: [], error: null };
   if (hErr) throw new Error(`marketing messages: ${hErr.message}`);
   const byPerson = new Set((hubSent ?? []).map((m) => m.external_id));
@@ -201,7 +208,9 @@ async function refreshAvatars(a: AccountForSync & { token: string }): Promise<nu
 /** One account's conversations — see the header. */
 export async function syncMessages(tenantId: string, accountId: string, opts: { minGapMs?: number } = {}): Promise<MessagesSyncOutcome> {
   const a = await loadAccountForSync(tenantId, accountId);
-  if (!a || (a.platform !== "facebook" && a.platform !== "instagram") || a.connection !== "api" || !a.token || !a.external_id
+  /* Only Social Marketing's accounts: CEO Brand reads no private messages
+     (owner, 29/09/2026). */
+  if (!a || a.space !== "company" || (a.platform !== "facebook" && a.platform !== "instagram") || a.connection !== "api" || !a.token || !a.external_id
     || a.status === "disconnected" || a.status === "expired") {
     return { ok: false, skipped: "unavailable" };
   }
