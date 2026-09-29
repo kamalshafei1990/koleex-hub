@@ -57,6 +57,9 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
   const off = marks ? PRINT_MARGIN - b : 0; // where the bleed box starts
   const trim = { x: off + b, y: off + b };
   const body = page.draw(values, { w, h, bleed: b, qrs, uid: `${uid}-${page.id}` });
+  /* A shaped piece (round corners, a hole): cut on screen, its line in the guides. */
+  const die = def.die?.(values, page.id, { w, h, bleed: b }) ?? null;
+  const cut = !!die && mode === "screen" && !guides;
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${outerW} ${outerH}`}
@@ -65,9 +68,12 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
       {mode === "print" ? <rect x={0} y={0} width={outerW} height={outerH} fill="#FFFFFF" /> : null}
       <defs>
         <clipPath id={`${uid}-bleed`}><rect x={off} y={off} width={w + b * 2} height={h + b * 2} /></clipPath>
+        {cut ? <clipPath id={`${uid}-die`}><path d={die} clipRule="evenodd" /></clipPath> : null}
       </defs>
       <g clipPath={`url(#${uid}-bleed)`}>
-        <g transform={`translate(${off} ${off})`}>{body}</g>
+        <g transform={`translate(${off} ${off})`}>
+          {cut ? <g clipPath={`url(#${uid}-die)`}>{body}</g> : body}
+        </g>
       </g>
 
       {mode === "screen" && guides ? (() => {
@@ -82,6 +88,8 @@ export default function TemplateSheet({ def, values, pageId, qrs, mode, guides =
             <rect x={trim.x} y={trim.y} width={w} height={h} fill="none" stroke="#0066FF" strokeWidth={0.2 * k} />
             <rect x={trim.x + sf.left} y={trim.y + sf.top} width={w - sf.left - sf.right} height={h - sf.top - sf.bottom}
               fill="none" stroke="#AAAAAA" strokeWidth={0.15 * k} strokeDasharray={`${0.8 * k} ${0.6 * k}`} />
+            {/* the die line in the press's magenta */}
+            {die ? <path d={die} transform={`translate(${off} ${off})`} fill="none" stroke="#EC008C" strokeWidth={0.2 * k} strokeDasharray={`${1 * k} ${0.5 * k}`} /> : null}
           </g>
         );
       })() : null}

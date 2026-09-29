@@ -72,7 +72,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
     });
     return () => { alive = false; };
   }, [def]);
-  const statusOf = (style: string): StyleStatus => styles?.statuses[style] ?? "approved";
+  const statusOf = (style: string): StyleStatus => (def ? styleStatus(def, styles?.statuses ?? {}, style) : "approved");
   /* A post makes its photo ready whenever the photo changes: what it was
      shot on (white, black, a cut-out, a scene — the choice stays editable)
      and a copy no larger than a post needs. The product's own slots that
@@ -370,6 +370,12 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
 /** The approved styles as small copies of this very card — both sides. */
 const STATUSES: StyleStatus[] = ["approved", "draft", "retired"];
 
+/** A style's standing: the saved one, else a draft for a style that starts
+ *  as one (the owner's references), else approved. */
+function styleStatus(def: TemplateDef, statuses: Record<string, StyleStatus>, style: string): StyleStatus {
+  return statuses[style] ?? (def.draftStyles?.includes(style) ? "draft" : "approved");
+}
+
 /** Someone who only uses the templates never lands on a style they cannot
  *  pick (a draft default, a saved fill in a retired style): the first
  *  approved style instead. Those who manage Brand Center see every style. */
@@ -377,7 +383,7 @@ function onApprovedStyle(def: TemplateDef, v: TemplateValues, s: { canManage: bo
   if (s.canManage) return v;
   const field = def.fields.find((f) => f.key === "style");
   if (!field || field.kind !== "choice") return v;
-  const approved = field.options.map((o) => o.value).filter((x) => (s.statuses[x] ?? "approved") === "approved");
+  const approved = field.options.map((o) => o.value).filter((x) => styleStatus(def, s.statuses, x) === "approved");
   if (!approved.length || approved.includes(String(v.style))) return v;
   return def.restyle ? def.restyle(v, approved[0]) : { ...v, style: approved[0] };
 }

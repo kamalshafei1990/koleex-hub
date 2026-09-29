@@ -16,6 +16,7 @@ import { CARD_ADDRESS, LANGS, asLang, defaultRows, qrsOf, relangRows, rowsOf, st
 const KOLEEX_WEB = "www.koleexgroup.com";
 import { NO_COMPANY_BACK, NO_COMPANY_FRONT, PORTRAIT_STYLES, STYLES, VERTICAL_STYLES, drawBack, drawFront, specKeysFor, styleOf } from "./card/styles";
 import { PATTERN_CARD_STYLES } from "./card/premium";
+import { DESCRIPTOR, DESCRIPTOR_STYLES, LABELLED_REFS, REF_STYLES, isReference, referenceDie } from "./card/reference";
 import { patternOptions } from "./patterns";
 
 const SIZES: Record<string, { w: number; h: number }> = {
@@ -145,12 +146,15 @@ export const businessCard: TemplateDef = {
     { key: "badgePlace", kind: "text", labelKey: "tpl.f.badgePlace", group: "person", max: 40, hintKey: "tpl.f.badgePlaceHint", when: isStyle("dealer") },
     { key: "badgeYear", kind: "text", labelKey: "tpl.f.badgeYear", group: "person", max: 4, when: isStyle("dealer") },
 
-    { key: "company", kind: "text", labelKey: "tpl.f.company", group: "company", max: 60, hintKey: "tpl.f.companyHint" },
+    { key: "company", kind: "text", labelKey: "tpl.f.company", group: "company", max: 60, hintKey: "tpl.f.companyHint", when: (v) => !isReference(v) },
+    { key: "descriptorOn", kind: "switch", labelKey: "tpl.f.descriptorOn", group: "company", when: (v) => DESCRIPTOR_STYLES.includes(styleOf(v)) },
+    { key: "descriptor", kind: "text", labelKey: "tpl.f.descriptor", group: "company", max: 48, hintKey: "tpl.f.descriptorHint", when: (v) => DESCRIPTOR_STYLES.includes(styleOf(v)) && v.descriptorOn !== false },
     { key: "companyBack", kind: "switch", labelKey: "tpl.f.companyBack", group: "company", when: (v) => !NO_COMPANY_BACK.includes(styleOf(v)) },
     { key: "companyFront", kind: "switch", labelKey: "tpl.f.companyFront", group: "company", when: (v) => !NO_COMPANY_FRONT.includes(styleOf(v)) },
 
     { key: "rows", kind: "rows", labelKey: "tpl.f.rows", group: "contacts", langKey: "lang" },
-    { key: "labels", kind: "switch", labelKey: "tpl.f.labels", group: "contacts" },
+    /* the references print their lines bare — all but one */
+    { key: "labels", kind: "switch", labelKey: "tpl.f.labels", group: "contacts", when: (v) => !isReference(v) || LABELLED_REFS.includes(styleOf(v)) },
     { key: "whatsapp", kind: "switch", labelKey: "tpl.f.whatsapp", group: "contacts" },
 
     { key: "photo", kind: "image", labelKey: "tpl.f.photo", group: "photo", hintKey: "tpl.f.photoHint", fromPerson: "photo", when: isStyle(...PORTRAIT_STYLES) },
@@ -169,7 +173,7 @@ export const businessCard: TemplateDef = {
   defaults: {
     style: "team-black", lang: "en", lang2: "zh", size: "90x54", font: "inter", scale: 100, pattern: "scan-edge",
     name: "", nameSep: "dot", title: "", name2: "", title2: "", hotline: "", dealerName: "", dealerLogo: "", badgeRole: "Distributor", badgePlace: "", badgeYear: String(new Date().getFullYear()),
-    company: "KOLEEX INTERNATIONAL GROUP", companyBack: true, companyFront: false,
+    company: "KOLEEX INTERNATIONAL GROUP", companyBack: true, companyFront: false, descriptor: DESCRIPTOR.en, descriptorOn: true,
     rows: defaultRows("en"), labels: true, whatsapp: true,
     photo: "", photoZoom: 100, photoX: 0, photoY: 0, soft: true,
     stroke: true, bar: true, slash: true, italic: true,
@@ -179,11 +183,17 @@ export const businessCard: TemplateDef = {
     { id: "front", draw: drawFront },
     { id: "back", draw: drawBack },
   ],
+  die: referenceDie,
+  draftStyles: REF_STYLES,
   qrRequests,
   fromPerson: cardFromPerson,
   specKeys: specKeysFor,
   fillName: (v, t) => t(`tpl.style.${styleOf(v)}`),
-  relang: (v, lang) => ({ ...v, lang, rows: relangRows(list(v, "rows"), asLang(lang)) }),
+  /* The descriptor still at the book's words follows the language (ch. 21). */
+  relang: (v, lang) => ({
+    ...v, lang, rows: relangRows(list(v, "rows"), asLang(lang)),
+    ...(LANGS.some((l) => DESCRIPTOR[l] === v.descriptor) ? { descriptor: DESCRIPTOR[asLang(lang)] } : {}),
+  }),
   /* A style brings its own typeface; the owner's card also brings its two
      QR codes while the list is still the untouched default (and back). */
   restyle: (v, style) => {

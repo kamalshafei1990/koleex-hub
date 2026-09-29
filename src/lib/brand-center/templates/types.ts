@@ -131,6 +131,14 @@ export interface TemplateDef {
   rekey?: Record<string, (v: TemplateValues, value: TemplateValue) => TemplateValues>;
   /** The pages this fill shows and prints (e.g. no back side), by id. */
   pagesFor?: (v: TemplateValues) => string[];
+  /** The die line when the piece is cut to a shape (round corners, a
+   *  hole): an SVG path in the page's mm, origin at the top-left of the
+   *  bleed; a hole is one more subpath (even-odd). The screen shows the cut
+   *  piece, the guides draw the line; the print file keeps its full bleed. */
+  die?: (v: TemplateValues, pageId: string, box: { w: number; h: number; bleed: number }) => string | null;
+  /** Styles that start as drafts until the owner approves them (a saved
+   *  status always wins). */
+  draftStyles?: readonly string[];
   /** The slots a chosen employee fills (name, title, photo …). */
   fromPerson?: (p: BcPerson, v: TemplateValues) => TemplateValues;
   /** What is still missing before it can print (a words key), or null. */
