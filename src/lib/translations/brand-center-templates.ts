@@ -518,4 +518,9 @@ export const brandCenterTemplatesT: Translations = {
   "cert.weight.medium":   { en: "Medium", zh: "中等", ar: "متوسط" },
   "cert.f.mark":          { en: "The large K mark", zh: "大号 K 标志", ar: "حرف K الكبير" },
   "cert.spec.guilloche":  { en: "Guilloche: 0.09 mm lines — print at 100% on a laser or offset press; they are also a light security feature.", zh: "扭索纹：0.09 毫米细线 — 用激光或胶印按 100% 印刷；同时具有轻度防伪作用。", ar: "الجيلوش: خطوط 0.09 مم — اطبع 100% ليزر أو أوفست؛ وهي كمان علامة أمان خفيفة." },
+
+  /* ── certificates, round 3 (owner 30/09: "not bad but even better") ── */
+  "cert.f.silverName":   { en: "The name in silver foil", zh: "姓名使用银色烫印", ar: "الاسم بالفضي (فويل)" },
+  "cert.spec.silverName": { en: "The name in silver foil (Pantone 877 C) — on screen shown as a dark silver.", zh: "姓名用银色烫印（Pantone 877 C）— 屏幕上显示为深银色。", ar: "الاسم سلفر فويل (Pantone 877 C) — على الشاشة بيبان فضي غامق." },
+  "cert.spec.micro":     { en: "The fine lines over the signatures and at the foot are microtext — the group's name in 1-point capitals; print at 600 dpi or finer.", zh: "签名上方和页脚的细线是微缩文字 — 1 磅大写的集团名称；请以 600 dpi 或更高精度印刷。", ar: "الخطوط الرفيعة فوق التوقيعات وتحت هي كلام ميكرو — اسم المجموعة بحروف 1 بوينت؛ اطبع 600 dpi أو أدق." },
 };

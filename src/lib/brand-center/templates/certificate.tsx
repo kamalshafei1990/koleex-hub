@@ -136,6 +136,7 @@ function read(v: TemplateValues, ctx: DrawContext) {
     foot, footName: foot === "legal" ? legalNameEn(issued(v)) : EVERYDAY_NAME_EN,
     nameWeight: WEIGHTS[String(v.nameWeight)] ?? WEIGHTS[STYLE_LOOK[style].nameWeight],
     mark: v.mark !== false,
+    silverName: v.silverName === true,
     qrs: qrsOf(v),
   };
 }
@@ -241,7 +242,7 @@ function Grid({ r, x, y, width, cells, look, align }: { r: R; x: number; y: numb
     bottom: y + hgt,
     node: (
       <g>
-        <rect x={x} y={y} width={width} height={0.2} fill={look.line} />
+        <MicroLine r={r} id="grid" x={x} y={y} width={width} fill={look.faint} />
         {ordered.map((c, i) => {
           const cx0 = x + i * cw;
           const first = r.rtl ? i === n - 1 : i === 0;
@@ -282,7 +283,7 @@ function Body({ r, top, bottom, o }: { r: R; top: number; bottom: number; o: Bod
     const hero = heroFit(r, o.max * r.k, o.min * r.k, o.width);
     hero.lines.forEach((l, i) => {
       y += i === 0 ? hero.size * 0.92 : hero.size * 1.08;
-      nodes.push(<Txt key={`n${i}`} r={r} x={o.x} y={y} size={hero.size} fill={o.look.nameFill ?? o.look.ink} weight={r.nameWeight} anchor={anchor} max={o.width} spacing={hero.size >= 14 * u && r.nameWeight <= 400 ? -hero.size * 0.012 : undefined}>{l}</Txt>);
+      nodes.push(<Txt key={`n${i}`} r={r} x={o.x} y={y} size={hero.size} fill={o.look.nameFill ?? (r.silverName ? `url(#${r.uid}-silverink)` : o.look.ink)} weight={r.nameWeight} anchor={anchor} max={o.width} spacing={hero.size >= 14 * u && r.nameWeight <= 400 ? -hero.size * 0.012 : undefined}>{l}</Txt>);
     });
     y += hero.size * 0.12;
     if (r.name2 && r.name2 !== r.name) { const s = 6 * u; y += s * 1.5; nodes.push(<Txt key="n2" r={r} x={o.x} y={y} size={s} fill={o.look.ink} weight={300} anchor={anchor} max={o.width}>{r.name2}</Txt>); }
@@ -321,7 +322,7 @@ function Foot({ r, x0, x1, look }: { r: R; x0: number; x1: number; look: Look })
     top: y,
     node: (
       <g>
-        <rect x={x0} y={y} width={room} height={0.15} fill={look.line} />
+        <MicroLine r={r} id="foot" x={x0} y={y} width={room} fill={look.line} />
         <Txt r={r} x={x0} y={y + 5 * u} size={s} fill={look.faint} weight={600} anchor="start" spacing={s * 0.12} ltr max={room * (room > 200 * u ? 0.4 : 0.56)}>{r.footName}</Txt>
         {room > 200 * u ? <Txt r={r} x={(x0 + x1) / 2} y={y + 5 * u} size={s} fill={look.faint} weight={600} spacing={s * 0.3} ltr>{tagline}</Txt> : null}
         <Txt r={r} x={x1} y={y + 5 * u} size={s} fill={look.faint} weight={500} anchor="end" ltr max={room * (room > 200 * u ? 0.3 : 0.4)}>{r.foot === "legal" ? KOLEEX_COMPANY.zh : KOLEEX_COMPANY.web}</Txt>
@@ -389,30 +390,86 @@ function Rosette({ cx, cy, r0, r1, color, rings = 7, lobes = 12, width = 0.09 }:
   return <g fill="none" stroke={color} strokeWidth={width}>{out.map((d, i) => <path key={i} d={d} />)}</g>;
 }
 
-/** The silver foil seal: guilloche rings, the tagline and the group's name
- *  around the rim, the logo on a clear centre. */
+/** Microtext: a line that is, close up, the group's name and tagline in
+ *  1-point capitals — the fine print of certificates and banknotes. */
+const MICRO = "KOLEEX INTERNATIONAL GROUP  ·  SHAPING THE FUTURE  ·  ";
+function MicroLine({ r, id, x, y, width, fill }: { r: R; id: string; x: number; y: number; width: number; fill: string }) {
+  const s = 0.5 * r.u;
+  const unit = textWidth(MICRO, s, 500, r.font) || s * 32;
+  const text = MICRO.repeat(Math.max(1, Math.ceil(width / unit) + 1));
+  const cid = `${r.uid}-micro-${id}`;
+  return (
+    <g>
+      <defs><clipPath id={cid}><rect x={x} y={y - s} width={width} height={s * 2} /></clipPath></defs>
+      <text x={x} y={y + s * 0.36} direction="ltr" textAnchor="start" fill={fill} clipPath={`url(#${cid})`}
+        style={{ fontFamily: r.font, fontSize: s, fontWeight: 500, letterSpacing: s * 0.04 }}>{text}</text>
+    </g>
+  );
+}
+
+/** The underprint: overlaid spirograph curves (hypotrochoids) around a
+ *  clear centre, in the lightest grey — the security print under a
+ *  banknote or a diploma. Cached: the same page draws the same curves. */
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+const UNDERPRINT = new Map<string, string[]>();
+function underprint(cx: number, cy: number, R: number): string[] {
+  const key = `${cx.toFixed(1)}|${cy.toFixed(1)}|${R.toFixed(1)}`;
+  const hit = UNDERPRINT.get(key);
+  if (hit) return hit;
+  const curves: Array<[number, number, number, number]> = [[40, 9, 14, 0], [40, 9, 14, Math.PI / 40], [40, 9, 7, 0], [36, 11, 16, 0], [36, 11, 16, Math.PI / 36]];
+  const out = curves.map(([A, B, D, rot]) => {
+    const k = (A - B) / B, loops = B / gcd(A, B), n = 160 * loops, maxR = A - B + D;
+    let d = "";
+    for (let i = 0; i <= n; i++) {
+      const t = (i / n) * loops * 2 * Math.PI;
+      const x = (A - B) * Math.cos(t) + D * Math.cos(k * t), y = (A - B) * Math.sin(t) - D * Math.sin(k * t);
+      const xr = x * Math.cos(rot) - y * Math.sin(rot), yr = x * Math.sin(rot) + y * Math.cos(rot);
+      d += `${i ? "L" : "M"}${(cx + (xr / maxR) * R).toFixed(2)} ${(cy + (yr / maxR) * R).toFixed(2)}`;
+    }
+    return d;
+  });
+  if (UNDERPRINT.size > 40) UNDERPRINT.clear();
+  UNDERPRINT.set(key, out);
+  return out;
+}
+function Underprint({ cx, cy, R, color }: { cx: number; cy: number; R: number; color: string }) {
+  return <g fill="none" stroke={color} strokeWidth={0.1}>{underprint(cx, cy, R).map((d, i) => <path key={i} d={d} />)}</g>;
+}
+
+/** The seal, a foil medallion: a scalloped silver rim, the tagline and the
+ *  group's name around it, a guilloche band, and the K of the wordmark on
+ *  a clear centre. */
 function Seal({ r, cx, cy, rad, dark }: { r: R; cx: number; cy: number; rad: number; dark: boolean }) {
   if (r.seal !== "silver") return null;
   const id = `${r.uid}-seal`;
-  const rt = rad * 0.84;
+  const rt = rad * 0.8;
   const ring = `M ${cx - rt} ${cy} a ${rt} ${rt} 0 1 1 ${rt * 2} 0 a ${rt} ${rt} 0 1 1 ${-rt * 2} 0`;
-  const lw = rad * 0.86;
+  let rim = "";
+  for (let i = 0; i <= 720; i++) {
+    const t = (i / 720) * Math.PI * 2;
+    const rr = rad * (1 - 0.028 * (1 - Math.cos(72 * t)) / 2);
+    rim += `${i ? "L" : "M"}${(cx + rr * Math.cos(t)).toFixed(2)} ${(cy + rr * Math.sin(t)).toFixed(2)}`;
+  }
   const words = `${KOLEEX_COMPANY.tagline.replace(/\.$/, "")}  ·  KOLEEX INTERNATIONAL GROUP  ·  `;
+  const kh = rad * 0.46;
+  const kw = (kh * 116.59) / 107.57;
   return (
     <g>
       <defs>
-        <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient>
+        <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">
+          {["#F2F2F7", "#FFFFFF", "#D1D1D6", "#AEAEB2", "#E5E5EA"].map((c, i) => <stop key={i} offset={[0, 0.3, 0.55, 0.8, 1][i]} stopColor={c} />)}
+        </linearGradient>
         <path id={`${id}-p`} d={ring} />
       </defs>
-      <circle cx={cx} cy={cy} r={rad} fill={`url(#${id}-g)`} />
-      <circle cx={cx} cy={cy} r={rad * 0.97} fill="none" stroke="#8E8E93" strokeWidth={0.15} />
-      <circle cx={cx} cy={cy} r={rad * 0.74} fill="none" stroke="#8E8E93" strokeWidth={0.15} />
-      <Rosette cx={cx} cy={cy} r0={rad * 0.56} r1={rad * 0.72} color="#8E8E93" rings={6} lobes={18} width={0.07} />
-      <circle cx={cx} cy={cy} r={rad * 0.54} fill={dark ? INK : WHITE} stroke="#8E8E93" strokeWidth={0.15} />
-      <text fill="#3A3A3C" style={{ fontFamily: r.font, fontSize: rad * 0.11, fontWeight: 600 }}>
+      <path d={`${rim}Z`} fill={`url(#${id}-g)`} stroke="#AEAEB2" strokeWidth={0.12} />
+      <circle cx={cx} cy={cy} r={rad * 0.9} fill="none" stroke="#8E8E93" strokeWidth={0.18} />
+      <text fill="#3A3A3C" style={{ fontFamily: r.font, fontSize: rad * 0.1, fontWeight: 600 }}>
         <textPath href={`#${id}-p`} textLength={2 * Math.PI * rt * 0.985} lengthAdjust="spacing">{words}</textPath>
       </text>
-      <Logo x={cx - lw / 2} y={cy - logoHeight(lw) / 2} width={lw} fill={dark ? WHITE : INK} />
+      <circle cx={cx} cy={cy} r={rad * 0.7} fill="none" stroke="#8E8E93" strokeWidth={0.18} />
+      <Rosette cx={cx} cy={cy} r0={rad * 0.5} r1={rad * 0.68} color="#8E8E93" rings={8} lobes={24} width={0.06} />
+      <circle cx={cx} cy={cy} r={rad * 0.48} fill={dark ? INK : "#F7F7F9"} stroke="#8E8E93" strokeWidth={0.18} />
+      <path d={K_PATH} fill={dark ? WHITE : "#1C1C1E"} transform={`translate(${cx - kw / 2} ${cy - kh / 2}) scale(${kh / 107.57})`} />
     </g>
   );
 }
@@ -432,7 +489,22 @@ function Codes({ r, x, y, size, look }: { r: R; x: number; y: number; size: numb
 
 /* ── the nine styles ───────────────────────────────────────────────────── */
 
+/** Every page: the silvers first, then its style. */
 function page(v: TemplateValues, ctx: DrawContext): ReactNode {
+  const uid = ctx.uid;
+  return (
+    <>
+      <defs>
+        <linearGradient id={`${uid}-silverink`} x1="0" y1="0" x2="1" y2="0.35">
+          {["#48484A", "#8E8E93", "#3A3A3C", "#6E6E73"].map((c, i) => <stop key={i} offset={[0, 0.4, 0.7, 1][i]} stopColor={c} />)}
+        </linearGradient>
+      </defs>
+      {styled(v, ctx)}
+    </>
+  );
+}
+
+function styled(v: TemplateValues, ctx: DrawContext): ReactNode {
   const r = read(v, ctx);
   const { b, w, h, W, H, u, tall } = r;
   const style = styleOf(v);
@@ -461,6 +533,11 @@ function page(v: TemplateValues, ctx: DrawContext): ReactNode {
     const logoY = b + (framed ? inset + T + 12 : 20) * u;
     const nodes: ReactNode[] = [<rect key="bg" x={0} y={0} width={W} height={H} fill={look.paper} />];
     nodes.push(<defs key="defs"><linearGradient id={`${r.uid}-silver`} x1="0" y1="0" x2="1" y2="1">{SILVER.map((c, i) => <stop key={c} offset={[0, 0.35, 0.62, 1][i]} stopColor={c} />)}</linearGradient></defs>);
+    if (style !== "corners") {
+      /* the underprint behind the name (the award's sits behind its seal) */
+      const upR = (tall ? 0.36 : 0.3) * Math.min(w, h) * 1.2;
+      if (!award) nodes.push(<Underprint key="up" cx={cx} cy={b + h * (tall ? 0.42 : 0.47)} R={upR} color={dark ? "#1F1F21" : "#E6E6EA"} />);
+    }
     if (framed) nodes.push(<Guilloche key="g" x0={b + inset} y0={b + inset} x1={b + w - inset} y1={b + h - inset} T={T} color={dark ? "#636366" : "#AEAEB2"} />);
     if (style === "corners") {
       const ci = 8 * u, arm = 16 * u, t = 0.5;
@@ -493,7 +570,9 @@ function page(v: TemplateValues, ctx: DrawContext): ReactNode {
       sealBelow = false;
       body = Body({ r, top, bottom: gridY - 18 * u, o: bodyOpts });
     }
-    if (award && r.seal === "silver" && sealBelow) nodes[rosetteAt] = <Rosette key="ar" cx={cx} cy={gridY - sealR - 12 * u} r0={sealR * 1.08} r1={sealR * 1.85} color="#D8D8DD" rings={9} lobes={28} width={0.08} />;
+    if (award) nodes[rosetteAt] = sealBelow && r.seal === "silver"
+      ? <Underprint key="ar" cx={cx} cy={gridY - sealR - 12 * u} R={sealR * 2.4} color="#E3E3E8" />
+      : <Underprint key="ar" cx={cx} cy={b + h * 0.5} R={0.36 * Math.min(w, h)} color="#E6E6EA" />;
     nodes.push(<g key="body">{body.node}</g>);
     const grid = Grid({ r, x: cx - gridW / 2, y: gridY, width: gridW, cells: signCells(r), look, align: "middle" });
     nodes.push(<g key="grid">{grid.node}</g>);
@@ -741,6 +820,7 @@ export const certificate: TemplateDef = {
       { value: "light", labelKey: "sig.weight.light" }, { value: "regular", labelKey: "sig.weight.regular" }, { value: "medium", labelKey: "cert.weight.medium" }, { value: "bold", labelKey: "sig.weight.bold" },
     ] },
     { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => isStyle("monolith", "editorial", "dots")(v) },
+    { key: "silverName", kind: "switch", labelKey: "cert.f.silverName", group: "look", when: (v) => !isStyle("black")(v) },
 
     { key: "heading", kind: "text", labelKey: "cert.f.heading", group: "words", max: 60 },
     { key: "pre", kind: "text", labelKey: "cert.f.pre", group: "words", max: 80 },
@@ -768,7 +848,7 @@ export const certificate: TemplateDef = {
     { key: "qrs", kind: "qrs", labelKey: "tpl.f.qrs", group: "qr", langKey: "lang" },
   ],
   defaults: {
-    kind: "training", style: "classic", size: "a4-land", lang: "en", font: "inter", scale: 100, nameWeight: "light", mark: true,
+    kind: "training", style: "classic", size: "a4-land", lang: "en", font: "inter", scale: 100, nameWeight: "light", mark: true, silverName: false,
     heading: START.heading, pre: START.pre, name: "", name2: "", org: "", statement: START.statement, facts: factRows("training", "en"),
     date: today(), number: numberFor("training"),
     sig1Name: "", sig1Role: START.sig1, sig1Image: "", sig2On: true, sig2Name: "", sig2Role: START.sig2, sig2Image: "",
@@ -786,6 +866,8 @@ export const certificate: TemplateDef = {
     "cert.spec.paper",
     ...(isStyle("black")(v) ? ["cert.spec.black"] : []),
     ...(isStyle("guilloche", "black")(v) ? ["cert.spec.guilloche"] : []),
+    ...(v.silverName === true ? ["cert.spec.silverName"] : []),
+    "cert.spec.micro",
     ...(v.seal === "silver" ? ["cert.spec.seal"] : v.seal === "emboss" ? ["cert.spec.emboss"] : []),
     "cert.spec.number",
     ...(kindOf(v) === "warranty" ? ["cert.spec.warranty"] : []),
