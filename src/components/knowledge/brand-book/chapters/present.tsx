@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+import { EVERYDAY_NAME_EN } from "@/lib/legal-name";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import {
@@ -391,11 +392,13 @@ export function Letterhead() {
 /* ── 93 · Email Signature ──────────────────────────────────────────────── */
 
 /* Served by Koleex Hub from our own domain — reachable from mainland China. */
-const SIGNATURE_LOGO = "https://hub.koleexgroup.com/brand/kit/koleex-logo-black-1000.png";
+/* The logo on its own white tile: a mail app in dark mode flips colours but
+   not pictures, so a transparent black logo would vanish on black. */
+const SIGNATURE_LOGO = "https://hub.koleexgroup.com/brand/email/koleex-logo-black-on-white.png";
 
 const SIGNATURE_HTML = `<table cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;color:#000000;font-size:13px;line-height:1.5">
-  <tr><td style="padding-bottom:8px"><strong>Full Name</strong><br><span style="color:#6E6E73">Job Title · KOLEEX</span></td></tr>
-  <tr><td style="padding-bottom:8px"><img src="${SIGNATURE_LOGO}" width="120" alt="KOLEEX" style="display:block"></td></tr>
+  <tr><td style="padding-bottom:8px"><strong>Full Name</strong><br><span style="color:#6E6E73">Job Title · ${EVERYDAY_NAME_EN}</span></td></tr>
+  <tr><td style="padding-bottom:8px"><img src="${SIGNATURE_LOGO}" width="132" alt="KOLEEX" style="display:block"></td></tr>
   <tr><td style="color:#6E6E73;font-size:12px">M ${KOLEEX_COMPANY.mobile} (WhatsApp)<br>${KOLEEX_COMPANY.email} · ${KOLEEX_COMPANY.web}</td></tr>
 </table>`;
 
@@ -421,7 +424,7 @@ export function EmailSignature() {
         <Stage bg="#FFFFFF" h="auto" pad={24}>
           <div className="w-full max-w-[360px] text-[13px] leading-[1.5] text-[#1D1D1F]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
             <p className="text-[#6E6E73]">Kind regards,</p>
-            <div className="mt-3"><p className="font-bold">Full Name</p><p className="text-[#6E6E73]">Job Title · KOLEEX</p></div>
+            <div className="mt-3"><p className="font-bold">Full Name</p><p className="text-[#6E6E73]">Job Title · {EVERYDAY_NAME_EN}</p></div>
             <div className="mt-2"><Wordmark color="#000000" width={120} /></div>
             <div className="mt-2 text-[12px] text-[#6E6E73]"><p>M {KOLEEX_COMPANY.mobile} (WhatsApp)</p><p>{KOLEEX_COMPANY.email} · {KOLEEX_COMPANY.web}</p></div>
           </div>
@@ -430,9 +433,10 @@ export function EmailSignature() {
 
       <Section id="sig-rules" title="Rules">
         <Bullets items={[
-          "Name and title in English; add the name in your own script on a second line if you wish.",
+          "Name and title in the language you write in — English, Chinese or Arabic; the name and title in a second language on the next lines if you wish.",
+          `The company is written ${EVERYDAY_NAME_EN} — after the title, on its own line, or under a 160 px logo as the group lockup (ch. 43).`,
           "One phone number, in international format, marked WhatsApp if it is.",
-          "The logo as an image, 120 px wide, from our own domain.",
+          "The logo as a picture, 120 px wide (100 px at least), on its own white tile so dark mode never draws it black on black — from our own domain.",
           "No quotes, animated images, social icon rows or legal disclaimers longer than one line.",
           "No banner — except the event banner below, while there is something to announce.",
           "Replies and forwards use a short version: name, title, phone.",
@@ -443,7 +447,7 @@ export function EmailSignature() {
         <Stage bg="#FFFFFF" h="auto" pad={24}>
           <div className="w-full max-w-[420px]">
             <p className="text-[12px] font-bold text-[#1D1D1F]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>Full Name</p>
-            <p className="mb-2 text-[11px] text-[#6E6E73]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>Job Title · KOLEEX</p>
+            <p className="mb-2 text-[11px] text-[#6E6E73]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>Job Title · {EVERYDAY_NAME_EN}</p>
             <div className="relative overflow-hidden rounded-[4px] bg-black px-5 py-3 text-white" style={{ aspectRatio: "600 / 120" }}>
               <div className="absolute inset-y-0 left-0 w-[1%] bg-white" />
               <div className="flex items-center gap-2"><Wordmark color="#FFFFFF" width={70} /><span className="h-[12px] w-px bg-white/80" /><span className="text-[11px]">CISMA 2025</span></div>
@@ -453,14 +457,18 @@ export function EmailSignature() {
         </Stage>
         <Specs rows={[
           ["When", "Only from the day an event or launch is announced to its last day — then removed"],
-          ["Size", "600 × 120 px PNG, from our own domain, under the signature"],
+          ["Size", "600 × 120 px, black, under the signature — built as text on black, so it still reads with pictures off"],
           ["Content", "The context header (ch. 43) and one line: booth and dates, or the launch"],
           ["Never", "A permanent banner, a slogan banner, or more than one banner"],
         ]} />
       </Section>
 
       <Section id="sig-code" title="Copy it">
-        <P>Paste this into the signature settings of your email app, then change the name, title and phone.</P>
+        <P>
+          Make yours in Brand Center → Templates → Email signature: filled from Employees, in English, Chinese or
+          Arabic, in seven approved layouts that all carry this same content, with the reply version and the event
+          banner. Or paste this into the signature settings of your email app, then change the name, title and phone.
+        </P>
         <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">HTML</span>

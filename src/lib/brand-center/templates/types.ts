@@ -37,8 +37,10 @@ export type FieldDef = Common & (
   | { kind: "image"; hintKey?: string; fromPerson?: "photo" }
   /** A job title from the title library, or typed. */
   | { kind: "title"; langKey: string }
-  /** The contact lines: label + value each, add / remove / reorder / hide. */
-  | { kind: "rows"; langKey: string }
+  /** The contact lines: label + value each, add / remove / reorder / hide.
+   *  `labels`: the default label of each kind by language (the card's own
+   *  when absent). */
+  | { kind: "rows"; langKey: string; labels?: Record<string, Record<string, string>> }
   /** QR codes: each on the front or the back, generated or a picture. */
   | { kind: "qrs"; langKey: string }
 );
@@ -62,6 +64,21 @@ export interface DrawContext {
 
 export interface QrRequest { id: string; text: string; level: "M" | "H" }
 
+/** A template that is not paper (the email signature): the studio shows it
+ *  as a mail app will and copies it as HTML instead of printing. */
+export interface HtmlOutput {
+  /** Tables and inline styles only. `base` is where pictures load from — our
+   *  domain in a copy, the studio's own address in its preview; `preview`
+   *  shows placeholders in empty slots. */
+  render: (v: TemplateValues, o: { variant: string; base: string; preview?: boolean }) => string;
+  /** The same as plain text (the clipboard's second format). */
+  text: (v: TemplateValues, variant: string) => string;
+  /** The versions offered, e.g. full and reply — words keys `sig.variant.<id>`. */
+  variants: string[];
+  /** Our domain: every picture in a copy loads from it. */
+  host: string;
+}
+
 export interface TemplateDef {
   id: string;
   /** Brand Center item this template makes (library key). */
@@ -80,6 +97,8 @@ export interface TemplateDef {
   usesPeople?: boolean;
   fields: FieldDef[];
   defaults: TemplateValues;
+  /** Set for a template that is HTML, not paper (then `pages` is empty). */
+  html?: HtmlOutput;
   pages: TemplatePage[];
   /** The QR codes to generate for this fill. */
   qrRequests?: (v: TemplateValues) => QrRequest[];

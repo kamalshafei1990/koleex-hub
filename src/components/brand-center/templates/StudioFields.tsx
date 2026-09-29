@@ -204,7 +204,7 @@ function RowsField({ t, f, values, setMany }: { t: T; f: Extract<FieldDef, { kin
         <select aria-label={t("studio.rowKind")} value={adding} onChange={(e) => setAdding(e.target.value as RowKind)} className={`${FIELD} !w-auto !py-1 !text-[12px]`}>
           {ROW_KINDS.map((k) => <option key={k} value={k}>{t(`row.${k}`)}</option>)}
         </select>
-        <button type="button" className={SMALL} onClick={() => save([...rows, { id: newId("r"), kind: adding, label: ROW_LABELS[lang][adding], value: "", on: true }])}>
+        <button type="button" className={SMALL} onClick={() => save([...rows, { id: newId("r"), kind: adding, label: (f.labels ?? ROW_LABELS)[lang]?.[adding] ?? "", value: "", on: true }])}>
           {t("studio.rowAdd")}
         </button>
       </div>

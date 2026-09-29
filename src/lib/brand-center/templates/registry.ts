@@ -5,8 +5,9 @@ import type { TemplateDef } from "./types";
 import { businessCard } from "./business-card";
 import { printProof } from "./print-proof";
 import { idBadge } from "./id-badge";
+import { emailSignature } from "./email-signature";
 
-export const TEMPLATES: TemplateDef[] = [businessCard, idBadge, printProof];
+export const TEMPLATES: TemplateDef[] = [businessCard, idBadge, emailSignature, printProof];
 
 /** Old addresses that still open the right template. */
 const ALIASES: Record<string, string> = { "business-card-team": "business-card" };

@@ -32,12 +32,13 @@ import TemplateSheet from "./TemplateSheet";
 import { Field } from "./StudioFields";
 import { printTemplate } from "./print";
 import SavedTemplates from "./SavedTemplates";
+import HtmlPreview from "./HtmlPreview";
 
 const WORDS = { ...brandCenterLibraryT, ...brandCenterTemplatesT };
 type T = (k: string) => string;
 type People = { state: "loading" } | { state: "error" } | { state: "ready"; scope: "all" | "self"; people: BcPerson[] };
 
-const GROUPS = ["look", "job", "person", "company", "contacts", "photo", "details", "back", "qr"];
+const GROUPS = ["look", "job", "person", "company", "brand", "contacts", "photo", "details", "banner", "back", "qr"];
 
 export default function TemplateStudio({ templateId }: { templateId: string }) {
   const { t } = useTranslation(WORDS);
@@ -141,7 +142,7 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
   return (
     <div className="min-h-full">
       <div className="mx-auto w-full max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-8">
-        <PageHeader title={heading} subtitle={fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
+        <PageHeader title={heading} subtitle={def.html ? t("sig.subtitle") : fill(t("studio.size"), { w: size.w, h: size.h, b: def.bleed, s: def.safe })}
           icon={<BrandCenterIcon size={16} />} showTabs={false} backHref="/brand-center" backLabel={t("back.center")} />
 
         {styleField && styleField.kind === "choice" ? (
@@ -172,6 +173,13 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
           </aside>
 
           <section data-kx-pane className={`${CARD} px-4 py-4 lg:sticky lg:top-4`}>
+            {def.html ? (
+              <>
+                <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{heading}</h2>
+                <HtmlPreview t={t} def={def} html={def.html} values={values} fileBase={fileBase} />
+              </>
+            ) : (
+            <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{heading}</h2>
               <label className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
@@ -199,10 +207,12 @@ export default function TemplateStudio({ templateId }: { templateId: string }) {
               {blocked ? <span role="alert" className="text-[12px] text-red-500">{t(blocked)}</span> : null}
             </div>
             <p className="mt-2 max-w-2xl text-[11.5px] leading-5 text-[var(--text-dim)]">{t("studio.printHint")}</p>
+            </>
+            )}
 
             {def.specKeys ? (
               <div className="mt-4 rounded-xl border border-[var(--border-subtle)] px-3 py-3">
-                <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("studio.spec")}</p>
+                <p className="text-[12px] font-semibold text-[var(--text-secondary)]">{t(def.html ? "sig.specTitle" : "studio.spec")}</p>
                 <ul className="mt-1.5 grid gap-1 text-[12px] text-[var(--text-secondary)]">
                   {def.specKeys(values).map((k) => <li key={k}>{t(k)}</li>)}
                 </ul>
@@ -230,6 +240,7 @@ function StylePicker({ t, def, values, field, qrs, onPick }: {
           return (
             <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onPick(o.value)}
               className={`flex flex-col items-center gap-2 rounded-xl border px-2 py-2.5 ${on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"}`}>
+              {def.html ? <HtmlThumb html={def.html.render(v, { variant: "full", base: window.location.origin, preview: true })} rtl={v.lang === "ar"} /> : (
               <span className="flex h-[64px] w-full items-center justify-center gap-1.5">
                 {def.pages.filter((p) => !def.pagesFor || def.pagesFor(v).includes(p.id)).map((p) => (
                   <span key={p.id} className={`block overflow-hidden rounded-[2px] shadow-[0_3px_10px_rgba(0,0,0,0.35)] ${tall ? "w-[34px]" : "w-[82px]"}`}>
@@ -237,12 +248,24 @@ function StylePicker({ t, def, values, field, qrs, onPick }: {
                   </span>
                 ))}
               </span>
+              )}
               <span className="text-center text-[11.5px] font-medium leading-tight">{t(o.labelKey)}</span>
             </button>
           );
         })}
       </div>
     </section>
+  );
+}
+
+/** A small copy of an HTML template (the signature) on a white mail. */
+function HtmlThumb({ html, rtl }: { html: string; rtl: boolean }) {
+  return (
+    /* inline white: a selected chip tints the spans inside it */
+    <span className="relative block h-[64px] w-full overflow-hidden rounded-[4px]" style={{ background: "#FFFFFF" }} dir={rtl ? "rtl" : "ltr"}>
+      <span aria-hidden className={`pointer-events-none absolute top-2 block w-[760px] ${rtl ? "right-2 origin-top-right" : "left-2 origin-top-left"}`}
+        style={{ transform: "scale(0.28)" }} dangerouslySetInnerHTML={{ __html: html }} />
+    </span>
   );
 }
 
