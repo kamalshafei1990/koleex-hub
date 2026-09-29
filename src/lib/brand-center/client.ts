@@ -5,12 +5,15 @@
 export type I18n = Partial<Record<"en" | "zh" | "ar", string>>;
 export interface BcOption { id: string; type_id: string; key: string; label: string; label_i18n: I18n; recommended: boolean; chosen: boolean; sort: number }
 export interface BcType { id: string; key: string; label: string; label_i18n: I18n; sort: number; options: BcOption[] }
+import type { ItemRules } from "./rules";
 export interface BcFile { id: string; design_id: string; file_name: string; mime: string | null; size_bytes: number | null; purpose: string; created_at: string }
 export interface BcDesign { id: string; item_id?: string; option_ids: string[]; name: string; kind: string; status: "draft" | "active" | "retired"; is_default: boolean; notes: string | null; updated_at: string; files?: BcFile[] }
 export interface BcItem {
   id: string; group_id: string | null; key: string; name: string; name_i18n: I18n; use_text: string | null;
   importance: "core" | "optional" | "later"; decision: "yes" | "later" | "no"; status: "draft" | "approved" | "retired";
   note: string | null; owner_note: string | null; sort: number;
+  /** The item's rules (C19–C39), {} until its section is built. */
+  rules?: ItemRules | null;
   types: BcType[]; designs: BcDesign[];
 }
 export interface BcSectionRow { id: string; key: string; no: number; name: string; name_i18n: I18n; icon: string | null; groups: number; items: number; types: number }

@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { brandCenterNamesT } from "@/lib/translations/brand-center-names";
 import { brandCenterLibraryT } from "@/lib/translations/brand-center-library";
+import { brandCenterT } from "@/lib/translations/brand-center";
+import ItemRules from "./ItemRules";
 import { bc, type BcItemData } from "@/lib/brand-center/client";
 import PageHeader from "@/components/ui/PageHeader";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -23,7 +25,8 @@ import { FIELD, ImportanceChip, StatusChip } from "./ui";
 import ItemTypes from "./ItemTypes";
 import ItemDesigns from "./ItemDesigns";
 
-const WORDS = { ...brandCenterNamesT, ...brandCenterLibraryT };
+/* brandCenterT: the templates' names on the rules' "Fill in" links */
+const WORDS = { ...brandCenterT, ...brandCenterNamesT, ...brandCenterLibraryT };
 type Field = "name" | "use" | "note" | "importance" | "status";
 
 export default function BrandItemApp({ itemId }: { itemId: string }) {
@@ -101,10 +104,7 @@ export default function BrandItemApp({ itemId }: { itemId: string }) {
       <ItemTypes t={t} itemId={item.id} types={data.types} canEdit={canEdit} onChanged={load} />
       <ItemDesigns t={t} itemId={item.id} types={data.types} designs={data.designs} canEdit={canEdit} onChanged={load} />
 
-      <section data-kx-pane className={`${CARD} mt-4 px-4 py-4`}>
-        <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("item.rules")}</h2>
-        <p className="mt-1 text-[12.5px] text-[var(--text-secondary)]">{t("item.rulesSoon")}</p>
-      </section>
+      <ItemRules t={t} itemId={item.id} rules={item.rules ?? null} canEdit={canEdit} onChanged={load} />
 
       {canEdit && item.status !== "retired" && (
         <div className="mt-6">
