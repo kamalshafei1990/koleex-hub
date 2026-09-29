@@ -75,7 +75,7 @@ export type MarketingPlatform = "facebook" | "instagram" | "linkedin" | "youtube
                 the platform's approval), so the tile says what is missing;
    · "manual" — no API for posting (WeChat, WhatsApp, Douyin): the account is
                 added by name and link, and posts go out with one-tap sharing. */
-export type PlatformFlow = "meta" | "soon" | "manual";
+export type PlatformFlow = "meta" | "instagram" | "soon" | "manual";
 export const PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
   facebook: "meta",
   instagram: "meta",
@@ -91,11 +91,11 @@ export const PLATFORM_ORDER: readonly MarketingPlatform[] = ["facebook", "instag
 export const MANUAL_PLATFORMS = PLATFORM_ORDER.filter((p) => PLATFORM_FLOW[p] === "manual");
 /** CEO Brand's personal accounts (owner, 29/09/2026): a personal Facebook
  *  profile has no posting API since 2018, so it is shared by hand like
- *  WeChat and Douyin; Instagram (a Creator account, Instagram Login) and
- *  LinkedIn (the member's profile) connect in the next steps. */
+ *  WeChat and Douyin; Instagram signs in with Instagram Login (a Creator
+ *  account, no Facebook Page); LinkedIn (the member's profile) comes next. */
 export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = {
   facebook: "manual",
-  instagram: "soon",
+  instagram: "instagram",
   linkedin: "soon",
   youtube: "soon",
   tiktok: "soon",
@@ -141,4 +141,6 @@ export interface MarketingSetup {
   tokenKey: boolean;
   meta: boolean;
   cron: boolean;
+  /** The Meta app's Instagram product keys (Business Login for Instagram). */
+  instagram: boolean;
 }

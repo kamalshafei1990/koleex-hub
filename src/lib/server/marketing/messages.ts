@@ -208,7 +208,7 @@ export async function syncMessages(tenantId: string, accountId: string, opts: { 
   /* Claimed first, even without the permissions: the account then waits its
      turn like the others. */
   if (!(await claimMessages(a, opts.minGapMs ?? MESSAGES_REFRESH_MS))) return { ok: true, skipped: "fresh" };
-  if (!messageScopesFor(a.platform).every((s) => a.scopes.includes(s))) return { ok: true, skipped: "no_permission" };
+  if (!messageScopesFor(a.platform, a.scopes).every((s) => a.scopes.includes(s))) return { ok: true, skipped: "no_permission" };
   const first = typeof a.sync_state.messages_since !== "string";
   const ruleDue = a.sync_state.messages_rule !== MESSAGES_RULE;
   const readTo = typeof a.sync_state.messages_read_to === "string" ? a.sync_state.messages_read_to : null;

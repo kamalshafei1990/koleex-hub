@@ -200,6 +200,10 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "brand-center": { chunks: 8, kbytes: 440 },
   "calendar": { chunks: 12, kbytes: 824 },
   "catalogs": { chunks: 15, kbytes: 1124 },
+  /* CEO Brand (29/09/2026): the Social engine on the CEO's own space —
+     measured 9 chunks / 585 KB (its Feed, the same as Social Marketing's),
+     +12% headroom. */
+  "ceo-brand": { chunks: 10, kbytes: 655 },
   /* Re-measured 2026-08-21 after a chunk repack (11 → 8 chunks, 673 KB —
      fewer, fatter chunks from unrelated shared-module churn; +5 KB tripped
      the old line). Measured + headroom. */

@@ -27,7 +27,9 @@ export const META_GRAPH_VERSION = (process.env.META_GRAPH_VERSION ?? "").trim() 
 
 /** Must match "Valid OAuth Redirect URIs" in the Meta app exactly (the
  *  setup checklist gives the owner this same URL). */
-export const META_REDIRECT_URI = `${(process.env.META_REDIRECT_ORIGIN ?? "").trim() || "https://hub.koleexgroup.com"}/api/marketing/connect/meta/callback`;
+/** The Hub's public origin the platforms send the sign-ins back to. */
+export const MARKETING_ORIGIN = (process.env.META_REDIRECT_ORIGIN ?? "").trim() || "https://hub.koleexgroup.com";
+export const META_REDIRECT_URI = `${MARKETING_ORIGIN}/api/marketing/connect/meta/callback`;
 
 /** The login's anti-forgery state rides in this cookie — httpOnly, ten
  *  minutes, only sent to the connect routes — and must come back unchanged
@@ -41,6 +43,32 @@ export const META_STATE_COOKIE_OPTIONS = {
   path: "/api/marketing/connect/meta",
   maxAge: 600,
 };
+
+/** Business Login for Instagram (the CEO's own Instagram): the Meta app's
+ *  Instagram product keys — INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET. */
+export interface InstagramLoginConfig { appId: string; appSecret: string }
+export function instagramLoginConfig(): InstagramLoginConfig | null {
+  const appId = (process.env.INSTAGRAM_APP_ID ?? "").trim();
+  const appSecret = (process.env.INSTAGRAM_APP_SECRET ?? "").trim();
+  return appId && appSecret ? { appId, appSecret } : null;
+}
+
+/* Instagram Login keys are served by graph.instagram.com, not
+   graph.facebook.com. The accounts loader marks each one here — in memory
+   only, never logged — and every Graph call made with a marked key goes to
+   Instagram's host: the Feed, publishing, comments, insights and messages
+   keep one set of paths, and no call can send such a key to the wrong host. */
+const instagramLoginKeys = new Set<string>();
+export function markInstagramLoginKey(token: string): void {
+  if (instagramLoginKeys.size > 500) instagramLoginKeys.clear();
+  instagramLoginKeys.add(token);
+}
+function routed(url: URL | string, token?: string): URL | string {
+  if (!token || !instagramLoginKeys.has(token)) return url;
+  const u = new URL(String(url));
+  if (u.hostname === "graph.facebook.com") u.hostname = "graph.instagram.com";
+  return u;
+}
 
 export interface MetaAppConfig {
   appId: string;
@@ -83,7 +111,7 @@ const graphMessage = (e: GraphError["error"], status: number): string =>
 /** One Graph API read. The token goes in the Authorization header, never
  *  in the URL. Shared with lib/server/marketing/meta-feed. */
 export async function metaGet<T>(url: URL | string, token?: string): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(routed(url, token), {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
@@ -96,7 +124,7 @@ export async function metaGet<T>(url: URL | string, token?: string): Promise<T> 
 /** One Graph API write (publishing): form-encoded, the token in the
  *  Authorization header — never in the URL or the body. */
 export async function metaPost<T>(url: URL | string, token: string, params: Record<string, string>): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(routed(url, token), {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),

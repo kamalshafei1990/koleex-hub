@@ -46,6 +46,9 @@ const T: Translations = {
   "add.manual":       { en: "Add by hand", zh: "手动添加", ar: "إضافة يدوية" },
   "add.soon":         { en: "Coming soon", zh: "即将推出", ar: "قريبًا" },
   "add.needsKeys":    { en: "Needs the Meta app keys in Vercel.", zh: "需要在 Vercel 中设置 Meta 应用密钥。", ar: "يحتاج مفاتيح تطبيق Meta في Vercel." },
+  "add.signInIg":     { en: "Sign in with Instagram", zh: "使用 Instagram 登录", ar: "تسجيل الدخول بـ Instagram" },
+  "add.needsIgKeys":  { en: "Needs the Instagram app keys in Vercel.", zh: "需要在 Vercel 中设置 Instagram 应用密钥。", ar: "يحتاج مفاتيح تطبيق Instagram في Vercel." },
+  "note.igLogin":     { en: "A Creator or Business account, no Facebook Page needed: the Hub publishes and reads the comments and numbers.", zh: "创作者或商业账号，无需 Facebook 主页：Hub 负责发布并读取评论和数据。", ar: "حساب Creator أو Business دون صفحة Facebook: يتولى الـ Hub النشر وقراءة التعليقات والأرقام." },
   "add.close":        { en: "Close", zh: "关闭", ar: "إغلاق" },
   "pname.facebook":   { en: "Facebook", zh: "Facebook", ar: "Facebook" },
   "pname.instagram":  { en: "Instagram", zh: "Instagram", ar: "Instagram" },
@@ -98,6 +101,7 @@ const T: Translations = {
   "setup.title":      { en: "Server settings", zh: "服务器设置", ar: "إعدادات الخادم" },
   "setup.tokenKey":   { en: "Encryption key for the accounts' access keys", zh: "账号访问密钥的加密密钥", ar: "مفتاح تشفير مفاتيح الوصول للحسابات" },
   "setup.meta":       { en: "Meta app keys (App ID, App Secret, Configuration ID)", zh: "Meta 应用密钥（App ID、App Secret、Configuration ID）", ar: "مفاتيح تطبيق Meta (App ID وApp Secret وConfiguration ID)" },
+  "setup.instagram":  { en: "Instagram app keys (Instagram App ID, App Secret)", zh: "Instagram 应用密钥（Instagram App ID、App Secret）", ar: "مفاتيح تطبيق Instagram (Instagram App ID وApp Secret)" },
   "setup.cron":       { en: "Key that protects scheduled publishing", zh: "保护定时发布的密钥", ar: "مفتاح حماية النشر المجدول" },
   "setup.cronNote":   { en: "Needed before scheduled posts, not for adding accounts.", zh: "定时发布前需要，添加账号时不需要。", ar: "مطلوب قبل النشر المجدول، وليس لإضافة الحسابات." },
   "setup.ok":         { en: "In place", zh: "已设置", ar: "جاهز" },
@@ -186,6 +190,10 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const signInWithMeta = () => {
     window.location.href = `/api/marketing/connect/meta/start?space=${space}`;
   };
+  const igReady = !!setup?.tokenKey && !!setup?.instagram;
+  const signInWithInstagram = () => {
+    window.location.href = `/api/marketing/connect/instagram/start?space=${space}`;
+  };
 
   const addManual = async () => {
     if (!manual) return;
@@ -231,6 +239,8 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     { key: "tokenKey", label: t("setup.tokenKey") },
     { key: "meta", label: t("setup.meta") },
     { key: "cron", label: t("setup.cron"), note: t("setup.cronNote") },
+    /* The CEO's Instagram signs in with Instagram Login — its own keys. */
+    ...(space === "ceo" ? [{ key: "instagram" as const, label: t("setup.instagram") }] : []),
   ];
   const kindOf = (a: MarketingAccountView) =>
     a.platform === "facebook" || a.platform === "instagram" ? t(`kind.${a.platform}`) : t(`pname.${a.platform}`);
@@ -358,10 +368,11 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {PLATFORM_ORDER.map((p) => {
             const flow = platformFlow(space, p);
-            const disabled = flow === "soon" || (flow === "meta" && !metaReady);
+            const disabled = flow === "soon" || (flow === "meta" && !metaReady) || (flow === "instagram" && !igReady);
             const selected = manual === p;
-            const note = flow === "manual" ? t("note.manual") : flow === "meta" && !metaReady ? t("add.needsKeys") : t(`note.${p}`);
-            const action = flow === "meta" ? t("add.signIn") : flow === "manual" ? t("add.manual") : t("add.soon");
+            const note = flow === "manual" ? t("note.manual") : flow === "meta" && !metaReady ? t("add.needsKeys")
+              : flow === "instagram" ? (igReady ? t("note.igLogin") : t("add.needsIgKeys")) : t(`note.${p}`);
+            const action = flow === "meta" ? t("add.signIn") : flow === "instagram" ? t("add.signInIg") : flow === "manual" ? t("add.manual") : t("add.soon");
             return (
               <li key={p}>
                 <button
@@ -370,6 +381,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                   aria-pressed={flow === "manual" ? selected : undefined}
                   onClick={() => {
                     if (flow === "meta") signInWithMeta();
+                    else if (flow === "instagram") signInWithInstagram();
                     else if (flow === "manual") { setManual(p); setFormError(null); }
                   }}
                   className={`flex h-full w-full flex-col items-start gap-2 rounded-xl border p-3 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${

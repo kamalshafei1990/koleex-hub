@@ -19,8 +19,13 @@ export const REPLY_WINDOW_MS = 24 * 3_600_000;
 /** The permissions Meta asks for reading and answering messages. */
 export const MESSENGER_SCOPES = ["pages_messaging", "pages_manage_metadata"] as const;
 export const INSTAGRAM_MESSAGE_SCOPES = ["instagram_manage_messages", "pages_manage_metadata"] as const;
-export const messageScopesFor = (platform: string): readonly string[] =>
-  platform === "facebook" ? MESSENGER_SCOPES : platform === "instagram" ? INSTAGRAM_MESSAGE_SCOPES : [];
+/** An Instagram account connected with Instagram Login (the CEO's) asks for
+ *  its own permission instead (lib/marketing/instagram-login). */
+export const INSTAGRAM_LOGIN_MESSAGE_SCOPES = ["instagram_business_manage_messages"] as const;
+export const messageScopesFor = (platform: string, scopes: readonly string[] = []): readonly string[] =>
+  platform === "facebook" ? MESSENGER_SCOPES
+    : platform === "instagram" ? (scopes.includes("instagram_business_basic") ? INSTAGRAM_LOGIN_MESSAGE_SCOPES : INSTAGRAM_MESSAGE_SCOPES)
+    : [];
 
 export interface MessageAttachment { kind: "image" | "video" | "file"; url: string; name: string | null }
 

@@ -32,6 +32,8 @@ import "server-only";
         on them (lib/server/marketing/ad-comments), each account claimed
         first (claimAdScan). It runs BEFORE step 7, whose Koleex AI call may
         take the rest of the run;
+    10. Instagram Login KEYS (29/09/2026, the CEO's Instagram): refreshed
+        while they still have 20 of their 60 days, before the steps below;
      9. private MESSAGES (29/09/2026): every run, each Page's Messenger and
         Instagram conversations updated since the last read — claimed per
         account (claimMessages); a customer waiting tells the team once. It
@@ -47,16 +49,17 @@ import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insigh
 import { weekPlansStep } from "@/lib/server/marketing/week-plan";
 import { AD_SCAN_MS, scanAdComments } from "@/lib/server/marketing/ad-comments";
 import { MESSAGES_REFRESH_MS, syncMessages } from "@/lib/server/marketing/messages";
+import { refreshInstagramLoginKeys } from "@/lib/server/marketing/instagram-login";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; adComments: number; messages: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; adComments: number; messages: number; igKeys: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, adComments: 0, messages: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, adComments: 0, messages: 0, igKeys: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -90,6 +93,15 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       await publishPost(p.tenant_id, p.id, { budgetMs: Math.min(30_000, left() - 5_000) });
       out.continued++;
     }
+  }
+
+  /* 10. Instagram Login keys (the CEO's Instagram) are refreshed while they
+         still have 20 of their 60 days — before any step uses them. */
+  if (left() > 12_000) {
+    out.igKeys = await refreshInstagramLoginKeys({ tenantId: opts.tenantId }).catch((e) => {
+      console.warn(`[marketing/cron] instagram keys: ${e instanceof Error ? e.message : String(e)}`);
+      return 0;
+    });
   }
 
   /* 9. Private messages, every run per account (syncMessages decides and

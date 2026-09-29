@@ -12,10 +12,11 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { inChunks } from "@/lib/server/in-chunks";
 import { decryptToken, encryptToken, isTokenCryptoConfigured } from "@/lib/server/marketing/token-crypto";
-import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
+import { metaAppConfig, type MetaPage, instagramLoginConfig, markInstagramLoginKey } from "@/lib/server/marketing/meta";
 import { PLATFORM_ORDER, platformFlow, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
 import { FACEBOOK_ADS_SCOPES, instagramAdsGranted, type AdsState } from "@/lib/marketing/ads";
 import { messageScopesFor } from "@/lib/marketing/message-types";
+import { isInstagramLogin, type InstagramLoginProfile } from "@/lib/marketing/instagram-login";
 
 const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, audience, updated_at";
 
@@ -101,6 +102,7 @@ export function marketingSetup(): MarketingSetup {
     tokenKey: isTokenCryptoConfigured(),
     meta: metaAppConfig() !== null,
     cron: !!(process.env.CRON_SECRET ?? "").trim(),
+    instagram: instagramLoginConfig() !== null,
   };
 }
 
@@ -192,6 +194,43 @@ export async function saveMetaAccounts(input: {
   return ids;
 }
 
+/** Save the signed-in Instagram account on a space — refreshed in place
+ *  when it was connected before (a reconnect never duplicates it). */
+export async function saveInstagramLoginAccount(input: {
+  tenantId: string; space: "company" | "ceo"; connectedBy: string;
+  profile: InstagramLoginProfile; token: string; expiresAt: string | null; scopes: string[];
+}): Promise<string> {
+  const now = new Date().toISOString();
+  const p = input.profile;
+  const row = {
+    tenant_id: input.tenantId, space: input.space, platform: "instagram", connection: "api",
+    external_id: p.id, name: p.name || p.username || "Instagram", handle: p.username,
+    avatar_url: p.picture, profile_url: p.username ? `https://www.instagram.com/${p.username}` : null,
+    audience: p.followers, token_encrypted: encryptToken(input.token), token_expires_at: input.expiresAt,
+    user_token_encrypted: null, user_token_expires_at: null,
+    scopes: input.scopes, status: "connected", last_error: null, connected_by: input.connectedBy, updated_at: now,
+  };
+  const { data: existing, error: rErr } = await supabaseServer.from("marketing_accounts").select("id")
+    .eq("tenant_id", input.tenantId).eq("platform", "instagram").eq("external_id", p.id).maybeSingle();
+  if (rErr) throw new Error(`marketing accounts: ${rErr.message}`);
+  if (existing) {
+    const { error } = await supabaseServer.from("marketing_accounts").update(row).eq("id", (existing as { id: string }).id);
+    if (error) throw new Error(`marketing accounts: ${error.message}`);
+    return (existing as { id: string }).id;
+  }
+  const { data, error } = await supabaseServer.from("marketing_accounts").insert(row).select("id").single();
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  return (data as { id: string }).id;
+}
+
+/** An Instagram Login key refreshed before its 60 days end (cron): the new
+ *  key replaces the old one, encrypted. */
+export async function storeRefreshedKey(id: string, token: string, expiresAt: string | null): Promise<void> {
+  const { error } = await supabaseServer.from("marketing_accounts")
+    .update({ token_encrypted: encryptToken(token), token_expires_at: expiresAt, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+}
+
 /** What the sync needs about an account, with its access key DECRYPTED.
  *  For the server's sync and publishing code only; never returned by a
  *  route. token is null for accounts shared by hand or removed. */
@@ -227,11 +266,14 @@ export async function loadAccountForSync(tenantId: string, id: string): Promise<
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   if (!data) return null;
   const { token_encrypted, user_token_encrypted, ...rest } = data as Omit<AccountForSync, "token" | "userToken"> & { token_encrypted: string | null; user_token_encrypted: string | null };
+  const token = token_encrypted ? decryptToken(token_encrypted) : null;
+  /* An Instagram Login key: its Graph calls go to graph.instagram.com (meta). */
+  if (token && isInstagramLogin(rest.scopes ?? [])) markInstagramLoginKey(token);
   return {
     ...rest,
     sync_state: rest.sync_state ?? {},
     scopes: rest.scopes ?? [],
-    token: token_encrypted ? decryptToken(token_encrypted) : null,
+    token,
     userToken: user_token_encrypted ? decryptToken(user_token_encrypted) : null,
   };
 }
@@ -407,6 +449,8 @@ export async function adsStates(tenantId: string, space: MarketingSpace): Promis
   const out: Record<string, AdsState> = {};
   for (const r of (data ?? []) as Array<{ id: string; platform: string; scopes: string[] | null; sync_state: Record<string, unknown> | null; user_token_expires_at: string | null; user_token_encrypted: string | null }>) {
     const scopes = r.scopes ?? [];
+    /* An Instagram Login account has no ads here (they need Facebook Login). */
+    if (isInstagramLogin(scopes)) continue;
     const err = typeof r.sync_state?.ads_error === "string" ? r.sync_state.ads_error : null;
     if (r.platform === "facebook") {
       const missing = FACEBOOK_ADS_SCOPES.filter((x) => !scopes.includes(x));
@@ -435,7 +479,7 @@ export async function messagesStates(tenantId: string, space: MarketingSpace): P
   if (error) throw new Error(`marketing accounts: ${error.message}`);
   const out: Record<string, { ready: boolean; missing: string[]; error: string | null }> = {};
   for (const r of (data ?? []) as Array<{ id: string; platform: string; scopes: string[] | null; sync_state: Record<string, unknown> | null }>) {
-    const missing = messageScopesFor(r.platform).filter((x) => !(r.scopes ?? []).includes(x));
+    const missing = messageScopesFor(r.platform, r.scopes ?? []).filter((x) => !(r.scopes ?? []).includes(x));
     out[r.id] = { ready: missing.length === 0, missing, error: typeof r.sync_state?.messages_error === "string" ? r.sync_state.messages_error : null };
   }
   return out;

@@ -176,7 +176,9 @@ check(`the callback logs errors only — never the code or a token${printed.some
 /* ── 3. The connect flow ── */
 console.log("\n3. Connect: state and permission before anything is exchanged");
 const meta = code(META);
-check("the redirect URI is the one on the owner's Meta checklist", /\|\| "https:\/\/hub\.koleexgroup\.com"\}\/api\/marketing\/connect\/meta\/callback`/.test(meta));
+check("the redirect URI is the one on the owner's Meta checklist",
+  /export const MARKETING_ORIGIN = \(process\.env\.META_REDIRECT_ORIGIN \?\? ""\)\.trim\(\) \|\| "https:\/\/hub\.koleexgroup\.com";/.test(meta) &&
+  /export const META_REDIRECT_URI = `\$\{MARKETING_ORIGIN\}\/api\/marketing\/connect\/meta\/callback`;/.test(meta));
 check("Graph API v26.0 by default", /\|\| "v26\.0";/.test(meta));
 const loginFn = meta.slice(meta.indexOf("export function metaLoginUrl"), meta.indexOf("export class MetaError"));
 check("the login dialog carries config_id — never scope", /searchParams\.set\("config_id", cfg\.configId\)/.test(loginFn) && !/"scope"/.test(loginFn));
@@ -958,7 +960,7 @@ const metaMsgs = code("src/lib/server/marketing/meta-messages.ts");
 const msgTypes = code("src/lib/marketing/message-types.ts");
 const msgSyncFn = msgs.slice(msgs.indexOf("export async function syncMessages("), msgs.indexOf("async function messageAccounts("));
 check("every read is claimed BEFORE the permissions are checked and Meta is asked (the account waits its turn); the claim is version-checked",
-  before(msgSyncFn, "if (!(await claimMessages(a, opts.minGapMs ?? MESSAGES_REFRESH_MS)))", "if (!messageScopesFor(a.platform).every((s) => a.scopes.includes(s))) return { ok: true, skipped: \"no_permission\" };") &&
+  before(msgSyncFn, "if (!(await claimMessages(a, opts.minGapMs ?? MESSAGES_REFRESH_MS)))", "if (!messageScopesFor(a.platform, a.scopes).every((s) => a.scopes.includes(s))) return { ok: true, skipped: \"no_permission\" };") &&
   before(msgSyncFn, "skipped: \"no_permission\" };", "await pageConversations(") &&
   /\.eq\("updated_at", a\.updated_at\)/.test(acc.slice(acc.indexOf("export async function claimMessages("), acc.indexOf("export async function adsStates("))) &&
   /export const MESSENGER_SCOPES = \["pages_messaging", "pages_manage_metadata"\] as const;/.test(msgTypes) &&
@@ -1073,11 +1075,47 @@ check(`every CEO Brand page is behind AuthGate on the CEO's space (${ceoPages.le
 check("CEO Brand is live for super admins only until the CEO opens it to his assistant",
   /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true,\s*superAdminOnly: true \}/.test(code("src/lib/navigation.ts")));
 const sp = code("src/lib/marketing/spaces.ts");
-check("the CEO's accounts: a personal Facebook profile is shared by hand (no API since 2018), Instagram and LinkedIn wait for their own sign-in; the Accounts tab asks per space",
-  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "manual",\s*instagram: "soon",\s*linkedin: "soon",/.test(sp) &&
+check("the CEO's accounts: a personal Facebook profile is shared by hand (no API since 2018), Instagram signs in with Instagram Login, LinkedIn waits; the Accounts tab asks per space",
+  /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "manual",\s*instagram: "instagram",\s*linkedin: "soon",/.test(sp) &&
   /\(space === "ceo" \? CEO_PLATFORM_FLOW : PLATFORM_FLOW\)\[platform\]/.test(sp) &&
   /const flow = platformFlow\(space, p\);/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
   !/PLATFORM_FLOW\[/.test(code("src/components/marketing/ConnectedAccounts.tsx")));
+
+console.log("\n17. Instagram Login (the CEO's own Instagram, no Facebook Page)");
+const igLib = code("src/lib/marketing/instagram-login.ts");
+const igSrv = code("src/lib/server/marketing/instagram-login.ts");
+const igStart = code("src/app/api/marketing/connect/instagram/start/route.ts");
+const igCb = code("src/app/api/marketing/connect/instagram/callback/route.ts");
+check("the sign-in asks for exactly Instagram Login's five permissions, back to the Hub's own URL, with no Facebook sign-in in it",
+  /export const INSTAGRAM_LOGIN_SCOPES = \[\s*"instagram_business_basic",\s*"instagram_business_content_publish",\s*"instagram_business_manage_comments",\s*"instagram_business_manage_messages",\s*"instagram_business_manage_insights",\s*\] as const;/.test(igLib) &&
+  /url\.searchParams\.set\("scope", INSTAGRAM_LOGIN_SCOPES\.join\(","\)\);/.test(igSrv) && /url\.searchParams\.set\("enable_fb_login", "0"\);/.test(igSrv) &&
+  /export const INSTAGRAM_REDIRECT_URI = `\$\{MARKETING_ORIGIN\}\/api\/marketing\/connect\/instagram\/callback`;/.test(igSrv));
+check("connect: the caller's right and a fresh state before the sign-in; on return the state (timing-safe) and the right again BEFORE anything is exchanged; the cookie cleared either way",
+  before(igStart, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "instagramLoginUrl(cfg, state)") && /res\.cookies\.set\(INSTAGRAM_STATE_COOKIE, state, INSTAGRAM_STATE_COOKIE_OPTIONS\);/.test(igStart) &&
+  before(igCb, "if (!state || !expected || !sameState(state, expected)) return back(\"expired\");", "await exchangeInstagramCode(cfg, code)") &&
+  before(igCb, 'requireModuleAction(auth, SPACE_MODULE[space], "edit")', "await exchangeInstagramCode(cfg, code)") &&
+  /crypto\.timingSafeEqual\(x, y\)/.test(igCb) && /res\.cookies\.set\(INSTAGRAM_STATE_COOKIE, "", \{ \.\.\.INSTAGRAM_STATE_COOKIE_OPTIONS, maxAge: 0 \}\);/.test(igCb) &&
+  /path: "\/api\/marketing\/connect\/instagram"/.test(igSrv));
+check("an Instagram Login key goes to graph.instagram.com on EVERY Graph call — marked when an account is loaded; the data calls carry it in the header",
+  /if \(u\.hostname === "graph\.facebook\.com"\) u\.hostname = "graph\.instagram\.com";/.test(meta) &&
+  (meta.match(/await fetch\(routed\(url, token\), \{/g) ?? []).length === 2 &&
+  /if \(token && isInstagramLogin\(rest\.scopes \?\? \[\]\)\) markInstagramLoginKey\(token\);/.test(acc) &&
+  /export const isInstagramLogin = \(scopes: readonly string\[\]\): boolean => scopes\.includes\("instagram_business_basic"\);/.test(igLib) &&
+  /const res = await fetch\(url, \{ headers: \{ Authorization: `Bearer \$\{token\}` \}, cache: "no-store"/.test(igSrv) && !/access_token/.test(igSrv.slice(igSrv.indexOf("export async function instagramLoginProfile("))));
+check("Instagram's account id (past 2^53, sent as a JSON number) is read from the raw answer as digits — never through a rounded number",
+  /const userId = rawId\(raw, "user_id"\);/.test(igSrv) && /const id = rawId\(raw, "user_id"\);/.test(igSrv) && !/String\(one\.user_id\)|String\(b\.user_id\)/.test(igSrv));
+check("its 60-day key is refreshed with 20 days left (a day old at least), by the cron before the steps that use it; a refused key marks the account expired",
+  /export const IG_REFRESH_BEFORE_MS = 20 \* 86_400_000;/.test(igSrv) && /\.limit\(opts\.max \?\? 5\)/.test(igSrv) &&
+  /if \(e instanceof MetaError && e\.code === 190\) \{\s*await recordSync\(a\.id, \{ status: "expired"/.test(igSrv) &&
+  /await storeRefreshedKey\(a\.id, fresh\.token, fresh\.expiresAt\);/.test(igSrv) &&
+  before(cronSrc, "await refreshInstagramLoginKeys({ tenantId: opts.tenantId })", "const r = await syncMessages(a.tenant_id, a.id);") &&
+  before(cronSrc, "await refreshInstagramLoginKeys({ tenantId: opts.tenantId })", "const r = await syncAccount(a.tenant_id, a.id,"));
+check("the Accounts tab: «Sign in with Instagram» on the CEO's space once its keys are set; its messages ask for its own permission; no ads line for it",
+  /else if \(flow === "instagram"\) signInWithInstagram\(\);/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
+  /\(flow === "instagram" && !igReady\)/.test(code("src/components/marketing/ConnectedAccounts.tsx")) &&
+  /instagram: instagramLoginConfig\(\) !== null,/.test(acc) &&
+  /export const INSTAGRAM_LOGIN_MESSAGE_SCOPES = \["instagram_business_manage_messages"\] as const;/.test(msgTypes) &&
+  /if \(isInstagramLogin\(scopes\)\) continue;/.test(acc));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
