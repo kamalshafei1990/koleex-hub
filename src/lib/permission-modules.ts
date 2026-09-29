@@ -65,8 +65,9 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    posts and publishing them (the CEO or the marketing manager, either one
    is enough; super admins always can). CEO Brand (owner's pick, 29 Sep
    2026): "CEO Brand Approvals" — approving the CEO's own posts: ONLY an
-   account granted it, NOT the super admins by default (the CEO grants it to
-   himself; lib/server/marketing/approvals). */
+   account granted it ON THE ACCOUNT ITSELF, never through a role (the
+   Super Admin role carries every module), so NOT the super admins (the CEO
+   grants it to himself; lib/server/marketing/approvals). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";

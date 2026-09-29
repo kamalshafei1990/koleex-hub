@@ -1,8 +1,9 @@
 import "server-only";
 
 /* GET  /api/marketing/accounts?space=company|ceo — the space's accounts (the
-        removed ones left out) and which server settings are in place
-        (booleans only). Never an access key: lib/server/marketing/accounts
+        removed ones left out), which server settings are in place
+        (booleans only), and whether the caller may remove an account
+        ("delete"). Never an access key: lib/server/marketing/accounts
         selects the columns a screen may see. Needs "view".
    POST /api/marketing/accounts — add an account by hand on a platform with
         no posting API (WeChat, WhatsApp, Douyin): { space, platform, name,
@@ -22,10 +23,11 @@ export async function GET(req: NextRequest) {
   const denied = await requireModuleAction(auth, SPACE_MODULE[space], "view");
   if (denied) return denied;
   try {
-    const [accounts, ads, messages, linkedin] = await Promise.all([
+    const [accounts, ads, messages, linkedin, cannotRemove] = await Promise.all([
       listAccounts(auth.tenant_id, space), adsStates(auth.tenant_id, space), messagesStates(auth.tenant_id, space), linkedinStates(auth.tenant_id, space),
+      requireModuleAction(auth, SPACE_MODULE[space], "delete"),
     ]);
-    return NextResponse.json({ accounts, ads, messages, linkedin, setup: marketingSetup() }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ accounts, ads, messages, linkedin, setup: marketingSetup(), canRemove: cannotRemove === null }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     console.error("[api/marketing/accounts]", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Could not load the connected accounts." }, { status: 500 });

@@ -18,7 +18,8 @@
        with what is missing;
      · WeChat, WhatsApp, Douyin — added by hand (no posting API).
    "Remove" deletes the account's access key and takes it off the list; its
-   history stays. Access keys never reach this screen.
+   history stays — shown only to whoever holds "delete" (the server asks the
+   same). Access keys never reach this screen.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useState } from "react";
@@ -155,6 +156,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const [ads, setAds] = useState<Record<string, AdsState>>({});
   const [msgs, setMsgs] = useState<Record<string, MessagesState>>({});
   const [liStates, setLiStates] = useState<Record<string, LinkedInState>>({});
+  const [canRemove, setCanRemove] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [result, setResult] = useState<{ code: ConnectResult; n: number; via: ConnectVia | null } | null>(null);
   const [adding, setAdding] = useState(false);
@@ -173,11 +175,13 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as {
         accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; messages?: Record<string, MessagesState>; linkedin?: Record<string, LinkedInState>; setup: MarketingSetup;
+        canRemove?: boolean;
       };
       setAccounts(body.accounts);
       setAds(body.ads ?? {});
       setMsgs(body.messages ?? {});
       setLiStates(body.linkedin ?? {});
+      setCanRemove(body.canRemove === true);
       setSetup(body.setup);
     } catch {
       setLoadError(true);
@@ -366,9 +370,11 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                         {t("open")}
                       </a>
                     )}
-                    <button type="button" onClick={() => { setRemoveError(false); setConfirm(a); }} className="text-[12px] font-medium text-[var(--text-dim)] hover:text-[#FF3333]">
-                      {t("remove")}
-                    </button>
+                    {canRemove && (
+                      <button type="button" onClick={() => { setRemoveError(false); setConfirm(a); }} className="text-[12px] font-medium text-[var(--text-dim)] hover:text-[#FF3333]">
+                        {t("remove")}
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

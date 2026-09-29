@@ -2,8 +2,10 @@ import "server-only";
 
 /* POST /api/marketing/accounts/[id]/disconnect — deletes the account's
    access key (what the public Data Deletion page promises) and marks it
-   disconnected; its posts and numbers stay as history. Needs "edit" on the
-   module of the account's own space. */
+   disconnected; its posts and numbers stay as history. Needs "delete" on
+   the module of the account's own space (30/09/2026: whoever writes the
+   posts — "edit" — must not be able to remove the accounts, e.g. the CEO's
+   assistant on CEO Brand). */
 
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
@@ -22,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const space = await accountSpace(auth.tenant_id, id);
     if (!space) return NextResponse.json({ error: "Account not found." }, { status: 404 });
-    const denied = await requireModuleAction(auth, SPACE_MODULE[space], "edit");
+    const denied = await requireModuleAction(auth, SPACE_MODULE[space], "delete");
     if (denied) return denied;
     await disconnectAccount(auth.tenant_id, id);
     return NextResponse.json({ ok: true });

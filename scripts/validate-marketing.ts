@@ -10,7 +10,7 @@
        to edit that space (view-as refused) BEFORE it exchanges anything with
        Meta;
      · the redirect URI is the one the owner's Meta setup checklist registers;
-     · every route is gated: "view" to read, "edit" to connect or disconnect.
+     · every route is gated: "view" to read, "edit" to connect, "delete" to disconnect.
    The Feed (27/09/2026) adds:
      · its routes read with "view" on the space the ACCOUNT belongs to, and
        answer without a key; a refresh claims the account before it calls
@@ -210,10 +210,12 @@ check("callback: saves through lib/server/marketing/accounts (keys encrypted the
 console.log("\n4. Every route is gated");
 check("accounts list: 'view' on the space's module", /requireModuleAction\(auth, SPACE_MODULE\[space\], "view"\)/.test(code(LIST)));
 const dc = code(DISCONNECT);
-check("disconnect: signed-in POST, then 'edit' on the ACCOUNT's own space",
+check("disconnect: signed-in POST, then 'delete' on the ACCOUNT's own space (writing posts is 'edit' — it must not remove accounts); the Remove button only for 'delete'",
   /requireAuth\(req\)/.test(dc) && dc.indexOf("accountSpace(auth.tenant_id, id)") > -1 &&
-  dc.indexOf("accountSpace(auth.tenant_id, id)") < dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') &&
-  dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "edit")') < dc.indexOf("disconnectAccount(auth.tenant_id, id)"));
+  dc.indexOf("accountSpace(auth.tenant_id, id)") < dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "delete")') &&
+  dc.indexOf('requireModuleAction(auth, SPACE_MODULE[space], "delete")') < dc.indexOf("disconnectAccount(auth.tenant_id, id)") &&
+  /canRemove: cannotRemove === null/.test(code(LIST)) && /requireModuleAction\(auth, SPACE_MODULE\[space\], "delete"\),/.test(code(LIST)) &&
+  /\{canRemove && \(\s*<button type="button" onClick=\{\(\) => \{ setRemoveError\(false\); setConfirm\(a\); \}\}/.test(code("src/components/marketing/ConnectedAccounts.tsx")));
 check("disconnect deletes the key (what the Data Deletion page promises)", /update\(\{ token_encrypted: null, token_expires_at: null, status: "disconnected"/.test(acc));
 check("a removed account leaves the list (its row and history stay)", /\.neq\("status", "disconnected"\)/.test(acc.slice(acc.indexOf("export async function listAccounts"), acc.indexOf("export function marketingSetup"))));
 const addFn = acc.slice(acc.indexOf("export async function addManualAccount"), acc.indexOf("export async function accountSpace"));
@@ -1097,8 +1099,9 @@ check("a Facebook sign-in NEVER moves an account between spaces (Koleex's Page s
   /return !\(r\.platform === "instagram" && isInstagramLogin\(e\.scopes \?\? \[\]\)\);/.test(saveMetaFn) &&
   /\.select\("id, platform, external_id, space, scopes"\)/.test(saveMetaFn) &&
   /const fresh = kept\.filter\(/.test(saveMetaFn) && /for \(const r of kept\) \{/.test(saveMetaFn) && !/for \(const r of rows\) \{\s*const id = idOf/.test(saveMetaFn));
-check("CEO Brand is live for super admins only until the CEO opens it to his assistant",
-  /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true,\s*superAdminOnly: true \}/.test(code("src/lib/navigation.ts")));
+check("CEO Brand is open to whoever is granted «CEO Brand» in Roles (owner, 30/09/2026: his assistant) — approving stays his own account's grant",
+  /\{ id: "ceo-brand",[^}]*route: "\/ceo-brand",\s*active: true\s*\}/.test(code("src/lib/navigation.ts")) &&
+  !/superAdminOnly/.test((code("src/lib/navigation.ts").match(/\{ id: "ceo-brand",[^}]*\}/) ?? [""])[0]));
 const sp = code("src/lib/marketing/spaces.ts");
 check("the CEO's accounts: his Public Figure PAGE signs in like Koleex's (a personal profile has no API), Instagram with Instagram Login, LinkedIn with Share on LinkedIn; the Accounts tab asks per space",
   /export const CEO_PLATFORM_FLOW: Record<MarketingPlatform, PlatformFlow> = \{\s*facebook: "meta",\s*instagram: "instagram",\s*linkedin: "linkedin",/.test(sp) &&
@@ -1183,7 +1186,7 @@ check("its 60 days (no refresh exists): the cron marks the account expired once 
   /await expireLinkedInKeys\(opts\.tenantId\)\.catch\(/.test(cronSrc) &&
   /if \(platformFlow\(space, "linkedin"\) !== "linkedin"\) return \{\};/.test(liStFn) && /\.select\("id, token_expires_at"\)/.test(liStFn) &&
   /out\[r\.id\] = \{ endsAt: r\.token_expires_at, ended: [^}]*\};/.test(liStFn) && !/token_encrypted/.test(liStFn) &&
-  /linkedinStates\(auth\.tenant_id, space\),?\s*\]\);/.test(code(LIST)) && /return NextResponse\.json\(\{ accounts, ads, messages, linkedin, setup/.test(code(LIST)));
+  /await Promise\.all\(\[[^\]]*linkedinStates\(auth\.tenant_id, space\),/.test(code(LIST)) && /return NextResponse\.json\(\{ accounts, ads, messages, linkedin, setup/.test(code(LIST)));
 check("publishing: words and pictures to /v2/ugcPosts (Rest.li 2.0.0), each picture registered as a feed-share image then uploaded, the URN from X-RestLi-Id; no video yet; no Feed row (nothing comes back)",
   /fetch\("https:\/\/api\.linkedin\.com\/v2\/ugcPosts"/.test(liSrv) && /"X-Restli-Protocol-Version": "2\.0\.0"/.test(liSrv) &&
   /recipes: \["urn:li:digitalmediaRecipe:feedshare-image"\]/.test(liSrv) && /method: "PUT"/.test(liSrv) &&
