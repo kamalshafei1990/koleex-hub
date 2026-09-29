@@ -21,10 +21,12 @@ import { CARD_ADDRESS, LANGS, asLang, fontOf, isPictureQr, list, num, qrsOf, str
 import { Dots, GREY_ON_INK, GREY_ON_WHITE, GroupLockup, INK, Logo, Photo, PhotoPlaceholder, QrZone, WHITE, fit, lockupHeight, lockupLines, logoHeight, textWidth, wrapBalanced, type Zone } from "./card/parts";
 import { nameIn, titleOf } from "./person";
 import { ID_PREMIUM, drawIdPremium, idPremiumDark, isIdPremium } from "./id-badge-premium";
+import { BIG_LINE, ID_REFS, ID_REF_LOGO_SWITCH, drawIdRefBack, drawIdRefFront, idRefDie, idRefNeedsPhoto, idRefSpecKeys, isIdRef } from "./id-badge-reference";
 import { patternOptions } from "./patterns";
 
-/** The first six, then the premium set (owner 30/09/2026) beside them. */
-export const ID_STYLES = ["standard", "black", "photo-full", "dots", "landscape", "minimal", ...ID_PREMIUM] as const;
+/** The first six, then the premium set (owner 30/09/2026) beside them, then
+ *  his seven references rebuilt (drafts until he approves them). */
+export const ID_STYLES = ["standard", "black", "photo-full", "dots", "landscape", "minimal", ...ID_PREMIUM, ...ID_REFS] as const;
 type IdStyle = (typeof ID_STYLES)[number];
 const styleOf = (v: TemplateValues): IdStyle => ((ID_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as IdStyle) : "standard");
 const landscape = (v: TemplateValues) => styleOf(v) === "landscape";
@@ -238,6 +240,7 @@ function minimalFront(v: TemplateValues, r: R): ReactNode {
 
 function front(v: TemplateValues, ctx: DrawContext): ReactNode {
   if (isIdPremium(v)) return drawIdPremium(v, ctx);
+  if (isIdRef(v)) return drawIdRefFront(v, ctx);
   const r = read(v, ctx);
   switch (styleOf(v)) {
     case "black": return portraitFront(v, r, "black");
@@ -255,6 +258,7 @@ function front(v: TemplateValues, ctx: DrawContext): ReactNode {
  *  return to" with the company and its address, the back's QR codes, and
  *  the number. */
 function back(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isIdRef(v)) return drawIdRefBack(v, ctx);
   const r = read(v, ctx);
   const { b, w, h, W, H } = r;
   const dark = styleOf(v) === "black" || idPremiumDark(v);
@@ -328,7 +332,7 @@ function qrRequests(v: TemplateValues): QrRequest[] {
   return out;
 }
 
-const hasPhotoFields = (v: TemplateValues) => !!str(v, "photo");
+const hasPhotoFields = (v: TemplateValues) => idRefNeedsPhoto(v) && !!str(v, "photo");
 const onBack = (v: TemplateValues) => v.back !== false;
 
 export const idBadge: TemplateDef = {
@@ -351,20 +355,22 @@ export const idBadge: TemplateDef = {
 
     { key: "name", kind: "text", labelKey: "tpl.f.name", group: "person", max: 40 },
     { key: "title", kind: "title", labelKey: "tpl.f.title", group: "person", langKey: "lang" },
-    { key: "dept", kind: "text", labelKey: "tpl.f.dept", group: "person", max: 50 },
+    { key: "dept", kind: "text", labelKey: "tpl.f.dept", group: "person", max: 50, when: (v) => !isIdRef(v) },
     { key: "staffNo", kind: "text", labelKey: "tpl.f.staffNo", group: "person", max: 20 },
     { key: "idLabel", kind: "text", labelKey: "tpl.f.idLabel", group: "person", max: 12, placeholder: "ID" },
     { key: "valid", kind: "text", labelKey: "tpl.f.valid", group: "person", max: 30, placeholder: "Valid until 12/2027" },
-    { key: "role", kind: "text", labelKey: "tpl.f.role", group: "person", max: 20, hintKey: "tpl.f.roleHint" },
+    { key: "role", kind: "text", labelKey: "tpl.f.role", group: "person", max: 20, hintKey: "tpl.f.roleHint", when: (v) => !isIdRef(v) || v.style === "r-staff" },
+    { key: "logoFront", kind: "switch", labelKey: "tpl.f.logoFront", group: "person", when: (v) => ID_REF_LOGO_SWITCH.includes(String(v.style)) },
 
-    { key: "photo", kind: "image", labelKey: "tpl.f.photo", group: "photo", hintKey: "tpl.f.badgePhotoHint", fromPerson: "photo" },
+    { key: "photo", kind: "image", labelKey: "tpl.f.photo", group: "photo", hintKey: "tpl.f.badgePhotoHint", fromPerson: "photo", when: idRefNeedsPhoto },
     { key: "photoZoom", kind: "range", labelKey: "tpl.f.photoZoom", group: "photo", min: 100, max: 300, step: 5, unit: "%", when: hasPhotoFields },
     { key: "photoX", kind: "range", labelKey: "tpl.f.photoX", group: "photo", min: -100, max: 100, step: 2, when: hasPhotoFields },
     { key: "photoY", kind: "range", labelKey: "tpl.f.photoY", group: "photo", min: -100, max: 100, step: 2, when: hasPhotoFields },
-    { key: "bw", kind: "switch", labelKey: "tpl.f.bw", group: "photo" },
+    { key: "bw", kind: "switch", labelKey: "tpl.f.bw", group: "photo", when: idRefNeedsPhoto },
 
     { key: "back", kind: "switch", labelKey: "tpl.f.back", group: "back" },
-    { key: "companyBack", kind: "switch", labelKey: "tpl.f.lockupBack", group: "back", when: onBack },
+    { key: "companyBack", kind: "switch", labelKey: "tpl.f.lockupBack", group: "back", when: (v) => onBack(v) && !isIdRef(v) },
+    { key: "bigText", kind: "text", labelKey: "tpl.f.bigText", group: "back", max: 30, hintKey: "tpl.f.bigTextHint", when: (v) => onBack(v) && v.style === "r-wave" },
     { key: "returnTitle", kind: "text", labelKey: "tpl.f.returnTitle", group: "back", max: 60, when: onBack },
     { key: "returnLine1", kind: "text", labelKey: "tpl.f.returnLine1", group: "back", max: 80, when: onBack },
     { key: "returnLine2", kind: "text", labelKey: "tpl.f.returnLine2", group: "back", max: 120, when: onBack },
@@ -378,10 +384,15 @@ export const idBadge: TemplateDef = {
     photo: "", photoZoom: 100, photoX: 0, photoY: 0, bw: false,
     back: true, companyBack: true, company: "KOLEEX INTERNATIONAL GROUP",
     returnTitle: RETURN_TITLE.en, returnLine1: EVERYDAY_NAME_EN, returnLine2: CARD_ADDRESS.en, returnLine3: DEFAULT_CONTACT,
+    logoFront: true, bigText: BIG_LINE.en,
     qrs: [] as TemplateItem[],
   },
   pages: [{ id: "front", draw: front }, { id: "back", draw: back }],
   pagesFor: (v) => (onBack(v) ? ["front", "back"] : ["front"]),
+  die: idRefDie,
+  draftStyles: ID_REFS,
+  /* The STAFF reference is its word: it comes with the status line filled. */
+  restyle: (v, style) => (style === "r-staff" && !str(v, "role") ? { ...v, style, role: "STAFF" } : { ...v, style }),
   qrRequests,
   fromPerson,
   relang: (v, lang) => {
@@ -392,16 +403,17 @@ export const idBadge: TemplateDef = {
       ...v, lang,
       ...(LANGS.some((x) => RETURN_TITLE[x] === title) ? { returnTitle: RETURN_TITLE[l] } : {}),
       ...(LANGS.some((x) => CARD_ADDRESS[x] === addr) ? { returnLine2: CARD_ADDRESS[l] } : {}),
+      ...(LANGS.some((x) => BIG_LINE[x] === v.bigText) ? { bigText: BIG_LINE[l] } : {}),
     };
   },
-  specKeys: (v) => ["spec.badge1", "spec.badge2", "spec.badge3", ...(onBack(v) ? ["spec.badgeBack"] : [])],
+  specKeys: (v) => [...(isIdRef(v) ? idRefSpecKeys(v) : ["spec.badge1", "spec.badge2", "spec.badge3"]), ...(onBack(v) ? ["spec.badgeBack"] : [])],
   forSaving: (v, keepPerson) => ({
     ...v, photo: "", qrs: list(v, "qrs").map((q) => ({ ...q, image: "" })),
     ...(keepPerson ? {} : { name: "", title: "", titleKey: "", staffNo: "", dept: "", valid: "" }),
   }),
   check: (v) => {
     if (!str(v, "name")) return "studio.needName";
-    if (!str(v, "photo")) return "studio.needPhoto";
+    if (idRefNeedsPhoto(v) && !str(v, "photo")) return "studio.needPhoto";
     for (const q of qrsOf(v)) {
       if (q.kind === "link" && !q.link.trim()) return "studio.needQrLink";
       if (isPictureQr(q) && !q.image) return "studio.needQrImage";
