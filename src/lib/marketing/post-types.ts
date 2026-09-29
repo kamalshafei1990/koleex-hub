@@ -3,6 +3,7 @@
    server and the screens share them. Never an access key.
    --------------------------------------------------------------------------- */
 
+import type { ContentCheck, ContentState } from "@/lib/marketing/ceo-rules";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 
 /* draft → in_review → approved → publishing → published / partly_published /
@@ -76,6 +77,9 @@ export interface PostView {
   created_at: string;
   updated_at: string;
   targets: PostTargetView[];
+  /** CEO Brand: the JD's content check (lib/marketing/ceo-rules); null elsewhere or before it. */
+  content_check: ContentCheck | null;
+  content_state: ContentState;
 }
 
 export interface PostSummary {

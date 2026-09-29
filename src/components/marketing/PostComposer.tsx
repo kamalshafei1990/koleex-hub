@@ -25,7 +25,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import MarketingHeader from "@/components/marketing/MarketingHeader";
+import MarketingHeader, { forgetCeoKpis } from "@/components/marketing/MarketingHeader";
+import { ContentCheckPanel, JdRulesCard } from "@/components/marketing/CeoContentRules";
 import ComposerPreview from "@/components/marketing/ComposerPreview";
 import CaptionAssistant from "@/components/marketing/CaptionAssistant";
 import Button from "@/components/kds/Button";
@@ -53,7 +54,7 @@ import type { ComposerSetup, PostDetailResponse, PostMedia, PostStatus, PostTarg
 
 type Tr = (key: string) => string;
 type Setup = ComposerSetup & { canCreate: boolean };
-type Busy = null | "save" | "submit" | "approve" | "reject" | "delete" | "retry" | "share" | "schedule";
+type Busy = null | "save" | "submit" | "approve" | "reject" | "delete" | "retry" | "share" | "schedule" | "check";
 type Uploading = { key: string; name: string; error: string | null };
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -92,6 +93,9 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
   const [unscheduling, setUnscheduling] = useState(false);
 
   const [busy, setBusy] = useState<Busy>(null);
+  /* CEO Brand: the author's tick on the JD's content rules — undone by any
+     edit, so it always speaks of what is sent. */
+  const [confirmed, setConfirmed] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [conflict, setConflict] = useState(false);
   const [serverIssues, setServerIssues] = useState<Record<string, Issue[]> | null>(null);
@@ -179,6 +183,14 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     return () => { alive = false; window.clearTimeout(timer); };
   }, [id, status, tick, loadPost]);
 
+  /* While Koleex AI reads a CEO Brand post, look again every few seconds;
+     the server says when it is done (or gave up). */
+  useEffect(() => {
+    if (!id || post?.content_state !== "running") return;
+    const timer = window.setTimeout(() => { void loadPost(id).catch(() => {}); }, 8_000);
+    return () => window.clearTimeout(timer);
+  }, [id, post, loadPost]);
+
   const accounts = useMemo(() => {
     const list = [...(setup?.accounts ?? [])];
     for (const x of post?.targets ?? []) if (!list.some((a) => a.id === x.account.id)) list.push(x.account);
@@ -199,7 +211,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
   const timePassed = later && !!scheduledAt && !timeAhead;
   const ready = chosen.length > 0 && issues.length === 0 && !stillUploading && (!later || !!scheduledAt);
 
-  const touch = () => { setDirty(true); setNotice(null); setServerIssues(null); };
+  const touch = () => { setDirty(true); setNotice(null); setServerIssues(null); setConfirmed(false); };
   const toggleAccount = (aid: string) => {
     touch();
     setSelected((s) => (s.includes(aid) ? s.filter((x) => x !== aid) : [...s, aid]));
@@ -208,6 +220,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
 
   const fail = (b: { error?: string; code?: string | null; issues?: Record<string, Issue[]> | null }) => {
     if (b.code === "conflict") { setConflict(true); return; }
+    if (b.code === "confirm") { setConfirmed(false); setNotice({ tone: "error", text: t("jd.confirmFirst") }); return; }
     if (b.issues) setServerIssues(b.issues);
     setNotice({ tone: "error", text: b.error ?? t("b.failed") });
   };
@@ -270,8 +283,21 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
     setNotice({ tone: "ok", text: t("a.saved") });
     return true;
   });
-  const submit = () => run("submit", () => act("submit"));
-  const approve = () => run("approve", () => act("approve"));
+  const submit = () => run("submit", () => act("submit", space === "ceo" ? { confirmed } : {}));
+  const approve = () => run("approve", async () => {
+    const ok = await act("approve");
+    if (ok && space === "ceo") forgetCeoKpis();
+    return ok;
+  });
+  /* CEO Brand: Koleex AI reads the post again (it failed, or the post changed). */
+  const recheck = () => run("check", async () => {
+    if (!id) return false;
+    const res = await fetch(`/api/marketing/posts/${id}/check`, { method: "POST", headers: JSON_HEADERS, body: "{}" });
+    const b = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    await loadPost(id).catch(() => {});
+    if (!res.ok) { setNotice({ tone: "error", text: b.code === "busy" ? t("ck.busy") : b.error ?? t("b.failed") }); return false; }
+    return true;
+  });
   const reject = () => run("reject", async () => {
     const ok = await act("reject", { note: rejectNote });
     if (ok) { setRejecting(false); setRejectNote(""); }
@@ -402,6 +428,9 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
         <p className="mt-4 rounded-xl border border-[#567FB2]/40 bg-[#567FB2]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">
           {approver && post.author ? t("b.waitingFrom").replace("{name}", post.author).replace("{when}", dmyHm(post.submitted_at)) : t("b.waiting").replace("{when}", dmyHm(post.submitted_at))}
         </p>
+      )}
+      {space === "ceo" && post && (
+        <ContentCheckPanel t={t} post={post} busy={busy === "check"} onCheck={() => void recheck()} canCheck={approver || !!detail?.canEdit} />
       )}
       {post?.status === "publishing" && <p className="mt-4 rounded-xl border border-[#567FB2]/40 bg-[#567FB2]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">{t("b.publishing")}</p>}
       {post?.status === "scheduled" && post.scheduled_at && (
@@ -604,6 +633,9 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
                 onRetry={() => void retry()} onShared={(x) => void markShared(x)} onCopy={(k, text) => void copyText(k, text)} />
             )}
 
+            {writing && space === "ceo" && !approver && post?.status !== "in_review" && (
+              <JdRulesCard t={t} confirmed={confirmed} onConfirm={setConfirmed} />
+            )}
             {writing && (
               <div className="flex flex-wrap items-center gap-3 border-t border-[var(--border-subtle)] pt-4">
                 {approver ? (
@@ -612,7 +644,7 @@ export default function PostComposer({ space, postId }: { space: MarketingSpace;
                     {timeAhead ? t("a.schedule") : post?.status === "in_review" ? t("a.approve") : t("a.publish")}
                   </Button>
                 ) : (
-                  <Button type="button" disabled={!ready || busy !== null || post?.status === "in_review"} onClick={() => void submit()}>
+                  <Button type="button" disabled={!ready || busy !== null || post?.status === "in_review" || (space === "ceo" && !confirmed)} onClick={() => void submit()}>
                     {busy === "submit" ? <SpinnerIcon size={14} className="motion-safe:animate-spin" /> : null}
                     {t("a.submit")}
                   </Button>

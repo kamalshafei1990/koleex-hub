@@ -30,9 +30,14 @@ import type {
   PostFilter, PostInput, PostMedia, PostStatus, PostSummary, PostTargetView, PostView, TargetStatus,
 } from "@/lib/marketing/post-types";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
+import { CEO_MONTHLY_APPROVED, CEO_WEEKLY_POSTS, contentState, type ContentCheck } from "@/lib/marketing/ceo-rules";
+import { planWeekStart, weekRange } from "@/lib/marketing/week-plan";
+import { contentSig } from "@/lib/server/marketing/content-check";
 
 export const EDITABLE: readonly PostStatus[] = ["draft", "in_review", "rejected"];
-const POST_COLUMNS = "id, space, status, body, media, created_by, submitted_at, decided_by, decided_at, decision_note, scheduled_at, published_at, version, created_at, updated_at";
+const LIST_COLUMNS = "id, space, status, body, media, created_by, submitted_at, decided_by, decided_at, decision_note, scheduled_at, published_at, version, created_at, updated_at";
+/* One post adds its content check (CEO Brand); the list does without. */
+const POST_COLUMNS = `${LIST_COLUMNS}, content_check`;
 /* A scheduled time must leave the publisher (every 5 minutes) room to
    pick it up; and nothing is planned more than a year ahead. */
 export const SCHEDULE_LEAD_MS = 2 * 60_000;
@@ -59,6 +64,7 @@ type PostRow = {
   id: string; space: MarketingSpace; status: PostStatus; body: string; media: PostMedia[] | null;
   created_by: string; submitted_at: string | null; decided_by: string | null; decided_at: string | null;
   decision_note: string | null; scheduled_at: string | null; published_at: string | null; version: number; created_at: string; updated_at: string;
+  content_check?: ContentCheck | null;
 };
 type TargetRow = {
   id: string; post_id: string; account_id: string; body_override: string | null; status: TargetStatus;
@@ -160,9 +166,14 @@ export async function loadPost(tenantId: string, id: string): Promise<PostView |
   if (!row) return null;
   const [targets, accounts] = await Promise.all([targetsOf([row.id]), spaceAccountsWithRemoved(tenantId, row.space)]);
   const names = await namesOf([row.created_by, row.decided_by ?? ""]);
+  const media = Array.isArray(row.media) ? row.media : [];
+  const overrides = [...new Set(targets.map((t) => t.body_override).filter((x): x is string => !!x && !!x.trim()))];
+  const check = row.content_check ?? null;
   return {
     ...row,
-    media: Array.isArray(row.media) ? row.media : [],
+    media,
+    content_check: check,
+    content_state: contentState(check, contentSig(row.body, overrides, media), Date.now()),
     author: names.get(row.created_by) || null,
     decider: row.decided_by ? names.get(row.decided_by) || null : null,
     targets: targets
@@ -295,12 +306,26 @@ async function readyToGo(tenantId: string, row: PostRow): Promise<Result> {
   return { ok: true };
 }
 
-export async function submitPost(tenantId: string, id: string, version: number): Promise<Result<{ version: number }>> {
+/** Send for approval. A CEO Brand post goes to the CEO only once its sender
+ *  confirmed it shows none of the JD's not-allowed content (`confirmedBy`);
+ *  the confirmation is kept with it, and Koleex AI's check is queued (the
+ *  route runs it after its response). */
+export async function submitPost(tenantId: string, id: string, version: number, opts: { confirmedBy?: string | null } = {}): Promise<Result<{ version: number }>> {
   const row = await readPost(tenantId, id);
   if (!row) return { error: "Post not found.", status: 404 };
+  if (row.space === "ceo" && !opts.confirmedBy) return { error: "Confirm the content rules before sending the post.", status: 400, code: "confirm" };
   const ready = await readyToGo(tenantId, row);
   if (isError(ready)) return ready;
-  return transition(tenantId, id, version, ["draft", "rejected"], { status: "in_review", submitted_at: new Date().toISOString(), decision_note: null });
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status: "in_review", submitted_at: now, decision_note: null };
+  if (row.space === "ceo") {
+    const targets = await targetsOf([row.id]);
+    const overrides = [...new Set(targets.map((t) => t.body_override).filter((x): x is string => !!x && !!x.trim()))];
+    const sig = contentSig(row.body, overrides, Array.isArray(row.media) ? row.media : []);
+    const check: ContentCheck = { confirmed_by: opts.confirmedBy ?? null, confirmed_at: now, ai: { status: "queued", at: now, sig } };
+    patch.content_check = check;
+  }
+  return transition(tenantId, id, version, ["draft", "rejected"], patch);
 }
 
 export async function rejectPost(tenantId: string, id: string, version: number, deciderId: string, note: string): Promise<Result<{ version: number }>> {
@@ -398,7 +423,7 @@ const FILTERS: Record<PostFilter, readonly PostStatus[] | null> = {
 };
 
 export async function listPosts(tenantId: string, space: MarketingSpace, filter: PostFilter, cursor: string | null): Promise<{ posts: PostSummary[]; next: string | null; counts: { drafts: number; review: number; scheduled: number; problems: number } }> {
-  let q = supabaseServer.from("marketing_posts").select(POST_COLUMNS).eq("tenant_id", tenantId).eq("space", space).neq("status", "archived");
+  let q = supabaseServer.from("marketing_posts").select(LIST_COLUMNS).eq("tenant_id", tenantId).eq("space", space).neq("status", "archived");
   const only = FILTERS[filter];
   if (only) q = q.in("status", only as PostStatus[]);
   if (cursor) {
@@ -453,4 +478,43 @@ export async function listPosts(tenantId: string, space: MarketingSpace, filter:
   });
   const last = rows[rows.length - 1];
   return { posts, next: more && last ? `${last.updated_at}|${last.id}` : null, counts: { drafts: counts[0], review: counts[1], scheduled: counts[2], problems: counts[3] } };
+}
+
+/** Posts the CEO approved (and did not take back): approved, going out, out,
+ *  or failed on the way. */
+const APPROVED: readonly PostStatus[] = ["approved", "scheduled", "publishing", "published", "partly_published", "failed"];
+/** Posts going out or out. */
+const GOING: readonly PostStatus[] = ["approved", "scheduled", "publishing", "published", "partly_published"];
+
+/** CEO Brand's KPIs (the JD): this week's posts — out, or approved to go
+ *  out this week (Monday to Sunday) — against 3, and this month's approved
+ *  posts against 12, Shanghai time. A post counts in the week of its going
+ *  out (published, else its time, else its approval), in the month of its
+ *  approval. */
+export async function ceoKpis(tenantId: string, now: number = Date.now()): Promise<{
+  week: { count: number; target: number }; month: { count: number; target: number };
+}> {
+  const wk = weekRange(planWeekStart(now));
+  const s = new Date(now + 8 * 3_600_000);
+  const y = s.getUTCFullYear();
+  const m = s.getUTCMonth();
+  const monthFrom = Date.UTC(y, m, 1) - 8 * 3_600_000;
+  const monthTo = Date.UTC(y, m + 1, 1) - 8 * 3_600_000;
+  const iso = (t: number) => new Date(t).toISOString();
+  const [month, week] = await Promise.all([
+    supabaseServer.from("marketing_posts").select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId).eq("space", "ceo").in("status", APPROVED as PostStatus[])
+      .gte("decided_at", iso(monthFrom)).lt("decided_at", iso(monthTo)),
+    supabaseServer.from("marketing_posts").select("id, status, decided_at, scheduled_at, published_at")
+      .eq("tenant_id", tenantId).eq("space", "ceo").in("status", GOING as PostStatus[])
+      .or(["published_at", "scheduled_at", "decided_at"].map((c) => `and(${c}.gte.${iso(wk.from)},${c}.lt.${iso(wk.to)})`).join(","))
+      .limit(500),
+  ]);
+  if (month.error) throw new Error(`marketing posts: ${month.error.message}`);
+  if (week.error) throw new Error(`marketing posts: ${week.error.message}`);
+  const inWeek = ((week.data ?? []) as Array<{ decided_at: string | null; scheduled_at: string | null; published_at: string | null }>).filter((r) => {
+    const at = Date.parse(r.published_at ?? r.scheduled_at ?? r.decided_at ?? "");
+    return at >= wk.from && at < wk.to;
+  }).length;
+  return { week: { count: inWeek, target: CEO_WEEKLY_POSTS }, month: { count: month.count ?? 0, target: CEO_MONTHLY_APPROVED } };
 }

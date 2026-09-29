@@ -13,7 +13,12 @@
    them; each number is kept for the session and drawn at once, asked again
    at most once a minute and only once the screen's own requests are done.
    The Comments and Messages screens tell it the new number after every
-   change. */
+   change.
+
+   CEO Brand's subtitle carries its KPIs from the JD (owner, 30/09/2026):
+   this week's posts of 3 and this month's approved posts of 12. The same
+   line as the plain subtitle, so the numbers arriving move nothing; kept for
+   the session like the counts, and asked again after an approval. */
 
 import { useEffect, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
@@ -44,6 +49,7 @@ const T: Translations = {
   "tab.accounts":  { en: "Accounts", zh: "账号", ar: "الحسابات" },
   "tab.comments":  { en: "Comments", zh: "评论", ar: "التعليقات" },
   "tab.messages":  { en: "Messages", zh: "私信", ar: "الرسائل" },
+  "kpi.line":      { en: "This week {w} of {wt} posts · This month {m} of {mt} approved", zh: "本周 {w}/{wt} 条帖子 · 本月 {m}/{mt} 条已批准", ar: "هذا الأسبوع {w} من {wt} منشورات · هذا الشهر {m} من {mt} تمت الموافقة عليها" },
 };
 
 /* ── How many comment threads and conversations wait for a reply ────────── */
@@ -107,16 +113,80 @@ function useWaitingCount(kind: WaitKind, space: MarketingSpace, enabled = true):
   return enabled ? n : null;
 }
 
+/* ── CEO Brand's KPIs ─────────────────────────────────────────────────── */
+
+type CeoKpis = { week: { count: number; target: number }; month: { count: number; target: number } };
+const KPI_KEY = "kx.mkt.ceoKpis";
+const KPI_EVENT = "kx-marketing-ceo-kpis";
+let kpiMemory: { v: CeoKpis; at: number } | null = null;
+
+function readKpis(): { v: CeoKpis; at: number } | null {
+  if (kpiMemory) return kpiMemory;
+  try {
+    const raw = sessionStorage.getItem(KPI_KEY);
+    const o = raw ? (JSON.parse(raw) as { v?: CeoKpis; at?: unknown }) : null;
+    if (o?.v && typeof o.v.week?.count === "number" && typeof o.v.month?.count === "number" && typeof o.at === "number") {
+      kpiMemory = { v: o.v, at: o.at };
+      return kpiMemory;
+    }
+  } catch { /* storage blocked: the numbers just wait for the server */ }
+  return null;
+}
+
+/** After an approval the kept numbers are out of date: every header showing
+ *  them asks again. */
+export function forgetCeoKpis(): void {
+  kpiMemory = null;
+  try { sessionStorage.removeItem(KPI_KEY); } catch { /* storage blocked */ }
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(KPI_EVENT));
+}
+
+function useCeoKpis(enabled: boolean): CeoKpis | null {
+  /* Read in the initialiser: the kept numbers are on the first frame. */
+  const [v, setV] = useState<CeoKpis | null>(() => (typeof window === "undefined" || !enabled ? null : readKpis()?.v ?? null));
+  const [ask, setAsk] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const onForget = () => setAsk((n) => n + 1);
+    window.addEventListener(KPI_EVENT, onForget);
+    return () => window.removeEventListener(KPI_EVENT, onForget);
+  }, [enabled]);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const held = readKpis();
+    if (held && Date.now() - held.at <= COUNT_TTL_MS) return;
+    void whenNetworkQuiet().then(async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch("/api/marketing/posts/kpis?space=ceo", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as CeoKpis;
+        if (!alive || typeof body?.week?.count !== "number" || typeof body?.month?.count !== "number") return;
+        kpiMemory = { v: body, at: Date.now() };
+        try { sessionStorage.setItem(KPI_KEY, JSON.stringify(kpiMemory)); } catch { /* storage blocked */ }
+        setV(body);
+      } catch { /* offline: the kept numbers stay */ }
+    });
+    return () => { alive = false; };
+  }, [enabled, ask]);
+  return enabled ? v : null;
+}
+
 export default function MarketingHeader({ space, action }: { space: MarketingSpace; action?: ReactNode }) {
   const { t } = useTranslation(T);
   const needs = useWaitingCount("comments", space);
+  const kpis = useCeoKpis(space === "ceo");
   /* CEO Brand reads no private messages (owner, 29/09/2026): no tab there. */
   const withMessages = space === "company";
   const waiting = useWaitingCount("messages", space, withMessages);
   return (
     <PageHeader
       title={t(`title.${space}`)}
-      subtitle={t(`sub.${space}`)}
+      subtitle={kpis
+        ? t("kpi.line").replace("{w}", String(kpis.week.count)).replace("{wt}", String(kpis.week.target))
+          .replace("{m}", String(kpis.month.count)).replace("{mt}", String(kpis.month.target))
+        : t(`sub.${space}`)}
       icon={space === "ceo" ? <CrownIcon size={16} /> : <Share2Icon size={16} />}
       backHref="/"
       action={action}

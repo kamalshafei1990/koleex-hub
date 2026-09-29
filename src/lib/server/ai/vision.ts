@@ -154,9 +154,10 @@ async function askProvider(
   key: string,
   prompt: string,
   dataUrl: string,
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<string | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const t0 = Date.now();
   try {
     const res = await fetch(provider.url, {
@@ -241,6 +242,35 @@ export async function describeImage(
       prompt,
       dataUrl,
     );
+    if (text) return { text };
+  }
+  return null;
+}
+
+/**
+ * Ask ONE precise question about an image in the caller's own prompt — a
+ * structured check (CEO Brand's content rules), not a description — within
+ * `timeoutMs` per provider (never longer than a reading may take). The same
+ * providers, order and failure rule as describeImage: null, never a throw.
+ */
+export async function askAboutImage(
+  bytes: Uint8Array,
+  mimeType: string,
+  prompt: string,
+  opts?: { timeoutMs?: number },
+): Promise<VisionResult | null> {
+  const configured = parseVisionConfig(readVisionEnv());
+  const configuredKey = process.env.AI_VISION_API_KEY?.trim() || "";
+  const defaultKey = process.env.DEEPSEEK_API_KEY;
+  if (!configured && !defaultKey) return null;
+  const timeoutMs = Math.max(1_000, Math.min(opts?.timeoutMs ?? TIMEOUT_MS, TIMEOUT_MS));
+  const mime = /^image\/(png|jpeg|jpg|webp|gif)$/.test(mimeType) ? mimeType : "image/png";
+  const dataUrl = `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
+  const providers: Array<[VisionProvider, string]> = [];
+  if (configured) providers.push([configured, configuredKey]);
+  if (defaultKey) providers.push([{ url: DEFAULT_ENDPOINT, model: DEFAULT_MODEL, label: "default" }, defaultKey]);
+  for (const [provider, key] of providers) {
+    const text = await askProvider(provider, key, prompt, dataUrl, timeoutMs);
     if (text) return { text };
   }
   return null;

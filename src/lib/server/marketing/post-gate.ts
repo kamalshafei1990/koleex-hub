@@ -38,7 +38,7 @@ export function reply<T extends object>(r: Result<T>, ok: (v: T) => object = (v)
 }
 
 export const notApprover = () =>
-  NextResponse.json({ error: "Only an approver can do this: the super admins and the roles given «Social Marketing Approvals».", code: "not_approver" }, { status: 403 });
+  NextResponse.json({ error: "Only an approver can do this: on Social Marketing the super admins and the roles given «Social Marketing Approvals»; on CEO Brand the account granted «CEO Brand Approvals».", code: "not_approver" }, { status: 403 });
 
 /** The version the person's screen read — required for every change. */
 export async function readVersion(req: Request): Promise<{ version: number; body: Record<string, unknown> } | NextResponse> {

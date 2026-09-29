@@ -96,6 +96,12 @@ const CHECKS: Record<string, Check> = {
     id: (m) => str(m.post_id),
     waiting: (e) => e.status === "in_review",
   },
+  /* A CEO Brand post waits on the CEO while it is in review. */
+  marketing_ceo_approval_request: {
+    table: "marketing_posts", cols: "id, status",
+    id: (m) => str(m.post_id),
+    waiting: (e) => e.status === "in_review",
+  },
   /* A weekly plan waits while it is a draft (closed at its week's end). */
   marketing_plan_approval_request: {
     table: "marketing_week_plans", cols: "id, status",

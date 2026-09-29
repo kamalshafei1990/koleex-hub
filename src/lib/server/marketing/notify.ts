@@ -27,8 +27,11 @@ import "server-only";
    back, edited back to a draft by its author, or deleted. One that waits a
    day comes back to the approvers (lib/server/approval-reminders).
 
-   Only the Social Marketing space for now: CEO Brand has no screens yet, so
-   a link there would open nothing; its notifications come with its screens.
+   CEO Brand's posts (30/09/2026, owner: "the CEO and the author") are told
+   the same way under their own types (marketing_ceo_*), so they count on the
+   CEO Brand tile and open its screens: the request goes to whoever is
+   granted «CEO Brand Approvals» (ceoApproverIds — no Super Admin by
+   default), the decisions and publishing results to the author.
 
    Fire-and-forget: the routes run these after their response, the
    publisher through later(), and nothing here can fail the change that
@@ -41,8 +44,8 @@ import { clearUnreadByMeta, clearUnreadByMetaIn } from "@/lib/server/inbox-lifec
 import { superAdminAccountIds } from "@/lib/server/sa-notify";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { loadPost } from "@/lib/server/marketing/posts";
-import { SOCIAL_APPROVALS_MODULE, isOpenAccessModule } from "@/lib/permission-modules";
-import { SPACE_MODULE, type MarketingPlatform } from "@/lib/marketing/spaces";
+import { CEO_APPROVALS_MODULE, SOCIAL_APPROVALS_MODULE, isOpenAccessModule } from "@/lib/permission-modules";
+import { SPACE_MODULE, SPACE_POSTS, type MarketingPlatform, type MarketingSpace } from "@/lib/marketing/spaces";
 import { dmyHm } from "@/lib/marketing/format";
 import type { PostStatus, PostTargetView } from "@/lib/marketing/post-types";
 import { conversationNeedsReply } from "@/lib/marketing/message-types";
@@ -71,7 +74,20 @@ function quiet<A extends unknown[]>(name: string, fn: (...args: A) => Promise<vo
   };
 }
 
-const postLink = (id: string) => `/social-marketing/posts/${encodeURIComponent(id)}`;
+const postLink = (space: MarketingSpace, id: string) => `${SPACE_POSTS[space]}/${encodeURIComponent(id)}`;
+
+/* The decision a person made, as each space's template. Literal keys: the
+   notification validator reads which templates are written. */
+const DECIDED_TPL: Record<MarketingSpace, Record<PostDecision, { k: string }>> = {
+  company: {
+    approved: { k: "marketing_post_decided" }, scheduled: { k: "marketing_post_decided.scheduled" },
+    rejected: { k: "marketing_post_decided.rejected" }, unscheduled: { k: "marketing_post_decided.unscheduled" },
+  },
+  ceo: {
+    approved: { k: "marketing_ceo_post_decided" }, scheduled: { k: "marketing_ceo_post_decided.scheduled" },
+    rejected: { k: "marketing_ceo_post_decided.rejected" }, unscheduled: { k: "marketing_ceo_post_decided.unscheduled" },
+  },
+};
 
 const PLATFORM_NAME: Record<MarketingPlatform, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
@@ -164,44 +180,106 @@ export async function marketingApproverIds(tenantId: string): Promise<string[]> 
   return [...ids];
 }
 
+/** Who may approve a CEO Brand post — exactly whom the approve route lets
+ *  through: active internal accounts granted «CEO Brand Approvals» ON THE
+ *  ACCOUNT ITSELF (canApprovePosts — no role, no Super Admin bypass) that may
+ *  also "edit" CEO Brand (a Super Admin always may; anyone else by override,
+ *  else by role). Nobody is asked until the CEO grants it; a failed read
+ *  asks nobody rather than someone who could not decide. */
+export async function ceoApproverIds(tenantId: string): Promise<string[]> {
+  type Perm = { role_id?: string; account_id?: string; module_name?: string; module_key?: string; can_view?: boolean | null; can_edit?: boolean | null };
+  const APP = SPACE_MODULE.ceo;
+  const [accountGrants, supers] = await Promise.all([
+    supabaseServer.from("account_permission_overrides").select("account_id").ilike("module_key", CEO_APPROVALS_MODULE).eq("can_view", true),
+    superAdminAccountIds(tenantId),
+  ]);
+  if (accountGrants.error) {
+    console.error("[marketing/notify.ceoApprovers]", accountGrants.error.message);
+    return [];
+  }
+  const granted = [...new Set(((accountGrants.data ?? []) as Perm[]).map((p) => p.account_id!))];
+  if (!granted.length) return [];
+  const { data: accts, error } = await supabaseServer
+    .from("accounts")
+    .select("id, role_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .eq("user_type", "internal")
+    .in("id", granted)
+    .limit(200);
+  if (error) {
+    console.error("[marketing/notify.ceoApprovers]", error.message);
+    return [];
+  }
+  const cands = (accts ?? []) as Array<{ id: string; role_id: string | null }>;
+  if (!cands.length) return [];
+  const roleIds = [...new Set(cands.map((c) => c.role_id).filter((r): r is string => !!r))];
+  const [rolePerms, overrides] = await Promise.all([
+    roleIds.length
+      ? supabaseServer.from("koleex_permissions").select("role_id, module_name, can_view, can_edit").in("role_id", roleIds).ilike("module_name", APP)
+      : Promise.resolve({ data: [] as Perm[], error: null }),
+    supabaseServer.from("account_permission_overrides").select("account_id, module_key, can_view, can_edit").in("account_id", cands.map((c) => c.id)).ilike("module_key", APP),
+  ]);
+  if (rolePerms.error || overrides.error) {
+    console.error("[marketing/notify.ceoApprovers]", rolePerms.error?.message ?? overrides.error?.message);
+    return [];
+  }
+  const superIds = new Set(supers);
+  const ids: string[] = [];
+  for (const c of cands) {
+    /* requireModuleAction(CEO Brand, "edit") */
+    if (superIds.has(c.id)) { ids.push(c.id); continue; }
+    const rM = ((rolePerms.data ?? []) as Perm[]).find((r) => !!c.role_id && r.role_id === c.role_id) ?? null;
+    const oM = ((overrides.data ?? []) as Perm[]).find((r) => r.account_id === c.id) ?? null;
+    if (oM?.can_view === false) continue;
+    const edit = typeof oM?.can_edit === "boolean" ? oM.can_edit : rM?.can_edit;
+    if (edit === true) ids.push(c.id);
+  }
+  return ids;
+}
+
 /** Sent for approval: every approver but the sender is asked; an unread
  *  request about the same post is replaced. */
 export const notifyPostSubmitted = quiet("notifyPostSubmitted", async (a: Actor, postId: string): Promise<void> => {
   const post = await loadPost(a.tenant_id, postId);
-  if (!post || post.space !== "company" || post.status !== "in_review") return;
+  if (!post || post.status !== "in_review") return;
+  const ceo = post.space === "ceo";
+  const p = { who: post.author || "—", accounts: accountsLabel(post.targets), text: excerpt(post.body) };
   await notifyLite({
     tenantId: a.tenant_id,
-    recipients: await marketingApproverIds(a.tenant_id),
+    recipients: ceo ? await ceoApproverIds(a.tenant_id) : await marketingApproverIds(a.tenant_id),
     senderId: a.account_id,
-    tpl: { k: "marketing_approval_request", p: { who: post.author || "—", accounts: accountsLabel(post.targets), text: excerpt(post.body) } },
-    link: postLink(post.id),
-    type: "marketing_approval_request",
-    metadata: { source: "social-marketing", post_id: post.id },
+    tpl: ceo ? { k: "marketing_ceo_approval_request", p } : { k: "marketing_approval_request", p },
+    link: postLink(post.space, post.id),
+    type: ceo ? "marketing_ceo_approval_request" : "marketing_approval_request",
+    metadata: { source: ceo ? "ceo-brand" : "social-marketing", post_id: post.id },
     tag: `mkt-post:${post.id}`,
-    supersede: { type: "marketing_approval_request", post_id: post.id },
+    supersede: { type: ceo ? "marketing_ceo_approval_request" : "marketing_approval_request", post_id: post.id },
   });
 });
 
 /** A person decided on a post: the request is answered for every approver,
  *  and the author hears — unless they decided it themselves. */
 export const notifyPostDecided = quiet("notifyPostDecided", async (a: Actor, postId: string, decision: PostDecision): Promise<void> => {
-  await clearUnreadByMeta({ type: "marketing_approval_request", post_id: postId });
+  await clearUnreadByMetaIn({ post_id: postId }, "type", ["marketing_approval_request", "marketing_ceo_approval_request"]);
   const post = await loadPost(a.tenant_id, postId);
-  if (!post || post.space !== "company") return;
+  if (!post) return;
+  const ceo = post.space === "ceo";
   const accounts = accountsLabel(post.targets);
+  const k = DECIDED_TPL[post.space][decision].k;
   await notifyLite({
     tenantId: a.tenant_id,
     recipients: [post.created_by],
     senderId: a.account_id,
-    tpl: decision === "scheduled" ? { k: "marketing_post_decided.scheduled", p: { when: dmyHm(post.scheduled_at), accounts } }
-      : decision === "rejected" ? { k: "marketing_post_decided.rejected", p: { note: post.decision_note ?? undefined } }
-      : decision === "unscheduled" ? { k: "marketing_post_decided.unscheduled" }
-      : { k: "marketing_post_decided", p: { accounts } },
-    link: postLink(post.id),
-    type: "marketing_post_decided",
-    metadata: { source: "social-marketing", post_id: post.id, decision },
+    tpl: decision === "scheduled" ? { k, p: { when: dmyHm(post.scheduled_at), accounts } }
+      : decision === "rejected" ? { k, p: { note: post.decision_note ?? undefined } }
+      : decision === "unscheduled" ? { k }
+      : { k, p: { accounts } },
+    link: postLink(post.space, post.id),
+    type: ceo ? "marketing_ceo_post_decided" : "marketing_post_decided",
+    metadata: { source: ceo ? "ceo-brand" : "social-marketing", post_id: post.id, decision },
     tag: `mkt-post:${post.id}`,
-    supersede: { type: "marketing_post_decided", post_id: post.id },
+    supersede: { type: ceo ? "marketing_ceo_post_decided" : "marketing_post_decided", post_id: post.id },
   });
 });
 
@@ -211,18 +289,20 @@ export const notifyPostDecided = quiet("notifyPostDecided", async (a: Actor, pos
  *  published with nobody watching → the author. */
 export const notifyPublishOutcome = quiet("notifyPublishOutcome", async (tenantId: string, postId: string, to: PostStatus, actorId: string | null): Promise<void> => {
   const post = await loadPost(tenantId, postId);
-  if (!post || post.space !== "company") return;
+  if (!post) return;
+  const ceo = post.space === "ceo";
   if (to === "published") {
     if (actorId) return;
     const out = post.targets.filter((t) => t.status === "published" || t.status === "shared");
+    const p = { accounts: accountsLabel(out.length ? out : post.targets) };
     await notifyLite({
       tenantId,
       recipients: [post.created_by],
       senderId: null,
-      tpl: { k: "marketing_post_published", p: { accounts: accountsLabel(out.length ? out : post.targets) } },
-      link: postLink(post.id),
-      type: "marketing_post_published",
-      metadata: { source: "social-marketing", post_id: post.id },
+      tpl: ceo ? { k: "marketing_ceo_post_published", p } : { k: "marketing_post_published", p },
+      link: postLink(post.space, post.id),
+      type: ceo ? "marketing_ceo_post_published" : "marketing_post_published",
+      metadata: { source: ceo ? "ceo-brand" : "social-marketing", post_id: post.id },
       tag: `mkt-post:${post.id}`,
     });
     return;
@@ -233,18 +313,20 @@ export const notifyPublishOutcome = quiet("notifyPublishOutcome", async (tenantI
      explained on the post itself, in the reader's language. */
   const said = failed.map((t) => t.error).find((e): e is string => !!e && !e.startsWith("rule:"));
   const reason = said && said.length > 140 ? `${said.slice(0, 139).trimEnd()}…` : said;
+  const all = { accounts: accountsLabel(failed.length ? failed : post.targets), reason };
+  const some = { accounts: accountsLabel(failed), reason };
   await notifyLite({
     tenantId,
     recipients: [post.created_by, post.decided_by],
     senderId: actorId,
     tpl: to === "failed"
-      ? { k: "marketing_publish_failed", p: { accounts: accountsLabel(failed.length ? failed : post.targets), reason } }
-      : { k: "marketing_publish_failed.partly", p: { accounts: accountsLabel(failed), reason } },
-    link: postLink(post.id),
-    type: "marketing_publish_failed",
-    metadata: { source: "social-marketing", post_id: post.id, status: to },
+      ? (ceo ? { k: "marketing_ceo_publish_failed", p: all } : { k: "marketing_publish_failed", p: all })
+      : (ceo ? { k: "marketing_ceo_publish_failed.partly", p: some } : { k: "marketing_publish_failed.partly", p: some }),
+    link: postLink(post.space, post.id),
+    type: ceo ? "marketing_ceo_publish_failed" : "marketing_publish_failed",
+    metadata: { source: ceo ? "ceo-brand" : "social-marketing", post_id: post.id, status: to },
     tag: `mkt-post:${post.id}`,
-    supersede: { type: "marketing_publish_failed", post_id: post.id },
+    supersede: { type: ceo ? "marketing_ceo_publish_failed" : "marketing_publish_failed", post_id: post.id },
   });
 });
 
@@ -255,18 +337,21 @@ export const settleReview = quiet("settleReview", async (tenantId: string, postI
   const { data, error } = await supabaseServer.from("marketing_posts").select("status").eq("tenant_id", tenantId).eq("id", postId).maybeSingle();
   if (error) throw new Error(`marketing posts: ${error.message}`);
   if ((data as { status: PostStatus } | null)?.status === "in_review") return;
-  await clearUnreadByMeta({ type: "marketing_approval_request", post_id: postId });
+  await clearUnreadByMetaIn({ post_id: postId }, "type", ["marketing_approval_request", "marketing_ceo_approval_request"]);
 });
 
 /** A deleted post has nothing left to open: its unread notifications go. */
 export const settleDeleted = quiet("settleDeleted", async (postId: string): Promise<void> => {
-  await clearUnreadByMetaIn({ post_id: postId }, "type", ["marketing_approval_request", "marketing_post_decided", "marketing_publish_failed"]);
+  await clearUnreadByMetaIn({ post_id: postId }, "type", [
+    "marketing_approval_request", "marketing_post_decided", "marketing_publish_failed",
+    "marketing_ceo_approval_request", "marketing_ceo_post_decided", "marketing_ceo_publish_failed",
+  ]);
 });
 
 /** The accounts that failed are being sent again: the failure is no longer
  *  the news (a new one replaces it; a success needs none). */
 export const settleFailure = quiet("settleFailure", async (postId: string): Promise<void> => {
-  await clearUnreadByMeta({ type: "marketing_publish_failed", post_id: postId });
+  await clearUnreadByMetaIn({ post_id: postId }, "type", ["marketing_publish_failed", "marketing_ceo_publish_failed"]);
 });
 
 /** Who hears of a customer's private message: the Super Admins, and active

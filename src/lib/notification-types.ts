@@ -42,7 +42,7 @@ export type NotifApp =
   | "projects" | "planning" | "inventory" | "quotations" | "invoices"
   | "finance" | "notes" | "accounts" | "ai" | "discuss" | "activity-monitor"
   | "settings" | "orders" | "contracts" | "crm" | "expenses" | "purchase"
-  | "social-marketing";
+  | "social-marketing" | "ceo-brand";
 
 export type NotifSeverity = "info" | "action" | "warning" | "critical";
 
@@ -164,6 +164,11 @@ export const NOTIFICATION_TYPES = {
   marketing_message_waiting: { app: "social-marketing", activity: "marketing_activity", severity: "action", lifecycle: { kind: "clear", key: "conversation_id", when: "the conversation is answered or marked «No reply needed» (a new wait in it replaces the unread one first)" } },
   /* The weekly plan (owner, 29/09/2026): Koleex AI's draft waits on an approver. */
   marketing_plan_approval_request: { app: "social-marketing", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "plan_id", when: "the plan is approved, or its week ends before anyone approved it" } },
+  /* ── CEO Brand: the CEO's own posts (owner, 30/09/2026) — he alone approves ── */
+  marketing_ceo_approval_request: { app: "ceo-brand", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "post_id", when: "the post is approved or sent back, its author edits it back to a draft, or it is deleted (sending it again replaces it first)" } },
+  marketing_ceo_post_decided:     { app: "ceo-brand", activity: "marketing_activity", severity: "info", lifecycle: { kind: "supersede", key: "post_id" } },
+  marketing_ceo_publish_failed:   { app: "ceo-brand", activity: "marketing_activity", severity: "warning", lifecycle: { kind: "clear", key: "post_id", when: "the accounts that failed are sent again (a newer failure replaces it first)" } },
+  marketing_ceo_post_published:   { app: "ceo-brand", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },
