@@ -13,6 +13,10 @@ import "server-only";
        tells the team once (notified_at), and answering (in the Hub or on
        the platform) or «No reply needed» clears it — the next wait tells
        them again.
+     · An AUTOMATIC reply is not an answer: a Page message within 15 s of
+       the customer's (an Instant Reply, an away message — message-types
+       AUTO_REPLY_MS). A new rule re-decides the kept conversations once
+       (applyRule, MESSAGES_RULE), silently.
      · Reply: anyone with "edit" on the account's space, inside the 24 hours
        Meta allows after the customer's last message (after that the Hub says
        so, and the answer is written on the platform). The reply is CLAIMED
@@ -34,13 +38,17 @@ import { claimMessages, listAccounts, loadAccountForSync, recordSync, recordSync
 import { later, notifyMessageWaiting, settleMessage } from "@/lib/server/marketing/notify";
 import { namesOf } from "@/lib/server/marketing/posts";
 import {
-  MESSAGE_MAX, canReplyNow, conversationNeedsReply, messageScopesFor, replyWindowEnd,
+  MESSAGE_MAX, canReplyNow, conversationNeedsReply, lastCountedIndex, messageScopesFor, replyWindowEnd,
   type ConversationView, type MessageAttachment, type MessageFilter, type MessageView,
 } from "@/lib/marketing/message-types";
 import type { MarketingAccountView, MarketingSpace } from "@/lib/marketing/spaces";
 
 /** Every cron run (5 minutes) reads each account again. */
 export const MESSAGES_REFRESH_MS = 4 * 60_000;
+/** The «Needs a reply» rule the stored conversations were decided with; a
+ *  new one re-decides them once from the messages kept (applyRule). 2: an
+ *  automatic reply is not an answer (29/09/2026). */
+const MESSAGES_RULE = 2;
 const PENDING = "pending:";
 const CLAIM_MS = 120_000;
 const PAGE = 30;
@@ -79,15 +87,26 @@ async function saveConversations(a: AccountForSync, remote: RemoteConversation[]
     supabaseServer.from("marketing_conversations").select(CONV_COLUMNS).eq("account_id", a.id).in("external_id", chunk));
   if (rErr) throw new Error(`marketing conversations: ${rErr.message}`);
   const prev = new Map((existing ?? []).map((c) => [c.external_id, c]));
+  /* Our messages a person sent from the Hub count however fast they came. */
+  const ours = remote.flatMap((rc) => rc.messages.filter((m) => m.from_us).map((m) => m.external_id));
+  const { data: hubSent, error: hErr } = ours.length
+    ? await inChunks<{ external_id: string }>(ours, (chunk) =>
+      supabaseServer.from("marketing_messages").select("external_id").eq("account_id", a.id).not("sent_by", "is", null).in("external_id", chunk))
+    : { data: [], error: null };
+  if (hErr) throw new Error(`marketing messages: ${hErr.message}`);
+  const byPerson = new Set((hubSent ?? []).map((m) => m.external_id));
   const now = new Date().toISOString();
   const rows = remote.map((rc) => {
     const last = rc.messages[rc.messages.length - 1] ?? null;
     const lastCustomer = [...rc.messages].reverse().find((m) => !m.from_us) ?? null;
     const p = prev.get(rc.external_id);
+    /* The last word that counts — an automatic reply does not (message-types). */
+    const idx = lastCountedIndex(rc.messages.map((m) => ({ from_us: m.from_us, sent_at: m.sent_at, by_person: byPerson.has(m.external_id) })));
+    const counted = idx >= 0 ? rc.messages[idx] : null;
     /* A reply sent from the Hub after Meta's page was read stays the last
        word until Meta shows it. */
-    const fresh = !!last && (!p || time(last.sent_at) >= time(p.last_message_at));
-    const lastFromUs = fresh ? last!.from_us : p?.last_from_us ?? false;
+    const fresh = !!last && !!counted && (!p || time(last.sent_at) >= time(p.last_message_at));
+    const lastFromUs = fresh ? counted!.from_us : p?.last_from_us ?? false;
     const lastCustomerAt = later_(lastCustomer?.sent_at, p?.last_customer_at);
     const waiting = conversationNeedsReply({ last_from_us: lastFromUs, last_customer_at: lastCustomerAt, handled_at: p?.handled_at ?? null });
     return {
@@ -99,7 +118,7 @@ async function saveConversations(a: AccountForSync, remote: RemoteConversation[]
       last_customer_at: lastCustomerAt,
       last_from_us: lastFromUs,
       /* Words only; a picture or file alone reads as such on the screen. */
-      snippet: fresh ? last!.text : p?.snippet ?? null,
+      snippet: fresh ? counted!.text : p?.snippet ?? null,
       /* Answered on the platform: the wait is over, and the next one tells
          the team again. Every row names it (a bulk upsert fills a missing
          column with null). */
@@ -125,6 +144,30 @@ async function saveConversations(a: AccountForSync, remote: RemoteConversation[]
   return { saved: (saved ?? []) as ConvRow[], ended };
 }
 
+/** The current rule (MESSAGES_RULE) over the conversations the Hub already
+ *  keeps for an account, from the messages it keeps — once per rule and
+ *  silently (history never notifies). */
+async function applyRule(a: AccountForSync): Promise<number> {
+  const { data: convs, error } = await allRows<ConvRow>(
+    supabaseServer.from("marketing_conversations").select(CONV_COLUMNS).eq("account_id", a.id).order("id"),
+    "marketing conversations", WINDOW_ROWS,
+  );
+  if (error) throw new Error(`marketing conversations: ${error.message}`);
+  let changed = 0;
+  for (const c of convs ?? []) {
+    const { data, error: mErr } = await supabaseServer.from("marketing_messages").select("from_us, text, sent_at, sent_by")
+      .eq("conversation_id", c.id).not("external_id", "like", `${PENDING}%`).order("sent_at", { ascending: false }).order("id").limit(MESSAGES_SHOWN);
+    if (mErr) throw new Error(`marketing messages: ${mErr.message}`);
+    const list = ((data ?? []) as Array<{ from_us: boolean; text: string | null; sent_at: string | null; sent_by: string | null }>).reverse();
+    const idx = lastCountedIndex(list.map((m) => ({ from_us: m.from_us, sent_at: m.sent_at, by_person: !!m.sent_by })));
+    if (idx < 0 || (list[idx].from_us === c.last_from_us && list[idx].text === c.snippet)) continue;
+    const { error: uErr } = await supabaseServer.from("marketing_conversations").update({ last_from_us: list[idx].from_us, snippet: list[idx].text }).eq("id", c.id);
+    if (uErr) throw new Error(`marketing conversations: ${uErr.message}`);
+    changed++;
+  }
+  return changed;
+}
+
 /** One account's conversations — see the header. */
 export async function syncMessages(tenantId: string, accountId: string, opts: { minGapMs?: number } = {}): Promise<MessagesSyncOutcome> {
   const a = await loadAccountForSync(tenantId, accountId);
@@ -137,9 +180,11 @@ export async function syncMessages(tenantId: string, accountId: string, opts: { 
   if (!(await claimMessages(a, opts.minGapMs ?? MESSAGES_REFRESH_MS))) return { ok: true, skipped: "fresh" };
   if (!messageScopesFor(a.platform).every((s) => a.scopes.includes(s))) return { ok: true, skipped: "no_permission" };
   const first = typeof a.sync_state.messages_since !== "string";
+  const ruleDue = a.sync_state.messages_rule !== MESSAGES_RULE;
   const readTo = typeof a.sync_state.messages_read_to === "string" ? a.sync_state.messages_read_to : null;
   const now = new Date().toISOString();
   try {
+    if (ruleDue) await applyRule(a);
     const remote = await pageConversations(a.token, a.platform === "facebook" ? "messenger" : "instagram", a.external_id, readTo);
     const { saved, ended } = await saveConversations(a, remote);
     for (const id of ended) later(() => settleMessage(id));
@@ -157,7 +202,7 @@ export async function syncMessages(tenantId: string, accountId: string, opts: { 
       notified++;
     }
     const newest = remote.reduce<string | null>((m, r) => later_(m, r.updated_at), readTo);
-    await recordSyncState(a, { messages_read_to: newest, messages_error: null, ...(first ? { messages_since: now } : {}) });
+    await recordSyncState(a, { messages_read_to: newest, messages_error: null, ...(first ? { messages_since: now } : {}), ...(ruleDue ? { messages_rule: MESSAGES_RULE } : {}) });
     return { ok: true, conversations: saved.length, notified, settled: ended.length };
   } catch (e) {
     if (e instanceof MetaError && e.code === 190) {

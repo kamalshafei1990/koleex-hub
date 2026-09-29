@@ -968,9 +968,16 @@ check("answered ON THE PLATFORM ends the wait: its notice is reset and cleared â
   /notified_at: waiting \? p\?\.notified_at \?\? null : null,/.test(msgs) &&
   /const ended = rows\.filter\(\(r\) => r\.notified_at === null && !!prev\.get\(r\.external_id\)\?\.notified_at\)/.test(msgs) &&
   /for \(const id of ended\) later\(\(\) => settleMessage\(id\)\);/.test(msgSyncFn));
+check("an automatic reply (a Page message within 15 s of the customer's) is not an answer â€” a person's Hub reply always is; the kept conversations are re-decided once per rule",
+  /export const AUTO_REPLY_MS = 15_000;/.test(msgTypes) &&
+  /if \(!m\.by_person && customerAt && t >= customerAt && t - customerAt <= AUTO_REPLY_MS\) return;/.test(msgTypes) &&
+  /const idx = lastCountedIndex\(rc\.messages\.map\(\(m\) => \(\{ from_us: m\.from_us, sent_at: m\.sent_at, by_person: byPerson\.has\(m\.external_id\) \}\)\)\);/.test(msgs) &&
+  /\.not\("sent_by", "is", null\)\.in\("external_id", chunk\)\)/.test(msgs) &&
+  before(msgSyncFn, "if (ruleDue) await applyRule(a);", "await pageConversations(") &&
+  /\.\.\.\(ruleDue \? \{ messages_rule: MESSAGES_RULE \} : \{\}\)/.test(msgSyncFn) && /const MESSAGES_RULE = 2;/.test(msgs));
 check("a reply sent while a read was under way stays the last word; the read overlaps the last minute (Meta's whole seconds)",
-  /const fresh = !!last && \(!p \|\| time\(last\.sent_at\) >= time\(p\.last_message_at\)\);/.test(msgs) &&
-  /last_from_us: lastFromUs,/.test(msgs) && /snippet: fresh \? last!\.text : p\?\.snippet \?\? null,/.test(msgs) &&
+  /const fresh = !!last && !!counted && \(!p \|\| time\(last\.sent_at\) >= time\(p\.last_message_at\)\);/.test(msgs) &&
+  /last_from_us: lastFromUs,/.test(msgs) && /snippet: fresh \? counted!\.text : p\?\.snippet \?\? null,/.test(msgs) &&
   /const OVERLAP_MS = 60_000;/.test(metaMsgs) && /const from = since \? \(Date\.parse\(since\) \|\| 0\) - OVERLAP_MS : 0;/.test(metaMsgs));
 const msgReplyFn = msgs.slice(msgs.indexOf("export async function replyToConversation("), msgs.indexOf("export async function setConversationHandled("));
 check("answering: inside the 24-hour window (checked before anything), CLAIMED before Meta is called, the claim removed on a refusal",

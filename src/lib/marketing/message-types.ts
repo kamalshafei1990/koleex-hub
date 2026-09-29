@@ -62,6 +62,27 @@ export function conversationNeedsReply(c: { last_from_us: boolean; last_customer
   return !c.handled_at || time(c.handled_at) < time(c.last_customer_at);
 }
 
+/** A Page message that comes within this long of the customer's message is
+ *  Meta's AUTOMATIC reply (an Instant Reply, an away message, an FAQ answer)
+ *  — no person answers that fast — so it is not an answer (owner, 29/09/2026;
+ *  Koleex's Page answered within 10 s in 35 of its 40 newest conversations). */
+export const AUTO_REPLY_MS = 15_000;
+
+/** The conversation's last word that COUNTS: the newest message that is not
+ *  an automatic reply. A message a person sent from the Hub always counts.
+ *  Oldest first in; its index out (-1: none). */
+export function lastCountedIndex(messages: ReadonlyArray<{ from_us: boolean; sent_at: string | null; by_person?: boolean }>): number {
+  let counted = -1;
+  let customerAt = 0;
+  messages.forEach((m, i) => {
+    const t = time(m.sent_at);
+    if (!m.from_us) { counted = i; customerAt = t; return; }
+    if (!m.by_person && customerAt && t >= customerAt && t - customerAt <= AUTO_REPLY_MS) return;
+    counted = i;
+  });
+  return counted;
+}
+
 /** The end of the 24-hour reply window (null when the customer never wrote). */
 export function replyWindowEnd(lastCustomerAt: string | null): string | null {
   const t = time(lastCustomerAt);
