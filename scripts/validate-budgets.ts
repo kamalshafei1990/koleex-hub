@@ -337,6 +337,9 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      plan card carries them without this screen: the Feed measured 582 KB
      with the card, inside its budget. */
   "social-marketing/plan": { chunks: 10, kbytes: 628 },
+  /* Messages (29/09/2026): measured 9 chunks / 551 KB, +12% headroom. Its
+     reply box follows the comment thread's; no new library came with it. */
+  "social-marketing/messages": { chunks: 10, kbytes: 617 },
   "software-center": { chunks: 11, kbytes: 618 },
   "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits

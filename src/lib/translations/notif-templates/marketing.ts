@@ -1,8 +1,9 @@
 import type { Translations } from "@/lib/i18n";
 
 /* Social Marketing — lib/server/marketing/notify.ts: a post sent for
-   approval, the decision on it, what publishing it came to, and the
-   weekly plan waiting on an approver. {accounts}
+   approval, the decision on it, what publishing it came to, a customer's
+   private message waiting for an answer, and the weekly plan waiting on an
+   approver. {accounts}
    is "Facebook · Instagram" (platform names read the same in every
    language); {when} is Shanghai time, D/M/Y, like every marketing screen. */
 export const marketingTpl: Translations = {
@@ -29,6 +30,9 @@ export const marketingTpl: Translations = {
 
   "marketing_post_published.s": { en: "Your post is live", zh: "你的帖子已发布", ar: "نُشر منشورك" },
   "marketing_post_published.b": { en: "Published on {accounts}.", zh: "已发布到 {accounts}。", ar: "نُشر على {accounts}." },
+
+  "marketing_message_waiting.s": { en: "{who} sent a message on {platform}", zh: "{who} 在 {platform} 发来消息", ar: "رسالة من {who} على {platform}" },
+  "marketing_message_waiting.b": { en: "[[{text:free}]]", zh: "[[{text:free}]]", ar: "[[{text:free}]]" },
 
   "marketing_plan_approval_request.s": { en: "This week's social media plan is ready to approve", zh: "本周社交媒体计划待审批", ar: "خطة السوشيال ميديا لهذا الأسبوع جاهزة لموافقتك" },
   "marketing_plan_approval_request.b": {

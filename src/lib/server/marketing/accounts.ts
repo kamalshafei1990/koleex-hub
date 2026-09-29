@@ -15,6 +15,7 @@ import { decryptToken, encryptToken, isTokenCryptoConfigured } from "@/lib/serve
 import { metaAppConfig, type MetaPage } from "@/lib/server/marketing/meta";
 import { MANUAL_PLATFORMS, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace } from "@/lib/marketing/spaces";
 import { FACEBOOK_ADS_SCOPES, instagramAdsGranted, type AdsState } from "@/lib/marketing/ads";
+import { messageScopesFor } from "@/lib/marketing/message-types";
 
 const VIEW_COLUMNS = "id, space, platform, connection, external_id, name, handle, avatar_url, profile_url, status, last_error, last_synced_at, audience, updated_at";
 
@@ -371,6 +372,26 @@ export async function claimAdScan(a: AccountForSync, minGapMs: number): Promise<
   return true;
 }
 
+/** The messages read's claim (sync_state.messages_at), like the others:
+ *  one run at a time per account, at most every minGapMs. */
+export async function claimMessages(a: AccountForSync, minGapMs: number): Promise<boolean> {
+  const last = typeof a.sync_state.messages_at === "string" ? Date.parse(a.sync_state.messages_at) || 0 : 0;
+  if (last && Date.now() - last < minGapMs) return false;
+  const now = new Date().toISOString();
+  const state = { ...a.sync_state, messages_at: now };
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .update({ sync_state: state, updated_at: now })
+    .eq("id", a.id)
+    .eq("updated_at", a.updated_at)
+    .select("id");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  if (!data || data.length === 0) return false;
+  a.sync_state = state;
+  a.updated_at = now;
+  return true;
+}
+
 /** What the Accounts screen says about each Page's and Instagram account's
  *  ads — derived here, so no key or key date leaves the server as a column. */
 export async function adsStates(tenantId: string, space: MarketingSpace): Promise<Record<string, AdsState>> {
@@ -396,6 +417,26 @@ export async function adsStates(tenantId: string, space: MarketingSpace): Promis
       const live = !!r.user_token_encrypted && (!until || Date.parse(until) > Date.now());
       out[r.id] = { ready: granted && live, missing: granted ? [] : [...FACEBOOK_ADS_SCOPES], findUntil: until, error: err };
     }
+  }
+  return out;
+}
+
+/** What the Accounts screen says about each Page's and Instagram account's
+ *  private messages: ready, what to add in Meta, or Meta's last refusal. */
+export async function messagesStates(tenantId: string, space: MarketingSpace): Promise<Record<string, { ready: boolean; missing: string[]; error: string | null }>> {
+  const { data, error } = await supabaseServer
+    .from("marketing_accounts")
+    .select("id, platform, scopes, sync_state")
+    .eq("tenant_id", tenantId)
+    .eq("space", space)
+    .eq("connection", "api")
+    .in("platform", ["facebook", "instagram"])
+    .neq("status", "disconnected");
+  if (error) throw new Error(`marketing accounts: ${error.message}`);
+  const out: Record<string, { ready: boolean; missing: string[]; error: string | null }> = {};
+  for (const r of (data ?? []) as Array<{ id: string; platform: string; scopes: string[] | null; sync_state: Record<string, unknown> | null }>) {
+    const missing = messageScopesFor(r.platform).filter((x) => !(r.scopes ?? []).includes(x));
+    out[r.id] = { ready: missing.length === 0, missing, error: typeof r.sync_state?.messages_error === "string" ? r.sync_state.messages_error : null };
   }
   return out;
 }

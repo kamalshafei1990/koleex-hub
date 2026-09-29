@@ -24,7 +24,7 @@ import { planCacheKey, readLastWeek, readPlanCache, writeLastWeek, writePlanCach
 /* Its own few words: the Plan tab's dictionary stays out of the Feed. */
 const T: Translations = {
   "title":  { en: "This week's plan", zh: "本周计划", ar: "خطة الأسبوع" },
-  "none":   { en: "No plan yet — Koleex AI drafts it on Monday", zh: "尚无计划——Koleex AI 将在周一起草", ar: "مفيش خطة لسه — Koleex AI بيجهّزها يوم الاتنين" },
+  "none":   { en: "No plan yet — Koleex AI drafts it on Monday", zh: "尚无计划——Koleex AI 将在周一起草", ar: "لا توجد خطة بعد — يُعدّها Koleex AI يوم الاثنين" },
   "draft":  { en: "Waiting for approval", zh: "待审批", ar: "في انتظار الموافقة" },
   "tasks":  { en: "{total} tasks", zh: "{total} 项任务", ar: "{total} مهام" },
   "doneOf": { en: "{done} of {total} done", zh: "已完成 {done}/{total}", ar: "تم {done} من {total}" },

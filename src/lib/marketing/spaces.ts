@@ -51,6 +51,12 @@ export const SPACE_COMMENTS: Record<MarketingSpace, string> = {
   ceo: "/ceo-brand/comments",
 };
 
+/** Each space's Messages tab (Messenger and Instagram Direct). */
+export const SPACE_MESSAGES: Record<MarketingSpace, string> = {
+  company: "/social-marketing/messages",
+  ceo: "/ceo-brand/messages",
+};
+
 /** The accounts page each space returns to after connecting an account. */
 export const SPACE_ROUTE: Record<MarketingSpace, string> = {
   company: "/social-marketing/accounts",

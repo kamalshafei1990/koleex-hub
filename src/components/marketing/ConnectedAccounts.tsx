@@ -33,6 +33,8 @@ import {
   type ConnectResult, type MarketingAccountView, type MarketingPlatform, type MarketingSetup, type MarketingSpace,
 } from "@/lib/marketing/spaces";
 
+type MessagesState = { ready: boolean; missing: string[]; error: string | null };
+
 const T: Translations = {
   "accounts.title":   { en: "Connected accounts", zh: "已连接的账号", ar: "الحسابات المربوطة" },
   "accounts.empty":   { en: "No account yet", zh: "还没有账号", ar: "لا توجد حسابات بعد" },
@@ -78,11 +80,14 @@ const T: Translations = {
   "status.error":        { en: "Needs attention", zh: "需要处理", ar: "يحتاج متابعة" },
   "status.disconnected": { en: "Removed", zh: "已移除", ar: "تمت الإزالة" },
   "lastSync":         { en: "Last synced {when}", zh: "上次同步：{when}", ar: "آخر مزامنة: {when}" },
-  "ads.on":           { en: "Comments on ads: on", zh: "广告评论：已开启", ar: "تعليقات الإعلانات: شغّالة" },
-  "ads.until":        { en: "Comments on ads: on · new ads found until {date}", zh: "广告评论：已开启 · 可发现新广告至 {date}", ar: "تعليقات الإعلانات: شغّالة · بيلاقي الإعلانات الجديدة لحد {date}" },
-  "ads.missing":      { en: "Comments on ads: add {perms} in Meta, then connect again", zh: "广告评论：请先在 Meta 添加 {perms}，再重新连接", ar: "تعليقات الإعلانات: أضف {perms} في Meta وبعدين اربط تاني" },
-  "ads.lapsed":       { en: "Comments on ads: connect again to keep finding new Instagram ads", zh: "广告评论：请重新连接以继续发现新的 Instagram 广告", ar: "تعليقات الإعلانات: اربط تاني عشان يفضل يلاقي إعلانات Instagram الجديدة" },
+  "ads.on":           { en: "Comments on ads: on", zh: "广告评论：已开启", ar: "تعليقات الإعلانات: مفعّلة" },
+  "ads.until":        { en: "Comments on ads: on · new ads found until {date}", zh: "广告评论：已开启 · 可发现新广告至 {date}", ar: "تعليقات الإعلانات: مفعّلة · يجد الإعلانات الجديدة حتى {date}" },
+  "ads.missing":      { en: "Comments on ads: add {perms} in Meta, then connect again", zh: "广告评论：请先在 Meta 添加 {perms}，再重新连接", ar: "تعليقات الإعلانات: أضف {perms} في Meta ثم أعد الربط" },
+  "ads.lapsed":       { en: "Comments on ads: connect again to keep finding new Instagram ads", zh: "广告评论：请重新连接以继续发现新的 Instagram 广告", ar: "تعليقات الإعلانات: أعد الربط ليواصل إيجاد إعلانات Instagram الجديدة" },
   "ads.refused":      { en: "Comments on ads: Meta refused — {why}", zh: "广告评论：Meta 拒绝了——{why}", ar: "تعليقات الإعلانات: Meta رفضت — {why}" },
+  "msg.on":           { en: "Messages: on", zh: "私信：已开启", ar: "الرسائل: مفعّلة" },
+  "msg.missing":      { en: "Messages: add {perms} in Meta, then connect again", zh: "私信：请先在 Meta 添加 {perms}，再重新连接", ar: "الرسائل: أضف {perms} في Meta ثم أعد الربط" },
+  "msg.refused":      { en: "Messages: Meta refused — {why}", zh: "私信：Meta 拒绝了——{why}", ar: "الرسائل: رفضت Meta — {why}" },
   "notSynced":        { en: "Not synced yet", zh: "尚未同步", ar: "لم تتم المزامنة بعد" },
   "open":             { en: "Open", zh: "打开", ar: "فتح" },
   "remove":           { en: "Remove", zh: "移除", ar: "إزالة" },
@@ -127,6 +132,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
   const [accounts, setAccounts] = useState<MarketingAccountView[] | null>(null);
   const [setup, setSetup] = useState<MarketingSetup | null>(null);
   const [ads, setAds] = useState<Record<string, AdsState>>({});
+  const [msgs, setMsgs] = useState<Record<string, MessagesState>>({});
   const [loadError, setLoadError] = useState(false);
   const [result, setResult] = useState<{ code: ConnectResult; n: number } | null>(null);
   const [adding, setAdding] = useState(false);
@@ -143,9 +149,10 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
     try {
       const res = await fetch(`/api/marketing/accounts?space=${space}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; setup: MarketingSetup };
+      const body = (await res.json()) as { accounts: MarketingAccountView[]; ads?: Record<string, AdsState>; messages?: Record<string, MessagesState>; setup: MarketingSetup };
       setAccounts(body.accounts);
       setAds(body.ads ?? {});
+      setMsgs(body.messages ?? {});
       setSetup(body.setup);
     } catch {
       setLoadError(true);
@@ -308,6 +315,7 @@ export default function ConnectedAccounts({ space }: { space: MarketingSpace }) 
                       </div>
                     )}
                     {a.connection === "api" && ads[a.id] && <AdsLine state={ads[a.id]} t={t} />}
+                    {a.connection === "api" && msgs[a.id] && <MessagesLine state={msgs[a.id]} t={t} />}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {a.profile_url && (
@@ -451,5 +459,12 @@ function AdsLine({ state, t }: { state: AdsState; t: (k: string) => string }) {
   else if (!state.ready) line = t("ads.missing").replace("{perms}", state.missing.join(", "));
   else if (state.error) line = t("ads.refused").replace("{why}", state.error.slice(0, 120));
   else line = state.findUntil ? t("ads.until").replace("{date}", dmyHm(state.findUntil).slice(0, 10)) : t("ads.on");
+  return <div className={`mt-0.5 text-[11px] ${state.ready && !state.error ? "text-[var(--text-dim)]" : "text-[#F59E0B]"}`}>{line}</div>;
+}
+
+/* Private messages, in one line: on, what to add in Meta, or Meta's refusal. */
+function MessagesLine({ state, t }: { state: MessagesState; t: (k: string) => string }) {
+  const line = !state.ready ? t("msg.missing").replace("{perms}", state.missing.join(", "))
+    : state.error ? t("msg.refused").replace("{why}", state.error.slice(0, 120)) : t("msg.on");
   return <div className={`mt-0.5 text-[11px] ${state.ready && !state.error ? "text-[var(--text-dim)]" : "text-[#F59E0B]"}`}>{line}</div>;
 }

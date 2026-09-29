@@ -31,7 +31,11 @@ import "server-only";
         Instagram account, the posts that exist only as ads and the comments
         on them (lib/server/marketing/ad-comments), each account claimed
         first (claimAdScan). It runs BEFORE step 7, whose Koleex AI call may
-        take the rest of the run.
+        take the rest of the run;
+     9. private MESSAGES (29/09/2026): every run, each Page's Messenger and
+        Instagram conversations updated since the last read — claimed per
+        account (claimMessages); a customer waiting tells the team once. It
+        runs third, right after publishing: a customer is waiting.
    Scheduled times are instants; the screens show and pick them in Shanghai
    time (lib/marketing/format).
    --------------------------------------------------------------------------- */
@@ -42,16 +46,17 @@ import { COMMENTS_REFRESH_MS, COMMENT_SCAN_MS, refreshRecentComments, scanOlderC
 import { INSIGHTS_REFRESH_MS, syncInsights } from "@/lib/server/marketing/insights";
 import { weekPlansStep } from "@/lib/server/marketing/week-plan";
 import { AD_SCAN_MS, scanAdComments } from "@/lib/server/marketing/ad-comments";
+import { MESSAGES_REFRESH_MS, syncMessages } from "@/lib/server/marketing/messages";
 
 export const FEED_REFRESH_MS = 3 * 3600_000;
 
-export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; adComments: number; stoppedEarly: boolean }
+export interface CronSummary { due: number; published: number; continued: number; refreshed: number; comments: number; insights: number; olderComments: number; plansClosed: number; plansDrafted: number; adComments: number; messages: number; stoppedEarly: boolean }
 
 export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: string } = {}): Promise<CronSummary> {
   const started = Date.now();
   const budget = opts.budgetMs ?? 50_000;
   const left = () => budget - (Date.now() - started);
-  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, adComments: 0, stoppedEarly: false };
+  const out: CronSummary = { due: 0, published: 0, continued: 0, refreshed: 0, comments: 0, insights: 0, olderComments: 0, plansClosed: 0, plansDrafted: 0, adComments: 0, messages: 0, stoppedEarly: false };
   /* 1. Due scheduled posts, oldest first. */
   const now = new Date().toISOString();
   let dueQ = supabaseServer.from("marketing_posts").select("id, tenant_id").eq("status", "scheduled").lte("scheduled_at", now);
@@ -84,6 +89,24 @@ export async function runMarketingCron(opts: { budgetMs?: number; tenantId?: str
       if (left() < 12_000) { out.stoppedEarly = true; break; }
       await publishPost(p.tenant_id, p.id, { budgetMs: Math.min(30_000, left() - 5_000) });
       out.continued++;
+    }
+  }
+
+  /* 9. Private messages, every run per account (syncMessages decides and
+        claims). Right after publishing: a customer is waiting. */
+  if (left() > 12_000) {
+    const staleMsgs = new Date(Date.now() - MESSAGES_REFRESH_MS).toISOString();
+    let mQ = supabaseServer.from("marketing_accounts").select("id, tenant_id").eq("connection", "api")
+      .in("platform", ["facebook", "instagram"])
+      .in("status", ["connected", "error"])
+      .or(`sync_state->>messages_at.is.null,sync_state->>messages_at.lt.${staleMsgs}`);
+    if (opts.tenantId) mQ = mQ.eq("tenant_id", opts.tenantId);
+    const { data: mAccs, error: mErr } = await mQ.order("updated_at", { ascending: true }).limit(4);
+    if (mErr) throw new Error(`marketing accounts: ${mErr.message}`);
+    for (const a of (mAccs ?? []) as Array<{ id: string; tenant_id: string }>) {
+      if (left() < 12_000) { out.stoppedEarly = true; break; }
+      const r = await syncMessages(a.tenant_id, a.id);
+      if (r.ok && !r.skipped) out.messages++;
     }
   }
 

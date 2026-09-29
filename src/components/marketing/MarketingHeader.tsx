@@ -2,16 +2,18 @@
 
 /* MarketingHeader — the header of a marketing space's screens: its name and
    the tabs between them (Feed, Insights, Plan, Posts, Calendar, Accounts,
-   Comments). One
+   Comments, Messages). One
    place for its screens, so their header and tabs never drift apart. Tabs
    are routes (key = href); PageHeader lights the one the address matches.
 
    The Comments tab carries how many comment threads wait for a reply (owner,
-   28/09/2026: a number on the tab, no notification per comment). It is the
-   LAST tab, so a number arriving after the first paint moves no other tab;
-   the last number is kept for the session and drawn at once, asked again
+   28/09/2026: a number on the tab, no notification per comment), and the
+   Messages tab how many conversations do (29/09/2026). They are the LAST
+   two tabs, so a number arriving after the first paint moves nothing but
+   them; each number is kept for the session and drawn at once, asked again
    at most once a minute and only once the screen's own requests are done.
-   The Comments screen tells it the new number after every change. */
+   The Comments and Messages screens tell it the new number after every
+   change. */
 
 import { useEffect, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
@@ -24,9 +26,10 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import PenSquareIcon from "@/components/icons/ui/PenSquareIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import CommentIcon from "@/components/icons/ui/CommentIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { whenNetworkQuiet } from "@/lib/net-idle";
-import { SPACE_CALENDAR, SPACE_COMMENTS, SPACE_HOME, SPACE_INSIGHTS, SPACE_PLAN, SPACE_POSTS, SPACE_ROUTE, type MarketingSpace } from "@/lib/marketing/spaces";
+import { SPACE_CALENDAR, SPACE_COMMENTS, SPACE_HOME, SPACE_INSIGHTS, SPACE_MESSAGES, SPACE_PLAN, SPACE_POSTS, SPACE_ROUTE, type MarketingSpace } from "@/lib/marketing/spaces";
 
 const T: Translations = {
   "title.company": { en: "Social Marketing", zh: "社交媒体营销", ar: "التسويق عبر السوشيال ميديا" },
@@ -40,65 +43,73 @@ const T: Translations = {
   "tab.calendar":  { en: "Calendar", zh: "日历", ar: "التقويم" },
   "tab.accounts":  { en: "Accounts", zh: "账号", ar: "الحسابات" },
   "tab.comments":  { en: "Comments", zh: "评论", ar: "التعليقات" },
+  "tab.messages":  { en: "Messages", zh: "私信", ar: "الرسائل" },
 };
 
-/* ── How many threads wait for a reply ─────────────────────────────────── */
+/* ── How many comment threads and conversations wait for a reply ────────── */
 
+type WaitKind = "comments" | "messages";
 const COUNT_TTL_MS = 60_000;
-/** Fired by the Comments screen with the number its list just read. */
+/** Fired by the Comments / Messages screen with the number its list just read. */
 export const COMMENTS_COUNT_EVENT = "kx-marketing-comments-count";
-const memory = new Map<MarketingSpace, { n: number; at: number }>();
-const storeKey = (space: MarketingSpace) => `kx.mkt.commentsNeeds.${space}`;
+export const MESSAGES_COUNT_EVENT = "kx-marketing-messages-count";
+const EVENT: Record<WaitKind, string> = { comments: COMMENTS_COUNT_EVENT, messages: MESSAGES_COUNT_EVENT };
+const COUNT_URL: Record<WaitKind, string> = { comments: "/api/marketing/comments/count", messages: "/api/marketing/messages/count" };
+const memory = new Map<string, { n: number; at: number }>();
+const storeKey = (kind: WaitKind, space: MarketingSpace) => `kx.mkt.${kind === "comments" ? "commentsNeeds" : "messagesNeeds"}.${space}`;
 
-function readCount(space: MarketingSpace): { n: number; at: number } | null {
-  const held = memory.get(space);
+function readCount(kind: WaitKind, space: MarketingSpace): { n: number; at: number } | null {
+  const held = memory.get(storeKey(kind, space));
   if (held) return held;
   try {
-    const raw = sessionStorage.getItem(storeKey(space));
+    const raw = sessionStorage.getItem(storeKey(kind, space));
     const v = raw ? (JSON.parse(raw) as { n?: unknown; at?: unknown }) : null;
-    if (v && typeof v.n === "number" && typeof v.at === "number") { memory.set(space, { n: v.n, at: v.at }); return { n: v.n, at: v.at }; }
+    if (v && typeof v.n === "number" && typeof v.at === "number") { memory.set(storeKey(kind, space), { n: v.n, at: v.at }); return { n: v.n, at: v.at }; }
   } catch { /* storage blocked: the number just waits for the server */ }
   return null;
 }
 
 /** Keep the number (for this session) and tell every header showing it. */
-export function publishCommentsCount(space: MarketingSpace, n: number): void {
+function publishCount(kind: WaitKind, space: MarketingSpace, n: number): void {
   const v = { n, at: Date.now() };
-  memory.set(space, v);
-  try { sessionStorage.setItem(storeKey(space), JSON.stringify(v)); } catch { /* storage blocked */ }
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(COMMENTS_COUNT_EVENT, { detail: { space, n } }));
+  memory.set(storeKey(kind, space), v);
+  try { sessionStorage.setItem(storeKey(kind, space), JSON.stringify(v)); } catch { /* storage blocked */ }
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENT[kind], { detail: { space, n } }));
 }
+export const publishCommentsCount = (space: MarketingSpace, n: number) => publishCount("comments", space, n);
+export const publishMessagesCount = (space: MarketingSpace, n: number) => publishCount("messages", space, n);
 
-function useCommentsNeeds(space: MarketingSpace): number | null {
+function useWaitingCount(kind: WaitKind, space: MarketingSpace): number | null {
   /* Read in the initialiser: the kept number is on the first frame. */
-  const [n, setN] = useState<number | null>(() => (typeof window === "undefined" ? null : readCount(space)?.n ?? null));
+  const [n, setN] = useState<number | null>(() => (typeof window === "undefined" ? null : readCount(kind, space)?.n ?? null));
   useEffect(() => {
     const onCount = (e: Event) => {
       const d = (e as CustomEvent<{ space: MarketingSpace; n: number }>).detail;
       if (d?.space === space) setN(d.n);
     };
-    window.addEventListener(COMMENTS_COUNT_EVENT, onCount);
+    window.addEventListener(EVENT[kind], onCount);
     let alive = true;
-    const held = readCount(space);
+    const held = readCount(kind, space);
     if (!held || Date.now() - held.at > COUNT_TTL_MS) {
       void whenNetworkQuiet().then(async () => {
         if (!alive) return;
         try {
-          const res = await fetch(`/api/marketing/comments/count?space=${space}`, { cache: "no-store" });
+          const res = await fetch(`${COUNT_URL[kind]}?space=${space}`, { cache: "no-store" });
           if (!res.ok) return;
           const body = (await res.json()) as { needs?: unknown };
-          if (alive && typeof body.needs === "number") publishCommentsCount(space, body.needs);
+          if (alive && typeof body.needs === "number") publishCount(kind, space, body.needs);
         } catch { /* offline: the kept number stays */ }
       });
     }
-    return () => { alive = false; window.removeEventListener(COMMENTS_COUNT_EVENT, onCount); };
-  }, [space]);
+    return () => { alive = false; window.removeEventListener(EVENT[kind], onCount); };
+  }, [kind, space]);
   return n;
 }
 
 export default function MarketingHeader({ space, action }: { space: MarketingSpace; action?: ReactNode }) {
   const { t } = useTranslation(T);
-  const needs = useCommentsNeeds(space);
+  const needs = useWaitingCount("comments", space);
+  const waiting = useWaitingCount("messages", space);
   return (
     <PageHeader
       title={t(`title.${space}`)}
@@ -114,6 +125,7 @@ export default function MarketingHeader({ space, action }: { space: MarketingSpa
         { key: SPACE_CALENDAR[space], label: t("tab.calendar"), icon: <CalendarRawIcon size={14} /> },
         { key: SPACE_ROUTE[space], label: t("tab.accounts"), icon: <UsersIcon size={14} /> },
         { key: SPACE_COMMENTS[space], label: t("tab.comments"), icon: <CommentIcon size={14} />, badge: needs ?? undefined },
+        { key: SPACE_MESSAGES[space], label: t("tab.messages"), icon: <MessageSquareIcon size={14} />, badge: waiting ?? undefined },
       ]}
     />
   );

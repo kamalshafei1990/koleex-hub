@@ -160,6 +160,8 @@ export const NOTIFICATION_TYPES = {
   marketing_post_decided:     { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "supersede", key: "post_id" } },
   marketing_publish_failed:   { app: "social-marketing", activity: "marketing_activity", severity: "warning", lifecycle: { kind: "clear", key: "post_id", when: "the accounts that failed are sent again (a newer failure replaces it first)" } },
   marketing_post_published:   { app: "social-marketing", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
+  /* Private messages (owner, 29/09/2026): a customer's message waits for an answer. */
+  marketing_message_waiting: { app: "social-marketing", activity: "marketing_activity", severity: "action", lifecycle: { kind: "clear", key: "conversation_id", when: "the conversation is answered or marked «No reply needed» (a new wait in it replaces the unread one first)" } },
   /* The weekly plan (owner, 29/09/2026): Koleex AI's draft waits on an approver. */
   marketing_plan_approval_request: { app: "social-marketing", activity: "approvals", severity: "action", lifecycle: { kind: "clear", key: "plan_id", when: "the plan is approved, or its week ends before anyone approved it" } },
 

@@ -15,6 +15,9 @@ import "server-only";
        approver who let it go.
      · Published with nobody watching (a scheduled post at its time, a video
        Instagram took longer to prepare) → the author hears it went out.
+     · A customer's private message (29/09/2026, owner: a number on the tab
+       and one notification per conversation) → the team that may answer it
+       hears once while it waits; answering or «No reply needed» clears it.
      · The weekly plan (29/09/2026): Koleex AI's draft for the week → every
        approver is asked to review and approve it; the request stops asking
        once it is approved or its week ends (settlePlan).
@@ -42,6 +45,7 @@ import { SOCIAL_APPROVALS_MODULE, isOpenAccessModule } from "@/lib/permission-mo
 import { SPACE_MODULE, type MarketingPlatform } from "@/lib/marketing/spaces";
 import { dmyHm } from "@/lib/marketing/format";
 import type { PostStatus, PostTargetView } from "@/lib/marketing/post-types";
+import { conversationNeedsReply } from "@/lib/marketing/message-types";
 
 type Actor = { account_id: string; tenant_id: string };
 
@@ -263,6 +267,96 @@ export const settleDeleted = quiet("settleDeleted", async (postId: string): Prom
  *  the news (a new one replaces it; a success needs none). */
 export const settleFailure = quiet("settleFailure", async (postId: string): Promise<void> => {
   await clearUnreadByMeta({ type: "marketing_publish_failed", post_id: postId });
+});
+
+/** Who hears of a customer's private message: the Super Admins, and active
+ *  internal accounts that may answer it — "edit" on Social Marketing, a
+ *  per-account override winning over the role the way requireModuleAction
+ *  reads them. A failed read of the grants still tells the Super Admins. */
+export async function marketingEditorIds(tenantId: string): Promise<string[]> {
+  type Perm = { role_id?: string; account_id?: string; module_name?: string; module_key?: string; can_view?: boolean | null; can_edit?: boolean | null };
+  const APP = SPACE_MODULE.company;
+  const ids = new Set(await superAdminAccountIds(tenantId));
+  const [roleGrants, accountGrants] = await Promise.all([
+    supabaseServer.from("koleex_permissions").select("role_id").ilike("module_name", APP).eq("can_edit", true),
+    supabaseServer.from("account_permission_overrides").select("account_id").ilike("module_key", APP).eq("can_edit", true),
+  ]);
+  if (roleGrants.error || accountGrants.error) {
+    console.error("[marketing/notify.editors]", roleGrants.error?.message ?? accountGrants.error?.message);
+    return [...ids];
+  }
+  const roles = [...new Set(((roleGrants.data ?? []) as Perm[]).map((p) => p.role_id!))];
+  const granted = [...new Set(((accountGrants.data ?? []) as Perm[]).map((p) => p.account_id!))];
+  const or = [roles.length ? `role_id.in.(${roles.join(",")})` : null, granted.length ? `id.in.(${granted.join(",")})` : null].filter(Boolean).join(",");
+  if (!or) return [...ids];
+  const { data: accts, error } = await supabaseServer
+    .from("accounts")
+    .select("id, role_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .eq("user_type", "internal")
+    .not("role_id", "is", null)
+    .or(or)
+    .limit(200);
+  if (error) {
+    console.error("[marketing/notify.editors]", error.message);
+    return [...ids];
+  }
+  const cands = ((accts ?? []) as Array<{ id: string; role_id: string }>).filter((c) => !ids.has(c.id));
+  if (!cands.length) return [...ids];
+  const [rolePerms, overrides] = await Promise.all([
+    supabaseServer.from("koleex_permissions").select("role_id, module_name, can_view, can_edit").in("role_id", [...new Set(cands.map((c) => c.role_id))]).ilike("module_name", APP),
+    supabaseServer.from("account_permission_overrides").select("account_id, module_key, can_view, can_edit").in("account_id", cands.map((c) => c.id)).ilike("module_key", APP),
+  ]);
+  if (rolePerms.error || overrides.error) {
+    console.error("[marketing/notify.editors]", rolePerms.error?.message ?? overrides.error?.message);
+    return [...ids];
+  }
+  for (const c of cands) {
+    const rM = ((rolePerms.data ?? []) as Perm[]).find((r) => r.role_id === c.role_id) ?? null;
+    const oM = ((overrides.data ?? []) as Perm[]).find((r) => r.account_id === c.id) ?? null;
+    /* requireModuleAction(Social Marketing, "edit") */
+    if (oM?.can_view === false) continue;
+    const edit = typeof oM?.can_edit === "boolean" ? oM.can_edit : rM?.can_edit === true;
+    if (edit) ids.add(c.id);
+  }
+  return [...ids];
+}
+
+/** A customer's message waits for an answer: the team hears — ONE
+ *  notification per conversation while it waits (an unread one about the
+ *  same conversation is replaced), never one per message. Social
+ *  Marketing's space only. */
+export const notifyMessageWaiting = quiet("notifyMessageWaiting", async (tenantId: string, conversationId: string): Promise<void> => {
+  const { data, error } = await supabaseServer.from("marketing_conversations")
+    .select("id, account_id, customer_name, customer_username, snippet, last_from_us, last_customer_at, handled_at")
+    .eq("tenant_id", tenantId).eq("id", conversationId).maybeSingle();
+  if (error) throw new Error(`marketing conversations: ${error.message}`);
+  const c = data as { id: string; account_id: string; customer_name: string | null; customer_username: string | null; snippet: string | null; last_from_us: boolean; last_customer_at: string | null; handled_at: string | null } | null;
+  if (!c || !conversationNeedsReply(c)) return;
+  const { data: acc, error: aErr } = await supabaseServer.from("marketing_accounts").select("space, platform").eq("id", c.account_id).maybeSingle();
+  if (aErr) throw new Error(`marketing accounts: ${aErr.message}`);
+  const account = acc as { space: string; platform: string } | null;
+  if (!account || account.space !== "company") return;
+  await notifyLite({
+    tenantId,
+    recipients: await marketingEditorIds(tenantId),
+    tpl: { k: "marketing_message_waiting", p: {
+      who: c.customer_name || (c.customer_username ? `@${c.customer_username}` : "—"),
+      platform: account.platform === "instagram" ? "Instagram" : "Messenger",
+      text: excerpt(c.snippet ?? ""),
+    } },
+    link: "/social-marketing/messages",
+    type: "marketing_message_waiting",
+    metadata: { source: "social-marketing", conversation_id: c.id },
+    tag: `mkt-msg:${c.id}`,
+    supersede: { type: "marketing_message_waiting", conversation_id: c.id },
+  });
+});
+
+/** Answered, or marked «No reply needed»: nobody is told any more. */
+export const settleMessage = quiet("settleMessage", async (conversationId: string): Promise<void> => {
+  await clearUnreadByMeta({ type: "marketing_message_waiting", conversation_id: conversationId });
 });
 
 /** A week's plan was drafted: every approver is asked to review it (the
