@@ -1031,6 +1031,11 @@ check(`the Messages screen: behind AuthGate, never sideways, the tab's number fr
   /useEffect\(\(\) => \{\s*if \(needsNow !== null && !account\) publishMessagesCount\(space, needsNow\);\s*\}, \[needsNow, account, space\]\);/.test(msgScreen) &&
   /className="kx-ai-glow"/.test(msgScreen) && /referrerPolicy="no-referrer"/.test(msgScreen) &&
   /company: "\/social-marketing\/messages",/.test(code("src/lib/marketing/spaces.ts")));
+check("a conversation past the 24-hour window says so and opens the platform's inbox (the Page's in Meta Business Suite; Instagram's Direct)",
+  /\{t\("windowClosed"\)\.replace\("\{platform\}", platform\)\}/.test(msgScreen) &&
+  /onClick=\{\(\) => window\.open\(platformInboxUrl\(c\.account\), "_blank", "noopener,noreferrer"\)\}/.test(msgScreen) &&
+  /if \(account\.platform === "instagram"\) return "https:\/\/www\.instagram\.com\/direct\/inbox\/";/.test(msgTypes) &&
+  /`https:\/\/business\.facebook\.com\/latest\/inbox\/all\?asset_id=\$\{encodeURIComponent\(account\.external_id\)\}`/.test(msgTypes));
 check("the Messages tab is last, its number on the first frame; the Accounts tab says each account's messages status (no key)",
   /\{ key: SPACE_MESSAGES\[space\], label: t\("tab\.messages"\), icon: <MessageSquareIcon size=\{14\} \/>, badge: waiting \?\? undefined \},\s*\]/.test(mh) &&
   /const waiting = useWaitingCount\("messages", space\);/.test(mh) &&

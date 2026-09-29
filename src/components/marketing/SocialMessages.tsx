@@ -25,12 +25,13 @@ import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import { useTranslation } from "@/lib/i18n";
 import { MESSAGES_T } from "@/lib/marketing/messages-i18n";
 import { dmyHm } from "@/lib/marketing/format";
 import { SPACE_ROUTE, accountLabel, type MarketingAccountView, type MarketingSpace } from "@/lib/marketing/spaces";
 import {
-  MESSAGE_MAX, canReplyNow, conversationNeedsReply, replyWindowEnd,
+  MESSAGE_MAX, canReplyNow, conversationNeedsReply, platformInboxUrl, replyWindowEnd,
   type ConversationView, type MessageAttachment, type MessageFilter, type MessageView,
 } from "@/lib/marketing/message-types";
 
@@ -175,7 +176,7 @@ export default function SocialMessages({ space }: { space: MarketingSpace }) {
               <Chip on={account === null} onClick={() => { setAccount(null); setOpenId(null); }}>{t("allAccounts")}</Chip>
               {accounts.map((a) => (
                 <Chip key={a.id} on={account === a.id} onClick={() => { setAccount(a.id); setOpenId(null); }}>
-                  <BrandGlyph name={a.platform} size={13} /><span className="truncate">{accountLabel(a)}</span>
+                  <BrandGlyph name={a.platform} size={13} /><span className="truncate"><bdi>{accountLabel(a)}</bdi></span>
                 </Chip>
               ))}
             </div>
@@ -209,7 +210,7 @@ export default function SocialMessages({ space }: { space: MarketingSpace }) {
                         <Initial name={who(c, t)} />
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{who(c, t)}</span>
+                            <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]"><bdi>{who(c, t)}</bdi></span>
                             <BrandGlyph name={c.account.platform} size={12} />
                             {c.last_message_at && <span dir="ltr" className="ms-auto shrink-0 text-[11px] tabular-nums text-[var(--text-dim)]">{dmyHm(c.last_message_at)}</span>}
                           </span>
@@ -324,7 +325,7 @@ function ConversationPane({ id, t, onBack, onChanged }: { id: string; t: Tr; onB
         </Button>
         <Initial name={who(c, t)} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]">{who(c, t)}</span>
+          <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]"><bdi>{who(c, t)}</bdi></span>
           <span className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-muted)]">
             <BrandGlyph name={c.account.platform} size={12} className="shrink-0" /><span dir="auto" className="truncate">{platform} · {accountLabel(c.account)}</span>
           </span>
@@ -344,7 +345,12 @@ function ConversationPane({ id, t, onBack, onChanged }: { id: string; t: Tr; onB
         {!detail.canReply ? (
           <p className="text-[12px] text-[var(--text-dim)]">{t("viewOnly")}</p>
         ) : !open ? (
-          <p className="text-[12px] text-[#F59E0B]">{t("windowClosed").replace("{platform}", platform)}</p>
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-[12px] text-[#F59E0B]">{t("windowClosed").replace("{platform}", platform)}</p>
+            <Button type="button" variant="secondary" onClick={() => window.open(platformInboxUrl(c.account), "_blank", "noopener,noreferrer")}>
+              <ExternalLinkIcon size={14} />{t("openOn").replace("{platform}", platform)}
+            </Button>
+          </div>
         ) : (
           <>
             <textarea

@@ -68,6 +68,15 @@ export function replyWindowEnd(lastCustomerAt: string | null): string | null {
   return t ? new Date(t + REPLY_WINDOW_MS).toISOString() : null;
 }
 
+/** Where the team answers once the window has closed: the Page's inbox in
+ *  Meta Business Suite (Messenger), the account's Direct inbox (Instagram). */
+export function platformInboxUrl(account: Pick<MarketingAccountView, "platform" | "external_id">): string {
+  if (account.platform === "instagram") return "https://www.instagram.com/direct/inbox/";
+  return account.external_id
+    ? `https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(account.external_id)}`
+    : "https://business.facebook.com/latest/inbox/all";
+}
+
 /** Whether the Hub may answer now. */
 export const canReplyNow = (lastCustomerAt: string | null, now: number = Date.now()) => {
   const t = time(lastCustomerAt);

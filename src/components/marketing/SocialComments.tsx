@@ -165,7 +165,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
                     }`}
                   >
                     {a && <BrandGlyph name={a.platform} size={13} />}
-                    <span className="truncate">{a ? accountLabel(a) : t("allAccounts")}</span>
+                    <span className="truncate">{a ? <bdi>{accountLabel(a)}</bdi> : t("allAccounts")}</span>
                   </button>
                 );
               })}
@@ -220,7 +220,7 @@ function ThreadHeader({ thread, t }: { thread: Thread; t: (k: string) => string 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
           <BrandGlyph name={thread.account.platform} size={12} />
-          <span className="truncate">{accountLabel(thread.account)}</span>
+          <span className="truncate"><bdi>{accountLabel(thread.account)}</bdi></span>
           {p?.is_ad && <StatusPill tone="brand" className="shrink-0">{t("ad")}</StatusPill>}
           {p?.posted_at && <span className="shrink-0 font-normal text-[var(--text-dim)]">· <span dir="ltr" className="tabular-nums">{dmyHm(p.posted_at)}</span></span>}
         </span>

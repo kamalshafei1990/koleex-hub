@@ -35,6 +35,7 @@ export const MESSAGES_T: Translations = {
   "chars":          { en: "{n} / {max}", zh: "{n} / {max}", ar: "{n} / {max}" },
   "windowOpen":     { en: "You can reply here until", zh: "可在此回复至", ar: "يمكنك الرد من هنا حتى" },
   "windowClosed":   { en: "More than 24 hours have passed since the customer's last message: Meta allows replying only on {platform} now.", zh: "距客户最后一条消息已超过 24 小时：Meta 现在只允许在 {platform} 上回复。", ar: "مرّ أكثر من 24 ساعة على آخر رسالة من العميل: تسمح Meta الآن بالرد على {platform} فقط." },
+  "openOn":         { en: "Open on {platform}", zh: "在 {platform} 打开", ar: "افتح على {platform}" },
   "viewOnly":       { en: "You can read the messages; replying needs the edit permission of Social Marketing.", zh: "你可以查看消息；回复需要社交媒体营销的编辑权限。", ar: "يمكنك قراءة الرسائل؛ الرد يحتاج صلاحية التعديل في التسويق عبر السوشيال ميديا." },
   "err.window":     { en: "More than 24 hours have passed since the customer's last message: reply on the platform.", zh: "距客户最后一条消息已超过 24 小时：请在平台上回复。", ar: "مرّ أكثر من 24 ساعة على آخر رسالة من العميل: رد من المنصة نفسها." },
   "err.not_allowed": { en: "Meta does not allow replying to customers from the Hub yet — that needs Meta's review of the app.", zh: "Meta 尚未允许从 Hub 回复客户——这需要 Meta 审核应用。", ar: "لا تسمح Meta بالرد على العملاء من الـ Hub بعد — يحتاج ذلك إلى مراجعة Meta للتطبيق." },
