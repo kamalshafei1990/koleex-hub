@@ -460,13 +460,13 @@ export const brandCenterTemplatesT: Translations = {
   "cert.kind.warranty":     { en: "Warranty", zh: "保修", ar: "ضمان" },
   "cert.kind.appreciation": { en: "Appreciation", zh: "感谢", ar: "تقدير" },
   "cert.kind.employee":     { en: "Employee of the month", zh: "月度优秀员工", ar: "موظف الشهر" },
-  "cert.style.book":    { en: "Standard — the book", zh: "标准 — 品牌手册", ar: "الأساسي — زي الكتاب" },
-  "cert.style.frame":   { en: "Fine frame", zh: "细边框", ar: "إطار رفيع" },
+  "cert.style.book": { en: "Book — first design", zh: "品牌手册 — 初版", ar: "الكتاب — التصميم الأول" },
+  "cert.style.frame": { en: "Fine frame — first design", zh: "细边框 — 初版", ar: "إطار رفيع — التصميم الأول" },
   "cert.style.black":   { en: "Black card, silver print", zh: "黑卡银印", ar: "كارت أسود وطباعة فضي" },
-  "cert.style.band":    { en: "Black band", zh: "黑色横条", ar: "شريط أسود" },
-  "cert.style.side":    { en: "Side panel", zh: "侧边栏", ar: "لوحة جانبية" },
+  "cert.style.band": { en: "Black band — first design", zh: "黑色横条 — 初版", ar: "شريط أسود — التصميم الأول" },
+  "cert.style.side": { en: "Side panel — first design", zh: "侧边栏 — 初版", ar: "لوحة جانبية — التصميم الأول" },
   "cert.style.dots":    { en: "Dots", zh: "圆点", ar: "نقط" },
-  "cert.style.minimal": { en: "Minimal", zh: "极简", ar: "بسيط" },
+  "cert.style.minimal": { en: "Minimal — first design", zh: "极简 — 初版", ar: "بسيط — التصميم الأول" },
   "cert.style.award":   { en: "Award", zh: "荣誉", ar: "تكريم" },
   "cert.size.a4-land": { en: "A4 landscape (the book)", zh: "A4 横版（品牌手册）", ar: "A4 عرضي (زي الكتاب)" },
   "cert.size.a4-port": { en: "A4 portrait", zh: "A4 竖版", ar: "A4 طولي" },
@@ -523,4 +523,9 @@ export const brandCenterTemplatesT: Translations = {
   "cert.f.silverName":   { en: "The name in silver foil", zh: "姓名使用银色烫印", ar: "الاسم بالفضي (فويل)" },
   "cert.spec.silverName": { en: "The name in silver foil (Pantone 877 C) — on screen shown as a dark silver.", zh: "姓名用银色烫印（Pantone 877 C）— 屏幕上显示为深银色。", ar: "الاسم سلفر فويل (Pantone 877 C) — على الشاشة بيبان فضي غامق." },
   "cert.spec.micro":     { en: "The fine lines over the signatures and at the foot are microtext — the group's name in 1-point capitals; print at 600 dpi or finer.", zh: "签名上方和页脚的细线是微缩文字 — 1 磅大写的集团名称；请以 600 dpi 或更高精度印刷。", ar: "الخطوط الرفيعة فوق التوقيعات وتحت هي كلام ميكرو — اسم المجموعة بحروف 1 بوينت؛ اطبع 600 dpi أو أدق." },
+
+  /* ── certificates: the first set kept beside the redesign (owner 30/09) ── */
+  "cert.style.black-1": { en: "Black card — first design", zh: "黑卡 — 初版", ar: "الكارت الأسود — التصميم الأول" },
+  "cert.style.dots-1":  { en: "Dots — first design", zh: "圆点 — 初版", ar: "نقط — التصميم الأول" },
+  "cert.style.award-1": { en: "Award — first design", zh: "荣誉 — 初版", ar: "تكريم — التصميم الأول" },
 };

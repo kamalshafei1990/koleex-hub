@@ -24,15 +24,17 @@ import type { DrawContext, QrRequest, TemplateDef, TemplateItem, TemplateValue, 
 import { LANGS, asLang, fontOf, isPictureQr, list, num, qrsOf, rowsOf, str, type Lang } from "./card/model";
 import { Dots, INK, Logo, QrZone, WHITE, fit, logoHeight, textWidth, wrap, wrapBalanced } from "./card/parts";
 import { nameIn } from "./person";
+import { LABELS, PLACEHOLDER, SILVER, issued } from "./certificate-common";
+import { V1_STYLES, pageV1 } from "./certificate-v1";
 
-export const CERT_STYLES = ["classic", "guilloche", "black", "monolith", "editorial", "swiss", "dots", "award", "corners"] as const;
-type Style = (typeof CERT_STYLES)[number];
-/** The first styles' names (30/09/2026), for fills saved with them. */
-const OLD_STYLES: Record<string, Style> = { book: "classic", frame: "corners", band: "swiss", side: "monolith", minimal: "editorial" };
-const styleOf = (v: TemplateValues): Style => {
-  const s = OLD_STYLES[String(v.style)] ?? String(v.style);
-  return (CERT_STYLES as readonly string[]).includes(s) ? (s as Style) : "classic";
-};
+/** The redesign (owner 30/09/2026: "made by a professional designer"). */
+const NEW_STYLES = ["classic", "guilloche", "black", "monolith", "editorial", "swiss", "dots", "award", "corners"] as const;
+type Style = (typeof NEW_STYLES)[number];
+/** Both sets in the picker — the redesign first, then the first set,
+ *  kept at the owner's word ("keep the old designs also"). */
+export const CERT_STYLES = [...NEW_STYLES, ...V1_STYLES] as const;
+const isV1 = (v: TemplateValues) => (V1_STYLES as readonly string[]).includes(String(v.style));
+const styleOf = (v: TemplateValues): Style => ((NEW_STYLES as readonly string[]).includes(String(v.style)) ? (v.style as Style) : "classic");
 /** What each style's designer set: the name's weight. */
 const STYLE_LOOK: Record<Style, { nameWeight: "light" | "regular" | "medium" | "bold" }> = {
   classic: { nameWeight: "light" }, guilloche: { nameWeight: "light" }, black: { nameWeight: "light" }, monolith: { nameWeight: "light" },
@@ -44,7 +46,6 @@ type Kind = (typeof CERT_KINDS)[number];
 const kindOf = (v: TemplateValues): Kind => ((CERT_KINDS as readonly string[]).includes(String(v.kind)) ? (v.kind as Kind) : "training");
 
 const SIZES: Record<string, { w: number; h: number }> = { "a4-land": { w: 297, h: 210 }, "a4-port": { w: 210, h: 297 }, "a3-land": { w: 420, h: 297 } };
-const SILVER = ["#E5E5EA", "#FFFFFF", "#C7C7CC", "#8E8E93"];
 
 /* ── the words each kind brings ────────────────────────────────────────── */
 
@@ -90,22 +91,11 @@ const WORDS: Record<Kind, Record<Lang, KindWords>> = {
 const PREFIX: Record<Kind, string> = { training: "KL-TC", dealer: "KL-AD", agency: "KL-EA", installation: "KL-IN", warranty: "KL-WC", appreciation: "KL-AP", employee: "KL-EM" };
 /** Formal papers carry the legal name of their day (owner, 28/09/2026). */
 const FORMAL: Kind[] = ["training", "dealer", "agency", "installation", "warranty"];
-const LABELS: Record<Lang, { date: string; number: string }> = {
-  en: { date: "Date", number: "Certificate no." },
-  zh: { date: "日期", number: "证书编号" },
-  ar: { date: "التاريخ", number: "رقم الشهادة" },
-};
-const PLACEHOLDER: Record<Lang, string> = { en: "Full Name", zh: "姓名", ar: "الاسم" };
 
 const today = () => {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
-/** The issue date (D/M/Y) as a date — the legal name is the one of that day. */
-function issued(v: TemplateValues): Date | null {
-  const m = str(v, "date").match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
-  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12) : null;
-}
 const factRows = (kind: Kind, lang: Lang): TemplateItem[] =>
   WORDS[kind][lang].facts.map((label, i) => ({ id: `f${i}`, kind: "custom", label, value: "", on: true }));
 const numberFor = (kind: Kind) => `${PREFIX[kind]}-${new Date().getFullYear()}-0001`;
@@ -489,8 +479,10 @@ function Codes({ r, x, y, size, look }: { r: R; x: number; y: number; size: numb
 
 /* ── the nine styles ───────────────────────────────────────────────────── */
 
-/** Every page: the silvers first, then its style. */
+/** Every page: the silvers first, then its style (the first set draws
+ *  itself). */
 function page(v: TemplateValues, ctx: DrawContext): ReactNode {
+  if (isV1(v)) return pageV1(v, ctx);
   const uid = ctx.uid;
   return (
     <>
@@ -762,7 +754,7 @@ function rekind(v: TemplateValues, value: TemplateValue): TemplateValues {
     sig1Role: W.sig1, sig2Role: W.sig2, sig2On: !!W.sig2,
     number: keepNumber ? oldNumber : numberFor(kind),
     foot: FORMAL.includes(kind) ? "legal" : "everyday",
-    style: kind === "appreciation" || kind === "employee" ? (styleOf(v) === "classic" ? "award" : styleOf(v)) : styleOf(v),
+    style: kind === "appreciation" || kind === "employee" ? (v.style === "classic" ? "award" : v.style === "book" ? "award-1" : String(v.style)) : String(v.style),
   };
 }
 /** Another language: every text still at a default moves with it. */
@@ -816,11 +808,11 @@ export const certificate: TemplateDef = {
       { value: "inter", labelKey: "tpl.font.inter" }, { value: "helvetica", labelKey: "tpl.font.helvetica" },
     ] },
     { key: "scale", kind: "range", labelKey: "evb.f.scale", group: "look", min: 70, max: 130, step: 5, unit: "%" },
-    { key: "nameWeight", kind: "choice", labelKey: "sig.f.nameWeight", group: "look", options: [
+    { key: "nameWeight", kind: "choice", labelKey: "sig.f.nameWeight", group: "look", when: (v) => !isV1(v), options: [
       { value: "light", labelKey: "sig.weight.light" }, { value: "regular", labelKey: "sig.weight.regular" }, { value: "medium", labelKey: "cert.weight.medium" }, { value: "bold", labelKey: "sig.weight.bold" },
     ] },
-    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => isStyle("monolith", "editorial", "dots")(v) },
-    { key: "silverName", kind: "switch", labelKey: "cert.f.silverName", group: "look", when: (v) => !isStyle("black")(v) },
+    { key: "mark", kind: "switch", labelKey: "cert.f.mark", group: "look", when: (v) => !isV1(v) && isStyle("monolith", "editorial", "dots")(v) },
+    { key: "silverName", kind: "switch", labelKey: "cert.f.silverName", group: "look", when: (v) => !isV1(v) && !isStyle("black")(v) },
 
     { key: "heading", kind: "text", labelKey: "cert.f.heading", group: "words", max: 60 },
     { key: "pre", kind: "text", labelKey: "cert.f.pre", group: "words", max: 80 },
@@ -860,20 +852,20 @@ export const certificate: TemplateDef = {
   fromPerson: (p: BcPerson, v: TemplateValues) => ({ name: nameIn(p, asLang(v.lang)) }),
   rekey: { kind: rekind },
   /* a style brings its designer's weight for the name */
-  restyle: (v, style) => ({ ...v, style, nameWeight: STYLE_LOOK[OLD_STYLES[style] ?? (CERT_STYLES.includes(style as Style) ? (style as Style) : "classic")].nameWeight }),
+  restyle: (v, style) => ((NEW_STYLES as readonly string[]).includes(style) ? { ...v, style, nameWeight: STYLE_LOOK[style as Style].nameWeight } : { ...v, style }),
   relang: (v, lang) => relang(v, lang),
   specKeys: (v) => [
     "cert.spec.paper",
-    ...(isStyle("black")(v) ? ["cert.spec.black"] : []),
-    ...(isStyle("guilloche", "black")(v) ? ["cert.spec.guilloche"] : []),
+    ...(v.style === "black" || v.style === "black-1" ? ["cert.spec.black"] : []),
+    ...(!isV1(v) && isStyle("guilloche", "black")(v) ? ["cert.spec.guilloche"] : []),
     ...(v.silverName === true ? ["cert.spec.silverName"] : []),
-    "cert.spec.micro",
+    ...(isV1(v) ? [] : ["cert.spec.micro"]),
     ...(v.seal === "silver" ? ["cert.spec.seal"] : v.seal === "emboss" ? ["cert.spec.emboss"] : []),
     "cert.spec.number",
     ...(kindOf(v) === "warranty" ? ["cert.spec.warranty"] : []),
     ...(v.foot === "legal" ? ["cert.spec.legal"] : []),
   ],
-  fillName: (v, t) => `${t(`cert.kind.${kindOf(v)}`)} · ${t(`cert.style.${styleOf(v)}`)}`,
+  fillName: (v, t) => `${t(`cert.kind.${kindOf(v)}`)} · ${t(`cert.style.${isV1(v) ? String(v.style) : styleOf(v)}`)}`,
   forSaving: (v, keepPerson) => ({
     ...v, sig1Image: "", sig2Image: "", qrs: list(v, "qrs").map((q) => ({ ...q, image: "" })),
     ...(keepPerson ? {} : { name: "", name2: "", org: "" }),
