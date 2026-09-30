@@ -3,10 +3,13 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { contactWebsiteMessages } from "@/lib/server/website/leads";
 
 /* GET /api/customers/[id]/activity
    The cross-app snapshot on a customer's profile: CRM opportunities,
-   quotations, invoices, projects, and the open tasks on those projects.
+   quotations, invoices, projects, the open tasks on those projects, and the
+   messages the customer sent from the public website (lib/server/website/
+   leads — their own words, in full).
 
    These five queries used to run in the BROWSER with the anon key. Every one
    of those tables has RLS on with no anon policy, and the client wrapper
@@ -98,6 +101,13 @@ export async function GET(
     return NextResponse.json({ customer: null });
   }
 
+  /* Started with the buckets, not after them: one more round trip would
+     be felt on every profile. A failure shows no messages, logged. */
+  const messagesP = contactWebsiteMessages(auth.tenant_id, contactId, LIMIT).catch((e) => {
+    console.error("[api/customers/activity] website_leads:", e instanceof Error ? e.message : e);
+    return { count: 0, recent: [] };
+  });
+
   const [opportunities, quotations, invoices, projects] = await Promise.all([
     /* expected_revenue, not `value`, and crm_opportunities has no currency
        column — the browser version asked for both, so this bucket errored on
@@ -181,8 +191,10 @@ export async function GET(
           status: s(r.status), createdAt: s(r.created_at), href: `/projects/${r.project_id}`,
         }));
 
+  const messages = await messagesP;
+
   return NextResponse.json(
-    { activity: { opportunities, quotations, invoices, projects, tasks } },
+    { activity: { opportunities, quotations, invoices, projects, tasks, messages } },
     { headers: { "Cache-Control": "private, max-age=30" } },
   );
 }
