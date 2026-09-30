@@ -70,7 +70,7 @@ export function websiteTenantId(): Promise<string | null> {
 
 /** What the website caches Hub data under. `products` covers the product
  *  pages and lists; `taxonomy` the divisions, categories and their counts. */
-export type WebsiteTag = "products" | "taxonomy" | "jobs" | `page:${string}`;
+export type WebsiteTag = "products" | "taxonomy" | "jobs" | "company" | "catalogs" | `page:${string}`;
 
 /** Ask the website to refresh what it cached under these tags. Runs after the
  *  response, so it never slows or fails the change that caused it. Inert until

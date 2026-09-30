@@ -1,5 +1,5 @@
 /* POST /api/website/media — a photo for a page (multipart "file"): JPEG, PNG,
-   WebP or AVIF, checked by its first bytes, 8 MB at most, into the public
+   WebP or AVIF, checked by its first bytes, 4 MB at most, into the public
    bucket website-media. Website edit. */
 
 import { NextResponse } from "next/server";
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const auth = await guardWebsite("edit");
   if (auth instanceof NextResponse) return auth;
   const len = Number(req.headers.get("content-length") ?? 0);
-  if (len > MEDIA_BYTES_MAX + 64 * 1024) return builderJson({ error: "Photos may be 8 MB at most.", code: "too_big" }, 413);
+  if (len > MEDIA_BYTES_MAX + 64 * 1024) return builderJson({ error: "Photos may be 4 MB at most.", code: "too_big" }, 413);
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!file || typeof file === "string") return builderJson({ error: "Choose a photo." }, 400);

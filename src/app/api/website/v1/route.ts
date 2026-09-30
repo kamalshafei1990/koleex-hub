@@ -21,7 +21,8 @@ export async function GET(req: Request) {
       "/api/website/v1/pages/{slug}",
       "/api/website/v1/jobs",
       "/api/website/v1/company",
+      "/api/website/v1/catalogs",
     ],
-    tags: ["products", "taxonomy", "jobs", "company", "page:{slug}"],
+    tags: ["products", "taxonomy", "jobs", "company", "catalogs", "page:{slug}"],
   });
 }

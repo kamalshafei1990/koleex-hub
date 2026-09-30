@@ -5,7 +5,7 @@
    language the editor has chosen (English, العربية, 中文); Arabic is typed
    right-to-left, and the English stands as the placeholder while
    translating. Photos go up through /api/website/media (the company's own
-   only, 8 MB).
+   only, 4 MB).
    --------------------------------------------------------------------------- */
 
 import { useRef, useState } from "react";
@@ -105,7 +105,7 @@ export function PhotoField({ label, value, lang, onChange }: { label: string; va
             </button>
             {value ? <button type="button" className={smallBtn} onClick={() => onChange(null)}><TrashIcon size={13} />{t("f.remove", "Remove")}</button> : null}
           </div>
-          <span className="text-[11px] text-[var(--text-dim)]">{t("f.photoRule", "Only the company's own photos — JPEG, PNG, WebP or AVIF, up to 8 MB.")}</span>
+          <span className="text-[11px] text-[var(--text-dim)]">{t("f.photoRule", "Only the company's own photos — JPEG, PNG, WebP or AVIF, up to 4 MB.")}</span>
           {failed ? <span className="text-[11px] text-[#FF3333]">{failed}</span> : null}
         </div>
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden"

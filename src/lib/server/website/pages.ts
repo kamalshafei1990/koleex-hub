@@ -14,7 +14,7 @@ import "server-only";
      «Website Publish». Every publish is kept in page_versions; the site is
      told to refresh the page (revalidateWebsite page:<slug>).
    · Photos go to the PUBLIC bucket website-media through here only: jpeg,
-     png, webp or avif, checked by their first bytes, 8 MB at most.
+     png, webp or avif, checked by their first bytes, 4 MB at most.
    --------------------------------------------------------------------------- */
 
 import crypto from "node:crypto";
@@ -25,7 +25,9 @@ import { WEBSITE_PUBLISH_MODULE } from "@/lib/permission-modules";
 import { cleanPageDoc, emptyDoc, publishProblems, type PageDoc, type PublishProblem } from "@/lib/website/page-doc";
 
 export const MEDIA_BUCKET = "website-media";
-export const MEDIA_BYTES_MAX = 8 * 1024 * 1024;
+/* 4 MB: a photo goes through our own function, whose request body the
+   platform caps at 4.5 MB (a bigger one would fail before reaching us). */
+export const MEDIA_BYTES_MAX = 4 * 1024 * 1024;
 
 export type Result<T> = T | { error: string; status: number; code?: string; problems?: PublishProblem[] };
 export const isError = <T,>(r: Result<T>): r is { error: string; status: number; code?: string; problems?: PublishProblem[] } =>
@@ -208,7 +210,7 @@ export function sniffPhoto(b: Uint8Array): string | null {
 
 export async function uploadPhoto(bytes: Uint8Array, declared: string): Promise<Result<{ url: string }>> {
   if (!bytes.length) return { error: "The file is empty.", status: 400, code: "empty" };
-  if (bytes.length > MEDIA_BYTES_MAX) return { error: "Photos may be 8 MB at most.", status: 400, code: "too_big" };
+  if (bytes.length > MEDIA_BYTES_MAX) return { error: "Photos may be 4 MB at most.", status: 400, code: "too_big" };
   const type = sniffPhoto(bytes);
   if (!type || (declared && declared.split(";")[0].trim().toLowerCase() !== type && !(declared === "image/jpg" && type === "image/jpeg"))) {
     return { error: "Only JPEG, PNG, WebP or AVIF photos.", status: 400, code: "type" };

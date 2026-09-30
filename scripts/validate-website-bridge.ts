@@ -63,7 +63,7 @@ const routeFiles: string[] = [];
     else if (f === "route.ts") routeFiles.push(p);
   }
 })(ROUTES);
-check("the bridge has its 8 routes (company added 30/09/2026)", routeFiles.length === 8);
+check("the bridge has its 9 routes (company and catalogs added 30/09/2026)", routeFiles.length === 9);
 for (const f of routeFiles) {
   const src = code(f);
   const rel = f === join(ROUTES, "route.ts") ? "(index)" : f.replace(`${ROUTES}/`, "").replace("/route.ts", "");
@@ -197,6 +197,16 @@ check("the address, phones and email are the papers' (DocumentBrandStrips), the 
   && /import \{ KOLEEX_COMPANY as FACTS \} from "@\/lib\/server\/ai\/identity";/.test(company)
   && /address: ON_PAPER\.address,/.test(company) && /tel: ON_PAPER\.tel,/.test(company) && /email: ON_PAPER\.email,/.test(company) && /offices: \[\.\.\.FACTS\.offices\],/.test(company));
 check("no contact detail is written in the website's copy (no phone, e-mail or street)", !/\+\d{2}|[\w.-]+@[\w-]+\.|Room \d|Street/.test(company));
+
+/* ── 8. Catalogs: Koleex's own only ── */
+console.log("\n8. Catalogs on the site are Koleex's own only");
+const cats = code("src/lib/server/website/catalogs.ts");
+check("the website's catalogs never read the Catalogs app's table (suppliers' catalogs)", !/from\("catalogs"\)/.test(cats) && /from\("website_catalogs"\)/.test(cats));
+check("the bridge lists only the catalogs shown", /listCatalogs\(true\)/.test(code(join(ROUTES, "catalogs/route.ts"))) && /if \(onlyVisible\) q = q\.eq\("visible", true\);/.test(cats));
+check("a catalog is saved only once its PDF is in the bucket", /const file = await uploadedPdf\(path\);\s*if \(!file\) return \{/.test(cats));
+const catSql = readFileSync("supabase/migrations/20260930_website_catalogs.sql", "utf8");
+check("website-files takes PDFs only; website_catalogs is under RLS with no policies",
+  /'website-files',\s*'website-files',\s*true,\s*104857600,\s*ARRAY\['application\/pdf'\]/.test(catSql) && /ALTER TABLE website_catalogs ENABLE ROW LEVEL SECURITY;/.test(catSql) && !/CREATE POLICY/i.test(stripComments(catSql, { lang: "sql" })));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

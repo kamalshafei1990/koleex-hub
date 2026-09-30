@@ -113,7 +113,7 @@ check("only English is required to publish", !/\.(ar|zh)\b/.test(between(doc, "e
 console.log("\n5. Photos");
 const upload = between(pages, "export async function uploadPhoto(", "export function previewLink(");
 check("the type is read from the first bytes and must match what was sent", /const type = sniffPhoto\(bytes\);/.test(upload) && /declared\.split\(";"\)\[0\]\.trim\(\)\.toLowerCase\(\) !== type/.test(upload));
-check("8 MB at most", /if \(bytes\.length > MEDIA_BYTES_MAX\)/.test(upload) && /export const MEDIA_BYTES_MAX = 8 \* 1024 \* 1024;/.test(pages));
+check("4 MB at most (under the platform's 4.5 MB request cap)", /if \(bytes\.length > MEDIA_BYTES_MAX\)/.test(upload) && /export const MEDIA_BYTES_MAX = 4 \* 1024 \* 1024;/.test(pages));
 check("jpeg, png, webp, avif only — no SVG", /const PHOTO_TYPES: Record<string, string> = \{ "image\/jpeg": "jpg", "image\/png": "png", "image\/webp": "webp", "image\/avif": "avif" \};/.test(pages) && !/svg/i.test(upload));
 const sql = readFileSync(MIGRATION, "utf8");
 check("the bucket is public read, 8 MB, raster types only; page_versions under RLS",

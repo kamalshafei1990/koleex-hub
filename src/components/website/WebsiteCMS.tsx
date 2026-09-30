@@ -21,6 +21,8 @@ import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import WebsitePagesPanel from "@/components/website/WebsitePagesPanel";
 import PageEditor from "@/components/website/builder/PageEditor";
+import WebsiteCatalogsPanel from "@/components/website/WebsiteCatalogsPanel";
+import { websiteBuilderT } from "@/lib/translations/website-builder";
 
 /* ── Config ── */
 /* The site's own /admin, which this screen used to frame, is gone (30/09/2026):
@@ -51,7 +53,8 @@ type Viewport = "desktop" | "tablet" | "mobile" | "full";
 
 export default function WebsiteCMS() {
   const { t } = useTranslation(websiteT);
-  const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
+  const [activeTab, setActiveTab] = useState<"builder" | "catalogs" | "preview">("builder");
+  const { t: tb } = useTranslation(websiteBuilderT);
   const [viewport, setViewport] = useState<Viewport>("full");
   const [previewPage, setPreviewPage] = useState("/");
   const [iframeKey, setIframeKey] = useState(0);
@@ -127,6 +130,13 @@ export default function WebsiteCMS() {
                 onClick: () => { setActiveTab("builder"); setIsLoading(false); },
                 icon: <LayoutIcon size={13} />,
                 label: <span className="hidden sm:inline">{t("pageBuilder", "Page Builder")}</span>,
+              },
+              {
+                key: "catalogs",
+                active: activeTab === "catalogs",
+                onClick: () => { setActiveTab("catalogs"); setIsLoading(false); },
+                icon: <DocumentIcon size={13} />,
+                label: <span className="hidden sm:inline">{tb("cat.tab", "Catalogs")}</span>,
               },
               {
                 key: "preview",
@@ -251,7 +261,9 @@ export default function WebsiteCMS() {
 
       {/* ── Page Builder (the site's pages) or the Live Preview frame ── */}
       <main className="flex-1 relative bg-[var(--bg-primary)]">
-        {activeTab === "builder" ? (
+        {activeTab === "catalogs" ? (
+          <WebsiteCatalogsPanel />
+        ) : activeTab === "builder" ? (
           editing ? (
             <PageEditor key={`${editing}-${iframeKey}`} slug={editing} onBack={() => setEditing(null)} />
           ) : (
