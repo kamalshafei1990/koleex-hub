@@ -84,7 +84,7 @@ const COMPANY = {
   tagline: "SHAPING THE FUTURE.",
   address:
     "Room 206, Building 88, West Feiyue Technological Innovative Park, Jingshui An Community, Xiachen Street, Jiaojiang District, Taizhou City, Zhejiang Province, China",
-  phone: "+86 0576 8892 7796",
+  phone: "+86 576 8892 7796",
   mobile: "+86 130 7380 0720",
   email: "info@koleexgroup.com",
   web: "www.koleexgroup.com",

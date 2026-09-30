@@ -43,7 +43,10 @@ function read(v: TemplateValues, ctx: DrawContext) {
       { name: str(v, "sig1Name"), role: str(v, "sig1Role"), image: str(v, "sig1Image") },
       ...(v.sig2On === false ? [] : [{ name: str(v, "sig2Name"), role: str(v, "sig2Role"), image: str(v, "sig2Image") }]),
     ],
-    seal: v.seal === "silver" ? "silver" : v.seal === "emboss" ? "emboss" : "none",
+    /* No seal around the logo (owner, 01/10/2026 — book ch. 40): a fill
+       saved with the silver seal reads without it; the printer's dry-seal
+       note stays. */
+    seal: v.seal === "emboss" ? "emboss" : "none",
     foot, footName: foot === "legal" ? legalNameEn(issued(v)) : EVERYDAY_NAME_EN,
     qrs: qrsOf(v),
   };

@@ -17,7 +17,7 @@ export const KOLEEX_COMPANY = {
      entirely, so the contract's SELLER card was missing the mobile and the
      email that the invoice beside it carried. One definition; a number that
      changes changes on all three papers at once. */
-  tel: "+86 0576 8892 7796",
+  tel: "+86 576 8892 7796",
   mobile: "+86 130 7380 0720",
   email: "info@koleexgroup.com",
   web: "www.koleexgroup.com",

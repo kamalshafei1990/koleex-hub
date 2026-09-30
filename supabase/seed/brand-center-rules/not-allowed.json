@@ -27,6 +27,12 @@
     "option": "ink.silver-logo-stamp-on-black",
     "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
    }
+  ],
+  "certificates": [
+   {
+    "option": "seal.silver-foil-seal",
+    "why": "No seal around the logo on certificates (book ch. 40; owner, 01/10/2026)"
+   }
   ]
  },
  "gifts": {
@@ -60,6 +66,10 @@
    {
     "option": "print.large-k-pattern",
     "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "print.logo-tagline",
+    "why": "The logo alone on gifts — no tagline or slogans (book ch. 123)"
    }
   ],
   "pins-and-badges": [
@@ -176,6 +186,12 @@
    {
     "option": "logo.full-colour-wrap",
     "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "mugs": [
+   {
+    "option": "print.logo-tagline",
+    "why": "The logo alone on gifts — no tagline or slogans (book ch. 123)"
    }
   ]
  },
@@ -482,6 +498,30 @@
    {
     "option": "kind.machine-line-drawing-animation",
     "why": "No drawings of machines — our own photographs and film only (owner, 27/09/2026; book ch. 60)"
+   }
+  ]
+ },
+ "paperwork": {
+  "warranty-certificate": [
+   {
+    "option": "format.a4-certificate-with-silver-seal",
+    "why": "No seal around the logo on certificates (book ch. 40; owner, 01/10/2026) — the A4 certificate without it"
+   }
+  ]
+ },
+ "print": {
+  "company-profile": [
+   {
+    "option": "format.house-size-210-270-mm",
+    "why": "Landscape 16:10 only (book ch. 102; owner, 01/10/2026)"
+   }
+  ]
+ },
+ "documents": {
+  "presentation-master-template": [
+   {
+    "option": "ratio.4-3-old-projectors",
+    "why": "16:9 only (book ch. 90; owner, 01/10/2026)"
    }
   ]
  }

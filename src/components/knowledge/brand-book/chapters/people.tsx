@@ -56,11 +56,12 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** The staff ID card, 86 × 124 mm (owner, 28/09/2026): a black front with
- *  the portrait on dark; the back is the owner's own design. */
+/** The staff ID card, 54 × 86 mm — the standard card of ch. 101 (owner,
+ *  01/10/2026; it was 86 × 124 mm): a black front with the portrait on
+ *  dark; the back is the owner's own design. */
 function StaffCard({ side, light = false }: { side: "front" | "back"; light?: boolean }) {
   const w = 124;
-  const h = (w * 124) / 86;
+  const h = (w * 86) / 54;
   if (side === "back") {
     return (
       <div className="relative overflow-hidden rounded-[6px] bg-black" style={{ width: w, height: h }}>
@@ -238,7 +239,8 @@ export function Uniforms() {
         <Specs rows={[
           ["Chest", "Wearer’s left, 70–80 mm wide, 180–200 mm below the shoulder seam"],
           ["Back (jackets, coveralls, fair polos, T-shirts)", "Optional: logo 200–250 mm wide, 100 mm below the collar; screen print on T-shirts"],
-          ["Sleeve, cap", "The full logo, 40–50 mm wide — or nothing"],
+          ["Sleeve", "The full logo, 40–50 mm wide — or nothing"],
+          ["Cap", "The full logo, 60–70 mm wide on the front (ch. 39)"],
           ["Method", "Embroidery, one thread color — screen print or DTF only on technical fabrics (ch. 39)"],
         ]} />
         <Note>In the warehouse, high-visibility vests and safety wear come first. The logo may be printed on the back of a vest, black on yellow; it never covers the reflective strips.</Note>
@@ -260,14 +262,14 @@ export function Uniforms() {
           <div className="flex flex-wrap items-end justify-center gap-5">
             {([["Front", "front", false], ["Back — the current design", "back", false], ["Second version", "front", true]] as Array<[string, "front" | "back", boolean]>).map(([label, side, light]) => (
               <figure key={label} className="flex flex-col items-center gap-2">
-                <Scaled w={120} base={124} h={180}><StaffCard side={side} light={light} /></Scaled>
+                <Scaled w={120} base={124} h={198}><StaffCard side={side} light={light} /></Scaled>
                 <figcaption className="text-[11px] font-medium text-[#6E6E73]">{label}</figcaption>
               </figure>
             ))}
           </div>
         </Stage>
         <Specs rows={[
-          ["Size", "86 × 124 mm, portrait, on the lanyard"],
+          ["Size", "54 × 86 mm, portrait, on the lanyard — the standard card (ch. 101)"],
           ["Front", "Black: the logo top-left; the portrait in black and white on dark (ch. 66); the name Bold, the title Light; staff number and department"],
           ["Back", "Black: the logo centered; the QR codes (ch. 104) and the horizontal lockup (ch. 43) at the bottom"],
           ["Second version", "White front, black type (ch. 47)"],
@@ -355,7 +357,7 @@ export function Merchandise() {
             ["Tool bag, black nylon — technicians", "Screen print, white", "The group lockup, large, on the front — from the lockup file"],
             ["Carry-on case, black hard shell", "UV print with a clear coat, or a black engraved badge", "The group lockup, upper center"],
             ["Ashtray, black metal — our offices only", "Laser engraving, the metal’s tone", "The group lockup; never given as a gift"],
-            ["Cap, black cotton", "Embroidery, white", "The full logo, 50–60 mm on the front"],
+            ["Cap, black cotton", "Embroidery, white", "The full logo, 60–70 mm on the front (ch. 39)"],
             ["Tape measure, seam ripper, thread snips", "Pad print", "The full logo along the longest flat side — tools for the people who use our machines"],
           ]}
         />

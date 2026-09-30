@@ -228,7 +228,7 @@ export function Brochures() {
         <Specs rows={[
           ["Print", "CMYK, 3 mm bleed, 300 dpi images, PDF/X-1a"],
           ["Paper", "Matte coated 170–250 g/m²"],
-          ["QR code", "The KOLEEX QR code below, at least 20 × 20 mm"],
+          ["QR code", "The KOLEEX QR code below, at least 20 × 20 mm (15 mm only on business cards — ch. 91)"],
         ]} />
       </Section>
 
@@ -244,7 +244,7 @@ export function Brochures() {
           ["Logo", "The KOLEEX tile in the middle, no more than 20% of the code"],
           ["Error correction", "Level H, so the code still reads with the logo in it"],
           ["Margin", "A white quiet zone of four modules on every side"],
-          ["Size", "20 × 20 mm at the smallest; larger for signs read from a distance"],
+          ["Size", "20 × 20 mm at the smallest; 15 mm only on business cards, read from the hand (ch. 91); larger for signs read from a distance"],
           ["Link", "Our own domain or WhatsApp Business — tested on two phones before printing"],
         ]} />
       </Section>

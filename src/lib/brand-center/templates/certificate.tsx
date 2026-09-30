@@ -9,7 +9,8 @@
    breaks of the book are fine — and in the library he chose the kinds
    (training, authorized dealer, exclusive agency, installation, warranty,
    appreciation, employee of the month), A4 either way or A3, black card
-   with silver print, and a silver seal. So: eight styles; each kind brings
+   with silver print, and a silver seal (withdrawn 01/10/2026: no seal around
+   the logo, book ch. 40). So: eight styles; each kind brings
    its own wording in English, Chinese or Arabic, all of it editable; the
    facts are lines he adds and names; one or two signatures (a scanned
    signature may sit on the line); a seal; the foot with the legal name of
@@ -124,7 +125,10 @@ function read(v: TemplateValues, ctx: DrawContext) {
       { name: str(v, "sig1Name"), role: str(v, "sig1Role"), image: str(v, "sig1Image") },
       ...(v.sig2On === false ? [] : [{ name: str(v, "sig2Name"), role: str(v, "sig2Role"), image: str(v, "sig2Image") }]),
     ],
-    seal: v.seal === "silver" ? "silver" : v.seal === "emboss" ? "emboss" : "none",
+    /* No seal around the logo (owner, 01/10/2026 — book ch. 40): a fill
+       saved with the silver seal reads without it; the printer's dry-seal
+       note stays. */
+    seal: v.seal === "emboss" ? "emboss" : "none",
     foot, footName: foot === "legal" ? legalNameEn(issued(v)) : EVERYDAY_NAME_EN,
     nameWeight: WEIGHTS[String(v.nameWeight)] ?? WEIGHTS[STYLE_LOOK[style].nameWeight],
     pattern: patternOf(v.pattern, "scan-edge"),
@@ -679,7 +683,7 @@ export const certificate: TemplateDef = {
     { key: "sig2Role", kind: "text", labelKey: "cert.f.sig2Role", group: "issue", max: 50, when: (v) => v.sig2On !== false },
     { key: "sig2Image", kind: "image", labelKey: "cert.f.sigImage", group: "issue", when: (v) => v.sig2On !== false },
     { key: "seal", kind: "choice", labelKey: "cert.f.seal", group: "issue", options: [
-      { value: "none", labelKey: "cert.seal.none" }, { value: "silver", labelKey: "cert.seal.silver" }, { value: "emboss", labelKey: "cert.seal.emboss" },
+      { value: "none", labelKey: "cert.seal.none" }, { value: "emboss", labelKey: "cert.seal.emboss" },
     ] },
     { key: "foot", kind: "choice", labelKey: "cert.f.foot", group: "issue", options: [
       { value: "legal", labelKey: "cert.foot.legal" }, { value: "everyday", labelKey: "cert.foot.everyday" }, { value: "none", labelKey: "cert.foot.none" },
@@ -691,7 +695,7 @@ export const certificate: TemplateDef = {
     heading: START.heading, pre: START.pre, name: "", name2: "", org: "", statement: START.statement, facts: factRows("training", "en"),
     date: today(), number: numberFor("training"),
     sig1Name: "", sig1Role: START.sig1, sig1Image: "", sig2On: true, sig2Name: "", sig2Role: START.sig2, sig2Image: "",
-    seal: "silver", foot: "legal",
+    seal: "none", foot: "legal",
     qrs: [] as TemplateItem[],
   },
   pages: [{ id: "front", draw: page }],
@@ -707,7 +711,7 @@ export const certificate: TemplateDef = {
     ...(!isV1(v) && isStyle("guilloche", "black")(v) ? ["cert.spec.guilloche"] : []),
     ...(v.silverName === true ? ["cert.spec.silverName"] : []),
     ...(isV1(v) ? [] : ["cert.spec.micro"]),
-    ...(v.seal === "silver" ? ["cert.spec.seal"] : v.seal === "emboss" ? ["cert.spec.emboss"] : []),
+    ...(v.seal === "emboss" ? ["cert.spec.emboss"] : []),
     "cert.spec.number",
     ...(kindOf(v) === "warranty" ? ["cert.spec.warranty"] : []),
     ...(v.foot === "legal" ? ["cert.spec.legal"] : []),

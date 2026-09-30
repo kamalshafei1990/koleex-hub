@@ -298,7 +298,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
       {
        "br": true
       },
-      "Email: info@koleexgroup.com · Tel: +86 0576 8892 7796"
+      "Email: info@koleexgroup.com · Tel: +86 576 8892 7796"
      ]
     }
    ]
@@ -588,7 +588,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
       },
       " · الهاتف: ",
       {
-       "ltr": "+86 0576 8892 7796"
+       "ltr": "+86 576 8892 7796"
       }
      ]
     }
@@ -849,7 +849,7 @@ export const LEGAL_DOCS: Record<(typeof LEGAL_SLUGS)[LegalSlug], Record<LegalLan
       {
        "br": true
       },
-      "电子邮箱：info@koleexgroup.com · 电话：+86 0576 8892 7796"
+      "电子邮箱：info@koleexgroup.com · 电话：+86 576 8892 7796"
      ]
     }
    ]

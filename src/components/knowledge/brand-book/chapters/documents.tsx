@@ -315,8 +315,8 @@ export function Certificates() {
           "A4 landscape; logo centered at the top; the legal lockup at the foot.",
           "Every certificate has a number and is recorded, so it can be verified.",
           "A warranty certificate states the machine model, serial number, start date and terms — nothing it does not cover.",
-          "No gold, ribbons or decorations that imitate official documents. Our own marks are allowed: a silver foil seal (the group's name around the logo) and a fine double frame (owner's choice, 28/09/2026).",
-          "Made in Brand Center → Templates → Certificate: seven kinds with their own wording in English, Chinese or Arabic, eight styles, one or two signatures, the seal, and the legal name of the issue date at the foot.",
+          "No gold, ribbons, seals or decorations that imitate official documents — no seal around the logo (ch. 40; owner, 01/10/2026). A fine double frame is allowed (owner's choice, 28/09/2026).",
+          "Made in Brand Center → Templates → Certificate: seven kinds with their own wording in English, Chinese or Arabic, eight styles, one or two signatures, and the legal name of the issue date at the foot.",
         ]} />
       </Section>
     </Chapter>

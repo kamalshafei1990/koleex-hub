@@ -101,7 +101,7 @@ export function GridLayout() {
             [<B key="a">Story / reel cover</B>, "1080 × 1920 px", "72 px sides · 250 px top and bottom", "4 · 24 px"],
             [<B key="a">Presentation</B>, "1920 × 1080 px", "96 px", "12 · 24 px"],
             [<B key="a">Website</B>, "Up to 1440 px content", "24 px (16 px on phones)", "12 · 24 px (4 on phones)"],
-            [<B key="a">Business card</B>, "90 × 54 mm", "5 mm", "—"],
+            [<B key="a">Business card</B>, "90 × 54 mm", "4 mm — the only exception (ch. 91)", "—"],
             [<B key="a">Roll-up banner</B>, "850 × 2000 mm", "60 mm · keep the bottom 200 mm empty", "6 · 20 mm"],
           ]}
         />

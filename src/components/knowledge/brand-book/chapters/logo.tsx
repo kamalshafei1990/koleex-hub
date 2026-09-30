@@ -635,7 +635,7 @@ export function Backgrounds() {
             ["Leather", "Blind deboss or laser, the leather’s own tone; minimum 30 mm"],
             ["Wood", "Laser engraving, the wood’s own tone; minimum 25 mm"],
             ["Pens, mugs, USB, bottles", "Pad print or laser, one color; minimum 20 mm — ch. 123"],
-            ["Cartons and tape", "One-color flexo print, black; minimum 60 mm on a carton — ch. 110"],
+            ["Cartons and tape", "One-color flexo print, black; minimum 80 mm on a carton — ch. 110"],
           ]} />
         </Sub>
 

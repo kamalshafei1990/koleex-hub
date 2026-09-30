@@ -4,8 +4,9 @@
    platform — Facebook, Instagram, LinkedIn, TikTok & Douyin, YouTube, X,
    WeChat, WhatsApp Business.
 
-   Known facts used: Instagram @koleexgroup and the Facebook page are live
-   (connected in Odoo); the owner wants WhatsApp on both an Egyptian and a
+   Known facts used: Instagram (live as @koleexgroup) and the Facebook page
+   are live (connected in Odoo); handles follow "@koleex + the market" (owner,
+   01/10/2026); the owner wants WhatsApp on both an Egyptian and a
    Chinese number; captions follow the house pattern seen in our own posts
    (a short hook, then the product and its benefit, then hashtags). */
 
@@ -25,7 +26,7 @@ function SizeTable({ rows }: { rows: Array<[string, string, string?]> }) {
   return <Table head={["Item", "Size", "Note"]} rows={rows.map(([a, b, c]) => [<B key="a">{a}</B>, <Code key="b">{b}</Code>, c ?? ""])} />;
 }
 
-function ProfileHeader({ name = "KOLEEX", handle = "@koleexgroup", bio }: { name?: string; handle?: string; bio: ReactNode }) {
+function ProfileHeader({ name = "KOLEEX Egypt", handle = "@koleexegypt", bio }: { name?: string; handle?: string; bio: ReactNode }) {
   return (
     <div className="px-3 pt-3 text-[#1D1D1F]">
       <div className="flex items-center gap-3">
@@ -68,7 +69,7 @@ export function SocialProfiles() {
             <Specs rows={[
               ["Profile picture", "The logo tile — the full white logo on black (ch. 41), uploaded at 1024 × 1024"],
               ["Name", "KOLEEX — for a regional account: KOLEEX Egypt, KOLEEX China"],
-              ["Handle", "@koleexgroup wherever it is available; never variants with numbers or underscores"],
+              ["Handle", "@koleex + the market — @koleexegypt, @koleexchina (owner, 01/10/2026); never variants with numbers or underscores"],
               ["Link", "The website in the reader's language, or the WhatsApp link"],
               ["Category", "Industrial Equipment / Machinery (the platform's closest category)"],
             ]} />
@@ -343,9 +344,9 @@ export function Instagram() {
   return (
     <PlatformChapter
       n={82}
-      lead="Instagram (@koleexgroup) is our visual showroom. The grid is seen as a whole, so every post is designed to sit beside the others."
+      lead="Instagram is our visual showroom. The grid is seen as a whole, so every post is designed to sit beside the others."
       sizes={[["Profile picture", "1024 × 1024", "Shown as a circle"], ["Feed post", "1080 × 1350", "Shown cropped to 3:4 on the grid — keep the headline inside"], ["Story", "1080 × 1920", "Top 250 px and bottom 340 px stay clear"], ["Reel cover", "1080 × 1920", "The post layout (logo top-left, silver headline, machine), inside the central 1080 × 1440"], ["Highlight cover", "1080 × 1920", "A Hub library icon, white on Ink"]]}
-      profile={[["Handle", "@koleexgroup"], ["Bio", "Short description + one link"], ["Highlights", "Machines · Services · Events · Contact — each with its icon"], ["Link", "The website or WhatsApp"]]}
+      profile={[["Handle", "@koleex + the market (ch. 79)"], ["Bio", "Short description + one link"], ["Highlights", "Machines · Services · Events · Contact — each with its icon"], ["Link", "The website or WhatsApp"]]}
       content={["Alternate dark-led and light-led posts so the grid breathes", "Reels of machines running — the most watched format", "Stories for events, day-to-day work and quick tips"]}
       extra={
         <Stage bg="#F5F5F7" h="auto" pad={20}>
@@ -383,7 +384,7 @@ export function TikTokDouyin() {
       n={84}
       lead="Short vertical video: a machine running, a tip, a moment from the factory. TikTok reaches our international audience; Douyin (抖音) is its separate Chinese twin, with its own account and content in Chinese."
       sizes={[["Video", "1080 × 1920", "9:16, 15–60 s"], ["Cover", "1080 × 1920", "The post layout: logo top-left, silver headline, the machine (ch. 71)"], ["Profile picture", "1024 × 1024", "The logo tile"], ["Safe areas", "Top 250 · bottom 420 · right 150 px", "Ch. 70"]]}
-      profile={[["TikTok", "@koleexgroup, English and Arabic"], ["Douyin", "An enterprise account under our Taizhou company, in Chinese"], ["Link", "Website or WhatsApp (TikTok) · WeChat (Douyin)"]]}
+      profile={[["TikTok", "@koleex + the market (ch. 79), English and Arabic"], ["Douyin", "An enterprise account under our Taizhou company, in Chinese"], ["Link", "Website or WhatsApp (TikTok) · WeChat (Douyin)"]]}
       content={["The machine is the star: real sound of the machine, subtitles, logo in the first or last second", "Music only from the platform's own licensed library", "Never re-upload a TikTok to Douyin (or back) with the other app's watermark — export clean from the edit", "Chinese content follows Chinese advertising rules: no \"best\", \"first\", \"top\" (ch. 29)"]}
     />
   );
@@ -395,7 +396,7 @@ export function YouTube() {
       n={85}
       lead="YouTube holds our longer videos — demonstrations, tutorials, the factory — and is the video library we link to from the website and quotations."
       sizes={[["Channel banner", "2560 × 1440", "Everything important inside the central 1546 × 423"], ["Thumbnail", "1280 × 720", "Ch. 71"], ["Video", "3840 × 2160 or 1920 × 1080", "16:9"], ["Shorts", "1080 × 1920"]]}
-      profile={[["Channel name", "KOLEEX"], ["Handle", "@koleexgroup"], ["Playlists", "One per machine category, plus Tutorials, Factory, Events"], ["Subtitles", "English, Arabic, Chinese uploaded as files (SRT)"]]}
+      profile={[["Channel name", "KOLEEX"], ["Handle", "@koleex + the market (ch. 79)"], ["Playlists", "One per machine category, plus Tutorials, Factory, Events"], ["Subtitles", "English, Arabic, Chinese uploaded as files (SRT)"]]}
       content={["Titles: what the video shows, under 60 characters — \"Threading an overlock machine in 60 seconds\"", "Descriptions: two lines, then links to the machine page and WhatsApp", "End screen: the outro (ch. 71) with one next video"]}
     />
   );
@@ -407,7 +408,7 @@ export function XPlatform() {
       n={86}
       lead="X is a secondary channel: news, exhibitions and links to our articles, in English."
       sizes={[["Profile picture", "400 × 400", "The logo tile"], ["Header", "1500 × 500", "Logo and descriptor centered"], ["Post image", "1600 × 900", "16:9"]]}
-      profile={[["Name", "KOLEEX"], ["Handle", "@koleexgroup"], ["Bio", "Short description + website"]]}
+      profile={[["Name", "KOLEEX"], ["Handle", "@koleex + the market (ch. 79)"], ["Bio", "Short description + website"]]}
       content={["Short news with one image or video", "Event updates during exhibitions", "Replies within one working day; no arguments in public"]}
     />
   );
