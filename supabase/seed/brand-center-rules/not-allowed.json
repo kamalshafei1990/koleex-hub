@@ -476,5 +476,13 @@
     "why": "KOLEEX is never typed as text — the logo, with the word under it"
    }
   ]
+ },
+ "video": {
+  "animated-explainers": [
+   {
+    "option": "kind.machine-line-drawing-animation",
+    "why": "No drawings of machines — our own photographs and film only (owner, 27/09/2026; book ch. 60)"
+   }
+  ]
  }
 }
