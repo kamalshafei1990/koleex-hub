@@ -54,8 +54,10 @@ export function classifyBySubstring(type: string): NotificationActivity | null {
   if (type.includes("mention")) return "mentions";
   if (type.includes("approval")) return "approvals";
   /* Social Marketing's posts — decided, published, failed to publish. A
-     request to approve one went to "approvals" just above. */
-  if (type.startsWith("marketing")) return "marketing_activity";
+     request to approve one went to "approvals" just above. A message from
+     the public website (website_lead) rides the same switch: a customer
+     writing in, like a private message on Facebook. */
+  if (type.startsWith("marketing") || type.startsWith("website")) return "marketing_activity";
   if (
     type.includes("login") || type.includes("device") || type.includes("new_ip") ||
     type.includes("password") || type.includes("security") || type.includes("2fa") ||

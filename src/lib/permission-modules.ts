@@ -70,12 +70,16 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    grants it to himself; lib/server/marketing/approvals). Website (owner's
    pick, 30 Sep 2026): "Website Publish" — putting a page built in the Page
    Builder live on the public site; the super admins always can, anyone
-   else with Website edit saves drafts only (lib/server/website/pages). */
+   else with Website edit saves drafts only (lib/server/website/pages).
+   Website (owner's pick, 30 Sep 2026): "Website Leads" — being told when
+   someone writes from the public site or asks it for a quotation (the
+   super admins always are; lib/server/website/leads). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";
 export const CEO_APPROVALS_MODULE = "CEO Brand Approvals";
 export const WEBSITE_PUBLISH_MODULE = "Website Publish";
+export const WEBSITE_LEADS_MODULE = "Website Leads";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
@@ -86,6 +90,7 @@ export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = 
   { name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" },
   { name: CEO_APPROVALS_MODULE, app: "CEO Brand" },
   { name: WEBSITE_PUBLISH_MODULE, app: "Website" },
+  { name: WEBSITE_LEADS_MODULE, app: "Website" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */
