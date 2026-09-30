@@ -20,7 +20,16 @@ export interface ItemRules {
   templates?: string[];
   /** The brand book's chapters on it. */
   book?: number[];
+  /** Choices of the item the rules forbid (a workshop option the standing
+   *  rules overrode), by "<type key>.<option key>", each with the reason. */
+  notAllowed?: Array<{ option: string; why: string }>;
 }
+
+/** How a choice is named in `notAllowed`. */
+export const optionRef = (typeKey: string, optionKey: string) => `${typeKey}.${optionKey}`;
+
+/** The forbidden choices of these rules: reference → reason. */
+export const notAllowedOf = (r: ItemRules | null | undefined) => new Map((r?.notAllowed ?? []).map((x) => [x.option, x.why] as const));
 
 /** The templates an item can link to, and their names' words keys. */
 export const RULE_TEMPLATES: Record<string, string> = {
@@ -59,8 +68,13 @@ export function cleanRules(x: unknown): ItemRules | null {
   if (tpl.length) out.templates = tpl;
   const book = Array.isArray(r.book) ? r.book.filter((n): n is number => Number.isInteger(n) && n > 0 && n < 1000).slice(0, 12) : [];
   if (book.length) out.book = book;
+  const no = Array.isArray(r.notAllowed)
+    ? r.notAllowed.map((x) => ({ option: s((x as { option?: unknown })?.option, 120), why: s((x as { why?: unknown })?.why, LIMITS.line) })).filter((x) => x.option && x.why).slice(0, 60)
+    : [];
+  if (no.length) out.notAllowed = no;
   return out;
 }
 
+/** The rules proper (a list of forbidden choices alone is not yet rules). */
 export const hasRules = (r: ItemRules | null | undefined) =>
   !!r && !!(r.specs?.length || r.logo || r.do?.length || r.dont?.length || r.vendor || r.templates?.length || r.book?.length);

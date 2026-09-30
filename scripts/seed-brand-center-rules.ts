@@ -8,6 +8,7 @@
 
    The owner's own edits win: an item whose rules are already filled is left
    alone unless --force names it. Every key must be an item of the section.
+   An item's forbidden choices (rules.notAllowed) are kept as they are.
 
      npx tsx scripts/seed-brand-center-rules.ts stationery            # dry run
      npx tsx scripts/seed-brand-center-rules.ts stationery --write    # write
@@ -49,6 +50,8 @@ async function main() {
     if (!rules || !hasRules(rules)) throw new Error(`${key}: empty or malformed rules`);
     const row = byKey.get(key)!;
     if (hasRules(row.rules) && !force.has(key)) { kept++; continue; }
+    /* the forbidden choices are seeded on their own (seed-brand-center-not-allowed) — keep them */
+    if (row.rules?.notAllowed?.length && !rules.notAllowed) rules.notAllowed = row.rules.notAllowed;
     if (WRITE) {
       const { error: e } = await sb.from("brand_items").update({ rules, updated_at: new Date().toISOString() }).eq("id", row.id);
       if (e) throw new Error(`${key}: ${e.message}`);

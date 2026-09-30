@@ -1,18 +1,21 @@
 "use client";
 
-/* Brand Center item — its types and the choices on each. A filled chip is a
-   choice we use (the owner's pick in the workshop). With the edit right a
-   tap switches it, and a new choice or a new type can be added. */
+/* Brand Center item — its types and the choices on each, as the owner edits
+   them. A filled chip is a choice we use (the owner's pick in the workshop);
+   a tap switches it, and a new choice or a new type can be added. A choice
+   the rules forbid is marked, with the reason (the rules' "Not allowed"). */
 
 import { useState } from "react";
 import { bc, type BcType } from "@/lib/brand-center/client";
 import RrIcon from "@/components/ui/RrIcon";
 import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
+import { notAllowedOf, optionRef, type ItemRules } from "@/lib/brand-center/rules";
 import { FIELD } from "./ui";
 
 type T = (k: string) => string;
 
-export default function ItemTypes({ t, itemId, types, canEdit, onChanged }: { t: T; itemId: string; types: BcType[]; canEdit: boolean; onChanged: () => Promise<void> }) {
+export default function ItemTypes({ t, itemId, types, rules, canEdit, onChanged }: { t: T; itemId: string; types: BcType[]; rules: ItemRules | null; canEdit: boolean; onChanged: () => Promise<void> }) {
+  const no = notAllowedOf(rules);
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -35,14 +38,16 @@ export default function ItemTypes({ t, itemId, types, canEdit, onChanged }: { t:
             <span dir="auto" className="pt-1 text-[12.5px] text-[var(--text-secondary)]">{ty.label}</span>
             <div className="flex flex-wrap gap-1.5">
               {ty.options.map((o) => {
-                const cls = `inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[12.5px] ${o.chosen ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-dim)] line-through decoration-[var(--text-faint)]"}`;
+                const why = no.get(optionRef(ty.key, o.key));
+                const cls = `inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[12.5px] ${o.chosen ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-dim)] line-through decoration-[var(--text-faint)]"}${why ? " !border-red-500/60" : ""}`;
+                const mark = why ? <span aria-hidden className="font-semibold text-red-500">✕</span> : null;
                 return canEdit ? (
-                  <button key={o.id} type="button" dir="auto" aria-pressed={o.chosen} disabled={busy === o.id}
+                  <button key={o.id} type="button" dir="auto" aria-pressed={o.chosen} disabled={busy === o.id} title={why}
                     onClick={() => void run(o.id, () => bc.editOption(o.id, { chosen: !o.chosen }))} className={cls}>
-                    {o.label}
+                    {mark}{o.label}
                   </button>
                 ) : (
-                  <span key={o.id} dir="auto" className={cls}>{o.label}</span>
+                  <span key={o.id} dir="auto" title={why} className={cls}>{mark}{o.label}</span>
                 );
               })}
               {canEdit && <AddInline id={`bc-add-opt-${ty.id}`} placeholder={t("item.addOption")} busy={busy === `opt-${ty.id}`}

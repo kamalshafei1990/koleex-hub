@@ -2,7 +2,8 @@
 
 /* Brand Center item — its designs (owner: "maybe later I need to add my own
    designs"). Any number per item, or per some of its choices; one is the
-   default. With the rights: add, make default, put in use, retire, and add
+   default. Readers see the designs in use and download their files; in the
+   editor (the edit right): add, make default, put in use, retire, and add
    or remove the design's files (DesignFiles). */
 
 import { useState } from "react";
@@ -15,7 +16,9 @@ import DesignFiles from "./DesignFiles";
 type T = (k: string) => string;
 const KINDS = ["print_file", "editable", "logo_pack", "mockup", "photo", "vendor_brief", "template", "other"] as const;
 
-export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChanged }: { t: T; itemId: string; types: BcType[]; designs: BcDesign[]; canEdit: boolean; onChanged: () => Promise<void> }) {
+export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChanged }: { t: T; itemId: string; types: BcType[]; designs: BcDesign[];
+  /** The editor (the edit right, "Edit" on): every design, and the actions. */
+  canEdit: boolean; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const optionLabel = new Map(types.flatMap((ty) => ty.options.map((o) => [o.id, o.label] as const)));
@@ -29,11 +32,12 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
     return true;
   };
 
-  const shown = designs.filter((d) => canEdit || d.status !== "retired");
+  const shown = designs.filter((d) => canEdit || d.status === "active");
+  if (!canEdit && !shown.length) return null;
   return (
     <section data-kx-pane className={`${CARD} mt-4 px-4 py-4`}>
       <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("des.title")}</h2>
-      <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">{t("des.hint")}</p>
+      {canEdit ? <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">{t("des.hint")}</p> : null}
       {failed ? <p role="alert" className="mt-2 text-[12px] text-red-500">{t("save.error")}</p> : null}
 
       {shown.length === 0 ? (
@@ -44,7 +48,7 @@ export default function ItemDesigns({ t, itemId, types, designs, canEdit, onChan
             <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5">
               <span dir="auto" className="text-[13px] font-semibold text-[var(--text-primary)]">{d.name}</span>
               {d.is_default ? <span className={`rounded-full border px-1.5 text-[10px] font-semibold ${SELECTED_CHIP}`}>{t("des.default")}</span> : null}
-              <StatusChip t={t} value={d.status} />
+              {canEdit ? <StatusChip t={t} value={d.status} /> : null}
               <span className="text-[12px] text-[var(--text-secondary)]">{t(`kind.${d.kind}`)}</span>
               <span dir="auto" className="text-[12px] text-[var(--text-dim)]">
                 {d.option_ids.length ? d.option_ids.map((id) => optionLabel.get(id)).filter(Boolean).join(" · ") : t("des.whole")}

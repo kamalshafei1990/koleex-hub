@@ -1,21 +1,22 @@
 "use client";
 
 /* Brand Center item — its rules (plan steps C19–C39): the specification,
-   the logo, do and don't, the vendor's brief, the templates that fill it
-   and the book's chapters. Everyone reads them; the owner edits them here
-   (a line per spec as "Label: value", a line per do / don't). */
+   the logo, do and don't, the vendor's brief and the book's chapters (its
+   templates open from the top of the page). Everyone reads them; the owner
+   edits them here (a line per spec as "Label: value", a line per do /
+   don't, a line per forbidden choice as "Choice: reason"). */
 
 import { useState } from "react";
 import Link from "next/link";
 import { CARD } from "@/components/travel/fields";
-import { bc } from "@/lib/brand-center/client";
-import { RULE_TEMPLATES, hasRules, type ItemRules as Rules } from "@/lib/brand-center/rules";
+import { bc, type BcType } from "@/lib/brand-center/client";
+import { hasRules, optionRef, type ItemRules as Rules } from "@/lib/brand-center/rules";
 import { chapterByNumber, chapterHref } from "@/lib/brand-book/chapters";
 import { FIELD } from "./ui";
 
 type T = (k: string) => string;
 
-export default function ItemRules({ t, itemId, rules, canEdit, onChanged }: { t: T; itemId: string; rules: Rules | null; canEdit: boolean; onChanged: () => Promise<void> }) {
+export default function ItemRules({ t, itemId, rules, types, canEdit, onChanged }: { t: T; itemId: string; rules: Rules | null; types: BcType[]; canEdit: boolean; onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const r = rules ?? {};
   return (
@@ -27,7 +28,7 @@ export default function ItemRules({ t, itemId, rules, canEdit, onChanged }: { t:
         ) : null}
       </div>
       {editing ? (
-        <RulesEditor t={t} itemId={itemId} rules={r} onDone={async (saved) => { if (saved) await onChanged(); setEditing(false); }} />
+        <RulesEditor t={t} itemId={itemId} rules={r} types={types} onDone={async (saved) => { if (saved) await onChanged(); setEditing(false); }} />
       ) : !hasRules(r) ? (
         <p className="mt-1 text-[12.5px] text-[var(--text-secondary)]">{t("item.rulesSoon")}</p>
       ) : (
@@ -50,14 +51,9 @@ export default function ItemRules({ t, itemId, rules, canEdit, onChanged }: { t:
             </div>
           ) : null}
           {r.vendor ? <Block title={t("rules.vendor")} boxed>{r.vendor}</Block> : null}
-          {r.templates?.length || r.book?.length ? (
+          {r.book?.length ? (
             <div className="flex flex-wrap items-center gap-2">
-              {r.templates?.map((id) => (
-                <Link key={id} href={`/brand-center/templates/${id}`} className="rounded-lg bg-[var(--bg-inverted)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--text-inverted)]">
-                  {t("rules.fill")}: {t(RULE_TEMPLATES[id] ?? id)}
-                </Link>
-              ))}
-              {r.book?.map((n) => {
+              {r.book.map((n) => {
                 const ch = chapterByNumber(n);
                 if (!ch) return null;
                 const label = `${t("rules.chapter")} ${n} · ${ch.title.en}`;
@@ -102,8 +98,26 @@ function List({ title, items, mark, tone }: { title: string; items: string[]; ma
 const specsText = (r: Rules) => (r.specs ?? []).map((p) => `${p.k}: ${p.v}`).join("\n");
 const listText = (x?: string[]) => (x ?? []).join("\n");
 const toLines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
+const norm = (s: string) => s.trim().toLowerCase();
 
-function RulesEditor({ t, itemId, rules, onDone }: { t: T; itemId: string; rules: Rules; onDone: (saved: boolean) => Promise<void> }) {
+/* A forbidden choice is written by its name ("Type / Choice" when two types
+   share the name) and stored by its keys, so renaming it keeps the mark. */
+function choiceNames(types: BcType[]) {
+  const all = types.flatMap((ty) => ty.options.map((o) => ({ ref: optionRef(ty.key, o.key), type: ty.label, label: o.label })));
+  const shared = (label: string) => all.filter((x) => norm(x.label) === norm(label)).length > 1;
+  const nameOf = (ref: string) => { const x = all.find((c) => c.ref === ref); return !x ? ref : shared(x.label) ? `${x.type} / ${x.label}` : x.label; };
+  const refOf = (name: string) => {
+    const [a, b] = name.includes(" / ") ? name.split(" / ", 2) : [null, name];
+    const hits = all.filter((c) => norm(c.label) === norm(b) && (a === null || norm(c.type) === norm(a)));
+    return hits.length === 1 ? hits[0].ref : all.some((c) => c.ref === name.trim()) ? name.trim() : null;
+  };
+  return { nameOf, refOf };
+}
+
+function RulesEditor({ t, itemId, rules, types, onDone }: { t: T; itemId: string; rules: Rules; types: BcType[]; onDone: (saved: boolean) => Promise<void> }) {
+  const names = choiceNames(types);
+  const [notAllowed, setNotAllowed] = useState((rules.notAllowed ?? []).map((x) => `${names.nameOf(x.option)}: ${x.why}`).join("\n"));
+  const [unknown, setUnknown] = useState<string[]>([]);
   const [specs, setSpecs] = useState(specsText(rules));
   const [logo, setLogo] = useState(rules.logo ?? "");
   const [does, setDoes] = useState(listText(rules.do));
@@ -112,11 +126,21 @@ function RulesEditor({ t, itemId, rules, onDone }: { t: T; itemId: string; rules
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const save = async () => {
+    /* a choice's name may hold ": " itself — split where the name is known */
+    const forbidden = toLines(notAllowed).map((l) => {
+      const cuts = [...l.matchAll(/: /g)].map((m) => m.index ?? 0).filter((i) => i > 0);
+      const at = cuts.find((i) => names.refOf(l.slice(0, i))) ?? cuts[0];
+      return at === undefined ? { name: l, why: "" } : { name: l.slice(0, at).trim(), why: l.slice(at + 2).trim() };
+    });
+    const missing = forbidden.filter((x) => !x.why || !names.refOf(x.name)).map((x) => x.name);
+    setUnknown(missing);
+    if (missing.length) return;
     setBusy(true); setFailed(false);
     const next: Rules = {
       ...rules,
       specs: toLines(specs).map((l) => { const i = l.indexOf(":"); return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : { k: "·", v: l }; }),
       logo: logo.trim(), do: toLines(does), dont: toLines(donts), vendor: vendor.trim(),
+      notAllowed: forbidden.map((x) => ({ option: names.refOf(x.name)!, why: x.why })),
     };
     const res = await bc.editItem(itemId, { rules: next });
     setBusy(false);
@@ -138,6 +162,8 @@ function RulesEditor({ t, itemId, rules, onDone }: { t: T; itemId: string; rules
         {area("bc-rules-dont", t("rules.dont"), donts, setDonts, 5, t("rules.lineHint"))}
       </div>
       {area("bc-rules-vendor", t("rules.vendor"), vendor, setVendor, 4)}
+      {area("bc-rules-not-allowed", t("ver.notAllowed"), notAllowed, setNotAllowed, 4, t("rules.notAllowedHint"))}
+      {unknown.length ? <p role="alert" dir="auto" className="-mt-1 text-[12px] text-red-500">{t("rules.notAllowedUnknown")}: {unknown.join(" · ")}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={busy} onClick={() => void save()} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] disabled:opacity-60">{t(busy ? "saving" : "rules.save")}</button>
         <button type="button" disabled={busy} onClick={() => void onDone(false)} className="rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-[12.5px] text-[var(--text-secondary)]">{t("item.cancel")}</button>
