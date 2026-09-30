@@ -236,11 +236,13 @@ async function productCards(rows: ProductRow[]): Promise<WebsiteProductCard[]> {
 }
 
 /** The id of a product the website may show: this company's, active and
- *  visible. null for anything else — the same "not found" either way. */
+ *  visible. null for anything else — the same "not found" either way. A
+ *  failed read throws: read as "not found", the website would drop a live
+ *  product's page for the hour it keeps an answer. */
 export async function websiteProductId(slug: string): Promise<string | null> {
   const tenantId = await websiteTenantId();
   if (!tenantId || !isSlug(slug)) return null;
-  const { data } = await supabaseServer
+  const { data, error } = await supabaseServer
     .from("products")
     .select("id")
     .eq("tenant_id", tenantId)
@@ -248,6 +250,7 @@ export async function websiteProductId(slug: string): Promise<string | null> {
     .eq("status", "active")
     .eq("visible", true)
     .maybeSingle();
+  if (error) throw new Error(`website product: ${error.message}`);
   return (data as { id?: string } | null)?.id ?? null;
 }
 
@@ -318,27 +321,31 @@ export async function listWebsitePages(): Promise<WebsitePageSummary[]> {
 }
 
 /** One page with its visible sections, each with its visible elements, in
- *  the order the Website app set. null when there is no such page. */
+ *  the order the Website app set. null when there is no such page; a failed
+ *  read throws, so the website keeps the page it has rather than a part. */
 export async function websitePage(slug: string): Promise<{ page: WebsitePageSummary; sections: Array<Record<string, unknown> & { elements: Array<Record<string, unknown>> }> } | null> {
   if (!isSlug(slug)) return null;
-  const { data: page } = await supabaseServer.from("pages").select("id, slug, name, title, description, updated_at").eq("slug", slug).maybeSingle();
+  const { data: page, error: pageError } = await supabaseServer.from("pages").select("id, slug, name, title, description, updated_at").eq("slug", slug).maybeSingle();
+  if (pageError) throw new Error(`website page: ${pageError.message}`);
   const p = page as { id: string; slug: string; name: string; title: string | null; description: string | null; updated_at: string | null } | null;
   if (!p) return null;
-  const { data: sectionRows } = await supabaseServer
+  const { data: sectionRows, error: sectionError } = await supabaseServer
     .from("sections")
     .select('id, section_key, layout, title, subtitle, content, image_url, image_alt, video_url, button_text, button_link, button2_text, button2_link, background, items, "order", updated_at')
     .eq("page_id", p.id)
     .eq("visible", true)
     .order("order", { ascending: true });
+  if (sectionError) throw new Error(`website sections: ${sectionError.message}`);
   const sections = (sectionRows as Array<Record<string, unknown> & { id: string }> | null) ?? [];
-  const { data: elementRows } = sections.length
+  const { data: elementRows, error: elementError } = sections.length
     ? await supabaseServer
         .from("elements")
         .select('id, section_id, type, content, style, settings, "order"')
         .in("section_id", sections.map((s) => s.id))
         .eq("visible", true)
         .order("order", { ascending: true })
-    : { data: [] };
+    : { data: [], error: null };
+  if (elementError) throw new Error(`website elements: ${elementError.message}`);
   const elementsOf = new Map<string, Array<Record<string, unknown>>>();
   for (const e of (elementRows as Array<Record<string, unknown> & { section_id: string }> | null) ?? []) {
     const list = elementsOf.get(e.section_id) ?? [];
@@ -378,9 +385,10 @@ export async function listWebsiteJobs(today: string): Promise<WebsiteJob[]> {
   type Row = { id: string; title: string; description: string | null; requirements: string | null; location: string | null; employment_type: string | null; department_id: string | null; published_at: string | null; closes_at: string | null };
   const rows = (data as Row[] | null) ?? [];
   const deptIds = Array.from(new Set(rows.map((r) => r.department_id).filter((x): x is string => !!x)));
-  const { data: depts } = deptIds.length
+  const { data: depts, error: deptError } = deptIds.length
     ? await supabaseServer.from("koleex_departments").select("id, name").in("id", deptIds)
-    : { data: [] };
+    : { data: [], error: null };
+  if (deptError) throw new Error(`website jobs departments: ${deptError.message}`);
   const deptName = new Map(((depts as Array<{ id: string; name: string }> | null) ?? []).map((d) => [d.id, d.name]));
   return rows.map((r) => ({
     id: r.id, title: r.title, description: r.description, requirements: r.requirements, location: r.location,

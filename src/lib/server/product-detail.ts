@@ -259,7 +259,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isPublic = (row: PublicProductRow): boolean =>
   row.visible === true && row.status === "active";
 
-async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> {
+async function fetchProduct(idOrSlug: string, strict = false): Promise<PublicProductRow | null> {
   const supabase = getSupabaseServer();
   // Slug is the common catalog link; fall back to UUID id.
   const bySlug = await supabase
@@ -267,6 +267,7 @@ async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> 
     .select(PRODUCT_PUBLIC_COLUMNS)
     .eq("slug", idOrSlug)
     .maybeSingle();
+  if (strict) failOnReadError([bySlug], "product");
   if (bySlug.data) return bySlug.data as unknown as PublicProductRow;
   if (UUID_RE.test(idOrSlug)) {
     const byId = await supabase
@@ -274,9 +275,20 @@ async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> 
       .select(PRODUCT_PUBLIC_COLUMNS)
       .eq("id", idOrSlug)
       .maybeSingle();
+    if (strict) failOnReadError([byId], "product");
     if (byId.data) return byId.data as unknown as PublicProductRow;
   }
   return null;
+}
+
+/* A read that failed must not become an empty section. With `strict` the
+   loader throws instead: the website bridge uses it, because the website
+   keeps what it is handed — on 30/09/2026 one passing database hiccup gave
+   it a product with no photos, models or place in the catalog, cached for
+   the hour. The Hub's own screens keep the old, lenient reading. */
+function failOnReadError(results: ReadonlyArray<{ error?: { message: string } | null }>, what: string): void {
+  const bad = results.find((r) => r.error);
+  if (bad?.error) throw new Error(`${what}: ${bad.error.message}`);
 }
 
 /**
@@ -333,18 +345,18 @@ function packingView(l: ProductLogistics | null): ProductPackingView | null {
 
 export async function loadPublicSchemaProduct(
   idOrSlug: string,
-  opts?: { allowUnpublished?: boolean; audience?: ProductAudience },
+  opts?: { allowUnpublished?: boolean; audience?: ProductAudience; strict?: boolean },
 ): Promise<LoadedSchemaProduct | null> {
   const audience: ProductAudience = opts?.audience ?? "public";
-  const product = await fetchProduct(idOrSlug);
+  const strict = opts?.strict === true;
+  const product = await fetchProduct(idOrSlug, strict);
   if (!product) return null;
   if (!opts?.allowUnpublished && !isPublic(product)) return null;
 
   const supabase = getSupabaseServer();
 
   const NAMES = "slug, name, name_zh, name_ar";
-  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }, { data: divRow }, { data: catRow }, { data: optionData }] =
-    await Promise.all([
+  const reads = await Promise.all([
       supabase.from("subcategories").select(`code, ${NAMES}`).eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
         .from("product_media")
@@ -379,19 +391,23 @@ export async function loadPublicSchemaProduct(
             if (!opts?.allowUnpublished) q = q.eq("visible", true).eq("status", "active");
             return q;
           })()
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
       supabase.from("divisions").select(NAMES).eq("slug", product.division_slug ?? "").maybeSingle(),
       supabase.from("categories").select(NAMES).eq("slug", product.category_slug ?? "").maybeSingle(),
       supabase.from("product_options")
         .select("id, title, title_i18n, kind, required, depends_on_value_id, sort_order")
         .eq("product_id", product.id).eq("active", true).order("sort_order", { ascending: true }),
     ]);
+  if (strict) failOnReadError(reads, "product detail");
+  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }, { data: divRow }, { data: catRow }, { data: optionData }] = reads;
   const optionRows = (optionData as OptionRow[] | null) ?? [];
-  const { data: optionValueData } = optionRows.length > 0
+  const optionValueRead = optionRows.length > 0
     ? await supabase.from("product_option_values")
         .select("id, option_id, label, label_i18n, image_url, price_delta_cny, weight_delta_kg, is_default, sort_order")
         .in("option_id", optionRows.map((o) => o.id)).eq("active", true).order("sort_order", { ascending: true })
-    : { data: [] as OptionValueRow[] };
+    : { data: [] as OptionValueRow[], error: null };
+  if (strict) failOnReadError([optionValueRead], "product options");
+  const { data: optionValueData } = optionValueRead;
   const optionValues = (optionValueData as OptionValueRow[] | null) ?? [];
 
   const subcategoryCode = (subcat?.code as string | null) ?? "";
@@ -449,12 +465,14 @@ export async function loadPublicSchemaProduct(
   );
   const siblingImages = new Map<string, string>();
   if (siblingRows.length > 0) {
-    const { data: sibMedia } = await supabase
+    const sibRead = await supabase
       .from("product_media")
       .select('product_id, url, type, "order"')
       .in("product_id", siblingRows.map((s) => s.id))
       .in("type", ["main_image", "gallery"])
       .order("order", { ascending: true });
+    if (strict) failOnReadError([sibRead], "product siblings");
+    const sibMedia = sibRead.data;
     for (const m of (sibMedia as { product_id: string; url: string; type: string }[] | null) ?? []) {
       if (!m.url) continue;
       // main_image wins; first gallery shot is the fallback.

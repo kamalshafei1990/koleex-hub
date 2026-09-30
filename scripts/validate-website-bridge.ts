@@ -10,7 +10,9 @@
        not in a product page (loader audience "public" + scrubForWebsite);
      · job postings go out without the salary;
      · every Hub write that changes what the website shows asks it to refresh
-       (revalidateWebsite), and that ask is inert until both env vars exist.
+       (revalidateWebsite), and that ask is inert until both env vars exist;
+     · a failed read is an error, never a partial or "not found" answer —
+       the website keeps what it is handed for an hour (30/09/2026).
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -105,7 +107,7 @@ check("the last-line scrub drops price, cost, supplier, MOQ, HS code, FOB and te
   /const INTERNAL_KEY = \/\(price\|cost\|supplier\|moq\|margin\|hs_\?code\|fob\|tenant\)\/i;/.test(catalog));
 const detailRoute = code(join(ROUTES, "products/[slug]/route.ts"));
 check("a product page goes through the host/active/visible gate first", /websiteProductId\(slug\)/.test(detailRoute));
-check("a product page uses the loader's PUBLIC audience", /loadPublicSchemaProduct\(id, \{ audience: "public" \}\)/.test(detailRoute));
+check("a product page uses the loader's PUBLIC audience, read strictly", /loadPublicSchemaProduct\(id, \{ audience: "public", strict: true \}\)/.test(detailRoute));
 check("a product page is scrubbed before it leaves", /scrubForWebsite\(product\)/.test(detailRoute));
 const detail = code(DETAIL);
 check("the public audience is not a price audience", /PRICE_AUDIENCES[^=]*= new Set\(\["internal", "customer"\]\)/.test(detail));
@@ -169,6 +171,23 @@ check(`every route that writes what the website shows refreshes it${unhooked.len
 check("each exemption still writes a shown table (no stale excuses)", Object.keys(NOT_SHOWN).every((f) => existsSync(f) && writesShown.test(code(f))));
 const hr = code("src/app/api/hr/data/route.ts");
 check("hr/data refreshes only for job postings, only on a write", /if \(q\.op !== "select" && q\.table === "hr_job_postings"\) revalidateWebsite\(\["jobs"\]\)/.test(hr));
+
+/* ── 6. A failed read is an error, never a partial answer ── */
+console.log("\n6. A failed read never goes out as a partial answer");
+const loaderFn = between(detail, "export async function loadPublicSchemaProduct(", null);
+const fetchFn = between(detail, "async function fetchProduct(", "function failOnReadError(");
+check("the loader's strict reading throws on any failed read (lib/server/product-detail failOnReadError)",
+  /function failOnReadError\([^)]*\): void \{\s*const bad = results\.find\(\(r\) => r\.error\);\s*if \(bad\?\.error\) throw new Error/.test(detail));
+check("strict covers the product itself, by slug and by id", (fetchFn.match(/if \(strict\) failOnReadError\(\[(bySlug|byId)\], "product"\);/g) ?? []).length === 2);
+check("strict covers the eight reads of a product page before any is used",
+  /const reads = await Promise\.all\(\[/.test(loaderFn)
+  && /\]\);\s*if \(strict\) failOnReadError\(reads, "product detail"\);\s*const \[\{ data: subcat \}[^\]]*\] = reads;/.test(loaderFn));
+check("strict covers the options and the compare band's photos",
+  /if \(strict\) failOnReadError\(\[optionValueRead\], "product options"\);/.test(loaderFn) && /if \(strict\) failOnReadError\(\[sibRead\], "product siblings"\);/.test(loaderFn));
+check("a failed product lookup throws (never read as \"not found\")", /const \{ data, error \} = await supabaseServer/.test(idFn) && /if \(error\) throw new Error\(`website product: /.test(idFn));
+check("a site page's three reads throw when they fail",
+  ["pageError", "sectionError", "elementError"].every((e) => new RegExp(`if \\(${e}\\) throw new Error`).test(pageFn)));
+check("the careers' department read throws when it fails", /if \(deptError\) throw new Error/.test(jobsFn));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
