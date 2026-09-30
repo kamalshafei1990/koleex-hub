@@ -12,7 +12,12 @@
      · every Hub write that changes what the website shows asks it to refresh
        (revalidateWebsite), and that ask is inert until both env vars exist;
      · a failed read is an error, never a partial or "not found" answer —
-       the website keeps what it is handed for an hour (30/09/2026).
+       the website keeps what it is handed for an hour (30/09/2026);
+     · the one write — a message from the site (01/10/2026) — lands on a
+       customer, never a supplier or a colleague; a new one starts inactive;
+       a flood is refused before anything is written; the Hub never sees
+       the sender's address, and the answer never says whether the email
+       was already a customer.
    --------------------------------------------------------------------------- */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -63,14 +68,21 @@ const routeFiles: string[] = [];
     else if (f === "route.ts") routeFiles.push(p);
   }
 })(ROUTES);
-check("the bridge has its 9 routes (company and catalogs added 30/09/2026)", routeFiles.length === 9);
+check("the bridge has its 10 routes (company and catalogs 30/09/2026, leads 01/10/2026)", routeFiles.length === 10);
+/* The one route the website writes through: a visitor's message. */
+const WRITES = new Set(["leads"]);
 for (const f of routeFiles) {
   const src = code(f);
   const rel = f === join(ROUTES, "route.ts") ? "(index)" : f.replace(`${ROUTES}/`, "").replace("/route.ts", "");
-  const gate = src.indexOf("requireWebsiteBridge(req)");
-  const firstData = Math.min(...["supabaseServer", "listWebsite", "websiteTaxonomy", "websitePage", "websiteProductId", "loadPublicSchemaProduct", "websiteTenantId()"].map((k) => { const i = src.indexOf(k, gate + 1); return i < 0 ? Infinity : i; }));
-  check(`${rel}: opens with the key check, before any read`, gate >= 0 && /if \(denied\) return denied;/.test(src) && gate < firstData);
-  check(`${rel}: reads only (GET)`, /export async function GET\(/.test(src) && !/export async function (POST|PUT|PATCH|DELETE)\(/.test(src));
+  /* Inside the handler: the first read anywhere in it — before the key
+     check as well as after (searching only after the check let a read
+     placed above it pass). */
+  const fnAt = src.search(/export async function (GET|POST)\(/);
+  const gate = src.indexOf("requireWebsiteBridge(req)", fnAt);
+  const firstData = Math.min(...["supabaseServer", "listWebsite", "websiteTaxonomy", "websitePage", "websiteProductId", "loadPublicSchemaProduct", "websiteTenantId()", "req.text()", "req.json()", "receiveLead"].map((k) => { const i = src.indexOf(k, fnAt); return i < 0 ? Infinity : i; }));
+  check(`${rel}: opens with the key check, before any read`, fnAt >= 0 && gate > fnAt && /if \(denied\) return denied;/.test(src) && gate < firstData);
+  if (WRITES.has(rel)) check(`${rel}: takes a message (POST only)`, /export async function POST\(/.test(src) && !/export async function (GET|PUT|PATCH|DELETE)\(/.test(src));
+  else check(`${rel}: reads only (GET)`, /export async function GET\(/.test(src) && !/export async function (POST|PUT|PATCH|DELETE)\(/.test(src));
   check(`${rel}: never touches the database directly`, !/supabaseServer/.test(src));
 }
 
@@ -207,6 +219,36 @@ check("a catalog is saved only once its PDF is in the bucket", /const file = awa
 const catSql = readFileSync("supabase/migrations/20260930_website_catalogs.sql", "utf8");
 check("website-files takes PDFs only; website_catalogs is under RLS with no policies",
   /'website-files',\s*'website-files',\s*true,\s*104857600,\s*ARRAY\['application\/pdf'\]/.test(catSql) && /ALTER TABLE website_catalogs ENABLE ROW LEVEL SECURITY;/.test(catSql) && !/CREATE POLICY/i.test(stripComments(catSql, { lang: "sql" })));
+
+/* ── 9. A message from the site ── */
+console.log("\n9. A message from the site becomes a potential customer");
+const leads = code("src/lib/server/website/leads.ts");
+const leadsRoute = code(join(ROUTES, "leads/route.ts"));
+const recv = between(leads, "export async function receiveLead", "export async function websiteLeadRecipients");
+check("the body is capped and must be a JSON object", /if \(raw\.length > BODY_MAX\)/.test(leadsRoute) && /Array\.isArray\(body\)/.test(leadsRoute));
+check("the answer never says whether the email was already a customer", /return bridgeJson\(\{ ok: true \}\);/.test(leadsRoute) && !/matched/.test(leadsRoute));
+check("the people are told after the answer; a failed notice never fails the send",
+  /after\(\(\) => notifyLead\(lead\)\)/.test(leadsRoute) && /try \{[\s\S]*await notifyLite\([\s\S]*\} catch/.test(between(leads, "export async function notifyLead", "export interface WebsiteMessage")));
+/* Order inside receiveLead, not adjacency: the flood check runs before the
+   first write (a new customer or the message itself). */
+const floodAt = recv.search(/^\s*const flood = await leadFlood\(/m);
+const firstWrite = Math.min(...['from("contacts").insert(', 'from("website_leads").insert('].map((k) => { const i = recv.indexOf(k); return i < 0 ? Infinity : i; }));
+check("a flood is refused before anything is written", floodAt > 0 && /if \(flood\) return \{[^}]*status: 429/.test(recv) && floodAt < firstWrite && firstWrite < Infinity);
+check("limits per place, per email and for the whole site", /LEAD_LIMITS = \{ perPlace: \d+, perEmail: \d+, perSite: \d+ \}/.test(leads));
+check("the Hub never sees the sender's address — only a 64-hex hash", /const HASH_RE = \/\^\[0-9a-f\]\{64\}\$\/;/.test(leads) && !/x-forwarded-for|x-real-ip|remoteAddress/i.test(leads + leadsRoute));
+check("only a customer is matched, by email, in the host company",
+  /\.eq\("tenant_id", tenantId\)\.eq\("contact_type", "customer"\)\.ilike\("email", exactly\(email\)\)/.test(leads) && /const tenantId = await websiteTenantId\(\);/.test(recv));
+check("a new customer starts INACTIVE — stage Lead, source Website Contact Form, tagged website",
+  ['contact_type: "customer",', "is_active: false,", 'relationship_stage: "Lead",', 'source: "Website Contact Form",', 'tags: ["website"],'].every((k) => recv.includes(k)));
+check("only a product the site shows can be asked about", /\.eq\("status", "active"\)\.eq\("visible", true\)\.maybeSingle\(\)/.test(between(leads, "async function shownProduct", "export async function receiveLead")));
+check("told: the super admins, and «Website Leads» holders who may also open Customers",
+  /superAdminAccountIds\(tenantId\)/.test(leads) && /view\(c, LEADS\) && view\(c, CUSTOMERS\)/.test(leads) && /\.eq\("user_type", "internal"\)/.test(leads) && /const LEADS = WEBSITE_LEADS_MODULE;/.test(leads));
+check("the notification opens the customer's page", /link: `\/customers\/\$\{lead\.contactId\}`/.test(leads));
+const leadSql = readFileSync("supabase/migrations/20261001_website_leads.sql", "utf8");
+check("website_leads is under RLS with no policies", /ALTER TABLE website_leads ENABLE ROW LEVEL SECURITY;/.test(leadSql) && !/CREATE POLICY/i.test(stripComments(leadSql, { lang: "sql" })));
+check("the customer's page shows the messages (Activity → Website messages)",
+  /contactWebsiteMessages\(auth\.tenant_id, contactId, LIMIT\)/.test(code("src/app/api/customers/[id]/activity/route.ts"))
+  && /<WebsiteMessagesCard bucket=\{activity\.messages\} \/>/.test(code("src/app/customers/[id]/page.tsx")));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

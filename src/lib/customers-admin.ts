@@ -223,12 +223,23 @@ export interface ActivityBucket {
   recent: ActivityItem[];
 }
 
+/** A message the customer sent from the public website (contact form or
+ *  «Request a quotation») — lib/server/website/leads. */
+export interface WebsiteMessage {
+  id: string;
+  quote: boolean;
+  message: string;
+  product: { id: string | null; slug: string; name: string | null } | null;
+  createdAt: string;
+}
+
 export interface CustomerActivity {
   opportunities: ActivityBucket;
   quotations: ActivityBucket;
   invoices: ActivityBucket;
   projects: ActivityBucket;
   tasks: ActivityBucket;
+  messages: { count: number; recent: WebsiteMessage[] };
 }
 
 const EMPTY_BUCKET: ActivityBucket = { count: 0, recent: [] };
@@ -239,6 +250,7 @@ const EMPTY_BUCKET: ActivityBucket = { count: 0, recent: [] };
  *    · Invoices            (invoices.customer_id)
  *    · Projects            (projects.customer_id)
  *    · Open tasks          (project_tasks on those projects)
+ *    · Website messages    (website_leads.contact_id)
  *
  *  These five queries used to run here, in the browser, with the anon key.
  *  All five tables have RLS on with no anon policy, and the wrapper swallowed
@@ -252,6 +264,7 @@ export async function fetchCustomerActivity(contactId: string): Promise<Customer
     invoices: EMPTY_BUCKET,
     projects: EMPTY_BUCKET,
     tasks: EMPTY_BUCKET,
+    messages: { count: 0, recent: [] },
   };
   if (!contactId) return blank;
   try {
@@ -263,7 +276,8 @@ export async function fetchCustomerActivity(contactId: string): Promise<Customer
       return blank;
     }
     const json = (await res.json()) as { activity: CustomerActivity };
-    return json.activity ?? blank;
+    /* Spread over the blank: an answer from before a bucket existed still renders. */
+    return json.activity ? { ...blank, ...json.activity } : blank;
   } catch (e) {
     console.error("[CustomerActivity] failed:", e);
     return blank;
