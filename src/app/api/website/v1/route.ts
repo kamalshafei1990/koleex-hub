@@ -20,7 +20,8 @@ export async function GET(req: Request) {
       "/api/website/v1/pages",
       "/api/website/v1/pages/{slug}",
       "/api/website/v1/jobs",
+      "/api/website/v1/company",
     ],
-    tags: ["products", "taxonomy", "jobs", "page:{slug}"],
+    tags: ["products", "taxonomy", "jobs", "company", "page:{slug}"],
   });
 }

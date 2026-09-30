@@ -106,7 +106,7 @@ export async function getBuilderPage(slug: string): Promise<BuilderPage | null> 
 
 /** Save the draft. `expected` is the draftUpdatedAt the editor loaded; a
  *  different one in the database means someone saved in between → 409. */
-export async function saveDraft(slug: string, raw: unknown, expected: string | null, accountId: string): Promise<Result<{ draftUpdatedAt: string; draft: PageDoc }>> {
+export async function saveDraft(slug: string, raw: unknown, expected: string | null, accountId: string | null): Promise<Result<{ draftUpdatedAt: string; draft: PageDoc }>> {
   const row = await pageRow(slug);
   if (!row) return { error: "No such page.", status: 404 };
   const draft = cleanPageDoc(raw, mediaOrigin());

@@ -63,7 +63,7 @@ const routeFiles: string[] = [];
     else if (f === "route.ts") routeFiles.push(p);
   }
 })(ROUTES);
-check("the bridge has its 7 routes", routeFiles.length === 7);
+check("the bridge has its 8 routes (company added 30/09/2026)", routeFiles.length === 8);
 for (const f of routeFiles) {
   const src = code(f);
   const rel = f === join(ROUTES, "route.ts") ? "(index)" : f.replace(`${ROUTES}/`, "").replace("/route.ts", "");
@@ -188,6 +188,15 @@ check("a failed product lookup throws (never read as \"not found\")", /const \{ 
 check("a site page's three reads throw when they fail",
   ["pageError", "sectionError", "elementError"].every((e) => new RegExp(`if \\(${e}\\) throw new Error`).test(pageFn)));
 check("the careers' department read throws when it fails", /if \(deptError\) throw new Error/.test(jobsFn));
+
+/* ── 7. The company's details come from the Hub's own record ── */
+console.log("\n7. The company, from the Hub's own record");
+const company = code("src/lib/server/website-company.ts");
+check("the address, phones and email are the papers' (DocumentBrandStrips), the facts the approved ones (ai/identity)",
+  /import \{ KOLEEX_COMPANY as ON_PAPER \} from "@\/components\/brand\/DocumentBrandStrips";/.test(company)
+  && /import \{ KOLEEX_COMPANY as FACTS \} from "@\/lib\/server\/ai\/identity";/.test(company)
+  && /address: ON_PAPER\.address,/.test(company) && /tel: ON_PAPER\.tel,/.test(company) && /email: ON_PAPER\.email,/.test(company) && /offices: \[\.\.\.FACTS\.offices\],/.test(company));
+check("no contact detail is written in the website's copy (no phone, e-mail or street)", !/\+\d{2}|[\w.-]+@[\w-]+\.|Room \d|Street/.test(company));
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
