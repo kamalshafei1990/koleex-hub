@@ -20,6 +20,7 @@ import { allRowsOrThrow } from "@/lib/server/all-rows";
 import { inChunks } from "@/lib/server/in-chunks";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { websiteTenantId } from "@/lib/server/website-bridge";
+import { cleanPageDoc, type PageDoc } from "@/lib/website/page-doc";
 
 /* ── Guards ─────────────────────────────────────────────────────────────── */
 
@@ -70,6 +71,8 @@ export interface WebsiteProductQuery {
   subcategory?: string | null;
   featured?: boolean;
   q?: string | null;
+  /** These products, in this order (a page's hand-picked products). */
+  slugs?: string[] | null;
   page?: number;
   pageSize?: number;
 }
@@ -147,6 +150,18 @@ export async function listWebsiteProducts(query: WebsiteProductQuery): Promise<{
   if (!tenantId) return { items: [], total: 0, page, pageSize };
   const from = (page - 1) * pageSize;
   const words = searchWords(query.q);
+
+  /* Hand-picked products (a page's products section): the ones still shown,
+     in the order picked. */
+  const picked = Array.from(new Set((query.slugs ?? []).filter(isSlug))).slice(0, 24);
+  if (picked.length) {
+    const { data, error } = await supabaseServer.from("products").select(LIST_COLUMNS)
+      .eq("tenant_id", tenantId).eq("status", "active").eq("visible", true).in("slug", picked);
+    if (error) throw new Error(`website products: ${error.message}`);
+    const bySlug = new Map(((data as ProductRow[] | null) ?? []).map((r) => [r.slug, r]));
+    const rows = picked.map((sl) => bySlug.get(sl)).filter((r): r is ProductRow => !!r);
+    return { items: await productCards(rows), total: rows.length, page: 1, pageSize: rows.length };
+  }
 
   let rows: ProductRow[];
   let total: number;
@@ -311,24 +326,33 @@ export async function websiteTaxonomy(): Promise<WebsiteDivision[]> {
 
 /* ── Site pages ─────────────────────────────────────────────────────────── */
 
-export interface WebsitePageSummary { slug: string; name: string; title: string | null; description: string | null; updatedAt: string | null }
+export interface WebsitePageSummary { slug: string; name: string; title: string | null; description: string | null; updatedAt: string | null; version: number }
 
+/** Every page, and its published version (0 = the site keeps its built-in page). */
 export async function listWebsitePages(): Promise<WebsitePageSummary[]> {
-  const { data, error } = await supabaseServer.from("pages").select("slug, name, title, description, updated_at").order("name", { ascending: true });
+  const { data, error } = await supabaseServer.from("pages").select("slug, name, title, description, updated_at, version, published_at").order("name", { ascending: true });
   if (error) throw new Error(`website pages: ${error.message}`);
-  return ((data as Array<{ slug: string; name: string; title: string | null; description: string | null; updated_at: string | null }> | null) ?? [])
-    .map((p) => ({ slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.updated_at }));
+  return ((data as Array<{ slug: string; name: string; title: string | null; description: string | null; updated_at: string | null; version: number | null; published_at: string | null }> | null) ?? [])
+    .map((p) => ({ slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.published_at ?? p.updated_at, version: p.version ?? 0 }));
 }
 
-/** One page with its visible sections, each with its visible elements, in
- *  the order the Website app set. null when there is no such page; a failed
- *  read throws, so the website keeps the page it has rather than a part. */
-export async function websitePage(slug: string): Promise<{ page: WebsitePageSummary; sections: Array<Record<string, unknown> & { elements: Array<Record<string, unknown>> }> } | null> {
+/** One page: its published document (the Page Builder's, lib/website/
+ *  page-doc) — or, with `draft`, the draft, for the site's own signed
+ *  preview. A page never published comes with the old editor's visible
+ *  sections, each with its visible elements, in their order (the site shows
+ *  those, else its built-in page). null when there is no such page; a
+ *  failed read throws, so the website keeps the page it has rather than a
+ *  part. */
+export async function websitePage(slug: string, opts: { draft?: boolean } = {}): Promise<{ page: WebsitePageSummary; doc: PageDoc | null; sections: Array<Record<string, unknown> & { elements: Array<Record<string, unknown>> }> } | null> {
   if (!isSlug(slug)) return null;
-  const { data: page, error: pageError } = await supabaseServer.from("pages").select("id, slug, name, title, description, updated_at").eq("slug", slug).maybeSingle();
+  const { data: page, error: pageError } = await supabaseServer.from("pages").select("id, slug, name, title, description, updated_at, version, published_at, draft, published").eq("slug", slug).maybeSingle();
   if (pageError) throw new Error(`website page: ${pageError.message}`);
-  const p = page as { id: string; slug: string; name: string; title: string | null; description: string | null; updated_at: string | null } | null;
+  const p = page as { id: string; slug: string; name: string; title: string | null; description: string | null; updated_at: string | null; version: number | null; published_at: string | null; draft: unknown; published: unknown } | null;
   if (!p) return null;
+  const summary: WebsitePageSummary = { slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.published_at ?? p.updated_at, version: p.version ?? 0 };
+  const origin = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  const source = opts.draft ? (p.draft ?? p.published) : (summary.version > 0 ? p.published : null);
+  if (source) return { page: summary, doc: cleanPageDoc(source, origin), sections: [] };
   const { data: sectionRows, error: sectionError } = await supabaseServer
     .from("sections")
     .select('id, section_key, layout, title, subtitle, content, image_url, image_alt, video_url, button_text, button_link, button2_text, button2_link, background, items, "order", updated_at')
@@ -353,7 +377,8 @@ export async function websitePage(slug: string): Promise<{ page: WebsitePageSumm
     elementsOf.set(e.section_id, list);
   }
   return {
-    page: { slug: p.slug, name: p.name, title: p.title, description: p.description, updatedAt: p.updated_at },
+    page: summary,
+    doc: null,
     sections: sections.map((s) => ({ ...s, elements: elementsOf.get(s.id) ?? [] })),
   };
 }

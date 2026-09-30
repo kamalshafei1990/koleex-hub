@@ -1,6 +1,7 @@
 /* Website bridge — the product list: active, visible products of the host
    company, no price. ?division= ?category= ?subcategory= ?featured=1 ?q=
-   ?page= ?pageSize= (≤100). The website caches it under the "products" tag. */
+   ?slugs=a,b,c (hand-picked, in that order, ≤24) ?page= ?pageSize= (≤100).
+   The website caches it under the "products" tag. */
 
 import { bridgeJson, requireWebsiteBridge } from "@/lib/server/website-bridge";
 import { listWebsiteProducts } from "@/lib/server/website-catalog";
@@ -20,6 +21,7 @@ export async function GET(req: Request) {
       subcategory: sp.get("subcategory"),
       featured: sp.get("featured") === "1",
       q: sp.get("q"),
+      slugs: sp.get("slugs")?.split(",").map((x) => x.trim()).filter(Boolean) ?? null,
       page: int("page"),
       pageSize: int("pageSize"),
     });

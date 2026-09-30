@@ -20,6 +20,7 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import WebsitePagesPanel from "@/components/website/WebsitePagesPanel";
+import PageEditor from "@/components/website/builder/PageEditor";
 
 /* ── Config ── */
 /* The site's own /admin, which this screen used to frame, is gone (30/09/2026):
@@ -55,6 +56,8 @@ export default function WebsiteCMS() {
   const [previewPage, setPreviewPage] = useState("/");
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  /* The page open in the Page Builder (null = the list of pages). */
+  const [editing, setEditing] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const viewportStyles: Record<Viewport, string> = {
@@ -249,7 +252,11 @@ export default function WebsiteCMS() {
       {/* ── Page Builder (the site's pages) or the Live Preview frame ── */}
       <main className="flex-1 relative bg-[var(--bg-primary)]">
         {activeTab === "builder" ? (
-          <WebsitePagesPanel key={iframeKey} onPreview={openPreview} />
+          editing ? (
+            <PageEditor key={`${editing}-${iframeKey}`} slug={editing} onBack={() => setEditing(null)} />
+          ) : (
+            <WebsitePagesPanel key={iframeKey} onPreview={openPreview} onOpen={setEditing} />
+          )
         ) : (
         <>
         {/* Loading overlay */}

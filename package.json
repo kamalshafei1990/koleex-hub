@@ -95,6 +95,7 @@
     "validate:edge-cases": "tsx scripts/edge-cases.ts",
     "validate:reports": "tsx scripts/validate-reports.ts",
     "validate:website-bridge": "tsx scripts/validate-website-bridge.ts",
+    "validate:website-builder": "tsx scripts/validate-website-builder.ts",
     "validate:read-limits": "tsx scripts/validate-read-limits.ts",
     "validate:marketing": "tsx scripts/validate-marketing.ts",
     "reports:heads": "tsx scripts/reports-heads.ts",

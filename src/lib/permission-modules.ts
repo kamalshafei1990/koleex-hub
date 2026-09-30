@@ -67,11 +67,15 @@ const LEGACY_MODULES = ["Koleex Mail", "Recruitment", "Appraisals", "Attendance"
    2026): "CEO Brand Approvals" — approving the CEO's own posts: ONLY an
    account granted it ON THE ACCOUNT ITSELF, never through a role (the
    Super Admin role carries every module), so NOT the super admins (the CEO
-   grants it to himself; lib/server/marketing/approvals). */
+   grants it to himself; lib/server/marketing/approvals). Website (owner's
+   pick, 30 Sep 2026): "Website Publish" — putting a page built in the Page
+   Builder live on the public site; the super admins always can, anyone
+   else with Website edit saves drafts only (lib/server/website/pages). */
 export const BANK_PROFIT_MODULE = "Bank & Profit";
 export const FINANCE_APPROVALS_MODULE = "Finance Approvals";
 export const SOCIAL_APPROVALS_MODULE = "Social Marketing Approvals";
 export const CEO_APPROVALS_MODULE = "CEO Brand Approvals";
+export const WEBSITE_PUBLISH_MODULE = "Website Publish";
 export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = [
   { name: "Report Templates", app: "Reports" },
   { name: "CEO Office", app: "Reports" },
@@ -81,6 +85,7 @@ export const CAPABILITY_MODULES: ReadonlyArray<{ name: string; app: string }> = 
   { name: FINANCE_APPROVALS_MODULE, app: "Finance" },
   { name: SOCIAL_APPROVALS_MODULE, app: "Social Marketing" },
   { name: CEO_APPROVALS_MODULE, app: "CEO Brand" },
+  { name: WEBSITE_PUBLISH_MODULE, app: "Website" },
 ];
 
 /** The app a capability belongs to (its icon on the Roles page), or null. */

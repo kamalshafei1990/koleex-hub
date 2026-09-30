@@ -3,7 +3,12 @@ export interface WebsitePageRow {
   slug: string;
   name: string;
   title: string | null;
-  /** Visible sections built for it in the Hub (0 = the site's built-in content). */
+  /** Visible sections from the old editor (shown until the page is published). */
   sections: number;
+  /** The published version (0 = never published: the site keeps its built-in page). */
+  version: number;
+  /** The draft has changes the site does not show yet. */
+  changed: boolean;
+  publishedAt: string | null;
   updatedAt: string | null;
 }

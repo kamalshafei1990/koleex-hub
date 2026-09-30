@@ -24,8 +24,6 @@ export const websiteT: Translations = {
   "loadingPreview": { en: "Loading preview…", zh: "正在加载预览…", ar: "جارٍ تحميل المعاينة…" },
 
   /* Page Builder tab — the site's pages, until the builder moves into the Hub */
-  "builder.moving":     { en: "The page builder is moving into the Hub", zh: "页面构建器正在迁入 Hub", ar: "منشئ الصفحات ينتقل إلى الـHub" },
-  "builder.next":       { en: "Next: sections in the Koleex style that you fill in English, Chinese and Arabic, saved as a draft and published when ready. Until then each page shows its built-in content.", zh: "接下来：采用 Koleex 风格的版块，用英文、中文和阿拉伯文填写，先存为草稿，准备好后发布。在此之前，每个页面显示其内置内容。", ar: "التالي: أقسام بأسلوب Koleex تملؤها بالإنجليزية والصينية والعربية، تُحفظ كمسودة وتُنشر عندما تكون جاهزة. حتى ذلك الحين تعرض كل صفحة محتواها المدمج." },
   "builder.pages":      { en: "Pages",                zh: "页面",       ar: "الصفحات" },
   "builder.sections":   { en: "sections",             zh: "个版块",     ar: "أقسام" },
   "builder.builtIn":    { en: "Built-in content",     zh: "内置内容",   ar: "محتوى مدمج" },
