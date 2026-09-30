@@ -8,6 +8,7 @@ import { workTpl } from "./work";
 import { adminTpl } from "./admin";
 import { commerceTpl } from "./commerce";
 import { marketingTpl } from "./marketing";
+import { websiteTpl } from "./website";
 
 /* ---------------------------------------------------------------------------
    Notification templates, en / zh / ar — see lib/notification-templates.ts
@@ -29,4 +30,5 @@ export const notifTemplatesT: Translations = {
   ...adminTpl,
   ...commerceTpl,
   ...marketingTpl,
+  ...websiteTpl,
 };

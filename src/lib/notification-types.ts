@@ -42,7 +42,7 @@ export type NotifApp =
   | "projects" | "planning" | "inventory" | "quotations" | "invoices"
   | "finance" | "notes" | "accounts" | "ai" | "discuss" | "activity-monitor"
   | "settings" | "orders" | "contracts" | "crm" | "expenses" | "purchase"
-  | "social-marketing" | "ceo-brand";
+  | "social-marketing" | "ceo-brand" | "website";
 
 export type NotifSeverity = "info" | "action" | "warning" | "critical";
 
@@ -171,6 +171,9 @@ export const NOTIFICATION_TYPES = {
   marketing_ceo_post_published:   { app: "ceo-brand", activity: "marketing_activity", severity: "info", lifecycle: { kind: "info" } },
   /* Quick capture (owner, 30/09/2026): the CEO spoke a draft; his assistant finishes and sends it. */
   marketing_ceo_capture_ready:    { app: "ceo-brand", activity: "marketing_activity", severity: "action", lifecycle: { kind: "clear", key: "post_id", when: "the draft is sent to the CEO or deleted (a newer notice about it replaces it first)" } },
+  /* ── Website: someone wrote from the public site or asked it for a quotation
+     (owner, 30/09/2026) — each message stays until read; the customer page keeps them all ── */
+  website_lead:             { app: "website", activity: "marketing_activity", severity: "action", lifecycle: { kind: "info" } },
 
   /* ── Notes, membership, AI, Discuss ────────────────────────────────── */
   note_shared:              { app: "notes", activity: null, activityNote: "OPEN: no Settings switch fits a shared note yet — lands under Other.", severity: "info", lifecycle: { kind: "info" } },
