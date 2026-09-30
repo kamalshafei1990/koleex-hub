@@ -226,7 +226,7 @@ export async function uploadPhoto(bytes: Uint8Array, declared: string): Promise<
 /** A link that opens the page's DRAFT on the site for 10 minutes: signed
  *  with the bridge key, which the site checks before it shows a draft. null
  *  while the bridge is not configured. */
-export function previewLink(slug: string, now = Date.now()): string | null {
+export function previewLink(slug: string, now = Date.now(), lang = "en"): string | null {
   const key = (process.env.WEBSITE_BRIDGE_KEY ?? "").trim();
   const refresh = (process.env.WEBSITE_REVALIDATE_URL ?? "").trim();
   if (!key || !refresh || !SLUG_RE.test(slug)) return null;
@@ -238,5 +238,7 @@ export function previewLink(slug: string, now = Date.now()): string | null {
   }
   const exp = Math.floor(now / 1000) + 600;
   const sig = crypto.createHmac("sha256", key).update(`preview:${slug}:${exp}`).digest("hex");
-  return `${origin}/api/preview?slug=${encodeURIComponent(slug)}&exp=${exp}&sig=${sig}`;
+  /* The language only picks which language of the same draft opens. */
+  const l = /^[a-z]{2}$/.test(lang) ? lang : "en";
+  return `${origin}/api/preview?slug=${encodeURIComponent(slug)}&exp=${exp}&sig=${sig}&lang=${l}`;
 }

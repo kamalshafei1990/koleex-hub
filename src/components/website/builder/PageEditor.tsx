@@ -222,7 +222,7 @@ export default function PageEditor({ slug, onBack }: { slug: string; onBack: () 
 
   const preview = async () => {
     if (!(await saveNow())) return;
-    const res = await fetch(`/api/website/pages/${encodeURIComponent(slug)}/preview`, { cache: "no-store" }).catch(() => null);
+    const res = await fetch(`/api/website/pages/${encodeURIComponent(slug)}/preview?lang=${lang}`, { cache: "no-store" }).catch(() => null);
     const j = res && res.ok ? ((await res.json()) as { url?: string }) : null;
     if (j?.url) window.open(j.url, "_blank", "noopener,noreferrer");
     else setFlash(t("previewUnavailable", "Preview works once the website bridge is configured."));
