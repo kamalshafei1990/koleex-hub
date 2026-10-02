@@ -283,7 +283,18 @@ export async function GET(
       { headers: upstreamHeaders, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) },
     );
   } catch {
-    return withPrivateCache(NextResponse.json({ error: "Upstream timeout" }, { status: 504 }));
+    /* One retry for a transient upstream drop (a rare Tokyo→Supabase blip),
+       mirroring the upload path. The auth chain already passed — only the
+       object fetch failed — so re-trying is safe and turns "image broke" into
+       a quiet recovery on the next request. */
+    try {
+      upstream = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/${resolved.bucket}/${encodeURI(resolved.path)}`,
+        { headers: upstreamHeaders, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) },
+      );
+    } catch {
+      return withPrivateCache(NextResponse.json({ error: "Upstream timeout" }, { status: 504 }));
+    }
   }
   timing.mark("upstream");
 

@@ -1512,9 +1512,29 @@ export async function uploadDiscussVoice(input: {
      now goes through /api/files/discuss/<messageId>/<index>, which re-checks
      membership on every request (and every Range request). Nothing fetchable
      is persisted: no url, no bucket-qualified link, no token. */
-  const mime =
+  const rawType =
     input.blob.type && input.blob.type.length > 0 ? input.blob.type : "audio/webm";
-  const verdict = checkDiscussUpload("discuss-voice", { size: input.blob.size, type: mime });
+
+  /* Cross-device format: Chrome/Firefox record webm/opus, which iOS Safari
+     cannot decode in an <audio> element — so a note recorded on desktop played
+     silently on an iPhone. Transcode webm/ogg → 64kbps mono MP3 (universally
+     playable); iOS's own mp4/aac is already portable and passes through. A
+     transcode failure falls back to the original blob (same behavior as before,
+     still playable on the recording browser). */
+  let blob: Blob = input.blob;
+  let mime = rawType;
+  const baseType = rawType.split(";")[0].trim().toLowerCase();
+  if (baseType === "audio/webm" || baseType === "audio/ogg") {
+    try {
+      const { transcodeVoiceToMp3 } = await import("./voice-transcode");
+      blob = await transcodeVoiceToMp3(input.blob);
+      mime = "audio/mpeg";
+    } catch (e) {
+      console.error("[Discuss] Voice transcode failed — uploading original:", e);
+    }
+  }
+
+  const verdict = checkDiscussUpload("discuss-voice", { size: blob.size, type: mime });
   if (!verdict.ok) {
     console.error("[Discuss] Voice rejected by policy:", verdict.reason);
     return null;
@@ -1523,22 +1543,22 @@ export async function uploadDiscussVoice(input: {
      4MB server-route ceiling would route to the browser→Storage direct PUT,
      the path production logs show failing intermittently on the China route.
      Fail fast here so the sender gets a clear retry instead of a silent drop. */
-  if (input.blob.size > DISCUSS_TRANSPORT_MAX_BYTES) {
-    console.error("[Discuss] Voice note exceeds reliable transport:", input.blob.size);
+  if (blob.size > DISCUSS_TRANSPORT_MAX_BYTES) {
+    console.error("[Discuss] Voice note exceeds reliable transport:", blob.size);
     return null;
   }
   const ext = pickVoiceExtension(mime);
   const filePath = `${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 10)}.${ext}`;
-  const result = await uploadToStorage("discuss-voice", filePath, input.blob, {
+  const result = await uploadToStorage("discuss-voice", filePath, blob, {
     cacheControl: "3600",
     contentType: mime,
   });
   if (!result.ok) {
     console.error("[Discuss] Voice upload:", result.error, {
       mime,
-      size: input.blob.size,
+      size: blob.size,
     });
     return null;
   }
@@ -1548,7 +1568,7 @@ export async function uploadDiscussVoice(input: {
     bucket: "discuss-voice",
     path: result.data.path,
     type: mime,
-    size: input.blob.size,
+    size: blob.size,
     duration_ms: input.durationMs,
     waveform: input.waveform,
   };
