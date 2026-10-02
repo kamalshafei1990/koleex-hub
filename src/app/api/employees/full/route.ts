@@ -389,6 +389,9 @@ export async function POST(req: Request) {
   const { data: employee, error: empErr } = await supabaseServer
     .from(EMPLOYEES)
     .insert({
+      /* Stamp the caller's tenant so the wizard-created row is scoped from
+         birth (previously omitted → NULL tenant → visible to every tenant). */
+      tenant_id: auth.tenant_id,
       person_id: person.id,
       account_id: null,
       employee_number: employeeNumber,
@@ -664,10 +667,16 @@ export async function PUT(req: Request) {
   /* ── Resolve the record we're editing ── */
   const { data: existing, error: exErr } = await supabaseServer
     .from(EMPLOYEES)
-    .select("id, person_id, employment_status")
+    .select("id, person_id, employment_status, tenant_id")
     .eq("id", employeeId)
     .maybeSingle();
-  if (exErr || !existing?.person_id) {
+  if (
+    exErr ||
+    !existing?.person_id ||
+    /* Tenant scope: a scoped row from another tenant must 404, never be
+       edited. NULL (legacy) rows stay in-tenant. */
+    (auth.tenant_id && existing.tenant_id && existing.tenant_id !== auth.tenant_id)
+  ) {
     return NextResponse.json({ success: false, error: "Employee not found." }, { status: 404 });
   }
   const personId = existing.person_id as string;

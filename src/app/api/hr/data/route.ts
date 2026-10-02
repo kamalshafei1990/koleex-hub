@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { canViewPrivate } from "@/lib/server/sensitive-columns";
 
 /* ---------------------------------------------------------------------------
    POST /api/hr/data — the HR app's single data gateway.
@@ -47,6 +48,14 @@ const TABLES: Record<string, { write: boolean }> = {
   koleex_departments: { write: false },
   koleex_positions: { write: false },
 };
+
+/** Compensation tables: the HR module gate is NOT enough — salary and payslip
+    rows are column-level private, so read AND write also require
+    can_view_private (or Super Admin), the same rule the employees route uses. */
+const SENSITIVE_TABLES: ReadonlySet<string> = new Set([
+  "hr_salary_records",
+  "hr_payslips",
+]);
 
 type FilterOp = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "in" | "is" | "not_is";
 const FILTER_OPS: ReadonlySet<string> = new Set([
@@ -97,6 +106,14 @@ export async function POST(req: Request) {
     : "delete";
   const denied = await requireModuleAction(auth, "HR", action);
   if (denied) return denied;
+
+  /* Column-level gate: HR·view alone must not reach compensation rows. */
+  if (SENSITIVE_TABLES.has(q.table) && !canViewPrivate(auth)) {
+    return NextResponse.json(
+      { error: "Private HR data requires elevated access" },
+      { status: 403 },
+    );
+  }
 
   /* Validate identifiers before they reach the query builder. */
   if (q.columns && !COLUMNS.test(q.columns)) {

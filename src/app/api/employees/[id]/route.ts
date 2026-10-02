@@ -50,7 +50,13 @@ export async function GET(
     console.error("[api/employees/[id] GET]", empErr.message);
     return NextResponse.json({ error: empErr.message }, { status: 500 });
   }
-  if (!emp || !emp.person_id) {
+  if (
+    !emp ||
+    !emp.person_id ||
+    /* Tenant scope: same rule as PATCH/DELETE below — a scoped row from
+       another tenant must 404, never leak. NULL (legacy) rows stay in-tenant. */
+    (auth.tenant_id && emp.tenant_id && emp.tenant_id !== auth.tenant_id)
+  ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

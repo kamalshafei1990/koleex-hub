@@ -6,8 +6,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useWarm, writeWarm } from "@/lib/warm-cache";
-import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, sectionTitleCls, relativeTime } from "../shared";
 
@@ -17,7 +15,6 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
-import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import KpiCard from "@/components/ui/KpiCard";
@@ -57,25 +54,19 @@ export default function DashboardModule({ t }: SalesModuleProps) {
     let cancelled = false;
     (async () => {
       try {
+        const res = await fetch("/api/sales/overview?module=dashboard", { credentials: "include" });
+        const json = res.ok ? await res.json() : null;
+        if (cancelled || !json) return;
+
+        const opps = (json.opps ?? []) as { id: string; name: string | null; value: number | null; is_won: boolean; is_lost: boolean; won_at: string | null }[];
+        const quotes = (json.quotes ?? []) as { id: string; quote_no: string | null; status: string | null; customer_name: string | null; total: number | null; created_at: string }[];
+        const orders = (json.orders ?? []) as { id: string; status: string | null }[];
+        const invoices = (json.invoices ?? []) as { id: string; status: string | null; customer_name: string | null; total: number | null; balance: number | null; issued_at: string | null; created_at: string }[];
+        const customers = (json.customers ?? []) as { id: string; is_active: boolean }[];
+        const acts = (json.activities ?? []) as { id: string; title: string | null; created_at: string }[];
+
         const monthStart = new Date();
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-
-        const [oppsR, quotesR, ordersR, invoicesR, custR, actR] = await Promise.all([
-          supabase.from("crm_opportunities").select("id,name,value,stage_id,is_won,is_lost,won_at,updated_at").eq("is_lost", false),
-          supabase.from("quotations").select("id,quote_no,status,total,created_at,customer_name").order("created_at", { ascending: false }).limit(50),
-          supabase.from("sales_orders").select("id,status,total,created_at").order("created_at", { ascending: false }).limit(50),
-          supabase.from("invoices").select("id,status,total,balance,issued_at,created_at,customer_name").order("created_at", { ascending: false }).limit(50),
-          supabase.from("customers").select("id,name,is_active"),
-          supabase.from("crm_activities").select("id,title,due_date,is_done,created_at").eq("is_done", false).order("due_date", { ascending: true }).limit(20),
-        ]);
-        if (cancelled) return;
-
-        const opps = oppsR.data ?? [];
-        const quotes = quotesR.data ?? [];
-        const orders = ordersR.data ?? [];
-        const invoices = invoicesR.data ?? [];
-        const customers = custR.data ?? [];
-        const acts = actR.data ?? [];
 
         const pipelineActive = opps.filter((o) => !o.is_won && !o.is_lost);
         const pipelineValue = pipelineActive.reduce((a, o) => a + (Number(o.value) || 0), 0);

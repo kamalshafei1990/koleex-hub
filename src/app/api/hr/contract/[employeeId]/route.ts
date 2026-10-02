@@ -8,6 +8,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { canViewPrivate } from "@/lib/server/sensitive-columns";
 import { loadPolicy, resolveEmployeeCountry } from "@/lib/server/work-calendar";
 
 export interface EmploymentContractData {
@@ -28,11 +29,20 @@ export async function GET(_req: Request, ctx: { params: Promise<{ employeeId: st
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "HR", "view");
   if (deny) return deny;
+  /* Employment contracts embed salary + legal-ID columns (EMPLOYEE_PRIVATE_COLUMNS)
+     — HR·view alone is not enough; require can_view_private (or SA). */
+  if (!canViewPrivate(auth)) {
+    return NextResponse.json({ error: "Private HR data requires elevated access" }, { status: 403 });
+  }
   const { employeeId } = await ctx.params;
   const { data: emp } = await supabaseServer.from("koleex_employees")
-    .select("id, employee_number, person_id, nationality, identification_id, passport_number, hire_date, probation_end_date, contract_end_date, employment_type, work_location, work_country, work_email, work_phone, people(full_name, name_alt, email, phone, mobile, address_line1, address_line2, city, country)")
+    .select("id, employee_number, person_id, tenant_id, nationality, identification_id, passport_number, hire_date, probation_end_date, contract_end_date, employment_type, work_location, work_country, work_email, work_phone, people(full_name, name_alt, email, phone, mobile, address_line1, address_line2, city, country)")
     .eq("id", employeeId).maybeSingle();
   if (!emp) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  /* Tenant scope: a scoped row from another tenant must 404, never leak. */
+  if (auth.tenant_id && emp.tenant_id && emp.tenant_id !== auth.tenant_id) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   const e = emp as Record<string, unknown> & { people?: Record<string, string | null> | Record<string, string | null>[] | null };
   const p = (Array.isArray(e.people) ? e.people[0] : e.people) ?? {};
   const personId = e.person_id as string | null;

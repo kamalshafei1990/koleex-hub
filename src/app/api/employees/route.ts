@@ -31,6 +31,13 @@ export async function GET(req: Request) {
     .select(
       "id, person_id, account_id, employee_number, hire_date, employment_status, employment_type, work_email, work_phone, work_location, manager_id",
     )
+    /* Tenant isolation: legacy rows predate the tenant column (NULL) and are
+       treated as in-tenant, matching the [id] route's PATCH/DELETE rule. */
+    .or(
+      auth.tenant_id
+        ? `tenant_id.eq.${auth.tenant_id},tenant_id.is.null`
+        : "tenant_id.is.null",
+    )
     .order("created_at", { ascending: false });
   if (activeOnly) empQ = empQ.eq("employment_status", "active");
 

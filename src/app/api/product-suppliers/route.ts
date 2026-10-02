@@ -21,8 +21,17 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { requireProductDataAction } from "@/lib/server/product-access";
+import { hasProductCostAccess, requireProductDataAction } from "@/lib/server/product-access";
 import { humanizeError } from "@/lib/ui/humanize-error";
+
+/* Cost-side columns a catalogue-only caller must NOT receive (supplier cost,
+   tier pricing, tooling, quote files). Mirrors MODEL_COST_FIELDS. */
+const SUPPLIER_COST_COLS: readonly string[] = [
+  "unit_cost_cny", "currency", "payment_terms", "price_options", "sample_cost",
+  "price_tiers", "price_quoted_on", "price_valid_until", "quotation_file_url",
+  "quotation_file_name", "min_order_value", "tooling_owner", "tooling_cost",
+  "cost_basis", "cost_includes_tax", "cost_extras",
+];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,8 +71,18 @@ export async function GET(req: Request) {
     console.error("[api/product-suppliers GET]", error.message);
     return NextResponse.json({ error: "Failed to load supplier links" }, { status: 500 });
   }
+  /* Cost-side fields need Product Data + can_view_private. Catalogue-only
+     callers get the link facts but never the supplier cost/tier/tooling. */
+  const canSeeCost = await hasProductCostAccess(auth);
+  const suppliers = canSeeCost
+    ? (data ?? [])
+    : (data ?? []).map((row) => {
+        const clean = { ...row } as Record<string, unknown>;
+        for (const c of SUPPLIER_COST_COLS) delete clean[c];
+        return clean;
+      });
   return NextResponse.json(
-    { suppliers: data ?? [] },
+    { suppliers },
     { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } },
   );
 }

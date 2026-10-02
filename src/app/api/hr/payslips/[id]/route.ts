@@ -8,6 +8,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { canViewPrivate } from "@/lib/server/sensitive-columns";
 import { resolveMyEmployee } from "@/lib/server/me-hr";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
   const slip = data as { employee_id: string; koleex_employees?: { person_id?: string | null } | null };
   const denyHr = await requireModuleAction(auth, "HR", "view");
-  if (denyHr) {
+  /* Payslips are compensation (column-level private): a HR·view role must ALSO
+     hold can_view_private (or SA). Otherwise fall through to the self-service
+     identity check — an employee can still fetch their own slip. */
+  const hrCanViewPrivate = denyHr == null && canViewPrivate(auth);
+  if (!hrCanViewPrivate) {
     const me = await resolveMyEmployee(auth);
     if (!me || me.id !== slip.employee_id) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
