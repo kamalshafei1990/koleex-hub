@@ -13,7 +13,7 @@
    so nothing moves after the first paint. Weeks start on Monday.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import Button from "@/components/kds/Button";
@@ -74,6 +74,14 @@ export default function SocialCalendar({ space }: { space: MarketingSpace }) {
 
   const grid = useMemo(() => monthGrid(month), [month]);
 
+  /* Retry state: the month being shown, how many quiet retries ran, and the
+     pending timer. A new month starts the count over; leaving the screen
+     cancels whatever is pending. */
+  const retries = useRef(0);
+  const retryTimer = useRef<number | null>(null);
+  const monthRef = useRef(month);
+  monthRef.current = month;
+
   const load = useCallback(async (m: Month) => {
     const days = monthGrid(m);
     setError(false);
@@ -81,12 +89,26 @@ export default function SocialCalendar({ space }: { space: MarketingSpace }) {
       const res = await fetch(`/api/marketing/calendar?space=${space}&from=${days[0].key}&to=${days[days.length - 1].key}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as { items: CalendarItem[]; canCreate: boolean };
+      retries.current = 0;
       setItems(body.items);
       setCanCreate(body.canCreate);
     } catch {
       setError(true);
+      /* A cold server or a dropped connection heals by itself: two quiet
+         retries (4s, then 12s), only while the failed month is still shown. */
+      if (retries.current < 2) {
+        retries.current += 1;
+        const delay = retries.current === 1 ? 4_000 : 12_000;
+        retryTimer.current = window.setTimeout(() => {
+          const cur = monthRef.current;
+          if (cur.y === m.y && cur.m === m.m) void load(m);
+        }, delay);
+      }
     }
   }, [space]);
+
+  useEffect(() => { retries.current = 0; }, [month]);
+  useEffect(() => () => { if (retryTimer.current !== null) window.clearTimeout(retryTimer.current); }, []);
 
   useEffect(() => { void load(month); }, [load, month]);
 

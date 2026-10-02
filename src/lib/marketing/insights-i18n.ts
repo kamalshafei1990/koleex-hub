@@ -21,6 +21,7 @@ export const INSIGHTS_T: Translations = {
   "emptyHint":      { en: "Connect one on the Accounts tab and its numbers appear here.", zh: "在“账号”页连接后，其数据会显示在这里。", ar: "اربط حسابًا من تبويب الحسابات وستظهر أرقامه هنا." },
   "openAccounts":   { en: "Open Accounts", zh: "打开账号", ar: "افتح الحسابات" },
   "loadError":      { en: "Could not load the insights.", zh: "无法加载数据洞察。", ar: "تعذّر تحميل الإحصاءات." },
+  "refreshError":   { en: "Could not refresh the insights. What you see is the last copy the Hub has.", zh: "无法刷新数据洞察。您看到的是 Hub 保存的最新副本。", ar: "تعذّر تحديث الإحصاءات. ما تراه هو آخر نسخة لدى الـHub." },
   "retry":          { en: "Try again", zh: "重试", ar: "إعادة المحاولة" },
   "up":             { en: "Up {n}%", zh: "上升 {n}%", ar: "ارتفاع {n}%" },
   "down":           { en: "Down {n}%", zh: "下降 {n}%", ar: "انخفاض {n}%" },

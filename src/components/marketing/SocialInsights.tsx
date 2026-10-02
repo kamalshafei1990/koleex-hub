@@ -162,6 +162,10 @@ export default function SocialInsights({ space }: { space: MarketingSpace }) {
 
         {refreshFailed && <p role="alert" className="text-[12px] text-[#FF3333]">{t("refreshFailed")}</p>}
 
+        {error && data && (
+          <p role="status" className="rounded-xl border border-[#F59E0B]/35 bg-[#F59E0B]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">{t("refreshError")}</p>
+        )}
+
         {error && !data ? (
           <EmptyState title={t("loadError")} action={<Button type="button" variant="secondary" onClick={() => void load(period)}>{t("retry")}</Button>} />
         ) : !data ? (
