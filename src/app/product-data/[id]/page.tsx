@@ -11,13 +11,31 @@
    The customer-facing page still lives at /products/[slug], and the header
    here links to it. */
 
+import { Suspense } from "react";
+import dynamic from "next/dynamic";
+import AppLoadingSkeleton from "@/components/ui/AppLoadingSkeleton";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PermissionGate from "@/components/layout/PermissionGate";
-import ProductProfile from "@/components/admin/ProductProfile";
+
+/* Wave A: code-split the 2627-line product profile off the route bundle
+   (SW-4, same as /crm + /discuss). */
+const ProductProfile = dynamic(() => import("@/components/admin/ProductProfile"), {
+  ssr: false,
+  loading: () => <AppLoadingSkeleton label="Loading product…" />,
+});
 
 export default function ProductDataDetailPage() {
   return (
     <PermissionGate module="Product Data">
-      <ProductProfile />
+      <Suspense
+        fallback={
+          <div className="flex-1 min-h-0 flex items-center justify-center bg-[var(--bg-primary)]">
+            <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
+          </div>
+        }
+      >
+        <ProductProfile />
+      </Suspense>
     </PermissionGate>
   );
 }
