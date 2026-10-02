@@ -31,6 +31,16 @@ import { DOTTED_WANDER_MS, dottedLook, dottedPreset, nextWanderMotion, type Dott
 import { DOTTED_MORPH_MS, easeInOutCubic, morphDots, type MorphDot } from "./dotted-orb-morph";
 import { auroraNoise, auroraTint, dottedFlows, dottedPalette, monoInk, tintedInk, type DottedPalette } from "./dotted-orb-ink";
 
+/* VISUAL SCALE (owner, 2026-10-02, after a side-by-side against the aura orb
+   in Settings → Koleex AI → Orb): the dotted orb read clearly smaller inside
+   its box than Aura inside the same box — the "weaker" choice even to people
+   who preferred its idea. One constant grow on the canvas, over the same
+   transform path the voice swell already uses, so the geometry, the dot
+   tuning and the approved look of the preview all stay identical. Applies to
+   every size the Hub draws (30…200) — it is the orb's presence, not one
+   surface's. */
+const ORB_VISUAL_SCALE = 1.18;
+
 export interface DottedOrbProps extends AIOrbProps {
   /** "dark" pins light dots — for surfaces that are dark in both themes
    *  (the call screen). "auto" follows the app's theme. */
@@ -311,8 +321,12 @@ export default function DottedOrb({
           height: size,
           display: "block",
           /* The voice, on a call: the sphere breathes with it. Transform
-             only — nothing here repaints anything but this canvas. */
-          transform: audioActive ? "scale(calc(1 + var(--kx-orb-audio, 0) * 0.12))" : undefined,
+             only — nothing here repaints anything but this canvas. The
+             constant factor is the orb's visual scale (above); the swell
+             multiplies it, it does not replace it. */
+          transform: audioActive
+            ? `scale(calc(${ORB_VISUAL_SCALE} * (1 + var(--kx-orb-audio, 0) * 0.12)))`
+            : `scale(${ORB_VISUAL_SCALE})`,
           transformOrigin: "50% 50%",
         }}
       />
