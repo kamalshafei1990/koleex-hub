@@ -295,9 +295,12 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     }));
 
   const tab = readFileSync(join(srcRoot, "components/settings/tabs/AiTab.tsx"), "utf8");
+  /* The pin names the SEQUENCE (apply → save to the account), not adjacency:
+     since the failed-save rollback (Settings: data, sync, speed and UX audit
+     fixes), setFailed(false) rightly sits between the two calls. */
   check("settings: Koleex AI has the picker — each option shown as its own live orb, applied at once and saved to the account",
     /<OrbPicker accountId=\{account\.id\}/.test(tab) && /<ChosenOrb style=\{style\}/.test(tab) &&
-    /setOrbStyle\(style\);\s*void updateAccountPreferences\(accountId, \{ orb: style \}\)/.test(tab) &&
+    /setOrbStyle\(style\);[\s\S]{0,400}?void updateAccountPreferences\(accountId, \{ orb: style \}\)/.test(tab) &&
     /role="radiogroup"/.test(tab) && /aria-checked=\{on\}/.test(tab));
   /* ORDER inside the account effect, never adjacency. Another account sync
      may sit between the two (the Home layout's does since 99de75883) and the
