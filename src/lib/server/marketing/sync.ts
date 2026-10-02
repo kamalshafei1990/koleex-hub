@@ -45,6 +45,7 @@ import {
   type CommentCount, type PostPage, type RemoteComment, type RemoteMedia, type RemotePost,
 } from "@/lib/server/marketing/meta-feed";
 import { claimCommentScan, claimComments, claimSync, loadAccountForSync, recordSync, recordSyncState, type AccountForSync } from "@/lib/server/marketing/accounts";
+import { commentWatch } from "@/lib/server/marketing/comment-waiting";
 import type { MarketingAccountView, MarketingPlatform } from "@/lib/marketing/spaces";
 
 export const SYNC_STALE_MS = 10 * 60_000;
@@ -192,10 +193,12 @@ async function saveComments(a: AccountForSync, rows: Array<{ remotePostId: strin
     ...comment, tenant_id: a.tenant_id, account_id: a.id, remote_post_id: remotePostId,
   }]));
   const list = [...byExt.values()];
+  const watched = await commentWatch(a, list);
   for (let i = 0; i < list.length; i += 500) {
     const { error } = await supabaseServer.from("marketing_comments").upsert(list.slice(i, i + 500), { onConflict: "account_id,external_id" });
     if (error) throw new Error(`marketing comments: ${error.message}`);
   }
+  await watched();
   return list.length;
 }
 

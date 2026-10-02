@@ -37,6 +37,7 @@ import { MetaError } from "@/lib/server/marketing/meta";
 import { facebookComments, instagramComments, type RemoteComment } from "@/lib/server/marketing/meta-feed";
 import { adAccounts, facebookAdPosts, instagramAdMedia, instagramAdMediaIds, type AdPost } from "@/lib/server/marketing/meta-ads";
 import { claimAdScan, loadAccountForSync, recordSync, recordSyncState, type AccountForSync } from "@/lib/server/marketing/accounts";
+import { commentWatch } from "@/lib/server/marketing/comment-waiting";
 import { facebookAdsGranted, instagramAdsGranted } from "@/lib/marketing/ads";
 
 export const AD_SCAN_MS = 30 * 60_000;
@@ -101,10 +102,12 @@ async function saveAds(a: AccountForSync, ads: AdPost[]): Promise<AdRow[]> {
 async function saveComments(a: AccountForSync, parent: { ad_post_id: string } | { remote_post_id: string }, comments: RemoteComment[]): Promise<void> {
   /* One statement may not touch a row twice. */
   const list = [...new Map(comments.map((c) => [c.external_id, { ...c, tenant_id: a.tenant_id, account_id: a.id, ...parent }])).values()];
+  const watched = await commentWatch(a, list);
   for (let i = 0; i < list.length; i += 500) {
     const { error } = await supabaseServer.from("marketing_comments").upsert(list.slice(i, i + 500), { onConflict: "account_id,external_id" });
     if (error) throw new Error(`marketing comments: ${error.message}`);
   }
+  await watched();
 }
 
 /** Instagram's ads: the ones the ad accounts name now (when the personal key

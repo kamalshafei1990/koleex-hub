@@ -34,6 +34,9 @@ export const marketingTpl: Translations = {
   "marketing_message_waiting.s": { en: "{who} sent a message on {platform}", zh: "{who} 在 {platform} 发来消息", ar: "رسالة من {who} على {platform}" },
   "marketing_message_waiting.b": { en: "[[{text:free}]]", zh: "[[{text:free}]]", ar: "[[{text:free}]]" },
 
+  "marketing_comment_waiting.s": { en: "{who} commented on {platform}", zh: "{who} 在 {platform} 评论了", ar: "تعليق من {who} على {platform}" },
+  "marketing_comment_waiting.b": { en: "[[{text:free}]]", zh: "[[{text:free}]]", ar: "[[{text:free}]]" },
+
   "marketing_plan_approval_request.s": { en: "This week's social media plan is ready to approve", zh: "本周社交媒体计划待审批", ar: "خطة السوشيال ميديا لهذا الأسبوع جاهزة لموافقتك" },
   "marketing_plan_approval_request.b": {
     en: "Koleex AI drafted it from the accounts' numbers — review it, edit it if needed, and approve it.",

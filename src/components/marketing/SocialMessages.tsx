@@ -97,6 +97,21 @@ export default function SocialMessages({ space }: { space: MarketingSpace }) {
 
   useEffect(() => { setData(null); void load(); }, [load]);
 
+  /* A bell notice's link opens its conversation (?c=<id>): the list has it
+     → it opens; answered already (not under «Needs a reply») → the filter
+     flips to «All» once; gone from the window → nothing opens. */
+  const [wanted, setWanted] = useState<string | null>(null);
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("c");
+    if (c) { setWanted(c); window.history.replaceState(null, "", window.location.pathname); }
+  }, []);
+  useEffect(() => {
+    if (!wanted || !data) return;
+    if (data.conversations.some((c) => c.id === wanted)) { setOpenId(wanted); setWanted(null); }
+    else if (filter !== "all") setFilter("all");
+    else setWanted(null);
+  }, [wanted, data, filter]);
+
   /* The tab's number: only the all-accounts count is the tab's. */
   const needsNow = data?.counts.needs ?? null;
   useEffect(() => {

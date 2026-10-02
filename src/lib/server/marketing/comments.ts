@@ -28,6 +28,7 @@ import { inChunks } from "@/lib/server/in-chunks";
 import { listAccounts, loadAccountForSync, recordSync, type AccountForSync } from "@/lib/server/marketing/accounts";
 import { MetaError } from "@/lib/server/marketing/meta";
 import { hideOnPlatform, replyOnPlatform } from "@/lib/server/marketing/meta-comments";
+import { later, settleComment } from "@/lib/server/marketing/notify";
 import { namesOf } from "@/lib/server/marketing/posts";
 import {
   REPLY_MAX, groupThreads, lastVisible, needsReply,
@@ -265,6 +266,14 @@ export async function replyToComment(tenantId: string, commentId: string, actorI
   } else {
     row = done as unknown as Row;
   }
+  /* The thread was answered: its bell's notice is cleared — the team's wait
+     is over, like a message conversation's. */
+  const resetQ = supabaseServer.from("marketing_comments").update({ notified_at: null }).eq("account_id", a.id).not("notified_at", "is", null);
+  const { data: reset } = target.parent_external_id
+    ? await resetQ.eq("external_id", target.parent_external_id).select("id")
+    : await resetQ.eq("id", target.id).select("id");
+  const rootId = (reset ?? [])[0]?.id as string | undefined;
+  if (rootId) later(() => settleComment(rootId));
   return { comment: view(row, await namesOf([actorId])) };
 }
 
@@ -281,8 +290,13 @@ export async function setCommentHidden(tenantId: string, commentId: string, hidd
   } catch (e) {
     return refused(usable.a, e);
   }
-  const { error } = await supabaseServer.from("marketing_comments").update({ hidden }).eq("tenant_id", tenantId).eq("id", c.id);
+  /* Hiding the thread's first comment ends its wait: the bell's notice is
+     cleared with it. */
+  const { error } = await supabaseServer.from("marketing_comments")
+    .update({ hidden, ...(hidden && !c.parent_external_id ? { notified_at: null } : {}) })
+    .eq("tenant_id", tenantId).eq("id", c.id);
   if (error) throw new Error(`marketing comments: ${error.message}`);
+  if (hidden && !c.parent_external_id) later(() => settleComment(c.id));
   return { ok: true };
 }
 
@@ -292,11 +306,12 @@ export async function setThreadHandled(tenantId: string, commentId: string, hand
   const c = await loadComment(tenantId, commentId);
   if (!c) return { error: "Comment not found.", status: 404 };
   const at = handled ? new Date().toISOString() : null;
-  let q = supabaseServer.from("marketing_comments").update({ handled_at: at, handled_by: handled ? actorId : null }).eq("tenant_id", tenantId).eq("account_id", c.account_id);
+  let q = supabaseServer.from("marketing_comments").update({ handled_at: at, handled_by: handled ? actorId : null, ...(handled ? { notified_at: null } : {}) }).eq("tenant_id", tenantId).eq("account_id", c.account_id);
   q = c.parent_external_id ? q.eq("external_id", c.parent_external_id) : q.eq("id", c.id);
   const { data, error } = await q.select("id");
   if (error) throw new Error(`marketing comments: ${error.message}`);
   if (!data?.length) return { error: "Comment not found.", status: 404 };
+  if (handled) later(() => settleComment((data as Array<{ id: string }>)[0].id));
   return { handled_at: at, handled_by_name: handled ? (await namesOf([actorId])).get(actorId) || null : null };
 }
 

@@ -512,7 +512,7 @@ export const notifyMessageWaiting = quiet("notifyMessageWaiting", async (tenantI
       platform: account.platform === "instagram" ? "Instagram" : "Messenger",
       text: excerpt(c.snippet ?? ""),
     } },
-    link: "/social-marketing/messages",
+    link: `/social-marketing/messages?c=${c.id}`,
     type: "marketing_message_waiting",
     metadata: { source: "social-marketing", conversation_id: c.id },
     tag: `mkt-msg:${c.id}`,
@@ -523,6 +523,48 @@ export const notifyMessageWaiting = quiet("notifyMessageWaiting", async (tenantI
 /** Answered, or marked «No reply needed»: nobody is told any more. */
 export const settleMessage = quiet("settleMessage", async (conversationId: string): Promise<void> => {
   await clearUnreadByMeta({ type: "marketing_message_waiting", conversation_id: conversationId });
+});
+
+/** A comment thread waits for a reply: the team hears — ONE notification
+ *  per thread while it waits (an unread one about the same thread is
+ *  replaced), never one per comment (owner, 02/10/2026). Social Marketing's
+ *  space only. `rootId`: the thread's FIRST comment's row. */
+export const notifyCommentWaiting = quiet("notifyCommentWaiting", async (tenantId: string, rootId: string, triggerId: string): Promise<void> => {
+  const { data, error } = await supabaseServer.from("marketing_comments")
+    .select("id, account_id, external_id, hidden, handled_at")
+    .eq("tenant_id", tenantId).eq("id", rootId).maybeSingle();
+  if (error) throw new Error(`marketing comments: ${error.message}`);
+  const root = data as { id: string; account_id: string; external_id: string; hidden: boolean; handled_at: string | null } | null;
+  if (!root || root.hidden) return;
+  const [{ data: trig, error: tErr }, { data: acc, error: aErr }] = await Promise.all([
+    supabaseServer.from("marketing_comments").select("author_name, message").eq("tenant_id", tenantId).eq("id", triggerId).maybeSingle(),
+    supabaseServer.from("marketing_accounts").select("space, platform").eq("id", root.account_id).maybeSingle(),
+  ]);
+  if (tErr) throw new Error(`marketing comments: ${tErr.message}`);
+  if (aErr) throw new Error(`marketing accounts: ${aErr.message}`);
+  const trigger = trig as { author_name: string | null; message: string | null } | null;
+  const account = acc as { space: string; platform: string } | null;
+  if (!trigger || !account || account.space !== "company") return;
+  await notifyLite({
+    tenantId,
+    recipients: await marketingEditorIds(tenantId),
+    tpl: { k: "marketing_comment_waiting", p: {
+      who: trigger.author_name || "—",
+      platform: account.platform === "instagram" ? "Instagram" : "Facebook",
+      text: excerpt(trigger.message ?? ""),
+    } },
+    link: `/social-marketing/comments?t=${root.id}`,
+    type: "marketing_comment_waiting",
+    metadata: { source: "social-marketing", thread_id: root.id },
+    tag: `mkt-comment:${root.id}`,
+    supersede: { type: "marketing_comment_waiting", thread_id: root.id },
+  });
+});
+
+/** The thread was answered, marked «No reply needed», or hidden: nobody is
+ *  told any more. */
+export const settleComment = quiet("settleComment", async (rootId: string): Promise<void> => {
+  await clearUnreadByMeta({ type: "marketing_comment_waiting", thread_id: rootId });
 });
 
 /** A week's plan was drafted: every approver is asked to review it (the

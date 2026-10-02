@@ -1028,6 +1028,37 @@ check("the notice: one per conversation (replaced, never stacked), Social Market
   /recipients: await marketingEditorIds\(tenantId\),/.test(waitFn) && /tag: `mkt-msg:\$\{c\.id\}`,/.test(waitFn) &&
   /supersede: \{ type: "marketing_message_waiting", conversation_id: c\.id \},/.test(waitFn) &&
   /marketing_message_waiting: \{ app: "social-marketing", activity: "marketing_activity", severity: "action", lifecycle: \{ kind: "clear", key: "conversation_id",/.test(code("src/lib/notification-types.ts")));
+/* Comment threads ring the bell too (owner, 02/10/2026): one notice per
+   thread while it waits, like a conversation's. */
+const cwSrc = code("src/lib/server/marketing/comment-waiting.ts");
+const cwWaitFn = notifyMsg.slice(notifyMsg.indexOf("export const notifyCommentWaiting"), notifyMsg.indexOf("export const settleComment"));
+const syncSave = syncC.slice(syncC.indexOf("async function saveComments"), syncC.indexOf("async function saveDay"));
+const adsSave = adsSrc.slice(adsSrc.indexOf("async function saveComments"), adsSrc.indexOf("async function instagramAds"));
+const commentMig = readFileSync("supabase/migrations/20261002_marketing_comment_notified.sql", "utf8").replace(/--[^\n]*/g, "");
+check("a comment thread waiting rings ONCE: the claim on the thread's first comment, the first import silent, our reply on the platform ends the wait",
+  /ALTER TABLE marketing_comments ADD COLUMN IF NOT EXISTS notified_at timestamptz;/.test(commentMig) &&
+  !/CREATE POLICY|\bDROP\b|\bDELETE\s+FROM\b|\bTRUNCATE\b/i.test(commentMig) &&
+  /export async function commentWatch\(/.test(cwSrc) && /if \(!list\.length \|\| a\.space !== "company"\) return noop;/.test(cwSrc) &&
+  /\.update\(\{ notified_at: now \}\)\.eq\("id", root\.id\)\.is\("notified_at", null\)\.select\("id"\)/.test(cwSrc) &&
+  /if \(typeof a\.sync_state\.comments_at !== "string"\) return;/.test(cwSrc) &&
+  /if \(!c\.is_ours \|\| !c\.parent_external_id\) continue;/.test(cwSrc) && /later\(\(\) => settleComment\(rootId\)\);/.test(cwSrc) &&
+  /const watched = await commentWatch\(a, list\);/.test(syncSave) && /await watched\(\);/.test(syncSave) &&
+  /const watched = await commentWatch\(a, list\);/.test(adsSave) && /await watched\(\);/.test(adsSave));
+check("the comment notice: one per thread (replaced, never stacked), to the people who may answer, its link opens the thread (?t=)",
+  /recipients: await marketingEditorIds\(tenantId\),/.test(cwWaitFn) && /tag: `mkt-comment:\$\{root\.id\}`,/.test(cwWaitFn) &&
+  /link: `\/social-marketing\/comments\?t=\$\{root\.id\}`,/.test(cwWaitFn) &&
+  /supersede: \{ type: "marketing_comment_waiting", thread_id: root\.id \},/.test(cwWaitFn) &&
+  /marketing_comment_waiting: \{ app: "social-marketing", activity: "marketing_activity", severity: "action", lifecycle: \{ kind: "clear", key: "thread_id",/.test(code("src/lib/notification-types.ts")) &&
+  /"marketing_comment_waiting\.s": \{ en: "\{who\} commented on \{platform\}",/.test(code("src/lib/translations/notif-templates/marketing.ts")));
+check("answering, «No reply needed» or hiding the thread's first comment ends its wait — the bell's notice is cleared",
+  /later\(\(\) => settleComment\(rootId\)\);/.test(replyFn) &&
+  /\.\.\.\(handled \? \{ notified_at: null \} : \{\}\)/.test(cmt) && /if \(handled\) later\(\(\) => settleComment\(\(data as Array<\{ id: string \}>\)\[0\]\.id\)\);/.test(cmt) &&
+  /\.\.\.\(hidden && !c\.parent_external_id \? \{ notified_at: null \} : \{\}\)/.test(cmt) && /if \(hidden && !c\.parent_external_id\) later\(\(\) => settleComment\(c\.id\)\);/.test(cmt));
+check("a bell notice's link opens what it is about: the message notice's conversation (?c=), the comment notice's thread (?t=), the param then dropped",
+  /link: `\/social-marketing\/messages\?c=\$\{c\.id\}`,/.test(waitFn) &&
+  /new URLSearchParams\(window\.location\.search\)\.get\("c"\)/.test(code("src/components/marketing/SocialMessages.tsx")) &&
+  /new URLSearchParams\(window\.location\.search\)\.get\("t"\)/.test(sc) && /data-thread-id=\{th\.id\}/.test(sc) &&
+  /window\.history\.replaceState\(null, "", window\.location\.pathname\);/.test(sc));
 const msgRoutes = walk("src/app/api/marketing/messages");
 const gateSrc = code("src/lib/server/marketing/message-gate.ts");
 const routeOf = (p: string) => code(`src/app/api/marketing/messages/${p}`);

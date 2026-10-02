@@ -61,6 +61,28 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
 
   useEffect(() => { setData(null); void load(); }, [load]);
 
+  /* A bell notice's link opens its thread (?t=<id>): found in the list →
+     scrolled to and flashed; answered already (not under «Needs a reply») →
+     the filter flips to «All» once; gone from the window → nothing opens. */
+  const [wanted, setWanted] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    const tid = new URLSearchParams(window.location.search).get("t");
+    if (tid) { setWanted(tid); window.history.replaceState(null, "", window.location.pathname); }
+  }, []);
+  useEffect(() => {
+    if (!wanted || !data) return;
+    if (data.threads.some((th) => th.id === wanted)) { setFlash(wanted); setWanted(null); }
+    else if (filter !== "all") setFilter("all");
+    else setWanted(null);
+  }, [wanted, data, filter]);
+  useEffect(() => {
+    if (!flash) return;
+    document.querySelector(`[data-thread-id="${flash}"]`)?.scrollIntoView({ block: "center" });
+    const off = window.setTimeout(() => setFlash(null), 2500);
+    return () => window.clearTimeout(off);
+  }, [flash]);
+
   /* The header's number follows the list's — told after the render, never
      from inside a state update. Only the all-accounts count is the tab's. */
   const needsNow = data?.counts.needs ?? null;
@@ -184,7 +206,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
         ) : (
           <ul className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
             {data.threads.map((th) => (
-              <li key={th.id} className="min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 md:p-4">
+              <li key={th.id} data-thread-id={th.id} className={`min-w-0 rounded-2xl border bg-[var(--bg-surface)] p-3 transition-shadow md:p-4 ${flash === th.id ? "border-[var(--border-focus)] shadow-[0_0_0_3px_var(--border-focus)]" : "border-[var(--border-subtle)]"}`}>
                 <ThreadHeader thread={th} t={t} />
                 <div className="mt-3">
                   <CommentThread
