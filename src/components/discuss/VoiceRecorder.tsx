@@ -161,9 +161,15 @@ export default function VoiceRecorder({
       } catch {
         preferred = undefined;
       }
+      /* 32kbps opus is plenty for a voice note and keeps even a ~10-minute clip
+         well under the 4.2MB server-route ceiling, so the upload stays on the
+         RELIABLE /api/storage/upload path instead of the browser→Storage direct
+         PUT that production logs show failing intermittently (China route).
+         This is a hint, not a hard cap — the size guard in uploadDiscussVoice
+         still catches a clip that came out larger. */
       const mr = preferred
-        ? new MediaRecorder(stream, { mimeType: preferred })
-        : new MediaRecorder(stream);
+        ? new MediaRecorder(stream, { mimeType: preferred, audioBitsPerSecond: 32_000 })
+        : new MediaRecorder(stream, { audioBitsPerSecond: 32_000 });
       chunksRef.current = [];
       mr.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);

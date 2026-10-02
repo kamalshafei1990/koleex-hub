@@ -1519,6 +1519,14 @@ export async function uploadDiscussVoice(input: {
     console.error("[Discuss] Voice rejected by policy:", verdict.reason);
     return null;
   }
+  /* Transport guard (mirrors uploadDiscussAttachment): a note above the
+     4MB server-route ceiling would route to the browser→Storage direct PUT,
+     the path production logs show failing intermittently on the China route.
+     Fail fast here so the sender gets a clear retry instead of a silent drop. */
+  if (input.blob.size > DISCUSS_TRANSPORT_MAX_BYTES) {
+    console.error("[Discuss] Voice note exceeds reliable transport:", input.blob.size);
+    return null;
+  }
   const ext = pickVoiceExtension(mime);
   const filePath = `${Date.now()}_${Math.random()
     .toString(36)
