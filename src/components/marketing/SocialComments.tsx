@@ -212,6 +212,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
                   <CommentThread
                     thread={th}
                     accountName={accountLabel(th.account)}
+                    accountAvatar={th.account.avatar_url}
                     canReply={data.canReply}
                     canHide={data.canHide}
                     onChange={(next) => changed(th.id, next)}

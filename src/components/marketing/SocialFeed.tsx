@@ -396,6 +396,7 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
             post={opened.post}
             platform={platformOf(opened.account)}
             accountName={opened.account.name}
+            accountAvatar={opened.account.avatar_url}
             t={t}
             onLoaded={(d) => {
               updatePost(opened.post, { metrics: d.post.metrics, thumb: d.post.thumb, media_count: d.post.media_count });
@@ -631,7 +632,7 @@ function toThreads(list: FeedComment[]): ThreadState[] {
   }));
 }
 
-function PostDetailView({ post, platform, accountName, t, onLoaded }: { post: FeedPost; platform: Platform; accountName: string; t: Tr; onLoaded: (d: PostDetail) => void }) {
+function PostDetailView({ post, platform, accountName, accountAvatar, t, onLoaded }: { post: FeedPost; platform: Platform; accountName: string; accountAvatar: string | null; t: Tr; onLoaded: (d: PostDetail) => void }) {
   const [detail, setDetail] = useState<PostDetail | null>(null);
   const [threads, setThreads] = useState<ThreadState[]>([]);
   const [failed, setFailed] = useState(false);
@@ -745,6 +746,7 @@ function PostDetailView({ post, platform, accountName, t, onLoaded }: { post: Fe
                   <CommentThread
                     thread={th}
                     accountName={accountName}
+                    accountAvatar={accountAvatar}
                     canReply={detail.canReply}
                     canHide={detail.canHide}
                     onChange={(next) => setThreads((list) => list.map((x) => (x.first.id === th.first.id ? next : x)))}

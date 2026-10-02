@@ -11,7 +11,7 @@
    To hide by role:     fill the `visibleTo` array (engine coming later).
    --------------------------------------------------------------------------- */
 
-import AppsIcon from "@/components/icons/ui/AppsIcon";
+import ChartPieIcon from "@/components/icons/ui/ChartPieIcon";
 import ActivityMonitorIcon from "@/components/icons/ui/ActivityIcon";
 import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
 import ManagementIcon from "@/components/icons/ManagementIcon";
@@ -67,6 +67,7 @@ import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import SoftwareCenterIcon from "@/components/icons/ui/DownloadIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import KoleexOrbIcon from "@/components/ai/KoleexOrbIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
@@ -319,7 +320,7 @@ export const APP_REGISTRY: AppDef[] = [
      his by default, and grantable to named accounts.
      Deny-by-default like every other module (no openAccess): a role with no
      row cannot read the AI's knowledge corpus, and super admins always can. */
-  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: KnowledgeIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
+  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: SparklesIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
@@ -344,7 +345,10 @@ export const APP_REGISTRY: AppDef[] = [
      openAccess: the app itself is open to everyone — every widget inside is
      already gated per-module by /api/dashboard, so the app shows each person
      only what their role can see. */
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",
+  /* Dashboard tile uses a pie-chart mark — AppsIcon (the grid) is reserved
+     for the All-Apps launcher itself, so the two never read as the same
+     thing on Home. */
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: ChartPieIcon,    route: "/dashboard",
     active: process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development", openAccess: true },
 ];
 

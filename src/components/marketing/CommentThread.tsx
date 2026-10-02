@@ -57,9 +57,11 @@ function refusal(t: Tr, json: Json): string {
 
 const textBtn = "inline-flex items-center gap-1 rounded-md px-1 text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]";
 
-export default function CommentThread({ thread, accountName, canReply, canHide, onChange, onReconcile }: {
+export default function CommentThread({ thread, accountName, accountAvatar, canReply, canHide, onChange, onReconcile }: {
   thread: ThreadState;
   accountName: string;
+  /** The account's own picture — Meta sends none for its own comments. */
+  accountAvatar?: string | null;
   canReply: boolean;
   canHide: boolean;
   onChange: (next: ThreadState) => void;
@@ -138,6 +140,7 @@ export default function CommentThread({ thread, accountName, canReply, canHide, 
     <CommentLine
       c={c}
       accountName={accountName}
+      accountAvatar={accountAvatar ?? null}
       t={t}
       action={canHide && !c.is_ours ? (
         <button type="button" className={textBtn} disabled={busy !== null} onClick={() => void setHidden(c, !c.hidden)} title={c.hidden ? undefined : t("hideHint")}>
@@ -233,14 +236,17 @@ export default function CommentThread({ thread, accountName, canReply, canHide, 
   );
 }
 
-function CommentLine({ c, accountName, t, action }: { c: CommentView; accountName: string; t: Tr; action: ReactNode }) {
+function CommentLine({ c, accountName, accountAvatar, t, action }: { c: CommentView; accountName: string; accountAvatar: string | null; t: Tr; action: ReactNode }) {
   const [bad, setBad] = useState(false);
   const name = c.is_ours ? accountName : c.author_name ?? t("someone");
+  /* Our own comment carries the ACCOUNT's picture (Meta sends none for the
+     page itself on Facebook, and never one on Instagram). */
+  const avatar = c.is_ours ? accountAvatar : c.author_avatar_url;
   return (
     <div className={`flex gap-2.5 ${c.hidden ? "opacity-60" : ""}`}>
-      {c.author_avatar_url && !bad && !c.is_ours ? (
+      {avatar && !bad ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.author_avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-7 w-7 shrink-0 rounded-full bg-[var(--bg-surface-subtle)] object-cover" />
+        <img src={avatar} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} className="h-7 w-7 shrink-0 rounded-full bg-[var(--bg-surface-subtle)] object-cover" />
       ) : (
         <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${c.is_ours ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"}`}>
           {Array.from(name)[0]?.toUpperCase() ?? "?"}
