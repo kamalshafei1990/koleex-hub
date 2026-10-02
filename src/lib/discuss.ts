@@ -1517,18 +1517,18 @@ export async function uploadDiscussVoice(input: {
 
   /* Cross-device format: Chrome/Firefox record webm/opus, which iOS Safari
      cannot decode in an <audio> element — so a note recorded on desktop played
-     silently on an iPhone. Transcode webm/ogg → 64kbps mono MP3 (universally
-     playable); iOS's own mp4/aac is already portable and passes through. A
-     transcode failure falls back to the original blob (same behavior as before,
-     still playable on the recording browser). */
+     silently on an iPhone. Transcode webm/ogg → 16kHz mono WAV (universally
+     playable, zero encoder dependency); iOS's own mp4/aac is already portable
+     and passes through. A transcode failure falls back to the original blob
+     (same behavior as before, still playable on the recording browser). */
   let blob: Blob = input.blob;
   let mime = rawType;
   const baseType = rawType.split(";")[0].trim().toLowerCase();
   if (baseType === "audio/webm" || baseType === "audio/ogg") {
     try {
-      const { transcodeVoiceToMp3 } = await import("./voice-transcode");
-      blob = await transcodeVoiceToMp3(input.blob);
-      mime = "audio/mpeg";
+      const { transcodeVoiceToWav } = await import("./voice-transcode");
+      blob = await transcodeVoiceToWav(input.blob);
+      mime = "audio/wav";
     } catch (e) {
       console.error("[Discuss] Voice transcode failed — uploading original:", e);
     }
