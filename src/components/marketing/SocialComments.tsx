@@ -193,6 +193,7 @@ export default function SocialComments({ space }: { space: MarketingSpace }) {
                     canReply={data.canReply}
                     canHide={data.canHide}
                     onChange={(next) => changed(th.id, next)}
+                    onReconcile={() => void load()}
                   />
                 </div>
               </li>

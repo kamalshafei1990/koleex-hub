@@ -57,12 +57,16 @@ function refusal(t: Tr, json: Json): string {
 
 const textBtn = "inline-flex items-center gap-1 rounded-md px-1 text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]";
 
-export default function CommentThread({ thread, accountName, canReply, canHide, onChange }: {
+export default function CommentThread({ thread, accountName, canReply, canHide, onChange, onReconcile }: {
   thread: ThreadState;
   accountName: string;
   canReply: boolean;
   canHide: boolean;
   onChange: (next: ThreadState) => void;
+  /** The send's answer never arrived (or came back «already sent»): the
+   *  reply may still have landed — the caller reloads so the screen shows
+   *  what the server knows, not a stale thread. */
+  onReconcile?: () => void;
 }) {
   const { t } = useTranslation(COMMENTS_T);
   const [open, setOpen] = useState(false);
@@ -82,7 +86,14 @@ export default function CommentThread({ thread, accountName, canReply, canHide, 
     setError(null);
     const r = await call(`/api/marketing/comments/${target.id}/reply`, { message: text });
     setBusy(null);
-    if (!r.ok || !r.json?.comment) { setError(refusal(t, r.json)); return; }
+    if (!r.ok || !r.json?.comment) {
+      /* No answer at all (the network dropped a send the server may have
+         finished) or «already sent»: the reply may be in the thread — the
+         caller reloads, so the truth shows even though this send looked lost. */
+      if (!r.json || r.json.code === "duplicate") onReconcile?.();
+      setError(refusal(t, r.json));
+      return;
+    }
     onChange(settle({ ...thread, replies: [...thread.replies, r.json.comment as CommentView] }));
     setText("");
     setIdeas(null);

@@ -310,6 +310,9 @@ export default function SocialFeed({ space }: { space: MarketingSpace }) {
           )
         ) : columns.length === 0 ? (
           <div className="flex flex-col gap-4">
+            {loadError && (
+              <p role="status" className="rounded-xl border border-[#F59E0B]/35 bg-[#F59E0B]/10 px-4 py-3 text-[13px] text-[var(--text-primary)]">{t("refreshError")}</p>
+            )}
             <EmptyState
               icon={<span className="inline-flex gap-2"><BrandGlyph name="facebook" size={22} /><BrandGlyph name="instagram" size={22} /></span>}
               title={t("empty.title")}
@@ -649,6 +652,14 @@ function PostDetailView({ post, platform, accountName, t, onLoaded }: { post: Fe
     return () => { alive = false; };
   }, [post.id]);
 
+  /* A reply whose answer never arrived may still have landed: read the
+     post's comments again so the thread shows what the server knows. */
+  const reload = useCallback(() => {
+    fetch(`/api/marketing/feed/${post.id}`, { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<PostDetail>) : Promise.reject(new Error(String(res.status)))))
+      .then((d) => { setDetail(d); setThreads(toThreads(d.comments)); }, () => { /* keep what the screen has */ });
+  }, [post.id]);
+
   const full = detail?.post;
   const media = full && full.media.length ? full.media : post.thumb ? [post.thumb] : [];
   const shown = media[Math.min(index, media.length - 1)];
@@ -737,6 +748,7 @@ function PostDetailView({ post, platform, accountName, t, onLoaded }: { post: Fe
                     canReply={detail.canReply}
                     canHide={detail.canHide}
                     onChange={(next) => setThreads((list) => list.map((x) => (x.first.id === th.first.id ? next : x)))}
+                    onReconcile={reload}
                   />
                 </li>
               ))}
