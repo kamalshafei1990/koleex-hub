@@ -39,6 +39,8 @@ export interface MeBootstrapPayload {
   customersServerList?: boolean;
   /* Wave 2A.2: same for the Suppliers server-list internal cohort. */
   suppliersServerList?: boolean;
+  /* Wave 2A: same for the generic Contacts server-list internal cohort. */
+  contactsServerList?: boolean;
   /* When a super admin is "viewing as", the server fills this with
      either the target USER's identity (kind="account") or the target
      ROLE's identity (kind="role"). The banner renders on this; the

@@ -6,6 +6,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { getServerAuthOutcome, authFailureResponse } from "@/lib/server/auth";
 import { isInCustomersServerListCohort } from "@/lib/server/customers-rollout";
 import { isInSuppliersServerListCohort } from "@/lib/server/suppliers-rollout";
+import { isInContactsServerListCohort } from "@/lib/server/contacts-rollout";
 
 /* GET /api/me/bootstrap
    Consolidates the three hot per-page /api/me/* lookups (context,
@@ -155,6 +156,12 @@ export async function GET() {
     /* Wave 2A.2 controlled rollout: same trusted, server-resolved pattern for
        the Suppliers server-list UI. Independent cohort (own env var). */
     suppliersServerList: isInSuppliersServerListCohort(
+      auth.real_account_id ?? auth.account_id,
+      auth.user_type,
+    ),
+    /* Wave 2A: same trusted, server-resolved pattern for the generic Contacts
+       server-list UI. Independent cohort (own env var). */
+    contactsServerList: isInContactsServerListCohort(
       auth.real_account_id ?? auth.account_id,
       auth.user_type,
     ),
