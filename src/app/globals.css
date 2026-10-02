@@ -5209,6 +5209,14 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
    page's own padding utilities, and it is only ever on a real scroller. */
 .kx-dock-pad {
   padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)) !important;
+  /* Pages render their aurora backdrop as a fixed z-0 layer inside .kx-app.
+     A static scroller paints UNDER positioned z-0 layers, so the backdrop's
+     bottom radial gradient veiled whatever scrolled under it — the "dark
+     empty band" mid-page. Lifting the scroller into its own layer (same as
+     kx-bar-host z-[1]) makes content paint above the backdrop; the aurora
+     still shows through the page's transparent surfaces. */
+  position: relative;
+  z-index: 1;
 }
 /* When the shell's own scroller is the one that scrolls, a page root that is
    min-h-screen gets squeezed to the viewport by the flex column and its

@@ -242,7 +242,7 @@ export default function PaymentTermsManager({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by label, short code, or term code (T/T, OA, L/C, …)"
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
+            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
           />
         </div>
       </div>
@@ -388,7 +388,7 @@ function TermCard({
   }, [term, canEdit, onChanged]);
 
   return (
-    <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
+    <div className="kx-glass bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap mb-1">

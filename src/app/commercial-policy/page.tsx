@@ -138,7 +138,7 @@ function CommercialPolicyView() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 pb-28 space-y-6">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 space-y-6">
           {loading && <LoadingState />}
           {!loading && error && <ErrorState message={error} />}
           {!loading && !error && snapshot && (
@@ -200,38 +200,41 @@ const POLICY_SECTIONS: { id: string; label: string }[] = [
   { id: "cp-documents", label: "Documents" },
 ];
 
-function Anchor({ id, children }: { id: string; children: React.ReactNode }) {
+function Anchor({ id, hidden, children }: { id: string; hidden?: boolean; children: React.ReactNode }) {
   const { t } = useTranslation(commercialPolicyT);
-  return <div id={id} className="scroll-mt-20">{children}</div>;
+  return <div id={id} hidden={hidden} className="scroll-mt-20">{children}</div>;
 }
 
 function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
   const { t } = useTranslation(commercialPolicyT);
+  const [active, setActive] = useState<string>(POLICY_SECTIONS[0].id);
+  const is = (id: string) => active !== id;
+  const pricingIds = POLICY_SECTIONS.slice(0, 9).map((x) => x.id);
   return (
     <>
       <PolicyHealthStrip s={s} />
-      <PolicyNav />
+      <PolicyNav active={active} onSelect={setActive} />
       <InfoBanner />
       <PriceCalculatorCTA />
 
       {/* ── Pricing policy ── */}
-      <GroupLabel>{t("pricingPolicy", "Pricing policy")}</GroupLabel>
-      <Anchor id="cp-settings"><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
-      <Anchor id="cp-levels"><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
-      <Anchor id="cp-tiers"><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
-      <Anchor id="cp-markets"><MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} onCountriesPatch={(c) => { onPatch("bandCountries", c); onToast("Country segmentation saved"); }} /></Anchor>
-      <Anchor id="cp-channels"><ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} /></Anchor>
-      <Anchor id="cp-volume"><VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} /></Anchor>
-      <Anchor id="cp-discounts"><DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} /></Anchor>
-      <Anchor id="cp-commission"><CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} /></Anchor>
-      <Anchor id="cp-approvals"><ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} /></Anchor>
+      {pricingIds.includes(active) && <GroupLabel>{t("pricingPolicy", "Pricing policy")}</GroupLabel>}
+      <Anchor id="cp-settings" hidden={is("cp-settings")}><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
+      <Anchor id="cp-levels" hidden={is("cp-levels")}><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
+      <Anchor id="cp-tiers" hidden={is("cp-tiers")}><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
+      <Anchor id="cp-markets" hidden={is("cp-markets")}><MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} onCountriesPatch={(c) => { onPatch("bandCountries", c); onToast("Country segmentation saved"); }} /></Anchor>
+      <Anchor id="cp-channels" hidden={is("cp-channels")}><ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} /></Anchor>
+      <Anchor id="cp-volume" hidden={is("cp-volume")}><VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} /></Anchor>
+      <Anchor id="cp-discounts" hidden={is("cp-discounts")}><DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} /></Anchor>
+      <Anchor id="cp-commission" hidden={is("cp-commission")}><CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} /></Anchor>
+      <Anchor id="cp-approvals" hidden={is("cp-approvals")}><ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} /></Anchor>
 
       {/* ── Trade terms & logistics (master data) ── */}
-      <GroupLabel>Trade terms &amp; logistics</GroupLabel>
-      <Anchor id="cp-payment-terms"><PaymentTermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
-      <Anchor id="cp-incoterms"><IncotermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
-      <Anchor id="cp-shipping"><ShippingMethodsManager isSuperAdmin={isSuperAdmin} /></Anchor>
-      <Anchor id="cp-documents"><ShippingDocumentsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      {!pricingIds.includes(active) && <GroupLabel>Trade terms &amp; logistics</GroupLabel>}
+      <Anchor id="cp-payment-terms" hidden={is("cp-payment-terms")}><PaymentTermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-incoterms" hidden={is("cp-incoterms")}><IncotermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-shipping" hidden={is("cp-shipping")}><ShippingMethodsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-documents" hidden={is("cp-documents")}><ShippingDocumentsManager isSuperAdmin={isSuperAdmin} /></Anchor>
     </>
   );
 }
@@ -247,25 +250,36 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ─── Sticky section nav (jump links) ───────────────────────── */
-function PolicyNav() {
+/* ─── Sticky section nav (tab switcher — one section at a time) ── */
+function PolicyNav({ active, onSelect }: { active: string; onSelect: (id: string) => void }) {
   const { t } = useTranslation(commercialPolicyT);
   const jump = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    onSelect(id);
+    const scroller = document.querySelector(".kx-dock-pad");
+    if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
   };
   return (
-    <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--bg-primary)]/95 backdrop-blur border-b border-[var(--border-subtle)]">
+    <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--bg-secondary)] backdrop-blur-md border-b border-[var(--border-subtle)]">
       <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-        {POLICY_SECTIONS.map((sec) => (
-          <button
-            key={sec.id}
-            type="button"
-            onClick={() => jump(sec.id)}
-            className="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-secondary)] transition-colors"
-          >
-            {t(`sec.${sec.id}`, sec.label)}
-          </button>
-        ))}
+        {POLICY_SECTIONS.map((sec) => {
+          const isActive = sec.id === active;
+          return (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => jump(sec.id)}
+              className={
+                "shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full border transition-colors " +
+                (isActive
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                  : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-surface)]")
+              }
+            >
+              {t(`sec.${sec.id}`, sec.label)}
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
