@@ -56,7 +56,7 @@ type ListRow = {
   period_start: string | null; period_end: string | null; period_key: string | null;
   status: string; confidential: boolean; review_required: boolean; version: number; superseded: boolean;
   submitted_at: string | null; updated_at: string; tpl_head?: unknown;
-  work_report_recipients?: Array<{ role: string; read_at: string | null; acknowledged_at: string | null }>;
+  work_report_recipients?: Array<{ account_id?: string; role: string; read_at: string | null; acknowledged_at: string | null }>;
 };
 
 export async function GET(req: Request) {
@@ -82,6 +82,68 @@ export async function GET(req: Request) {
     if (ids.length) extraOr.push(`author_account_id.in.(${ids.join(",")})`);
   }
   const reqQ = { ...lr, q: lr.q.toLowerCase() };
+
+  /* Shared row mapper. inbox's !inner join already filtered recipients to me
+     ([0] is mine); box=all's inbox leg does the same, and its "mine" leg has
+     no recipient rows at all — so pick my row explicitly, then fall back. */
+  const toRow = (r: ListRow, nameOf: Map<string, { name: string; nameAlt: string | null }>) => {
+    const mineRow = r.work_report_recipients?.find((x) => x.account_id === me) ?? r.work_report_recipients?.[0] ?? null;
+    const author = nameOf.get(r.author_account_id);
+    return {
+      id: r.id, templateKey: r.template_key, title: r.title,
+      authorId: r.author_account_id, authorName: author?.name ?? "—", authorNameAlt: author?.nameAlt ?? null,
+      periodStart: r.period_start, periodEnd: r.period_end, periodKey: r.period_key,
+      status: r.status, confidential: r.confidential, reviewRequired: r.review_required, version: r.version,
+      submittedAt: r.submitted_at, updatedAt: r.updated_at,
+      myRole: mineRow?.role ?? null, readAt: mineRow?.read_at ?? null, acknowledgedAt: mineRow?.acknowledged_at ?? null,
+      ...(r.tpl_head ? { tpl: r.tpl_head } : {}),
+    };
+  };
+
+  if (box === "all") {
+    /* The search bar's global view: my own reports (drafts included — they
+       are most of what a writer has) PLUS reports addressed to me. The old
+       "search jumps to inbox" behaviour made search look broken for anyone
+       whose content lives in Drafts.
+       PostgREST cannot express "author = me OR recipient = me" in ONE query
+       (a child-table filter inside or() only works with an !inner embed,
+       which would drop every report I wrote but did not receive — measured
+       live: HTTP 500). So: two queries, merged in memory. The sets are
+       per-person and small; a 500-row cap each keeps the merge bounded. */
+    let mineQ = supabaseServer.from("work_reports")
+      .select(`${REPORT_LIST_COLS}, work_report_recipients(account_id, role, read_at, acknowledged_at)`)
+      .eq("author_account_id", me).eq("superseded", false).limit(500);
+    let inboxQ = supabaseServer.from("work_reports")
+      .select(`${REPORT_LIST_COLS}, work_report_recipients!inner(account_id, role, read_at, acknowledged_at)`)
+      .eq("work_report_recipients.account_id", me).neq("status", "draft").limit(500);
+    if (auth.tenant_id) { mineQ = mineQ.eq("tenant_id", auth.tenant_id); inboxQ = inboxQ.eq("tenant_id", auth.tenant_id); }
+    const [resMine, resInbox, people] = await Promise.all([
+      applyServerList(mineQ, reqQ, LIST_CFG, extraOr, { window: false }),
+      applyServerList(inboxQ, reqQ, LIST_CFG, extraOr, { window: false }),
+      peopleP,
+    ]);
+    if (resMine.error || resInbox.error) {
+      console.error("[api/work-reports GET all]", resMine.error?.message ?? resInbox.error?.message);
+      return NextResponse.json({ error: "Could not load reports." }, { status: 500 });
+    }
+    const byId = new Map<string, ListRow>();
+    for (const r of (resMine.data ?? []) as ListRow[]) byId.set(r.id, r);
+    for (const r of (resInbox.data ?? []) as ListRow[]) byId.set(r.id, r);
+    const sortCol = LIST_CFG.sortFields[lr.sort] ?? LIST_CFG.sortFields[LIST_CFG.defaultSort.field];
+    const sign = lr.dir === "asc" ? 1 : -1;
+    const merged = [...byId.values()].sort((a, b) => {
+      const av = String((a as unknown as Record<string, unknown>)[sortCol] ?? "");
+      const bv = String((b as unknown as Record<string, unknown>)[sortCol] ?? "");
+      return (av < bv ? -1 : av > bv ? 1 : 0) * sign;
+    });
+    const start = (lr.page - 1) * lr.pageSize;
+    const pageRows = merged.slice(start, start + lr.pageSize);
+    const nameOf = new Map(people.map((p) => [p.id, p]));
+    return NextResponse.json(
+      { rows: pageRows.map((r) => toRow(r, nameOf)), page: lr.page, pageSize: lr.pageSize, total: merged.length, hasMore: start + lr.pageSize < merged.length, q: lr.q, sort: lr.sort, dir: lr.dir },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
 
   let query;
   if (box === "mine") {
@@ -109,19 +171,7 @@ export async function GET(req: Request) {
     console.error("[api/work-reports GET]", error.message);
     return NextResponse.json({ error: "Could not load reports." }, { status: 500 });
   }
-  const rows = ((data ?? []) as ListRow[]).map((r) => {
-    const mineRow = r.work_report_recipients?.[0] ?? null;
-    const author = nameOf.get(r.author_account_id);
-    return {
-      id: r.id, templateKey: r.template_key, title: r.title,
-      authorId: r.author_account_id, authorName: author?.name ?? "—", authorNameAlt: author?.nameAlt ?? null,
-      periodStart: r.period_start, periodEnd: r.period_end, periodKey: r.period_key,
-      status: r.status, confidential: r.confidential, reviewRequired: r.review_required, version: r.version,
-      submittedAt: r.submitted_at, updatedAt: r.updated_at,
-      myRole: mineRow?.role ?? null, readAt: mineRow?.read_at ?? null, acknowledgedAt: mineRow?.acknowledged_at ?? null,
-      ...(r.tpl_head ? { tpl: r.tpl_head } : {}),
-    };
-  });
+  const rows = ((data ?? []) as ListRow[]).map((r) => toRow(r, nameOf));
   return NextResponse.json(
     { rows, page: lr.page, pageSize: lr.pageSize, total: count ?? null, hasMore: rows.length === lr.pageSize, q: lr.q, sort: lr.sort, dir: lr.dir },
     { headers: { "Cache-Control": "private, no-store" } },

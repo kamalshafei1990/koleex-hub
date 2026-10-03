@@ -51,8 +51,8 @@ const ComplianceTab = dynamic(() => import("./ComplianceTab"), { ssr: false, loa
 const TemplatesTab = dynamic(() => import("./TemplatesTab"), { ssr: false, loading: () => <div className={`${CARD} grid place-items-center py-14`}><SpinnerIcon size={18} /></div> });
 const TeamSummary = dynamic(() => import("./TeamSummary"), { ssr: false, loading: () => <div className={`${CARD} mb-4 grid place-items-center py-10`}><SpinnerIcon size={16} /></div> });
 
-type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates";
-const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates"];
+type Tab = "home" | "inbox" | "mine" | "team" | "compliance" | "library" | "templates" | "search";
+const TABS: Tab[] = ["home", "inbox", "mine", "team", "compliance", "library", "templates", "search"];
 const WARM_KEY = "kx:reports:bundle";
 /** The home's words and every type's name. Never the whole Reports
  *  dictionary: the report page's words stay with the report page (26 Sep). */
@@ -178,7 +178,21 @@ export default function ReportsApp() {
   ];
 
   const [query, setQuery] = useState("");
-  const onSearch = (q: string) => { setQuery(q); if (tab === "home" || tab === "library") setTab("inbox"); };
+  /* Search is GLOBAL, not per-box: the old version dropped the searcher into
+     Inbox, so anyone whose reports live in Drafts/My reports (the owner's 10
+     drafts vs 1 inbox item) searched and saw an empty page — "the search bar
+     does not work". Submitting still opens the full reports results view
+     (box=all: my reports + addressed to me), but the star is the smart
+     dropdown: suggestions from across the whole Hub appear as you type. */
+  const onSearch = (q: string) => { setQuery(q); setTab("search"); };
+  const suggestLabels = {
+    templates: t("search.group.templates"),
+    reports: t("search.group.reports"),
+    products: t("search.group.products"),
+    contacts: t("search.group.contacts"),
+    todos: t("search.group.todos"),
+    notes: t("search.group.notes"),
+  };
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
@@ -203,7 +217,7 @@ export default function ReportsApp() {
         </div>
 
         <div className="mt-4 mb-4">
-          <AppHomeMenu searchPlaceholder={t("search.placeholder")} onSearchSubmit={onSearch} navItems={navItems} />
+          <AppHomeMenu searchPlaceholder={t("search.placeholder")} onSearchSubmit={onSearch} globalSuggest suggestLabels={suggestLabels} navItems={navItems} />
         </div>
 
         {loadError && !bundle && (
@@ -216,6 +230,7 @@ export default function ReportsApp() {
           {tab === "home" && <Home t={t} lang={lang} bundle={bundle} ready={!!bundle && !!descs} failed={loadError && !bundle} creating={creating} createError={createError} onStart={start} onOpenInbox={() => setTab("inbox")} />}
           {tab === "team" && bundle?.me.hasTeam && <TeamSummary t={t} lang={lang} />}
           {(tab === "inbox" || tab === "mine" || tab === "team") && <ReportList t={t} lang={lang} box={tab} query={query} accountId={bundle?.me.id ?? null} />}
+          {tab === "search" && <ReportList t={t} lang={lang} box="all" query={query} accountId={bundle?.me.id ?? null} />}
           {tab === "compliance" && <ComplianceTab t={t} lang={lang} />}
           {tab === "library" && <Library t={t} bundle={bundle} />}
           {tab === "templates" && (bundle?.me.templates
@@ -422,14 +437,16 @@ function DueCard({ t, due, creating, onStart }: { t: T; due: DueItem[]; creating
 
 /* ── Inbox / My reports / Team: server-side lists ──────────────────────── */
 
-function ReportList({ t, lang, box, query, accountId }: { t: T; lang: string; box: "inbox" | "mine" | "team"; query: string; accountId: string | null }) {
+function ReportList({ t, lang, box, query, accountId }: { t: T; lang: string; box: "inbox" | "mine" | "team" | "all"; query: string; accountId: string | null }) {
   const list = useServerList<ReportListRow>({
     resource: `work-reports:${box}`,
     endpoint: "/api/work-reports",
     scope: { accountId },
     fixedParams: { box },
     pageSize: 25,
-    initialSort: { field: box === "mine" ? "updated" : "submitted", dir: "desc" },
+    /* "all" is the search view: sort by last touch so drafts (no
+       submitted_at) never sink to the bottom. */
+    initialSort: { field: box === "mine" || box === "all" ? "updated" : "submitted", dir: "desc" },
   });
   const { setQuery } = list;
   useEffect(() => { setQuery(query); }, [query, setQuery]);
@@ -439,7 +456,7 @@ function ReportList({ t, lang, box, query, accountId }: { t: T; lang: string; bo
     return <div className={`${CARD} px-5 py-8 text-center text-[13px] text-[var(--text-dim)]`}>{t("err.generic")} <button type="button" onClick={() => void list.refetch()} className="ms-2 underline">↻</button></div>;
   }
   if (list.rows.length === 0) {
-    return <div className={`${CARD} px-5 py-12 text-center text-[13px] text-[var(--text-dim)]`}>{query ? t("empty.search") : box === "mine" ? t("empty.mine") : box === "team" ? t("empty.team") : t("empty.inbox")}</div>;
+    return <div className={`${CARD} px-5 py-12 text-center text-[13px] text-[var(--text-dim)]`}>{query || box === "all" ? t("empty.search") : box === "mine" ? t("empty.mine") : box === "team" ? t("empty.team") : t("empty.inbox")}</div>;
   }
   return (
     <section className={`${CARD} p-2 sm:p-3`}>
