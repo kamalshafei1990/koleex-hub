@@ -20,9 +20,11 @@
 import { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
 import { computeWaveform } from "./VoiceRecorder";
 
 const CANCEL_DY_PX = 64;
+const CONVERT_DX_PX = 72;
 const MIN_CLIP_MS = 700;
 const MAX_CLIP_MS = 60_000;
 
@@ -34,13 +36,21 @@ export interface PushToTalkBarProps {
     durationMs: number;
     waveform: number[];
   }) => Promise<void> | void;
+  /** WeChat's "slide right → Convert to Text": fires on release-in-convert-
+   *  zone with the raw clip (NO waveform — nothing is displayed or stored).
+   *  Resolves true when the words landed in the composer, false when the
+   *  conversion failed (the bar flashes it). Optional: no prop, no gesture. */
+  onConvertToText?: (input: { blob: Blob; durationMs: number }) => Promise<boolean>;
   labels: {
     holdToTalk: string;
     releaseToSend: string;
     releaseToCancel: string;
+    releaseToConvert: string;
     tooShort: string;
     permissionDenied: string;
     sending: string;
+    converting: string;
+    convertFailed: string;
   };
 }
 
@@ -49,8 +59,10 @@ type BarState =
   | "requesting"
   | "recording"
   | "sending"
+  | "converting"
   | "denied"
-  | "tooShort";
+  | "tooShort"
+  | "convertFailed";
 
 function formatClock(ms: number): string {
   const total = Math.floor(ms / 1000);
@@ -61,10 +73,11 @@ function formatClock(ms: number): string {
   return `${mm}:${ss}`;
 }
 
-export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
+export default function PushToTalkBar({ onSend, onConvertToText, labels }: PushToTalkBarProps) {
   const [state, setState] = useState<BarState>("idle");
   const [durationMs, setDurationMs] = useState(0);
   const [willCancel, setWillCancel] = useState(false);
+  const [willConvert, setWillConvert] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -78,7 +91,11 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
      sequence on iOS — refs are the only reliable source of truth here. */
   const gestureActiveRef = useRef(false);
   const willCancelRef = useRef(false);
+  const willConvertRef = useRef(false);
+  const convertEnabledRef = useRef(!!onConvertToText);
+  convertEnabledRef.current = !!onConvertToText;
   const startYRef = useRef(0);
+  const startXRef = useRef(0);
   /* Set when the finger lifts while the mic permission/start is still in
      flight; the pending start then aborts instead of recording with nobody
      holding the bar. */
@@ -182,18 +199,42 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
     const heldMs = Date.now() - startTimeRef.current;
     const tooShort = !willCancelRef.current && heldMs < MIN_CLIP_MS;
     const cancel = willCancelRef.current || tooShort;
+    const convert = !cancel && willConvertRef.current;
     const blob = new Blob(chunksRef.current, {
       type: mr.mimeType || preferred || "audio/webm",
     });
     chunksRef.current = [];
     teardown();
     setWillCancel(false);
+    setWillConvert(false);
     setDurationMs(0);
     if (cancel) {
       if (tooShort) {
         setState("tooShort");
         flashTimerRef.current = window.setTimeout(() => setState("idle"), 1200);
       } else {
+        setState("idle");
+      }
+      return;
+    }
+    /* Convert-to-Text (WeChat slide-right): the clip goes to the transcriber
+       and is never stored — no waveform needed, so the expensive decode is
+       skipped entirely. */
+    if (convert) {
+      if (!onConvertToText) {
+        setState("idle");
+        return;
+      }
+      setState("converting");
+      try {
+        const ok = await onConvertToText({ blob, durationMs: heldMs });
+        if (ok) {
+          setState("idle");
+        } else {
+          setState("convertFailed");
+          flashTimerRef.current = window.setTimeout(() => setState("idle"), 1600);
+        }
+      } catch {
         setState("idle");
       }
       return;
@@ -232,7 +273,7 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
 
   /* ── Pointer gesture ─────────────────────────────────────────────── */
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (state === "sending") return;
+    if (state === "sending" || state === "converting") return;
     e.preventDefault();
     /* Capture so move/up keep firing when the finger slides off the bar —
        that's exactly the slide-up-to-cancel path. Guarded: synthetic or
@@ -245,16 +286,29 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
     }
     gestureActiveRef.current = true;
     willCancelRef.current = false;
+    willConvertRef.current = false;
     setWillCancel(false);
+    setWillConvert(false);
     startYRef.current = e.clientY;
+    startXRef.current = e.clientX;
     void start();
   };
   const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!gestureActiveRef.current) return;
-    const cancel = startYRef.current - e.clientY > CANCEL_DY_PX;
+    const dy = startYRef.current - e.clientY;
+    const dx = e.clientX - startXRef.current;
+    /* Two zones (WeChat): slide UP cancels, slide RIGHT converts. A diagonal
+       resolves to the dominant axis; the upward cancel wins ties because
+       throwing a recording away must never need precision. */
+    const cancel = dy > CANCEL_DY_PX && dy >= dx;
+    const convert = !cancel && convertEnabledRef.current && dx > CONVERT_DX_PX && dx > dy;
     if (cancel !== willCancelRef.current) {
       willCancelRef.current = cancel;
       setWillCancel(cancel);
+    }
+    if (convert !== willConvertRef.current) {
+      willConvertRef.current = convert;
+      setWillConvert(convert);
     }
   };
   const onPointerUp = () => {
@@ -274,13 +328,17 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
   const label =
     state === "sending"
       ? labels.sending
-      : state === "denied"
-        ? labels.permissionDenied
-        : state === "tooShort"
-          ? labels.tooShort
-          : recording
-            ? labels.releaseToSend
-            : labels.holdToTalk;
+      : state === "converting"
+        ? labels.converting
+        : state === "convertFailed"
+          ? labels.convertFailed
+          : state === "denied"
+            ? labels.permissionDenied
+            : state === "tooShort"
+              ? labels.tooShort
+              : recording
+                ? labels.releaseToSend
+                : labels.holdToTalk;
 
   return (
     <>
@@ -291,10 +349,10 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
-        disabled={state === "sending"}
+        disabled={state === "sending" || state === "converting"}
         aria-label={labels.holdToTalk}
         className={`flex h-9 flex-1 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-[13px] font-semibold select-none touch-none transition-colors ${
-          state === "denied" || state === "tooShort"
+          state === "denied" || state === "tooShort" || state === "convertFailed"
             ? "border-red-500/40 bg-red-500/10 text-red-500 dark:text-red-300"
             : recording
               ? "border-[var(--border-color)] bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
@@ -302,26 +360,34 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
         }`}
         style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
       >
-        {state === "sending" && <SpinnerIcon className="h-4 w-4" />}
+        {(state === "sending" || state === "converting") && <SpinnerIcon className="h-4 w-4" />}
         {/* WeChat: the bar is plain centered text — no icon on the bar
             itself; the mic lives in the floating HUD while recording. */}
         <span className="truncate">{label}</span>
       </button>
 
       {/* Recording HUD — floats above the composer, centered, and never
-          intercepts the gesture (pointer-events-none). */}
+          intercepts the gesture (pointer-events-none). Slide UP flips it red
+          (cancel); slide RIGHT flips it green with the text glyph (WeChat's
+          Convert to Text). */}
       {recording && (
         <div className="fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none">
           <div
             className={`flex flex-col items-center gap-1.5 rounded-2xl px-6 py-4 shadow-2xl transition-colors ${
               willCancel
                 ? "bg-red-500 text-white"
-                : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                : willConvert
+                  ? "bg-emerald-600 text-white"
+                  : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
             }`}
           >
             <div className="relative">
-              <MicrophoneIcon className="h-8 w-8" />
-              {!willCancel && (
+              {willConvert ? (
+                <TypeIcon className="h-8 w-8" />
+              ) : (
+                <MicrophoneIcon className="h-8 w-8" />
+              )}
+              {!willCancel && !willConvert && (
                 <span className="absolute inset-0 rounded-full border-2 border-current animate-ping opacity-40" />
               )}
             </div>
@@ -329,7 +395,11 @@ export default function PushToTalkBar({ onSend, labels }: PushToTalkBarProps) {
               {formatClock(durationMs)}
             </span>
             <span className="text-[11px] opacity-80">
-              {willCancel ? labels.releaseToCancel : labels.releaseToSend}
+              {willCancel
+                ? labels.releaseToCancel
+                : willConvert
+                  ? labels.releaseToConvert
+                  : labels.releaseToSend}
             </span>
           </div>
         </div>

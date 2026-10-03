@@ -136,6 +136,9 @@ import {
   renameChannel,
   leaveChannel,
   archiveChannel,
+  transcribeVoiceMessage,
+  discardVoiceTranscript,
+  transcribeAudioBlob,
   type DiscussChannelListRow,
 } from "@/lib/discuss";
 import { findMentionQuery, normalizeMentions, rankMentionCandidates } from "@/lib/discuss-mentions";
@@ -214,6 +217,7 @@ import type {
   ProductRow,
 } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
 
 /* Heavy, rarely-opened surfaces load on first use instead of riding the
    Discuss bundle: pickers, modals, the recorder, the lightbox, the AI chat
@@ -2888,6 +2892,70 @@ export default function DiscussApp() {
     [selectedChannelId, showToast, showError, t],
   );
 
+  /* ---- Voice "Convert to text" (WeChat) ----------------------------------
+     The transcript lives on the message itself, so a local patch of the
+     voice media item is all the UI needs — the next server refetch agrees
+     with it because the action stored the same words. */
+  const patchVoiceTranscript = useCallback(
+    (messageId: string, transcript: { text: string; lang: string | null } | null) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const media = (m.metadata?.media ?? []).map((item) => {
+            if (item.kind !== "voice") return item;
+            if (transcript) return { ...item, transcript };
+            const next = { ...item };
+            delete next.transcript;
+            return next;
+          });
+          return { ...m, metadata: { ...m.metadata, media } };
+        }),
+      );
+    },
+    [],
+  );
+
+  /* Ref, not state: the menu closes the moment the action starts, so the
+     "converting" state is a toast — nothing in the tree needs to re-render. */
+  const transcribingRef = useRef<Set<string>>(new Set());
+
+  const handleTranscribeVoice = useCallback(
+    async (messageId: string) => {
+      if (transcribingRef.current.has(messageId)) return;
+      transcribingRef.current.add(messageId);
+      showToast(t("voice.converting", "Converting…"));
+      const out = await transcribeVoiceMessage(messageId);
+      transcribingRef.current.delete(messageId);
+      if (out) patchVoiceTranscript(messageId, out);
+      else showError(t("voice.convertFailed", "Couldn't convert this recording."));
+    },
+    [patchVoiceTranscript, showToast, showError, t],
+  );
+
+  const handleDiscardTranscript = useCallback(
+    async (messageId: string) => {
+      const ok = await discardVoiceTranscript(messageId);
+      if (ok) patchVoiceTranscript(messageId, null);
+      else showError(t("error.generic", "Something went wrong."));
+    },
+    [patchVoiceTranscript, showError, t],
+  );
+
+  /* Push-to-talk "slide right → Convert to Text": the clip is transcribed
+     WITHOUT being stored, the words land in the composer and the keyboard
+     comes back (WeChat) so the sender can edit before sending. */
+  const handlePttConvert = useCallback(
+    async (input: { blob: Blob; durationMs: number }): Promise<boolean> => {
+      const out = await transcribeAudioBlob(input.blob);
+      if (!out || !out.text.trim()) return false;
+      setComposerBody((prev) => (prev.trim() ? `${prev.trimEnd()} ${out.text}` : out.text));
+      setPttMode(false);
+      window.setTimeout(() => composerRef.current?.focus(), 60);
+      return true;
+    },
+    [],
+  );
+
   const handleStartReply = useCallback(
     (msg: DiscussMessageWithAuthor) => {
       setReplyTarget(msg);
@@ -4227,6 +4295,8 @@ export default function DiscussApp() {
                     onUnpin={handleUnpin}
                     onStar={handleStar}
                     onCopyLink={handleCopyLink}
+                    onTranscribeVoice={handleTranscribeVoice}
+                    onDiscardTranscript={handleDiscardTranscript}
                     onReply={handleStartReply}
                     onOpenThread={handleOpenThread}
                     onToggleReaction={handleToggleReaction}
@@ -4309,6 +4379,7 @@ export default function DiscussApp() {
                 onOpenVoice={() => setVoiceOpen(true)}
                 onCloseVoice={() => setVoiceOpen(false)}
                 onSendVoice={handleSendVoice}
+                onConvertVoiceToText={handlePttConvert}
                 pttMode={pttMode}
                 onTogglePtt={() => {
                   /* Voice-mode toggle (phones): closing the preview recorder
@@ -4833,6 +4904,9 @@ type MessageListProps = {
   onUnpin: (messageId: string) => void;
   onStar: (messageId: string) => void;
   onCopyLink: (messageId: string) => void;
+  /** "Convert to text" on a voice message; "Discard converted text" removes it. */
+  onTranscribeVoice: (messageId: string) => void;
+  onDiscardTranscript: (messageId: string) => void;
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
@@ -4983,6 +5057,8 @@ function MessageList(props: MessageListProps) {
             onUnpin={props.onUnpin}
             onStar={props.onStar}
             onCopyLink={props.onCopyLink}
+            onTranscribeVoice={props.onTranscribeVoice}
+            onDiscardTranscript={props.onDiscardTranscript}
             onReply={props.onReply}
             onOpenThread={props.onOpenThread}
             onToggleReaction={props.onToggleReaction}
@@ -5124,6 +5200,9 @@ type MessageBubbleProps = {
   onUnpin: (messageId: string) => void;
   onStar: (messageId: string) => void;
   onCopyLink: (messageId: string) => void;
+  /** "Convert to text" on a voice message; "Discard converted text" removes it. */
+  onTranscribeVoice: (messageId: string) => void;
+  onDiscardTranscript: (messageId: string) => void;
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
@@ -5229,6 +5308,8 @@ function MessageBubble({
   onUnpin,
   onStar,
   onCopyLink,
+  onTranscribeVoice,
+  onDiscardTranscript,
   onReply,
   onOpenThread,
   onToggleReaction,
@@ -5563,6 +5644,14 @@ function MessageBubble({
                   durationMs={voiceMedia.duration_ms ?? 0}
                   waveform={voiceMedia.waveform ?? []}
                 />
+                {/* "Convert to text" result (WeChat): the words sit in a quiet
+                    sub-bubble under the voice note; long-press → "Discard
+                    converted text" removes them. */}
+                {voiceMedia.transcript && (
+                  <div className="mt-1.5 max-w-[320px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap">
+                    {voiceMedia.transcript.text}
+                  </div>
+                )}
               </div>
             ) : (
               msg.body && (
@@ -5769,6 +5858,31 @@ function MessageBubble({
                 closeMenu();
               }}
             />
+            {/* Voice notes: WeChat's "Convert to text" — the words appear in a
+                sub-bubble under the recording; once converted, the entry flips
+                to "Discard converted text". Temp bubbles have no canonical id
+                yet, so the server action cannot resolve them. */}
+            {msg.kind === "voice" && voiceMedia && !isTemp && (
+              voiceMedia.transcript ? (
+                <MessageMenuItem
+                  icon={<TypeIcon className="h-4 w-4" />}
+                  label={t("voice.discardTranscript", "Discard converted text")}
+                  onClick={() => {
+                    onDiscardTranscript(msg.id);
+                    closeMenu();
+                  }}
+                />
+              ) : (
+                <MessageMenuItem
+                  icon={<TypeIcon className="h-4 w-4" />}
+                  label={t("voice.convertToText", "Convert to text")}
+                  onClick={() => {
+                    onTranscribeVoice(msg.id);
+                    closeMenu();
+                  }}
+                />
+              )
+            )}
             {/* Photos: save to disk. The packaged desktop shell has no native
                 image context menu, so the action has to be offered here — and
                 it belongs in the message's OWN menu rather than a second one
@@ -6136,6 +6250,7 @@ function Composer({
   onOpenVoice,
   onCloseVoice,
   onSendVoice,
+  onConvertVoiceToText,
   pttMode,
   onTogglePtt,
   uploading,
@@ -6187,6 +6302,10 @@ function Composer({
     durationMs: number;
     waveform: number[];
   }) => Promise<void>;
+  /** Push-to-talk "slide right → Convert to Text": the clip is transcribed
+   *  WITHOUT being stored; the parent drops the words into the composer.
+   *  Resolves false when conversion failed so the bar can flash it. */
+  onConvertVoiceToText?: (input: { blob: Blob; durationMs: number }) => Promise<boolean>;
   /** WeChat push-to-talk mode (phones only): swaps the text field for a
    *  hold-to-talk bar. The toggle button stays where WeChat puts it —
    *  left of the field, flipping between mic and keyboard glyphs. */
@@ -6496,13 +6615,17 @@ function Composer({
             <div className="hidden max-md:flex flex-1 min-w-0">
               <PushToTalkBar
                 onSend={(input) => onSendVoice(input)}
+                onConvertToText={onConvertVoiceToText}
                 labels={{
                   holdToTalk: t("voice.holdToTalk", "Hold to Talk"),
                   releaseToSend: t("voice.releaseToSend", "Release to send · slide up to cancel"),
                   releaseToCancel: t("voice.releaseToCancel", "Release to cancel"),
+                  releaseToConvert: t("voice.releaseToConvert", "Release to convert to text"),
                   tooShort: t("voice.tooShort", "Too short"),
                   permissionDenied: t("voice.permissionDenied", "Microphone permission denied"),
                   sending: t("voice.sending", "Sending…"),
+                  converting: t("voice.converting", "Converting…"),
+                  convertFailed: t("voice.convertFailed", "Couldn't convert this recording"),
                 }}
               />
             </div>

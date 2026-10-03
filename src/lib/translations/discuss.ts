@@ -461,6 +461,13 @@ export const discussT: Translations = {
   "voice.releaseToCancel":   { en: "Release to cancel",       zh: "松开取消",              ar: "اترك للإلغاء" },
   "voice.tooShort":          { en: "Too short",               zh: "说话时间太短",           ar: "قصير جدًا" },
   "voice.sending":           { en: "Sending…",                zh: "发送中…",               ar: "جارٍ الإرسال…" },
+  /* Convert to text (WeChat): on a received/sent voice note via the message
+     menu; while recording via slide-right on the hold-to-talk bar. */
+  "voice.convertToText":     { en: "Convert to text",         zh: "转文字",                ar: "تحويل إلى نص" },
+  "voice.converting":        { en: "Converting…",             zh: "转换中…",               ar: "جارٍ التحويل…" },
+  "voice.convertFailed":     { en: "Couldn't convert this recording", zh: "无法转换此录音",  ar: "تعذّر تحويل هذا التسجيل" },
+  "voice.discardTranscript": { en: "Discard converted text",  zh: "删除转换的文字",          ar: "حذف النص المحوَّل" },
+  "voice.releaseToConvert":  { en: "Release to convert to text", zh: "松开转文字",           ar: "اترك للتحويل إلى نص" },
   /* Mobile "⊕" more-panel tiles (WeChat grid) */
   "composer.tile.files":     { en: "Files",                   zh: "文件",                 ar: "ملفات" },
   "composer.tile.mention":   { en: "Mention",                 zh: "提醒谁看",              ar: "إشارة" },

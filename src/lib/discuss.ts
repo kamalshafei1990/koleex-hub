@@ -444,6 +444,49 @@ export async function deleteDiscussMessage(id: string): Promise<boolean> {
   return (await discussMutate("deleteMessage", { id })).ok;
 }
 
+/** "Convert to text" on a voice note (WeChat). The server reads the audio
+ *  from the private bucket, transcribes it and stores the words on the
+ *  message; every member sees the same transcript. Returns null on any
+ *  failure — the caller flashes a gentle error, the recording is untouched. */
+export async function transcribeVoiceMessage(
+  id: string,
+): Promise<{ text: string; lang: string | null } | null> {
+  const res = await discussMutate<{ text: string; lang: string | null }>(
+    "transcribeVoiceMessage",
+    { id },
+  );
+  return res.ok ? (res.data ?? null) : null;
+}
+
+/** Remove a voice note's stored transcript ("Discard converted text"). */
+export async function discardVoiceTranscript(id: string): Promise<boolean> {
+  return (await discussMutate("discardVoiceTranscript", { id })).ok;
+}
+
+/** Dictation: raw recorder bytes in, the words out — NOTHING is stored and
+ *  no message is created. The push-to-talk "Convert to Text" flow drops the
+ *  result into the composer so the sender can edit before sending. */
+export async function transcribeAudioBlob(
+  blob: Blob,
+): Promise<{ text: string; lang: string | null } | null> {
+  try {
+    const res = await fetch("/api/discuss/transcribe-audio", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": blob.type || "audio/webm" },
+      body: blob,
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      data?: { text: string; lang: string | null };
+    };
+    if (!res.ok || !json.ok || !json.data) return null;
+    return json.data;
+  } catch {
+    return null;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Reactions
    ═══════════════════════════════════════════════════════════════════════ */

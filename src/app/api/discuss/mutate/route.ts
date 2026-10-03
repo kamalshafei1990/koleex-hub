@@ -35,6 +35,8 @@ import {
   isClientKind,
   sanitizeMessageMetadataForStorage,
 } from "@/lib/server/discuss-validate";
+import { discussMediaList } from "@/lib/server/discuss-media";
+import { transcribe } from "@/lib/server/ai/speech";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { stageTimer } from "@/lib/server/perf";
@@ -78,6 +80,12 @@ const ACTION_PERMISSION: Record<string, ModuleAction> = {
   setMemberRole: "edit",
   editMessage: "create",
   deleteMessage: "create",
+  /* Reading a voice note's words back is a read-equivalent: anyone who may
+     play the recording may ask for its transcript. */
+  transcribeVoiceMessage: "view",
+  /* Removing the stored transcript rewrites the shared message — same tier
+     as editing one's own message (authorship re-checked in the action). */
+  discardVoiceTranscript: "create",
   pinMessage: "edit",
   unpinMessage: "edit",
   leaveChannel: "view",
@@ -803,6 +811,106 @@ export async function POST(req: Request) {
         if (error) return bad(error.message, 500);
         await touchChannel(msg.channel_id);
         await pingChannelActivity(msg.channel_id, await channelMemberIds(msg.channel_id));
+        return NextResponse.json({ ok: true });
+      }
+
+      /* ---- Voice transcript ("Convert to text") --------------------------
+         WeChat's long-press → "Convert to text". The words are stored on the
+         message itself (metadata.voice.transcript) so every member sees the
+         same transcript and it dies with the message's soft delete. The audio
+         is fetched server-side from the private bucket — the client never
+         sends a path and never receives one. */
+      case "transcribeVoiceMessage": {
+        const id = str(p.id);
+        if (!id) return bad("id required");
+        const msg = await loadMessage(id);
+        if (!msg || msg.deleted_at) return bad("Message not found", 404);
+        if (!(await isMember(msg.channel_id))) return bad("Not a member of this channel", 403);
+        const { data: row } = await supabaseServer
+          .from(MESSAGES)
+          .select("metadata")
+          .eq("id", id)
+          .maybeSingle();
+        const meta = (row?.metadata ?? {}) as Record<string, unknown>;
+        const voice = discussMediaList(meta).find((m) => m.kind === "voice");
+        if (!voice || !voice.path) return bad("This message has no voice note", 400);
+        /* Idempotent: a second tap (or a retry) returns the stored words
+           instead of paying the provider again. */
+        if (voice.transcript) return NextResponse.json({ ok: true, data: voice.transcript });
+
+        const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+        const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+        if (!supabaseUrl || !serviceKey) return bad("Storage unavailable", 503);
+        let bytes: Uint8Array;
+        try {
+          const res = await fetch(
+            `${supabaseUrl}/storage/v1/object/${voice.bucket}/${encodeURI(voice.path)}`,
+            {
+              headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+              signal: AbortSignal.timeout(30_000),
+            },
+          );
+          if (!res.ok) return bad("Voice note unavailable", 404);
+          const len = Number(res.headers.get("content-length") ?? "0");
+          if (len > 10 * 1024 * 1024) return bad("Voice note too large", 413);
+          bytes = new Uint8Array(await res.arrayBuffer());
+        } catch {
+          return bad("Voice note unavailable", 504);
+        }
+        const out = await transcribe(bytes, voice.type);
+        /* Every provider failure is a soft "no" — the recording itself is
+           untouched and the user can try again. */
+        if (!out) return bad("Couldn't convert this recording", 502);
+        const rawVoice = (meta.voice ?? {}) as Record<string, unknown>;
+        const { error } = await supabaseServer
+          .from(MESSAGES)
+          .update({
+            metadata: {
+              ...meta,
+              voice: {
+                ...rawVoice,
+                transcript: { text: out.text, lang: out.lang, at: new Date().toISOString() },
+              },
+            },
+          })
+          .eq("id", id)
+          .is("deleted_at", null);
+        if (error) return bad(error.message, 500);
+        await touchChannel(msg.channel_id);
+        await emitPings([{ topic: rtTopic.channel(msg.channel_id) }]);
+        return NextResponse.json({ ok: true, data: { text: out.text, lang: out.lang } });
+      }
+
+      case "discardVoiceTranscript": {
+        const id = str(p.id);
+        if (!id) return bad("id required");
+        const msg = await loadMessage(id);
+        if (!msg || msg.deleted_at) return bad("Message not found", 404);
+        /* The author rewrites their own message; a channel admin may clean up
+           anyone's — the same split deleteMessage uses. */
+        const own = msg.author_account_id === me;
+        if (!own && !(isSA || (await isChannelAdmin(msg.channel_id)))) {
+          return bad("Not allowed to change this message", 403);
+        }
+        if (!(await isMember(msg.channel_id))) return bad("Not a member of this channel", 403);
+        const { data: row } = await supabaseServer
+          .from(MESSAGES)
+          .select("metadata")
+          .eq("id", id)
+          .maybeSingle();
+        const meta = (row?.metadata ?? {}) as Record<string, unknown>;
+        const rawVoice = (meta.voice ?? null) as Record<string, unknown> | null;
+        if (!rawVoice || rawVoice.transcript === undefined) return NextResponse.json({ ok: true });
+        const nextVoice = { ...rawVoice };
+        delete nextVoice.transcript;
+        const { error } = await supabaseServer
+          .from(MESSAGES)
+          .update({ metadata: { ...meta, voice: nextVoice } })
+          .eq("id", id)
+          .is("deleted_at", null);
+        if (error) return bad(error.message, 500);
+        await touchChannel(msg.channel_id);
+        await emitPings([{ topic: rtTopic.channel(msg.channel_id) }]);
         return NextResponse.json({ ok: true });
       }
 

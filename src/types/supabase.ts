@@ -1481,6 +1481,9 @@ export interface DiscussMediaPublic {
   kind: "attachment" | "voice";
   duration_ms?: number;
   waveform?: number[];
+  /** A voice note's converted text ("Convert to text") — display data only,
+   *  never an object location. */
+  transcript?: { text: string; lang: string | null };
 }
 
 export interface DiscussMessageMetadata {
