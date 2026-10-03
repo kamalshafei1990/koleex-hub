@@ -67,7 +67,7 @@ export default function DiscussModalShell({
         className="kx-app kx-glass-pop kx-pop-in relative m-auto w-full rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden outline-none"
         style={{ maxWidth: width }}
       >
-        <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+        <div className="h-14 shrink-0 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <h2 id={titleId} className="text-[14px] font-semibold text-[var(--text-primary)]">
             {title}
           </h2>

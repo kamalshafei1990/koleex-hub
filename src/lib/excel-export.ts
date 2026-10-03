@@ -406,7 +406,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
            way the result passes through downscaleForCell — the embedded
            bytes are ALWAYS thumbnail-sized. */
         const raw =
-          (await fetchImageBase64(cdnImage(u, { width: 256, quality: 75 }))) ??
+          (await fetchImageBase64(cdnImage(u, { width: 256, quality: 75, resize: "contain" }))) ??
           (await fetchImageBase64(u));
         return raw ? downscaleForCell(raw) : null;
       }),

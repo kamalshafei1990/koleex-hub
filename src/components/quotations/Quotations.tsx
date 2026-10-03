@@ -2011,7 +2011,7 @@ export default function Quotations() {
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
       // Column order matches the document: NO. · ITEM · MODEL · PICTURE · UNIT PRICE · QTY · TOTAL
       rows.push([n, it.description || "", it.model || "", "", money(it.unitPrice), Number(it.qty) || 0, lineTotal]);
-      images.push(it.image ? cdnImage(it.image, { width: 256, quality: 75 }) : null);
+      images.push(it.image ? cdnImage(it.image, { width: 256, quality: 75, resize: "contain" }) : null);
     }
 
     const TL = docLabels(q.docLang);

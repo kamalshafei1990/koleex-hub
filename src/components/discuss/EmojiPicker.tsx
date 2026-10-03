@@ -7,7 +7,11 @@ import type { DiscussT } from "./discuss-shared";
    EMOJI PICKER — compact static palette (full emoji search ships in Phase B)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const EMOJI_PALETTE = [
+/* Desktop modal emoji picker. On phones Discuss renders the inline
+   EmojiPanel under the composer instead (WeChat style) — this modal is
+   wrapped in max-md:hidden at the call site. The palette is exported for
+   the panel so both surfaces offer the exact same set. */
+export const EMOJI_PALETTE = [
   "😀", "😁", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍",
   "🥰", "😘", "😗", "😎", "🤓", "🧐", "🤔", "😐", "😑", "😶",
   "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱",
@@ -30,7 +34,12 @@ export default function EmojiPicker({
   t: DiscussT;
 }) {
   return (
-    <ModalShell title={t("composer.emoji", "Emoji")} onCancel={onCancel} width={380} closeLabel={t("btn.close", "Close")}>
+    <ModalShell
+      title={t("composer.emoji", "Emoji")}
+      onCancel={onCancel}
+      width={380}
+      closeLabel={t("btn.close", "Close")}
+    >
       <div className="p-4">
         {/* 7 columns on a phone, 10 from sm up — cells stretch to the grid
             instead of fixed 36px squares that overflowed a 320px screen. */}

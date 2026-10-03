@@ -265,7 +265,7 @@ export default function ProductPicker({
                          cdnImage serves a 256px variant through our origin —
                          orders of magnitude less to paint a grid. Lazy so
                          off-screen cards cost nothing until scrolled to. */
-                      src={cdnImage(images[p.id], { width: 256, quality: 75 })}
+                      src={cdnImage(images[p.id], { width: 256, quality: 75, resize: "contain" })}
                       alt={stripHtmlText(p.product_name)}
                       loading="lazy"
                       decoding="async"

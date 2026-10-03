@@ -141,6 +141,8 @@ export const discussT: Translations = {
   "composer.product":       { en: "Mention product",       zh: "提及产品",              ar: "أشر إلى منتج" },
   "composer.mention":       { en: "Mention someone",       zh: "提及某人",              ar: "أشر إلى شخص" },
   "composer.emoji":         { en: "Emoji",                 zh: "表情",                 ar: "إيموجي" },
+  "emoji.recentlyUsed":     { en: "Recently Used",         zh: "最近使用",              ar: "المستخدمة مؤخرًا" },
+  "emoji.backspace":        { en: "Delete",                zh: "删除",                 ar: "مسح" },
   "composer.voice":         { en: "Voice message",         zh: "语音消息",              ar: "رسالة صوتية" },
   "composer.voice.recording": { en: "Recording…",          zh: "录音中...",             ar: "جارٍ التسجيل..." },
   "composer.voice.stop":    { en: "Stop",                  zh: "停止",                 ar: "إيقاف" },
@@ -452,6 +454,17 @@ export const discussT: Translations = {
   "voice.record":            { en: "Record voice",            zh: "录制语音",              ar: "تسجيل صوتي" },
   "voice.recording":         { en: "Recording…",              zh: "录音中…",               ar: "جارٍ التسجيل…" },
   "voice.uploadFailed":      { en: "Voice upload failed",     zh: "语音上传失败",          ar: "فشل رفع الرسالة الصوتية" },
+  /* Push-to-talk (WeChat hold-to-talk bar, phones) */
+  "voice.keyboard":          { en: "Keyboard",                zh: "键盘",                 ar: "لوحة المفاتيح" },
+  "voice.holdToTalk":        { en: "Hold to Talk",            zh: "按住 说话",             ar: "اضغط مطولًا للتحدث" },
+  "voice.releaseToSend":     { en: "Release to send · slide up to cancel", zh: "松开发送 · 上滑取消", ar: "اترك للإرسال · اسحب لأعلى للإلغاء" },
+  "voice.releaseToCancel":   { en: "Release to cancel",       zh: "松开取消",              ar: "اترك للإلغاء" },
+  "voice.tooShort":          { en: "Too short",               zh: "说话时间太短",           ar: "قصير جدًا" },
+  "voice.sending":           { en: "Sending…",                zh: "发送中…",               ar: "جارٍ الإرسال…" },
+  /* Mobile "⊕" more-panel tiles (WeChat grid) */
+  "composer.tile.files":     { en: "Files",                   zh: "文件",                 ar: "ملفات" },
+  "composer.tile.mention":   { en: "Mention",                 zh: "提醒谁看",              ar: "إشارة" },
+  "composer.tile.product":   { en: "Products",                zh: "产品",                 ar: "منتجات" },
 
   /* Details pane */
   "details.more":            { en: "More",                    zh: "更多",                 ar: "المزيد" },

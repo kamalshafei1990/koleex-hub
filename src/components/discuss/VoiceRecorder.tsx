@@ -69,8 +69,9 @@ type RecorderState =
   | "error";
 
 /** Downsample a raw Float32 PCM buffer into N bars by averaging
- *  absolute amplitude within each bucket. Returns values in [0, 1]. */
-function computeWaveform(pcm: Float32Array, bars: number): number[] {
+ *  absolute amplitude within each bucket. Returns values in [0, 1].
+ *  Exported for PushToTalkBar so both recorders emit identical waveforms. */
+export function computeWaveform(pcm: Float32Array, bars: number): number[] {
   if (pcm.length === 0) return new Array(bars).fill(0);
   const bucketSize = Math.floor(pcm.length / bars) || 1;
   const out: number[] = [];

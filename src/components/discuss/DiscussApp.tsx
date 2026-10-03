@@ -67,8 +67,9 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import MicIcon from "@/components/icons/ui/MicIcon";
+import KeyboardIcon from "@/components/icons/ui/KeyboardIcon";
+import WaveformIcon from "@/components/icons/ui/WaveformIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
-import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import BoundIcon from "@/components/common/BoundIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
@@ -192,6 +193,7 @@ import { ThreadPane } from "./ThreadPane";
 import { DiscussAvatar as Avatar } from "./DiscussAvatar";
 import ModalShell from "./DiscussModalShell";
 import { formatBytes, nativeAltOf, type DiscussRecipient } from "./discuss-shared";
+import { rememberEmoji } from "./emoji-recents";
 import { discussDayLabel, discussListStamp, discussTime } from "@/lib/discuss-time";
 import { fetchProductsSlim, fetchProductMainImages } from "@/lib/products-admin";
 import { useCurrentAccount } from "@/lib/identity";
@@ -220,7 +222,9 @@ const ProductPicker = dynamic(() => import("./ProductPicker"), { ssr: false });
 const NewChannelModal = dynamic(() => import("./NewChannelModal"), { ssr: false });
 const CustomerChatModal = dynamic(() => import("./CustomerChatModal"), { ssr: false });
 const EmojiPicker = dynamic(() => import("./EmojiPicker"), { ssr: false });
+const EmojiPanel = dynamic(() => import("./EmojiPanel"), { ssr: false });
 const VoiceRecorder = dynamic(() => import("./VoiceRecorder"), { ssr: false });
+const PushToTalkBar = dynamic(() => import("./PushToTalkBar"), { ssr: false });
 const VoicePlaybackBubble = dynamic(
   () => import("./VoiceRecorder").then((m) => m.VoicePlaybackBubble),
   { ssr: false },
@@ -634,6 +638,10 @@ export default function DiscussApp() {
   /** Voice recorder panel toggle. Shown inline inside the composer
    *  when the user clicks the mic button. */
   const [voiceOpen, setVoiceOpen] = useState(false);
+  /** WeChat-style push-to-talk mode (phones only): the mic button swaps
+   *  the text field for a hold-to-talk bar. Desktop keeps the preview
+   *  recorder above. */
+  const [pttMode, setPttMode] = useState(false);
   /** Message to scroll to + highlight once it is on screen (deep link,
    *  search hit, details-pane list). */
   const [pendingJump, setPendingJump] = useState<string | null>(null);
@@ -2684,10 +2692,29 @@ export default function DiscussApp() {
     [composerBody, insertMention],
   );
 
+  /* WeChat behaviour: a pick inserts at the end and the panel STAYS open so
+     several emojis can be tapped in a row. The desktop modal closes itself
+     in its onSelect wrapper below. */
   const handleAddEmoji = useCallback((emoji: string) => {
+    rememberEmoji(emoji);
     setComposerBody((prev) => prev + emoji);
-    setEmojiPickerOpen(false);
-    composerRef.current?.focus();
+  }, []);
+
+  /* Backspace key in the mobile emoji panel — grapheme-safe so a composed
+     emoji (surrogate pair / ZWJ sequence start) is not split in half. */
+  const handleEmojiBackspace = useCallback(() => {
+    setComposerBody((prev) => {
+      const chars = Array.from(prev);
+      chars.pop();
+      return chars.join("");
+    });
+  }, []);
+
+  /* Mobile emoji-panel toggle. Blurring the field drops the software
+     keyboard so the panel takes the keyboard's place, exactly like WeChat. */
+  const handleToggleEmoji = useCallback(() => {
+    setEmojiPickerOpen((v) => !v);
+    composerRef.current?.blur();
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -4282,6 +4309,16 @@ export default function DiscussApp() {
                 onOpenVoice={() => setVoiceOpen(true)}
                 onCloseVoice={() => setVoiceOpen(false)}
                 onSendVoice={handleSendVoice}
+                pttMode={pttMode}
+                onTogglePtt={() => {
+                  /* Voice-mode toggle (phones): closing the preview recorder
+                     keeps the two voice flows mutually exclusive, and the
+                     blur drops the software keyboard so the hold-to-talk bar
+                     sits where the field was. */
+                  setVoiceOpen(false);
+                  setPttMode((v) => !v);
+                  composerRef.current?.blur();
+                }}
                 uploading={uploading}
                 sending={sending}
                 onSend={handleSend}
@@ -4300,6 +4337,10 @@ export default function DiscussApp() {
                 onOpenProductPicker={openProductPicker}
                 onOpenMentionPicker={() => setMentionPickerOpen(true)}
                 onOpenEmojiPicker={() => setEmojiPickerOpen(true)}
+                emojiOpen={emojiPickerOpen}
+                onToggleEmoji={handleToggleEmoji}
+                onPickEmoji={handleAddEmoji}
+                onEmojiBackspace={handleEmojiBackspace}
                 placeholder={
                   selectedChannel.kind === "direct"
                     ? t("composer.placeholderDm").replace(
@@ -4544,11 +4585,19 @@ export default function DiscussApp() {
         />
       )}
       {emojiPickerOpen && (
-        <EmojiPicker
-          onCancel={() => setEmojiPickerOpen(false)}
-          onSelect={handleAddEmoji}
-          t={t}
-        />
+        /* Desktop keeps the centred modal; on phones the inline EmojiPanel
+           under the composer takes over (WeChat), so the modal is hidden. */
+        <div className="max-md:hidden">
+          <EmojiPicker
+            onCancel={() => setEmojiPickerOpen(false)}
+            onSelect={(emoji) => {
+              handleAddEmoji(emoji);
+              setEmojiPickerOpen(false);
+              composerRef.current?.focus();
+            }}
+            t={t}
+          />
+        </div>
       )}
     </div>
   );
@@ -5970,7 +6019,7 @@ function ProductChip({ product, t }: { product: DiscussProductRef; t: TFn }) {
         {product.image ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={cdnImage(product.image, { width: 384, quality: 75 })}
+            src={cdnImage(product.image, { width: 384, quality: 75, resize: "contain" })}
             alt={product.name}
             width={384}
             height={288}
@@ -5979,7 +6028,7 @@ function ProductChip({ product, t }: { product: DiscussProductRef; t: TFn }) {
             className="max-h-full max-w-full object-contain"
           />
         ) : (
-          <PackageIcon className="h-10 w-10 text-black/15" />
+          <BoundIcon semanticKey="app.products" className="h-10 w-10 text-black/15" fallback={<ProductsIcon size={40} className="text-black/15" />} />
         )}
       </div>
       <div className="px-3 py-2.5 border-t border-[var(--border-subtle)]">
@@ -5991,7 +6040,7 @@ function ProductChip({ product, t }: { product: DiscussProductRef; t: TFn }) {
             {product.slug}
           </span>
           <span className="shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors">
-            <PackageIcon className="h-3 w-3" />
+            <BoundIcon semanticKey="app.products" className="h-3 w-3" fallback={<ProductsIcon size={12} />} />
             {t("product.viewShort", "View")}
           </span>
         </div>
@@ -6087,6 +6136,8 @@ function Composer({
   onOpenVoice,
   onCloseVoice,
   onSendVoice,
+  pttMode,
+  onTogglePtt,
   uploading,
   sending,
   onSend,
@@ -6094,6 +6145,10 @@ function Composer({
   onOpenProductPicker,
   onOpenMentionPicker,
   onOpenEmojiPicker,
+  emojiOpen,
+  onToggleEmoji,
+  onPickEmoji,
+  onEmojiBackspace,
   placeholder,
   hintText,
   sendLabel,
@@ -6132,6 +6187,11 @@ function Composer({
     durationMs: number;
     waveform: number[];
   }) => Promise<void>;
+  /** WeChat push-to-talk mode (phones only): swaps the text field for a
+   *  hold-to-talk bar. The toggle button stays where WeChat puts it —
+   *  left of the field, flipping between mic and keyboard glyphs. */
+  pttMode: boolean;
+  onTogglePtt: () => void;
   uploading: boolean;
   sending: boolean;
   onSend: () => void;
@@ -6139,6 +6199,13 @@ function Composer({
   onOpenProductPicker: () => void;
   onOpenMentionPicker: () => void;
   onOpenEmojiPicker: () => void;
+  /** Mobile inline emoji panel (WeChat): open state + toggle + pick +
+   *  backspace all owned by the parent so the desktop modal and the panel
+   *  share one state. The desktop toolbar still uses onOpenEmojiPicker. */
+  emojiOpen: boolean;
+  onToggleEmoji: () => void;
+  onPickEmoji: (emoji: string) => void;
+  onEmojiBackspace: () => void;
   placeholder: string;
   hintText: string;
   sendLabel: string;
@@ -6314,7 +6381,7 @@ function Composer({
               key={`cp-${i}`}
               className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-[var(--bg-surface-active)] border border-[var(--border-color)]"
             >
-              <PackageIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+              <BoundIcon semanticKey="app.products" className="h-3.5 w-3.5 text-[var(--text-secondary)]" fallback={<ProductsIcon size={14} className="text-[var(--text-secondary)]" />} />
               <span className="text-[11.5px] text-[var(--text-primary)] max-w-[180px] truncate font-medium">
                 {p.name}
               </span>
@@ -6414,12 +6481,32 @@ function Composer({
         <div className="max-md:flex max-md:items-end max-md:gap-1.5 max-md:px-2 max-md:pt-1.5">
           <button
             type="button"
-            onClick={onOpenVoice}
-            aria-label={t("voice.record", "Record voice")}
-            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
+            onClick={onTogglePtt}
+            aria-label={pttMode ? t("voice.keyboard", "Keyboard") : t("voice.record", "Record voice")}
+            aria-pressed={pttMode}
+            /* WeChat: the toggle keeps the SAME outlined-circle look in both
+               states — only the glyph flips (voice-wave ↔ keyboard). */
+            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)] transition-colors"
           >
-            <MicIcon className="h-4 w-4" />
+            {pttMode ? <KeyboardIcon className="h-4 w-4" /> : <WaveformIcon className="h-4 w-4" />}
           </button>
+          {/* Push-to-talk bar replaces the field on phones while voice mode
+              is on (WeChat). Desktop never renders it. */}
+          {pttMode && (
+            <div className="hidden max-md:flex flex-1 min-w-0">
+              <PushToTalkBar
+                onSend={(input) => onSendVoice(input)}
+                labels={{
+                  holdToTalk: t("voice.holdToTalk", "Hold to Talk"),
+                  releaseToSend: t("voice.releaseToSend", "Release to send · slide up to cancel"),
+                  releaseToCancel: t("voice.releaseToCancel", "Release to cancel"),
+                  tooShort: t("voice.tooShort", "Too short"),
+                  permissionDenied: t("voice.permissionDenied", "Microphone permission denied"),
+                  sending: t("voice.sending", "Sending…"),
+                }}
+              />
+            </div>
+          )}
         <textarea
           ref={composerRef}
           value={body}
@@ -6453,15 +6540,22 @@ function Composer({
           placeholder={placeholder}
           aria-label={placeholder}
           rows={2}
-          className="w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none max-md:flex-1 max-md:min-w-0 max-md:w-auto max-md:rounded-lg max-md:border max-md:border-[var(--border-subtle)] max-md:bg-[var(--bg-primary)] max-md:px-3 max-md:py-2 max-md:min-h-9"
+          className={`w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none max-md:flex-1 max-md:min-w-0 max-md:w-auto max-md:rounded-lg max-md:border max-md:border-[var(--border-subtle)] max-md:bg-[var(--bg-primary)] max-md:px-3 max-md:py-2 max-md:min-h-9 ${pttMode ? "max-md:hidden" : ""}`}
         />
+          {/* Emoji toggle — WeChat: opens the inline panel under the composer
+              (keyboard drops), the glyph flips smile ↔ keyboard while open,
+              and the ⊕ panel closes so only one panel is ever up. */}
           <button
             type="button"
-            onClick={onOpenEmojiPicker}
-            aria-label={t("composer.emoji", "Emoji")}
+            onClick={() => {
+              setMoreOpen(false);
+              onToggleEmoji();
+            }}
+            aria-label={emojiOpen ? t("voice.keyboard", "Keyboard") : t("composer.emoji", "Emoji")}
+            aria-expanded={emojiOpen}
             className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
           >
-            <SmileIcon className="h-4 w-4" />
+            {emojiOpen ? <KeyboardIcon className="h-4 w-4" /> : <SmileIcon className="h-4 w-4" />}
           </button>
           {body.trim().length > 0 || attachments.length > 0 || products.length > 0 ? (
             <button
@@ -6480,7 +6574,12 @@ function Composer({
           ) : (
             <button
               type="button"
-              onClick={() => setMoreOpen((v) => !v)}
+              onClick={() => {
+                /* Panels are mutually exclusive like WeChat: opening ⊕
+                   lowers the emoji panel first. */
+                if (emojiOpen) onToggleEmoji();
+                setMoreOpen((v) => !v);
+              }}
               aria-label={t("composer.more", "More")}
               aria-expanded={moreOpen}
               className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
@@ -6489,20 +6588,39 @@ function Composer({
             </button>
           )}
         </div>
-        {/* Mobile "⊕" panel — the Koleex extras (attach / mention / product)
-            stay available, folded into this strip like WeChat's more-panel. */}
+        {/* Mobile emoji panel — inline under the composer row, no backdrop,
+            the chat above stays visible and tappable (WeChat). Desktop uses
+            the modal instead; the panel hides itself there. */}
+        {emojiOpen && (
+          <EmojiPanel onSelect={onPickEmoji} onBackspace={onEmojiBackspace} t={t} />
+        )}
+        {/* Mobile "⊕" panel — WeChat grid: rounded-square tiles, icon on top,
+            short label under. Tapping a tile closes the panel and fires the
+            action, exactly like WeChat's more-panel. */}
         {moreOpen && (
-          <div className="hidden max-md:flex items-center gap-2 px-3 pt-2">
-            <ComposerIconButton title={t("composer.attach", "Attach files")} onClick={onPickFile}>
-              <PaperclipIcon className="h-4 w-4" />
-            </ComposerIconButton>
-            <ComposerIconButton title={t("composer.mention", "Mention someone")} onClick={onOpenMentionPicker}>
-              <AtSignIcon className="h-4 w-4" />
-            </ComposerIconButton>
-            <ComposerIconButton title={t("composer.product", "Mention product")} onClick={onOpenProductPicker}>
-              {/* Same registry-bound glyph as the desktop toolbar above. */}
-              <BoundIcon semanticKey="app.products" className="h-4 w-4" fallback={<ProductsIcon size={16} />} />
-            </ComposerIconButton>
+          <div className="hidden max-md:grid grid-cols-4 gap-2 px-4 pt-3">
+            {(
+              [
+                { key: "files", label: t("composer.tile.files", "Files"), icon: <PaperclipIcon className="h-5 w-5" />, act: onPickFile },
+                { key: "mention", label: t("composer.tile.mention", "Mention"), icon: <AtSignIcon className="h-5 w-5" />, act: onOpenMentionPicker },
+                { key: "product", label: t("composer.tile.product", "Products"), icon: <BoundIcon semanticKey="app.products" className="h-5 w-5" fallback={<ProductsIcon size={20} />} />, act: onOpenProductPicker },
+              ] as const
+            ).map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false);
+                  it.act();
+                }}
+                className="flex flex-col items-center gap-1.5 active:opacity-70 transition-opacity"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-secondary)]">
+                  {it.icon}
+                </span>
+                <span className="text-[10px] text-[var(--text-dim)]">{it.label}</span>
+              </button>
+            ))}
             {uploading && (
               <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
                 <SpinnerIcon className="h-3 w-3" />

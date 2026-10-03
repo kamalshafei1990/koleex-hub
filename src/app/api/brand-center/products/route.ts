@@ -21,7 +21,7 @@ import { brandCenterGate } from "@/lib/server/brand-center/access";
 import { mainPhotoByProduct } from "@/lib/server/product-photos";
 import { cdnImage } from "@/lib/cdn";
 
-const big = (url: string | null | undefined) => (url ? cdnImage(url, { width: 2048, quality: 78 }) : null);
+const big = (url: string | null | undefined) => (url ? cdnImage(url, { width: 2048, quality: 78, resize: "contain" }) : null);
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +126,6 @@ export async function GET(req: Request) {
   const ids = rows.map((r) => r.id);
   const [photos, models, names] = await Promise.all([mainPhotoByProduct(ids), modelsOf(ids), categoryNames(rows)]);
   return NextResponse.json({
-    products: rows.map((r) => ({ id: r.id, name: r.product_name, model: models[r.id] ?? null, category: names(r)?.name ?? null, photo: photos[r.id] ? cdnImage(photos[r.id], { width: 96 }) : null })),
+    products: rows.map((r) => ({ id: r.id, name: r.product_name, model: models[r.id] ?? null, category: names(r)?.name ?? null, photo: photos[r.id] ? cdnImage(photos[r.id], { width: 96, resize: "contain" }) : null })),
   });
 }

@@ -7564,7 +7564,7 @@ function PictureCell({
       {image ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
-          src={cdnImage(image, { width: 256, quality: 75 })}
+          src={cdnImage(image, { width: 256, quality: 75, resize: "contain" })}
           decoding="async"
           alt=""
           style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
@@ -7784,7 +7784,7 @@ export function StampSignatureBox({
     /* Same-origin through the optimizer: the pixel read above needs a
        CORS-clean bitmap, and the raw bucket URL is the slow, off-origin one
        from China. */
-    img.src = cdnImage(imageUrl, { width: 384, quality: 78 });
+    img.src = cdnImage(imageUrl, { width: 384, quality: 78, resize: "contain" });
     return () => {
       cancelled = true;
     };
@@ -7823,7 +7823,7 @@ export function StampSignatureBox({
       {imageUrl ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
-          src={cdnImage(imageUrl, { width: 384, quality: 78 })}
+          src={cdnImage(imageUrl, { width: 384, quality: 78, resize: "contain" })}
           decoding="async"
           alt=""
           style={{
