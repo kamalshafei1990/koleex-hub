@@ -69,6 +69,8 @@ import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import MicIcon from "@/components/icons/ui/MicIcon";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
+import ProductsIcon from "@/components/icons/ProductsIcon";
+import BoundIcon from "@/components/common/BoundIcon";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -82,8 +84,8 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import {
+  AngleDownIcon,
   ArchiveIcon,
-  ArrowDownIcon,
   CrownIcon,
   PencilIcon,
   RefreshIcon,
@@ -3933,7 +3935,6 @@ export default function DiscussApp() {
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
                           onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
-                          aurora={aurora}
                           lang={lang}
                           t={t}
                         />
@@ -3969,7 +3970,6 @@ export default function DiscussApp() {
                           onSelect={() => handleSelectChannel(c.id)}
                           onPrefetch={() => void prefetchChannel(c.id)}
                           onMenu={(x, y) => setConvMenu({ channel: c, x, y })}
-                          aurora={aurora}
                           lang={lang}
                           t={t}
                         />
@@ -4035,7 +4035,7 @@ export default function DiscussApp() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
+              <div className="relative shrink-0 h-14 px-4 flex items-center gap-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
                 {/* Mobile back to the conversation list. This is the ONLY place
                     it now lives — the app bar that used to host it is gone. */}
                 <button
@@ -4047,13 +4047,17 @@ export default function DiscussApp() {
                   <ArrowLeftIcon className="h-5 w-5" />
                 </button>
                 {selectedChannel.kind === "direct" ? (
-                  <Avatar
-                    name={displayNameFor(selectedChannel, t)}
-                    url={selectedChannel.other?.avatar_url}
-                    size={34}
-                  />
+                  /* WeChat mobile: no avatar in the chat header — just the
+                     centered name. Desktop keeps the avatar. */
+                  <div className="max-md:hidden">
+                    <Avatar
+                      name={displayNameFor(selectedChannel, t)}
+                      url={selectedChannel.other?.avatar_url}
+                      size={34}
+                    />
+                  </div>
                 ) : (
-                  <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                  <div className="max-md:hidden h-[34px] w-[34px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                     {selectedChannel.kind === "channel" ? (
                       <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
                     ) : (
@@ -4061,7 +4065,9 @@ export default function DiscussApp() {
                     )}
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
+                {/* WeChat mobile centres the chat name in the header; desktop
+                    keeps it left-aligned next to the avatar. */}
+                <div className="flex-1 min-w-0 max-md:absolute max-md:left-1/2 max-md:-translate-x-1/2 max-md:max-w-[40%] max-md:text-center">
                   <div className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
                     {displayNameFor(selectedChannel, t)}
                     {altNameFor(selectedChannel) && (
@@ -4087,28 +4093,32 @@ export default function DiscussApp() {
                 )}
                 {/* Search lives in the conversation's own toolbar (the
                     unified app header is untouched). Opens scoped to this
-                    conversation with a switch to search everywhere. */}
+                    conversation with a switch to search everywhere. On mobile
+                    the header keeps the WeChat-minimal set (translate + ⋯),
+                    so search stays a desktop affordance. */}
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
-                  className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  className="max-md:hidden h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   title={t("header.search", "Search in conversation")}
                   aria-label={t("header.search", "Search in conversation")}
                 >
                   <SearchIcon className="h-4 w-4" />
                 </button>
-                <TranslateControl
-                  prefs={translatePrefs}
-                  open={translateMenuOpen}
-                  onOpenChange={setTranslateMenuOpen}
-                  onChange={updateTranslatePrefs}
-                  t={t}
-                />
+                <div className="max-md:ms-auto">
+                  <TranslateControl
+                    prefs={translatePrefs}
+                    open={translateMenuOpen}
+                    onOpenChange={setTranslateMenuOpen}
+                    onChange={updateTranslatePrefs}
+                    t={t}
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => void handleToggleMute()}
                   aria-pressed={selectedChannel.muted}
-                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
+                  className={`max-md:hidden h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
                     selectedChannel.muted
                       ? "text-[var(--text-secondary)] bg-[var(--bg-surface-active)] hover:bg-[var(--bg-surface-active)]"
                       : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
@@ -4220,6 +4230,12 @@ export default function DiscussApp() {
                 <button
                   type="button"
                   onClick={jumpToLatest}
+                  /* The global Aurora hover rule resets `translate: none` on
+                     buttons, which deletes this pill's `-translate-x-1/2`
+                     centering and made it JUMP ~60px right on hover (owner:
+                     "two jump buttons" — it was one button moving). The rule
+                     exempts carriers of data-kx-keep-hover. */
+                  data-kx-keep-hover
                   aria-label={
                     newBelowCount > 0
                       ? t("unread.pill", "{n} new").replace("{n}", String(newBelowCount))
@@ -4233,7 +4249,7 @@ export default function DiscussApp() {
                       : "kx-glass-pop bg-[var(--bg-elevated)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  <ArrowDownIcon className="h-3.5 w-3.5" aria-hidden />
+                  <AngleDownIcon size={13} aria-hidden />
                   <span aria-live="polite">
                     {newBelowCount > 0
                       ? t("unread.pill", "{n} new").replace("{n}", String(newBelowCount > 99 ? "99+" : newBelowCount))
@@ -4548,7 +4564,6 @@ function ChannelRow({
   onSelect,
   onPrefetch,
   onMenu,
-  aurora = false,
   lang,
   t,
 }: {
@@ -4560,9 +4575,6 @@ function ChannelRow({
   /** Open the WeChat-style conversation menu at the given viewport point
    *  (right-click on desktop, ~450ms long-press on touch). */
   onMenu?: (x: number, y: number) => void;
-  /** Aurora skin: the selected row is the Hub Blue segment (kx-seg-on)
-   *  instead of Core's solid inverted pill. */
-  aurora?: boolean;
   lang: string;
   t: TFn;
 }) {
@@ -4577,8 +4589,9 @@ function ChannelRow({
      kept off the bell / home-tile badge server-side. */
   const unread = rowUnread(channel);
   const showUnreadDot = unread === 0 && channel.marked_unread === true;
-  /* Inverted text only on Core's solid selected pill. */
-  const inv = selected && !aurora;
+  /* Flat WeChat rows: no inverted-pill text any more — the open conversation
+     is a quiet tint (aria-current) and every token keeps its normal color. */
+  const inv = false;
   const longPressRef = useRef<number | null>(null);
   const clearLongPress = () => {
     if (longPressRef.current !== null) {
@@ -4588,7 +4601,7 @@ function ChannelRow({
   };
 
   return (
-    <li>
+    <li className="kx-wx-row-li">
       <button
         type="button"
         onClick={onSelect}
@@ -4629,16 +4642,12 @@ function ChannelRow({
         }
         onTouchEnd={onMenu ? clearLongPress : undefined}
         onTouchMove={onMenu ? clearLongPress : undefined}
-        className={`relative w-[calc(100%-16px)] mx-2 my-0.5 text-start px-3 py-2.5 rounded-xl transition-colors ${
-          /* Selected row = SOLID --bg-inverted fill on Core (real white in
-             dark, real black in light) so the open chat is unmistakable;
-             every text token below flips to --text-inverted. Under Aurora the
-             selection is the shared Hub Blue segment and text stays normal. */
-          selected
-            ? aurora
-              ? "kx-seg-on"
-              : "bg-[var(--bg-inverted)]"
-            : "hover:bg-[var(--bg-surface-hover)]"
+        className={`kx-wx-row relative text-start px-3 py-2.5 transition-colors ${
+          /* WeChat's conversation list is flat and full-bleed: hairline
+             separators between rows (li.kx-wx-row-li), and the open
+             conversation is a quiet tint on the row (aria-current styling in
+             globals.css), not a floating pill. */
+          selected ? "" : "hover:bg-[var(--bg-surface-hover)]"
         }`}
       >
         <div className="flex items-start gap-3 min-w-0">
@@ -4721,23 +4730,17 @@ function ChannelRow({
               {unread > 0 ? (
                 <span className={`h-[18px] min-w-[18px] px-1.5 rounded-full text-[10.5px] font-bold tabular-nums flex items-center justify-center ${
                   channel.muted
-                    ? inv
-                      ? "bg-[var(--text-inverted)]/25 text-[var(--text-inverted)]"
-                      : "bg-[var(--bg-surface-active)] text-[var(--text-muted)]"
-                    : inv
-                      ? "bg-[var(--text-inverted)] text-[var(--bg-inverted)]"
-                      : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    ? "bg-[var(--bg-surface-active)] text-[var(--text-muted)]"
+                    : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                 }`}>
                   {unread > 99 ? "99+" : unread}
                 </span>
               ) : showUnreadDot ? (
-                /* Manually "marked as unread" — a WeChat-style dot with no count. */
+                /* Manually "marked as unread" — a dot with no count. */
                 <span
                   title={t("sidebar.unread", "Unread")}
                   aria-label={t("sidebar.unread", "Unread")}
-                  className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-                    inv ? "bg-[var(--text-inverted)]" : "bg-[var(--bg-inverted)]"
-                  }`}
+                  className="h-2.5 w-2.5 rounded-full shrink-0 bg-[var(--bg-inverted)]"
                 />
               ) : null}
               {channel.muted && (
@@ -4817,6 +4820,7 @@ function MessageList(props: MessageListProps) {
   const withSeparators = useMemo(() => {
     const out: Array<
       | { kind: "sep"; key: string; label: string }
+      | { kind: "time"; key: string; label: string }
       | { kind: "unread"; key: string }
       | { kind: "msg"; key: string; msg: DiscussMessageWithAuthor; showAuthor: boolean }
     > = [];
@@ -4855,8 +4859,18 @@ function MessageList(props: MessageListProps) {
         lastTime = 0;
       }
       const thisTime = d.getTime();
-      /* Group consecutive messages from the same author within 5 minutes
-         into a single bubble cluster — Slack style. */
+      /* WeChat drops a small centered timestamp whenever the conversation
+         pauses for more than 5 minutes — that stamp carries the time, so
+         individual bubbles don't repeat it. */
+      if (lastTime > 0 && thisTime - lastTime > 5 * 60_000) {
+        out.push({
+          kind: "time",
+          key: `time-${m.id}`,
+          label: discussTime(m.created_at, lang),
+        });
+      }
+      /* Author header (name in group channels) only on the first message of
+         a run — same-author consecutive messages stack under one name. */
       const showAuthor =
         lastAuthor !== (m.author_account_id ?? "") ||
         thisTime - lastTime > 5 * 60_000;
@@ -4871,13 +4885,17 @@ function MessageList(props: MessageListProps) {
     <div className="flex flex-col gap-1">
       {withSeparators.map((row) => {
         if (row.kind === "sep") {
+          /* Day change — WeChat style: a small centered stamp, no side rules. */
           return (
-            <div key={row.key} className="flex items-center my-3">
-              <div className="flex-1 h-px bg-[var(--border-subtle)]" />
-              <div className="px-3 text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                {row.label}
-              </div>
-              <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+            <div key={row.key} className="kx-wx-time">
+              <span>{row.label}</span>
+            </div>
+          );
+        }
+        if (row.kind === "time") {
+          return (
+            <div key={row.key} className="kx-wx-time">
+              <span>{row.label}</span>
             </div>
           );
         }
@@ -4897,6 +4915,7 @@ function MessageList(props: MessageListProps) {
             key={row.key}
             msg={row.msg}
             showAuthor={row.showAuthor}
+            channelKind={props.channelKind}
             isSelf={row.msg.author_account_id === currentAccountId}
             editedText={editedText}
             deletedText={deletedText}
@@ -5036,6 +5055,10 @@ function TranslateControl({
 type MessageBubbleProps = {
   msg: DiscussMessageWithAuthor;
   showAuthor: boolean;
+  /** Direct conversations never render the author header (WeChat: a 1:1 chat
+   *  has no names, the side says who wrote it); channels show the sender name
+   *  above the first bubble of each run. */
+  channelKind: DiscussChannelKind;
   highlighted: boolean;
   lang: string;
   isSelf: boolean;
@@ -5140,6 +5163,7 @@ function MessageSurface({
 function MessageBubble({
   msg,
   showAuthor,
+  channelKind,
   highlighted,
   lang,
   isSelf,
@@ -5394,43 +5418,29 @@ function MessageBubble({
           </button>
         </div>
       )}
-      {showAuthor ? (
-        <Avatar
-          name={authorName}
-          url={author?.avatar_url ?? null}
-          size={32}
-        />
-      ) : (
-        <div className="w-8 shrink-0 flex items-start justify-center pt-1">
-          <span className="text-[9px] text-transparent group-hover:text-[var(--text-dim)] tabular-nums transition-colors">
-            {time}
-          </span>
-        </div>
-      )}
+      {/* WeChat renders the avatar on EVERY message — no collapsed Slack
+          clusters. The sender name above the bubble only appears in group
+          channels (a 1:1 chat has no names; the bubble side says who), and
+          only on the first message of a same-author run. Per-message time is
+          gone too: the centered stamps in the list carry it. */}
+      <Avatar
+        name={authorName}
+        url={author?.avatar_url ?? null}
+        size={32}
+      />
       {/* min-w-0 keeps long words wrapping; the flex column aligns the bubble
           to the correct edge so mine hug the right like WeChat. */}
       <div className={`flex-1 min-w-0 flex flex-col ${isSelf ? "items-end" : "items-start"}`}>
-        {showAuthor && (
-          <div className={`flex items-baseline gap-2 mb-1 px-0.5 ${isSelf ? "flex-row-reverse" : ""}`}>
-            {/* My own name is noise — the bubble side already says it's mine.
-                WeChat shows no name on your own messages either. */}
-            {!isSelf && (
-              <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">
-                {authorName}
-                {authorAlt && (
-                  <span lang="zh" className="ms-1 font-normal text-[var(--text-dim)]">
-                    {authorAlt}
-                  </span>
-                )}
-              </span>
-            )}
-            <span className="text-[10.5px] text-[var(--text-dim)] tabular-nums">
-              {time}
+        {showAuthor && !isSelf && channelKind !== "direct" && (
+          <div className="flex items-baseline gap-2 mb-1 px-0.5">
+            <span className="text-[12px] text-[var(--text-dim)]">
+              {authorName}
+              {authorAlt && (
+                <span lang="zh" className="ms-1">
+                  {authorAlt}
+                </span>
+              )}
             </span>
-            {/* The "You" badge is gone: the author name already says who wrote
-                this, and the surface panel below now carries "mine" without
-                colour. At 4.10:1 in dark theme it was also the lowest-contrast
-                element carrying the outgoing signal alone. */}
           </div>
         )}
 
@@ -6144,6 +6154,9 @@ function Composer({
      element fires leave-then-enter, so a naive boolean flickers the overlay
      off and on across the whole composer. */
   const [dragging, setDragging] = useState(false);
+  /* Mobile "⊕" more-panel (WeChat): voice/emoji live in the input row, the
+     remaining tools (attach, mention, product) fold into this panel. */
+  const [moreOpen, setMoreOpen] = useState(false);
   const dragDepth = useRef(0);
   const hasFiles = (e: React.DragEvent) =>
     Array.from(e.dataTransfer?.types ?? []).includes("Files");
@@ -6319,7 +6332,7 @@ function Composer({
       )}
 
       {/* Textarea + action row */}
-      <div className="relative rounded-xl border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] bg-[var(--bg-primary)] transition-colors">
+      <div className="relative rounded-xl border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] bg-[var(--bg-primary)] transition-colors max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:focus-within:border-0">
         {/* @mention suggestions — a listbox owned by the textarea (combobox
             pattern): ↑/↓ move, Enter/Tab insert, Esc closes, handled in the
             composer's keydown so focus never leaves the text. */}
@@ -6359,6 +6372,54 @@ function Composer({
             </div>
           </div>
         )}
+        {/* Toolbar ABOVE the text field — the WeChat desktop composer order:
+            emoji first, then the attach/mention/product/voice tools (the
+            Koleex extras stay, only the placement changes). On phones these
+            tools live in the "⊕" more-panel instead (WeChat mobile). */}
+        <div className="flex items-center gap-1 px-2 pt-2 max-md:hidden">
+          <ComposerIconButton title={t("composer.emoji", "Emoji")} onClick={onOpenEmojiPicker}>
+            <SmileIcon className="h-4 w-4" />
+          </ComposerIconButton>
+          <ComposerIconButton title={t("composer.attach", "Attach files")} onClick={onPickFile}>
+            <PaperclipIcon className="h-4 w-4" />
+          </ComposerIconButton>
+          <ComposerIconButton title={t("composer.mention", "Mention someone")} onClick={onOpenMentionPicker}>
+            <AtSignIcon className="h-4 w-4" />
+          </ComposerIconButton>
+          <ComposerIconButton title={t("composer.product", "Mention product")} onClick={onOpenProductPicker}>
+            {/* Resolve through the Semantic Icon Registry so the glyph always
+                matches the Products app icon on Home (bound in the Visual
+                Library); the code icon below is only the no-binding fallback. */}
+            <BoundIcon semanticKey="app.products" className="h-4 w-4" fallback={<ProductsIcon size={16} />} />
+          </ComposerIconButton>
+          <ComposerIconButton
+            title={t("voice.record", "Record voice")}
+            onClick={onOpenVoice}
+          >
+            <MicIcon className="h-4 w-4" />
+          </ComposerIconButton>
+
+          <div className="flex-1" />
+
+          {uploading && (
+            <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
+              <SpinnerIcon className="h-3 w-3" />
+              {t("composer.uploading", "Uploading…")}
+            </span>
+          )}
+        </div>
+        {/* Mobile (WeChat phone layout): one row — voice, the field itself,
+            emoji, then ⊕ which flips into Send once there is text. On md+
+            this wrapper is a plain block and none of the buttons render. */}
+        <div className="max-md:flex max-md:items-end max-md:gap-1.5 max-md:px-2 max-md:pt-1.5">
+          <button
+            type="button"
+            onClick={onOpenVoice}
+            aria-label={t("voice.record", "Record voice")}
+            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
+          >
+            <MicIcon className="h-4 w-4" />
+          </button>
         <textarea
           ref={composerRef}
           value={body}
@@ -6392,37 +6453,68 @@ function Composer({
           placeholder={placeholder}
           aria-label={placeholder}
           rows={2}
-          className="w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
+          className="w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none max-md:flex-1 max-md:min-w-0 max-md:w-auto max-md:rounded-lg max-md:border max-md:border-[var(--border-subtle)] max-md:bg-[var(--bg-primary)] max-md:px-3 max-md:py-2 max-md:min-h-9"
         />
-        <div className="flex items-center gap-1 px-2 pb-2">
-          <ComposerIconButton title={t("composer.attach", "Attach files")} onClick={onPickFile}>
-            <PaperclipIcon className="h-4 w-4" />
-          </ComposerIconButton>
-          <ComposerIconButton title={t("composer.mention", "Mention someone")} onClick={onOpenMentionPicker}>
-            <AtSignIcon className="h-4 w-4" />
-          </ComposerIconButton>
-          <ComposerIconButton title={t("composer.product", "Mention product")} onClick={onOpenProductPicker}>
-            <PackageIcon className="h-4 w-4" />
-          </ComposerIconButton>
-          <ComposerIconButton title={t("composer.emoji", "Emoji")} onClick={onOpenEmojiPicker}>
-            <SmileIcon className="h-4 w-4" />
-          </ComposerIconButton>
-          <ComposerIconButton
-            title={t("voice.record", "Record voice")}
-            onClick={onOpenVoice}
+          <button
+            type="button"
+            onClick={onOpenEmojiPicker}
+            aria-label={t("composer.emoji", "Emoji")}
+            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
           >
-            <MicIcon className="h-4 w-4" />
-          </ComposerIconButton>
-
-          <div className="flex-1" />
-
-          {uploading && (
-            <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-              <SpinnerIcon className="h-3 w-3" />
-              {t("composer.uploading", "Uploading…")}
-            </span>
+            <SmileIcon className="h-4 w-4" />
+          </button>
+          {body.trim().length > 0 || attachments.length > 0 || products.length > 0 ? (
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={!canSend}
+              aria-label={sendLabel}
+              className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] items-center justify-center transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            >
+              {sending ? (
+                <SpinnerIcon className="h-4 w-4" />
+              ) : (
+                <PaperPlaneIcon className="h-4 w-4" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              aria-label={t("composer.more", "More")}
+              aria-expanded={moreOpen}
+              className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
+            >
+              <PlusIcon className="h-4 w-4" />
+            </button>
           )}
-
+        </div>
+        {/* Mobile "⊕" panel — the Koleex extras (attach / mention / product)
+            stay available, folded into this strip like WeChat's more-panel. */}
+        {moreOpen && (
+          <div className="hidden max-md:flex items-center gap-2 px-3 pt-2">
+            <ComposerIconButton title={t("composer.attach", "Attach files")} onClick={onPickFile}>
+              <PaperclipIcon className="h-4 w-4" />
+            </ComposerIconButton>
+            <ComposerIconButton title={t("composer.mention", "Mention someone")} onClick={onOpenMentionPicker}>
+              <AtSignIcon className="h-4 w-4" />
+            </ComposerIconButton>
+            <ComposerIconButton title={t("composer.product", "Mention product")} onClick={onOpenProductPicker}>
+              {/* Same registry-bound glyph as the desktop toolbar above. */}
+              <BoundIcon semanticKey="app.products" className="h-4 w-4" fallback={<ProductsIcon size={16} />} />
+            </ComposerIconButton>
+            {uploading && (
+              <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
+                <SpinnerIcon className="h-3 w-3" />
+                {t("composer.uploading", "Uploading…")}
+              </span>
+            )}
+          </div>
+        )}
+        {/* Send pinned to the bottom-right corner under the field — exactly
+            where WeChat desktop puts it. On phones the send button lives in
+            the input row instead. */}
+        <div className="flex justify-end px-2 pb-2 max-md:hidden">
           <button
             type="button"
             onClick={onSend}

@@ -5226,3 +5226,43 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
 #main-scroll-container.kx-dock-pad > * {
   flex-shrink: 0;
 }
+
+/* ── Discuss × WeChat — LAYOUT ONLY ────────────────────────────────────────
+   These classes carry WeChat's structure (flat full-bleed rows, hairline
+   separators, centered timestamp stamps). All colours stay on the hub's own
+   tokens — nothing here introduces a new hue. */
+
+/* WeChat timestamp divider — a small centered grey stamp dropped between
+   message groups whenever the gap passes 5 minutes, and for day changes.
+   No side rules: WeChat never draws lines through the thread. */
+.kx-wx-time {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 4px;
+}
+.kx-wx-time > span {
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  background: var(--bg-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Conversation row — WeChat's list is flat and full-bleed with hairline
+   separators, not floating rounded cards. The li carries the hairline so the
+   button itself can stay padding-only. */
+.kx-wx-row {
+  width: 100% !important;
+  margin-inline: 0 !important;
+  border-radius: 0 !important;
+}
+li.kx-wx-row-li + li.kx-wx-row-li {
+  border-top: 1px solid var(--border-faint);
+}
+/* Selected conversation: WeChat greys the open row — a neutral surface
+   tint from the hub's own tokens, same in both skins. */
+.kx-wx-row[aria-current="true"] {
+  background: var(--bg-surface-active);
+}
