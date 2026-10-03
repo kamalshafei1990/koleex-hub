@@ -351,7 +351,7 @@ export default function PushToTalkBar({ onSend, onConvertToText, labels }: PushT
         onContextMenu={(e) => e.preventDefault()}
         disabled={state === "sending" || state === "converting"}
         aria-label={labels.holdToTalk}
-        className={`flex h-9 flex-1 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-[13px] font-semibold select-none touch-none transition-colors ${
+        className={`flex h-11 flex-1 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-semibold select-none touch-none transition-colors ${
           state === "denied" || state === "tooShort" || state === "convertFailed"
             ? "border-red-500/40 bg-red-500/10 text-red-500 dark:text-red-300"
             : recording

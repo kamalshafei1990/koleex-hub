@@ -4158,7 +4158,7 @@ export default function DiscussApp() {
                 <button
                   type="button"
                   onClick={() => setMobileView("list")}
-                  className="md:hidden -ms-2 h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  className="md:hidden -ms-2 h-11 w-11 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   aria-label={t("mobile.list")}
                 >
                   <ArrowLeftIcon className="h-5 w-5" />
@@ -4263,11 +4263,11 @@ export default function DiscussApp() {
                     setDetailsOpen((v) => !v);
                     setMobileView("details");
                   }}
-                  className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                  className="h-8 w-8 max-md:h-11 max-md:w-11 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   title={t("header.details")}
                   aria-label={t("header.details")}
                 >
-                  <InfoIcon className="h-4 w-4" />
+                  <InfoIcon className="h-4 w-4 max-md:h-5 max-md:w-5" />
                 </button>
               </div>
 
@@ -5154,14 +5154,14 @@ function TranslateControl({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={`h-8 px-2 rounded-md flex items-center gap-1.5 transition-colors ${
+        className={`h-8 max-md:h-11 px-2 max-md:px-2.5 rounded-md flex items-center gap-1.5 transition-colors ${
           prefs.auto
             ? "text-[var(--text-secondary)] bg-[var(--bg-surface-active)] hover:bg-[var(--bg-surface-active)]"
             : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
         }`}
         title={t("translate.title", "Translation")}
       >
-        <LanguagesIcon className="h-4 w-4" />
+        <LanguagesIcon className="h-4 w-4 max-md:h-5 max-md:w-5" />
         <span className="text-[10.5px] font-semibold uppercase tracking-wide">
           {prefs.lang}
         </span>
@@ -6651,17 +6651,18 @@ function Composer({
         {/* Mobile (WeChat phone layout): one row — voice, the field itself,
             emoji, then ⊕ which flips into Send once there is text. On md+
             this wrapper is a plain block and none of the buttons render. */}
-        <div className="max-md:flex max-md:items-end max-md:gap-1.5 max-md:px-2 max-md:pt-1.5">
+        <div className="max-md:flex max-md:items-end max-md:gap-2 max-md:px-2 max-md:pt-1.5">
           <button
             type="button"
             onClick={onTogglePtt}
             aria-label={pttMode ? t("voice.keyboard", "Keyboard") : t("voice.record", "Record voice")}
             aria-pressed={pttMode}
-            /* WeChat: the toggle keeps the SAME outlined-circle look in both
-               states — only the glyph flips (voice-wave ↔ keyboard). */
-            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)] transition-colors"
+            /* WeChat-sized touch target: 44px (Apple HIG minimum) so the
+               toggle is easy to hit by thumb — same outlined-circle look in
+               both states, only the glyph flips (voice-wave ↔ keyboard). */
+            className="hidden max-md:flex h-11 w-11 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)] transition-colors"
           >
-            {pttMode ? <KeyboardIcon className="h-4 w-4" /> : <WaveformIcon className="h-4 w-4" />}
+            {pttMode ? <KeyboardIcon className="h-5 w-5" /> : <WaveformIcon className="h-5 w-5" />}
           </button>
           {/* Push-to-talk bar replaces the field on phones while voice mode
               is on (WeChat). Desktop never renders it. */}
@@ -6717,7 +6718,7 @@ function Composer({
           placeholder={placeholder}
           aria-label={placeholder}
           rows={2}
-          className={`w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none max-md:flex-1 max-md:min-w-0 max-md:w-auto max-md:rounded-lg max-md:border max-md:border-[var(--border-subtle)] max-md:bg-[var(--bg-primary)] max-md:px-3 max-md:py-2 max-md:min-h-9 ${pttMode ? "max-md:hidden" : ""}`}
+          className={`w-full bg-transparent resize-none px-3.5 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none max-md:flex-1 max-md:min-w-0 max-md:w-auto max-md:rounded-lg max-md:border max-md:border-[var(--border-subtle)] max-md:bg-[var(--bg-primary)] max-md:px-3 max-md:py-2.5 max-md:min-h-11 max-md:text-[16px] ${pttMode ? "max-md:hidden" : ""}`}
         />
           {/* Emoji toggle — WeChat: opens the inline panel under the composer
               (keyboard drops), the glyph flips smile ↔ keyboard while open,
@@ -6730,9 +6731,9 @@ function Composer({
             }}
             aria-label={emojiOpen ? t("voice.keyboard", "Keyboard") : t("composer.emoji", "Emoji")}
             aria-expanded={emojiOpen}
-            className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
+            className="hidden max-md:flex h-11 w-11 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
           >
-            {emojiOpen ? <KeyboardIcon className="h-4 w-4" /> : <SmileIcon className="h-4 w-4" />}
+            {emojiOpen ? <KeyboardIcon className="h-5 w-5" /> : <SmileIcon className="h-5 w-5" />}
           </button>
           {body.trim().length > 0 || attachments.length > 0 || products.length > 0 ? (
             <button
@@ -6740,12 +6741,12 @@ function Composer({
               onClick={onSend}
               disabled={!canSend}
               aria-label={sendLabel}
-              className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] items-center justify-center transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              className="hidden max-md:flex h-11 w-11 shrink-0 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] items-center justify-center transition-colors disabled:opacity-40 disabled:pointer-events-none"
             >
               {sending ? (
-                <SpinnerIcon className="h-4 w-4" />
+                <SpinnerIcon className="h-5 w-5" />
               ) : (
-                <PaperPlaneIcon className="h-4 w-4" />
+                <PaperPlaneIcon className="h-5 w-5" />
               )}
             </button>
           ) : (
@@ -6759,9 +6760,9 @@ function Composer({
               }}
               aria-label={t("composer.more", "More")}
               aria-expanded={moreOpen}
-              className="hidden max-md:flex h-9 w-9 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
+              className="hidden max-md:flex h-11 w-11 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] items-center justify-center text-[var(--text-secondary)] active:bg-[var(--bg-surface-active)]"
             >
-              <PlusIcon className="h-4 w-4" />
+              <PlusIcon className="h-5 w-5" />
             </button>
           )}
         </div>

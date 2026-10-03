@@ -2823,8 +2823,20 @@ export function browserVoiceDeps(): VoiceDeps {
       navigator.mediaDevices.getUserMedia({
         /* Audio only. A voice call has no reason to ask for a camera, and
            asking would put a second permission prompt in front of the user
-           for a capability nothing here uses. */
-        audio: { echoCancellation: true, noiseSuppression: true },
+           for a capability nothing here uses.
+
+           channelCount:1 keeps the uplink mono (half the bandwidth vs a stereo
+           capture) — on a jittery mainland link that is fewer dropped packets.
+           autoGainControl normalises the level so the caller is neither clipped
+           nor too quiet. echoCancellation + noiseSuppression stay for a clean
+           signal. These are hints: iOS Safari may apply them via its own audio
+           unit, but the request is free and never hurts a browser that ignores it. */
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
         video: false,
       }),
     fetchFn: (...args) => fetch(...args),
