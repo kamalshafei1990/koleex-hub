@@ -1,0 +1,14 @@
+name = "koleex-voice-relay"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# The Worker reaches api.x.ai from Cloudflare's edge (not from China), so the
+# vendor's realtime endpoint works here. Only a model id is appended per call.
+[vars]
+VOICE_UPSTREAM_URL = "wss://api.x.ai/v1/realtime"
+VOICE_PROTOCOL_PREFIX = "xai-client-secret."
+VOICE_RELAY_ORIGINS = "koleexgroup.com,koleex-*.vercel.app"
+
+# The shared secret is NOT committed — set it with:
+#   wrangler secret put VOICE_RELAY_SECRET
+# It must equal Vercel's AI_VOICE_RELAY_SECRET (both sign/verify the ticket).
