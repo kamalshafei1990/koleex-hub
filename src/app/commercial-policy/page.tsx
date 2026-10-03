@@ -12,7 +12,7 @@
    of scope here — they need a different UI pattern (see Phase 3b).
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { commercialPolicyT } from "@/lib/translations/commercial-policy";
 import { useToast } from "@/components/kds/useToast";
@@ -24,6 +24,19 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
+import CogIcon from "@/components/icons/ui/CogIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
+import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
+import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import PaymentTermsManager from "@/components/commercial-policy/PaymentTermsManager";
 import IncotermsManager from "@/components/commercial-policy/IncotermsManager";
@@ -182,22 +195,23 @@ interface BodyProps {
   isSuperAdmin: boolean;
 }
 
-/* Section anchors — id + nav label, in render order. Used by the sticky
-   nav (jump links) and as scroll targets. */
-const POLICY_SECTIONS: { id: string; label: string }[] = [
-  { id: "cp-settings", label: "Settings" },
-  { id: "cp-levels", label: "Levels" },
-  { id: "cp-tiers", label: "Tiers" },
-  { id: "cp-markets", label: "Markets" },
-  { id: "cp-channels", label: "Channels" },
-  { id: "cp-volume", label: "Volume" },
-  { id: "cp-discounts", label: "Discounts" },
-  { id: "cp-commission", label: "Commission" },
-  { id: "cp-approvals", label: "Approvals" },
-  { id: "cp-payment-terms", label: "Payment Terms" },
-  { id: "cp-incoterms", label: "Incoterms" },
-  { id: "cp-shipping", label: "Shipping" },
-  { id: "cp-documents", label: "Documents" },
+/* Section anchors — id + nav label + tab icon, in render order. Used by the
+   sticky nav (tab switcher) and as scroll targets. Icons come from the shared
+   ui icon library, same 14px size the PageHeader tab strip uses. */
+const POLICY_SECTIONS: { id: string; label: string; icon: React.ReactNode }[] = [
+  { id: "cp-settings", label: "Settings", icon: <CogIcon size={14} /> },
+  { id: "cp-levels", label: "Levels", icon: <LayersIcon size={14} /> },
+  { id: "cp-tiers", label: "Tiers", icon: <UsersIcon size={14} /> },
+  { id: "cp-markets", label: "Markets", icon: <GlobeIcon size={14} /> },
+  { id: "cp-channels", label: "Channels", icon: <Share2Icon size={14} /> },
+  { id: "cp-volume", label: "Volume", icon: <BarChart3Icon size={14} /> },
+  { id: "cp-discounts", label: "Discounts", icon: <TagsIcon size={14} /> },
+  { id: "cp-commission", label: "Commission", icon: <HandCoinsIcon size={14} /> },
+  { id: "cp-approvals", label: "Approvals", icon: <BadgeCheckIcon size={14} /> },
+  { id: "cp-payment-terms", label: "Payment Terms", icon: <CreditCardIcon size={14} /> },
+  { id: "cp-incoterms", label: "Incoterms", icon: <FileBadge2Icon size={14} /> },
+  { id: "cp-shipping", label: "Shipping", icon: <TruckIcon size={14} /> },
+  { id: "cp-documents", label: "Documents", icon: <DocumentIcon size={14} /> },
 ];
 
 function Anchor({ id, hidden, children }: { id: string; hidden?: boolean; children: React.ReactNode }) {
@@ -250,33 +264,78 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ─── Sticky section nav (tab switcher — one section at a time) ── */
+/* ─── Sticky section nav (tab switcher — one section at a time) ──
+   Same segmented-control recipe as PageHeader's tab strip (Social Marketing
+   and every other app): ONE glass container holding all tabs, icon + label
+   each, and a single gliding fill (.kx-ph-pill) under the active tab — so
+   the aurora skin restyles this bar exactly like the others. */
 function PolicyNav({ active, onSelect }: { active: string; onSelect: (id: string) => void }) {
   const { t } = useTranslation(commercialPolicyT);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const [instant, setInstant] = useState(true);
+
   const jump = (id: string) => {
     onSelect(id);
     const scroller = document.querySelector(".kx-dock-pad");
     if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
     else window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  /* Place the gliding fill under the active tab. The first placement must
+     JUMP (data-kx-instant kills the transition), not streak across the bar
+     from x=0; the glide is re-enabled after the first paint. */
+  useLayoutEffect(() => {
+    const place = () => {
+      const i = POLICY_SECTIONS.findIndex((s) => s.id === active);
+      const el = tabRefs.current[i];
+      if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    place();
+    const raf = requestAnimationFrame(() => setInstant(false));
+    window.addEventListener("resize", place);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", place); };
+  }, [active]);
+
   return (
     <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--bg-secondary)] backdrop-blur-md border-b border-[var(--border-subtle)]">
-      <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-        {POLICY_SECTIONS.map((sec) => {
+      <nav
+        role="tablist"
+        className="kx-ph-tabs relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {/* The moving fill carries the active background; the tabs below
+            only carry colour — one block glides instead of one blinking off
+            and another on. */}
+        <span
+          aria-hidden
+          className="kx-ph-pill"
+          data-kx-instant={instant ? "1" : undefined}
+          style={pill ? { transform: `translateX(${pill.left}px)`, width: pill.width, opacity: 1 } : { opacity: 0, width: 0 }}
+        />
+        {POLICY_SECTIONS.map((sec, i) => {
           const isActive = sec.id === active;
           return (
             <button
               key={sec.id}
               type="button"
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              ref={(el) => { tabRefs.current[i] = el; }}
               onClick={() => jump(sec.id)}
               className={
-                "shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full border transition-colors " +
+                "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors [transition-duration:var(--kx-dur-slow,320ms)] [transition-timing-function:var(--kx-ease-glide,cubic-bezier(0.32,0.72,0,1))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
                 (isActive
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                  : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-surface)]")
+                  ? "text-[var(--text-inverted)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]")
               }
             >
-              {t(`sec.${sec.id}`, sec.label)}
+              {/* Icon wrapper is inline-flex so the icon centres against the
+                  text instead of sitting on the text baseline. */}
+              <span aria-hidden className={`inline-flex items-center leading-none ${isActive ? "opacity-90" : "opacity-70"}`}>
+                {sec.icon}
+              </span>
+              <span>{t(`sec.${sec.id}`, sec.label)}</span>
             </button>
           );
         })}
