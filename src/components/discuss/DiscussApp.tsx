@@ -239,6 +239,11 @@ const SearchPanel = dynamic(() => import("./SearchPanel"), { ssr: false });
 const QuickSwitcher = dynamic(() => import("./QuickSwitcher"), { ssr: false });
 const AddMembersModal = dynamic(() => import("./AddMembersModal"), { ssr: false });
 
+/* WeChat keyboard ride — see the hook file for the full story: lifts the
+   composer onto the on-screen keyboard on engines where the keyboard
+   overlays the page instead of resizing it (iOS ≤ 18.3 Safari). */
+import { useKeyboardLift } from "./useKeyboardLift";
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Small helpers — shared by multiple subsections of the file
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -592,6 +597,12 @@ export default function DiscussApp() {
   const [awayAnchorAt, setAwayAnchorAt] = useState<number | null>(null);
   const scrolledUpRef = useRef(false);
 
+  /* WeChat keyboard ride: the px the composer lifts while the on-screen
+     keyboard is up. 0 on desktop, 0 on iOS 18.4+ (there
+     `interactive-widget: resizes-content` shrinks the layout viewport and
+     the lift would double-shift — the hook self-disables). */
+  const keyboardLift = useKeyboardLift();
+
   /* ── Translation ──────────────────────────────────────────────────
      Multi-national teams: a sender writes in their own language and the
      receiver reads it in theirs. `auto` renders every incoming message in
@@ -700,6 +711,17 @@ export default function DiscussApp() {
     selectedChannelId, newChannelOpen, newDmOpen,
     productPickerOpen, mentionPickerOpen, emojiPickerOpen, voiceOpen,
   ]);
+
+  /* Keyboard ride, part 2: when the keyboard rises or drops, keep the newest
+     message pinned just above the composer (WeChat's bottom-anchored feel).
+     Only while the reader is already at the bottom — someone reading up in
+     history keeps their exact place. */
+  useEffect(() => {
+    if (scrolledUpRef.current) return;
+    const scroller = threadScrollRef.current;
+    if (!scroller) return;
+    scroller.scrollTop = scroller.scrollHeight;
+  }, [keyboardLift]);
 
   /* ── Latest-value refs ────────────────────────────────────────────
      The realtime subscribe effect used to list `channels`, `members`,
@@ -4255,6 +4277,16 @@ export default function DiscussApp() {
                 ref={threadScrollRef}
                 onScroll={(e) => handleThreadScroll(e.currentTarget)}
                 className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
+                style={{
+                  /* Keyboard ride, part 3: grow the bottom pad by the keyboard
+                     height so the newest message rests on the composer instead
+                     of sliding under it (the scroller itself does NOT shrink
+                     on overlay-keyboard engines). Same UIKit timing as the
+                     composer lift, so list and composer move as one piece. */
+                  paddingBottom:
+                    keyboardLift > 0 ? `calc(1rem + ${keyboardLift}px)` : undefined,
+                  transition: "padding-bottom 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+                }}
               >
                 {loadingOlder && (
                   <div className="flex justify-center py-2" aria-live="polite">
@@ -4345,6 +4377,14 @@ export default function DiscussApp() {
                         : "bg-[var(--bg-inverted)] border-transparent text-[var(--text-inverted)] hover:bg-[var(--bg-inverted-hover)]"
                       : "kx-glass-pop bg-[var(--bg-elevated)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
+                  style={{
+                    /* Rides the keyboard with the composer (Tailwind v4 keeps
+                       its centering on the separate `translate` property, so
+                       this transform composes instead of replacing). */
+                    transform:
+                      keyboardLift > 0 ? `translateY(-${keyboardLift}px)` : undefined,
+                    transition: "transform 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+                  }}
                 >
                   <AngleDownIcon size={13} aria-hidden />
                   <span aria-live="polite">
@@ -4358,6 +4398,7 @@ export default function DiscussApp() {
 
               {/* Composer */}
               <Composer
+                keyboardLift={keyboardLift}
                 body={composerBody}
                 onChange={handleComposerChange}
                 onKeyDown={handleKeyDown}
@@ -6246,6 +6287,7 @@ function Composer({
   onRemoveProduct,
   replyTarget,
   onCancelReply,
+  keyboardLift,
   voiceOpen,
   onOpenVoice,
   onCloseVoice,
@@ -6294,6 +6336,11 @@ function Composer({
   onRemoveProduct: (index: number) => void;
   replyTarget: DiscussMessageWithAuthor | null;
   onCancelReply: () => void;
+  /* WeChat keyboard ride: px to lift the composer onto the on-screen
+     keyboard. 0 everywhere except touch devices on overlay-keyboard engines
+     (iOS ≤ 18.3) — the prop is plumbed always so the lift and the message
+     list padding share one value and one timing. */
+  keyboardLift: number;
   voiceOpen: boolean;
   onOpenVoice: () => void;
   onCloseVoice: () => void;
@@ -6379,6 +6426,13 @@ function Composer({
         /* Respect the iPhone home-indicator so the composer sits above
            the rounded bottom edge instead of being partially hidden. */
         paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+        /* WeChat keyboard ride: translate the whole composer (row + panels)
+           up onto the keyboard. UIKit's keyboard timing (≈260ms,
+           cubic-bezier(0.32, 0.72, 0, 1)) so the composer and the keyboard
+           move as ONE piece — the "same motion as WeChat" ask. The message
+           list pads itself by the same value, so nothing jumps. */
+        transform: keyboardLift > 0 ? `translateY(-${keyboardLift}px)` : undefined,
+        transition: "transform 260ms cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       {dragging && (
