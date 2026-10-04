@@ -609,6 +609,65 @@ Task workflow: Understand → Plan → Implement → Verify → Review → Repor
 Report using: Completed / Changed / Verified / Important Notes / Remaining
 Issues.
 
+## Hard-won UI lessons (owner-flagged — do not repeat)
+
+When building or changing ANY app screen, copy the layout conventions of an
+existing app pixel-for-pixel instead of inventing one. Concretely, verified
+against Travel and the other apps (owner corrections, 04 Oct 2026, Events app):
+
+- AppHomeMenu must sit in `<div className="mt-5 mb-3">` — without the wrapper
+  its search band touches the header hero above and the content below.
+- Lists are full-width ROWS inside one `CARD` with `divide-y` (row: pills +
+  title + meta line left, stats right). Never a card grid — a grid leaves half
+  the page empty whenever the list is short, which the owner flagged.
+- Page container is `mx-auto w-full max-w-[1500px] px-4 py-6 md:px-6 lg:px-8
+  md:py-8 !pb-16`. Never `max-w-6xl` — the owner rejected that width before.
+- PageHeader hides the app title on ≥md screens by design (`md:sr-only`); the
+  shell header shows the app name there. Not a bug, do not "fix" it.
+- Dates on internal app screens format as instants ("15 Oct 2026 → 19 Oct
+  2026"); the DMY rule and `formatDateEn` are for printed documents only.
+- After changing UI code, the owner's browser tab needs a RELOAD to see it —
+  hot state can leave the page stale. Verify visually before claiming done.
+
+## Public/guest-facing surfaces — brand recipe (owner-flagged)
+
+Never invent styling for a page an outsider sees. The sign-in gate
+(AdminAuth.tsx) is the canonical public dark KOLEEX surface — copy its
+register exactly:
+- Frame `h-[100dvh] bg-[#05070C] overflow-hidden` + `<WavyBackground theme="dark" />`.
+- The official lockup `/brand/hub-logo/koleex-hub-logo-for-dark-e.webp`
+  (alt "Koleex Hub", h-6, draggable=false) — NEVER a text-drawn "KOLEEX hub".
+  Reusable component: HubMark in knowledge/brand-book/marks.tsx.
+- Tagline row: "WORK SMARTER. TOGETHER." in 10px uppercase tracking-[0.24em]
+  white/45 between two white/15 hairlines.
+- Bypass the Hub chrome via RootShell's BYPASS_PREFIXES (the /legal pattern).
+
+EXCEPTION the owner chose (04 Oct 2026): the event INVITATION page
+(/invite/<token>) wears the AURORA register, not the dark gate — `kx-app
+kx-ground-host` scope, the app's WavyBackground ground, the CARD recipe
+(kx-glass + border-subtle + bg-surface) and design tokens. Do NOT set
+data-kx-skin/data-theme per element — the bootstrap script already pins them
+on <html>; per-element values caused a hydration mismatch.
+
+## Colored answer buttons — the owner's approved recipe (owner-picked)
+
+For action buttons whose color MEANS something (RSVP answers, destructive,
+brand actions), the owner's final style — approved on the invitation page
+and to be reused:
+- Resting: OUTLINE ONLY — `border border-<color>-500/[0.35] text-<color>-300`,
+  NO fill (never fill the button with its color as a hover or resting state).
+- Hover: do NOT fill — a soft GLOW of the same color:
+  `hover:bg-<color>-500/[0.08] hover:shadow-[0_0_14px_0_rgba(<rgb>,0.25),
+  0_0_0_1px_rgba(<rgb>,0.22)]` (the owner tuned it down from stronger glows —
+  subtle, not loud). Colors: green emerald (accepted/success), orange amber
+  (maybe/warning), red rose (declined/danger).
+- The CURRENT/selected answer alone carries the solid fill
+  (`bg-<color>-500 text-white`).
+- ALWAYS add `data-kx-keep-hover` to these buttons: Aurora's global CSS
+  forces every button hover to Hub-blue with !important, and that attribute
+  is the documented escape hatch for meaningful hover colors. Without it the
+  color hover silently never shows.
+
 ---
 
 # KOLEEX AI
