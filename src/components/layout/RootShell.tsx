@@ -135,7 +135,9 @@ function ScrollToTopOnRouteChange() {
 const BYPASS_SUFFIXES = ["/print"];
 /* /legal: Koleex's public legal pages (privacy, terms, data deletion) —
    read by the social platforms' reviewers, who never sign in. */
-const BYPASS_PREFIXES = ["/auth", "/legal"];
+/* /invite: public event invitations — guests open their RSVP link without
+   a Hub account, so the chrome (sidebar, header) must not render. */
+const BYPASS_PREFIXES = ["/auth", "/legal", "/invite"];
 
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;

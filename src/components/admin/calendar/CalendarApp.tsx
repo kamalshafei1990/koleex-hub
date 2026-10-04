@@ -584,6 +584,7 @@ export default function CalendarApp() {
       return;
     }
     if (e.source === "planning" && e.planning_item_id) { window.location.assign(`/planning?item=${e.planning_item_id}`); return; }
+    if (e.source === "events" && e.event_id) { window.location.assign(`/events/${e.event_id}?tab=agenda`); return; }
     if (e.source === "report") { window.location.assign(reportHref(e, viewingOwn)); return; }
     if (e.source === "leave") { showToast(t(e.source_kind === "pending" ? "readOnly.leavePending" : "readOnly.leave"), "info"); return; }
     if (e.source) return;

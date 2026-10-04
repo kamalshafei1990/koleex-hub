@@ -366,6 +366,49 @@ async function milestoneMirror(auth: ServerAuthContext, accountId: string, w: Fe
   }
 }
 
+/** Timed agenda sessions of events OWNED by the calendar's account — the
+ *  program the person is running shows where they plan their day. Read-time
+ *  mirror, same contract as the other sources: no writes to the calendar
+ *  tables, a failure leaves the rest of the feed standing. */
+async function eventsMirror(auth: ServerAuthContext, accountId: string, w: FeedWindow): Promise<CalendarFeedEvent[]> {
+  if (!auth.tenant_id) return [];
+  const { data, error } = await supabaseServer
+    .from("koleex_event_agenda_items")
+    .select("id, title, description, speaker, location, starts_at, ends_at, event:event_id!inner ( id, title, owner_account_id, tenant_id, status )")
+    .eq("tenant_id", auth.tenant_id)
+    .eq("event.owner_account_id", accountId)
+    .neq("event.status", "archived")
+    .not("starts_at", "is", null)
+    .lt("starts_at", w.to)
+    .gte("starts_at", w.from)
+    .order("starts_at", { ascending: true })
+    .limit(300);
+  if (error) { console.error("[calendar-feed] events:", error.message); return []; }
+  return ((data ?? []) as Array<Record<string, unknown>>).flatMap((a) => {
+    const start = a.starts_at as string | null;
+    if (!start) return [];
+    const ev = (Array.isArray(a.event) ? a.event[0] : a.event) as { id: string; title: string } | null;
+    const end = (a.ends_at as string | null) ?? new Date(Date.parse(start) + 60 * 60_000).toISOString();
+    return [mirrorRow({
+      id: `event-agenda:${a.id}`,
+      accountId, tenantId: auth.tenant_id,
+      title: (a.title as string) || "",
+      description: ev?.title ?? null,
+      color: null,
+      event_type: "event",
+      source: "events",
+      source_kind: "agenda",
+      start_at: start,
+      end_at: end,
+      extra: {
+        location: (a.location as string | null) ?? null,
+        event_id: ev?.id,
+        agenda_item_id: String(a.id),
+      },
+    })];
+  });
+}
+
 /** APPROVED leave of the employee behind the account, as out-of-office, and
  *  PENDING leave as tentative (source_kind "pending" — the views draw it
  *  dashed). HR's record stays the only record; nothing is written to the
@@ -524,7 +567,7 @@ export async function loadCalendarFeed(
 ): Promise<CalendarFeedEvent[]> {
   const viewingOwn = accountId === auth.account_id;
   const tz = await accountTimezone(accountId);
-  const [own, invited, planning, todos, projects, milestones, leave, reports] = await Promise.all([
+  const [own, invited, planning, todos, projects, milestones, leave, reports, events] = await Promise.all([
     ownEvents(auth, accountId, viewingOwn, w, tz),
     viewingOwn ? invitedEvents(auth, accountId, w) : Promise.resolve([]),
     viewingOwn ? planningMirror(auth, accountId, w) : Promise.resolve([]),
@@ -533,8 +576,9 @@ export async function loadCalendarFeed(
     milestoneMirror(auth, accountId, w, tz),
     leaveMirror(auth, accountId, w, tz),
     reportMirror(auth, accountId, viewingOwn, w),
+    eventsMirror(auth, accountId, w),
   ]);
-  return [...own, ...invited, ...planning, ...todos, ...projects, ...milestones, ...leave, ...reports];
+  return [...own, ...invited, ...planning, ...todos, ...projects, ...milestones, ...leave, ...reports, ...events];
 }
 
 /** One account's BUSY time in the window, for the free/busy view of the

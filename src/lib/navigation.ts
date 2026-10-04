@@ -293,7 +293,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "sms-whatsapp",     tKey: "app.sms-whatsapp",     name: "SMS & WhatsApp",    icon: MessageSquareIcon, route: "/sms-whatsapp", active: false },
   { id: "marketing-automation", tKey: "app.marketing-automation", name: "Marketing Automation", icon: WorkflowIcon, route: "/marketing-automation", active: false },
   { id: "marketing-cards",  tKey: "app.marketing-cards",  name: "Marketing Cards",   icon: MarketingCardsIcon, route: "/marketing-cards", active: false },
-  { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: false },
+  { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: true,  newSince: "2026-10-04" },
 
   /* ── Planning ── */
   { id: "planning",         tKey: "app.planning",         name: "Planning",          icon: PlanningIcon,  route: "/planning",         active: true  },

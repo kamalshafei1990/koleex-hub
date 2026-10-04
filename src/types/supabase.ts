@@ -1080,7 +1080,7 @@ export type CalendarEventUpdate = Partial<CalendarEventInsert>;
 /** What GET /api/calendar/events hands the views: real rows, expanded
  *  occurrences of a series, events the viewer is invited to, and read-only
  *  mirrors of other modules. The optional fields say which. */
-export type CalendarMirrorSource = "planning" | "todo" | "project" | "leave" | "report";
+export type CalendarMirrorSource = "planning" | "todo" | "project" | "leave" | "report" | "events";
 export interface CalendarViewEvent extends CalendarEventRow {
   /** Set on each occurrence of a recurring series; the id is `<base>~<i>`. */
   series_base_id?: string;
@@ -1102,6 +1102,9 @@ export interface CalendarViewEvent extends CalendarEventRow {
   report_id?: string;
   report_request?: string;
   report_subject?: string;
+  /** Events mirrors: the agenda session and its event, for the deep link. */
+  event_id?: string;
+  agenda_item_id?: string;
 }
 
 export type CalendarAttendeeStatus = "invited" | "accepted" | "declined";
