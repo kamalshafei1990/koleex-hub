@@ -1,12 +1,29 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { notifyTaskAssigned } from "@/lib/server/project-notify";
+import { notifyTaskAssigned, clearTaskNotifications } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { assertTaskAccess, assertTaskWrite, projectModuleRights, taskEditFlags, taskFlagsPayload } from "@/lib/server/project-access";
+import { checkDateOrder, loadStages, reconcileStageStatus, validateTaskWrite } from "@/lib/server/project-task-rules";
+import { removeTaskAttachmentFiles } from "@/lib/server/project-files";
+import { pruneProjectChatSeats, syncProjectMembersFromAssignees } from "@/lib/server/project-members";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
+
+/* logged_hours is NOT here: it is derived from project_time_entries
+   (src/lib/server/project-time.ts) and must never be hand-written. */
+const PATCHABLE = [
+  "stage_id", "parent_task_id",
+  "title", "description", "priority",
+  "assignee_account_id", "followers_account_ids", "tag_ids",
+  "blocked_by_task_ids",
+  "due_date", "start_date", "estimated_hours",
+  "progress_pct", "status",
+  "linked_planning_item_id", "linked_entity_type", "linked_entity_id", "linked_entity_label",
+  "sort_order",
+] as const;
 
 export async function GET(_req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
@@ -14,6 +31,8 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAccess(auth, "Projects");
   if (deny) return deny;
   const { id } = await params;
+  const gate = await assertTaskAccess(auth, id);
+  if (gate instanceof NextResponse) return gate;
 
   const { data, error } = await supabaseServer
     .from("project_tasks")
@@ -26,9 +45,15 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/projects/tasks/:id GET]", error.message);
+    return NextResponse.json({ error: "Failed to load task" }, { status: 500 });
+  }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ task: data });
+  /* can_edit / project_access: what assertTaskWrite would answer, so the
+     task form enables exactly the writes the server accepts. */
+  const flags = (await taskEditFlags(auth, [gate.task], await projectModuleRights(auth))).get(id);
+  return NextResponse.json({ task: { ...data, ...taskFlagsPayload(flags) } });
 }
 
 export async function PATCH(req: Request, { params }: RouteCtx) {
@@ -37,37 +62,27 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
+  const gate = await assertTaskWrite(auth, id);
+  if (gate instanceof NextResponse) return gate;
+  const prev = gate.task;
 
-  const body = (await req.json()) as Record<string, unknown>;
-  const allowed = [
-    "stage_id", "parent_task_id",
-    "title", "description", "priority",
-    "assignee_account_id", "followers_account_ids", "tag_ids",
-    "blocked_by_task_ids",
-    "due_date", "start_date", "estimated_hours", "logged_hours",
-    "progress_pct", "status",
-    "linked_planning_item_id", "linked_entity_type", "linked_entity_id", "linked_entity_label",
-    "sort_order",
-  ];
-  const patch: Record<string, unknown> = {};
-  for (const k of allowed) if (k in body) patch[k] = body[k];
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  // Look at previous assignee / status so we can fire notifications +
-  // stamp closed_at automatically on the "done" transition.
-  const { data: prev } = await supabaseServer
-    .from("project_tasks")
-    .select("assignee_account_id, status, title, project_id, due_date")
-    .eq("id", id)
-    .eq("tenant_id", auth.tenant_id)
-    .maybeSingle();
-
-  if (patch.status === "done" && prev?.status !== "done") {
-    patch.closed_at = new Date().toISOString();
-    patch.progress_pct = 100;
-  }
-  if (patch.status && patch.status !== "done") {
-    patch.closed_at = null;
-  }
+  const stages = await loadStages(auth.tenant_id, prev.project_id);
+  const checked = await validateTaskWrite({
+    tenantId: auth.tenant_id,
+    projectId: prev.project_id,
+    taskId: id,
+    body,
+    allowed: PATCHABLE,
+    stages,
+  });
+  if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
+  const dateErr = checkDateOrder(prev, checked.patch);
+  if (dateErr) return NextResponse.json({ error: dateErr, code: "date_order" }, { status: 400 });
+  const patch = reconcileStageStatus({ status: prev.status, stage_id: prev.stage_id }, checked.patch, stages);
+  if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
   const { data, error } = await supabaseServer
     .from("project_tasks")
@@ -76,17 +91,33 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .eq("tenant_id", auth.tenant_id)
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Notify on fresh assignment (not on re-save with same assignee) —
-  // inbox + web-push — and keep the project's progress % in sync.
-  const newAssignee = data?.assignee_account_id as string | null;
-  if (newAssignee && newAssignee !== prev?.assignee_account_id) {
-    void notifyTaskAssigned(auth, data);
+  if (error) {
+    console.error("[api/projects/tasks/:id PATCH]", error.message);
+    return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
   }
-  void recomputeProjectProgress(auth.tenant_id, data?.project_id as string | null);
 
-  return NextResponse.json({ task: data });
+  /* Post-response side effects: notify on a fresh assignment (inbox +
+     push), clear finished notifications on done, keep project % in sync.
+     after() keeps them alive past the response on serverless — `void`
+     could be frozen mid-flight. */
+  const newAssignee = data?.assignee_account_id as string | null;
+  const becameDone = data?.status === "done" && prev.status !== "done";
+  after(async () => {
+    if (newAssignee && newAssignee !== prev.assignee_account_id) {
+      await notifyTaskAssigned(auth, data);
+      await syncProjectMembersFromAssignees(auth, prev.project_id, [newAssignee]);
+    }
+    /* Reassigned AWAY from someone: if that was their last way into the
+       project (and they are not a member), they leave its chat. */
+    if (prev.assignee_account_id && prev.assignee_account_id !== newAssignee) {
+      await pruneProjectChatSeats(auth.tenant_id, [{ project_id: prev.project_id, account_id: prev.assignee_account_id }]);
+    }
+    if (becameDone) await clearTaskNotifications(id);
+    await recomputeProjectProgress(auth.tenant_id, prev.project_id);
+  });
+
+  const flags = (await taskEditFlags(auth, [prev], await projectModuleRights(auth))).get(id);
+  return NextResponse.json({ task: { ...data, ...taskFlagsPayload(flags), can_edit: true } });
 }
 
 export async function DELETE(_req: Request, { params }: RouteCtx) {
@@ -95,20 +126,45 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Projects", "delete");
   if (deny) return deny;
   const { id } = await params;
+  const gate = await assertTaskWrite(auth, id);
+  if (gate instanceof NextResponse) return gate;
 
-  const { data: victim } = await supabaseServer
+  /* Collect storage paths BEFORE the cascade removes the attachment rows
+     (this task and any subtasks cascading with it). */
+  const { data: subs } = await supabaseServer
     .from("project_tasks")
-    .select("project_id")
-    .eq("id", id)
+    .select("id, assignee_account_id, created_by_account_id")
     .eq("tenant_id", auth.tenant_id)
-    .maybeSingle();
+    .eq("parent_task_id", id);
+  const subRows = (subs ?? []) as { id: string; assignee_account_id: string | null; created_by_account_id: string | null }[];
+  const taskIds = [id, ...subRows.map((r) => r.id)];
+  /* Their assignees (and creators — a reason to keep an automatic
+     membership) may lose their last way into the project. */
+  const lostSeats = [gate.task, ...subRows]
+    .flatMap((r) => [r.assignee_account_id, r.created_by_account_id])
+    .filter((a): a is string => !!a)
+    .map((account_id) => ({ project_id: gate.task.project_id, account_id }));
+  const { data: files } = await supabaseServer
+    .from("project_task_attachments")
+    .select("file_path")
+    .eq("tenant_id", auth.tenant_id)
+    .in("task_id", taskIds);
 
   const { error } = await supabaseServer
     .from("project_tasks")
     .delete()
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  void recomputeProjectProgress(auth.tenant_id, victim?.project_id as string | null);
+  if (error) {
+    console.error("[api/projects/tasks/:id DELETE]", error.message);
+    return NextResponse.json({ error: "Failed to delete task" }, { status: 500 });
+  }
+  const paths = (files ?? []).map((f) => (f as { file_path: string }).file_path);
+  after(async () => {
+    await removeTaskAttachmentFiles(paths);
+    await clearTaskNotifications(id);
+    await recomputeProjectProgress(auth.tenant_id, gate.task.project_id);
+    await pruneProjectChatSeats(auth.tenant_id, lostSeats);
+  });
   return NextResponse.json({ ok: true });
 }

@@ -40,6 +40,9 @@ export default function PassportScanBox({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState<"upload" | "read" | null>(null);
+  /** In-app viewer — a new-tab open strands the desktop app (no tabs there,
+   *  no way back), exactly what happened with the licence. */
+  const [viewingScan, setViewingScan] = useState(false);
   const [progress, setProgress] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +147,7 @@ export default function PassportScanBox({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => window.open(scanUrl, "_blank", "noopener")}
+              onClick={() => setViewingScan(true)}
             >
               {t("scan.view")}
             </Button>
@@ -180,6 +183,32 @@ export default function PassportScanBox({
         </div>
       </div>
 
+      {viewingScan && scanUrl && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center px-4 py-6 bg-black/40 backdrop-blur-[2px]"
+          onClick={() => setViewingScan(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("scan.title")}
+        >
+          <div
+            className="kx-glass-pop relative max-h-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- one-off
+                document view; next/image buys nothing here */}
+            <img src={scanUrl} alt="Passport scan, full size" className="max-h-[85vh] w-auto max-w-[90vw] bg-white object-contain" />
+            <button
+              type="button"
+              onClick={() => setViewingScan(false)}
+              aria-label="Close"
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 text-lg leading-none text-[var(--text-primary)] shadow hover:bg-[var(--bg-surface-hover)]"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       <input
         ref={fileRef}
         type="file"

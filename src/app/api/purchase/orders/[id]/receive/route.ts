@@ -13,10 +13,11 @@ import "server-only";
    and recomputes the PO header status.
    ========================================================================== */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { receivePurchaseOrder } from "@/lib/purchase/receiving";
 import type { ReceiveRequest } from "@/lib/purchase/types";
+import { notifyPurchaseReceived } from "@/lib/server/commerce-notify";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -37,5 +38,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     request: body,
   });
   if (!outcome.ok) return NextResponse.json(outcome, { status: outcome.code ?? 500 });
+  /* Whoever raised the PO hears the goods are in (all of them, or part). */
+  const poStatus = outcome.po_status;
+  after(() => notifyPurchaseReceived(auth, id, poStatus));
   return NextResponse.json(outcome);
 }

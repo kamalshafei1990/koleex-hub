@@ -4,9 +4,9 @@
    spend by category, spend by supplier. Same pure-SVG style as the
    Sales reports so the two apps look consistent. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, sectionTitleCls } from "../shared";
+import { cardCls, formatMoney, sectionTitleCls, usePurchaseList } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -18,31 +18,16 @@ type CategoryRow = { id: string; name: string; kind: string };
 type SupplierRow = { id: string; display_name: string | null; company_name: string | null; full_name: string | null };
 
 export default function ReportsModule({ t }: PurchaseModuleProps) {
-  const [payments, setPayments]   = useState<PaymentRow[]>([]);
-  const [billItems, setBillItems] = useState<BillItemRow[]>([]);
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [suppliers, setSuppliers]   = useState<SupplierRow[]>([]);
-  const [loading, setLoading]       = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=reports", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { payments: [], billItems: [], categories: [], suppliers: [] }) as {
-        payments: PaymentRow[];
-        billItems: BillItemRow[];
-        categories: CategoryRow[];
-        suppliers: SupplierRow[];
-      };
-      if (cancelled) return;
-      setPayments(data.payments);
-      setBillItems(data.billItems);
-      setCategories(data.categories);
-      setSuppliers(data.suppliers);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{
+    payments: PaymentRow[];
+    billItems: BillItemRow[];
+    categories: CategoryRow[];
+    suppliers: SupplierRow[];
+  }>("reports");
+  const payments   = useMemo(() => data?.payments ?? [], [data]);
+  const billItems  = useMemo(() => data?.billItems ?? [], [data]);
+  const categories = useMemo(() => data?.categories ?? [], [data]);
+  const suppliers  = useMemo(() => data?.suppliers ?? [], [data]);
 
   /* Monthly spend trend — last 6 months. */
   const monthly = useMemo(() => {

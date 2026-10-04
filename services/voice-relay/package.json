@@ -1,0 +1,15 @@
+{
+  "name": "koleex-voice-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Koleex AI voice relay: carries a caller's realtime voice socket to the vendor through Koleex's own domain.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  }
+}

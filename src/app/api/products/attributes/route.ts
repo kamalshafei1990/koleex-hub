@@ -16,8 +16,9 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 
 const BUCKET = "media";
 const CONFIG_PATH = "config/product-attributes.json";
@@ -127,6 +128,7 @@ export async function PATCH(req: Request) {
           .eq("id", p.id as string);
         if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
       }
+      revalidateWebsite(["products"]);
       return NextResponse.json({ ok: true });
     }
     const col = SCALAR[attrType];
@@ -136,6 +138,7 @@ export async function PATCH(req: Request) {
       .update({ [col]: newValue })
       .eq(col, oldValue);
     if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
+    revalidateWebsite(["products"]);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/products attributes PATCH]", e instanceof Error ? e.message : String(e));

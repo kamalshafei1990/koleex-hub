@@ -6,7 +6,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { AccountWithLinks } from "@/types/supabase";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
@@ -40,7 +39,7 @@ function LinkRow({ href, icon, label, hint, last }: {
   );
 }
 
-export default function AdminTab(_props: { account: AccountWithLinks }) {
+export default function AdminTab() {
   const { t } = useTranslation(settingsT);
   const qaEnabled = useQaReporterEnabled();
   const [savingQa, setSavingQa] = useState(false);

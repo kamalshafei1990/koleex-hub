@@ -6,67 +6,84 @@
    A single drawer mounted at the layout root that surfaces every
    creation flow. Operators open it from:
      · header chip ("+ Create")
-     · mobile action bar
      · any empty state via the openSmartCreate() event
      · keyboard shortcut "c"
 
-   Selecting a tile navigates to the matching SmartCreate page
-   (/create/expense, /create/customer, …) so we reuse the polished
-   guided forms already built. The drawer itself is a quick chooser —
-   no business logic.
+   Picking a tile goes to that app with ?new=1, which opens its create form
+   (lib/use-open-on-new-param); the /create/* pages are the form already.
+   When the app is the page you are on, the form is asked to open in place.
+
+   What it shows, in order (no filter typed):
+     · Recent — the last three kinds this browser created
+     · Suggested here — the kinds that belong to the app you are in
+     · the rest
+   Only kinds the viewer's role may CREATE are listed (usePermissions).
+   ↑/↓ move, Enter opens; the filter matches all three languages.
+
+   Desktop and tablet only. Owner: "remove smart create completely from
+   mobile phone". Below the sm breakpoint (640px) the drawer never opens —
+   whatever asks it to — its chunk is not preloaded, and the "Create"
+   buttons that open it are hidden (hidden sm:contents at each call site).
+   Rotating a tablet into phone width while it is open closes it.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
+import { usePresence } from "@/components/kds/usePresence";
+import { useCurrentAccountId } from "@/lib/identity";
 
-type Kind = "expense" | "po" | "so" | "invoice" | "item" | "customer" | "supplier" | "fx" | "asset" | "bank";
-
-interface Tile {
-  k: Kind;
-  label: string;
-  icon: RrIconName;
-  hint: string;
-  href: string;
-  affects?: Array<"accounting" | "inventory">;
-}
-
-const TILES: Array<Tile> = [
-  { k: "expense",  label: "Expense",        icon: "receipt",             hint: "Operating cost",           href: "/create/expense",       affects: ["accounting"] },
-  { k: "po",       label: "Purchase Order", icon: "shipping-fast",       hint: "Buy from a supplier",      href: "/purchase?new=1",       affects: ["inventory"] },
-  { k: "so",       label: "Sales Order",    icon: "file-invoice-dollar", hint: "Sell to a customer",       href: "/sales/orders?new=1",   affects: ["inventory"] },
-  { k: "invoice",  label: "Invoice",        icon: "receipt",             hint: "Bill a customer",          href: "/invoices?new=1",       affects: ["accounting"] },
-  { k: "item",     label: "Inventory Item", icon: "box-open",            hint: "New SKU",                  href: "/create/inventory-item",affects: ["inventory"] },
-  { k: "customer", label: "Customer",       icon: "users",               hint: "Party you sell to",        href: "/create/customer" },
-  { k: "supplier", label: "Supplier",       icon: "id-badge",            hint: "Party you buy from",       href: "/create/supplier" },
-  { k: "fx",       label: "FX Rate",        icon: "balance-scale-left",  hint: "Currency pair",            href: "/finance/fx-rates",     affects: ["accounting"] },
-  { k: "asset",    label: "Asset",          icon: "briefcase",           hint: "Capital purchase",         href: "/create/asset",         affects: ["accounting"] },
-  { k: "bank",     label: "Bank Account",   icon: "bank",                hint: "Add a treasury account",   href: "/finance/bank-accounts?new=1" },
-];
+/* The panel (tiles, translations, permission lookup) is its own chunk: this
+   component sits in the root layout, so only the listener ships everywhere. */
+const SmartCreatePanel = dynamic(() => import("./SmartCreatePanel"), { ssr: false });
 
 const STORE_EVENT = "koleex:smart-create-open";
 
+/* Phone = below Tailwind's sm breakpoint, the same line the call sites use
+   to hide their "Create" buttons. */
+const PHONE_QUERY = "(max-width: 639.98px)";
+const isPhoneNow = () => typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches;
+function subscribePhone(cb: () => void) {
+  const m = window.matchMedia(PHONE_QUERY);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+}
+
 /** Imperatively open the drawer from anywhere in the app. */
-export function openSmartCreate(initialKind?: Kind) {
+export function openSmartCreate() {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(STORE_EVENT, { detail: initialKind ?? null }));
+  window.dispatchEvent(new CustomEvent(STORE_EVENT));
 }
 
 export default function SmartCreateDrawer() {
-  const router = useRouter();
+  /* The drawer is mounted beside the sign-in screen too; it only works for
+     a signed-in operator ("c" on the login form used to open it). */
+  const signedIn = !!useCurrentAccountId();
+  const isPhone = useSyncExternalStore(subscribePhone, isPhoneNow, () => false);
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
+  const close = useCallback(() => setOpen(false), []);
 
-  const close = useCallback(() => { setOpen(false); setFilter(""); }, []);
+  /* Fetch the panel's chunk once the page is idle, so the first "c" opens
+     instantly — it stays out of the initial bundle either way. */
+  useEffect(() => {
+    if (isPhoneNow()) return;
+    const warm = () => { void import("./SmartCreatePanel"); };
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(warm, { timeout: 5000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(warm, 3000);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
-    function onOpen() { setOpen(true); }
+    function onOpen() { if (!isPhoneNow()) setOpen(true); }
     function onKey(e: KeyboardEvent) {
       /* Keyboard shortcut: bare "c" toggles the drawer (skips when
-         the operator is typing in an input). */
-      if (e.key !== "c" || e.metaKey || e.ctrlKey || e.altKey) return;
-      const tag = (e.target as HTMLElement | null)?.tagName ?? "";
-      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement | null)?.isContentEditable) return;
+         the operator is typing in a field). */
+      if (e.key !== "c" || e.metaKey || e.ctrlKey || e.altKey || isPhoneNow()) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName ?? "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
       setOpen((o) => !o);
       e.preventDefault();
     }
@@ -78,85 +95,10 @@ export default function SmartCreateDrawer() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    function onEsc(e: KeyboardEvent) { if (e.key === "Escape") close(); }
-    document.addEventListener("keydown", onEsc);
-    return () => document.removeEventListener("keydown", onEsc);
-  }, [open, close]);
-
-  if (!open) return null;
-
-  const visible = filter
-    ? TILES.filter((t) => `${t.label} ${t.hint}`.toLowerCase().includes(filter.toLowerCase()))
-    : TILES;
-
-  function pick(t: Tile) { close(); router.push(t.href); }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 backdrop-blur-sm p-3 sm:items-center sm:p-6">
-      <div className="kx-pop-in w-full max-w-2xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--bg-primary)] shadow-2xl">
-        <header className="border-b border-white/[0.06] px-5 py-3.5">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Smart Create</div>
-              <h2 className="text-[15px] font-semibold tracking-tight">What do you want to add?</h2>
-            </div>
-            <button type="button" onClick={close}
-                    className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.10] bg-white/[0.04] text-gray-400 hover:text-gray-200"
-                    aria-label="Close">
-              <RrIcon name="cross" size={11} />
-            </button>
-          </div>
-          <input
-            autoFocus
-            value={filter} onChange={(e) => setFilter(e.target.value)}
-            placeholder="Type to filter — e.g. expense, supplier, FX…"
-            className="mt-3 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[12.5px] outline-none focus:border-white/[0.20]"
-          />
-        </header>
-        <div className="grid max-h-[60vh] grid-cols-1 gap-2 overflow-y-auto p-4 sm:grid-cols-2">
-          {visible.length === 0 && (
-            <div className="col-span-full px-3 py-6 text-center text-[11.5px] text-gray-500">
-              No match. Try "expense", "PO", "invoice", "FX", "bank"…
-            </div>
-          )}
-          {visible.map((t) => (
-            <button key={t.k} type="button" onClick={() => pick(t)}
-                    className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-3 py-3 text-left transition-colors hover:bg-white/[0.04]">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300 group-hover:text-gray-100">
-                <RrIcon name={t.icon} size={14} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-medium">{t.label}</div>
-                <div className="text-[10.5px] text-gray-500">{t.hint}</div>
-              </div>
-              {(t.affects ?? []).length > 0 && (
-                <div className="flex flex-col items-end gap-0.5">
-                  {t.affects?.includes("accounting") && (
-                    <span className="text-[9px] uppercase tracking-[0.06em] text-amber-200/80">A/C</span>
-                  )}
-                  {t.affects?.includes("inventory") && (
-                    <span className="text-[9px] uppercase tracking-[0.06em] text-blue-200/80">INV</span>
-                  )}
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-        <footer className="flex items-center justify-between border-t border-white/[0.06] px-5 py-2.5 text-[10px] text-gray-500">
-          <span>
-            Tip: press <span className="rounded border border-white/[0.10] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9.5px]">c</span> anywhere to open this drawer.
-          </span>
-          <button
-            type="button"
-            onClick={() => { close(); router.push("/finance/data-entry"); }}
-            className="text-emerald-200 hover:text-emerald-100"
-          >
-            Don't see what you need? Open the Data Entry hub →
-          </button>
-        </footer>
-      </div>
-    </div>
-  );
+  /* Motion + material match the KDS modals (FormModal): pop in, shrink
+     away, on the .kx-glass-pop surface Aurora renders as glass. The panel
+     (and its permission lookup) only exists while the drawer is shown. */
+  const { mounted, closing } = usePresence(open && signedIn && !isPhone);
+  if (!mounted) return null;
+  return <SmartCreatePanel closing={closing} onClose={close} />;
 }

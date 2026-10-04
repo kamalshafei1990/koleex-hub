@@ -126,6 +126,15 @@ for (const file of files) {
 }
 check("quotation_items is insert-only in AI agent (no reader)", itemReaders === 0);
 
+/* ── 5. getProductDetails takes a CODE as well as a UUID (2026-09-03: two
+       calls with "XP-3560"-style codes failed the uuid cast). ─────────── */
+check(
+  "getProductDetails resolves a non-UUID productId as a code before the id query",
+  /const productId = UUID_RE\.test\(requested\) \? requested : await productIdForCode\(requested\);/.test(qtext) &&
+    /slug\.ilike\.\$\{safe\},product_name\.ilike\.\$\{safe\},legacy_code\.ilike\.\$\{safe\}/.test(qtext) &&
+    /from\("product_models"\)\s*\.select\("product_id"\)/.test(qtext),
+);
+
 /* ── 5. registry wires quotationTools (sanity: the tool set is the audited one) */
 const registry = readFileSync(join(AI_DIR, "tool-registry.ts"), "utf8");
 check("tool-registry imports + spreads quotationTools", /quotationTools/.test(registry));

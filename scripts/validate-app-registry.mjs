@@ -36,9 +36,12 @@ if (/const\s+PERMISSION_GROUPS\s*:/.test(roles)) {
 /* ── 2. Every active registry app resolves to a governable module ──
    Parse the registry entries we care about: id, name, active, and the
    not-governable exclusions declared in permission-modules. */
+/* `active` may be a literal or an expression (Dashboard is gated on an env
+   flag). An expression counts as active for governance: the app CAN be
+   live, so Roles must be able to govern it and openAccess must be honoured. */
 const entries = [...nav.matchAll(
-  /\{\s*id:\s*"([^"]+)",[\s\S]*?name:\s*"([^"]+)",[\s\S]*?active:\s*(true|false)/g,
-)].map(([, id, name, active]) => ({ id, name, active: active === "true" }));
+  /\{\s*id:\s*"([^"]+)",[\s\S]*?name:\s*"([^"]+)",[\s\S]*?active:\s*([^,}]+)/g,
+)].map(([, id, name, active]) => ({ id, name, active: active.trim() !== "false" }));
 
 if (entries.length < 20) {
   fail.push(`Only parsed ${entries.length} registry entries — the parser is out of date with navigation.ts`);
@@ -76,7 +79,7 @@ if (goofs.length) {
 }
 
 /* ── 3. openAccess apps must be real, active registry entries ── */
-const openIds = [...nav.matchAll(/id:\s*"([^"]+)"[^}]*openAccess:\s*true/g)].map(([, id]) => id);
+const openIds = [...nav.matchAll(/id:\s*"([^"]+)"[^}]*openAccess:\s*(?:true|"view")/g)].map(([, id]) => id);
 const badOpen = openIds.filter((id) => !active.some((e) => e.id === id));
 if (badOpen.length) {
   fail.push(`openAccess set on inactive/unknown apps: ${badOpen.join(", ")}`);
@@ -87,12 +90,21 @@ if (badOpen.length) {
 /* ── 4. Both enforcement points honour openAccess ── */
 const client = readFileSync("src/lib/permissions.ts", "utf8");
 const server = readFileSync("src/lib/server/auth.ts", "utf8");
-if (!/isOpenAccessModule\(module\)/.test(client)) {
+if (!/isOpenAccessModule\(module, action\)/.test(client)) {
   fail.push("src/lib/permissions.ts can() no longer applies the openAccess default");
 } else ok.push("client can() honours openAccess");
-if (!/isOpenAccessModule\(moduleName\)/.test(server)) {
+if (!/isOpenAccessModule\(moduleName, action\)/.test(server)) {
   fail.push("requireModuleAction no longer applies the openAccess default");
 } else ok.push("server requireModuleAction honours openAccess");
+
+/* ── 5. A view-only open app never lets writes through by default ── */
+const pm = readFileSync("src/lib/permission-modules.ts", "utf8");
+if (!/return action === "view" \|\| !VIEW_ONLY_OPEN\.has\(lower\);/.test(pm)) {
+  fail.push('openAccess "view" no longer limits the default to reading');
+} else {
+  const viewOnly = [...nav.matchAll(/id:\s*"([^"]+)"[^}]*openAccess:\s*"view"/g)].map(([, id]) => id);
+  ok.push(`read-only open apps (writes need a grant): ${viewOnly.join(", ") || "(none)"}`);
+}
 
 /* ── report ── */
 for (const line of ok) console.log(`  ✓ ${line}`);

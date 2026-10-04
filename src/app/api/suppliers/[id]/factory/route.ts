@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction} from "@/lib/server/auth";
 import { recordSectionEdits } from "@/lib/suppliers/section-audit";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 

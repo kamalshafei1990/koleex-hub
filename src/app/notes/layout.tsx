@@ -16,6 +16,7 @@
 
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import "./notes-extras.css";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 

@@ -154,13 +154,34 @@ export interface DiscussMediaItem {
   /** Voice waveform bars. Display-only: derived from the audio at record time,
    *  carries no storage location, so it is safe to hand the browser. */
   waveform?: number[];
+  /** The note's converted text, when someone ran "Convert to text" on it. */
+  transcript?: DiscussVoiceTranscript;
 }
 
 type RawAttachment = { name?: unknown; url?: unknown; file_path?: unknown; size?: unknown; type?: unknown };
 type RawVoice = {
   url?: unknown; bucket?: unknown; path?: unknown;
   duration_ms?: unknown; size?: unknown; type?: unknown; waveform?: unknown;
+  transcript?: unknown;
 };
+
+/** A stored voice-note transcript ("Convert to text"). Display data only —
+ *  it never locates the object, so it is safe to hand the browser. Written
+ *  server-side by the transcribeVoiceMessage action. */
+export interface DiscussVoiceTranscript {
+  text: string;
+  lang: string | null;
+}
+
+function parseTranscript(raw: unknown): DiscussVoiceTranscript | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as { text?: unknown; lang?: unknown };
+  if (typeof o.text !== "string" || !o.text.trim()) return undefined;
+  return {
+    text: o.text,
+    lang: typeof o.lang === "string" && o.lang ? o.lang : null,
+  };
+}
 
 /**
  * Flatten a message's metadata into THE canonical, index-stable media list.
@@ -208,6 +229,7 @@ export function discussMediaList(metadata: unknown): DiscussMediaItem[] {
       waveform: Array.isArray(raw.waveform)
         ? (raw.waveform as unknown[]).filter((n): n is number => typeof n === "number")
         : undefined,
+      transcript: parseTranscript(raw.transcript),
     });
   }
 
@@ -227,6 +249,8 @@ export interface DiscussMediaPublic {
   duration_ms?: number;
   /** Display-only waveform bars for the voice bubble. */
   waveform?: number[];
+  /** The voice note's converted text — display data, never a location. */
+  transcript?: DiscussVoiceTranscript;
 }
 
 /**
@@ -244,5 +268,6 @@ export function sanitizeDiscussMedia(metadata: unknown): DiscussMediaPublic[] {
     kind: m.kind,
     ...(m.duration_ms !== undefined ? { duration_ms: m.duration_ms } : {}),
     ...(m.waveform !== undefined ? { waveform: m.waveform } : {}),
+    ...(m.transcript !== undefined ? { transcript: m.transcript } : {}),
   }));
 }

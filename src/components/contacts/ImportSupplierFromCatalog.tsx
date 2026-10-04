@@ -273,13 +273,12 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated, on
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget && phase !== "creating") close(); }}
     >
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
-        style={{ background: "var(--bg-card, #fff)", border: "1px solid var(--border-subtle, #e0e0e0)", color: "var(--text-primary, #111)" }}
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+        /* The paint is a class, never an inline style — inline beats every rule, so the Aurora glass could never replace it. */
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 sticky top-0 z-10"

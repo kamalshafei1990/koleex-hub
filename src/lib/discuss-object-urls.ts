@@ -18,8 +18,9 @@
    classic pair of bugs: a URL revoked while still rendering (broken preview)
    and a URL never revoked at all (leak). Centralizing makes both testable.
 
-   REVOKE POINTS (all funnel through release/releaseAll):
-       reconciled onto canonical row · discarded · conversation switch ·
+   REVOKE POINTS (all funnel through release/releaseExcept/releaseAll):
+       reconciled onto canonical row · discarded · conversation switch
+       (except still-failed sends, see releasePreviewUrlsExcept) ·
        unmount · logout · account switch
    Deliberately NOT revoked while a pending message is still unresolved —
    a failed send keeps its preview so Unit 3 can offer retry/discard. Releasing
@@ -92,6 +93,23 @@ export function releasePreviewUrls(key: string): void {
  */
 export function releaseAllPreviewUrls(): void {
   for (const key of Array.from(owned.keys())) releasePreviewUrls(key);
+}
+
+/**
+ * Release every tracked object URL EXCEPT those owned by `keep`.
+ *
+ * The conversation-switch release: bubbles that left the screen have no
+ * reader, but a FAILED send ("Not sent · Retry · Delete") is still a live
+ * message — it is redrawn when the user comes back, and a voice clip that
+ * only exists as this Blob would otherwise lose its playback. Those keys are
+ * released later, when the bubble is sent (reconcile), deleted, refused for
+ * good, or on unmount / logout / account switch (releaseAllPreviewUrls).
+ */
+export function releasePreviewUrlsExcept(keep: Iterable<string>): void {
+  const kept = new Set(keep);
+  for (const key of Array.from(owned.keys())) {
+    if (!kept.has(key)) releasePreviewUrls(key);
+  }
 }
 
 /**

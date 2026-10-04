@@ -1,0 +1,644 @@
+{
+ "section": "paperwork",
+ "items": {
+  "user-manual": {
+   "specs": [
+    {
+     "k": "Size",
+     "v": "A5 148 × 210 mm, saddle-stitched; A4 for big systems; perfect bound or Wire-O for thick manuals"
+    },
+    {
+     "k": "Paper",
+     "v": "Cover 250 g/m², inside 100 g/m² uncoated"
+    },
+    {
+     "k": "Cover",
+     "v": "Black, white or Cloud grey with the machine photo — set per model in Koleex Hub, the same for every manual of that model"
+    },
+    {
+     "k": "Inside",
+     "v": "1 · Safety first, then one step = one sentence = one photograph, numbers on the photo matching the text"
+    },
+    {
+     "k": "Type",
+     "v": "Inter 9/13 pt for steps; the Arabic and Chinese faces of ch. 52–53"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Digital copy",
+     "v": "PDF with the same pages, linked by a QR on the cover and on the machine (20 × 20 mm minimum)"
+    }
+   ],
+   "logo": "Cover: the full logo top-left, about a third of the cover width, white on black or black on white. Inside: the logo only on the cover and the back cover.",
+   "do": [
+    "Photographs, not drawings — the machine with numbered parts, a close-up for every step (ch. 60)",
+    "Safety words exactly as on the machine's labels (ch. 109)",
+    "The model name as in Koleex Hub"
+   ],
+   "dont": [
+    "A supplier's manual with our logo pasted over theirs",
+    "The supplier's name, codes or website anywhere in the manual",
+    "Prices"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    109,
+    60,
+    30
+   ]
+  },
+  "quick-start-guide": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Folded A3 poster · A5 card · sticker inside the machine cover"
+    },
+    {
+     "k": "Content",
+     "v": "Pictures first, few words: unpack, set up, thread, first stitch — numbered photos"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "QR",
+     "v": "To the full manual and the setup video of that exact model, 20 × 20 mm minimum"
+    }
+   ],
+   "logo": "The full logo top-left, 30 mm on the A5 card, 45 mm on the A3 poster; none on the sticker inside the cover.",
+   "do": [
+    "Safety line first, in the words of the machine's labels (ch. 109)",
+    "The same photos and numbers as the manual"
+   ],
+   "dont": [
+    "Long paragraphs",
+    "A second, different set of instructions from the manual"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    109,
+    104
+   ]
+  },
+  "installation-guide": {
+   "specs": [
+    {
+     "k": "Format",
+     "v": "A4 booklet, or PDF only"
+    },
+    {
+     "k": "Content",
+     "v": "Steps with photos · torque and settings tables · a checklist page the technician signs"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    },
+    {
+     "k": "Link",
+     "v": "The installation report IR- is filled in Koleex Hub (Reports → Installation) — the guide's checklist matches it"
+    }
+   ],
+   "logo": "The full logo top-left of the cover, 45 mm, as on the house sheet.",
+   "do": [
+    "Units stated on every value (N·m, mm, bar)",
+    "The checklist in the same order as the Hub's installation report"
+   ],
+   "dont": [
+    "Values that are not confirmed — a dash instead",
+    "Supplier drawings with their title blocks"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    94
+   ]
+  },
+  "service-technician-manual": {
+   "specs": [
+    {
+     "k": "Format",
+     "v": "A4 booklet · PDF with search"
+    },
+    {
+     "k": "Access",
+     "v": "Technicians and dealers only — never posted publicly"
+    },
+    {
+     "k": "Content",
+     "v": "Adjustments, timing, fault codes, exploded views with KOLEEX part numbers"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    }
+   ],
+   "logo": "Cover: the full logo top-left, 45 mm; \"For technicians\" in grey under the title.",
+   "do": [
+    "KOLEEX part numbers only, matching the parts catalogue",
+    "A date and version on the cover (DD/MM/YYYY, V#)"
+   ],
+   "dont": [
+    "Supplier part codes or the supplier's name",
+    "Public links to the file"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    112
+   ]
+  },
+  "parts-catalogue": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Exploded drawings + part numbers · online parts page with QR · PDF"
+    },
+    {
+     "k": "Numbers",
+     "v": "The KOLEEX part number (never a supplier's code), the name in EN / ZH, the models it fits by their Hub names"
+    },
+    {
+     "k": "Access",
+     "v": "Dealers and technicians: the full catalogue · customers: basic parts"
+    },
+    {
+     "k": "Numbers match",
+     "v": "The same part numbers as the part labels on the bags and boxes (ch. 112)"
+    }
+   ],
+   "logo": "The full logo top-left of the cover, 45 mm; on the online page, the site header only.",
+   "do": [
+    "Every drawing numbered to match the table",
+    "The QR on each page opens that assembly online"
+   ],
+   "dont": [
+    "Supplier codes or drawings with their title blocks",
+    "Prices in the catalogue — the dealer's price list is separate"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    112,
+    113
+   ]
+  },
+  "safety-leaflet": {
+   "specs": [
+    {
+     "k": "Format",
+     "v": "A5 leaflet · or the first pages of the manual"
+    },
+    {
+     "k": "Symbols",
+     "v": "ISO 7010 symbols in ISO 3864 layout and colours — yellow, red and blue kept, never restyled"
+    },
+    {
+     "k": "Words",
+     "v": "The same words as the labels on the machine"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    }
+   ],
+   "logo": "The full logo top-left, 30 mm, black on white — the safety colours stay the only colours.",
+   "do": [
+    "Electrical hazard with ISO 7010 W012",
+    "Switch off before threading or changing parts — first line"
+   ],
+   "dont": [
+    "Redrawn or brand-coloured safety symbols",
+    "Safety colours used for decoration"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    109,
+    113
+   ]
+  },
+  "video-guides": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Threading and first use · maintenance · troubleshooting · installation"
+    },
+    {
+     "k": "Length",
+     "v": "1–5 minutes, 16:9 (a 9:16 cut for social)"
+    },
+    {
+     "k": "Shooting",
+     "v": "4K where possible (1080p minimum), 25 fps, tripod or gimbal, the machine on a clean ground (ch. 63)"
+    },
+    {
+     "k": "Kit",
+     "v": "Intro 2–3 s (the logo animation, short melody), outro 3–4 s (the group lockup, one contact) — ch. 71"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always: burned in for social, an SRT file for YouTube and the website; English plus the market's language"
+    },
+    {
+     "k": "Music",
+     "v": "Very quiet background music, or none"
+    },
+    {
+     "k": "Access",
+     "v": "A QR in the manual and on the machine opens the video of that exact model"
+    }
+   ],
+   "logo": "Only in the intro and outro, and the thumbnail's top-left — never a watermark over the machine.",
+   "do": [
+    "The thumbnail: the logo top-left, the title in silver on the left, the machine on the right",
+    "One step on screen at a time, matching the manual's numbers"
+   ],
+   "dont": [
+    "Arrows, red circles, shocked faces, long titles on thumbnails",
+    "Handheld walking shots"
+   ],
+   "vendor": "Deliver the master (4K or 1080p, 25 fps), the 9:16 cut, the SRT files and the thumbnail, named by the file-naming rules (ch. 135). The Marketing Manager reviews the first cut; the Founder & CEO approves before it goes public (ch. 134).",
+   "book": [
+    70,
+    71,
+    113
+   ]
+  },
+  "warranty-card": {
+   "specs": [
+    {
+     "k": "Size",
+     "v": "A6 148 × 105 mm, 300 g/m² uncoated card"
+    },
+    {
+     "k": "Front",
+     "v": "The logo and WARRANTY; model, serial no., date of sale, invoice no.; the dealer's stamp box"
+    },
+    {
+     "k": "Back",
+     "v": "The warranty terms — word for word the sales contract's terms (ch. 95)"
+    },
+    {
+     "k": "QR",
+     "v": "To register the machine online, 20 × 20 mm minimum"
+    }
+   ],
+   "logo": "The full logo top-left of the front, 30 mm, black on white.",
+   "do": [
+    "Model and serial exactly as on the machine's nameplate",
+    "\"Keep this card with your invoice\" on the front"
+   ],
+   "dont": [
+    "Terms that promise more than the contract",
+    "Handwritten model names"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    95,
+    104
+   ]
+  },
+  "warranty-terms": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Leaflet · the back of the warranty card · a web page"
+    },
+    {
+     "k": "Source",
+     "v": "The sales contract's warranty clause, word for word — one text for all three"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    }
+   ],
+   "logo": "As on each carrier: the house sheet's logo on the leaflet, none on the card's back.",
+   "do": [
+    "The same version number and date on every carrier",
+    "The web page and the leaflet changed on the same day"
+   ],
+   "dont": [
+    "A shorter \"friendly\" version that changes the meaning",
+    "Terms that differ by market without the owner's approval"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    95
+   ]
+  },
+  "warranty-certificate": {
+   "specs": [
+    {
+     "k": "Format",
+     "v": "A4 landscape certificate — Brand Center → Templates → Certificate, kind \"Warranty\" (numbers KL-WC-…)"
+    },
+    {
+     "k": "Content",
+     "v": "The machine model, serial number, start date and the terms — nothing it does not cover"
+    },
+    {
+     "k": "Kinds",
+     "v": "Standard warranty · extended warranty"
+    },
+    {
+     "k": "Seal",
+     "v": "No seal around the logo (ch. 40; owner, 01/10/2026) — a fine double frame only"
+    },
+    {
+     "k": "Paper and print",
+     "v": "Matte coated 170–250 g/m²; CMYK, 3 mm bleed, PDF/X-1a"
+    }
+   ],
+   "logo": "Centred at the top; the legal lockup at the foot (ch. 99).",
+   "do": [
+    "A number on every certificate, recorded so it can be verified",
+    "The terms of the sales contract, word for word"
+   ],
+   "dont": [
+    "Gold, ribbons or decorations that imitate official documents",
+    "Promises the contract does not make"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    99,
+    113,
+    95
+   ],
+   "templates": [
+    "certificate"
+   ]
+  },
+  "warranty-registration": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "QR registration page · postage-paid return card · the dealer registers in Koleex Hub"
+    },
+    {
+     "k": "Fields",
+     "v": "Model, serial, date of sale, dealer, customer's company and contact — nothing more"
+    },
+    {
+     "k": "QR",
+     "v": "On the warranty card and the machine info card, 20 × 20 mm minimum"
+    }
+   ],
+   "logo": "The site header on the page; 30 mm top-left on the return card.",
+   "do": [
+    "The same fields as the warranty card"
+   ],
+   "dont": [
+    "Asking for data the warranty does not need"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    104
+   ]
+  },
+  "maintenance-contract-documents": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Contract cover and pages · membership card for the customer · maintenance calendar sticker"
+    },
+    {
+     "k": "Pages",
+     "v": "The house sheet 210 × 270 mm, like every KOLEEX document (ch. 94)"
+    },
+    {
+     "k": "Card",
+     "v": "Customer, machines covered, contract number, valid until DD/MM/YYYY, the service QR"
+    },
+    {
+     "k": "Sticker",
+     "v": "The next service dates, filled by the technician"
+    }
+   ],
+   "logo": "45 mm top-left on the house sheet; 25 mm on the card; 20 mm on the sticker.",
+   "do": [
+    "The contract number on every page, card and sticker"
+   ],
+   "dont": [
+    "Prices on the card or the sticker"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    94,
+    95,
+    113
+   ]
+  },
+  "service-history-card": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "A card in a clear sleeve on the machine · a sticker log inside the cover"
+    },
+    {
+     "k": "Content",
+     "v": "Model, serial, installation date; a line per visit: date, SR- number, technician"
+    },
+    {
+     "k": "QR",
+     "v": "To the machine's full history in Koleex Hub, 20 × 20 mm minimum"
+    }
+   ],
+   "logo": "25 mm top-left, black on white.",
+   "do": [
+    "Every visit also in the Hub — the card is the copy, the Hub is the record"
+   ],
+   "dont": [
+    "Coloured cards",
+    "Visits written without their SR- number"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    113,
+    104
+   ]
+  },
+  "service-visit-papers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "The customer copy PDF SR- / IR- (live in Koleex Hub) · the blank paper form (live) · a visit note \"We came, you were out\" · a customer feedback card with QR"
+    },
+    {
+     "k": "Sheet",
+     "v": "The house sheet, 210 × 270 mm (ch. 94)"
+    },
+    {
+     "k": "Filled in",
+     "v": "Koleex Hub on the technician's phone or tablet; the customer signs on the screen and gets the PDF by WhatsApp or e-mail"
+    },
+    {
+     "k": "Paper",
+     "v": "The blank form from the Hub (Reports → the report → Blank form) where there is no connection — entered into the Hub the same day"
+    },
+    {
+     "k": "Numbers",
+     "v": "SR-2026-0001 for a service visit, IR-2026-0001 for an installation — given by the Hub"
+    }
+   ],
+   "logo": "As on the house sheet: 45 mm top-left; 25 mm on the visit note and the feedback card.",
+   "do": [
+    "The customer copy only — without the internal links, recipients, status or review"
+   ],
+   "dont": [
+    "Service forms made outside the Hub",
+    "Handwritten report numbers"
+   ],
+   "vendor": "Nothing to print but the visit note and the feedback card (A6, 300 g/m² uncoated); the reports themselves come from Koleex Hub.",
+   "book": [
+    113,
+    94
+   ]
+  },
+  "quality-and-compliance-papers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "QC inspection certificate · CE declaration of conformity · test report · calibration certificate (measuring tools)"
+    },
+    {
+     "k": "Format",
+     "v": "The house sheet PDF from Koleex Hub"
+    },
+    {
+     "k": "CE",
+     "v": "Only for the exact models that hold it; official artwork from the European Commission; Declarations renewed under the EU Machinery Regulation 2023/1230 from 20/01/2027"
+    },
+    {
+     "k": "ISO 9001",
+     "v": "Words only: \"Quality management system certified to ISO 9001 · Certificate no. — · Certification body —\" in a band at the foot"
+    }
+   ],
+   "logo": "45 mm top-left as on the house sheet; certification marks never locked to it.",
+   "do": [
+    "Remove an expired certificate from every page the same day",
+    "The inspector's name and number on every QC certificate"
+   ],
+   "dont": [
+    "The ISO organization's logo",
+    "\"ISO 9001 certified machine\"",
+    "CE on a model it does not cover"
+   ],
+   "vendor": "Generated in Koleex Hub — nothing is printed outside it. The CE artwork comes from the European Commission only (ch. 133).",
+   "book": [
+    133,
+    94,
+    108
+   ]
+  },
+  "machine-tags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "New-machine hang tag (model, 3 features, QR) · \"Under repair — do not use\" lockout tag · \"Inspected\" tag · \"Reserved / sold\" tag (showroom) · \"Demo machine\" tag"
+    },
+    {
+     "k": "Style",
+     "v": "Black tag with white print; the lockout tag in the safety colours (red / yellow, ISO 3864)"
+    },
+    {
+     "k": "QR",
+     "v": "20 × 20 mm minimum, black on white"
+    }
+   ],
+   "logo": "The full logo 25 mm across the top of the hang tag; the lockout tag carries the safety sign first, the logo small at the foot.",
+   "do": [
+    "Features from the product's own record in the Hub",
+    "The lockout tag with the name and date of who locked it"
+   ],
+   "dont": [
+    "Prices on the hang tag",
+    "The K alone on a tag"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    109,
+    108,
+    104
+   ]
+  },
+  "machine-info-card": {
+   "specs": [
+    {
+     "k": "Content",
+     "v": "The model, three key features, the QR to the product page — never a price"
+    },
+    {
+     "k": "Format",
+     "v": "A5 card on a stand · A4 on a stand"
+    },
+    {
+     "k": "Source",
+     "v": "Model and features from Koleex Hub's product data — the same as the website"
+    }
+   ],
+   "logo": "Top-left, 30 mm on A5 and 45 mm on A4, black on white.",
+   "do": [
+    "Our own photos only (ch. 63)",
+    "The same three features as the spec sheet"
+   ],
+   "dont": [
+    "Prices — ever",
+    "Supplier codes or names"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    105,
+    118
+   ]
+  },
+  "spec-sheet": {
+   "specs": [
+    {
+     "k": "Sheet",
+     "v": "One machine per sheet, on the house sheet, light-led (A4 house sheet from Product Data); a landscape comparison sheet follows the same data"
+    },
+    {
+     "k": "Content",
+     "v": "Photo, three key features, the specifications table, the QR"
+    },
+    {
+     "k": "Data",
+     "v": "From Koleex Hub's product data — the same values as the website; a dash where a value is not confirmed"
+    },
+    {
+     "k": "Units",
+     "v": "Always stated; decimals consistent; dates DD/MM/YYYY; \"Specifications may change\" with the date"
+    },
+    {
+     "k": "Language",
+     "v": "English, plus the language of the market — checked by a person, never an unchecked machine translation (ch. 30)"
+    }
+   ],
+   "logo": "45 mm top-left, as on the house sheet.",
+   "do": [
+    "\"CE marked\" only for the models that hold it (ch. 133)",
+    "The model name as in the Hub"
+   ],
+   "dont": [
+    "Prices — ever",
+    "Values nobody confirmed",
+    "Supplier codes or names"
+   ],
+   "vendor": "Send the master files (InDesign or PDF/X-1a, fonts outlined, 3 mm bleed, CMYK) named by the file-naming rules (ch. 135). Ask for a printed proof of the first run; the Marketing Manager checks it against the book, the Founder & CEO approves anything new (ch. 134).",
+   "book": [
+    105,
+    94,
+    133
+   ]
+  }
+ }
+}

@@ -54,6 +54,7 @@ import Button from "@/components/ui/Button";
 import RrIcon from "@/components/ui/RrIcon";
 import { formatMoney, relativeTime } from "./shared";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useWarm, writeWarm } from "@/lib/warm-cache";
 
 /* ---------------------------------------------------------------------------
    Section eyebrow + small primitives reused from the Inventory home so the
@@ -187,11 +188,21 @@ interface RecentItem {
   href: string;
 }
 
+/* What the warm cache holds: the DIGESTED screen, not the raw feed. The
+   dashboard payload is seven tables; the numbers on screen are a few dozen
+   bytes. Caching the result keeps the entry tiny and means a warm paint
+   costs no recomputation either. */
+interface WarmHome { stats: HomeStats; recent: RecentItem[] }
+
 export default function PurchaseHome() {
   const router = useRouter();
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  /* Measured 2026-08-22: this screen needs one 474ms request and showed a
+     spinner for the whole ~1s until it answered. The previous answer is
+     good enough to look at while the fresh one is on its way. */
+  const warm = useWarm<WarmHome>("purchase:home");
 
   useEffect(() => {
     let cancelled = false;
@@ -244,7 +255,7 @@ export default function PurchaseHome() {
 
         const activeSuppliers = supps.filter((s) => s.is_active !== false).length;
 
-        setStats({
+        const nextStats: HomeStats = {
           openPOs: openPOs.length,
           openPOValue,
           spendMTD,
@@ -259,7 +270,8 @@ export default function PurchaseHome() {
           todayPOs,
           todayReceipts,
           activeSuppliers,
-        });
+        };
+        setStats(nextStats);
 
         const feed: RecentItem[] = [];
         for (const p of pos.slice(0, 4))      feed.push({ id: p.id, kind: "po",      label: `PO ${p.po_no || ""} — ${formatMoney(Number(p.total) || 0)}`, ts: p.created_at ?? "", href: "/purchase/orders" });
@@ -269,7 +281,9 @@ export default function PurchaseHome() {
         for (const r of receipts.slice(0, 3)) feed.push({ id: r.id, kind: "receipt", label: `Receipt ${r.gr_no || ""}`, ts: r.created_at ?? "", href: "/purchase/receipts" });
         for (const p of payments.slice(0, 2)) feed.push({ id: p.id, kind: "payment", label: `Payment — ${formatMoney(Number(p.amount) || 0)}`, ts: p.created_at ?? "", href: "/purchase/payments" });
         feed.sort((a, b) => (a.ts < b.ts ? 1 : -1));
-        setRecent(feed.slice(0, 10));
+        const nextRecent = feed.slice(0, 10);
+        setRecent(nextRecent);
+        writeWarm<WarmHome>("purchase:home", { stats: nextStats, recent: nextRecent });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -277,10 +291,18 @@ export default function PurchaseHome() {
     return () => { cancelled = true; };
   }, []);
 
+  /* Fresh always wins; the warm copy only fills the gap the request leaves.
+     Deriving rather than seeding state keeps one source of truth and avoids
+     a setState-from-effect. */
+  const shownStats: HomeStats | null = stats ?? warm?.stats ?? null;
+  const shownRecent: RecentItem[] = stats ? recent : (warm?.recent ?? recent);
+
   /* Loading shimmer — same shape as Inventory home so the transition
      between apps feels consistent. The outer page wrapper + PurchaseHeader
-     are owned by /app/purchase/layout.tsx so this returns a body fragment. */
-  if (loading || !stats) {
+     are owned by /app/purchase/layout.tsx so this returns a body fragment.
+     Only a genuinely cold screen waits: with a warm copy we paint it and
+     let the fetch replace it silently. */
+  if ((loading && !shownStats) || !shownStats) {
     return (
       <div className="flex items-center justify-center py-20 text-[var(--text-dim)]">
         <SpinnerIcon size={20} />
@@ -288,7 +310,7 @@ export default function PurchaseHome() {
     );
   }
 
-  const totalAlerts = stats.overdueBills + stats.pendingApprovals + stats.lateDeliveries;
+  const totalAlerts = shownStats.overdueBills + shownStats.pendingApprovals + shownStats.lateDeliveries;
 
   return (
     <div className="space-y-6">
@@ -308,15 +330,15 @@ export default function PurchaseHome() {
             className="kx-glass"
             icon="box-open"
             label="Open Orders"
-            value={String(stats.openPOs)}
-            hint={formatMoney(stats.openPOValue)}
+            value={String(shownStats.openPOs)}
+            hint={formatMoney(shownStats.openPOValue)}
             href="/purchase/orders"
           />
           <KpiCard
             className="kx-glass"
             icon="wallet"
             label="Spend (MTD)"
-            value={formatMoney(stats.spendMTD)}
+            value={formatMoney(shownStats.spendMTD)}
             hint="Paid this month"
             href="/purchase/payments"
           />
@@ -324,7 +346,7 @@ export default function PurchaseHome() {
             className="kx-glass"
             icon="file-invoice"
             label="Outstanding"
-            value={formatMoney(stats.outstandingBills)}
+            value={formatMoney(shownStats.outstandingBills)}
             hint="Unpaid balances"
             href="/purchase/bills"
           />
@@ -332,9 +354,9 @@ export default function PurchaseHome() {
             className="kx-glass"
             icon="info"
             label="Overdue Bills"
-            value={String(stats.overdueBills)}
+            value={String(shownStats.overdueBills)}
             hint="Past due"
-            tone={stats.overdueBills > 0 ? "rose" : "default"}
+            tone={shownStats.overdueBills > 0 ? "rose" : "default"}
             href="/purchase/bills"
           />
         </div>
@@ -380,17 +402,17 @@ export default function PurchaseHome() {
         <section>
           <SectionEyebrow>Needs Attention</SectionEyebrow>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {stats.overdueBills > 0 && (
-              <AlertCard href="/purchase/bills?status=overdue" label="Overdue vendor bills" count={stats.overdueBills} tone="rose" />
+            {shownStats.overdueBills > 0 && (
+              <AlertCard href="/purchase/bills?status=overdue" label="Overdue vendor bills" count={shownStats.overdueBills} tone="rose" />
             )}
-            {stats.pendingApprovals > 0 && (
-              <AlertCard href="/purchase/requisitions?status=pending" label="Requisitions awaiting approval" count={stats.pendingApprovals} tone="amber" />
+            {shownStats.pendingApprovals > 0 && (
+              <AlertCard href="/purchase/requisitions?status=pending" label="Requisitions awaiting approval" count={shownStats.pendingApprovals} tone="amber" />
             )}
-            {stats.lateDeliveries > 0 && (
-              <AlertCard href="/purchase/orders?status=late" label="Late deliveries" count={stats.lateDeliveries} tone="amber" />
+            {shownStats.lateDeliveries > 0 && (
+              <AlertCard href="/purchase/orders?status=late" label="Late deliveries" count={shownStats.lateDeliveries} tone="amber" />
             )}
-            {stats.openRFQs > 0 && (
-              <AlertCard href="/purchase/rfqs" label="Open RFQs" count={stats.openRFQs} tone="blue" />
+            {shownStats.openRFQs > 0 && (
+              <AlertCard href="/purchase/rfqs" label="Open RFQs" count={shownStats.openRFQs} tone="blue" />
             )}
           </div>
         </section>
@@ -400,23 +422,23 @@ export default function PurchaseHome() {
       <section>
         <SectionEyebrow>Today</SectionEyebrow>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <TodayTile label="Requisitions" value={stats.todayPRs}      href="/purchase/requisitions" />
-          <TodayTile label="RFQs sent"    value={stats.todayRFQs}     href="/purchase/rfqs" />
-          <TodayTile label="POs placed"   value={stats.todayPOs}      href="/purchase/orders" />
-          <TodayTile label="Receipts"     value={stats.todayReceipts} href="/purchase/receipts" />
+          <TodayTile label="Requisitions" value={shownStats.todayPRs}      href="/purchase/requisitions" />
+          <TodayTile label="RFQs sent"    value={shownStats.todayRFQs}     href="/purchase/rfqs" />
+          <TodayTile label="POs placed"   value={shownStats.todayPOs}      href="/purchase/orders" />
+          <TodayTile label="Receipts"     value={shownStats.todayReceipts} href="/purchase/receipts" />
         </div>
       </section>
 
       {/* ── 5. Recent activity ──────────────────────────────────── */}
       <section>
         <SectionEyebrow>Recent</SectionEyebrow>
-        {recent.length === 0 ? (
+        {shownRecent.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-6 py-10 text-center text-[12px] text-[var(--text-dim)]">
             No purchase activity yet. Start with a requisition or PO above.
           </div>
         ) : (
           <ul className="space-y-1">
-            {recent.map((r) => (
+            {shownRecent.map((r) => (
               <li key={r.kind + r.id}>
                 <Link
                   href={r.href}

@@ -7,10 +7,15 @@
      koleex_todo_notes     — per-task comments / notes
      koleex_todo_labels    — custom label catalogue
 
-   Integrations:
-     CRM activities  → source="crm"
-     Calendar events → source="calendar"
-     Inbox           → notification fan-out on assignment (server-side)
+   Integrations (every one goes through /api/todos POST):
+     CRM activities   → source="crm"
+     Calendar events  → source="calendar"
+     HR lifecycle     → source="manual", source_id="probation:<employee>"
+     Koleex AI        → source="manual", metadata.created_via="koleex-ai"
+     Reports (6A)     → source="report", source_id=<report id> — written by
+                        POST /api/work-reports/[id]/tasks, never through here
+                        (/api/todos POST refuses that source)
+     Inbox            → notification fan-out on assignment (server-side)
 
    THE BROWSER NO LONGER READS OR WRITES THESE TABLES (2026-08-09). Every
    function called its API route and then, on any outcome that was not a clean
@@ -28,11 +33,14 @@
 
    `resolveAssignees` went with them; /api/todos/assignees does that job.
 
-   Realtime (`subscribeToTodos`) still uses the Supabase client, because live
-   task updates need a socket and there is no first-party replacement yet.
-   That is the only reason this file still touches the client at all. */
+   Realtime (`subscribeToTodos`, now in ./todo-realtime so this module —
+   and every screen that imports it — no longer carries supabase-js) still
+   needs the Supabase client for the socket — but it listens for the server's BROADCAST ping on the tenant's
+   `todos` topic and refetches through the gated route. It used to subscribe
+   to anon postgres_changes on koleex_todos, a table locked to the service
+   role, so it never received a single row and the screen only refreshed on
+   its own writes. */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type {
   TodoRow,
   TodoUpdate,
@@ -42,40 +50,57 @@ import type {
   TodoAssigneeInfo,
   TodoMetadata,
 } from "@/types/supabase";
-import type { ScopeContext } from "./scope";
+import { todoListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
 
-/* ── Fetch todos with scope enforcement ──
-   When ctx is provided, the fetch filters results to what the user's role
-   allows (own / department / all + is_super_admin bypass + private handling).
-   When ctx is null/undefined the fetch stays wide-open for backwards-compat
-   with integrations that haven't been migrated yet. All UI pages should pass
-   ctx — only Supabase-internal triggers or data migrations may skip it.   */
+/* ── Fetch todos ──
+   The server scopes the list to the session (lib/server/todo-scope.ts):
+   creator / assigner / assignee / observer / department / broadcast, minus
+   private tasks the caller neither created nor is assigned to.
 
-export async function fetchTodos(
-  ctx?: ScopeContext | null,
-): Promise<TodoWithRelations[]> {
-  void ctx; // the server derives scope from the session; see the file header
-  try {
-    /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
-       a toggle repaints the cached, pre-toggle list. */
-    const res = await fetch(`/api/todos?v=${todoWriteVersion()}`, { credentials: "include" });
-    if (!res.ok) {
-      if (res.status !== 401 && res.status !== 403) {
-        console.error("[Todos] fetchTodos:", res.status);
-      }
-      return [];
-    }
-    const json = (await res.json()) as { todos: TodoWithRelations[] };
-    return json.todos;
-  } catch (e) {
-    console.error("[Todos] fetchTodos failed:", e);
-    return [];
+   THROWS on failure (a non-2xx, a network error): an empty array used to
+   stand for "you have no tasks" AND "the request failed", so a 500 painted
+   an empty list. The error carries the HTTP status (0 for a network error)
+   so a caller can tell 401/403 from a real failure. */
+
+export class TodoFetchError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "TodoFetchError";
   }
+}
+
+async function getTodoList(url: string): Promise<{ todos: TodoWithRelations[]; next_before?: string | null; truncated?: boolean }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: "include" });
+  } catch (e) {
+    throw new TodoFetchError(0, e instanceof Error ? e.message : "Network error");
+  }
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: unknown };
+    throw new TodoFetchError(res.status, typeof json.error === "string" ? json.error : `HTTP ${res.status}`);
+  }
+  const json = (await res.json()) as { todos?: TodoWithRelations[]; next_before?: string | null; truncated?: boolean };
+  return { todos: Array.isArray(json.todos) ? json.todos : [], next_before: json.next_before, truncated: json.truncated };
+}
+
+/** One page of completed tasks, newest completion first. Pass the previous
+ *  page's `nextBefore` to continue; null means there is no more. Throws on
+ *  failure. */
+export async function fetchCompletedTodos(opts: { limit?: number; before?: string | null } = {}): Promise<{
+  todos: TodoWithRelations[];
+  nextBefore: string | null;
+}> {
+  const q = new URLSearchParams({ status: "completed", limit: String(opts.limit ?? 50) });
+  if (opts.before) q.set("before", opts.before);
+  const r = await getTodoList(`${todoListUrl()}&${q.toString()}`);
+  return { todos: r.todos, nextBefore: r.next_before ?? null };
 }
 
 /* ── Create todo ── */
 
-export async function createTodo(input: {
+/** What POST /api/todos accepts (createTodoResult below). */
+export type TodoCreateInput = {
   title: string;
   description?: string | null;
   priority?: "high" | "medium" | "low";
@@ -86,58 +111,23 @@ export async function createTodo(input: {
   status?: "todo" | "in_progress" | "blocked" | "done";
   recurrence?: "daily" | "weekly" | "monthly" | null;
   recurrence_until?: string | null;
-  created_by_account_id?: string | null;
-  assigned_by_account_id?: string | null;
+  /* No created_by / assigned_by: the server sets both from the session.
+     They used to be accepted here, passed by every caller, and dropped. */
   source?: "manual" | "crm" | "calendar";
   source_id?: string | null;
   assignee_account_ids?: string[];
   assigned_department?: string | null;
   assign_to_all?: boolean;
   metadata?: TodoMetadata;
-}): Promise<TodoRow | null> {
-  // API-first — server enforces creator/tenant and handles fan-out.
-  try {
-    const res = await fetch("/api/todos", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: input.title,
-        description: input.description,
-        priority: input.priority,
-        label: input.label,
-        due_date: input.due_date,
-        start_date: input.start_date,
-        remind_at: input.remind_at,
-        status: input.status,
-        recurrence: input.recurrence,
-        recurrence_until: input.recurrence_until,
-        source: input.source,
-        source_id: input.source_id,
-        assignee_account_ids: input.assignee_account_ids,
-        assigned_department: input.assigned_department,
-        assign_to_all: input.assign_to_all,
-        metadata: input.metadata,
-      }),
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { todo: TodoRow | null };
-      if (typeof window !== "undefined" && json.todo) {
-        setTimeout(
-          () => window.dispatchEvent(new CustomEvent("inbox:force-recount")),
-          500,
-        );
-      }
-      return json.todo;
-    }
-    if (res.status !== 401 && res.status !== 403) {
-      console.error("[Todos] createTodo:", res.status);
-    }
-    return null;
-  } catch (e) {
-    console.error("[Todos] createTodo failed:", e);
-    return null;
-  }
+};
+
+/** Create a task and return the row, or null when it was refused — for the
+ *  apps that file a task on the side (Calendar, CRM). The To-do screen uses
+ *  createTodoResult, which also says why. */
+export async function createTodo(input: TodoCreateInput): Promise<TodoRow | null> {
+  const r = await createTodoResult(input);
+  if (!r.ok && r.status !== 401 && r.status !== 403) console.error("[Todos] createTodo:", r.status);
+  return r.ok ? r.data : null;
 }
 
 /* ── Update todo ── */
@@ -173,19 +163,13 @@ export async function createTodo(input: {
 
    `kx_` prefix, so the sign-out wipe in session-caches.ts clears it. Ordinary
    repeat loads with no write in between still keep the 30s cache. */
-const WRITE_VERSION_KEY = "kx_todo_write_v";
 
-export function bumpTodoWriteVersion(): void {
+function bumpTodoWriteVersion(): void {
   if (typeof window === "undefined") return;
   try {
-    const n = Number(window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0") + 1;
-    window.localStorage.setItem(WRITE_VERSION_KEY, String(n));
+    const n = Number(window.localStorage.getItem(TODO_WRITE_VERSION_KEY) ?? "0") + 1;
+    window.localStorage.setItem(TODO_WRITE_VERSION_KEY, String(n));
   } catch { /* private mode — the no-store fallback below still applies */ }
-}
-
-function todoWriteVersion(): string {
-  if (typeof window === "undefined") return "";
-  try { return window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0"; } catch { return "0"; }
 }
 
 async function announceTodoChange(): Promise<void> {
@@ -197,48 +181,6 @@ async function announceTodoChange(): Promise<void> {
     invalidateCachedGet("/api/inbox/feed");   // bell + tile unread counts
   } catch { /* the event below still refreshes it */ }
   window.dispatchEvent(new CustomEvent("inbox:force-recount"));
-}
-
-export async function updateTodo(
-  id: string,
-  updates: TodoUpdate,
-  newAssigneeIds?: string[],
-): Promise<boolean> {
-  try {
-    const res = await fetch("/api/todos/" + id, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ updates, newAssigneeIds }),
-    });
-    if (res.ok) { await announceTodoChange(); return true; }
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Todos] updateTodo:", res.status);
-    }
-    return false;
-  } catch (e) {
-    console.error("[Todos] updateTodo failed:", e);
-    return false;
-  }
-}
-
-/* ── Toggle complete ── */
-
-export async function toggleTodo(id: string): Promise<boolean> {
-  try {
-    const res = await fetch("/api/todos/" + id + "/toggle", {
-      method: "POST",
-      credentials: "include",
-    });
-    if (res.ok) { await announceTodoChange(); return true; }
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Todos] toggleTodo:", res.status);
-    }
-    return false;
-  } catch (e) {
-    console.error("[Todos] toggleTodo failed:", e);
-    return false;
-  }
 }
 
 /* ── Delete todo ── */
@@ -262,9 +204,14 @@ export async function deleteTodo(id: string): Promise<boolean> {
 
 /* ── Notes ── */
 
+/* The author is the session (the server sets it); the second parameter is
+   kept only so existing callers compile. A note changes the list (and a
+   recurring period's "touched" state), so it announces itself like every
+   other write — without it the 30-second list cache showed the task without
+   its new note after a reload. */
 export async function addTodoNote(
   todoId: string,
-  authorAccountId: string,
+  _authorAccountId: string,
   body: string,
 ): Promise<TodoNoteRow | null> {
   try {
@@ -276,6 +223,7 @@ export async function addTodoNote(
     });
     if (res.ok) {
       const json = (await res.json()) as { note: TodoNoteRow | null };
+      if (json.note) await announceTodoChange();
       return json.note;
     }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
@@ -294,7 +242,7 @@ export async function deleteTodoNote(noteId: string): Promise<boolean> {
       method: "DELETE",
       credentials: "include",
     });
-    if (res.ok) return true;
+    if (res.ok) { await announceTodoChange(); return true; }
     if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
       console.error("[Todos] deleteTodoNote:", res.status);
     }
@@ -311,7 +259,7 @@ export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
   try {
     /* Coalesced (SYS-2): two components mount together on /todo and each
        asked for labels; one shared request + 60s reuse covers both.
-       createTodoLabel() below invalidates after a write. */
+       createTodoLabelResult() below invalidates after a write. */
     const { cachedGet } = await import("@/lib/client-cache");
     const json = await cachedGet<{ labels: TodoLabelRow[] }>("/api/todo-labels", 60_000);
     return json.labels;
@@ -320,34 +268,6 @@ export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
     if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) return [];
     console.error("[Todos] fetchTodoLabels failed:", e);
     return [];
-  }
-}
-
-export async function createTodoLabel(
-  name: string,
-  color?: string | null,
-): Promise<TodoLabelRow | null> {
-  try {
-    const res = await fetch("/api/todo-labels", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, color }),
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { label: TodoLabelRow | null };
-      /* Drop the coalesced list so the next fetch shows the new label. */
-      const { invalidateCachedGet } = await import("@/lib/client-cache");
-      invalidateCachedGet("/api/todo-labels");
-      return json.label;
-    }
-    if (res.status !== 401 && res.status !== 403) {
-      console.error("[Todos] createTodoLabel:", res.status);
-    }
-    return null;
-  } catch (e) {
-    console.error("[Todos] createTodoLabel failed:", e);
-    return null;
   }
 }
 
@@ -386,55 +306,91 @@ export async function fetchDepartments(): Promise<string[]> {
   }
 }
 
-/* ── Realtime subscription for live todo updates ── */
+/* ── Realtime: the tenant's `todos` topic ──
+   Every task write on the server (routes, AI tools, the cron's spawns) emits
+   a broadcast ping on `todos:tenant:<id>`; the payload carries nothing, so a
+   world-subscribable topic leaks only "something changed". The screen then
+   refetches through the gated route, which enforces the scope. Pings that
+   land within `debounceMs` collapse into one refetch. */
+/* ── Writes that REPORT WHY they failed ─────────────────────────────────────
+   The helpers above answer a bare true/false (or null), so a screen can only
+   say "something went wrong" — for a lost race (409), a refused "assign to
+   everyone" (403), an invalid field (400, with the server's message) or a
+   duplicate label alike. These call the same routes and return the status
+   and the server's message; on success they announce the change exactly as
+   the helpers above do. */
 
-export function subscribeToTodos(
-  onInsert: (row: TodoRow) => void,
-  onChange: (row: TodoRow) => void,
-  onDelete: (oldRow: { id: string }) => void,
-): () => void {
-  let channel: ReturnType<typeof supabase.channel> | null = null;
-  let disposed = false;
+export type TodoWriteResult<T = undefined> =
+  | { ok: true; status: number; error: null; data: T }
+  | { ok: false; status: number; error: string | null; data: null };
 
-  /* Build a fully-wired channel. On CHANNEL_ERROR the previous code created a
-     bare `supabase.channel(topic).subscribe()` with NO handlers (and never
-     reassigned it) — so after any transient error, live updates stopped and
-     the dead channel leaked. Rebuild the whole subscription instead. */
-  const build = () => {
-    if (disposed) return;
-    const topic = `todos-live-${Date.now()}`;
-    channel = supabase
-      .channel(topic)
-      .on(
-        "postgres_changes" as never,
-        { event: "INSERT", schema: "public", table: "koleex_todos" },
-        (payload: { new: TodoRow }) => onInsert(payload.new),
-      )
-      .on(
-        "postgres_changes" as never,
-        { event: "UPDATE", schema: "public", table: "koleex_todos" },
-        (payload: { new: TodoRow }) => onChange(payload.new),
-      )
-      .on(
-        "postgres_changes" as never,
-        { event: "DELETE", schema: "public", table: "koleex_todos" },
-        (payload: { old: { id: string } }) => onDelete(payload.old),
-      )
-      .subscribe((status: string) => {
-        if (status === "CHANNEL_ERROR" && !disposed) {
-          setTimeout(() => {
-            if (disposed || !channel) return;
-            void supabase.removeChannel(channel);
-            build();
-          }, 3000);
-        }
-      });
-  };
-
-  build();
-
-  return () => {
-    disposed = true;
-    if (channel) void supabase.removeChannel(channel);
-  };
+async function sendTodoWrite<T>(
+  url: string,
+  init: RequestInit,
+  pick: (json: Record<string, unknown>) => T,
+  announce = true,
+): Promise<TodoWriteResult<T>> {
+  try {
+    const res = await fetch(url, { credentials: "include", ...init });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      return { ok: false, status: res.status, error: typeof json.error === "string" ? json.error : null, data: null };
+    }
+    if (announce) await announceTodoChange();
+    return { ok: true, status: res.status, error: null, data: pick(json) };
+  } catch {
+    return { ok: false, status: 0, error: null, data: null };
+  }
 }
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** POST /api/todos — the created row. */
+export function createTodoResult(body: TodoCreateInput): Promise<TodoWriteResult<TodoRow | null>> {
+  return sendTodoWrite("/api/todos", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) },
+    (j) => (j.todo ?? null) as TodoRow | null);
+}
+
+/** PATCH /api/todos/[id]. `rejectionReason` (≤ 1000 chars) sends a task back
+ *  without writing the whole metadata column — the server files it under
+ *  metadata.rejection. */
+export function updateTodoResult(
+  id: string,
+  updates: TodoUpdate,
+  opts: { newAssigneeIds?: string[]; rejectionReason?: string } = {},
+): Promise<TodoWriteResult> {
+  return sendTodoWrite(`/api/todos/${id}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ updates, newAssigneeIds: opts.newAssigneeIds, rejectionReason: opts.rejectionReason }),
+  }, () => undefined);
+}
+
+/** POST /api/todos/[id]/toggle — the server's resulting state: `completed`
+ *  on an owner's flip, `approval` on a participant's submit/withdraw. */
+export function toggleTodoResult(id: string): Promise<TodoWriteResult<{ completed: boolean | null; approval: "pending" | null | undefined }>> {
+  return sendTodoWrite(`/api/todos/${id}/toggle`, { method: "POST" }, (j) => ({
+    completed: typeof j.completed === "boolean" ? j.completed : null,
+    approval: (j.approval ?? undefined) as "pending" | null | undefined,
+  }));
+}
+
+/** POST /api/todo-labels — 409 when the name is taken. */
+export async function createTodoLabelResult(name: string, color?: string | null): Promise<TodoWriteResult<TodoLabelRow | null>> {
+  const r = await sendTodoWrite("/api/todo-labels", {
+    method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, color }),
+  }, (j) => (j.label ?? null) as TodoLabelRow | null, false);
+  if (r.ok) {
+    try {
+      const { invalidateCachedGet } = await import("@/lib/client-cache");
+      invalidateCachedGet("/api/todo-labels");
+    } catch { /* the next load refetches */ }
+  }
+  return r;
+}
+
+/** The session-gated link for a stored attachment (redirects to a
+ *  short-lived signed URL) — works for attachments saved before the bucket
+ *  goes private too. */
+export const todoAttachmentHref = (path: string): string =>
+  `/api/todos/attachment?path=${encodeURIComponent(path)}`;

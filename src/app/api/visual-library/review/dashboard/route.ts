@@ -4,6 +4,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 function band(n: number) { return n >= 80 ? "high" : n >= 55 ? "mid" : "low"; }
@@ -35,8 +36,8 @@ export async function GET(req: Request) {
 
   // Distributions over computed engines (sampled to 5000 for safety).
   const [{ data: quality }, { data: dna }] = await Promise.all([
-    supabaseServer.from("visual_asset_quality").select("quality_score, duplicate_risk_score").eq("tenant_id", tid).limit(5000),
-    supabaseServer.from("asset_dna_analysis").select("overall_score").eq("tenant_id", tid).limit(5000),
+    allRows(supabaseServer.from("visual_asset_quality").select("quality_score, duplicate_risk_score").eq("tenant_id", tid).order("id"), "quality scores", 5000),
+    allRows(supabaseServer.from("asset_dna_analysis").select("overall_score").eq("tenant_id", tid).order("id"), "dna scores", 5000),
   ]);
   const qDist = { high: 0, mid: 0, low: 0 }, dDist = { high: 0, mid: 0, low: 0 };
   let dupRisk = 0;

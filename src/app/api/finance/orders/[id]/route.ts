@@ -3,6 +3,14 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { supplierOutstanding } from "@/lib/finance/calc";
+import type { FinanceOrderSupplier } from "@/lib/finance/types";
+import { canSeeBankAndProfit, canSeeCostData, hideOrderFigures } from "@/lib/experience";
+
+/* The same rule as the list (/api/finance/orders): expected_profit only with
+   «Bank & Profit», the supplier costs only with the private-records switch —
+   0 with profit_hidden / cost_hidden otherwise; each line's outstanding_amount
+   stays. Guarded by validate:finance-perf §G. */
 
 interface RouteCtx { params: Promise<{ id: string }> }
 
@@ -24,7 +32,11 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ order: data });
+  const order = {
+    ...data,
+    suppliers: ((data.suppliers ?? []) as FinanceOrderSupplier[]).map((s) => ({ ...s, outstanding_amount: supplierOutstanding(s) })),
+  };
+  return NextResponse.json({ order: hideOrderFigures(order, { profit: await canSeeBankAndProfit(auth), cost: canSeeCostData(auth) }) });
 }
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {

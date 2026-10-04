@@ -1,8 +1,18 @@
 import "server-only";
 
+/* DELETE /api/finance/setup/opening-balances/:id
+   Removes an opening-balance line. Its journal entry (if it was posted)
+   is reversed first so the books and the setup list stay in step; a
+   line inside a closed period cannot be removed until it is reopened.
+   A line this caller may not see (src/lib/experience, openingCategoryRefusal)
+   is not theirs to remove: it would change figures they were never shown.
+   Guarded by validate:finance-perf §G. */
+
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { voidJournalEntry } from "@/lib/accounting/posting";
+import { canSeeBankAndProfit, canSeeCostData, openingCategoryRefusal } from "@/lib/experience";
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -10,6 +20,24 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Finance", "delete");
   if (deny) return deny;
+
+  const { data: row } = await supabaseServer
+    .from("finance_opening_balances")
+    .select("id, category, accounting_entry_id, accounting_status")
+    .eq("id", id)
+    .eq("tenant_id", auth.tenant_id)
+    .maybeSingle();
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const r = row as { category: string; accounting_entry_id: string | null; accounting_status: string | null };
+  const refusal = openingCategoryRefusal(r.category, { bankAndProfit: await canSeeBankAndProfit(auth), cost: canSeeCostData(auth) });
+  if (refusal) {
+    return NextResponse.json({ error: "This opening line is removed only by a role that can see it.", code: refusal }, { status: 403 });
+  }
+  if (r.accounting_entry_id && (r.accounting_status === "posted" || r.accounting_status === "drafted")) {
+    const v = await voidJournalEntry({ tenantId: auth.tenant_id, postedByAccountId: auth.account_id }, r.accounting_entry_id, "Opening balance removed");
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.code ?? 409 });
+  }
 
   const { error } = await supabaseServer
     .from("finance_opening_balances")

@@ -3,14 +3,28 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
-import { computeOrderProfit, deriveTaxRefundValue } from "@/lib/finance/calc";
+import { computeOrderProfit, deriveTaxRefundValue, supplierOutstanding } from "@/lib/finance/calc";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
+import { canSeeBankAndProfit, canSeeCostData, hideOrderFigures } from "@/lib/experience";
 
 /* GET  /api/finance/orders — list (tenant-scoped, with computed profit fields)
    POST /api/finance/orders — create or update an order + its supplier lines.
         Body shape: { order: {...}, suppliers: [{...}, ...] }
         For an update include order.id; for a new order omit it.
+
+   Who sees what (src/lib/experience, hideOrderFigures): profit — gross, net,
+   margin, realized cash, expected_profit — only with «Bank & Profit»; what
+   the suppliers cost and what was paid on it only with the private-records
+   switch. Hidden figures go out as 0 with profit_hidden / cost_hidden; what
+   is still owed (outstanding_payable, each line's outstanding_amount) stays.
+
+   Can't read → can't write. The editor sends the whole order back, zeros
+   included, and an update REPLACES the supplier lines: for a caller without
+   the switch the lines are left exactly as they are and a non-zero cost is
+   refused; expected_profit is written only when sent, by «Bank & Profit»
+   (it used to be nulled by every edit, the editor never sends it).
+   Guarded by validate:finance-perf §G.
 */
 
 async function nextOrderNumber(tenantId: string): Promise<string> {
@@ -69,7 +83,7 @@ export async function GET(req: Request) {
      reads these fields straight — no need to redo the math on the
      client for every row. */
   const orderIds = (data ?? []).map((o) => o.id as string);
-  const [expensesRes, paymentsRes] = await Promise.all([
+  const [expensesRes, paymentsRes, bankAndProfit] = await Promise.all([
     orderIds.length
       ? supabaseServer
           .from("finance_expenses")
@@ -84,7 +98,9 @@ export async function GET(req: Request) {
           .eq("tenant_id", auth.tenant_id)
           .in("linked_order_id", orderIds)
       : Promise.resolve({ data: [], error: null }),
+    canSeeBankAndProfit(auth),
   ]);
+  const can = { profit: bankAndProfit, cost: canSeeCostData(auth) };
 
   type ExpenseAgg = { amount: number; payment_status: import("@/lib/finance/types").PaymentStatus };
   const expensesByOrder = new Map<string, ExpenseAgg[]>();
@@ -128,7 +144,7 @@ export async function GET(req: Request) {
       ...o,
       tax_refund_value: taxRefundValue,
       financial_charges: Number(o.financial_charges) || 0,
-      suppliers: o.suppliers ?? [],
+      suppliers: (o.suppliers ?? []).map((s) => ({ ...s, outstanding_amount: supplierOutstanding(s) })),
       total_supplier_cost: profit.total_supplier_cost,
       total_order_expenses: profit.total_order_expenses,
       gross_profit: profit.gross_profit,
@@ -143,7 +159,7 @@ export async function GET(req: Request) {
     };
   });
 
-  return NextResponse.json({ orders: out });
+  return NextResponse.json({ orders: out.map((o) => hideOrderFigures(o, can)) });
 }
 
 export async function POST(req: Request) {
@@ -170,6 +186,16 @@ export async function POST(req: Request) {
   }
   const o = body.order;
   const suppliers = body.suppliers ?? [];
+
+  /* Can't read → can't write (see the header). */
+  const can = { profit: await canSeeBankAndProfit(auth), cost: canSeeCostData(auth) };
+  if (!can.cost && suppliers.some((s) => (Number(s.supplier_cost) || 0) !== 0 || (Number(s.paid_amount) || 0) !== 0)) {
+    return NextResponse.json(
+      { error: "Supplier costs are set only with «Can see private data» in Roles & Permissions.", code: "needs_private_data" },
+      { status: 403 },
+    );
+  }
+  const expectedProfit = can.profit && o.expected_profit !== undefined ? { expected_profit: o.expected_profit ?? null } : {};
 
   const taxRefundValue = deriveTaxRefundValue(
     Number(o.selling_price) || 0,
@@ -199,7 +225,7 @@ export async function POST(req: Request) {
         tax_refund_pct: Number(o.tax_refund_pct) || 0,
         tax_refund_value: taxRefundValue,
         financial_charges: Number(o.financial_charges) || 0,
-        expected_profit: o.expected_profit ?? null,
+        ...expectedProfit,
         status: o.status ?? "open",
         payment_status: o.payment_status ?? "unpaid",
         payment_due_date: o.payment_due_date ?? null,
@@ -216,6 +242,11 @@ export async function POST(req: Request) {
       console.error("[orders update]", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    /* A caller without the private-records switch was sent every supplier
+       cost as 0; replacing the lines from what they send back would write
+       those zeros over the real costs. Their lines stay exactly as they are. */
+    if (!can.cost) return NextResponse.json({ order: hideOrderFigures(updated, can) });
 
     /* Replace supplier rows atomically. Simpler than diffing — Phase 2
        can switch to a proper upsert-then-delete-missing path.
@@ -246,7 +277,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ order: updated });
+    return NextResponse.json({ order: hideOrderFigures(updated, can) });
   }
 
   /* INSERT path */
@@ -264,7 +295,7 @@ export async function POST(req: Request) {
       tax_refund_pct: Number(o.tax_refund_pct) || 0,
       tax_refund_value: taxRefundValue,
       financial_charges: Number(o.financial_charges) || 0,
-      expected_profit: o.expected_profit ?? null,
+      expected_profit: can.profit ? (o.expected_profit ?? null) : null,
       status: o.status ?? "open",
       payment_status: o.payment_status ?? "unpaid",
       payment_due_date: o.payment_due_date ?? null,
@@ -300,5 +331,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ order: created });
+  return NextResponse.json({ order: hideOrderFigures(created, can) });
 }

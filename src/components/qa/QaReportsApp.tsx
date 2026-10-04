@@ -1873,7 +1873,7 @@ function ShortcutsHelp({ onClose }: { onClose: () => void }) {
   ];
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 shadow-2xl">
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-[14px] font-bold text-[var(--text-primary)]">{t("qa.keys.title", "Keyboard shortcuts")}</h3>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
@@ -1937,6 +1937,7 @@ function ScreenshotsGallery({ report }: { report: QaReport }) {
       )}
       {zoomUrl && (
         <div
+          data-kx-viewer
           className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"

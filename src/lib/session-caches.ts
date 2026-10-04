@@ -65,6 +65,11 @@ export async function clearSessionScopedCaches(): Promise<void> {
      account-scoped — a second sign-in must never read the first one's. */
   try { invalidateCachedGet(); } catch { /* ignore */ }
   if (typeof window === "undefined") return;
+  /* The installed app's icon: no number stays on it for the next person. */
+  try {
+    const { clearIconBadge } = await import("@/lib/app-icon-badge");
+    clearIconBadge();
+  } catch { /* unsupported */ }
   clearByPrefix(window.localStorage);
   clearByPrefix(window.sessionStorage);
   /* Same prefixes, third store. Imported lazily so sign-out stays the only

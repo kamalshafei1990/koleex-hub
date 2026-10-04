@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const DICT = "src/lib/translations/hr.ts";
-const ROOTS = ["src/components/hr", "src/app/hr"];
+const ROOTS = ["src/components/hr", "src/app/hr", "src/components/me", "src/app/me", "src/components/employees/EmployeeHr360.tsx"];
 
 /* ── Keys the dictionary defines ── */
 const dictSrc = readFileSync(DICT, "utf8");
@@ -43,7 +43,9 @@ function walk(dir) {
   return out;
 }
 
-const files = ROOTS.flatMap(walk);
+/* A ROOT may be a single file (a component outside the HR folders that
+   still speaks hr.*) — walk() only reads directories. */
+const files = ROOTS.flatMap((r) => { try { return statSync(r).isFile() ? [r] : walk(r); } catch { return []; } });
 const missing = [];
 const usedCount = new Map();
 

@@ -2,22 +2,54 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import {
+  callerResourceIds,
+  checkPlanningRefs,
+  planningReadScopeOr,
+  PLANNING_ERR,
+} from "@/lib/server/planning-access";
+import { checkPlanningConflicts, conflictBody } from "@/lib/server/planning-conflicts";
+import {
+  expandWeekly,
+  parsePlanningRecurrence,
+  parsePlanningTz,
+  recurrenceRuleText,
+} from "@/lib/planning-recurrence";
+import {
+  PLANNING_ITEM_TYPES,
+  PLANNING_STATUSES,
+  isPlanningUuid,
+  parsePlanningDate,
+  validatePlanningItemInput,
+} from "@/lib/planning-validate";
 
 /* GET  /api/planning/items — list planning items.
      Query params:
-       start=<ISO>        inclusive window start (required for range queries)
-       end=<ISO>          exclusive window end
+       start=<ISO>        inclusive window start (items ending after it)
+       end=<ISO>          exclusive window end (items starting before it)
        resource_id=X      filter to a single resource
        role_id=X          filter to a single role
        type=shift|...     filter by entity type
        status=draft|...   filter by lifecycle status
        mine=1             only items on the caller's own resource
-                          (where resource.account_id == auth.account_id)
        open=1             only open shifts (resource_id IS NULL)
-       linked_entity_type=X & linked_entity_id=Y → look up items attached
-                          to a Hub entity (customer, project, etc.)
-   POST /api/planning/items — create a new item (draft by default). */
+       linked_entity_type=X & linked_entity_id=Y → items attached to a
+                          Hub entity (customer, project, etc.)
+       limit=N            max rows (default + cap 2000)
+     Non-super-admins only ever see: items they created, items on their own
+     resource, and open shifts (see lib/server/planning-access.ts).
+   POST /api/planning/items — create a new item (draft by default).
+     Extra body fields (besides the item's columns):
+       recurrence: { weekdays: 0-6[], until: "YYYY-MM-DD" } — expand into a
+                   weekly series of concrete rows sharing one series id
+                   (recurrence_parent_id = the first row's id);
+       tz:         the planner's IANA zone (series wall time, leave days);
+       force:      super admin only — save despite schedule conflicts.
+     Every create runs the conflict check (lib/server/planning-conflicts):
+     409 { error: "schedule_conflict", conflicts, total, can_override }. */
+
+const MAX_ROWS = 2000;
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -36,6 +68,40 @@ export async function GET(req: Request) {
   const open = url.searchParams.get("open") === "1";
   const linkedType = url.searchParams.get("linked_entity_type");
   const linkedId = url.searchParams.get("linked_entity_id");
+  const limitParam = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), MAX_ROWS) : MAX_ROWS;
+
+  /* Reject malformed filters up front instead of letting PostgREST turn
+     them into a 500 (or, for .or() pieces, into filter injection). */
+  const startIso = start ? parsePlanningDate(start) : null;
+  const endIso = end ? parsePlanningDate(end) : null;
+  if ((start && !startIso) || (end && !endIso)) {
+    return NextResponse.json({ error: PLANNING_ERR[400] }, { status: 400 });
+  }
+  if ((resourceId && !isPlanningUuid(resourceId)) || (roleId && !isPlanningUuid(roleId)) || (linkedId && !isPlanningUuid(linkedId))) {
+    return NextResponse.json({ error: PLANNING_ERR[400] }, { status: 400 });
+  }
+  if ((type && !(PLANNING_ITEM_TYPES as readonly string[]).includes(type)) || (status && !(PLANNING_STATUSES as readonly string[]).includes(status))) {
+    return NextResponse.json({ error: PLANNING_ERR[400] }, { status: 400 });
+  }
+  if (linkedType && !/^[a-z_]{1,40}$/.test(linkedType)) {
+    return NextResponse.json({ error: PLANNING_ERR[400] }, { status: 400 });
+  }
+
+  /* The caller's own resource ids feed BOTH the ?mine narrowing and the
+     non-SA scope — resolved once (it used to be queried twice). */
+  let rids: string[] = [];
+  if (mine || !auth.is_super_admin) {
+    try {
+      rids = await callerResourceIds(auth);
+    } catch (e) {
+      console.error("[api/planning/items GET] resources:", e instanceof Error ? e.message : e);
+      return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
+    }
+  }
+  if (mine && rids.length === 0) {
+    return NextResponse.json({ items: [] }, { headers: { "Cache-Control": "private, no-store" } });
+  }
 
   let q = supabaseServer
     .from("planning_items")
@@ -52,8 +118,8 @@ export async function GET(req: Request) {
     )
     .eq("tenant_id", auth.tenant_id);
 
-  if (start) q = q.gte("end_at", start);
-  if (end) q = q.lt("start_at", end);
+  if (startIso) q = q.gte("end_at", startIso);
+  if (endIso) q = q.lt("start_at", endIso);
   if (resourceId) q = q.eq("resource_id", resourceId);
   if (roleId) q = q.eq("role_id", roleId);
   if (type) q = q.eq("type", type);
@@ -61,47 +127,24 @@ export async function GET(req: Request) {
   if (open) q = q.is("resource_id", null);
   if (linkedType) q = q.eq("linked_entity_type", linkedType);
   if (linkedId) q = q.eq("linked_entity_id", linkedId);
-
-  // "mine" — restrict to items whose resource belongs to the caller.
-  if (mine) {
-    const { data: mineResources } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("tenant_id", auth.tenant_id)
-      .eq("account_id", auth.account_id);
-    const ids = (mineResources ?? []).map((r) => r.id);
-    if (ids.length === 0) {
-      return NextResponse.json({ items: [] });
-    }
-    q = q.in("resource_id", ids);
-  }
+  if (mine) q = q.in("resource_id", rids);
 
   // Type C scope: non-SA callers see items on THEIR resource, items they
   // created (planners see their own planning), and open (unassigned) shifts.
-  if (!auth.is_super_admin) {
-    const { data: mineRes } = await supabaseServer
-      .from("planning_resources")
-      .select("id")
-      .eq("tenant_id", auth.tenant_id)
-      .eq("account_id", auth.account_id);
-    const rids = (mineRes ?? []).map((r) => (r as { id: string }).id);
-    const orParts = [
-      `created_by_account_id.eq.${auth.account_id}`,
-      `resource_id.is.null`,
-    ];
-    if (rids.length > 0) orParts.push(`resource_id.in.(${rids.join(",")})`);
-    q = q.or(orParts.join(","));
-  }
+  if (!auth.is_super_admin) q = q.or(planningReadScopeOr(auth.account_id, rids));
 
-  q = q.order("start_at", { ascending: true });
+  q = q.order("start_at", { ascending: true }).limit(limit);
 
   const { data, error } = await q;
   if (error) {
     console.error("[api/planning/items GET]", error.message);
-    return NextResponse.json({ error: "Failed to load items" }, { status: 500 });
+    return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
   }
+  /* no-store: the list changes with every mutation and the client keeps
+     its own warm cache — a 30s HTTP cache made the entity strips and the
+     post-save refetch show stale rows. */
   return NextResponse.json({ items: data ?? [] }, {
-    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
+    headers: { "Cache-Control": "private, no-store" },
   });
 }
 
@@ -111,29 +154,33 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Planning", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as {
-    type?: string;
-    title?: string;
-    notes?: string | null;
-    resource_id?: string | null;
-    role_id?: string | null;
-    start_at: string;
-    end_at: string;
-    allocated_hours?: number | null;
-    allocated_pct?: number | null;
-    linked_entity_type?: string | null;
-    linked_entity_id?: string | null;
-    linked_entity_label?: string | null;
-    is_billable?: boolean;
-    hourly_rate?: number | null;
-    status?: "draft" | "published" | "completed" | "cancelled";
-    recurrence_rule?: string | null;
-  };
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+  const parsed = validatePlanningItemInput(raw, "create");
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.code, field: parsed.field }, { status: 400 });
+  }
+  const body = parsed.value;
 
-  if (!body.start_at || !body.end_at) {
-    return NextResponse.json({ error: "start_at and end_at required" }, { status: 400 });
+  const badRef = await checkPlanningRefs(auth.tenant_id, body);
+  if (badRef) {
+    return NextResponse.json({ error: badRef === "resource_id" ? "invalid_resource" : "invalid_role", field: badRef }, { status: 400 });
   }
 
+  const extra = raw as Record<string, unknown>;
+  const tz = parsePlanningTz(extra.tz) ?? "UTC";
+  const force = extra.force === true && auth.is_super_admin;
+  const recurrence = parsePlanningRecurrence(extra.recurrence);
+  if (recurrence === null) {
+    return NextResponse.json({ error: "invalid_recurrence", field: "recurrence" }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const status = body.status ?? "draft";
   const row = {
     tenant_id: auth.tenant_id,
     type: body.type ?? "shift",
@@ -141,8 +188,8 @@ export async function POST(req: Request) {
     notes: body.notes ?? null,
     resource_id: body.resource_id ?? null,
     role_id: body.role_id ?? null,
-    start_at: body.start_at,
-    end_at: body.end_at,
+    start_at: body.start_at as string,
+    end_at: body.end_at as string,
     allocated_hours: body.allocated_hours ?? null,
     allocated_pct: body.allocated_pct ?? null,
     linked_entity_type: body.linked_entity_type ?? null,
@@ -150,19 +197,43 @@ export async function POST(req: Request) {
     linked_entity_label: body.linked_entity_label ?? null,
     is_billable: body.is_billable ?? false,
     hourly_rate: body.hourly_rate ?? null,
-    status: body.status ?? "draft",
+    status,
+    published_at: status === "published" ? now : null,
+    completed_at: status === "completed" ? now : null,
+    cancelled_at: status === "cancelled" ? now : null,
     recurrence_rule: body.recurrence_rule ?? null,
+    recurrence_parent_id: null as string | null,
     created_by_account_id: auth.account_id,
   };
 
+  /* One row, or a weekly series expanded into concrete rows. */
+  let rows: Array<typeof row & { id?: string }> = [row];
+  if (recurrence) {
+    const occ = expandWeekly(row.start_at, row.end_at, recurrence, tz);
+    if (!occ) return NextResponse.json({ error: "invalid_recurrence", field: "recurrence" }, { status: 400 });
+    const ids = occ.map(() => crypto.randomUUID());
+    const rule = recurrenceRuleText(recurrence);
+    rows = occ.map((o, i) => ({ ...row, ...o, id: ids[i], recurrence_parent_id: ids[0], recurrence_rule: rule }));
+  }
+
+  try {
+    const check = await checkPlanningConflicts(auth.tenant_id, rows, { tz });
+    if (check.total > 0 && !force) {
+      return NextResponse.json(conflictBody(check, auth.is_super_admin), { status: 409 });
+    }
+  } catch (e) {
+    console.error("[api/planning/items POST] conflicts:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
+  }
+
   const { data, error } = await supabaseServer
     .from("planning_items")
-    .insert(row)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[api/planning/items POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    .insert(rows)
+    .select("*");
+  if (error || !data?.length) {
+    console.error("[api/planning/items POST]", error?.message ?? "no row");
+    return NextResponse.json({ error: PLANNING_ERR[500] }, { status: 500 });
   }
-  return NextResponse.json({ item: data });
+  const saved = [...data].sort((x, y) => String(x.start_at).localeCompare(String(y.start_at)));
+  return NextResponse.json({ item: saved[0], items: saved });
 }

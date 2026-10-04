@@ -1,4 +1,5 @@
 import "server-only";
+import { memoryFor, readPersonalization } from "@/lib/server/ai/personalization-prompt";
 
 /* ---------------------------------------------------------------------------
    ai-agent/permissions — the single point of truth for what a user is
@@ -59,6 +60,13 @@ export const SENSITIVE_FIELDS: Record<string, {
   /* Customers / suppliers — commercial side */
   "customers.credit_limit":     { requiresViewPrivate: true, label: "customer credit limit" },
   "customers.payment_terms":    { requiresViewPrivate: true, label: "customer payment terms" },
+  /* The COLUMN is `notes`, and filterFields builds its id from the column
+     name — so a key of "customers.internal_notes" matched nothing and the
+     field sailed through for everyone, while the customers tool's own header
+     promised the AI "never even receives" it. Both spellings are registered:
+     the real one does the work, the other stays in case a caller passes the
+     logical name. */
+  "customers.notes":            { requiresViewPrivate: true, label: "internal customer notes" },
   "customers.internal_notes":   { requiresViewPrivate: true, label: "internal customer notes" },
   "suppliers.bank_details":     { superAdminOnly: true,      label: "supplier bank details" },
   "suppliers.internal_notes":   { requiresViewPrivate: true, label: "internal supplier notes" },
@@ -112,7 +120,9 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   const prefs = (prefsRes.data?.preferences ?? {}) as {
     calendar?: { timezone?: string };
     ai_memory?: Record<string, string>;
+    ai?: unknown;
   };
+  const personalization = readPersonalization(prefs);
   const timezone = prefs.calendar?.timezone || "Asia/Dubai";
 
   /* Identity of the person actually typing. Supabase returns an embedded
@@ -134,12 +144,14 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   };
 
   /* Only well-formed string facts — never let arbitrary JSON reach the prompt. */
-  const memory: Record<string, string> = {};
+  const facts: Record<string, string> = {};
   for (const [k, v] of Object.entries(prefs.ai_memory ?? {})) {
     if (typeof k === "string" && typeof v === "string" && k.length <= 40 && v.length <= 200) {
-      memory[k] = v;
+      facts[k] = v;
     }
   }
+  /* And none of them when the user turned memory off in Settings. */
+  const memory = memoryFor(personalization, facts);
 
   const modulePermissions: UserContext["modulePermissions"] = {};
 
@@ -195,6 +207,7 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     timezone,
     viewer,
     memory,
+    personalization,
   };
 }
 

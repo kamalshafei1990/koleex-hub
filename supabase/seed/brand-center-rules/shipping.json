@@ -1,0 +1,505 @@
+{
+ "section": "shipping",
+ "items": {
+  "machine-carton": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Head-only carton · complete set (head + table + stand + motor) · table and stand carton · motor / servo box"
+    },
+    {
+     "k": "Board",
+     "v": "Kraft: brown corrugated, black flexo · white-top: black flexo · black kraft liner: white print"
+    },
+    {
+     "k": "Strength",
+     "v": "5-ply for heads and tables, 3-ply for small items"
+    },
+    {
+     "k": "Print",
+     "v": "One colour only"
+    },
+    {
+     "k": "Panels",
+     "v": "The logo and the model on both long sides; ISO 780 symbols; the shipping label on the short side"
+    }
+   ],
+   "logo": "On both long sides, about one third of the side's width, never below 80 mm; one colour.",
+   "do": [
+    "The model name as in the Hub on both long sides",
+    "KOLEEX tape on every carton"
+   ],
+   "dont": [
+    "Full-colour or two-colour printing on shipping cartons (the workshop's \"2 colours\" option gives way to one colour)",
+    "The supplier's carton print left on"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110,
+    39
+   ]
+  },
+  "wooden-crate": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Closed wooden case · open crate · plywood box"
+    },
+    {
+     "k": "Wood",
+     "v": "Heat-treated, with the ISPM 15 stamp for export"
+    },
+    {
+     "k": "Marking",
+     "v": "The logo stencilled black, at least 200 mm wide, with the model; the Hub label in a clear pouch"
+    }
+   ],
+   "logo": "Black stencil, 200 mm or wider, on two sides.",
+   "do": [
+    "ISPM 15 stamp on every export crate"
+   ],
+   "dont": [
+    "Painted colours or paper posters on crates"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110
+   ]
+  },
+  "pallets": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Wooden pallet (ISPM 15) · plastic reusable pallet"
+    },
+    {
+     "k": "Label",
+     "v": "A pallet label with the contents, carton count and gross weight, printed from the Hub"
+    },
+    {
+     "k": "Wrap",
+     "v": "Black stretch wrap with the white logo, or clear"
+    }
+   ],
+   "logo": "Stencilled on the block, 80 mm, black — or none.",
+   "do": [
+    "Corner boards and strapping for heavy loads"
+   ],
+   "dont": [
+    "Mixed customers' orders on one pallet without separate labels"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110,
+    111
+   ]
+  },
+  "protection-inside": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "EPE foam corners · moulded pulp / EPS insert · plastic cover bag · desiccant · stretch wrap"
+    },
+    {
+     "k": "Branding",
+     "v": "Plain (standard) · black stretch wrap with the white logo · a printed cover bag"
+    }
+   ],
+   "logo": "On the cover bag, 150 mm, one colour — or none.",
+   "do": [
+    "Desiccant in every sea shipment",
+    "Pulp or EPE first, EPS only where needed"
+   ],
+   "dont": [
+    "Printing on foam"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110
+   ]
+  },
+  "retail-colour-box": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Colour box · box with a window · clamshell blister"
+    },
+    {
+     "k": "Design",
+     "v": "Black box with the machine photo on a white panel · white box with black details"
+    },
+    {
+     "k": "Content",
+     "v": "The model and three key features · the barcode · EN / ZH / AR"
+    },
+    {
+     "k": "Photos",
+     "v": "Our own photos only, on white or black (ch. 63)"
+    }
+   ],
+   "logo": "Top-left of the front, 40–60 mm, white on black.",
+   "do": [
+    "The three features from the product's own record"
+   ],
+   "dont": [
+    "Prices on the box",
+    "Borrowed or stock photos",
+    "Supplier codes on the outside"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110,
+    63,
+    54
+   ]
+  },
+  "shipping-marks": {
+   "specs": [
+    {
+     "k": "Source",
+     "v": "Printed from the Hub template — the one rule (owner, workshop)"
+    },
+    {
+     "k": "Main mark",
+     "v": "Customer name · port of destination · invoice number, e.g. CUSTOMER NAME · ALEXANDRIA · KL-IN-12349"
+    },
+    {
+     "k": "Side mark",
+     "v": "Description · quantity · N.W. · G.W. · dimensions"
+    },
+    {
+     "k": "Origin",
+     "v": "MADE IN CHINA"
+    },
+    {
+     "k": "Handling",
+     "v": "ISO 780: this way up, keep dry, fragile"
+    }
+   ],
+   "logo": "No logo in the shipping mark — the carton carries it on its long sides.",
+   "do": [
+    "Print from the packing list in the Hub"
+   ],
+   "dont": [
+    "Marks typed by hand at the warehouse"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    111
+   ]
+  },
+  "carton-labels": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Model + serial + barcode label · quantity and contents label · \"QC passed\" label"
+    },
+    {
+     "k": "Sizes",
+     "v": "100 × 70 mm · 100 × 150 mm thermal (logistics), on the short side"
+    },
+    {
+     "k": "Style",
+     "v": "White with black print, monospace capitals for codes — every scanner reads them"
+    }
+   ],
+   "logo": "The full logo 30 mm at the top of the 100 × 70 mm label; none on the logistics label.",
+   "do": [
+    "Printed from the Hub"
+   ],
+   "dont": [
+    "Coloured labels"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    111,
+    53
+   ]
+  },
+  "handling-symbols": {
+   "specs": [
+    {
+     "k": "Symbols",
+     "v": "This way up · fragile · keep dry · stacking limit · centre of gravity (big crates) · do not use hooks"
+    },
+    {
+     "k": "Standard",
+     "v": "ISO 780 official artwork, in the carton's print colour"
+    },
+    {
+     "k": "Size",
+     "v": "At least 100 mm on machine cartons"
+    }
+   ],
+   "logo": "Not applicable — symbols only.",
+   "do": [
+    "Official ISO 780 artwork"
+   ],
+   "dont": [
+    "Redrawn or restyled symbols"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110
+   ]
+  },
+  "document-pouch": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "\"Packing list enclosed\" clear pouch · printed pouch with the logo"
+    },
+    {
+     "k": "Place",
+     "v": "On the carton's short side, beside the shipping label"
+    }
+   ],
+   "logo": "On the printed pouch, 40 mm, black.",
+   "do": [
+    "Packing list and invoice copy inside"
+   ],
+   "dont": [
+    "Covering the shipping label"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    111
+   ]
+  },
+  "packing-tape": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "Black tape with the white logo repeated (ch. 110)"
+    },
+    {
+     "k": "Other",
+     "v": "Clear tape with the black logo · brown tape with the black logo · \"Fragile\" warning tape"
+    },
+    {
+     "k": "Width",
+     "v": "48 mm · 72 mm"
+    }
+   ],
+   "logo": "The full logo 60–80 mm, repeated every 300 mm, never rotated.",
+   "do": [
+    "KOLEEX tape on all three carton types"
+   ],
+   "dont": [
+    "The K alone on tape"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110,
+    39
+   ]
+  },
+  "stickers-for-cartons": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "\"Fragile\" · \"QC passed\" with the inspector's number · carton seal \"Opened? Call us\" · \"Spare parts inside\""
+    },
+    {
+     "k": "Style",
+     "v": "Black / white house style, Inter capitals"
+    }
+   ],
+   "logo": "The full logo 20–25 mm on the seal sticker; none on warning stickers.",
+   "do": [
+    "The inspector's number on every QC sticker"
+   ],
+   "dont": [
+    "Coloured warning stickers except the standard fragile red"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110
+   ]
+  },
+  "parts-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Clear PE zip bag with a white label area · zip bag with a euro hole · anti-static bag (electronics) · heat-sealed bag"
+    },
+    {
+     "k": "Sizes",
+     "v": "Small · medium · large"
+    },
+    {
+     "k": "Label",
+     "v": "White 60 × 40 mm part label (ch. 112)"
+    }
+   ],
+   "logo": "On the label only (30 mm).",
+   "do": [
+    "Anti-static bags for every electronic part"
+   ],
+   "dont": [
+    "The supplier's bag print showing"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    112
+   ]
+  },
+  "parts-boxes": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "Small · medium · long (knives, shafts)"
+    },
+    {
+     "k": "Design",
+     "v": "Black with the white logo, or white with the black logo — set per product in the Hub"
+    },
+    {
+     "k": "Label area",
+     "v": "The white part label carries the part number, the models it fits and the QR"
+    }
+   ],
+   "logo": "On the box: 40 mm; on the label: 30 mm across the top.",
+   "do": [
+    "Per-product design chosen in the Hub"
+   ],
+   "dont": [
+    "Supplier codes on the outside"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    112
+   ]
+  },
+  "part-labels": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "50 × 30 mm · 70 × 40 mm · 60 × 40 mm on bags"
+    },
+    {
+     "k": "Content",
+     "v": "The KOLEEX part number (never a supplier's code) · the name in EN / ZH · the models it fits, by their Hub names · the QR to the part page · batch / date DD/MM/YYYY"
+    },
+    {
+     "k": "Barcode",
+     "v": "Code 128 of the part number"
+    }
+   ],
+   "logo": "The full logo 30 mm across the top of the label (ch. 41).",
+   "do": [
+    "Printed from the Hub"
+   ],
+   "dont": [
+    "A supplier's code on the outside",
+    "Handwritten part numbers"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    112,
+    41
+   ]
+  },
+  "kits": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Maintenance kit box · needle and bobbin starter kit · technician refill kit"
+    },
+    {
+     "k": "Design",
+     "v": "Black box with the white logo · white box with the black logo"
+    },
+    {
+     "k": "Inside",
+     "v": "The contents list printed from the Hub inside the lid"
+    }
+   ],
+   "logo": "Top-left of the lid, 40 mm, white on black.",
+   "do": [
+    "The kit's name and contents in EN / ZH"
+   ],
+   "dont": [
+    "A silver logo (the workshop's \"black box, silver logo\" becomes white)"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    112,
+    39
+   ]
+  },
+  "dealer-shelf-packaging": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Hanging card with blister · counter display box · shelf label strip"
+    },
+    {
+     "k": "Design",
+     "v": "Black card, the white logo, the part label on the back"
+    }
+   ],
+   "logo": "40 mm on the hanging card; 60 mm on the counter display.",
+   "do": [
+    "The part number and fits on every card"
+   ],
+   "dont": [
+    "Prices printed on our packaging (the dealer prices on the shelf)"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    112,
+    128
+   ]
+  },
+  "paper-inside-the-box": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Packing list · quick-start card · warranty card (Machine paperwork) · QC inspection card with the inspector's name · thank-you card · \"Register your machine\" QR card"
+    },
+    {
+     "k": "Style",
+     "v": "The house sheet and house card (ch. 94); QR black on white, 20 mm minimum"
+    }
+   ],
+   "logo": "As on each document: 45 mm on the house sheet, 30 mm on cards.",
+   "do": [
+    "Everything in one clear document pouch on top"
+   ],
+   "dont": [
+    "Loose papers under the machine"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    94,
+    104,
+    113
+   ]
+  },
+  "opening-experience": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Branded tissue or a cover inside the lid · \"Welcome to KOLEEX\" first sheet · the unboxing order printed on the inner flap"
+    },
+    {
+     "k": "Style",
+     "v": "Black and white, Inter; the KOLEEX pattern on tissue — never a K pattern"
+    }
+   ],
+   "logo": "Inside the lid: the full logo white, 100 mm, centred.",
+   "do": [
+    "The first thing the customer reads is the welcome sheet"
+   ],
+   "dont": [
+    "Gimmicks that make the machine harder to unpack safely"
+   ],
+   "vendor": "Send the dieline and the one-colour artwork from the master vector files (ch. 136). Approve the first printed carton, label and tape of every run; labels and marks are printed from Koleex Hub, never typed again by hand.",
+   "book": [
+    110,
+    57
+   ]
+  }
+ }
+}

@@ -1,13 +1,84 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
-import { getNoteRole, canRead, canWrite, SHARED_EDITOR_FIELDS } from "@/lib/server/note-access";
+import {
+  canRead,
+  canWrite,
+  getNoteAccess,
+  ownsFolder,
+  validateNoteInput,
+} from "@/lib/notes-server";
+import { extractPlainText } from "@/lib/notes-text";
+import { NOTE_LIMITS } from "@/lib/notes-policy";
+import {
+  applyBodyToState,
+  mergeState,
+  notesCollabAvailable,
+  pingNoteBodyChanged,
+  rebaseBody,
+  rebaseOntoState,
+} from "@/lib/notes-yjs-server";
+import { afterContentSaved } from "@/lib/notes-history-server";
+import { mergeNoteMeta, type NoteMeta } from "@/lib/notes-merge3";
 
 /* GET    /api/notes/[id] — full note including body_json. Owner OR anyone the
-                            note is shared with (view/edit) may read.
-   PATCH  /api/notes/[id] — owner: any field. Shared editor: content only.
+                            note is shared with (view/edit) may read; a trashed
+                            note is owner-only.
+   PATCH  /api/notes/[id] — owner: whitelisted fields. Shared editor: content
+                            only. Optimistic concurrency: when the body carries
+                            `base_updated_at`, the write only lands if the row
+                            still has that updated_at; otherwise 409 + the
+                            fresh note, and the client re-sends its body as
+                            a REBASE (below) — it never reloads over its
+                            unsaved typing.
+                            COLLABORATIVE save (shared note, Yjs): the body
+                            carries `yjs_update` (the client's full Yjs
+                            state, base64) instead of body_json. It is MERGED
+                            into the stored state and body_json/body_plain
+                            are derived from the merge — a merge cannot
+                            conflict, so no base token and no 409. Typing
+                            that lands in a block the stored state deleted
+                            keeps the block (`kept` in the response; live
+                            peers are pinged to pull it).
+                            SINGLE-EDITOR body save on a note that has a
+                            Yjs state (a client that fell back from the
+                            live session): body_json is converted into a
+                            Yjs update against the stored state and merged
+                            (never a reset), body_json/body_plain are
+                            derived from the merge, and the note's live
+                            peers are pinged to pull it. Guarded by the
+                            base token → a stale copy gets a 409.
+                            REBASE (a stale single-editor save after its
+                            409): body_json + `rebase_from_base` (the body
+                            the client's edits started from). The client's
+                            changes base → body_json are 3-way merged onto
+                            the note's CURRENT body (notes-merge3; for a
+                            Yjs note, onto the stored state via the block
+                            matcher) — never a 409, nothing typed is lost;
+                            a same-block conflict keeps both versions (the
+                            local one flagged with the language-neutral
+                            `conflict` block attribute — the editor draws
+                            the label in the viewer's language), and a block
+                            the client deleted that someone edited is KEPT.
+                            Responds with the merged body, the conflict
+                            count and the kept count.
+                            META REBASE (title / tags / colour after a 409):
+                            the retry carries `meta_base` (those fields as
+                            the client last saw them). Only the fields the
+                            client changed vs that base are applied onto
+                            the current note; tags merge as a set; a title
+                            or colour both sides changed differently keeps
+                            the current value and is reported in
+                            `meta_conflicts`. Responds with the resolved
+                            `meta`.
+                            A body_json save carries a base token (or is a
+                            rebase): without one → 400, so no caller can
+                            blindly overwrite newer saved content.
+                            Every landed content save then (after the
+                            response) snapshots a version (≤ 1 / 10 min) and
+                            refreshes the note's outgoing links.
    DELETE /api/notes/[id] — owner only. Soft delete (Recently Deleted). */
 
 export async function GET(
@@ -20,23 +91,387 @@ export async function GET(
   const deny = await requireModuleAccess(auth, "Notes");
   if (deny) return deny;
 
-  const access = await getNoteRole(id, auth.account_id);
-  if (!canRead(access.role)) {
+  // One parallel round-trip: the full row + its shares → role.
+  const access = await getNoteAccess(id, auth.account_id, "*");
+  if (!access.note || !canRead(access.role)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  // The Yjs state is served only by /collab (it can be large).
+  const { yjs_state: _yjs, ...note } = access.note as Record<string, unknown>;
+  void _yjs;
 
-  const { data, error } = await supabaseServer
-    .from("notes")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[api/notes/[id] GET]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // "Shared with me" unread badge: a sharee opening the note marks it read.
+  // Best-effort — the column arrives with migration 20260926.
+  if (access.role === "viewer" || access.role === "editor") {
+    after(async () => {
+      await supabaseServer
+        .from("note_shares")
+        .update({ last_opened_at: new Date().toISOString() })
+        .eq("note_id", id)
+        .eq("shared_with_account_id", auth.account_id)
+        .is("last_opened_at", null);
+    });
   }
-  if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ note: data, role: access.role });
+
+  return NextResponse.json({
+    note: { ...note, is_shared: access.shares.length > 0 },
+    role: access.role,
+  });
+}
+
+/** Collaborative save: merge the client's Yjs state, derive the body. */
+async function collabPatch(
+  id: string,
+  update: string,
+  fields: Record<string, unknown>,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  if (!(await notesCollabAvailable())) {
+    return NextResponse.json({ error: "Collaboration unavailable" }, { status: 400 });
+  }
+  // Optimistic loop: read → merge → write only if nobody wrote in between.
+  // A lost race just re-merges (merges commute), so nothing is ever lost.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select("yjs_state, updated_at, title")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH collab read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as { yjs_state: string | null; updated_at: string; title: string };
+    const merged = mergeState(row.yjs_state, update);
+    if (!merged.ok) return NextResponse.json({ error: merged.error }, { status: 400 });
+    if (JSON.stringify(merged.bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
+      return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+    }
+    const body_plain = extractPlainText(merged.bodyJson);
+    const patch = {
+      ...fields,
+      body_json: merged.bodyJson,
+      body_plain,
+      yjs_state: merged.state,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabaseServer
+      .from("notes")
+      .update(patch)
+      .eq("id", id)
+      .eq("updated_at", row.updated_at)
+      .select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH collab]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    if (!saved) continue; // someone saved in between — merge again
+    const kept = merged.rescued ?? 0;
+    const collapsed = merged.collapsed ?? 0;
+    after(async () => {
+      // A kept block is new to every live doc (the delete already reached
+      // them), and so is the removal of a racing duplicate copy: have them
+      // pull the stored state.
+      if (kept || collapsed) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson: merged.bodyJson,
+        bodyChanged: true,
+      });
+    });
+    return NextResponse.json({
+      ok: true,
+      updated_at: saved.updated_at,
+      body_plain: body_plain.slice(0, NOTE_LIMITS.preview),
+      ...(kept ? { kept } : {}),
+    });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
+/**
+ * Single-editor body save on a note with live co-editing available.
+ *
+ * With a Yjs state stored, the incoming body_json becomes a Yjs update
+ * against that state (see applyBodyToState) and the merged state is written
+ * together with the body DERIVED from it — so concurrent live edits that are
+ * already in the state, or that peers merge later, are never discarded the
+ * way a state reset + last-writer-wins would. The write is conditional on
+ * the row's updated_at (and on the base token, when sent): a stale fallback
+ * copy gets a 409 instead of diffing newer collaborative content away.
+ *
+ * Without a state (never co-edited) the body is written plainly, on the
+ * condition that the note is STILL unseeded — a seed racing in from the
+ * older body makes us retry against it rather than leave it stale.
+ */
+async function singleEditorBodyPatch(
+  id: string,
+  patch: Record<string, unknown>,
+  base: string | null,
+  conflict: () => Promise<NextResponse>,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select("yjs_state, updated_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH body read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as { yjs_state: string | null; updated_at: string };
+    // The client's copy is older than the note: its body would undo newer
+    // (possibly collaborative) content. Let it reload instead.
+    if (base && row.updated_at !== base) return conflict();
+
+    const write: Record<string, unknown> = { ...patch };
+    let bodyJson: unknown = patch.body_json;
+    if (row.yjs_state) {
+      const r = applyBodyToState(row.yjs_state, patch.body_json);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      if (JSON.stringify(r.bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
+        return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+      }
+      bodyJson = r.bodyJson;
+      write.body_json = r.bodyJson;
+      write.body_plain = extractPlainText(r.bodyJson);
+      write.yjs_state = r.state;
+    }
+
+    let q = supabaseServer.from("notes").update(write).eq("id", id).eq("updated_at", row.updated_at);
+    if (!row.yjs_state) q = q.is("yjs_state", null);
+    const { data, error } = await q.select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH body]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    // Someone wrote in between: re-read. With a base token a real save
+    // turns into a 409 above; a mere seed (state appeared, updated_at
+    // unchanged) is diffed against on the next pass.
+    if (!saved) continue;
+    const hadState = !!row.yjs_state;
+    after(async () => {
+      // Live peers pull + merge the new state; solo peers refetch.
+      if (hadState) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson,
+        bodyChanged: true,
+      });
+    });
+    return NextResponse.json({ ok: true, updated_at: saved.updated_at });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
+/**
+ * REBASE a stale single-editor body save (the client got a 409): re-apply
+ * the client's own changes (base → local) on top of the note as it is NOW.
+ * Optimistic loop like the other writers — a racing save just re-merges.
+ * The response carries the merged body so the client can show it (and
+ * keep typing on top of it) without dropping anything.
+ */
+async function rebasePatch(
+  id: string,
+  patch: Record<string, unknown>,
+  baseBody: unknown,
+  metaBase: NoteMeta | null,
+  collab: boolean,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select(collab ? "body_json, updated_at, title, tags, color, yjs_state" : "body_json, updated_at, title, tags, color")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH rebase read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as unknown as MetaRow & { body_json: unknown; yjs_state?: string | null };
+    const meta = resolveMeta(patch, metaBase, row);
+    const write: Record<string, unknown> = { ...meta.patch };
+    let bodyJson: Record<string, unknown>;
+    let conflicts: number;
+    let kept: number;
+    if (row.yjs_state) {
+      const r = rebaseOntoState(row.yjs_state, baseBody, patch.body_json);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      bodyJson = r.bodyJson;
+      conflicts = r.conflicts;
+      kept = r.kept;
+      write.yjs_state = r.state;
+    } else {
+      const r = rebaseBody(row.body_json, baseBody, patch.body_json);
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+      bodyJson = r.bodyJson;
+      conflicts = r.conflicts;
+      kept = r.kept;
+    }
+    if (JSON.stringify(bodyJson).length > NOTE_LIMITS.bodyJsonBytes) {
+      return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+    }
+    write.body_json = bodyJson;
+    write.body_plain = extractPlainText(bodyJson);
+
+    let q = supabaseServer.from("notes").update(write).eq("id", id).eq("updated_at", row.updated_at);
+    if (collab && !row.yjs_state) q = q.is("yjs_state", null);
+    const { data, error } = await q.select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH rebase]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    if (!saved) continue; // someone saved (or seeded) in between — merge again
+    const hadState = !!row.yjs_state;
+    after(async () => {
+      if (hadState) await pingNoteBodyChanged(id);
+      await afterContentSaved({
+        noteId: id,
+        tenantId: ctx.tenantId,
+        accountId: ctx.accountId,
+        title: saved.title ?? "",
+        bodyJson,
+        bodyChanged: true,
+      });
+    });
+    return NextResponse.json({
+      ok: true,
+      updated_at: saved.updated_at,
+      merged: { body_json: bodyJson, conflicts, kept },
+      body_plain: (write.body_plain as string).slice(0, NOTE_LIMITS.preview),
+      ...(metaBase ? { meta: meta.resolved, meta_conflicts: meta.conflicts } : {}),
+    });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
+}
+
+/* ── Metadata 3-way merge (a title / tags / colour retry after a 409) ──── */
+
+type MetaRow = { updated_at: string; title: string | null; tags: string[] | null; color: string | null };
+
+/** The client's `meta_base`, validated like the fields themselves (or null). */
+function parseMetaBase(v: unknown): NoteMeta | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const src = v as Record<string, unknown>;
+  const pick: Record<string, unknown> = {};
+  for (const k of ["title", "tags", "color"]) if (k in src) pick[k] = src[k];
+  const r = validateNoteInput(pick, "owner");
+  if (!r.ok) return null;
+  const out: NoteMeta = {};
+  if (r.value.title !== undefined) out.title = r.value.title;
+  if (r.value.tags !== undefined) out.tags = r.value.tags;
+  if (r.value.color !== undefined) out.color = r.value.color;
+  return out;
+}
+
+/**
+ * Apply `metaBase` to a patch against the current row: title / tags /
+ * colour become only what the client changed vs its base (merged onto the
+ * current values). Without a base the patch is used as is.
+ */
+function resolveMeta(
+  patch: Record<string, unknown>,
+  metaBase: NoteMeta | null,
+  row: MetaRow,
+): { patch: Record<string, unknown>; resolved: { title: string; tags: string[]; color: string | null }; conflicts: string[] } {
+  const current = { title: row.title ?? "", tags: row.tags ?? [], color: row.color ?? null };
+  if (!metaBase) {
+    return {
+      patch,
+      resolved: {
+        title: typeof patch.title === "string" ? patch.title : current.title,
+        tags: Array.isArray(patch.tags) ? (patch.tags as string[]) : current.tags,
+        color: "color" in patch ? ((patch.color as string | null) ?? null) : current.color,
+      },
+      conflicts: [],
+    };
+  }
+  const local: NoteMeta = {};
+  if (typeof patch.title === "string") local.title = patch.title;
+  if (Array.isArray(patch.tags)) local.tags = patch.tags as string[];
+  if ("color" in patch) local.color = (patch.color as string | null) ?? null;
+  const m = mergeNoteMeta(metaBase, local, current);
+  const out: Record<string, unknown> = { ...patch };
+  delete out.title;
+  delete out.tags;
+  delete out.color;
+  if (m.apply.title !== undefined) out.title = m.apply.title;
+  if (m.apply.tags !== undefined) out.tags = m.apply.tags.slice(0, NOTE_LIMITS.tags);
+  if (m.apply.color !== undefined) out.color = m.apply.color;
+  return {
+    patch: out,
+    resolved: {
+      title: (out.title as string | undefined) ?? current.title,
+      tags: (out.tags as string[] | undefined) ?? current.tags,
+      color: "color" in out ? ((out.color as string | null) ?? null) : current.color,
+    },
+    conflicts: m.conflicts,
+  };
+}
+
+/**
+ * A metadata-only save re-sent after a 409 with `meta_base`: merge it onto
+ * the note as it is NOW (optimistic loop, like the body writers).
+ */
+async function metaRebasePatch(
+  id: string,
+  patch: Record<string, unknown>,
+  metaBase: NoteMeta,
+  ctx: { tenantId: string; accountId: string },
+): Promise<NextResponse> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: cur, error: readErr } = await supabaseServer
+      .from("notes")
+      .select("updated_at, title, tags, color, body_json")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr || !cur) {
+      console.error("[api/notes/[id] PATCH meta read]", readErr?.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const row = cur as unknown as MetaRow & { body_json: unknown };
+    const meta = resolveMeta(patch, metaBase, row);
+    const write = { ...meta.patch };
+    const changed = ["title", "tags", "color"].some((k) => k in write);
+    if (!changed) {
+      // Nothing of ours is left to apply (already there, or conflicts only).
+      return NextResponse.json({ ok: true, updated_at: row.updated_at, meta: meta.resolved, meta_conflicts: meta.conflicts });
+    }
+    const { data, error } = await supabaseServer
+      .from("notes")
+      .update(write)
+      .eq("id", id)
+      .eq("updated_at", row.updated_at)
+      .select("id, updated_at, title");
+    if (error) {
+      console.error("[api/notes/[id] PATCH meta]", error.message);
+      return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
+    }
+    const saved = (data ?? [])[0] as { updated_at: string; title: string } | undefined;
+    if (!saved) continue; // someone saved in between — merge again
+    after(() => afterContentSaved({
+      noteId: id,
+      tenantId: ctx.tenantId,
+      accountId: ctx.accountId,
+      title: saved.title ?? "",
+      bodyJson: row.body_json,
+      bodyChanged: false,
+    }));
+    return NextResponse.json({ ok: true, updated_at: saved.updated_at, meta: meta.resolved, meta_conflicts: meta.conflicts });
+  }
+  return NextResponse.json({ error: "Busy — please retry" }, { status: 503 });
 }
 
 export async function PATCH(
@@ -49,42 +484,139 @@ export async function PATCH(
   const deny = await requireModuleAction(auth, "Notes", "edit");
   if (deny) return deny;
 
-  const access = await getNoteRole(id, auth.account_id);
-  if (!canWrite(access.role)) {
+  const access = await getNoteAccess(id, auth.account_id, "updated_at");
+  if (!access.note || !canWrite(access.role)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const incoming = (await req.json()) as Record<string, unknown>;
-  delete incoming.id;
-  delete incoming.account_id;
-  delete incoming.tenant_id;
-  delete incoming.created_at;
-  delete incoming.deleted_at;
+  let incoming: unknown;
+  try { incoming = await req.json(); } catch { incoming = null; }
 
-  // A shared editor may only change CONTENT — never the owner's folder /
-  // pin / lock state. The owner keeps full control.
-  let patch = incoming;
-  if (access.role !== "owner") {
-    patch = {};
-    for (const k of SHARED_EDITOR_FIELDS) {
-      if (k in incoming) patch[k] = incoming[k];
+  const yjsUpdate =
+    incoming && typeof incoming === "object" && typeof (incoming as { yjs_update?: unknown }).yjs_update === "string"
+      ? (incoming as { yjs_update: string }).yjs_update
+      : null;
+  if (yjsUpdate !== null) {
+    // The body comes from the merge, never from the client's copy.
+    const { body_json: _b, yjs_update: _y, base_updated_at: _t, ...rest } = incoming as Record<string, unknown>;
+    void _b; void _y; void _t;
+    const cv = validateNoteInput(rest, access.role === "owner" ? "owner" : "editor");
+    if (!cv.ok) return NextResponse.json({ error: cv.error }, { status: 400 });
+    const fields: Record<string, unknown> = { ...cv.value };
+    if (typeof fields.folder_id === "string" && !(await ownsFolder(fields.folder_id, auth.account_id))) {
+      return NextResponse.json({ error: "Folder not found" }, { status: 400 });
     }
-    if (Object.keys(patch).length === 0) {
-      return NextResponse.json({ ok: true });
-    }
+    return collabPatch(id, yjsUpdate, fields, { tenantId: access.note.tenant_id, accountId: auth.account_id });
   }
 
-  const { data, error } = await supabaseServer
-    .from("notes")
-    .update(patch)
-    .eq("id", id)
-    .select("id, updated_at")
-    .single();
+  const v = validateNoteInput(incoming, access.role === "owner" ? "owner" : "editor");
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  const patch: Record<string, unknown> = { ...v.value };
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ ok: true, updated_at: (access.note as { updated_at?: string }).updated_at ?? null });
+  }
+
+  if (typeof patch.folder_id === "string" && !(await ownsFolder(patch.folder_id, auth.account_id))) {
+    return NextResponse.json({ error: "Folder not found" }, { status: 400 });
+  }
+
+  const base =
+    incoming && typeof incoming === "object" && typeof (incoming as { base_updated_at?: unknown }).base_updated_at === "string"
+      ? ((incoming as { base_updated_at: string }).base_updated_at)
+      : null;
+  const src = (incoming ?? {}) as Record<string, unknown>;
+  const rebaseFrom = "rebase_from_base" in src ? src.rebase_from_base : undefined;
+  if ("body_json" in patch) {
+    if (rebaseFrom !== undefined) {
+      // The base body is only compared against — validate its shape + size.
+      let size = 0;
+      try { size = JSON.stringify(rebaseFrom ?? null).length; } catch { size = Infinity; }
+      if (rebaseFrom !== null && (typeof rebaseFrom !== "object" || Array.isArray(rebaseFrom))) {
+        return NextResponse.json({ error: "Invalid base body" }, { status: 400 });
+      }
+      if (size > NOTE_LIMITS.bodyJsonBytes) return NextResponse.json({ error: "Note is too large" }, { status: 400 });
+    } else if (!base) {
+      // No token and no base body: the save cannot tell what the client
+      // changed, so it could only overwrite — refuse. (Every caller sends
+      // one: the editor's saves, version restore and the rename dialog.)
+      return NextResponse.json({ error: "base_updated_at is required for a body save" }, { status: 400 });
+    }
+  }
+  // (`conflict_label` from older clients is ignored: conflict copies carry a
+  // language-neutral flag, labelled by each viewer's editor.)
+  const metaBase = "meta_base" in src ? parseMetaBase(src.meta_base) : null;
+
+  /* Only a CONTENT change moves updated_at (the concurrency token and the
+     list's recency sort). Organising a note — pin, move to a folder — must
+     not make a collaborator's next save look like a conflict. */
+  const isContent = ["title", "body_json", "color", "tags"].some((k) => k in patch);
+  if (isContent) patch.updated_at = new Date().toISOString();
+  const bodyChanged = "body_json" in patch;
+  const conflict = async (): Promise<NextResponse> => {
+    // The row moved on since the client's base: hand back the fresh copy.
+    const fresh = await getNoteAccess(id, auth.account_id, "*");
+    if (!fresh.note || !canRead(fresh.role)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const { yjs_state: _ys, ...freshNote } = fresh.note as Record<string, unknown>;
+    void _ys;
+    return NextResponse.json(
+      {
+        error: "conflict",
+        note: { ...freshNote, is_shared: fresh.shares.length > 0 },
+        role: fresh.role,
+      },
+      { status: 409 },
+    );
+  };
+
+  /* A stale body save re-sent as a rebase: merge the client's changes onto
+     the current note instead of refusing it. */
+  if (bodyChanged && rebaseFrom !== undefined) {
+    return rebasePatch(id, patch, rebaseFrom, metaBase, await notesCollabAvailable(), {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
+  }
+
+  /* A title / tags / colour retry after a 409: 3-way merge the fields. */
+  if (!bodyChanged && metaBase && isContent) {
+    return metaRebasePatch(id, patch, metaBase, {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
+  }
+
+  /* A body save where live co-editing exists: never reset the Yjs state —
+     express the body as a Yjs update and merge it. */
+  if (bodyChanged && (await notesCollabAvailable())) {
+    return singleEditorBodyPatch(id, patch, base, conflict, {
+      tenantId: access.note.tenant_id,
+      accountId: auth.account_id,
+    });
+  }
+
+  let q = supabaseServer.from("notes").update(patch).eq("id", id);
+  if (base && isContent) q = q.eq("updated_at", base);
+  const { data, error } = await q.select("id, updated_at, title, body_json");
   if (error) {
     console.error("[api/notes/[id] PATCH]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save note" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, updated_at: data.updated_at });
+  const row = (data ?? [])[0] as { updated_at: string } | undefined;
+  if (!row) return conflict();
+  if (isContent) {
+    const saved = row as unknown as { title: string; body_json: unknown };
+    after(() => afterContentSaved({
+      noteId: id,
+      tenantId: access.note!.tenant_id,
+      accountId: auth.account_id,
+      title: saved.title ?? "",
+      bodyJson: saved.body_json,
+      bodyChanged,
+    }));
+  }
+  return NextResponse.json({ ok: true, updated_at: row.updated_at });
 }
 
 export async function DELETE(
@@ -97,7 +629,7 @@ export async function DELETE(
   const deny = await requireModuleAction(auth, "Notes", "delete");
   if (deny) return deny;
 
-  const access = await getNoteRole(id, auth.account_id);
+  const access = await getNoteAccess(id, auth.account_id);
   if (access.role !== "owner") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -109,7 +641,7 @@ export async function DELETE(
     .eq("id", id);
   if (error) {
     console.error("[api/notes/[id] DELETE]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete note" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

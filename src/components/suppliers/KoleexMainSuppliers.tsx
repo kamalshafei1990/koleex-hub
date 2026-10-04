@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_COV } from "@/lib/translations/contacts/cov";
 import SuppliersHeader from "./SuppliersHeader";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
@@ -80,7 +80,7 @@ function writeCache(key: string, data: unknown): void {
 
 export default function KoleexMainSuppliers() {
   const aurora = useSkin() === "aurora";
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_COV);
   const router = useRouter();
 
   const [rows, setRows] = useState<CoverageRow[]>([]);
@@ -246,7 +246,7 @@ export default function KoleexMainSuppliers() {
                 {/* ── Division header (sticky, large) ── */}
                 <button
                   type="button"
-                  onClick={() => setCollapsedDiv((s) => { const n = new Set(s); n.has(d.id) ? n.delete(d.id) : n.add(d.id); return n; })}
+                  onClick={() => setCollapsedDiv((s) => { const n = new Set(s); if (n.has(d.id)) n.delete(d.id); else n.add(d.id); return n; })}
                   className="sticky top-0 z-20 flex w-full items-center gap-3 kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-5 py-4 text-start backdrop-blur"
                 >
                   <AngleDownIcon className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform ${divCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
@@ -278,7 +278,7 @@ export default function KoleexMainSuppliers() {
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => setCollapsedCat((s) => { const n = new Set(s); n.has(catKey) ? n.delete(catKey) : n.add(catKey); return n; })}
+                              onClick={() => setCollapsedCat((s) => { const n = new Set(s); if (n.has(catKey)) n.delete(catKey); else n.add(catKey); return n; })}
                               className="flex flex-1 min-w-0 items-center gap-2.5 py-2 text-start"
                             >
                               <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${catCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
@@ -582,7 +582,7 @@ function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
   }, [all, q]);
 
   const allSelected = selected.size === target.subcategories.length && target.subcategories.length > 0;
-  const toggleCode = (code: string) => setSelected((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n; });
+  const toggleCode = (code: string) => setSelected((p) => { const n = new Set(p); if (n.has(code)) n.delete(code); else n.add(code); return n; });
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(target.subcategories.map((s) => s.code)));
 
   const assign = async (sup: PickerSupplier) => {

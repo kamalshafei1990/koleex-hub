@@ -6,6 +6,7 @@
    position-requirements configurator behave identically everywhere.
    --------------------------------------------------------------------------- */
 
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -130,10 +131,12 @@ export function BehaviorPicker({
     ? indicators.filter((s) => !excludeIds.has(s.id) && s.is_critical_default).slice(0, 20)
     : [];
 
-  return (
+  /* On <body>: the picker opens from inside the requirements dialog, whose glass panel (backdrop-filter) would otherwise hold a fixed overlay inside its own box. */
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
         onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t("hr.bhv.addIndicatorTitle")}
       >
         <div className="p-4 border-b border-[var(--border-subtle)] space-y-2.5">
@@ -184,7 +187,8 @@ export function BehaviorPicker({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -234,7 +238,7 @@ export function PositionBehaviorConfig({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+      <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
         onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t("hr.bhv.posReqTitle")}>
         <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)]">
           <div>

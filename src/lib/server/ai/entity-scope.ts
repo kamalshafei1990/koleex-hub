@@ -176,7 +176,7 @@ export function detectEntityScope(
   ];
   scores.sort((a, b) => (b[1] as number) - (a[1] as number));
   const [top, topHits] = scores[0];
-  const [_runner, runnerHits] = scores[1];
+  const [, runnerHits] = scores[1];
 
   if ((topHits as number) > 0 && (topHits as number) - (runnerHits as number) >= 1) {
     const conf = Math.min(1, 0.55 + (topHits as number) * 0.15);

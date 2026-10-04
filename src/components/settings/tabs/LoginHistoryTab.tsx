@@ -19,18 +19,22 @@ interface Attempt {
   created_at: string;
 }
 
-function deviceLabel(ua: string | null): string {
+/* Order matters: an iPhone's agent says "like Mac OS X", so iOS is checked
+   before macOS (every iPhone sign-in read "macOS"), and Chrome/Firefox/Edge on
+   iOS name themselves CriOS/FxiOS/EdgiOS (they read "Safari"). */
+function deviceLabel(ua: string | null, unknownBrowser: string): string {
   if (!ua) return "";
   const browser =
-    /Edg\//.test(ua) ? "Edge" :
-    /Chrome\//.test(ua) ? "Chrome" :
-    /Firefox\//.test(ua) ? "Firefox" :
-    /Safari\//.test(ua) ? "Safari" : "Browser";
+    /Edg\/|EdgiOS\//.test(ua) ? "Edge" :
+    /Electron\//.test(ua) ? "Koleex Hub" :
+    /Chrome\/|CriOS\//.test(ua) ? "Chrome" :
+    /Firefox\/|FxiOS\//.test(ua) ? "Firefox" :
+    /Safari\//.test(ua) ? "Safari" : unknownBrowser;
   const os =
+    /iPhone|iPad|iPod/.test(ua) ? "iOS" :
+    /Android/.test(ua) ? "Android" :
     /Windows/.test(ua) ? "Windows" :
     /Mac OS X|Macintosh/.test(ua) ? "macOS" :
-    /iPhone|iPad|iOS/.test(ua) ? "iOS" :
-    /Android/.test(ua) ? "Android" :
     /Linux/.test(ua) ? "Linux" : "";
   return os ? `${browser} · ${os}` : browser;
 }
@@ -65,7 +69,7 @@ export default function LoginHistoryTab({ account }: { account: AccountWithLinks
         const json = (await res.json()) as { attempts: Attempt[] };
         if (alive) setRows(json.attempts);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Could not load login history");
+        if (alive) setError(e instanceof Error ? e.message : "");
       }
     })();
     return () => { alive = false; };
@@ -98,7 +102,7 @@ export default function LoginHistoryTab({ account }: { account: AccountWithLinks
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ background: oc.color }} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] text-[var(--text-primary)] truncate">
-                      {deviceLabel(a.user_agent) || t("hist.unknownDevice")} <span className="text-[var(--text-faint)]">· {a.ip_address}</span>
+                      {deviceLabel(a.user_agent, t("hist.browser")) || t("hist.unknownDevice")} <span className="text-[var(--text-faint)]">· {a.ip_address}</span>
                     </div>
                     <div className="text-[11px] text-[var(--text-dim)]">{fmt(a.created_at, disp)}</div>
                   </div>

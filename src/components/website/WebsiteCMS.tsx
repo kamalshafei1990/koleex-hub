@@ -19,13 +19,20 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import TabStrip from "@/components/ui/TabStrip";
+import WebsitePagesPanel from "@/components/website/WebsitePagesPanel";
+import PageEditor from "@/components/website/builder/PageEditor";
+import WebsiteCatalogsPanel from "@/components/website/WebsiteCatalogsPanel";
+import { websiteBuilderT } from "@/lib/translations/website-builder";
 
 /* ── Config ── */
+/* The site's own /admin, which this screen used to frame, is gone (30/09/2026):
+   the Page Builder tab lists the site's pages from the Hub until the builder
+   is rebuilt here (Phase 3 step 3). */
 const WEBSITE_URL = "https://koleex-website.vercel.app";
-const CMS_URL = `${WEBSITE_URL}/admin?v=2`;
+const BUILDER = "builder";
 
 const quickLinks = [
-  { label: "Page Builder", labelKey: "pageBuilder", icon: <LayoutIcon size={16} />, url: `${WEBSITE_URL}/admin?v=2` },
+  { label: "Page Builder", labelKey: "pageBuilder", icon: <LayoutIcon size={16} />, url: BUILDER },
   { label: "Products", labelKey: "page.products", icon: <PackageIcon size={16} />, url: "/products" },
   { label: "Divisions", labelKey: "page.divisions", icon: <LayersIcon size={16} />, url: "/divisions" },
   { label: "Categories", labelKey: "page.categories", icon: <TagsIcon size={16} />, url: "/categories" },
@@ -46,11 +53,14 @@ type Viewport = "desktop" | "tablet" | "mobile" | "full";
 
 export default function WebsiteCMS() {
   const { t } = useTranslation(websiteT);
-  const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
+  const [activeTab, setActiveTab] = useState<"builder" | "catalogs" | "preview">("builder");
+  const { t: tb } = useTranslation(websiteBuilderT);
   const [viewport, setViewport] = useState<Viewport>("full");
   const [previewPage, setPreviewPage] = useState("/");
   const [iframeKey, setIframeKey] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  /* The page open in the Page Builder (null = the list of pages). */
+  const [editing, setEditing] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const viewportStyles: Record<Viewport, string> = {
@@ -65,10 +75,16 @@ export default function WebsiteCMS() {
     setIframeKey((k) => k + 1);
   };
 
-  const iframeSrc = activeTab === "builder" ? CMS_URL : `${WEBSITE_URL}${previewPage}`;
+  const iframeSrc = `${WEBSITE_URL}${previewPage}`;
+  const openPreview = (path: string) => {
+    setPreviewPage(path);
+    setActiveTab("preview");
+    setIsLoading(true);
+    setIframeKey((k) => k + 1);
+  };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between px-4 h-14">
@@ -111,9 +127,16 @@ export default function WebsiteCMS() {
               {
                 key: "builder",
                 active: activeTab === "builder",
-                onClick: () => { setActiveTab("builder"); setIsLoading(true); },
+                onClick: () => { setActiveTab("builder"); setIsLoading(false); },
                 icon: <LayoutIcon size={13} />,
                 label: <span className="hidden sm:inline">{t("pageBuilder", "Page Builder")}</span>,
+              },
+              {
+                key: "catalogs",
+                active: activeTab === "catalogs",
+                onClick: () => { setActiveTab("catalogs"); setIsLoading(false); },
+                icon: <DocumentIcon size={13} />,
+                label: <span className="hidden sm:inline">{tb("cat.tab", "Catalogs")}</span>,
               },
               {
                 key: "preview",
@@ -180,7 +203,7 @@ export default function WebsiteCMS() {
             </button>
 
             <a
-              href={activeTab === "builder" ? CMS_URL : `${WEBSITE_URL}${previewPage}`}
+              href={activeTab === "builder" ? WEBSITE_URL : `${WEBSITE_URL}${previewPage}`}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
@@ -194,14 +217,13 @@ export default function WebsiteCMS() {
         {/* Quick Links Bar */}
         <div className="flex items-center gap-2 px-4 py-2 border-t border-[#181818] overflow-x-auto scrollbar-hide">
           {quickLinks.map((link) => {
-            const isExternal = link.url.startsWith("http");
-            if (isExternal) {
+            if (link.url === BUILDER) {
               return (
                 <button
                   key={link.label}
                   onClick={() => {
                     setActiveTab("builder");
-                    setIsLoading(true);
+                    setIsLoading(false);
                     setIframeKey((k) => k + 1);
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap transition-all ${
@@ -237,8 +259,18 @@ export default function WebsiteCMS() {
         </div>
       </header>
 
-      {/* ── Iframe Container ── */}
+      {/* ── Page Builder (the site's pages) or the Live Preview frame ── */}
       <main className="flex-1 relative bg-[var(--bg-primary)]">
+        {activeTab === "catalogs" ? (
+          <WebsiteCatalogsPanel />
+        ) : activeTab === "builder" ? (
+          editing ? (
+            <PageEditor key={`${editing}-${iframeKey}`} slug={editing} onBack={() => setEditing(null)} />
+          ) : (
+            <WebsitePagesPanel key={iframeKey} onPreview={openPreview} onOpen={setEditing} />
+          )
+        ) : (
+        <>
         {/* Loading overlay */}
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-primary)]">
@@ -246,7 +278,7 @@ export default function WebsiteCMS() {
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center animate-pulse">
                 <WebsiteIcon size={20} className="text-emerald-400" />
               </div>
-              <p className="text-xs text-gray-500">Loading {activeTab === "builder" ? "Page Builder" : "Preview"}...</p>
+              <p className="text-xs text-gray-500">{t("loadingPreview", "Loading preview…")}</p>
             </div>
           </div>
         )}
@@ -275,6 +307,8 @@ export default function WebsiteCMS() {
             />
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   );

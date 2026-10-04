@@ -1,11 +1,20 @@
 import "server-only";
 
 /* GET /api/reports/operational?kind=sales|purchases|expenses|inventory|customers|suppliers
- *  &from=YYYY-MM-DD&to=YYYY-MM-DD */
+ *  &from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * The company's sales, purchases, expenses, inventory, customers and
+ * suppliers. It used to check only that the caller was signed in, so any
+ * account — a customer login included — could read the sales, customers and
+ * suppliers reports; the page itself is reached only from Finance and the
+ * Reports library's Finance row. Now the finance-numbers door (internal +
+ * Finance) runs before anything is read, and the cost reports also need the
+ * role's «private records» switch (src/lib/experience).
+ * Guarded by validate:finance-perf §G. */
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserExperience } from "@/lib/experience";
+import { canSeeCostData, requireFinanceNumbers } from "@/lib/experience";
 import {
   buildSalesReport, buildPurchasesReport, buildExpensesReport,
   buildInventoryReport, buildCustomersReport, buildSuppliersReport,
@@ -16,6 +25,8 @@ const RESTRICTED = new Set(["purchases", "expenses", "inventory"]);   // require
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const denied = await requireFinanceNumbers(auth);
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const kind = url.searchParams.get("kind") ?? "sales";
@@ -23,8 +34,7 @@ export async function GET(req: Request) {
   const from = url.searchParams.get("from") ?? `${year}-01-01`;
   const to   = url.searchParams.get("to")   ?? new Date().toISOString().slice(0, 10);
 
-  const exp = await getUserExperience(auth);
-  if (RESTRICTED.has(kind) && !exp.can_see_cost_data) {
+  if (RESTRICTED.has(kind) && !canSeeCostData(auth)) {
     return NextResponse.json({ error: "Insufficient permission for cost data." }, { status: 403 });
   }
 

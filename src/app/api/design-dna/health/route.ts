@@ -5,6 +5,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 async function count(tid: string, build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) {
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     count(tid, (q) => q.eq("inconsistent_stroke", true)),
   ]);
   // Average overall (brand consistency) over analyzed rows.
-  const { data: avgRows } = await supabaseServer.from("asset_dna_analysis").select("overall_score").eq("tenant_id", tid).limit(5000);
+  const { data: avgRows } = await allRows(supabaseServer.from("asset_dna_analysis").select("overall_score").eq("tenant_id", tid).order("id"), "dna scores", 5000);
   const brandConsistency = (avgRows && avgRows.length)
     ? Math.round(avgRows.reduce((s, r) => s + (r.overall_score as number), 0) / avgRows.length) : null;
 

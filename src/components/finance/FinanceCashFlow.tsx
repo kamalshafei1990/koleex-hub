@@ -5,11 +5,19 @@
    Direct-method cash flow from POSTED journal lines.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { useWarmData } from "@/lib/warm-cache";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_CF } from "@/lib/translations/finance/cf";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_CF, ...FIN_COMMON } as const;
+
 
 interface CashFlowLine { label: string; amount: number; detail?: string }
 interface CashFlowSection { label: string; amount: number; lines: CashFlowLine[] }
@@ -25,14 +33,9 @@ interface CashFlowStatement {
   reconciled: boolean;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 
 export default function FinanceCashFlow() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const sectionKeyFor = (label: string): string => {
     const l = label.toLowerCase();
     if (l.includes("operat")) return "cf.section.operating";
@@ -40,31 +43,28 @@ export default function FinanceCashFlow() {
     if (l.includes("financ")) return "cf.section.financing";
     return "";
   };
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayIso(), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);
-  const [data, setData] = useState<CashFlowStatement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/accounting/cash-flow?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.statement as CashFlowStatement);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally { setLoading(false); }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const res = await fetch(`/api/accounting/cash-flow?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    /* No «Bank & Profit» (src/lib/experience): a line, not a failure. */
+    if (res.status === 403 && j.code === "needs_bank_profit") throw Object.assign(new Error(String(j.error ?? "")), { name: "needs_bank_profit" });
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.statement as CashFlowStatement;
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<CashFlowStatement>(`fin:cf:${from}:${to}`, fetchData);
+  const locked = loadError instanceof Error && loadError.name === "needs_bank_profit";
+  const error = loadError && !locked ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.cf.title", "Cash Flow Statement")}
           subtitle={t("accounting.cf.subtitle.long", "Direct-method statement built from posted journal lines that touch cash accounts.")}
@@ -82,6 +82,7 @@ export default function FinanceCashFlow() {
           </div>
         </div>
 
+        {locked && <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 text-[13px] text-[var(--text-dim)]">{t("cf.locked", "The cash flow opens with «Bank & Profit» in Roles & Permissions.")}</div>}
         {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
 
         {data && (

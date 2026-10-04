@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* GET  /api/planning/roles — list roles for current tenant
    POST /api/planning/roles — create a new role */
@@ -20,7 +20,8 @@ export async function GET() {
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[api/planning/roles]", error.message);
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
   return NextResponse.json({ roles: data ?? [] });
 }
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Planning", "create");
   if (deny) return deny;
 
-  const body = (await req.json()) as {
+  const body = (await req.json().catch(() => ({}))) as {
     name: string;
     color?: string | null;
     hourly_rate?: number | null;
@@ -52,9 +53,10 @@ export async function POST(req: Request) {
       is_active: true,
     })
     .select("*")
-    .single();
+    .maybeSingle();
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[api/planning/roles]", error.message);
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
   return NextResponse.json({ role: data });
 }

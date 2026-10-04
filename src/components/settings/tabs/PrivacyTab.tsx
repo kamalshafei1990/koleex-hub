@@ -4,13 +4,12 @@
    (profile, preferences, recent sign-ins) via GET /api/me/export. */
 
 import { useState } from "react";
-import type { AccountWithLinks } from "@/types/supabase";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-export default function PrivacyTab(_props: { account: AccountWithLinks }) {
+export default function PrivacyTab() {
   const [busy, setBusy] = useState(false);
   const { t } = useTranslation(settingsT);
   const [error, setError] = useState<string | null>(null);

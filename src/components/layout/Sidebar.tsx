@@ -651,6 +651,14 @@ export default function Sidebar() {
   const { t } = useTranslation(hubT);
   const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
 
+  /* The phone drawer's links exist only while it is open (and until its slide-out ends). Closed, it sat translated just past the screen edge —
+     inside the 200 px margin Next uses to decide a <Link> is "visible" — so
+     every app launch on a phone prefetched Notes, Calendar, Inbox, Discuss,
+     Reports… route data AND their client code, on the connection the app the
+     user just opened was waiting for (measured 26/09). */
+  const [drawerLive, setDrawerLive] = useState(false);
+  if (mobileOpen && !drawerLive) setDrawerLive(true);
+
   // Role-based filtering: hide apps the viewer's role has no can_view on.
   // Super Admin sees everything. While the permission check is loading we
   // show NO apps (fail-closed) so a user never sees modules they aren't
@@ -788,6 +796,7 @@ export default function Sidebar() {
         /* Aurora: the drawer wears the menus' glass (kx-glass-drawer — the
            solid ${bg} stays as the Core fallback) and slides with the family
            motion: a mild spring in, a quicker plain ease out. */
+        onTransitionEnd={(e) => { if (e.target === e.currentTarget && !mobileOpen) setDrawerLive(false); }}
         className={`kx-below-header kx-glass-drawer md:hidden fixed top-14 bottom-0 start-0 z-50 ${bg} border-e ${border} transition-transform ${
           mobileOpen
             ? "translate-x-0 rtl:-translate-x-0 duration-[340ms] ease-[cubic-bezier(0.34,1.3,0.5,1)]"
@@ -795,7 +804,7 @@ export default function Sidebar() {
         }`}
         style={{ width: SIDEBAR_EXPANDED_W }}
       >
-        <SidebarContent
+        {(mobileOpen || drawerLive) && <SidebarContent
           mobile
           expanded={expanded}
           dk={dk}
@@ -805,7 +814,7 @@ export default function Sidebar() {
           activeAppId={activeAppId}
           onToggleGroup={toggleGroup}
           onNavigate={onNavigate}
-        />
+        />}
       </aside>
     </>
   );

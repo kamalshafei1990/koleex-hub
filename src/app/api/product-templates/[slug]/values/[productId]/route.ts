@@ -1,6 +1,7 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { validateValueShape } from "@/lib/product-templates/validate";
@@ -331,6 +332,7 @@ export async function POST(
     /* swallow — audit is informational, not authoritative */
   }
 
+  revalidateWebsite(["products"]);
   return NextResponse.json({
     ok: true,
     upserted: upserts.length,

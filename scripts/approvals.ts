@@ -11,15 +11,19 @@
      05  Rejecting from submitted requires a reason (≥ 3 chars)
      06  Rejection persists reason + rejected_at
      07  Activity log captures each transition (submit + approve + reject)
-     08  canApprove enforces role gate (CEO + accountant + super_admin only)
+     08  approving is «Finance Approvals» in Roles: a super admin yes; the
+         «private records» switch alone, or no role at all, no (the department
+         is not an input — validate:role-experience and finance-perf §G)
      09  listPending excludes approved + rejected entries
      10  Tenant isolation — A's pending queue never contains B's items
    ========================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
 import {
-  transitionApproval, listPending, listActivity, canApprove,
+  transitionApproval, listPending, listActivity,
 } from "../src/lib/approvals";
+import { canApproveFinance } from "../src/lib/experience";
+import type { ServerAuthContext } from "../src/lib/server/auth";
 
 const URL_ENV = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -159,14 +163,21 @@ async function main() {
     `actions=${Array.from(actions).join(",")}`,
   );
 
-  /* 08 — canApprove gate. */
+  /* 08 — the approver is «Finance Approvals». Each case is decided before a
+     permission row is read: a super admin always, an account with no role
+     never. */
+  const approverCtx = (over: Partial<ServerAuthContext>): ServerAuthContext => ({
+    account_id: "00000000-0000-4000-a000-00000000a801", tenant_id: TENANT_A,
+    role_id: null, department: null, is_super_admin: false, can_view_private: false,
+    username: "approvals-probe", login_email: "approvals-probe@test.local", status: "active", user_type: "internal",
+    viewing_as: false, real_account_id: null, view_as_kind: null, view_as_role_id: null,
+    ...over,
+  });
   ok(
-    "08  canApprove gate (CEO + accountant + SA only)",
-    canApprove("ceo", false) === true
-      && canApprove("accountant", false) === true
-      && canApprove("sales", false) === false
-      && canApprove("warehouse", false) === false
-      && canApprove("marketing", true) === true,   // super-admin bypass
+    "08  approving is «Finance Approvals» (SA yes; the private switch alone or a department, no)",
+    await canApproveFinance(approverCtx({ is_super_admin: true })) === true
+      && await canApproveFinance(approverCtx({ can_view_private: true })) === false
+      && await canApproveFinance(approverCtx({ department: "Executive Office" })) === false,
   );
 
   /* 09 — listPending excludes terminal states. */

@@ -248,7 +248,7 @@ export default function Markets() {
   if (selectedMarket) {
     const bandColor = getBandColor(selectedMarket.band);
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)]">
           <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 flex items-center gap-4">
@@ -459,7 +459,7 @@ export default function Markets() {
 
   /* ─────────── Directory View ─────────── */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* ── Page header ── */}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">

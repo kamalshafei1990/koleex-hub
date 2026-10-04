@@ -2,8 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
+import { refuseIfInLedger } from "@/lib/accounting/hooks";
 
 /* PUT /api/invoices/:id/lines — replace every line on the invoice and
    recompute header totals in one atomic-ish operation. Body:
@@ -32,6 +33,9 @@ export async function PUT(req: Request, { params }: RouteCtx) {
     .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
   if (!inv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Totals are what the ledger booked: a recognised invoice is frozen.
+  const refuse = await refuseIfInLedger("invoices", id, auth.tenant_id);
+  if (refuse) return refuse;
 
   const { hydrated, subtotal, tax_total, discount_total, total } =
     calcInvoiceTotals(body.lines ?? [], body.tax_rate ?? 0, body.discount_percent ?? 0);

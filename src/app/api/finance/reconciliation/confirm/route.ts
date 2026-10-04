@@ -25,7 +25,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
 
 interface Body {
   candidate_id: string;
@@ -72,6 +73,16 @@ export async function POST(req: Request) {
     const status = result.code === 404 ? 404 : result.code === 400 ? 400 : 409;
     return NextResponse.json({ error: result.error ?? "Conflict" }, { status });
   }
+
+  /* One bank movement, one ledger entry. The statement line was booked
+     against the clearing account when it was imported; now that it is
+     matched to a payment, the payment's own entry (Dr Bank / Cr A/R or
+     Dr A/P / Cr Bank) is the one that stays — the clearing entry is
+     reversed so the bank is not counted twice. */
+  if (result.cash_movement_id) {
+    await ledgerVoid("cash_movement", result.cash_movement_id, auth.tenant_id, auth.account_id, "Reconciled to payment");
+  }
+  if (result.payment_id) await ledgerDraft("payment", result.payment_id, auth.tenant_id, auth.account_id);
 
   return NextResponse.json(result);
 }

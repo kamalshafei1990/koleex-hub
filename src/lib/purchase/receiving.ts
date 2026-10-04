@@ -43,6 +43,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
 import { createInventoryMovement, postInventoryMovement, voidInventoryMovement, ensureDefaultWarehouse } from "@/lib/inventory/posting";
 import {
   ensureInventoryItemForProduct,
@@ -369,6 +370,10 @@ export async function receivePurchaseOrder(opts: {
     .eq("tenant_id", tenantId);
   if (postErr) return { ok: false, error: postErr.message, code: 500 };
 
+  /* 6b — Goods received are inventory we owe for: draft Dr Inventory /
+     Cr Goods Received Not Invoiced. The vendor bill clears GRNI later. */
+  if (affectsInventory) await ledgerDraft("inventory_receipt", receiptId, tenantId, receivedBy);
+
   /* 7 — Roll up PO status. */
   const { data: poStatusRes } = await supabaseServer.rpc("fn_purchase_recompute_po_status", {
     p_po_id: poId,
@@ -437,6 +442,8 @@ export async function voidPurchaseReceipt(opts: {
     .eq("id", receiptId)
     .eq("tenant_id", tenantId);
   if (voidErr) return { ok: false, error: voidErr.message, code: 500 };
+
+  await ledgerVoid("inventory_receipt", receiptId, tenantId, voidedBy, reason ?? `Receipt ${receipt.gr_no} voided`);
 
   if (receipt.po_id) {
     await supabaseServer.rpc("fn_purchase_recompute_po_status", {

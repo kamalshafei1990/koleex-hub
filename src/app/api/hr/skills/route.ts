@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { logAudit } from "@/lib/server/audit";
 
@@ -53,14 +54,14 @@ export async function GET(req: Request) {
       .from("employee_skill_assessments")
       .select("skill_id, source, employee_score, last_assessed_at")
       .eq("employee_id", employeeId),
-    supabaseServer
+    allRows(supabaseServer
       .from("employee_skill_history")
       .select("skill_id, employee_score, recorded_at")
       .eq("employee_id", employeeId)
       .order("recorded_at", { ascending: true })
-      /* Bounded: an employee touches dozens of skills a handful of times a
-         year; 2000 rows is years of history. */
-      .limit(2000),
+      /* Every row, in pages: a plain read stops at the API's 1000 rows, and
+         in this order the ones lost would be the NEWEST scores. */
+      .order("id"), "skill history"),
     assignment?.position_id
       ? supabaseServer
           .from("position_skill_requirements")

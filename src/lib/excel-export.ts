@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { cdnImage } from "./cdn";
+import { legalNameEn } from "@/lib/legal-name";
 
 export interface DocColumn {
   header: string;
@@ -50,6 +51,9 @@ export interface DocExport {
   totals: DocTotal[];
   /** Optional free-text terms block (rendered at the bottom, HTML-stripped). */
   terms?: string;
+  /** When the document was created — the sheet prints the legal name in
+   *  force that day (lib/legal-name). */
+  madeAt?: string | null;
 }
 
 /** Round to 2dp, keep numeric (so Excel treats it as money, not text). */
@@ -76,19 +80,18 @@ function stripHtml(s: unknown): string {
 
 /* ── KOLEEX letterhead constants (mirror the printed A4 header) ──────────── */
 const COMPANY = {
-  legal: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
   cn: "科莱恪斯国际商业管理（台州）有限公司",
   tagline: "SHAPING THE FUTURE.",
   address:
     "Room 206, Building 88, West Feiyue Technological Innovative Park, Jingshui An Community, Xiachen Street, Jiaojiang District, Taizhou City, Zhejiang Province, China",
-  phone: "+86 0576 8892 7796",
+  phone: "+86 576 8892 7796",
   mobile: "+86 130 7380 0720",
   email: "info@koleexgroup.com",
   web: "www.koleexgroup.com",
 };
 /** FROM block lines (the KOLEEX seller). First line bold. */
-const FROM_LINES = [
-  COMPANY.legal,
+const fromLinesFor = (legal: string) => [
+  legal,
   COMPANY.address,
   `Phone:  ${COMPANY.phone}`,
   `Mobile:  ${COMPANY.mobile}`,
@@ -272,7 +275,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   ws.getRow(4).height = 16;
   ws.mergeCells(`A4:${MIDL}4`);
   ws.mergeCells(`${MIDR}4:${LAST}4`);
-  ws.getCell("A4").value = COMPANY.legal;
+  ws.getCell("A4").value = legalNameEn(doc.madeAt);
   ws.getCell("A4").font = { bold: true, size: 9, color: { argb: WHITE } };
   ws.getCell("A4").alignment = { vertical: "middle", horizontal: "left", indent: 1 };
   fillCell("A4", BLACK);
@@ -338,7 +341,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
     fillCell(addr, BLACK);
   });
 
-  const fromLines = FROM_LINES;
+  const fromLines = fromLinesFor(legalNameEn(doc.madeAt));
   const toLines = doc.toLines.map((l) => stripHtml(l)).filter((l) => l !== "");
   const lineCount = Math.max(fromLines.length, toLines.length);
   for (let i = 0; i < lineCount; i++) {
@@ -403,7 +406,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
            way the result passes through downscaleForCell — the embedded
            bytes are ALWAYS thumbnail-sized. */
         const raw =
-          (await fetchImageBase64(cdnImage(u, { width: 256, quality: 75 }))) ??
+          (await fetchImageBase64(cdnImage(u, { width: 256, quality: 75, resize: "contain" }))) ??
           (await fetchImageBase64(u));
         return raw ? downscaleForCell(raw) : null;
       }),
@@ -531,7 +534,7 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
   ws.getRow(r).height = 6;
   r += 1;
   ws.mergeCells(`A${r}:${LAST}${r}`);
-  ws.getCell(`A${r}`).value = `${COMPANY.legal}  ·  ${COMPANY.tagline}`;
+  ws.getCell(`A${r}`).value = `${legalNameEn(doc.madeAt)}  ·  ${COMPANY.tagline}`;
   ws.getCell(`A${r}`).font = { size: 8, italic: true, color: { argb: GRAY } };
   ws.getCell(`A${r}`).alignment = { vertical: "middle", horizontal: "center" };
 

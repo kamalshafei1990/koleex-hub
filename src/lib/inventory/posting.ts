@@ -36,6 +36,7 @@ import {
 import { logInventoryAudit } from "./audit";
 import { applyBatchMovement } from "./variants";
 import { validateSerialMovement, moveSerials, reverseSerialMovement } from "./serials";
+import { clearLowStockIfRestocked } from "@/lib/server/notify-lite";
 
 export async function ensureDefaultWarehouse(tenantId: string): Promise<string> {
   const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_default_warehouse", {
@@ -369,12 +370,13 @@ export async function postInventoryMovement(
     /* INV-H4B — apply serial state changes if the movement carries any. */
     const { data: postedFull } = await supabaseServer
       .from("inventory_stock_movements")
-      .select("id, movement_type, direction, warehouse_id, serial_ids, posted_at, metadata")
+      .select("id, inventory_item_id, movement_type, direction, warehouse_id, serial_ids, posted_at, metadata")
       .eq("id", movementId)
       .eq("tenant_id", tenantId)
       .maybeSingle();
     const pFull = postedFull as {
       id: string;
+      inventory_item_id: string;
       movement_type: import("./types").MovementType;
       direction: import("./types").Direction;
       warehouse_id: string;
@@ -400,6 +402,9 @@ export async function postInventoryMovement(
         },
       });
     }
+    /* Stock came IN, by whatever path (receipt, return, transfer, count):
+       a low-stock alert it answered is settled here, once, for all of them. */
+    if (pFull?.direction === "in") await clearLowStockIfRestocked(tenantId, pFull.inventory_item_id, pFull.warehouse_id);
     await logInventoryAudit({
       tenant_id: tenantId,
       actor_id: postedBy,
@@ -443,11 +448,13 @@ export async function voidInventoryMovement(
      batch.quantity_remaining effect. INV-H4B — also capture serial_ids. */
   const { data: preVoid } = await supabaseServer
     .from("inventory_stock_movements")
-    .select("batch_id, direction, quantity, status, serial_ids")
+    .select("batch_id, direction, quantity, status, serial_ids, inventory_item_id, warehouse_id")
     .eq("id", movementId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   const preRow = preVoid as {
+    inventory_item_id: string;
+    warehouse_id: string | null;
     batch_id: string | null;
     direction: "in" | "out";
     quantity: number;
@@ -473,6 +480,10 @@ export async function voidInventoryMovement(
     /* INV-H4B — reverse serial state changes if any were applied. */
     if (preRow?.serial_ids && preRow.serial_ids.length > 0 && preRow.status === "posted") {
       await reverseSerialMovement(tenantId, preRow.serial_ids);
+    }
+    /* Voiding a shipment puts its stock back — the same settle as a receipt. */
+    if (preRow?.direction === "out" && preRow.status === "posted") {
+      await clearLowStockIfRestocked(tenantId, preRow.inventory_item_id, preRow.warehouse_id);
     }
     await logInventoryAudit({
       tenant_id: tenantId,

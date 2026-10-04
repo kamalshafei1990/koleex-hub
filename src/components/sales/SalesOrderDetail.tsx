@@ -20,6 +20,7 @@ import ConfirmWithReason from "@/components/kds/ConfirmWithReason";
 import { useState as useVoidState } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import {
   InventoryEmpty,
   LocationTypeChip,
@@ -195,12 +196,9 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
         {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/sales/orders"
-              aria-label="Back to Sales Orders"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              <RrIcon name="arrow-left" size={16} />
+            <Link href="/sales/orders" aria-label="Back to Sales Orders" className={BACK_CHROME}>
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">Sales Orders</span>
             </Link>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
               <RrIcon name="file-invoice" size={16} />

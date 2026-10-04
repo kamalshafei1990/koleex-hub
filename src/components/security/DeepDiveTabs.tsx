@@ -9,6 +9,7 @@ import type {
   SecurityReport, ReportIdentifier, ReportRule, ReportFalsePositive, ReportBucket,
 } from "@/lib/security/view-model";
 import TabStrip from "@/components/ui/TabStrip";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import SectionCard from "./SectionCard";
 import DataTable, { type Column } from "./DataTable";
 import { ruleLabel, type Entity, type TabId } from "./investigation";
@@ -36,6 +37,7 @@ export interface DeepDiveTabsProps {
 }
 
 export default function DeepDiveTabs({ report, activeTab, onTab, onSelect }: DeepDiveTabsProps) {
+  const tabMotion = useTabMotion(TABS.findIndex((t) => t.id === activeTab));
   return (
     <SectionCard title="Investigate">
       <div className="mb-3">
@@ -50,7 +52,7 @@ export default function DeepDiveTabs({ report, activeTab, onTab, onSelect }: Dee
         />
       </div>
 
-      <div key={activeTab} className="kx-tab-in">
+      <div key={activeTab} className={tabMotion}>
       {activeTab === "identifiers" && (
         <DataTable<ReportIdentifier>
           columns={IDENT_COLS}

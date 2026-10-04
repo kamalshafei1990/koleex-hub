@@ -25,8 +25,14 @@ interface Props {
 export default function BarcodeQRDisplay({ value, label, qrPayload, compact = false }: Props) {
   const barcodeRef = useRef<SVGSVGElement>(null);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [qrError, setQrError] = useState<string | null>(null);
-  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  /* Errors are stored WITH the value that produced them and derived at
+     render, so the success path needs no setState at all — the sync
+     "clear the error" call in the effect body was a cascading re-render on
+     every value change (react-hooks/set-state-in-effect). */
+  const [qrErr, setQrErr] = useState<{ v: string; msg: string } | null>(null);
+  const [barcodeErr, setBarcodeErr] = useState<{ v: string; msg: string } | null>(null);
+  const qrError = qrErr && qrErr.v === (qrPayload || value) ? qrErr.msg : null;
+  const barcodeError = barcodeErr && barcodeErr.v === value ? barcodeErr.msg : null;
 
   // Generate barcode
   useEffect(() => {
@@ -42,9 +48,12 @@ export default function BarcodeQRDisplay({ value, label, qrPayload, compact = fa
         lineColor: "#e5e7eb",
         displayValue: true,
       });
-      setBarcodeError(null);
     } catch (err) {
-      setBarcodeError(err instanceof Error ? err.message : "Barcode failed");
+      /* JsBarcode throws synchronously; deferring the error write breaks the
+         render cascade the sync call would cause (the drawing itself already
+         happened — the state only drives the fallback message). */
+      const msg = err instanceof Error ? err.message : "Barcode failed";
+      queueMicrotask(() => setBarcodeErr({ v: value, msg }));
     }
   }, [value, compact]);
 
@@ -61,8 +70,7 @@ export default function BarcodeQRDisplay({ value, label, qrPayload, compact = fa
       },
       errorCorrectionLevel: "M",
     })
-      .then(() => setQrError(null))
-      .catch((err: Error) => setQrError(err.message));
+      .catch((err: Error) => setQrErr({ v: payload, msg: err.message }));
   }, [value, qrPayload, compact]);
 
   // Download handlers

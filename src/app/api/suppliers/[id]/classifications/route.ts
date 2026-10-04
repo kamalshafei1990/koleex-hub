@@ -10,23 +10,25 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { CLASSIFICATION_LABELS, classificationLabel } from "@/lib/suppliers/intelligence";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const VALID = new Set(Object.keys(CLASSIFICATION_LABELS));
 
-async function guard(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function guard(req: Request, ctx: { params: Promise<{ id: string }> }, action: "create" | "delete") {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return { error: auth as NextResponse };
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  /* Write routes must demand the matching action, not just view access —
+     same contract as the sibling contacts/[contactId] route. */
+  const deny = await requireModuleAction(auth, "Suppliers", action);
   if (deny) return { error: deny };
   const { id } = await ctx.params;
   return { auth, id };
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const g = await guard(req, ctx);
+  const g = await guard(req, ctx, "create");
   if ("error" in g) return g.error;
   const { auth, id } = g;
 
@@ -97,7 +99,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const g = await guard(req, ctx);
+  const g = await guard(req, ctx, "delete");
   if ("error" in g) return g.error;
   const { auth, id } = g;
 

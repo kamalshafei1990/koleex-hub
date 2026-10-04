@@ -386,7 +386,7 @@ export default function TaxonomyAdmin({
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-[480px] bg-[#141414] rounded-2xl border border-white/[0.08] shadow-2xl">
+          <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-[480px] bg-[#141414] rounded-2xl border border-white/[0.08] shadow-2xl">
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
               <h2 className="text-[16px] font-semibold text-white">

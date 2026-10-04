@@ -21,7 +21,9 @@ import type {
   TodoProductRef,
   TodoAssigneeInfo,
 } from "@/types/supabase";
-import ProductPicker from "@/components/todo/ProductPicker";
+import dynamic from "next/dynamic";
+import FloatLayer from "./FloatLayer";
+import { todoAttachmentHref as attachmentHref } from "@/lib/todo-admin";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
@@ -33,6 +35,10 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { fpAvatar } from "@/lib/cdn";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
+/* The product browser pulls the catalogue, thumbnails and taxonomy — its
+   own chunk, fetched the first time it is opened. */
+const ProductPicker = dynamic(() => import("./ProductPicker"), { ssr: false });
+
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 const isImage = (t: string) => t.startsWith("image/");
 
@@ -40,10 +46,14 @@ export default function TaskExtras({
   value,
   onChange,
   employees,
+  part = "all",
 }: {
   value: TodoMetadata;
   onChange: (next: TodoMetadata) => void;
   employees: TodoAssigneeInfo[];
+  /* The task form shows Observers under People (owner: "where is the
+     observer?") and the rest under More; other callers keep everything. */
+  part?: "all" | "observers" | "rest";
 }) {
   const { t } = useTranslation(todoT);
   const attachments = value.attachments ?? [];
@@ -172,6 +182,35 @@ export default function TaskExtras({
   const actionBtn =
     "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-inverted)]/[0.04] transition-colors disabled:opacity-50";
 
+  const observersBlock = (
+      <div>
+        <label className={lbl}>{t("extras.observers")}</label>
+        <PeoplePicker
+          icon={<EyeIcon className="h-4 w-4" />}
+          placeholder={t("extras.observerSearch")}
+          selected={observers}
+          employees={employees}
+          noMatchesLabel={t("extras.noMatches")}
+          onToggle={toggleObserver}
+        />
+        <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
+        {observers.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {observers.map((o) => (
+              <span key={o.account_id} className={chip}>
+                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
+                {o.full_name || o.username}
+                <button type="button" onClick={() => removeObserver(o.account_id)} className={chipX} aria-label={t("common.remove")}>
+                  <CrossIcon className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+  );
+  if (part === "observers") return observersBlock;
+
   return (
     <div className="space-y-4" onPaste={onPaste}>
       {/* ── Attachments ── */}
@@ -195,16 +234,16 @@ export default function TaskExtras({
             onChange={onPickFiles}
           />
         </div>
-        {err && <p className="mt-1.5 text-[11px] text-[#FF6B6B]">{err}</p>}
+        {err && <p role="alert" className="mt-1.5 text-[11px] text-red-400">{err}</p>}
         {attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {attachments.map((a) => (
               <div key={a.path} className="relative group">
                 {isImage(a.type) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover border border-[var(--border-subtle)]" />
+                  <img src={attachmentHref(a.path)} alt={a.name} loading="lazy" decoding="async" className="h-16 w-16 rounded-lg object-cover border border-[var(--border-subtle)]" />
                 ) : (
-                  <a href={a.url} target="_blank" rel="noreferrer" className="h-16 w-28 px-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1 text-center">
+                  <a href={attachmentHref(a.path)} target="_blank" rel="noreferrer" className="h-16 w-28 px-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1 text-center">
                     <FileIcon className="h-5 w-5 text-[var(--text-dim)]" />
                     <span className="text-[9px] text-[var(--text-dim)] truncate max-w-full">{a.name}</span>
                   </a>
@@ -212,7 +251,7 @@ export default function TaskExtras({
                 <button
                   type="button"
                   onClick={() => removeAttachment(a.path)}
-                  className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-[#FF3333] text-white inline-flex items-center justify-center shadow"
+                  className="absolute -top-1.5 -end-1.5 h-5 w-5 rounded-full bg-red-500 text-white inline-flex items-center justify-center shadow"
                   aria-label={t("common.remove")}
                 >
                   <CrossIcon className="h-3 w-3" />
@@ -248,33 +287,7 @@ export default function TaskExtras({
         )}
       </div>
 
-      {/* ── Observers ── */}
-      <div>
-        <label className={lbl}>{t("extras.observers")}</label>
-        <PeoplePicker
-          icon={<EyeIcon className="h-4 w-4" />}
-          placeholder={t("extras.observerSearch")}
-          selected={observers}
-          employees={employees}
-          noMatchesLabel={t("extras.noMatches")}
-          onToggle={toggleObserver}
-        />
-        <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]">{t("extras.observerHint")}</p>
-        {observers.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {observers.map((o) => (
-              <span key={o.account_id} className={chip}>
-                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
-                {o.full_name || o.username}
-                <button type="button" onClick={() => removeObserver(o.account_id)} className={chipX} aria-label={t("common.remove")}>
-                  <CrossIcon className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {part === "all" && observersBlock}
       {/* ── Products ── */}
       <div>
         <label className={lbl}>{t("extras.linkProducts")}</label>
@@ -297,12 +310,12 @@ export default function TaskExtras({
         )}
       </div>
 
-      <ProductPicker
+      {pickerOpen && <ProductPicker
         open={pickerOpen}
         selectedIds={products.map((p) => p.id)}
         onToggle={toggleProduct}
         onClose={() => setPickerOpen(false)}
-      />
+      />}
     </div>
   );
 }
@@ -316,8 +329,11 @@ export default function TaskExtras({
 /* Photo with initials fallback (mirrors MiniAvatar on the To-do page) —
    broken/blocked images degrade to initials, never the broken-image glyph. */
 function PickerAvatar({ info, size = 24 }: { info: TodoAssigneeInfo; size?: number }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [info.avatar_url]);
+  /* The failure remembers WHICH src failed and is derived at render — no
+     reset effect needed, and a new avatar_url is automatically "not failed".
+     (The old reset-in-effect was a synchronous setState cascade.) */
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc !== null && failedSrc === info.avatar_url;
 
   const initials = (info.full_name || info.username || "?")
     .split(/\s+/)
@@ -330,7 +346,7 @@ function PickerAvatar({ info, size = 24 }: { info: TodoAssigneeInfo; size?: numb
   return info.avatar_url && !failed ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
-      style={{ width: size, height: size }} onError={() => setFailed(true)} />
+      style={{ width: size, height: size }} onError={() => setFailedSrc(info.avatar_url)} />
   ) : (
     <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"
       style={{ width: size, height: size, fontSize: size * 0.38 }}>
@@ -357,11 +373,13 @@ function PeoplePicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (ev: MouseEvent | TouchEvent) => {
-      if (rootRef.current && !rootRef.current.contains(ev.target as Node)) {
+      const n = ev.target as Node;
+      if (rootRef.current && !rootRef.current.contains(n) && !layerRef.current?.contains(n)) {
         setOpen(false);
         setQ("");
       }
@@ -386,6 +404,8 @@ function PeoplePicker({
     <div ref={rootRef} className="relative">
       <span className="absolute start-3 top-[18px] -translate-y-1/2 text-[var(--text-dim)] pointer-events-none">{icon}</span>
       <input
+        aria-label={placeholder}
+        onKeyDown={(ev) => { if (ev.key === "Escape" && open) { ev.preventDefault(); ev.stopPropagation(); setOpen(false); setQ(""); } }}
         className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         placeholder={placeholder}
         value={q}
@@ -396,8 +416,12 @@ function PeoplePicker({
           setOpen(true);
         }}
       />
+      {/* On <body> through FloatLayer: inside the task window the list sat in
+          the window's glass, came out see-through and ran over the hint and
+          the next section (owner's screenshot, 26/09). */}
       {open && (
-        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+        <FloatLayer anchor={rootRef} inset={0} width={0} layerRef={layerRef}>
+        <div className="kx-glass-pop kx-pop-panel kx-pop-in max-h-64 overflow-y-auto">
           {list.length === 0 && (
             <div className="px-3 h-9 flex items-center text-[12px] text-[var(--text-dim)]">{noMatchesLabel}</div>
           )}
@@ -408,6 +432,7 @@ function PeoplePicker({
               <button
                 key={e.account_id}
                 type="button"
+                aria-pressed={on}
                 onClick={() => onToggle(e)}
                 className={`w-full text-start px-3 h-10 text-[12px] flex items-center gap-2 hover:bg-[var(--bg-surface-hover)] transition-colors ${
                   on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
@@ -436,6 +461,7 @@ function PeoplePicker({
             );
           })}
         </div>
+        </FloatLayer>
       )}
     </div>
   );

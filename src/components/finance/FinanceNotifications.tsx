@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_NOTIFICATIONS } from "@/lib/translations/finance/notifications";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -55,22 +56,20 @@ const OFFSET_OPTIONS = [
 ];
 
 export default function FinanceNotifications() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_NOTIFICATIONS);
   const baseCurrency = useBaseCurrency();
-  const [rows, setRows] = useState<FinanceNotification[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/notifications", { cache: "no-store" });
-      const j = (await r.json()) as { notifications?: FinanceNotification[] };
-      setRows(j.notifications ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/notifications", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:notifications: ${r.status}`);
+    const j = (await r.json()) as { notifications?: FinanceNotification[] };
+    return j.notifications ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceNotification[]>("fin:notifications", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() => rows.filter((n) => n.status === "scheduled" || n.status === "snoozed"), [rows]);
@@ -106,7 +105,7 @@ export default function FinanceNotifications() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("notifications.title", "Reminders")}
           subtitle={t("notifications.subtitle.long", "Command center for money to collect and money to pay — colour-coded by severity.")}

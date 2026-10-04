@@ -40,7 +40,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    TRAINING MODULE
    ═══════════════════════════════════════════════════ */
 
-export default function Training({ employees, t, lang }: HRModuleProps) {
+export default function Training({ employees, t }: HRModuleProps) {
   /* ── Translation helpers ── */
   const { tStatus } = makeTranslationHelpers(t);
 

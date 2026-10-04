@@ -1,8 +1,10 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { canViewPrivate } from "@/lib/server/sensitive-columns";
 
 /* ---------------------------------------------------------------------------
    POST /api/hr/data — the HR app's single data gateway.
@@ -36,6 +38,9 @@ const TABLES: Record<string, { write: boolean }> = {
   hr_checklist_instances: { write: true },
   hr_salary_records: { write: true },
   hr_payslips: { write: true },
+  /* Phase D — rules are HR data; runs are written by the payroll engine only. */
+  hr_payroll_rules: { write: true },
+  hr_payroll_runs: { write: false },
   hr_courses: { write: true },
   hr_training_records: { write: true },
   hr_documents: { write: true },
@@ -43,6 +48,14 @@ const TABLES: Record<string, { write: boolean }> = {
   koleex_departments: { write: false },
   koleex_positions: { write: false },
 };
+
+/** Compensation tables: the HR module gate is NOT enough — salary and payslip
+    rows are column-level private, so read AND write also require
+    can_view_private (or Super Admin), the same rule the employees route uses. */
+const SENSITIVE_TABLES: ReadonlySet<string> = new Set([
+  "hr_salary_records",
+  "hr_payslips",
+]);
 
 type FilterOp = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "in" | "is" | "not_is";
 const FILTER_OPS: ReadonlySet<string> = new Set([
@@ -93,6 +106,14 @@ export async function POST(req: Request) {
     : "delete";
   const denied = await requireModuleAction(auth, "HR", action);
   if (denied) return denied;
+
+  /* Column-level gate: HR·view alone must not reach compensation rows. */
+  if (SENSITIVE_TABLES.has(q.table) && !canViewPrivate(auth)) {
+    return NextResponse.json(
+      { error: "Private HR data requires elevated access" },
+      { status: 403 },
+    );
+  }
 
   /* Validate identifiers before they reach the query builder. */
   if (q.columns && !COLUMNS.test(q.columns)) {
@@ -154,6 +175,8 @@ export async function POST(req: Request) {
          would have, so debugging stays familiar. */
       return NextResponse.json({ data: null, count: null, error: error.message }, { status: 200 });
     }
+    /* A job posting changed: the website's careers page refreshes. */
+    if (q.op !== "select" && q.table === "hr_job_postings") revalidateWebsite(["jobs"]);
     return NextResponse.json({ data: data ?? null, count: count ?? null, error: null });
   } catch (e) {
     console.error("[api/hr/data]", e instanceof Error ? e.message : e);

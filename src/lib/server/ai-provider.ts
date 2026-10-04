@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai-provider — thin adapter layer so the rest of Koleex never knows which
@@ -96,11 +97,27 @@ export interface ChatResult {
   provider: string;
 }
 
+/** A chat's own limits. maxTokens: how long the answer may be — each
+ *  provider's default suits a short reply; a caller expecting structured
+ *  output in three languages (the marketing weekly plan) asks for more. */
+export interface ChatOptions {
+  maxTokens?: number;
+}
+
 /** Last detailed error from a provider call — surfaces through the
  *  /api/ai/chat response so the UI can show "quota exceeded" etc.
  *  instead of a generic "unreachable". Module-level lets us avoid
  *  threading it through every call signature. */
 let lastProviderError: string | null = null;
+
+/* EVERY PROVIDER CALL HAS A DEADLINE. A hung upstream used to hold the
+   function until the platform killed it — forty translate calls in flight
+   behind one request, none of them ending (audit, 2026-09-11). Long enough
+   for a slow model on a slow link; short enough to be a real answer. */
+const PROVIDER_TIMEOUT_MS = 45_000;
+function providerDeadline(): AbortSignal | undefined {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(PROVIDER_TIMEOUT_MS) : undefined;
+}
 export function getLastAiError(): string | null {
   return lastProviderError;
 }
@@ -149,10 +166,13 @@ Text to translate:
 ${input.text}`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      /* THE KEY TRAVELS IN A HEADER, never in the URL: a query string lands in
+         every proxy, CDN and access log on the way (audit, 2026-09-11). */
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      signal: providerDeadline(),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -165,7 +185,7 @@ ${input.text}`;
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.gemini.translate]", res.status, bodyText);
+    logProviderFailure("[ai.gemini.translate]", res.status, bodyText);
     lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -189,7 +209,7 @@ function extractErrorMessage(body: string): string {
   return body.slice(0, 200);
 }
 
-export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+export async function geminiChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
 
@@ -211,7 +231,7 @@ export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | 
     contents,
     generationConfig: {
       temperature: 0.6,
-      maxOutputTokens: 2048,
+      maxOutputTokens: opts.maxTokens ?? 2048,
     },
   };
   if (systemText) {
@@ -219,17 +239,20 @@ export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | 
   }
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      /* THE KEY TRAVELS IN A HEADER, never in the URL: a query string lands in
+         every proxy, CDN and access log on the way (audit, 2026-09-11). */
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      signal: providerDeadline(),
       body: JSON.stringify(body),
     },
   );
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.gemini.chat]", res.status, bodyText);
+    logProviderFailure("[ai.gemini.chat]", res.status, bodyText);
     lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -253,12 +276,13 @@ function stripThinking(text: string): string {
   return text.replace(/<think[\s\S]*?<\/think>/gi, "").trim();
 }
 
-async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+async function groqChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult | null> {
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -267,13 +291,13 @@ async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
       model: GROQ_CHAT_MODEL,
       messages,
       temperature: 0.3,
-      max_tokens: 120,
+      max_tokens: opts.maxTokens ?? 120,
     }),
   });
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.chat]", res.status, bodyText);
+    logProviderFailure("[ai.groq.chat]", res.status, bodyText);
     lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -305,6 +329,7 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -319,7 +344,7 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.translate]", res.status, bodyText);
+    logProviderFailure("[ai.groq.translate]", res.status, bodyText);
     lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -352,6 +377,7 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
 
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -361,7 +387,7 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.deepseek.translate]", res.status, bodyText);
+    logProviderFailure("[ai.deepseek.translate]", res.status, bodyText);
     lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -375,22 +401,23 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
   return { translated, provider: `deepseek:${DEEPSEEK_MODEL}` };
 }
 
-async function deepseekChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+async function deepseekChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult | null> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return null;
 
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages, temperature: 0.3, max_tokens: 600 }),
+    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages, temperature: 0.3, max_tokens: opts.maxTokens ?? 600 }),
   });
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.deepseek.chat]", res.status, bodyText);
+    logProviderFailure("[ai.deepseek.chat]", res.status, bodyText);
     lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -428,13 +455,13 @@ export async function aiTranslate(input: TranslateInput): Promise<TranslateResul
  * Run a chat completion. Returns null on failure — the caller should
  * show a graceful "AI unavailable" message rather than a 500.
  */
-export async function aiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+export async function aiChat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult | null> {
   const provider = pickProvider();
   if (!provider) return null;
   try {
-    if (provider === "deepseek") return await deepseekChat(messages);
-    if (provider === "groq") return await groqChat(messages);
-    if (provider === "gemini") return await geminiChat(messages);
+    if (provider === "deepseek") return await deepseekChat(messages, opts);
+    if (provider === "groq") return await groqChat(messages, opts);
+    if (provider === "gemini") return await geminiChat(messages, opts);
     return null;
   } catch (e) {
     console.error("[ai.chat]", e);

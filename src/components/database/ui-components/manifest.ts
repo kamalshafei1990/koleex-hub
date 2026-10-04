@@ -4,7 +4,7 @@
    (@/components/kds, /ui or /common) — the convergence signal the
    catalog shows as a percentage. Do not hand-edit; rerun the crawl. */
 export interface UiModule { key: string; fileCount: number; kitFiles: number; components: string[] }
-export const UI_COMPONENT_TOTALS = { components: 841, files: 1034, modules: 111 };
+export const UI_COMPONENT_TOTALS = { components: 840, files: 1033, modules: 111 };
 export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "activity",
@@ -45,12 +45,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "FamilySharedDivider",
       "FamilySpecGrid",
       "FamilyStrip",
-      "FeatureCardsSection",
       "FieldHelp",
       "KnowledgeSection",
       "MediaSection",
       "MemberIdentityPanel",
-      "MemberLogisticsPanel",
       "MemberPricingPanel",
       "MemberSupplierPanel",
       "ModelsSection",
@@ -92,13 +90,11 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "fileCount": 11,
     "kitFiles": 1,
     "components": [
-      "AutoTranslate",
       "EmojiButton",
       "KoleexAiApp",
       "KoleexGlowOrb",
       "KoleexOrb",
       "KoleexOrbIcon",
-      "KoleexRobot",
       "MessageMarkdown",
       "MicButton",
       "ProjectGlyph",
@@ -486,11 +482,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "invoices",
-    "fileCount": 2,
-    "kitFiles": 2,
+    "fileCount": 1,
+    "kitFiles": 1,
     "components": [
-      "EntityInvoicesStrip",
-      "InvoicesApp"
+      "EntityInvoicesStrip"
     ]
   },
   {
@@ -664,13 +659,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "product-templates",
-    "fileCount": 4,
-    "kitFiles": 1,
+    "fileCount": 1,
+    "kitFiles": 0,
     "components": [
-      "FieldRenderer",
-      "SectionRenderer",
-      "TemplateForm",
-      "TemplateView"
+      "FieldRenderer"
     ]
   },
   {
@@ -940,7 +932,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "ReportTotal",
       "SmartCreateDrawer",
       "SmartCreatePage",
-      "SmartEmpty",
       "SmartEmptyState",
       "SmartField",
       "SmartHelpCard",
@@ -997,16 +988,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "components": [
       "AiKnowledgePage",
       "AiPage",
-      "Loading",
-      "OrbDemoPage"
-    ]
-  },
-  {
-    "key": "routes \u00b7 ai-face-lab",
-    "fileCount": 1,
-    "kitFiles": 0,
-    "components": [
-      "AiFaceLabPage"
+      "Loading"
     ]
   },
   {
@@ -1452,7 +1434,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "kitFiles": 1,
     "components": [
       "EditProductPage",
-      "LegacyProductView",
       "Loading",
       "NewProductPage",
       "OgImage",

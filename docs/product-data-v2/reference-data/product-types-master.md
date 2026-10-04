@@ -18,7 +18,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XSL | Lockstitch Machine | stitch_type, bed_type, drive_type, max_speed | needle_count, bed_type, drive_type, max_speed, hook_size | auto_trimmer, auto_foot_lifter, auto_backtack, thread_wiper, edge_cutter, puller |
 | ✅ XSO | Overlock Machine | thread_count, differential_feed, max_speed, bed_type | thread_count, differential_feed, max_speed, automation_level | auto_trimmer, differential_feed, puller |
 | ✅ XSI | Interlock (Coverstitch) Machine | needle_count, thread_count, top_cover, bed_type | needle_count, thread_count, top_cover, gauge | top_cover, puller, elastic_feeder, edge_cutter |
-| ▲ XSF | Flatlock (Flat Seamer) Machine | needle_count, thread_count, bed_type, differential_feed | needle_count, thread_count, gauge, bed_type | top_cover, puller, elastic_feeder |
+| ✅ XSF | Flatlock (Flat Seamer) Machine | needle_count, thread_count, bed_type, differential_feed | needle_count, thread_count, gauge, bed_type | top_cover, puller, elastic_feeder |
 | ✅ XSC | Chainstitch Machine | needle_count, bed_type, feed_off_arm | needle_count, feed_off_arm, gauge | puller, edge_cutter, folder, tape_feeder |
 | ▲ XSBH | Buttonhole Machine (Lockstitch) | buttonhole_type, automation_level, max_speed | electronic_vs_mechanical, buttonhole_length | programmable_patterns, auto_knife |
 | ▲ XSEB | Eyelet Buttonhole Machine | buttonhole_type, gimp, max_speed | with_gimp, electronic_vs_mechanical | gimp_device, taping |
@@ -26,20 +26,21 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XSBT | Bartack Machine | sewing_area, automation_level | electronic_vs_mechanical, sewing_area | programmable_patterns, work_clamps |
 | ▲ XSBL | Blind Stitch Machine | stitch_type, bed_type, skip_stitch | bed_type, skip_stitch, fabric_suitability | skip_stitch_device, edge_cutter |
 | ▲ XSZ | Zigzag Machine | zigzag_width, zigzag_pattern, max_speed | zigzag_width, single_vs_multistep, electronic | programmable_patterns, auto_trimmer |
-| ▲ XSEA | Elastic Attaching Machine | needle_count, bed_type, elastic_metering | needle_count, bed_type, metering_type | elastic_feeder, puller, cutter |
+| ✅ XSEA | Elastic Attaching Machine | needle_count, bed_type, elastic_metering | needle_count, bed_type, metering_type | elastic_feeder, puller, cutter |
 | ▲ XSWB | Waistband Attaching Machine | needle_count, gauge, bed_type | needle_count, gauge, bed_type | puller, folder, tape_feeder |
 | ▲ XSBLP| Belt Loop Machine | function(make/attach), automation_level | making_vs_attaching, electronic | auto_feed_cut, loop_program |
 | ▲ XSSM | Smocking / Shirring Machine | needle_count, gauge | needle_count(rows), gauge | elastic_metering, puller |
 | ▲ XSPC | Picoting Machine | stitch_type, needle_count | needle_count, gauge | differential_feed, edge_trimmer |
 | ▲ XSBG | Bag Closing Machine | stitch_type, format(portable/stationary), tape | portable_vs_stationary, with_tape | tape_feed, printer, thread_cutter |
 | ▲ XSMT | Mattress Sewing Machine | function(tape-edge/border/flanging), max_thickness | function, automation_level | carriage_automation, pneumatic |
-| ▲ XSUS | Ultrasonic Sewing Machine | power, working_width, roller_pattern | working_width, continuous_vs_spot | embossing_wheels, slitting |
+| ✅ XSUS | Ultrasonic Sewing Machine | power, working_width, roller_pattern | working_width, continuous_vs_spot | embossing_wheels, slitting |
+| ✅ XSRG | Carpet Overedging Machine | thread_count, max_carpet_thickness | thread_count, portable_vs_stationary | edge_guide, trimming | *(CL-0024)* |
 
 ## B. Automatic Sewing Systems  (Category XA)
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |
 |---|---|---|---|---|
 | ▲ XAPS | Programmable Pattern Sewing Machine | working_field, head_type, max_speed, programmable_memory | working_field, head_type, max_speed | stacker, laser_marker, intermittent_presser |
-| ▲ XATM | Template Sewing Machine | working_field, head_count, head_type | working_field, head_count, template_change | rotary_template_loader, vision_registration |
+| ✅ XATM | Template Sewing Machine | working_field, head_count, head_type | working_field, head_count, template_change | rotary_template_loader, vision_registration |
 | ▲ XAPW | Automatic Pocket Welting Machine | welt_type, welt_length, stacker | single_vs_double_welt, flap, zipper | flap_loader, zipper_feeder, dart_device |
 | ▲ XAPP | Automatic Patch Pocket Setter | pocket_size, shape_programmable, head_type | pocket_size, with_creaser, stacker | pocket_creaser, label_insert, corner_bartack |
 | ▲ XAPL | Automatic Placket Machine | placket_type, placket_length, cutter | placket_type, interlining_feed, stacker | interlining_feed, label_insert |
@@ -47,10 +48,16 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XASL | Automatic Sleeve Setting Machine | ease_method, head_type | garment_type, ease_program, head_type | ease_profiles, photocell, stacker |
 | ▲ XAHM | Automatic Hemming Machine | hem_type, head_type, folding_device | hem_type, contour_following, cylinder_bed | contour_follow, label_insert, stacker |
 | ▲ XALB | Automatic Label Attaching Machine | label_type, label_feed, head_type | label_type, auto_feed_source, multi_label | label_cutter, vision_placement, stacker |
-| ▲ XABL | Automatic Belt Loop Attaching System | loop_width, programmable_positions | loop_width, programmable_positions, inline_forming | loop_forming, indexing_feed, stacker |
+| ✅ XABL | Automatic Belt Loop Attaching System | loop_width, programmable_positions | loop_width, programmable_positions, inline_forming | loop_forming, indexing_feed, stacker |
 | ▲ XAWB | Automatic Waistband Machine | garment_type, head_config | garment_type, needle_count, curtain_feed | curtain_feed, label_insert |
-| ▲ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
+| ✅ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
 | ▲ XAIX | Automatic Buttonhole/Button Indexer | function, positions, base_head | function, position_count, auto_button_feed | auto_button_feeder, transport_clamp, stacker |
+| ✅ XAGD | Glue Dispensing Machine | dispensing_heads, working_field, vision | head_count, ab_glue, vision | curing_oven, vision_registration *(CL-0026)* |
+| ✅ XAGP | Garment Prep Unit | prep_function, automation_level | function(zipper/cord/crease) | — *(CL-0026)* |
+| ✅ XFAB | Bra Hardware Machine *(lives under Fastening & Press XFA\*)* | hardware_type, feed_type | hook_eye_vs_buckle, auto_feed | auto_feeder *(CL-0026)* |
+| ✅ XATA | Automatic Tape Attaching System | tape_count, working_field, cycle_time | tape_count, robotic_feed, cycle_time | auto_feeding_arm, template_loader *(CL-0024)* |
+| ✅ XAPK | Automatic Pintuck Machine | tucking_length, tucking_width, head_type | tucking_length, plc_patterns, head_type | stepper_feed, infrared_break_detect *(CL-0024)* |
+| ✅ XSEF | Fur Sewing Machine *(lives under Leather & Footwear XSE\*)* | stitch_type, max_skin_thickness | portable_vs_stationary, speed | edge_guide *(CL-0024)* |
 
 ## C. Cutting Equipment  (Category XC)
 | Prefix | Product Type | Required Facets | Comparison Facets | Device Compatibility |
@@ -89,7 +96,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XFSB | Steam Boiler / Generator | boiler_capacity, irons_supported, heating_method | capacity, irons_supported, heating_method | auto_fill, descaling |
 | ✅ XFSG | Steam Generator (Electric, compact) | power_kw, steam_output, irons_supported | power_kw, steam_output, irons_supported | auto_water_feed, dual_outlet |
 | ✅ XFIT | Ironing Table (Vacuum/Heated/Blowing) | surface_features, size | vacuum, up_blow, heated_buck, with_boiler | vacuum, up_blow, heated_buck |
-| ▲ XFPB | Pressing Machine (Buck/Cabinet) | press_type, actuation, application | press_type, actuation, dual_buck | dual_buck, programmable_cycle |
+| ✅ XFPB | Pressing Machine (Buck/Cabinet) | press_type, actuation, application | press_type, actuation, dual_buck | dual_buck, programmable_cycle |
 | ✅ XFCP | Collar & Cuff Press | actuation, station_count | actuation, double_station | double_station, programmable |
 | ✅ XFFP | Fusing Machine | fusing_type, belt_width, temperature_range | fusing_type, belt_width, temperature_range | double_belt, cooling_section |
 | ▲ XFFF | Form Finisher (Steam-Air Dolly) | garment_type, tensioning_method, steam_source | garment_type, tensioning_method, twin_station | side_clamps, sleeve_tensioners |
@@ -113,11 +120,13 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 |---|---|---|---|---|---|
 | ✅ XPSP | Screen Printing Machine | Printing | type(manual/auto), config, color_count | manual_vs_auto, carousel_vs_oval, color_count | flash_cure, vacuum_holddown |
 | ✅ XPDT | DTG Printer | Printing | print_area, ink_set, platen_size | print_area, white_ink, throughput | bulk_ink, pretreat |
-| ▲ XPDF | DTF Printer | Printing | film_width, ink_set, roll_fed | film_width, roll_vs_sheet, white_ink | inline_shaker_cure, take_up |
+| ✅ XPDF | DTF Printer | Printing | film_width, ink_set, roll_fed | film_width, roll_vs_sheet, white_ink | inline_shaker_cure, take_up |
 | ✅ XPSU | Sublimation Printer | Printing | print_width, mode(transfer/direct), ink | print_width, transfer_vs_direct, throughput | bulk_ink, integrated_dryer |
 | ▲ XPCD | Conveyor Dryer / Curing Oven | Printing | belt_width, heat_source, max_temp | belt_width, heat_source, chamber_length | IR_boosters, multi_zone |
-| ▲ XPPS | DTF Powder Shaker / Curing Unit | Printing | film_width, format(inline/standalone) | width, inline_vs_standalone, powder_recycling | powder_recycling, fume_extraction |
+| ✅ XPPS | DTF Powder Shaker / Curing Unit | Printing | film_width, format(inline/standalone) | width, inline_vs_standalone, powder_recycling | powder_recycling, fume_extraction |
 | ✅ XPH | Heat Press Machine (Flat) | Transfer | platen_size, opening_type, actuation, stations | platen_size, actuation, stations, platen_shape | cap_platen, mug_platen, twin_station |
+| ✅ XPUV | UV-DTF Printer | Printing | film_width, print_mode(roll/flat/cylinder), ink_channels | roll_vs_flat, varnish, rotary_set | rotary_attachment, vacuum_table *(CL-0027)* |
+| ✅ XPPD | Pad Printing Machine | Printing | plate_size, color_count, drive(electric/pneumatic) | color_count, conveyor, sealed_cup | conveyor_table, shuttle_table *(CL-0027 — un-parked)* |
 | ▲ XPRH | Calender / Rotary Heat Press | Transfer | working_width, max_temp, speed, feed_type | working_width, feed_type, speed, drum_diameter | protective_paper_feed, cooling_section |
 
 ## H. Packing & Inspection  (Category XPC)

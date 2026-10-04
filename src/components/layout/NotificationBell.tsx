@@ -30,36 +30,49 @@
        regardless of which page the user is on.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import PopoverPanel from "@/components/kds/PopoverPanel";
 import { useRouter } from "next/navigation";
 import BellIcon from "@/components/icons/ui/BellIcon";
+import MoonIcon from "@/components/icons/ui/MoonIcon";
 import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
-import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import {
-  fetchInboxMessages,
+  archiveMessages,
+  fetchInboxMessagesOrNull,
   fetchUnreadCount,
-  markAllRead,
   markMessageRead,
+  markMessagesRead,
+  markMessagesUnread,
+  snoozeMessages,
   subscribeToInboxMessages,
 } from "@/lib/inbox";
+import { muteTopic } from "@/lib/notification-mute-client";
+import { invalidateCachedGet } from "@/lib/client-cache";
 import {
   fetchMyChannels,
   isAccountStreamHealthy,
   markChannelRead,
+  sendDiscussMessage,
   subscribeToMyChannels,
 } from "@/lib/discuss";
 import { getActiveDiscussChannel } from "@/lib/discuss-active-store";
-import { useCurrentAccount } from "@/lib/identity";
-import { activityAllowed, inQuietHours } from "@/lib/notification-activity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
+import { readWarmBellFeed, writeWarmBellFeed } from "@/lib/inbox-warm";
+import { activityAllowed, hushedNow, pausedUntil } from "@/lib/notification-activity";
+import { clockText, requestPause, type PauseChoice } from "@/lib/notification-pause";
 import { useTranslation } from "@/lib/i18n";
+import { useSkin } from "@/lib/appearance";
 import { hubT } from "@/lib/translations/hub";
-/* Filter-chip labels come from the SAME dictionary Settings uses for its
-   "By activity" switches — one label per activity, everywhere. */
-import { settingsT } from "@/lib/translations/settings";
+import { notifUiT } from "@/lib/translations/notif-ui";
 import { publishInboxUnread } from "@/lib/inbox-unread-store";
-import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import { setIconBadge } from "@/lib/app-icon-badge";
+import { NotificationSections, NotificationSkeleton, notifTimeAgo, type ListActions } from "@/components/layout/NotificationList";
+import PushNudge from "@/components/layout/PushNudge";
+import { peekPushNudge, preparePushNudge, type PushNudge as Nudge } from "@/lib/push-nudge";
+import { desktopToast, inboxToastText, outOfView, type Toast } from "@/lib/desktop-toast";
+import NotificationCards, { CARD_MAX, lessMotion, type NoticeCard } from "@/components/layout/NotificationCards";
+import { awaySummary, inTab, isAway, isSecurity, type BellTab } from "@/lib/notification-view";
 import {
   classifyInboxActivity,
   playAppSound,
@@ -69,125 +82,31 @@ import type {
   DiscussChannelWithState,
   InboxMessageWithSender,
 } from "@/types/supabase";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* Refresh inbox unread count every 60s while the tab is open. Discuss
    also polls every 15s as a safety net since the WebSocket can drop
    silently on flaky networks or after mobile Safari kills the tab. */
 const POLL_INTERVAL_MS = 60_000;
 
-/* One slim fetch covers the whole feed (rows are ~250B without avatars),
-   so the filter chips can carry accurate per-type counts and nothing is
-   ever hidden behind a "show more". Server caps at 300. */
+/* One slim fetch covers the whole feed (rows are ~250B without avatars):
+   every tab's count is exact and nothing hides behind a "show more".
+   Server caps at 300. */
 const FEED_LIMIT = 300;
-
-/* Type-filter chips. `discuss` covers the chat section; the eight activity
-   keys mirror classifyInboxActivity() exactly — same classifier that routes
-   sounds and push, so a notification always lands under the same chip that
-   its Settings switch controls. `other` catches unclassified system mail. */
-type NotifFilter =
-  | "all"
-  | "discuss"
-  | "mentions"
-  | "approvals"
-  | "assignments"
-  | "tasks_due"
-  | "calendar_events"
-  | "projects_planning"
-  | "quotation_activity"
-  | "low_stock"
-  | "inventory_activity"
-  | "finance_activity"
-  | "qa_reports"
-  | "price_fx"
-  | "hr_activity"
-  | "discuss_messages"
-  | "security_alerts"
-  | "comments_activity"
-  | "membership_requests"
-  | "other";
-
-const FILTER_CHIPS: Array<{ key: NotifFilter; hubKey?: string; settingsKey?: string }> = [
-  { key: "all", hubKey: "notif.filter.all" },
-  { key: "discuss", hubKey: "notif.discuss" },
-  { key: "mentions", settingsKey: "act.mentions" },
-  { key: "approvals", settingsKey: "act.approvals" },
-  { key: "assignments", settingsKey: "act.assignments" },
-  { key: "tasks_due", settingsKey: "act.tasksDue" },
-  { key: "calendar_events", settingsKey: "act.calendar" },
-  { key: "projects_planning", settingsKey: "act.projects" },
-  { key: "quotation_activity", settingsKey: "act.quotation" },
-  { key: "membership_requests", settingsKey: "act.membership" },
-  { key: "low_stock", settingsKey: "act.lowStock" },
-  { key: "inventory_activity", settingsKey: "act.inventory" },
-  { key: "finance_activity", settingsKey: "act.finance" },
-  { key: "qa_reports", settingsKey: "act.qa" },
-  { key: "price_fx", settingsKey: "act.priceFx" },
-  { key: "hr_activity", settingsKey: "act.hr" },
-  { key: "discuss_messages", settingsKey: "act.discuss" },
-  { key: "security_alerts", settingsKey: "act.security" },
-  { key: "comments_activity", settingsKey: "act.comments" },
-  { key: "other", hubKey: "notif.filter.other" },
-];
 
 type TFn = (key: string, fallback?: string) => string;
 
-function timeAgo(iso: string, t: TFn): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diff = Date.now() - then;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return t("notif.justNow");
-  if (minutes < 60) return t("notif.minAgo").replace("{n}", String(minutes));
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t("notif.hourAgo").replace("{n}", String(hours));
-  const days = Math.floor(hours / 24);
-  if (days < 7) return t("notif.dayAgo").replace("{n}", String(days));
-  return new Date(iso).toLocaleDateString();
-}
+/* No pop-up cards on screen (components/layout/NotificationCards). */
+const NO_CARDS: { cards: NoticeCard[]; more: number } = { cards: [], more: 0 };
 
-function categoryStyle(
-  category: InboxMessageWithSender["category"],
-  dk: boolean,
-): { labelKey: string; className: string } {
-  switch (category) {
-    case "membership_request":
-      return {
-        labelKey: "notif.cat.request",
-        className: dk
-          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-          : "bg-amber-100 text-amber-700 border-amber-200",
-      };
-    case "system":
-      return {
-        labelKey: "notif.cat.system",
-        className: dk
-          ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
-          : "bg-sky-100 text-sky-700 border-sky-200",
-      };
-    case "alert":
-      return {
-        labelKey: "notif.cat.alert",
-        className: dk
-          ? "bg-red-500/15 text-red-300 border-red-500/30"
-          : "bg-red-100 text-red-700 border-red-200",
-      };
-    case "task":
-      return {
-        labelKey: "notif.cat.task",
-        className: dk
-          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-          : "bg-emerald-100 text-emerald-700 border-emerald-200",
-      };
-    default:
-      return {
-        labelKey: "notif.cat.message",
-        className: dk
-          ? "bg-white/[0.06] text-white/70 border-white/[0.1]"
-          : "bg-black/[0.04] text-black/70 border-black/[0.1]",
-      };
-  }
-}
+/** Quiet hours, or the pause taken here (whose newest answer the bell knows
+ *  before the account is re-read): no sound, no desktop notification. */
+const hushed = (prefs: Record<string, unknown> | undefined, pause: string | null) =>
+  hushedNow({ ...(prefs ?? {}), pause_until: pause });
+
+/* The pause menu loads when first opened (NotificationMore — prefetched as
+   the panel opens), off the bell's own chunk. */
+const PauseMenu = lazy(() => import("./NotificationMore").then((m) => ({ default: m.PauseMenu })));
+const prefetchMore = () => { void import("./NotificationMore").catch(() => undefined); };
 
 /** Resolve the best label for a Discuss channel row, mirroring the
  *  same fallback chain the sidebar uses: explicit name → DM partner's
@@ -213,7 +132,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
      already happened by then, so the panel must come up open — otherwise the
      first tap would look like it did nothing. */
   const router = useRouter();
-  const { t } = useTranslation(hubT);
+  const { t, lang } = useTranslation(hubT);
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
 
@@ -221,25 +140,150 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
   useEffect(() => {
     accountIdRef.current = accountId;
   }, [accountId]);
-  /* Live view of the per-activity notification switches. A ref (updated every
-     render) rather than a closure capture: the realtime subscription below
-     re-subscribes only when accountId changes, and must still see preference
-     edits made mid-session. */
-  const notifPrefsRef = useRef<Record<string, unknown> | undefined>(undefined);
-  notifPrefsRef.current = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
+  /* Live view of the per-activity notification switches. A ref rather than a
+     closure capture: the realtime subscription below re-subscribes only when
+     accountId changes, and must still see preference edits made mid-session.
+     Synced in an effect (refs must not be written during render); the ref is
+     only read from subscription / event callbacks, which run after commit, so
+     they always see the latest committed preferences — same as before. */
+  const notifPrefs = (account?.preferences as { notifications?: Record<string, unknown> } | null | undefined)?.notifications ?? undefined;
+  const notifPrefsRef = useRef<Record<string, unknown> | undefined>(notifPrefs);
+  useEffect(() => {
+    notifPrefsRef.current = notifPrefs;
+  }, [notifPrefs]);
 
   const [open, setOpen] = useState(defaultOpen);
   const [inboxUnread, setInboxUnread] = useState(0);
-  const [messages, setMessages] = useState<InboxMessageWithSender[]>([]);
-  const [loadingInbox, setLoadingInbox] = useState(false);
-  const [filter, setFilter] = useState<NotifFilter>("all");
-  /* Chip labels for the eight activities live in the Settings dictionary. */
-  const { t: tAct } = useTranslation(settingsT);
+  /* Painted from the last answer (inbox-warm): the panel opens with rows,
+     not a spinner, and the refresh below replaces them. Read synchronously,
+     here, so nothing shifts after the first frame. */
+  const [messages, setMessages] = useState<InboxMessageWithSender[]>(
+    () => readWarmBellFeed(getCurrentAccountIdSync()) ?? [],
+  );
+  /* Starts true when the panel mounts open for a signed-in account with
+     nothing painted yet: the open-effect below fetches straight away. */
+  const [loadingInbox, setLoadingInbox] = useState(() => defaultOpen && !!accountId && messages.length === 0);
+  /* Keep the stored list in step with the screen — every path that changes
+     `messages` (refresh, realtime, mark read) lands here once. Only after a
+     real answer has arrived, so an empty first frame never erases a good
+     list. */
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (loadedRef.current) writeWarmBellFeed(accountId, messages);
+  }, [messages, accountId]);
+  /* The list as the realtime handler last saw it: a row brought back to the
+     top (a snooze waking, a reminder) may already be here — unread or not. */
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  /* All (the work) · Needs you · Security (lib/notification-view). */
+  const [tab, setTab] = useState<BellTab>("all");
+  const { t: tUi } = useTranslation(notifUiT);
+  /* Dual skin: Aurora marks the selected tab with kx-seg-on; Core keeps the
+     inverted pill. */
+  const aurora = useSkin() === "aurora";
 
   const [discussChannels, setDiscussChannels] = useState<
     DiscussChannelWithState[]
   >([]);
+
+  /* Transitions of the account and of the panel, applied DURING render (the
+     React "adjust state when a prop changes" pattern) instead of as a
+     synchronous setState inside the effects that react to them — which made
+     every sign-out / open / close cost an extra cascading render (and tripped
+     react-hooks/set-state-in-effect). Same outcomes as before:
+       · signed out → inbox count, Discuss rows and the feed are cleared;
+       · panel opened (or the account changed while open) → the feed shows its
+         spinner until the open-effect's fetch lands;
+       · panel closed → the tab resets to All so a tab left behind cannot
+         hide fresh notifications on the next open.
+     The async fetches themselves stay in the effects below. */
+  /* The offer to turn push on here (lib/push-nudge): taken as the panel
+     opens and fixed for that open, so it is there on the first frame or not
+     at all — never pushed in above the rows a moment later. */
+  const [nudge, setNudge] = useState<Nudge>(() => (defaultOpen ? peekPushNudge(accountId) : null));
+  /* Pop-up cards on screen, and how many more folded behind them. Opening
+     the panel clears them: the rows are all there. */
+  const [cardStack, setCardStack] = useState(NO_CARDS);
+  /* A pause taken from the bell (lib/notification-pause): shown from the
+     account's preferences, and a choice made here shows at once — `from`
+     is the stored value it was last aligned with, so a fresh read of the
+     account (this tab, Settings, another device) always wins. */
+  const prefsPause = (notifPrefs as { pause_until?: string | null } | undefined)?.pause_until ?? null;
+  const [pause, setPause] = useState({ from: prefsPause, until: prefsPause });
+  if (pause.from !== prefsPause) setPause({ from: prefsPause, until: prefsPause });
+  const [pauseMenu, setPauseMenu] = useState(false);
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [pauseNote, setPauseNote] = useState<"failed" | "noMeeting" | null>(null);
+  const pauseRef = useRef<string | null>(pause.until);
+  useEffect(() => {
+    pauseRef.current = pause.until;
+  }, [pause.until]);
+  /* Re-render when the pause runs out, so the bell and its banner end with it. */
+  const [, setPauseTick] = useState(0);
+  useEffect(() => {
+    const ms = pause.until ? Date.parse(pause.until) - Date.now() : NaN;
+    if (!(ms > 0)) return;
+    const id = window.setTimeout(() => setPauseTick((n) => n + 1), Math.min(ms + 500, 2_147_000_000));
+    return () => window.clearTimeout(id);
+  }, [pause.until]);
+  const pauseEnd = pausedUntil({ pause_until: pause.until });
+  const twelveHour = (account?.preferences as { display?: { time_format?: string } } | null | undefined)?.display?.time_format === "12h";
+  const [seen, setSeen] = useState({ accountId, open });
+  if (seen.accountId !== accountId || seen.open !== open) {
+    const accountChanged = seen.accountId !== accountId;
+    const opened = open && !seen.open;
+    const closed = !open && seen.open;
+    setSeen({ accountId, open });
+    if (accountChanged && !accountId) {
+      setInboxUnread(0);
+      setDiscussChannels([]);
+      setMessages([]);
+    }
+    if (closed) { setTab("all"); setPauseMenu(false); setPauseNote(null); }
+    if (opened || accountChanged) setNudge(open ? peekPushNudge(accountId) : null);
+    if (opened || accountChanged) setCardStack(NO_CARDS);
+    /* A spinner only over an empty panel — rows painted from the last
+       answer stay put while the refresh runs. */
+    if (open && accountId && (opened || accountChanged)) setLoadingInbox(messages.length === 0);
+  }
+  /* Worked out again while the panel is shut, for the next open: permission
+     or a subscription may have changed meanwhile (Settings, another tab). */
+  useEffect(() => {
+    if (!open) void preparePushNudge(accountId);
+  }, [open, accountId]);
+  /* Latest list for the realtime handler (per-channel mute check). */
+  const discussChannelsRef = useRef<DiscussChannelWithState[]>([]);
+  useEffect(() => {
+    discussChannelsRef.current = discussChannels;
+  }, [discussChannels]);
   const wrapRef = useRef<HTMLDivElement>(null);
+  /* The bell itself: where an unopened card flies home, and what swings. */
+  const bellBtnRef = useRef<HTMLButtonElement>(null);
+  const bellIconRef = useRef<HTMLSpanElement>(null);
+  const badgeRef = useRef<HTMLSpanElement>(null);
+  /** A card arrived, or an unopened one came home: the bell swings once and
+   *  its number pops. Nothing under reduced motion. */
+  function nudgeBell() {
+    if (lessMotion()) return;
+    requestAnimationFrame(() => {
+      bellIconRef.current?.animate(
+        [{ transform: "rotate(0)" }, { transform: "rotate(14deg)" }, { transform: "rotate(-11deg)" }, { transform: "rotate(6deg)" }, { transform: "rotate(0)" }],
+        { duration: 520, easing: "ease-out" },
+      );
+      badgeRef.current?.animate([{ transform: "scale(1)" }, { transform: "scale(1.35)" }, { transform: "scale(1)" }], { duration: 360, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+    });
+  }
+  /* What a desktop notification needs when it is shown or clicked — the
+     latest language, words and handlers. The realtime callbacks subscribe
+     once per account, so they read these through a ref (synced after each
+     commit, below the handlers it points at). */
+  const toastRef = useRef<{
+    lang: typeof lang; t: TFn; many: (n: number) => Toast;
+    openRow: (m: InboxMessageWithSender) => void; openChannel: (id: string) => void;
+    card: (c: NoticeCard) => void;
+  } | null>(null);
 
   /** Grace-period tracking: after a realtime bump, protect the optimistic
    *  `inboxUnread` from being overwritten by a stale poll result. */
@@ -276,7 +320,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
          arrives (it knows WHICH activity it is). Only chime here when the
          rise came from a poll — realtime missed it, activity unknown. */
       if (Date.now() - lastRealtimeChimeRef.current > 3000
-          && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
+          && !hushed(notifPrefsRef.current, pauseRef.current)) {
         playAppSound("notification");
       }
     }
@@ -290,18 +334,28 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     publishInboxUnread(accountId ?? null, inboxUnread);
   }, [accountId, inboxUnread]);
 
+  /* The installed app's icon carries the number this bell shows. Only once
+     both halves have been read: both start at 0 here, and a mount must not
+     wipe the number the Gate already put on the icon. */
+  const [iconKnown, setIconKnown] = useState({ inbox: false, discuss: false });
+  useEffect(() => {
+    if (!accountId || !iconKnown.inbox || !iconKnown.discuss) return;
+    setIconBadge(inboxUnread, discussUnread);
+  }, [accountId, iconKnown, inboxUnread, discussUnread]);
+
   /* ── Discuss: seed channel list ──────────────────────────────────── */
-  const recountDiscuss = useCallback(async () => {
+  const recountDiscuss = useCallback(async (): Promise<DiscussChannelWithState[] | null> => {
     const aid = accountIdRef.current;
-    if (!aid) {
-      setDiscussChannels([]);
-      return;
-    }
+    /* Signed out: the render-time transition above already emptied the list. */
+    if (!aid) return null;
     try {
       const rows = await fetchMyChannels(aid);
       setDiscussChannels(rows);
+      setIconKnown((k) => (k.discuss ? k : { ...k, discuss: true }));
+      return rows;
     } catch {
       /* Leave prior list in place. */
+      return null;
     }
   }, []);
 
@@ -328,7 +382,18 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
            EXCEPT on /discuss, where DiscussApp raises its own sound with
            per-channel mute/mention rules for the same event. Both firing
            at once was the "two different sounds per message" bug. */
-        if (!window.location.pathname.startsWith("/discuss") && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) playAppSound("message");
+        /* …and never for a conversation the user muted (or set to
+           "Nothing"), nor — in one set to "Mentions only" — for a message
+           that doesn't @-mention them: the same per-channel rule push and
+           DiscussApp follow (the ping says mentionsYou; lib/discuss). */
+        const mentionsYou = !!(msg.metadata as { mentions_you?: boolean } | null)?.mentions_you;
+        const quietFor = (c: DiscussChannelWithState) =>
+          c.muted || c.notification_pref === "none" || (c.notification_pref === "mentions" && !mentionsYou);
+        const ch = discussChannelsRef.current.find((c) => c.id === msg.channel_id);
+        const silenced = !!ch && quietFor(ch);
+        const onDiscuss = window.location.pathname.startsWith("/discuss");
+        const heard = !silenced && !onDiscuss && !hushed(notifPrefsRef.current, pauseRef.current);
+        if (heard) playAppSound("message");
         /* But if the message landed in the conversation you're ACTIVELY
            viewing, you can already see it — don't add it to the bell badge
            (no phantom "1" to dismiss). DiscussApp is marking it read anyway.
@@ -344,7 +409,25 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
               : c,
           ),
         );
-        void recountDiscuss();
+        void recountDiscuss().then((rows) => {
+          /* The conversation's own setting, read again on the fresh list
+             (which knows a conversation that was new to the bell). */
+          const c = rows?.find((x) => x.id === msg.channel_id);
+          const r = toastRef.current;
+          if (!c || !r || quietFor(c)) return;
+          const preview = c.last_message?.body?.trim() || r.t("notif.newMessage");
+          const author = c.last_message?.author_username;
+          const title = channelLabel(c, r.t);
+          const who = c.last_message?.author_username ?? null;
+          const body = author ? `${author}: ${preview}` : preview;
+          /* In front of the reader: a pop-up card. Quiet hours only silence
+             the chime. Never on Discuss itself, where the message is on screen. */
+          if (!onDiscuss) r.card({ key: `discuss:${c.id}`, kind: "discuss", channelId: c.id, title, body: preview, author: who });
+          /* The desktop app with its window not in front: a system
+             notification (lib/desktop-toast), under the chime's rules. */
+          if (!heard || !c || quietFor(c)) return;
+          desktopToast({ key: `discuss:${c.id}`, title, body, open: () => r.openChannel(c.id) }, r.many);
+        });
       },
       onChannelChange: () => {
         void recountDiscuss();
@@ -377,7 +460,25 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
      regardless of browser. */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    function onDiscussChange() {
+    function onDiscussChange(e: Event) {
+      /* DiscussApp says exactly what changed (channel + new unread state):
+         patch that row locally instead of re-reading every channel. Only an
+         event without a detail falls back to the full recount. */
+      const d = (e as CustomEvent<{ channelId?: string; unread?: number; markedUnread?: boolean } | undefined>).detail;
+      if (d?.channelId) {
+        setDiscussChannels((prev) =>
+          prev.map((c) =>
+            c.id === d.channelId
+              ? {
+                  ...c,
+                  ...(typeof d.unread === "number" ? { unread_count: d.unread } : {}),
+                  ...(typeof d.markedUnread === "boolean" ? { marked_unread: d.markedUnread } : {}),
+                }
+              : c,
+          ),
+        );
+        return;
+      }
       void recountDiscuss();
     }
     function onResume() {
@@ -435,15 +536,16 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       lastForced = Date.now();
       try {
         const rows = await fetchMyChannels(aid);
-        const newTotal = rows.reduce(
-          (s, c) => s + (c.unread_count ?? 0),
-          0,
-        );
-        setDiscussChannels((prev) => {
-          const oldTotal = prev.reduce(
-            (s, c) => s + (c.unread_count ?? 0),
+        /* Only conversations that are allowed to make a sound count toward
+           "did something new arrive" — a muted chat must not chime. */
+        const audibleUnread = (list: DiscussChannelWithState[]) =>
+          list.reduce(
+            (s, c) => s + (c.muted || c.notification_pref === "none" ? 0 : c.unread_count ?? 0),
             0,
           );
+        const newTotal = audibleUnread(rows);
+        setDiscussChannels((prev) => {
+          const oldTotal = audibleUnread(prev);
           /* Baseline guard: the FIRST fetch compares against the empty
              initial list, so pre-existing unread used to chime (and spin
              up the AudioContext) on every page load. Only rises AFTER a
@@ -451,7 +553,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           const hadBaseline = discussBaselineRef.current;
           discussBaselineRef.current = true;
           if (hadBaseline && newTotal > oldTotal && !window.location.pathname.startsWith("/discuss")
-              && !inQuietHours((notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours)) {
+              && !hushed(notifPrefsRef.current, pauseRef.current)) {
             playAppSound("message");
           }
           return rows;
@@ -466,10 +568,8 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   /* ── Inbox: poll unread count + fetch on open ────────────────────── */
   useEffect(() => {
-    if (!accountId) {
-      setInboxUnread(0);
-      return;
-    }
+    /* Signed out: the render-time transition above already zeroed the count. */
+    if (!accountId) return;
     let cancelled = false;
     async function tick() {
       const aid = accountIdRef.current;
@@ -485,6 +585,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
       } else {
         setInboxUnread(n);
       }
+      setIconKnown((k) => (k.inbox ? k : { ...k, inbox: true }));
     }
     void tick();
     const t = window.setInterval(() => {
@@ -522,16 +623,28 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
          chose quiet, not blind. Same shared classifier gates the server-side
          push, so one switch controls both channels. */
       const activity = classifyInboxActivity((msg as { metadata?: unknown }).metadata);
-      const qh = (notifPrefsRef.current as { quiet_hours?: { enabled?: boolean; start?: string; end?: string; tz?: string } } | undefined)?.quiet_hours;
-      if (activityAllowed(notifPrefsRef.current, activity) && !inQuietHours(qh)) {
+      if (activityAllowed(notifPrefsRef.current, activity) && !hushed(notifPrefsRef.current, pauseRef.current)) {
         playAppSound("notification", activity);
+        /* The desktop app with its window not in front: a system
+           notification too (lib/desktop-toast) — the same switches decide. */
+        const r = toastRef.current;
+        if (r) desktopToast({ key: `inbox:${msg.id}`, ...inboxToastText(msg, r.lang), open: () => r.openRow(msg as unknown as InboxMessageWithSender) }, r.many);
       }
-      setInboxUnread((n) => n + 1);
+      /* In front of the reader: a pop-up card (NotificationCards). The same
+         switch decides; quiet hours only silence the chime, not the card. */
+      if (activityAllowed(notifPrefsRef.current, activity)) {
+        const row = { ...msg, sender: null } as InboxMessageWithSender;
+        toastRef.current?.card({ key: `inbox:${msg.id}`, kind: "inbox", row, action: inTab(row, "action") });
+      }
+      /* A row brought back to the top (lib/server/inbox-resurface) that was
+         already unread here adds nothing to the count. */
+      const known = messagesRef.current.find((m) => m.id === msg.id);
+      if (!known || known.read_at) setInboxUnread((n) => n + 1);
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        /* Prepend with an empty sender object — the next loadInbox()
-           round-trip will hydrate the avatar / username. */
-        return [{ ...msg, sender: null } as InboxMessageWithSender, ...prev];
+        const old = prev.find((m) => m.id === msg.id);
+        /* On top — new, or back (its newer created_at). An empty sender
+           until the next loadInbox() round-trip hydrates it. */
+        return [{ ...msg, sender: old?.sender ?? null } as InboxMessageWithSender, ...prev.filter((m) => m.id !== msg.id)];
       });
       /* NO chime here. setInboxUnread above raises the count, and the
          count-watcher effect ("inboxUnread > prev") already chimes for
@@ -551,28 +664,92 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     });
   }, [accountId]);
 
-  const loadInbox = useCallback(async () => {
-    if (!accountId) {
-      setMessages([]);
-      return;
-    }
-    setLoadingInbox(true);
-    const rows = await fetchInboxMessages(accountId, { limit: FEED_LIMIT, slim: true });
-    setMessages(rows);
-    setLoadingInbox(false);
-    const n = await fetchUnreadCount(accountId);
-    setInboxUnread(n);
+  /* ── Back after an absence ────────────────────────────────────────────
+     One card summing up what came in meanwhile (lib/notification-view),
+     after three hours away or first thing in a new day. When the reader was
+     last here is kept per account on this device: it moves each minute the
+     Hub is in front, and when it leaves the front. The one read it costs —
+     the list — is the one the bell makes on opening anyway, and it lands in
+     the list. */
+  useEffect(() => {
+    if (!accountId) return;
+    const key = `kx-last-seen:${accountId}`;
+    const lastSeen = () => { try { return Number(localStorage.getItem(key)) || 0; } catch { return 0; } };
+    const stamp = () => { try { localStorage.setItem(key, String(Date.now())); } catch { /* storage off */ } };
+    let alive = true;
+    let pending: number | null = null;
+    const check = () => {
+      if (outOfView()) return;
+      const last = lastSeen();
+      stamp();
+      if (!isAway(last, Date.now())) return;
+      /* A moment for the conversations' own recount to land, then one read. */
+      if (pending !== null) window.clearTimeout(pending);
+      pending = window.setTimeout(async () => {
+        pending = null;
+        const rows = await fetchInboxMessagesOrNull({ limit: FEED_LIMIT, slim: true });
+        if (!alive || !rows) return;
+        loadedRef.current = true;
+        setMessages(rows);
+        const s = awaySummary(rows, last);
+        const chats = discussChannelsRef.current
+          .filter((c) => !c.muted && c.notification_pref !== "none" && !!c.last_message_at && Date.parse(c.last_message_at) > last)
+          .reduce((n, c) => n + (c.unread_count ?? 0), 0);
+        if (s.needs + s.updates + chats < 2) return;
+        toastRef.current?.card({ key: "away", kind: "away", needs: s.needs, updates: s.updates, messages: chats, apps: s.apps });
+      }, 1500);
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") check(); else stamp(); };
+    const first = window.setTimeout(check, 1000);
+    const tick = window.setInterval(() => { if (!outOfView()) stamp(); }, 60_000);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", check);
+    window.addEventListener("blur", stamp);
+    window.addEventListener("pagehide", stamp);
+    return () => {
+      alive = false;
+      window.clearTimeout(first);
+      if (pending !== null) window.clearTimeout(pending);
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("blur", stamp);
+      window.removeEventListener("pagehide", stamp);
+    };
+  }, [accountId]);
+
+  const loadInbox = useCallback(() => {
+    /* Signed out: the feed was cleared by the render-time transition above.
+       The profile (accountId) can still be loading on a fresh tab while the
+       id in localStorage is already there — the request is session-scoped,
+       so it goes out on either. State is written only in the continuation
+       (never synchronously in the effect that calls this). */
+    const aid = accountId ?? getCurrentAccountIdSync();
+    if (!aid) return;
+    /* List and count leave together (the count used to wait for the list).
+       A FAILED list keeps what is shown — null, not [] — because a blink in
+       the network used to empty the panel and announce "You're all caught
+       up", and would now also overwrite the stored list with nothing. */
+    return Promise.all([
+      fetchInboxMessagesOrNull({ limit: FEED_LIMIT, slim: true }),
+      fetchUnreadCount(aid),
+    ]).then(([rows, n]) => {
+      if (rows) {
+        loadedRef.current = true;
+        setMessages(rows);
+      }
+      setLoadingInbox(false);
+      setInboxUnread(n);
+    });
   }, [accountId]);
 
   useEffect(() => {
-    if (open) {
-      void loadInbox();
-      void recountDiscuss();
-    } else {
-      /* Closing resets the filter so one left behind can't hide fresh
-         notifications on the next open. */
-      setFilter("all");
-    }
+    /* Closing (filter reset) is handled by the render-time transition above. */
+    if (!open) return;
+    void loadInbox();
+    void recountDiscuss();
+    /* The pause menu and the rows' ⋯ are a click away now. */
+    prefetchMore();
   }, [open, loadInbox, recountDiscuss]);
 
 
@@ -609,39 +786,109 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     }
   }
 
-  async function handleMarkAllRead() {
-    if (totalUnread === 0) return;
-    const aid = accountIdRef.current;
-    if (!aid) return;
-
-    /* Optimistic local clear. */
-    if (inboxUnread > 0) {
-      setInboxUnread(0);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.read_at ? m : { ...m, read_at: new Date().toISOString() },
-        ),
-      );
-      void markAllRead(aid);
-    }
-    if (discussUnread > 0) {
-      /* Include channels the user manually "marked as unread" (dot, count 0):
-         they contribute to the badge, so leaving them out let the badge stay
-         red after "Mark all read" — the server's markRead clears the flag. */
-      const toClear = discussChannels.filter(
-        (c) => (c.unread_count ?? 0) > 0 || c.marked_unread,
-      );
-      setDiscussChannels((prev) =>
-        prev.map((c) => ({ ...c, unread_count: 0, marked_unread: false })),
-      );
-      /* Fan out one mark-read per unread channel. Errors are
-         swallowed — the next recount will reconcile. */
-      await Promise.all(
-        toClear.map((c) => markChannelRead(c.id, aid).catch(() => false)),
-      );
-      window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
-    }
+  /* Optimistic, then one request for the lot (a row, a folded group, a
+     tab). The server count follows the rows that actually changed. */
+  function setRowsRead(rows: InboxMessageWithSender[], read: boolean) {
+    const change = rows.filter((m) => !!m.read_at !== read);
+    if (change.length === 0) return;
+    const ids = new Set(change.map((m) => m.id));
+    const nowIso = new Date().toISOString();
+    setMessages((prev) => prev.map((m) => (ids.has(m.id) ? { ...m, read_at: read ? nowIso : null } : m)));
+    setInboxUnread((n) => Math.max(0, n + (read ? -change.length : change.length)));
+    void (read ? markMessagesRead([...ids]) : markMessagesUnread([...ids]));
   }
+
+  function archiveRows(rows: InboxMessageWithSender[]) {
+    if (rows.length === 0) return;
+    const ids = new Set(rows.map((m) => m.id));
+    const unread = rows.filter((m) => !m.read_at).length;
+    setMessages((prev) => prev.filter((m) => !ids.has(m.id)));
+    if (unread) setInboxUnread((n) => Math.max(0, n - unread));
+    void archiveMessages([...ids]);
+  }
+
+  /** Later: out of the list (and the count) until they wake, on top again. */
+  function snoozeRows(rows: InboxMessageWithSender[], until: string) {
+    if (rows.length === 0) return;
+    const ids = new Set(rows.map((m) => m.id));
+    const unread = rows.filter((m) => !m.read_at).length;
+    setMessages((prev) => prev.filter((m) => !ids.has(m.id)));
+    if (unread) setInboxUnread((n) => Math.max(0, n - unread));
+    void snoozeMessages([...ids], until);
+  }
+
+  /** Pause (or resume) from the header. The cards on screen go with it. */
+  async function choosePause(choice: PauseChoice | null) {
+    setPauseBusy(true);
+    setPauseNote(null);
+    const r = await requestPause(choice);
+    setPauseBusy(false);
+    if (!r) { setPauseNote("failed"); return; }
+    setPause((p) => ({ ...p, until: r.until }));
+    setPauseMenu(false);
+    if (choice === "meeting" && !r.meeting) setPauseNote("noMeeting");
+    if (r.until) setCardStack(NO_CARDS);
+  }
+
+  const listActions: ListActions<InboxMessageWithSender> = {
+    onOpen: (m) => void handleInboxRowClick(m),
+    onSetRead: setRowsRead,
+    onArchive: archiveRows,
+    /* Decided on the row: its work is done — it leaves the list. */
+    onDecided: (m) => archiveRows([m]),
+    onSnooze: snoozeRows,
+    /* Muted: what was unread about it is read now (server-side) — the list
+       is read again to show it. */
+    onMute: async (m) => {
+      const ok = await muteTopic(m.id);
+      if (ok) { invalidateCachedGet("/api/inbox/feed"); void loadInbox(); }
+      return ok;
+    },
+  };
+
+  /* A card's actions, on the page the reader is on (NotificationCards). */
+  /** Discuss "Open chat": the floating Discuss panel opens on that
+   *  conversation over this page (FloatingPanel answers the event). Only
+   *  where no panel answers does it fall back to the Discuss app. */
+  function openChatInPlace(channelId: string) {
+    const detail = { channelId, handled: false };
+    window.dispatchEvent(new CustomEvent("koleex:discuss-open", { detail }));
+    if (!detail.handled) handleDiscussRowClick(channelId);
+  }
+  /** Discuss reply from the card. Answering is reading: the conversation
+   *  leaves the bell once the message is in. */
+  async function replyInPlace(c: Extract<NoticeCard, { kind: "discuss" }>, text: string): Promise<boolean> {
+    const aid = accountIdRef.current;
+    if (!aid) return false;
+    const clientMsgId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : undefined;
+    const saved = await sendDiscussMessage({ channelId: c.channelId, authorId: aid, body: text, kind: "text", clientMsgId }).catch(() => null);
+    if (!saved) return false;
+    setDiscussChannels((prev) => prev.map((ch) => (ch.id === c.channelId ? { ...ch, unread_count: 0, marked_unread: false } : ch)));
+    void markChannelRead(c.channelId, aid).catch(() => false).then(() => window.dispatchEvent(new CustomEvent("discuss:unread-changed")));
+    return true;
+  }
+
+  /* The desktop notification's latest words and handlers (toastRef). */
+  useEffect(() => {
+    toastRef.current = {
+      lang,
+      t,
+      many: (n) => ({ key: "inbox:many", title: t("notif.title"), body: tUi("toast.many").replace("{n}", String(n)), open: () => setOpen(true) }),
+      openRow: (m) => void handleInboxRowClick(m),
+      openChannel: (id) => handleDiscussRowClick(id),
+      /* Only while the window is in front (out of view, the system
+         notification or the push speaks), with cards on, and the panel
+         shut — open, the row lands in the list in front of the reader. */
+      card: (c) => {
+        if (open || outOfView() || notifPrefs?.popup_cards === false || pausedUntil({ pause_until: pauseRef.current })) return;
+        setCardStack((s) => {
+          const next = [c, ...s.cards.filter((x) => x.key !== c.key)];
+          return { cards: next.slice(0, CARD_MAX), more: s.more + Math.max(0, next.length - CARD_MAX) };
+        });
+        nudgeBell();
+      },
+    };
+  });
 
   /* Discuss section: only channels that actually have unread, sorted
      by the most recent activity so the freshest pings are at the top. */
@@ -652,54 +899,54 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
        find. Badge and rows must always agree. */
     .filter((c) => (c.unread_count ?? 0) > 0 || c.marked_unread)
     .sort((a, b) => {
-      const at = a.last_message_at
-        ? new Date(a.last_message_at).getTime()
-        : 0;
-      const bt = b.last_message_at
-        ? new Date(b.last_message_at).getTime()
-        : 0;
+      const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+      const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
       return bt - at;
     });
-  /* The 6-row cap only applies to the compact "All" view; the Discuss chip
-     shows every unread channel. */
-  const discussRows =
-    filter === "discuss" ? allDiscussRows : allDiscussRows.slice(0, 6);
-  const discussVisible = filter === "all" || filter === "discuss";
+  const discussRows = allDiscussRows.slice(0, 6);
 
-  /* Per-type counts over the WHOLE loaded feed — they drive which chips are
-     shown (only types that actually have something) and the count badges. */
-  const typeCounts = new Map<NotifFilter, number>();
-  for (const m of messages) {
-    const a =
-      classifyInboxActivity((m as { metadata?: unknown }).metadata) ?? "other";
-    typeCounts.set(a, (typeCounts.get(a) ?? 0) + 1);
+  /* The tabs. A count is things needing attention (unread), one convention
+     everywhere a number appears on this panel. Security appears only for
+     someone who has security rows — Super Admins. */
+  const tabRows = messages.filter((m) => inTab(m, tab));
+  const workUnread = messages.filter((m) => !m.read_at && !isSecurity(m.metadata)).length;
+  const actionCount = messages.filter((m) => inTab(m, "action")).length;
+  const securityAll = messages.filter((m) => isSecurity(m.metadata));
+  const securityUnread = securityAll.filter((m) => !m.read_at).length;
+  const tabs: Array<{ key: BellTab; label: string; count: number }> = [
+    { key: "all", label: tUi("tab.all"), count: workUnread + allDiscussRows.length },
+    { key: "action", label: tUi("tab.action"), count: actionCount },
+    ...(securityAll.length > 0 || tab === "security"
+      ? [{ key: "security" as const, label: tUi("tab.security"), count: securityUnread }]
+      : []),
+  ];
+  const showDiscuss = tab === "all" && discussRows.length > 0;
+  const tabUnread = tab === "all" ? workUnread + allDiscussRows.length : tabRows.filter((m) => !m.read_at).length;
+
+  /* Mark read — what the reader is looking at: this tab's rows (and, on
+     All, the unread chats). One request for the rows, one per chat. */
+  async function handleMarkAllRead() {
+    const aid = accountIdRef.current;
+    if (!aid || tabUnread === 0) return;
+    setRowsRead(tabRows.filter((m) => !m.read_at), true);
+    if (tab === "all" && allDiscussRows.length > 0) {
+      /* Include channels the user manually "marked as unread" (dot, count 0):
+         they contribute to the badge, so leaving them out let the badge stay
+         red after "Mark all read" — the server's markRead clears the flag. */
+      const toClear = allDiscussRows;
+      setDiscussChannels((prev) => prev.map((c) => ({ ...c, unread_count: 0, marked_unread: false })));
+      await Promise.all(toClear.map((c) => markChannelRead(c.id, aid).catch(() => false)));
+      window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+    }
   }
-  const chipCount = (key: NotifFilter): number =>
-    key === "all"
-      ? messages.length + allDiscussRows.length
-      : key === "discuss"
-        ? allDiscussRows.length
-        : (typeCounts.get(key) ?? 0);
-  /* A chip earns its place by having content — except "All", and except the
-     currently-selected type (so the active chip can never vanish under you). */
-  const visibleChips = FILTER_CHIPS.filter(
-    (c) => c.key === "all" || c.key === filter || chipCount(c.key) > 0,
-  );
 
-  /* Inbox rows through the type filter. Same classifier as sounds/push. */
-  const visibleMessages =
-    filter === "all"
-      ? messages
-      : filter === "discuss"
-        ? []
-        : messages.filter((m) => {
-            const a = classifyInboxActivity((m as { metadata?: unknown }).metadata);
-            return filter === "other" ? a === null : a === filter;
-          });
+  const emptyText =
+    tab === "action" ? tUi("empty.action") : tab === "security" ? tUi("empty.security") : t("notif.caughtUp");
 
   return (
     <div ref={wrapRef} className="relative">
       <button
+        ref={bellBtnRef}
         type="button"
         aria-label={
           totalUnread > 0
@@ -715,9 +962,14 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             : "kx-hover-glow border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
         } ${open ? (dk ? "text-white bg-white/[0.06]" : "text-black bg-black/[0.06]") : ""}`}
       >
-        <BellIcon size={15} className="md:w-4 md:h-4" />
+        <span ref={bellIconRef} className="grid place-items-center" style={{ transformOrigin: "50% 15%" }}>
+          {/* Paused (lib/notification-pause): the bell says so before it is
+              opened — the moon, as the pause button and banner wear it. */}
+          {pauseEnd ? <MoonIcon size={14} className="md:w-[15px] md:h-[15px]" /> : <BellIcon size={15} className="md:w-4 md:h-4" />}
+        </span>
         {totalUnread > 0 && (
           <span
+            ref={badgeRef}
             aria-hidden
             className="absolute -top-1 -end-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[var(--bg-primary)]"
           >
@@ -731,93 +983,109 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           under the header — while md+ stays a dropdown anchored to the bell. */}
       <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end"
         matchAnchorWidth={false} mobileSheet maxHeight={620}
-        className="kx-drop-in kx-pop-sheet w-auto md:w-[380px] md:max-w-[92vw]">
-          {/* Header */}
-          <div
-            className={`flex items-center justify-between px-4 py-3 border-b ${
-              dk ? "border-white/[0.06]" : "border-black/[0.06]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <BellIcon
-                size={14}
-                className={dk ? "text-white/60" : "text-black/60"}
-              />
-              <span
-                className={`text-[13px] font-semibold ${
-                  dk ? "text-white" : "text-black"
-                }`}
-              >
-                {t("notif.title")}
-              </span>
-              {totalUnread > 0 && (
-                <span
-                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                    dk
-                      ? "bg-red-500/15 text-red-300 border-red-500/30"
-                      : "bg-red-100 text-red-700 border-red-200"
-                  }`}
+        className="kx-drop-in kx-pop-sheet kx-pop-clear w-auto md:w-[400px] md:max-w-[92vw]">
+          {/* Header: the title, what this tab still holds, mark read, and the
+              way to everything (the notification center). */}
+          <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+            <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("notif.title")}</span>
+            <span className="ms-auto flex items-center gap-1">
+              {!pauseEnd && (
+                <button
+                  type="button"
+                  data-kx-keep-hover
+                  onClick={() => { setPauseMenu((v) => !v); setPauseNote(null); }}
+                  aria-expanded={pauseMenu}
+                  aria-label={tUi("pause.button")}
+                  title={tUi("pause.button")}
+                  className={`grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] ${pauseMenu ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}
                 >
-                  {totalUnread} {t("notif.new")}
-                </span>
+                  <MoonIcon size={13} />
+                </button>
               )}
-            </div>
-            <button
-              type="button"
-              onClick={handleMarkAllRead}
-              disabled={totalUnread === 0}
-              className={`flex items-center gap-1 text-[11px] font-medium transition-colors disabled:opacity-40 ${
-                dk
-                  ? "text-white/60 hover:text-white"
-                  : "text-black/60 hover:text-black"
-              }`}
-            >
-              <CheckCheckIcon size={12} />
-              {t("notif.markAllRead")}
-            </button>
+              <button
+                type="button"
+                data-kx-keep-hover
+                onClick={handleMarkAllRead}
+                disabled={tabUnread === 0}
+                className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-40"
+              >
+                <CheckCheckIcon size={12} />
+                {t("notif.markAllRead")}
+              </button>
+              <button
+                type="button"
+                data-kx-keep-hover
+                onClick={() => { setOpen(false); router.push("/inbox"); }}
+                className="flex h-7 items-center rounded-md px-2 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+              >
+                {tUi("seeAll")}
+              </button>
+            </span>
           </div>
 
-          {/* Type filter chips — only types that actually have items, each
-              with its count, WRAPPING onto extra lines so nothing hides
-              behind a horizontal scroll. Active chip inverts. */}
-          <div
-            className={`flex flex-wrap gap-1.5 px-3 py-2 border-b ${
-              dk ? "border-white/[0.06]" : "border-black/[0.06]"
-            }`}
-          >
-            {visibleChips.map((chip) => {
-              const active = filter === chip.key;
-              const label = chip.hubKey ? t(chip.hubKey) : tAct(chip.settingsKey!);
-              const n = chipCount(chip.key);
+          {/* Paused: until when, and the way back. */}
+          {pauseEnd && (
+            <div className="mx-3 mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+              <div className="flex items-center gap-2">
+                <MoonIcon size={13} className="shrink-0 text-[var(--text-secondary)]" />
+                <span className="min-w-0 flex-1 text-[11.5px] font-medium text-[var(--text-primary)]">
+                  {tUi("pause.on").replace("{time}", clockText(pauseEnd, twelveHour, tUi("pause.tomorrow")))}
+                </span>
+                <button
+                  type="button"
+                  data-kx-keep-hover
+                  onClick={() => void choosePause(null)}
+                  disabled={pauseBusy}
+                  className="h-6 shrink-0 rounded-md px-2 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
+                >
+                  {tUi("pause.resume")}
+                </button>
+              </div>
+              {pauseNote && (
+                <p role="status" className={`mt-1 ps-[21px] text-[11px] ${pauseNote === "failed" ? "font-medium text-red-500" : "text-[var(--text-dim)]"}`}>
+                  {tUi(pauseNote === "failed" ? "pause.failed" : "pause.noMeeting")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* The pause menu: sounds, pop-ups and phone alerts stop; the bell
+              keeps collecting. */}
+          {!pauseEnd && pauseMenu && (
+            <Suspense fallback={null}>
+              <PauseMenu twelveHour={twelveHour} busy={pauseBusy} failed={pauseNote === "failed"} onPick={(c) => void choosePause(c)} />
+            </Suspense>
+          )}
+
+          {nudge && accountId && (
+            <PushNudge nudge={nudge} accountId={accountId} tUi={tUi} onClose={() => setNudge(null)} />
+          )}
+
+          {/* Tabs: All (the work) · Needs you · Security (Super Admins). */}
+          <div role="tablist" aria-label={t("notif.title")} className="mx-3 mb-1 flex gap-1 rounded-lg bg-[var(--bg-surface-subtle)] p-0.5">
+            {tabs.map((x) => {
+              const active = tab === x.key;
               return (
                 <button
-                  key={chip.key}
+                  key={x.key}
                   type="button"
-                  onClick={() => setFilter(chip.key)}
-                  className={`shrink-0 inline-flex items-center gap-1 text-[10.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(x.key)}
+                  className={`flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md text-[11.5px] font-medium transition-colors ${
                     active
-                      ? dk
-                        ? "kx-chip-on bg-white text-black border-white"
-                        : "kx-chip-on bg-black text-white border-black"
-                      : dk
-                        ? "bg-white/[0.04] text-white/60 border-white/[0.1] hover:text-white"
-                        : "bg-black/[0.03] text-black/60 border-black/[0.1] hover:text-black"
+                      ? aurora
+                        ? "kx-seg-on text-[var(--text-primary)]"
+                        : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  {label}
-                  {n > 0 && (
-                    <span
-                      className={`text-[9px] font-bold px-1 rounded-full ${
-                        active
-                          ? dk
-                            ? "bg-black/15 text-black/70"
-                            : "bg-white/25 text-white/90"
-                          : dk
-                            ? "bg-white/[0.1] text-white/50"
-                            : "bg-black/[0.08] text-black/50"
-                      }`}
-                    >
-                      {n > 99 ? "99+" : n}
+                  {x.label}
+                  {x.count > 0 && (
+                    <span className={`min-w-[16px] rounded-full px-1 text-[9.5px] font-bold tabular-nums ${
+                      x.key === "security" ? "bg-red-500/15 text-red-500" : active && !aurora ? "bg-[var(--text-inverted)]/20" : "bg-[#567FB2]/15 text-[#567FB2]"
+                    }`}>
+                      {x.count > 99 ? "99+" : x.count}
                     </span>
                   )}
                 </button>
@@ -825,263 +1093,99 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
             })}
           </div>
 
-          {/* Body — on mobile the sheet may be taller than 460px is useful
-              for; cap to the space under the header instead. */}
-          <div className="max-h-[calc(100dvh-var(--kx-header-h)-170px)] md:max-h-[460px] overflow-y-auto">
-            {/* Discuss section */}
-            {discussVisible && discussRows.length > 0 && (
-              <div>
-                <div
-                  className={`px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                    dk ? "text-white/40" : "text-black/40"
-                  }`}
-                >
-                  <MessageSquareIcon size={11} />
+          {/* Body — on mobile the sheet may be taller than is useful; cap to
+              the space under the header instead. */}
+          <div className="max-h-[calc(100dvh-var(--kx-header-h)-150px)] md:max-h-[480px] overflow-y-auto pb-1">
+            {showDiscuss && (
+              <section aria-label={t("notif.discuss")}>
+                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-faint)]">
                   {t("notif.discuss")}
-                </div>
-                <ul className="pb-1">
+                </h3>
+                <ul>
                   {discussRows.map((channel) => {
                     const label = channelLabel(channel, t);
                     const preview =
                       channel.last_message?.body?.trim() ||
-                      ((channel.unread_count ?? 0) > 0
-                        ? t("notif.newMessage")
-                        : t("notif.markedUnread"));
-                    const author =
-                      channel.last_message?.author_username || null;
+                      ((channel.unread_count ?? 0) > 0 ? t("notif.newMessage") : t("notif.markedUnread"));
+                    const author = channel.last_message?.author_username || null;
                     return (
                       <li key={channel.id}>
                         <button
                           type="button"
                           onClick={() => handleDiscussRowClick(channel.id)}
-                          className={`w-full text-left px-4 py-2.5 transition-colors flex gap-3 ${
-                            dk
-                              ? "hover:bg-white/[0.04]"
-                              : "hover:bg-black/[0.03]"
-                          }`}
+                          className="relative flex w-full gap-3 px-4 py-2.5 text-start transition-colors hover:bg-[var(--bg-surface-hover)]"
                         >
-                          <span
-                            className={`mt-1 h-2 w-2 rounded-full shrink-0 bg-red-500`}
-                            aria-hidden
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <span
-                                className={`text-[12.5px] font-semibold truncate ${
-                                  dk ? "text-white" : "text-black"
-                                }`}
-                              >
-                                {label}
-                              </span>
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                                  dk
-                                    ? "bg-red-500/15 text-red-300"
-                                    : "bg-red-100 text-red-700"
-                                }`}
-                              >
+                          <span aria-hidden className="absolute start-1.5 top-[18px] h-1.5 w-1.5 rounded-full bg-[#567FB2]" />
+                          <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                            <MessageSquareIcon size={15} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-baseline gap-2">
+                              <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[var(--text-primary)]">{label}</span>
+                              <span className="shrink-0 rounded-full bg-[#567FB2]/15 px-1.5 text-[10px] font-bold tabular-nums text-[#567FB2]">
                                 {(channel.unread_count ?? 0) > 0 ? channel.unread_count : "•"}
                               </span>
-                            </div>
-                            <div
-                              className={`text-[11.5px] truncate ${
-                                dk ? "text-white/55" : "text-black/55"
-                              }`}
-                            >
+                            </span>
+                            <span className="mt-0.5 block truncate text-[11.5px] text-[var(--text-dim)]">
                               {author ? `${author}: ${preview}` : preview}
-                            </div>
-                          </div>
+                            </span>
+                          </span>
                         </button>
                       </li>
                     );
                   })}
                 </ul>
-              </div>
+              </section>
             )}
 
-            {/* Inbox section */}
-            {visibleMessages.length > 0 && (
-              <div
-                className={
-                  discussVisible && discussRows.length > 0
-                    ? `border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`
-                    : ""
-                }
-              >
-                <div
-                  className={`px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                    dk ? "text-white/40" : "text-black/40"
-                  }`}
-                >
-                  <InboxRawIcon size={11} />
-                  {t("notif.inbox")}
-                </div>
-                <ul className="py-1">
-                  {visibleMessages.map((msg) => {
-                    const cat = categoryStyle(msg.category, dk);
-                    const senderName =
-                      msg.sender?.full_name ||
-                      msg.sender?.username ||
-                      (msg.sender_account_id === null
-                        ? "Koleex System"
-                        : "Unknown");
-                    const senderAlt = (() => {
-                      const alt = (msg.sender?.name_alt ?? "").trim();
-                      return alt && alt !== (msg.sender?.full_name ?? "").trim()
-                        ? alt
-                        : null;
-                    })();
-                    const isUnread = !msg.read_at;
-                    return (
-                      <li key={msg.id}>
-                        {/* div, not <button>: the row body renders
-                            AutoTranslatedText, whose inline "machine
-                            translation" toggle is itself a <button>. Nested
-                            buttons are invalid HTML and were breaking React
-                            hydration on every open of the dropdown. */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleInboxRowClick(msg)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              void handleInboxRowClick(msg);
-                            }
-                          }}
-                          className={`w-full cursor-pointer text-left px-4 py-3 transition-colors flex gap-3 ${
-                            dk
-                              ? "hover:bg-white/[0.04]"
-                              : "hover:bg-black/[0.03]"
-                          }`}
-                        >
-                          <span
-                            className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                              isUnread
-                                ? "bg-red-500"
-                                : dk
-                                  ? "bg-white/[0.12]"
-                                  : "bg-black/[0.15]"
-                            }`}
-                            aria-hidden
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span
-                                className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${cat.className}`}
-                              >
-                                {t(cat.labelKey)}
-                              </span>
-                              <span
-                                className={`text-[10px] ${
-                                  dk ? "text-white/40" : "text-black/40"
-                                }`}
-                              >
-                                {timeAgo(msg.created_at, t)}
-                              </span>
-                            </div>
-                            {/* Auto-translate the notification into the reader's
-                                language — a task assigned in English reaches an
-                                Arabic/Chinese employee readable. */}
-                            <div
-                              className={`text-[12.5px] font-semibold truncate ${
-                                dk ? "text-white" : "text-black"
-                              }`}
-                            >
-                              <AutoTranslatedText text={msg.subject} />
-                            </div>
-                            {msg.body && (
-                              <AutoTranslatedText
-                                text={msg.body}
-                                block
-                                className={`text-[11.5px] mt-0.5 line-clamp-2 ${
-                                  dk ? "text-white/55" : "text-black/55"
-                                }`}
-                              />
-                            )}
-                            <div
-                              className={`text-[10.5px] mt-1 ${
-                                dk ? "text-white/40" : "text-black/40"
-                              }`}
-                            >
-                              {t("notif.from")} {senderName}
-                              {senderAlt && (
-                                <span lang="zh" className="ms-1">
-                                  {senderAlt}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+            {tabRows.length > 0 && (
+              <NotificationSections
+                rows={tabRows}
+                lang={lang}
+                tHub={t}
+                tUi={tUi}
+                time={(iso) => notifTimeAgo(iso, t)}
+                actions={listActions}
+                waiting={tab === "action"}
+              />
             )}
 
-            {/* Filtered-empty state: this TYPE has nothing (the feed itself
-                may not be empty — different message from "all caught up"). */}
-            {filter !== "all" &&
-              (discussVisible ? discussRows.length === 0 : true) &&
-              visibleMessages.length === 0 &&
-              !loadingInbox && (
-                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                  <p
-                    className={`text-[12px] font-medium ${
-                      dk ? "text-white/50" : "text-black/50"
-                    }`}
-                  >
-                    {t("notif.noneOfType")}
-                  </p>
-                </div>
-              )}
+            {/* Never an empty box while the first answer is on its way. */}
+            {loadingInbox && messages.length === 0 && !showDiscuss && <NotificationSkeleton />}
 
-            {/* Empty state — show only when both sections have nothing
-                AND we're not still loading the inbox fetch. */}
-            {filter === "all" &&
-              discussRows.length === 0 &&
-              messages.length === 0 &&
-              !loadingInbox && (
-                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center mb-3 ${
-                      dk ? "bg-white/[0.04]" : "bg-black/[0.04]"
-                    }`}
-                  >
-                    <BellIcon
-                      size={18}
-                      className={dk ? "text-white/40" : "text-black/40"}
-                    />
-                  </div>
-                  <p
-                    className={`text-[12px] font-medium ${
-                      dk ? "text-white/60" : "text-black/60"
-                    }`}
-                  >
-                    {t("notif.caughtUp")}
-                  </p>
-                  <p
-                    className={`text-[11px] mt-1 ${
-                      dk ? "text-white/35" : "text-black/35"
-                    }`}
-                  >
-                    {t("notif.caughtUpHint")}
-                  </p>
+            {!loadingInbox && tabRows.length === 0 && !showDiscuss && (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div className="mb-3 grid h-10 w-10 place-items-center rounded-full bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]">
+                  <BellIcon size={18} />
                 </div>
-              )}
-
-            {loadingInbox &&
-              discussRows.length === 0 &&
-              messages.length === 0 && (
-                <div className="flex items-center justify-center py-10">
-                  <SpinnerIcon
-                    className={`h-4 w-4 ${ dk ? "text-white/40" : "text-black/40" }`}
-                  />
-                </div>
-              )}
+                <p className="text-[12px] font-medium text-[var(--text-secondary)]">{emptyText}</p>
+                {tab === "all" && <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("notif.caughtUpHint")}</p>}
+              </div>
+            )}
           </div>
       </PopoverPanel>
+
+      {(cardStack.cards.length > 0 || cardStack.more > 0) && (
+        <NotificationCards
+          cards={cardStack.cards}
+          more={cardStack.more}
+          lang={lang}
+          tHub={t}
+          tUi={tUi}
+          aurora={aurora}
+          bellRef={bellBtnRef}
+          onOpen={(c) => void handleInboxRowClick(c.row)}
+          onOpenChat={openChatInPlace}
+          onReply={replyInPlace}
+          onDecided={(c, v) => listActions.onDecided?.(c.row, v)}
+          onLater={(c, until) => snoozeRows([c.row], until)}
+          onAway={(c) => { setCardStack(NO_CARDS); setTab(c.needs > 0 ? "action" : "all"); setOpen(true); }}
+          onGone={(key) => setCardStack((s) => ({ ...s, cards: s.cards.filter((x) => x.key !== key) }))}
+          onReturned={nudgeBell}
+          onMore={() => { setCardStack(NO_CARDS); setOpen(true); }}
+          onMoreGone={() => setCardStack((s) => ({ ...s, more: 0 }))}
+        />
+      )}
     </div>
   );
 }

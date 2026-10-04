@@ -1,0 +1,531 @@
+{
+ "section": "documents",
+ "items": {
+  "sales-documents": {
+   "specs": [
+    {
+     "k": "Documents",
+     "v": "Quotation · proforma invoice · commercial invoice · sales contract · packing list · delivery note · order confirmation · payment receipt"
+    },
+    {
+     "k": "Sheet",
+     "v": "The house sheet 210 × 270 mm: logo at the start 45 mm, the title at the end in capitals; blocks with 12 px corners and hairlines; tables with a black head and a black total bar; \"Page N of M\" on every sheet (ch. 94)"
+    },
+    {
+     "k": "Colours",
+     "v": "Black, Graphite #1D1D1F, Gray #6E6E73, Mist #D2D2D7, Cloud #F5F5F7 — no Hub Blue, no gradients, no photographs of people on business documents (ch. 94)"
+    },
+    {
+     "k": "Numbers",
+     "v": "One deal, one number on every document of it: KL-QU-… quotation · KL-IN-… invoice · KL-CN-… contract · KL-PL-… packing list"
+    },
+    {
+     "k": "Dates and amounts",
+     "v": "Dates DD/MM/YYYY; amounts with the currency code before the number (USD 12,500.00)"
+    },
+    {
+     "k": "Names",
+     "v": "The registered legal name exactly on contracts, invoices and official letters; the trading name KOLEEX International Group everywhere else (ch. 132)"
+    },
+    {
+     "k": "Contracts",
+     "v": "Initials on every page, the signatures on the page with the last terms; once signed in the Hub it cannot be edited — changes are an amendment (ch. 95)"
+    },
+    {
+     "k": "Seal",
+     "v": "The company seal (公章) placed by Koleex Hub at its real 40 mm size — never copied, resized or pasted by hand (ch. 95, 100)"
+    },
+    {
+     "k": "Sending",
+     "v": "PDF; the file name is the document number"
+    }
+   ],
+   "logo": "At the start of the header, 45 mm (ch. 94).",
+   "do": [
+    "Terms and prices set per deal in Koleex Hub",
+    "A QR to verify the document where it helps the customer"
+   ],
+   "dont": [
+    "A quotation or invoice rebuilt in Word or Excel",
+    "A trading name on a legal document",
+    "Bank details retyped — they come from one source (ch. 98)"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    94,
+    95,
+    98
+   ]
+  },
+  "purchasing-and-logistics-documents": {
+   "specs": [
+    {
+     "k": "Documents",
+     "v": "Purchase order · shipping instructions · shipping marks (template) · inspection request"
+    },
+    {
+     "k": "Purchase order",
+     "v": "English and Chinese side by side (PURCHASE ORDER 采购订单), KL-PO-…, currency, delivery date, the requirements line: KOLEEX nameplate and packing per KOLEEX specifications (ch. 97)"
+    },
+    {
+     "k": "Shipping marks",
+     "v": "Printed from the Hub template (ch. 111)"
+    },
+    {
+     "k": "Sheet",
+     "v": "The house sheet 210 × 270 mm: logo at the start 45 mm, the title at the end in capitals; blocks with 12 px corners and hairlines; tables with a black head and a black total bar; \"Page N of M\" on every sheet (ch. 94)"
+    },
+    {
+     "k": "Dates and amounts",
+     "v": "Dates DD/MM/YYYY; amounts with the currency code before the number (USD 12,500.00)"
+    }
+   ],
+   "logo": "At the start of the header, 45 mm.",
+   "do": [
+    "Our nameplate, labels and packing written into every PO"
+   ],
+   "dont": [
+    "A supplier's own PO form",
+    "Marks typed by hand at the warehouse"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    97,
+    96,
+    111
+   ]
+  },
+  "hr-documents": {
+   "specs": [
+    {
+     "k": "Offer letter",
+     "v": "The letterhead (ch. 92), in the employee's language plus English"
+    },
+    {
+     "k": "Employment contract",
+     "v": "The house sheet with initials and signatures, like the sales contract (ch. 95)"
+    },
+    {
+     "k": "Payslip",
+     "v": "Produced by Koleex Hub; amounts right-aligned, month and dates DD/MM/YYYY"
+    },
+    {
+     "k": "Salary and experience certificates",
+     "v": "The letterhead, signed by HR, with the company seal"
+    },
+    {
+     "k": "Warning / notice letter",
+     "v": "The letterhead, signed by HR, handed to the employee alone"
+    },
+    {
+     "k": "Visa invitation letter",
+     "v": "From the Hub (ch. 100): English and Chinese — the Chinese text is the reference; the legal name and licence address verbatim; signed by the legal representative with the seal"
+    }
+   ],
+   "logo": "As on the letterhead or the house sheet.",
+   "do": [
+    "Salary and personal data only on documents addressed to that employee"
+   ],
+   "dont": [
+    "HR documents used as examples, templates or screenshots with real data",
+    "An old letter edited instead of the Hub's template"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    101,
+    100,
+    92
+   ]
+  },
+  "partner-documents": {
+   "specs": [
+    {
+     "k": "Documents",
+     "v": "Letter of authorization (LOA) · dealer agreement · reference letter · exclusive agency letter · partnership certificate"
+    },
+    {
+     "k": "Letters",
+     "v": "The letterhead (ch. 92): the legal name, the partner's legal name, territory, products and the period — dates DD/MM/YYYY"
+    },
+    {
+     "k": "Certificates",
+     "v": "Brand Center → Templates → Certificate, kinds \"Authorized dealer\" (KL-AD-…) and \"Exclusive agency\" (KL-EA-…)"
+    },
+    {
+     "k": "Agreement",
+     "v": "The house sheet, initials on every page, like the sales contract (ch. 95)"
+    },
+    {
+     "k": "Signature",
+     "v": "The legal representative or an authorised signatory, with the company seal"
+    }
+   ],
+   "logo": "As on the letterhead; centred at the top of certificates (ch. 99).",
+   "do": [
+    "A number on every certificate and letter, recorded so it can be verified",
+    "An end date on every authorization"
+   ],
+   "dont": [
+    "Authorizations without a territory or an end date",
+    "A partner's logo without their written permission (ch. 44)"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    128,
+    92,
+    95,
+    99
+   ],
+   "templates": [
+    "certificate"
+   ]
+  },
+  "tender-documents": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Tender cover page · technical proposal · compliance matrix · company documents pack cover · machine data sheets pack"
+    },
+    {
+     "k": "Sheet",
+     "v": "The house sheet 210 × 270 mm: logo at the start 45 mm, the title at the end in capitals; blocks with 12 px corners and hairlines; tables with a black head and a black total bar; \"Page N of M\" on every sheet (ch. 94)"
+    },
+    {
+     "k": "Colours",
+     "v": "Black, Graphite #1D1D1F, Gray #6E6E73, Mist #D2D2D7, Cloud #F5F5F7 — no Hub Blue, no gradients, no photographs of people on business documents (ch. 94)"
+    },
+    {
+     "k": "Data sheets",
+     "v": "The spec sheets from Koleex Hub's product data — a dash where a value is not confirmed (ch. 105)"
+    },
+    {
+     "k": "Certificates",
+     "v": "CE only for the models that hold it; ISO 9001 in words, never the ISO logo (ch. 133)"
+    },
+    {
+     "k": "Names",
+     "v": "The registered legal name exactly on contracts, invoices and official letters; the trading name KOLEEX International Group everywhere else (ch. 132)"
+    }
+   ],
+   "logo": "At the start of the header, 45 mm; the cover's logo white on black or black on white.",
+   "do": [
+    "Every claim checkable — test reports, certificates with their numbers and dates",
+    "One tender, one number on every file of it"
+   ],
+   "dont": [
+    "Certificates that have expired",
+    "Supplier names or documents",
+    "Absolute claims (\"best\", \"No. 1\")"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    94,
+    105,
+    133,
+    132
+   ]
+  },
+  "forms": {
+   "specs": [
+    {
+     "k": "Forms",
+     "v": "Dealer application · customer registration · credit application · visitor NDA · feedback survey · training registration"
+    },
+    {
+     "k": "Online",
+     "v": "Forms feed Koleex Hub, so every answer is followed up (ch. 89)"
+    },
+    {
+     "k": "Printable",
+     "v": "The house sheet, black uppercase labels over white fields (ch. 94)"
+    },
+    {
+     "k": "Consent",
+     "v": "A plain consent line where personal data is asked for; nothing asked that the form does not need"
+    }
+   ],
+   "logo": "At the start of the header, 45 mm.",
+   "do": [
+    "The same fields online and on paper"
+   ],
+   "dont": [
+    "Forms made outside the Hub that nobody reads"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    94,
+    78
+   ]
+  },
+  "legal-pages": {
+   "specs": [
+    {
+     "k": "Documents",
+     "v": "Terms and conditions · privacy policy · NDA · warranty terms · cookie notice (website)"
+    },
+    {
+     "k": "Names",
+     "v": "The registered legal name in English and Chinese; KOLEEX International Group as the trading name; trademark KOLEEX No. 74343050 (ch. 132)"
+    },
+    {
+     "k": "Warranty terms",
+     "v": "Word for word the sales contract's warranty clause (ch. 113)"
+    },
+    {
+     "k": "Languages",
+     "v": "English, Chinese, Arabic — which version rules is stated in each"
+    },
+    {
+     "k": "Privacy",
+     "v": "Consent before marketing messages; the laws of China, Egypt and the Gulf (ch. 78)"
+    }
+   ],
+   "logo": "The house sheet's header on PDFs; the site header on web pages.",
+   "do": [
+    "A version and a date on every legal page"
+   ],
+   "dont": [
+    "® on a name that is not registered",
+    "Pages that differ between languages in meaning"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    132,
+    78,
+    113
+   ]
+  },
+  "pdf-rules": {
+   "specs": [
+    {
+     "k": "Names",
+     "v": "By the file-naming rules: KOLEEX-Type-Subject-LANG-V#-Year; a business document's file name is its number (ch. 135, 94)"
+    },
+    {
+     "k": "Properties",
+     "v": "Title = the file's subject; author = KOLEEX (the workshop's rule)"
+    },
+    {
+     "k": "Watermarks",
+     "v": "\"Draft\" on anything not approved; \"Confidential\" on internal and partner-only files"
+    },
+    {
+     "k": "Signatures and passwords",
+     "v": "A digital signature on signed documents; a password for sensitive files (salaries, contracts, bank details) — sent separately from the file"
+    }
+   ],
+   "logo": "As on the document itself.",
+   "do": [
+    "English and Latin letters in file names, words joined by hyphens"
+   ],
+   "dont": [
+    "final, new, last, copy, updated in a file name — the version number says which is newest",
+    "A password in the same message as the file"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    135,
+    94
+   ]
+  },
+  "excel-templates": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Report sheet with header · chart colours · internal price list · stock list"
+    },
+    {
+     "k": "Look",
+     "v": "The house colours (no Hub Blue); the logo in the header; Arial where Inter is missing"
+    },
+    {
+     "k": "Tables",
+     "v": "Black header row with white capitals, hairline rows, numbers right-aligned with the same decimals, a black totals row (ch. 62)"
+    },
+    {
+     "k": "Charts",
+     "v": "Grey, the one key value black — no blue (ch. 61)"
+    },
+    {
+     "k": "Price list",
+     "v": "Internal only — never sent or printed for customers; prices go in quotations from the Hub"
+    }
+   ],
+   "logo": "Top-left in the header, small.",
+   "do": [
+    "Dates DD/MM/YYYY"
+   ],
+   "dont": [
+    "Quotations or invoices made in Excel",
+    "Zebra stripes, vertical lines, a colour per series"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    62,
+    61,
+    94
+   ]
+  },
+  "presentation-master-template": {
+   "specs": [
+    {
+     "k": "Apps",
+     "v": "PowerPoint · Keynote · Google Slides — one master, the same look"
+    },
+    {
+     "k": "Format",
+     "v": "16:9, 1920 × 1080 only (ch. 90; owner, 01/10/2026)"
+    },
+    {
+     "k": "Look",
+     "v": "Black for the cover, section and closing slides; white for content — easy to read in a lit room and to print"
+    },
+    {
+     "k": "Grid",
+     "v": "12 columns, 96 px margins (ch. 55)"
+    },
+    {
+     "k": "Type",
+     "v": "Inter; Arial when the file travels to computers without Inter (set in the master); titles 40–56 px, text never under 20 px"
+    },
+    {
+     "k": "Logo",
+     "v": "Centred on the cover and the close; top-left, 200 px, on every other slide"
+    },
+    {
+     "k": "Numbers",
+     "v": "Slide number bottom-right on content slides"
+    },
+    {
+     "k": "Languages",
+     "v": "English, Chinese, Arabic; others on request — reviewed (ch. 30)"
+    }
+   ],
+   "logo": "Centred on the cover and close, 200 px top-left elsewhere.",
+   "do": [
+    "The master's layouts only — no slide built from a blank page"
+   ],
+   "dont": [
+    "Animations beyond a simple fade between slides",
+    "Other fonts in the master"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    90,
+    55
+   ]
+  },
+  "slide-library": {
+   "specs": [
+    {
+     "k": "Slides",
+     "v": "Cover · section divider · agenda · text + image · full photo · chart · table · comparison · timeline · world map / presence · team · quote · machine specs · thank you + contact"
+    },
+    {
+     "k": "Cover",
+     "v": "Black: the logo, one line in silver, the machine"
+    },
+    {
+     "k": "Section",
+     "v": "Black: the number and the title in silver"
+    },
+    {
+     "k": "Content",
+     "v": "White: title, short text, the machine"
+    },
+    {
+     "k": "Chart",
+     "v": "Grey bars, the key value in black (ch. 61)"
+    },
+    {
+     "k": "Close",
+     "v": "Black: the logo centred and one way to reach us"
+    }
+   ],
+   "logo": "As the master sets it.",
+   "do": [
+    "One idea per slide — a second title means two slides",
+    "30 words at most on a slide"
+   ],
+   "dont": [
+    "Stock photos, drawings of machines",
+    "Client or partner logos without permission (ch. 44)"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    90,
+    61
+   ]
+  },
+  "ready-decks": {
+   "specs": [
+    {
+     "k": "Decks",
+     "v": "Company presentation · product range · sales pitch per machine family · dealer onboarding · technician training · partner / investor · event keynote · internal monthly report"
+    },
+    {
+     "k": "Built from",
+     "v": "The master and the slide library only"
+    },
+    {
+     "k": "Data",
+     "v": "Machines and specs from Koleex Hub's product data; company numbers from the company profile, each with a source (ch. 102)"
+    },
+    {
+     "k": "Versions",
+     "v": "A version and a date on the cover; the old deck archived, never edited in place"
+    }
+   ],
+   "logo": "As the master sets it.",
+   "do": [
+    "Real photographs, charts from real data, dates DD/MM/YYYY"
+   ],
+   "dont": [
+    "Prices in a deck that leaves the company",
+    "Supplier names",
+    "Claims we cannot show"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    90,
+    102
+   ]
+  },
+  "charts-and-icons-for-decks": {
+   "specs": [
+    {
+     "k": "Charts",
+     "v": "No blue: grey, with the one key value black on white or silver on black; bars start at zero; label directly, no legend (ch. 61)"
+    },
+    {
+     "k": "Icons",
+     "v": "Line icons from the Visual Library in Koleex Hub — the same stroke and size (ch. 58); machine icons for categories (ch. 59)"
+    },
+    {
+     "k": "Diagrams",
+     "v": "Black and grey hairlines, like the tables (ch. 62)"
+    },
+    {
+     "k": "Map",
+     "v": "Only real, current offices and agents (ch. 102)"
+    }
+   ],
+   "logo": "Not applicable.",
+   "do": [
+    "The icon set from the Hub — never downloaded from the internet"
+   ],
+   "dont": [
+    "A colour per series",
+    "Filled or colourful icons, drawings of machines",
+    "Pins for markets where we have nobody"
+   ],
+   "vendor": "Made in Koleex Hub from its templates — nothing is rebuilt in Word or Excel. A new template: the Marketing Manager checks it against the book, the Founder & CEO approves it (ch. 134); the approved master is kept under the file-naming rules (ch. 135).",
+   "book": [
+    61,
+    58,
+    59,
+    102
+   ]
+  }
+ }
+}

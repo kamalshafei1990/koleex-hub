@@ -50,14 +50,14 @@ function DownloadCenterView() {
 
   if (boot === undefined) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon className="h-5 w-5" />
       </div>
     );
   }
   if (!isSuperAdmin) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
+      <div className="min-h-full bg-[var(--bg-primary)] flex items-center justify-center p-4">
         <div className="text-center max-w-sm">
           <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto mb-4 text-[var(--text-dim)]">
             <PackageIcon size={20} />
@@ -112,8 +112,11 @@ function DownloadCenterContent() {
   }, [query]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-6 lg:px-8 pt-5 md:pt-7 pb-16">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* The Hub shell — same width and top padding as every app (was 1280
+          wide with pt-5/md:pt-7). !pb-16 keeps this page's own bottom past the
+          compact density layer's rewrite of .py-6. */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 !pb-16">
         <PageHeader
           title="Download Center"
           subtitle="Download apps, updates, drivers and installers"
@@ -397,7 +400,7 @@ function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => v
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-secondary)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

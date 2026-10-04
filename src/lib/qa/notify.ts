@@ -12,11 +12,18 @@ import "server-only";
      recipient_account_id  → who is notified
      sender_account_id     → the actor (used to suppress self-notifications)
      category              → 'task' (normal) | 'alert' (reopen / urgent)
-     subject / body        → title / message
+     subject / body        → title / message — the English render of the
+                             target's template (metadata.tpl), so every
+                             reader sees it in their own language
      link                  → /issues?issue=<id>  (auto-selects the issue)
-     metadata.qa_type      → fine-grained type (qa_issue_assigned, …) for the
-                             future (digests, preferences, cross-module routing)
+     metadata.type         → the fine-grained type (qa_issue_assigned, …) —
+                             the key the shared classifier reads, so the row
+                             lands under the "QA reports" chip / switch / chime.
+                             (`qa_type` is kept alongside for older readers.)
      tenant_id             → the issue's tenant (recipients are tenant accounts)
+
+   Each row also goes out as a Web Push (kind = the same type), like every
+   other module — QA used to be the one producer with no push at all.
 
    Everything here is best-effort: a notification failure must never break the
    QA mutation that triggered it.
@@ -24,6 +31,10 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { sendPushToAccounts } from "@/lib/server/web-push";
+import { clearUnreadByMetaIn, supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { prepareTpl, type NotifTpl } from "@/lib/notification-templates";
+import type { IssueStatus } from "@/lib/qa/types";
 
 export type QaNotificationType =
   | "qa_issue_assigned"
@@ -53,8 +64,14 @@ export function reporterIssueLink(issueId: string): string {
 export interface NotifyTarget {
   recipientId: string | null | undefined;
   type: QaNotificationType;
-  title: string;
-  body: string;
+  /** What was said, rendered in each reader's language (notification-
+   *  templates, dictionary translations/notif-templates/qa.ts); the stored
+   *  subject — and body, when the template has one — are its English. */
+  tpl?: NotifTpl;
+  /** The stored subject for a target with no template. */
+  title?: string;
+  /** The stored body when there is no template, or the template has none. */
+  body?: string;
   /** Force the alert tier (e.g. urgent priority). */
   alert?: boolean;
   /** Per-recipient destination. Defaults to the admin console link.
@@ -67,6 +84,13 @@ export interface NotifyContext {
   issueId: string;
   actorId: string | null;
   actorName: string | null;
+}
+
+/** A target's stored English subject/body, and its template when it fully
+ *  renders (prepareTpl) — the row and its push say the same thing. */
+function textOf(t: NotifyTarget): { subject: string; body: string; tpl: NotifTpl | null } {
+  const r = t.tpl ? prepareTpl(t.tpl) : null;
+  return { subject: r?.subject ?? t.title ?? "", body: r?.body ?? t.body ?? "", tpl: r?.tpl ?? null };
 }
 
 /**
@@ -89,42 +113,75 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
     byRecipient.set(id, t);
   }
   if (byRecipient.size === 0) return;
+  const texts = new Map(Array.from(byRecipient, ([recipientId, t]) => [recipientId, textOf(t)] as const));
 
-  const rows = Array.from(byRecipient.entries()).map(([recipientId, t]) => ({
-    tenant_id: ctx.tenantId,
-    recipient_account_id: recipientId,
-    sender_account_id: ctx.actorId,
-    category: t.alert || ALERT_TYPES.has(t.type) ? "alert" : "task",
-    subject: t.title.slice(0, 200),
-    body: t.body.slice(0, 1000),
-    link: t.link ?? issueLink(ctx.issueId),
-    metadata: {
-      qa_type: t.type,
-      entity_type: "qa_issue",
-      entity_id: ctx.issueId,
-      actor_name: ctx.actorName,
-    },
-  }));
+  const rows = Array.from(byRecipient.entries()).map(([recipientId, t]) => {
+    const text = texts.get(recipientId)!;
+    return {
+      tenant_id: ctx.tenantId,
+      recipient_account_id: recipientId,
+      sender_account_id: ctx.actorId,
+      category: t.alert || ALERT_TYPES.has(t.type) ? "alert" : "task",
+      subject: text.subject.slice(0, 200),
+      body: text.body.slice(0, 1000),
+      link: t.link ?? issueLink(ctx.issueId),
+      metadata: {
+        type: t.type,
+        qa_type: t.type,
+        entity_type: "qa_issue",
+        entity_id: ctx.issueId,
+        actor_name: ctx.actorName,
+        ...(text.tpl ? { tpl: text.tpl } : {}),
+      },
+    };
+  });
 
   // Thread per issue: collapse repeated updates into ONE notification per
-  // recipient per issue instead of piling up a new row for every change. We
-  // clear any still-UNREAD QA notification for this issue (any qa_type) for
-  // these recipients, then insert the fresh one — so the inbox shows a single,
-  // latest entry per issue. Read notifications are left untouched (history).
+  // recipient per issue instead of piling up a new row for every change. Any
+  // still-UNREAD QA notification for this issue (any qa_type) is superseded
+  // for these recipients, then the fresh one lands — so the inbox shows a
+  // single, latest entry per issue. Read notifications are left untouched
+  // (history). Superseded = archived like every other module's, no longer
+  // hard-deleted.
   const recipientIds = Array.from(byRecipient.keys());
-  const { error: delErr } = await supabaseServer
-    .from("inbox_messages")
-    .delete()
-    .eq("tenant_id", ctx.tenantId)
-    .in("recipient_account_id", recipientIds)
-    .is("read_at", null)
-    .eq("metadata->>entity_type", "qa_issue")
-    .eq("metadata->>entity_id", ctx.issueId);
-  if (delErr) console.error("[qa notify] collapse", delErr.message);
+  await supersedeUnread({ recipients: recipientIds, meta: { entity_type: "qa_issue", entity_id: ctx.issueId } });
 
   const { error } = await supabaseServer.from("inbox_messages").insert(rows);
-  if (error) console.error("[qa notify]", error.message);
-  else await emitPings(recipientIds.map((id) => ({ topic: rtTopic.inbox(id) })));
+  if (error) { console.error("[qa notify]", error.message); return; }
+  await emitPings(recipientIds.map((id) => ({ topic: rtTopic.inbox(id) })));
+
+  /* Push mirrors the row, one per recipient (their own title/link — the
+     reporter gets the reporter-safe link). Tagged per issue so a burst of
+     updates on one issue replaces rather than stacks on the lock screen. */
+  await Promise.all(
+    Array.from(byRecipient.entries()).map(([recipientId, t]) =>
+      sendPushToAccounts(
+        [recipientId],
+        {
+          title: texts.get(recipientId)!.subject.slice(0, 120),
+          body: texts.get(recipientId)!.body.slice(0, 200),
+          url: t.link ?? issueLink(ctx.issueId),
+          tag: `qa:${ctx.issueId}`,
+          kind: t.type,
+          tpl: texts.get(recipientId)!.tpl,
+        },
+        { actorAccountId: ctx.actorId },
+      ).catch((e) => console.error("[qa notify] push:", e instanceof Error ? e.message : e)),
+    ),
+  );
+}
+
+/* ── Settled issues ────────────────────────────────────────────────────────
+   Verified, closed, rejected or a duplicate: nothing about the issue waits on
+   anyone any more. Every recipient's unread QA row for it is finished
+   business — not only the people the status change itself notifies (an
+   assignee who closes their own issue is never notified, and their
+   "assigned to you" used to stay unread forever). Call BEFORE notifyIssue,
+   so the notice of the settling status itself survives. */
+export const SETTLED_STATUSES: ReadonlySet<IssueStatus> = new Set<IssueStatus>(["verified", "closed", "rejected", "duplicate"]);
+
+export async function settleIssueNotifications(issueIds: string[]): Promise<void> {
+  await clearUnreadByMetaIn({ entity_type: "qa_issue" }, "entity_id", issueIds);
 }
 
 /* ── Mentions ──────────────────────────────────────────────────────────────

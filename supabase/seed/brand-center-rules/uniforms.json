@@ -1,0 +1,997 @@
+{
+ "section": "uniforms",
+ "items": {
+  "polo-shirt": {
+   "specs": [
+    {
+     "k": "Designs",
+     "v": "A — white collar and white shoulder / sleeve piping (produced) · B — white collar, placket and cuffs"
+    },
+    {
+     "k": "Fabric",
+     "v": "Piqué cotton; black body (standard), white with black trims and logo (second version, hot days)"
+    },
+    {
+     "k": "Sleeve and fit",
+     "v": "Short or long · men, women, unisex"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar. A small logo at the back of the neck or on the sleeve (40–50 mm) only as the second mark.",
+   "do": [
+    "Everyone in sales, office, exhibitions and visits",
+    "Replace worn or faded polos"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "office-shirt": {
+   "specs": [
+    {
+     "k": "Designs",
+     "v": "A — black with the white logo · B — white with the black logo · C — black with the polo's white collar, placket and cuffs"
+    },
+    {
+     "k": "Sleeve and fit",
+     "v": "Long (standard) or short · men, women, unisex"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm, embroidered in one colour.",
+   "do": [
+    "Meetings, visits, management, formal days"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "women-s-blouse": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black blouse · white blouse · tunic (longer cut)"
+    },
+    {
+     "k": "Sleeve",
+     "v": "Long · three-quarter"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 60–70 mm (50 mm minimum for embroidery).",
+   "do": [
+    "The same black and white as the men's shirts"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "modest-wear-option": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black scarf · grey scarf · long-cut tunic shirt · sleeve covers"
+    },
+    {
+     "k": "Scarf mark",
+     "v": "Plain, or a small woven label with the full logo, 25 mm"
+    },
+    {
+     "k": "Why",
+     "v": "So every colleague can wear the uniform comfortably — Egypt and the Middle East"
+    }
+   ],
+   "logo": "On the tunic: left chest 60–70 mm; on the scarf: a 25 mm woven label or nothing.",
+   "do": [
+    "Offer it to every colleague who wants it"
+   ],
+   "dont": [
+    "The K alone (lapel pins, scarves, patches) — the full logo only (owner, 30/09/2026)",
+    "Silver thread"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "trousers-and-skirts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black trousers (standard) · dark grey trousers · black skirt · black chinos"
+    },
+    {
+     "k": "Fit",
+     "v": "Men · women"
+    }
+   ],
+   "logo": "No logo on trousers and skirts.",
+   "do": [
+    "Black with every office top"
+   ],
+   "dont": [
+    "Logos or stripes on trousers"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "blazer-and-suit": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black blazer · black suit · grey suit"
+    },
+    {
+     "k": "Details",
+     "v": "A lapel pin with the full logo (black enamel, white logo) · the logo embroidered inside the lining"
+    },
+    {
+     "k": "Fit",
+     "v": "Men · women · unisex"
+    }
+   ],
+   "logo": "No logo on the outside; the lapel pin (20 mm) and the lining label only.",
+   "do": [
+    "Management, exhibitions opening day, ceremonies"
+   ],
+   "dont": [
+    "The K alone (lapel pins, scarves, patches) — the full logo only (owner, 30/09/2026)",
+    "Embroidered logos on the outside of a suit"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    41
+   ]
+  },
+  "knitwear": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Quarter-zip pullover (approved) · V-neck sweater · cardigan"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · grey"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 60–70 mm, embroidered.",
+   "do": [
+    "Cool offices and winter"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "work-shirt": {
+   "specs": [
+    {
+     "k": "Design",
+     "v": "A — two pockets and the polo's piping (approved)"
+    },
+    {
+     "k": "Colour",
+     "v": "Black, white details"
+    },
+    {
+     "k": "Extras",
+     "v": "Name embroidered above the pocket · reflective strips · pen pocket on the sleeve"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "Installation and service visits",
+    "The name as on the staff card"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "coverall": {
+   "specs": [
+    {
+     "k": "Design",
+     "v": "B — white zip line, the large logo on the back (approved)"
+    },
+    {
+     "k": "Season",
+     "v": "Summer light · winter lined"
+    },
+    {
+     "k": "Extras",
+     "v": "Name embroidered · reflective strips · knee-pad pockets"
+    }
+   ],
+   "logo": "Chest 70–80 mm; the large back logo 200–250 mm, 100 mm below the collar (screen print or embroidery).",
+   "do": [
+    "Heavy installation and factory work"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "work-jacket-and-trousers": {
+   "specs": [
+    {
+     "k": "Design",
+     "v": "C — a short work jacket over black trousers (approved)"
+    },
+    {
+     "k": "Trousers",
+     "v": "Cargo work trousers · straight work trousers"
+    },
+    {
+     "k": "Extras",
+     "v": "Reflective strips · tool pockets"
+    }
+   ],
+   "logo": "Chest 70–80 mm; the back logo 200–250 mm on the jacket.",
+   "do": [
+    "Service visits and cold months"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "technician-t-shirt": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black T-shirt, chest logo, large back logo (approved) · long-sleeve T-shirt"
+    },
+    {
+     "k": "Fabric",
+     "v": "Cotton · quick-dry sport fabric"
+    },
+    {
+     "k": "Print",
+     "v": "Screen print or DTF, matte white, 40 mm minimum"
+    }
+   ],
+   "logo": "Chest 70–80 mm; back 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "Hot weather and the workshop"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "workshop-apron": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Bib apron with tool pockets · waist apron"
+    },
+    {
+     "k": "Material",
+     "v": "Black canvas · black denim · leather straps (showroom)"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Centred on the bib, 80–100 mm, one colour.",
+   "do": [
+    "Workshop, showroom demos, training"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "workshop-coat": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black work coat · grey work coat"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "Quality control, spare-parts store, showroom"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "warehouse-wear": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "T-shirt · polo · hi-vis vest over the shirt · coverall"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · grey — hi-vis stays yellow or orange"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "The hi-vis vest over the brand garment in the warehouse"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "driver-uniform": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Polo + black trousers · shirt + black tie (VIP driver) · jacket"
+    },
+    {
+     "k": "Extras",
+     "v": "Black cap with the full logo · name badge"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar. Cap: the full logo 60–70 mm.",
+   "do": [
+    "Clean and pressed — the driver is the first KOLEEX person a visitor meets"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "security-uniform": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black shirt + trousers · jacket · cap"
+    },
+    {
+     "k": "Marking",
+     "v": "SECURITY on the back in white Inter Bold capitals, 60–80 mm high; the logo on the sleeve"
+    }
+   ],
+   "logo": "Sleeve 50 mm (embroidery minimum); never the chest logo larger than the SECURITY word.",
+   "do": [
+    "The word in the market's language as well where the law asks"
+   ],
+   "dont": [
+    "KOLEEX typed as a word on the back — the logo is the name"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39
+   ]
+  },
+  "office-service-staff": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Hospitality waistcoat / apron · cleaning staff polo · kitchen apron"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · grey"
+    }
+   ],
+   "logo": "Wearer's left chest, 60–80 mm, one colour.",
+   "do": [
+    "The same care as the office uniform"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "booth-staff-outfit": {
+   "specs": [
+    {
+     "k": "Men",
+     "v": "Black shirt C + black trousers · black polo + chinos · black suit (opening day)"
+    },
+    {
+     "k": "Women",
+     "v": "Black blouse + trousers · tunic + trousers · black dress / abaya-style dress"
+    },
+    {
+     "k": "Extras",
+     "v": "Lapel pin with the full logo · the event badge with names and languages · the black KOLEEX lanyard (not the fair's)"
+    }
+   ],
+   "logo": "The garment's chest logo only; the badge and the pin carry the rest.",
+   "do": [
+    "One look for the whole team",
+    "The black lanyard instead of the fair's own"
+   ],
+   "dont": [
+    "The K alone (lapel pins, scarves, patches) — the full logo only (owner, 30/09/2026)",
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    115
+   ]
+  },
+  "event-team-wear": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Event T-shirt · hoodie · cap · vest"
+    },
+    {
+     "k": "Print",
+     "v": "Chest logo · the large back logo with TEAM under it in Inter Bold · the event's name and year"
+    },
+    {
+     "k": "Method",
+     "v": "Screen print or DTF, matte white on black"
+    }
+   ],
+   "logo": "Chest 70–80 mm; back 200–250 mm with the word under it — never \"KOLEEX\" typed as text.",
+   "do": [
+    "Setup crews, sport days, volunteers"
+   ],
+   "dont": [
+    "KOLEEX TEAM typed as a line of text (the workshop option) — the logo, then TEAM",
+    "Slogans, phone numbers or social icons on garments"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39
+   ]
+  },
+  "hosts-and-promoters": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Host outfit · sash with the logo · gloves (awards stage)"
+    },
+    {
+     "k": "Sash",
+     "v": "Black satin, the full logo in white, 60 mm"
+    }
+   ],
+   "logo": "On the sash, centred at the front, 60 mm.",
+   "do": [
+    "Large events and launches"
+   ],
+   "dont": [
+    "Coloured sashes",
+    "Slogans on the sash"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "soft-shell-jacket": {
+   "specs": [
+    {
+     "k": "Design",
+     "v": "A — white zip (approved)"
+    },
+    {
+     "k": "Fit",
+     "v": "Men · women"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "Autumn and spring, all staff"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "down-jacket": {
+   "specs": [
+    {
+     "k": "Design",
+     "v": "B — down jacket (approved)"
+    },
+    {
+     "k": "Length",
+     "v": "Short · long"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar. Embroidery on down only with a backing that keeps the feathers in.",
+   "do": [
+    "The Chinese winter"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "fleece-and-quarter-zip": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Quarter-zip (approved) · fleece jacket · fleece vest"
+    },
+    {
+     "k": "Logo method",
+     "v": "Flat satin embroidery, matte polyester thread, one colour — white on black, black on white; screen print or DTF only on technical fabrics (ch. 122, 39)"
+    }
+   ],
+   "logo": "Wearer's left chest, 70–80 mm wide, 180–200 mm below the shoulder seam; optional back logo 200–250 mm, 100 mm below the collar.",
+   "do": [
+    "Offices and cool days"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments",
+    "Supplier or partner logos next to ours",
+    "Gold or metallic thread, 3D puff, a patch border, a big logo in the middle"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "rain-wear": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Rain jacket · rain poncho · rain trousers"
+    },
+    {
+     "k": "Extras",
+     "v": "Reflective strips · the back logo"
+    },
+    {
+     "k": "Print",
+     "v": "Screen print or heat transfer on the waterproof fabric (embroidery would leak)"
+    }
+   ],
+   "logo": "Chest 70–80 mm; back 200–250 mm.",
+   "do": [
+    "Technicians and drivers in rain"
+   ],
+   "dont": [
+    "Stitching through the waterproof layer"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "winter-accessories": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Beanie · scarf · gloves · neck warmer"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · grey"
+    }
+   ],
+   "logo": "Beanie: woven label or embroidery 50–60 mm at the front; scarf and gloves: a 25 mm woven label or nothing.",
+   "do": [
+    "Winter kit"
+   ],
+   "dont": [
+    "Slogans, phone numbers or social icons on garments"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "safety-helmet": {
+   "specs": [
+    {
+     "k": "Colours",
+     "v": "White (visitors, managers) · black (KOLEEX technicians) · yellow (where the site's rule asks)"
+    },
+    {
+     "k": "Marks",
+     "v": "The logo sticker on the front · the name on the back"
+    }
+   ],
+   "logo": "Front sticker: the full logo 60 mm, white on black or black on white/yellow.",
+   "do": [
+    "Safety colours and the site's rules win over brand colours",
+    "Certified to the local standard (EN 397 / GB 2811)"
+   ],
+   "dont": [
+    "Stickers that cover the certification label"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    39,
+    118
+   ]
+  },
+  "hi-vis-vest": {
+   "specs": [
+    {
+     "k": "Colours",
+     "v": "Yellow · orange — safety colours win over brand colours"
+    },
+    {
+     "k": "Print",
+     "v": "The logo on the front, 70–80 mm, black; SERVICE on the back under the logo"
+    }
+   ],
+   "logo": "Front chest 70–80 mm in black; back: the logo 200 mm with SERVICE under it.",
+   "do": [
+    "Certified to EN ISO 20471",
+    "Black print only"
+   ],
+   "dont": [
+    "Black or branded-colour vests — the vest stays yellow or orange",
+    "KOLEEX typed as a word"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    39,
+    118
+   ]
+  },
+  "safety-shoes": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Low-cut safety shoe · safety boot · anti-static (electronics)"
+    },
+    {
+     "k": "Colour",
+     "v": "Black"
+    },
+    {
+     "k": "Logo",
+     "v": "A small side logo (20 mm) or none"
+    }
+   ],
+   "logo": "Small, on the outer side, 20–25 mm, or nothing.",
+   "do": [
+    "Certified safety class (S1P / S3)"
+   ],
+   "dont": [
+    "Logos that hide the safety marking"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "gloves": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Cut-resistant gloves (cutting tables) · mechanics' gloves · disposable nitrile"
+    },
+    {
+     "k": "Logo",
+     "v": "Print on the back of the hand or none"
+    }
+   ],
+   "logo": "On the back of the hand, 30–40 mm, one colour — or nothing.",
+   "do": [
+    "Cut level shown (EN 388) on cutting-table gloves"
+   ],
+   "dont": [
+    "Logos on disposable gloves"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "eye-ear-and-breathing-protection": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Safety glasses · ear-plug case with the logo · ear muffs · dust mask"
+    },
+    {
+     "k": "Logo",
+     "v": "Only on cases and ear muffs"
+    }
+   ],
+   "logo": "Cases and ear muffs: the full logo 20–30 mm, one colour; nothing on lenses or masks.",
+   "do": [
+    "Certified PPE only"
+   ],
+   "dont": [
+    "Logos on lenses or on the mask's filter"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "first-aid-kit": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Car first-aid bag · wall first-aid box · booth kit"
+    },
+    {
+     "k": "Colours",
+     "v": "Standard green with the white cross (recognisable in an emergency); black with the white cross for the booth and the car"
+    }
+   ],
+   "logo": "Small on the side, 30 mm, white — never bigger than the cross.",
+   "do": [
+    "The cross must be recognised first"
+   ],
+   "dont": [
+    "A logo that competes with the cross"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    47
+   ]
+  },
+  "logo-placement": {
+   "specs": [
+    {
+     "k": "Chest",
+     "v": "Wearer's left, 70–80 mm wide, 180–200 mm below the shoulder seam (ch. 122)"
+    },
+    {
+     "k": "Back",
+     "v": "200–250 mm wide, 100 mm below the collar — jackets, coveralls, fair polos, T-shirts"
+    },
+    {
+     "k": "Sleeve",
+     "v": "The full logo 50 mm (embroidery minimum) — or nothing"
+    },
+    {
+     "k": "Cap",
+     "v": "The full logo 60–70 mm on the front (ch. 39)"
+    },
+    {
+     "k": "Pocket",
+     "v": "50–60 mm above the pocket, never on the flap"
+    },
+    {
+     "k": "Back of neck",
+     "v": "Small, 40–50 mm, printed only (embroidery needs 50 mm)"
+    }
+   ],
+   "logo": "One logo per garment side, one colour: white on black, black on white.",
+   "do": [
+    "Measure with a ruler on the first garment of every order"
+   ],
+   "dont": [
+    "The workshop's 70–90 / 250–300 mm ranges — the book's 70–80 / 200–250 mm hold",
+    "A logo in the middle of the chest"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    39,
+    38
+   ]
+  },
+  "names-and-extra-marks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Name embroidered · country flag patch (international staff) · role on the back (SERVICE / SECURITY) · department on the sleeve"
+    },
+    {
+     "k": "Name",
+     "v": "Inter SemiBold, white, 8–10 mm capitals, above the right pocket"
+    },
+    {
+     "k": "Flag",
+     "v": "A flat woven flag 30 × 20 mm on the right sleeve, never next to the logo"
+    }
+   ],
+   "logo": "The logo keeps its clear space: names and roles never touch it.",
+   "do": [
+    "Names as on the staff card"
+   ],
+   "dont": [
+    "A coloured band or sleeve colour per department (ch. 122)"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    122,
+    37
+   ]
+  },
+  "sizes-and-ordering": {
+   "specs": [
+    {
+     "k": "Size range",
+     "v": "XS–4XL; women's cut separate; Asian and European size tables side by side"
+    },
+    {
+     "k": "Care label",
+     "v": "A woven KOLEEX label inside the neck (25 mm logo) with the care symbols"
+    },
+    {
+     "k": "Order",
+     "v": "From the approved sample, the same supplier per garment, a size run on file"
+    }
+   ],
+   "logo": "Inside: the woven label, 25 mm.",
+   "do": [
+    "Keep a sample of each approved garment in the office"
+   ],
+   "dont": [
+    "Changing supplier without a new approved sample"
+   ],
+   "vendor": "Send the logo from the master vector file; the embroiderer digitises from it and never alters it (ch. 36, 39). Approve one finished garment per size range before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size and place with a ruler on delivery.",
+   "book": [
+    39,
+    134
+   ]
+  }
+ }
+}

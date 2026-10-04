@@ -1,11 +1,21 @@
 import { forwardRef } from "react";
 
+/* Landed Cost icon — an anchor: the moment the goods ARRIVE at the port and
+   the full landed cost (product + freight + duty + handling) is fixed.
+
+   ⚠️ NOT a ship. ShippingIcon already carries the vessel mark (container
+   ship), and one meaning gets one mark in this Hub — two apps drawn with the
+   same metaphor are indistinguishable in the launcher. The anchor reads as
+   "arrival at destination port", which is exactly when landed cost is known.
+
+   Filled grammar like the rest of the set: 24-grid, currentColor, solid
+   silhouette (artwork shared with ui/AnchorIcon). */
 const LandedCostIcon = forwardRef<SVGSVGElement, { size?: number | string; className?: string; style?: React.CSSProperties; strokeWidth?: number }>(
   ({ size = 24, className, style, ...rest }, ref) => {
     const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
     return (
       <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={s} height={s} fill="currentColor" className={className} style={style} {...rest}>
-        <path d="M23,20a1,1,0,0,0-1,1c0,.344-.682,1-1.75,1a2.023,2.023,0,0,1-1.593-.689,1.932,1.932,0,0,1,.128-.184,12.152,12.152,0,0,0,3.156-6.183A3,3,0,0,0,20,11.584V9a4,4,0,0,0-4-4V4A4,4,0,0,0,8,4V5A4,4,0,0,0,4,9v2.571a3,3,0,0,0-1.972,3.373,12.188,12.188,0,0,0,3.187,6.183,1.973,1.973,0,0,1,.133.189A2.005,2.005,0,0,1,3.75,22C2.661,22,2,21.306,2,21a1,1,0,0,0-2,0c0,1.626,1.718,3,3.75,3a4.212,4.212,0,0,0,2.763-1A4.295,4.295,0,0,0,12,23.016,4.317,4.317,0,0,0,17.5,23a4.208,4.208,0,0,0,2.746,1C22.282,24,24,22.626,24,21A1,1,0,0,0,23,20ZM10,4a2,2,0,0,1,4,0V5H10ZM8,7h8a2,2,0,0,1,2,2v1.92L12.948,9.262a3.026,3.026,0,0,0-1.891,0L6,10.913V9A2,2,0,0,1,8,7ZM9.25,22a1.938,1.938,0,0,1-1.711-.849,5.113,5.113,0,0,0-.848-1.372A10.253,10.253,0,0,1,4,14.607a1.018,1.018,0,0,1,.662-1.153L11,11.383V21C11,21.344,10.318,22,9.25,22Zm5.5,0C13.661,22,13,21.306,13,21V11.384l6.305,2.069a1.021,1.021,0,0,1,.666,1.155,10.2,10.2,0,0,1-2.662,5.171,4.991,4.991,0,0,0-.848,1.378A1.929,1.929,0,0,1,14.75,22Z" />
+        <path d="m23.392,13.001c-.518-.636-1.284-1.001-2.103-1.001h-1.289c-.553,0-1,.448-1,1s.447,1,1,1h1.289c.214,0,.415.096.552.264.076.093.196.29.141.557-.883,4.291-5.101,6.758-8.981,7.125v-7.946h2c.553,0,1-.448,1-1s-.447-1-1-1h-2v-4.142c1.721-.447,3-2,3-3.858,0-2.206-1.794-4-4-4s-4,1.794-4,4c0,1.858,1.28,3.411,3,3.858v4.142h-2c-.552,0-1,.448-1,1s.448,1,1,1h2v7.946c-3.88-.367-8.099-2.834-8.982-7.125-.055-.268.065-.464.141-.558.137-.167.338-.264.552-.264h1.289c.552,0,1-.448,1-1s-.448-1-1-1h-1.289c-.817,0-1.583.364-2.102,1C.098,13.627-.103,14.438.059,15.225c1.186,5.761,6.904,8.775,11.941,8.775s10.755-3.014,11.94-8.775c.162-.786-.038-1.597-.549-2.224ZM10,4c0-1.103.897-2,2-2s2,.897,2,2-.897,2-2,2-2-.897-2-2Z"/>
       </svg>
     );
   },

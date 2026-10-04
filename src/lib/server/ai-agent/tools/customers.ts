@@ -52,7 +52,7 @@ const getCustomerByName: ToolDef<
          fallback and a hint for the model. */
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Which customer should I look up? You can send a name or customer code.",
       };
@@ -80,7 +80,7 @@ const getCustomerByName: ToolDef<
       console.error("[tool.getCustomerByName]", error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't search customers right now.",
       };
@@ -120,7 +120,7 @@ const getCustomerByCode: ToolDef<
     if (!code) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Which customer code should I use?",
       };
@@ -136,7 +136,7 @@ const getCustomerByCode: ToolDef<
       console.error("[tool.getCustomerByCode]", error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't fetch that customer right now.",
       };

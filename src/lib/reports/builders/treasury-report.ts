@@ -16,6 +16,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import type {
   ReportBuildContext,
   ReportColumn,
@@ -42,12 +43,12 @@ export async function buildTreasuryReport(ctx: ReportBuildContext): Promise<Repo
       .eq("tenant_id", ctx.tenantId)
       .order("is_primary", { ascending: false })
       .order("current_balance", { ascending: false }),
-    supabaseServer
+    allRows(supabaseServer
       .from("finance_cash_movements")
       .select("id, direction, amount, currency, movement_date")
       .eq("tenant_id", ctx.tenantId)
       .gte("movement_date", recentSince)
-      .limit(2000),
+      .order("id"), "cash movements"),
   ]);
 
   const accounts = (accountsRes.data ?? []) as BankAccount[];

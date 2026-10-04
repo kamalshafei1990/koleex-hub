@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isUnderglassRoute, appOwnsTopRamp } from "@/lib/underglass";
@@ -20,8 +20,52 @@ import UserMenu from "./UserMenu";
    a plain dynamic import that renders immediately) put the inbox + discuss +
    supabase chunks into every page's boot; see NotificationBellGate. */
 import NotificationBellGate from "./NotificationBellGate";
-import TenantPicker from "./TenantPicker";
-import ViewAsPicker from "./ViewAsPicker";
+import ViewAsTrigger from "./view-as-trigger";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { whenPageLoaded } from "@/lib/net-idle";
+import { syncAccountLanguage } from "@/lib/account-language";
+/* Super-Admin tools load AFTER the page has loaded — every other person
+   downloaded them on every cold load and never saw them (measured
+   25/09/2026), and loading them before the load event held that event open.
+   The tenant picker already appears late (it waits for its tenant list, and
+   shows only with two or more tenants), so it needs no stand-in; the View-as
+   button gets an identical stand-in so the header cannot shift (ViewAsSlot). */
+const TenantPicker = dynamic(() => import("./TenantPicker"), { ssr: false });
+const ViewAsPicker = lazy(() => import("./ViewAsPicker"));
+
+/** true once the page's load event has fired. */
+function useAfterPageLoad(): boolean {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void whenPageLoaded().then(() => { if (alive) setDone(true); });
+    return () => { alive = false; };
+  }, []);
+  return done;
+}
+
+/** The picker's own rule for showing itself (Super Admin, not already viewing
+ *  as someone), decided here so the stand-in appears exactly when the real
+ *  button would. The real picker loads after the page load, or at once when
+ *  the button is hovered or pressed — a press opens it as soon as it arrives. */
+function ViewAsSlot({ dk }: { dk: boolean }) {
+  const { data } = useMeBootstrap();
+  const loaded = useAfterPageLoad();
+  const [armed, setArmed] = useState(false);
+  const [openAtOnce, setOpenAtOnce] = useState(false);
+  if (!data?.isSuperAdmin || data?.viewingAs) return null;
+  const standIn = (
+    <div className="relative">
+      <ViewAsTrigger dk={dk} onMouseEnter={() => setArmed(true)} onClick={() => { setArmed(true); setOpenAtOnce(true); }} />
+    </div>
+  );
+  if (!loaded && !armed) return standIn;
+  return (
+    <Suspense fallback={standIn}>
+      <ViewAsPicker dk={dk} defaultOpen={openAtOnce} />
+    </Suspense>
+  );
+}
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
 import { APP_REGISTRY } from "@/lib/navigation";
@@ -58,6 +102,40 @@ const languages: { code: Lang; label: string; short: string }[] = [
 
 export default function MainHeader() {
   const pathname = usePathname();
+  const afterLoad = useAfterPageLoad();
+
+  /* SOLID BAR AT REST, FROSTED ONCE YOU SCROLL — the owner's call after the
+     blur-at-rest defect resisted three fixes on his 17 Pro Max.
+     
+     The flag goes on <html> so the switch is pure CSS: no re-render per
+     scroll frame, and the rule can key off it anywhere. Threshold is 4px so
+     a rubber-band bounce at the top does not flicker the bar, and the
+     listener is passive — it must never delay a scroll.
+     
+     Reads #main-scroll-container, NOT the window: the Hub scrolls inside
+     that element, and window.scrollY is always 0 here. */
+  useEffect(() => {
+    const sc = document.getElementById("main-scroll-container");
+    if (!sc) return;
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      document.documentElement.toggleAttribute("data-kx-scrolled", sc.scrollTop > 4);
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(apply);
+    };
+    apply();
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      sc.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      document.documentElement.removeAttribute("data-kx-scrolled");
+    };
+    /* Re-bind per route: the scroller element is replaced on some segment
+       changes, and a listener on a detached node silently stops firing. */
+  }, [pathname]);
   const { t } = useTranslation(hubT);
   /* Initialize from localStorage on the first client render — prevents the
      write-effect from clobbering the saved theme with the default "dark"
@@ -106,6 +184,8 @@ export default function MainHeader() {
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
     localStorage.setItem("koleex-lang", lang);
     window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));
+    /* …and the account learns it, so pushes are written in it too. */
+    void syncAccountLanguage(lang);
   }, [lang]);
 
   const dk = theme === "dark";
@@ -252,23 +332,25 @@ export default function MainHeader() {
               the rest of the bar doesn't jump when the logo lands. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.webp" : "/brand/hub-logo/koleex-hub-logo-for-light.webp"}
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark-e.webp" : "/brand/hub-logo/koleex-hub-logo-for-light-e.webp"}
             alt="Koleex Hub"
             width={640}
-            height={99}
+            height={70}
             decoding="async"
             fetchPriority="high"
             /* Dragging the logo out of the header does nothing useful and, in
                the desktop shell, drops a stray image onto whatever is behind
                the window. */
             draggable={false}
-            /* The lockup is ~207px wide at h-8. On a 768 tablet that plus the
+            /* The lockup is ~218px wide at h-6 (Birdman "hub", 2026-09-23 — the
+               lockup is wider and shorter than the script one, so each step is
+               one notch lower to keep KOLEEX at the same size). On a 768 tablet that plus the
                language bar, theme, bell and avatar does not fit the row, and
                the logo — which cannot shrink — was overlapped by the right
                group (measured: logo ended at 231px, the language bar started
                at 166px). It steps down between md and lg, where the space
                actually runs out, and keeps its full size from lg up. */
-            className="w-auto h-5 md:h-6 lg:h-8 select-none [-webkit-user-drag:none]"
+            className="w-auto h-[15px] md:h-[18px] lg:h-6 select-none [-webkit-user-drag:none]"
           />
         </Link>
         {appName && (
@@ -389,13 +471,13 @@ export default function MainHeader() {
             users. Stores the active tenant_id in localStorage; each page
             load, loadScopeContext() reads the override and scopes every
             query accordingly. */}
-        <div className="hidden md:block"><TenantPicker dk={dk} /></div>
+        <div className="hidden md:block">{afterLoad && <TenantPicker dk={dk} />}</div>
 
         {/* View-as picker — Super Admin only. Lets the SA view the
             system as any other user in their tenant (read-only). The
             picker disappears once view-as is active; the persistent
             banner is the only way to exit. */}
-        <div className="hidden md:block"><ViewAsPicker dk={dk} /></div>
+        <div className="hidden md:block"><ViewAsSlot dk={dk} /></div>
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}

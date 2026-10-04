@@ -21,7 +21,7 @@
    flows that proceeded even on cancel.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 interface Ask {
   title: ReactNode;
@@ -29,6 +29,9 @@ interface Ask {
   initial?: string;
   placeholder?: string;
   confirmLabel?: string;
+  /** The Cancel button's words, for a screen in another language. The
+   *  default stays English for the callers that have not passed one. */
+  cancelLabel?: string;
   validate?: (value: string) => string | null;
 }
 
@@ -37,8 +40,23 @@ export function useInput() {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  /* FOCUS GOES BACK WHERE IT CAME FROM when the dialog closes — it fell to
+     the page after a rename (review, 2026-09-26). The opener is noted when
+     the dialog is asked for, before its own field takes focus. */
+  const openerRef = useRef<HTMLElement | null>(null);
+  const open = ask !== null;
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      const el = openerRef.current;
+      openerRef.current = null;
+      if (el && el.isConnected) el.focus({ preventScroll: true });
+    };
+  }, [open]);
+
   const askInput = useCallback(
     (title: ReactNode, onSubmit: (value: string) => void | Promise<void>, opts?: Omit<Ask, "title" | "onSubmit">) => {
+      openerRef.current = typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setValue(opts?.initial ?? "");
       setError(null);
       setAsk({ title, onSubmit, ...opts });
@@ -63,16 +81,24 @@ export function useInput() {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden"
+        className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3.5">
           <p className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{ask.title}</p>
           <input
             autoFocus
+            /* A name can be Arabic or English: each lays out its own way. */
+            dir="auto"
             value={value}
             onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setAsk(null); }}
+            onKeyDown={(e) => {
+              /* Confirming a pinyin candidate is Enter too (keyCode 229 on
+                 older engines): not a submit. */
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+              if (e.key === "Enter") submit();
+              if (e.key === "Escape") setAsk(null);
+            }}
             placeholder={ask.placeholder}
             className="mt-2.5 w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]"
           />
@@ -84,7 +110,7 @@ export function useInput() {
             onClick={() => setAsk(null)}
             className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.05] hover:text-[var(--text-primary)]"
           >
-            Cancel
+            {ask.cancelLabel ?? "Cancel"}
           </button>
           <button
             type="button"

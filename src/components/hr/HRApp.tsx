@@ -6,11 +6,13 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, type ComponentType } from "react";
+import dynamic from "next/dynamic";
 import { useTranslation } from "@/lib/i18n";
 import { hrT } from "@/lib/translations/hr";
 import type { EmployeeListItem } from "@/lib/employees-admin";
-import { cachedEmployeeList } from "@/lib/hr-admin";
+import { cachedEmployeeList, fetchHrModulePresence, type HrModulePresence } from "@/lib/hr-admin";
 import { type TabId, TAB_IDS, TAB_LABEL_KEYS } from "./shared";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 
 /* ── Icons ── */
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
@@ -31,17 +33,39 @@ import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
-import SkillsModule from "./modules/Skills";
-import BehaviorModule from "./modules/Behavior";
-import LeaveModule from "./modules/LeaveManagement";
-import AttendanceModule from "./modules/Attendance";
-import RecruitmentModule from "./modules/Recruitment";
-import AppraisalsModule from "./modules/Appraisals";
-import OnboardingModule from "./modules/Onboarding";
-import PayrollModule from "./modules/Payroll";
-import TrainingModule from "./modules/Training";
-import DocumentsModule from "./modules/Documents";
-import ReportsModule from "./modules/Reports";
+
+/* ── The other eleven sections load on their own ──
+   They were all static imports, so opening HR downloaded payroll, leave,
+   appraisals, attendance… (6,300 lines) to show the dashboard — about
+   400 KB of script, measured from a phone tapping HR on Home (26/09). Each
+   is now its own chunk, fetched when its tab opens, and all of them are
+   warmed once the dashboard is up and the network is quiet (see HRApp), so
+   switching tabs stays instant. */
+const HR_MODULE_LOADERS = {
+  leave:       () => import("./modules/LeaveManagement"),
+  attendance:  () => import("./modules/Attendance"),
+  recruitment: () => import("./modules/Recruitment"),
+  appraisals:  () => import("./modules/Appraisals"),
+  skills:      () => import("./modules/Skills"),
+  behavior:    () => import("./modules/Behavior"),
+  onboarding:  () => import("./modules/Onboarding"),
+  payroll:     () => import("./modules/Payroll"),
+  training:    () => import("./modules/Training"),
+  documents:   () => import("./modules/Documents"),
+  reports:     () => import("./modules/Reports"),
+} satisfies Record<Exclude<TabId, "dashboard">, () => Promise<{ default: ComponentType<HRModuleProps> }>>;
+const moduleLoading = () => <BrandLoading className="h-full min-h-[40vh]" />;
+const LeaveModule       = dynamic(HR_MODULE_LOADERS.leave,       { ssr: false, loading: moduleLoading });
+const AttendanceModule  = dynamic(HR_MODULE_LOADERS.attendance,  { ssr: false, loading: moduleLoading });
+const RecruitmentModule = dynamic(HR_MODULE_LOADERS.recruitment, { ssr: false, loading: moduleLoading });
+const AppraisalsModule  = dynamic(HR_MODULE_LOADERS.appraisals,  { ssr: false, loading: moduleLoading });
+const SkillsModule      = dynamic(HR_MODULE_LOADERS.skills,      { ssr: false, loading: moduleLoading });
+const BehaviorModule    = dynamic(HR_MODULE_LOADERS.behavior,    { ssr: false, loading: moduleLoading });
+const OnboardingModule  = dynamic(HR_MODULE_LOADERS.onboarding,  { ssr: false, loading: moduleLoading });
+const PayrollModule     = dynamic(HR_MODULE_LOADERS.payroll,     { ssr: false, loading: moduleLoading });
+const TrainingModule    = dynamic(HR_MODULE_LOADERS.training,    { ssr: false, loading: moduleLoading });
+const DocumentsModule   = dynamic(HR_MODULE_LOADERS.documents,   { ssr: false, loading: moduleLoading });
+const ReportsModule     = dynamic(HR_MODULE_LOADERS.reports,     { ssr: false, loading: moduleLoading });
 
 /* ── Tab icon mapping ── */
 const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string }>> = {
@@ -58,6 +82,17 @@ const TAB_ICONS: Record<TabId, ComponentType<{ size?: number; className?: string
   documents:   DocumentIcon,
   reports:     BarChart3Icon,
 };
+
+/* ── Tabs that only earn their place once they hold something ──
+   Recruitment and Training sit out of the strip while their tables are
+   empty (owner, 20/09/2026). The module itself still mounts through the
+   ?tab= deep link, which is how the first row gets in. */
+const OPTIONAL_TABS: Partial<Record<TabId, keyof HrModulePresence>> = {
+  recruitment: "recruitment",
+  training:    "training",
+};
+const PRESENCE_KEY = "kx:hr:presence";
+const PRESENCE_HIDDEN: HrModulePresence = { recruitment: false, training: false };
 
 /* ── Shared props interface for every module ── */
 export interface HRModuleProps {
@@ -100,6 +135,47 @@ export default function HRApp() {
     return (TAB_IDS as string[]).includes(t ?? "") ? (t as TabId) : "dashboard";
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  /* A client-side navigation here (a notification's /hr?tab=leave, the
+     Reports Library's attendance sheet) renders this BEFORE the router
+     writes the new URL, so initialTab still read the old one. Read ?tab=
+     again once the navigation has committed. */
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if ((TAB_IDS as string[]).includes(q ?? "")) setActiveTab(q as TabId);
+    });
+  }, []);
+
+  /* ── Which optional tabs are in the strip ──
+     Warm-start from the last session's answer so the strip does not
+     reflow after first paint; refresh in the background. Unknown = hidden,
+     which is the common case (both modules are empty today). */
+  const [presence, setPresence] = useState<HrModulePresence>(() => {
+    if (typeof window === "undefined") return PRESENCE_HIDDEN;
+    try {
+      const raw = sessionStorage.getItem(PRESENCE_KEY);
+      return raw ? { ...PRESENCE_HIDDEN, ...(JSON.parse(raw) as Partial<HrModulePresence>) } : PRESENCE_HIDDEN;
+    } catch { return PRESENCE_HIDDEN; }
+  });
+  useEffect(() => {
+    let cancelled = false;
+    fetchHrModulePresence().then((p) => {
+      if (cancelled) return;
+      setPresence(p);
+      try { sessionStorage.setItem(PRESENCE_KEY, JSON.stringify(p)); } catch { /* full */ }
+    });
+    return () => { cancelled = true; };
+  }, []);
+  /* A hidden tab reached by deep link still shows, so the strip always
+     names where the person is. */
+  const visibleTabs = TAB_IDS.filter((id) => {
+    const flag = OPTIONAL_TABS[id];
+    return flag === undefined || presence[flag] || id === activeTab;
+  });
+
+  /* Directional pane swap (owner pick 3A) — direction from the tab's index
+     in the strip order; RTL flips in CSS. */
+  const tabMotion = useTabMotion(visibleTabs.indexOf(activeTab));
 
   /* ── Shared employee list (many modules need it) ──
      Warm-start: hydrate instantly from the last session's snapshot so the
@@ -128,6 +204,21 @@ export default function HRApp() {
 
   useEffect(() => { loadEmployees(); }, [loadEmployees]);
 
+  /* Warm every section's chunk once the first screen is up and the network
+     has gone quiet — tab switches stay instant without the first paint
+     paying for them. import() de-dupes, so an opened tab is not fetched twice. */
+  useEffect(() => {
+    let gone = false;
+    const run = () => {
+      void import("@/lib/net-idle")
+        .then(({ whenNetworkQuiet }) => whenNetworkQuiet({ quietMs: 700, maxWaitMs: 8000 }))
+        .then(() => { if (!gone) Object.values(HR_MODULE_LOADERS).forEach((load) => { void load().catch(() => {}); }); })
+        .catch(() => {});
+    };
+    const t = window.setTimeout(run, 1200);
+    return () => { gone = true; window.clearTimeout(t); };
+  }, []);
+
   /* ── Active module component ── */
   const ActiveModule = MODULE_MAP[activeTab];
 
@@ -140,7 +231,7 @@ export default function HRApp() {
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
           searchPlaceholder={searchPlaceholder}
-          tabs={TAB_IDS.map((tabId) => {
+          tabs={visibleTabs.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             return {
               key: tabId,
@@ -158,7 +249,7 @@ export default function HRApp() {
         {empLoading ? (
           <BrandLoading className="h-full min-h-[40vh]" />
         ) : (
-          <div key={activeTab} className="kx-tab-in">
+          <div key={activeTab} className={tabMotion}>
             <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
           </div>
         )}

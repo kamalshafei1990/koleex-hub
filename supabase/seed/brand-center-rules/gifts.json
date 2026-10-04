@@ -1,0 +1,1283 @@
+{
+ "section": "gifts",
+ "items": {
+  "mugs": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "Black ceramic, matte, white inside — ceramic print in white"
+    },
+    {
+     "k": "Kinds",
+     "v": "Ceramic 11 oz / 15 oz · enamel camping mug · glass mug · espresso cup and saucer set · colour-changing (heat) mug"
+    },
+    {
+     "k": "Inside",
+     "v": "White (standard); silver inside for the premium set"
+    },
+    {
+     "k": "Mark",
+     "v": "The group lockup, 60 mm, on both sides"
+    },
+    {
+     "k": "Packaging",
+     "v": "None for giveaways · paper sleeve · black gift box"
+    }
+   ],
+   "logo": "The group lockup (ch. 43), 60 mm wide, on both sides, in white — taken from the lockup file.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Dishwasher-safe ceramic print — test one on the sample"
+   ],
+   "dont": [
+    "Slogans, website lists or social icons on the item",
+    "The tagline or pictures on the mug",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    43,
+    39,
+    47
+   ]
+  },
+  "tumblers-and-travel-mugs": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Vacuum tumbler 350 / 500 ml · large tumbler with handle 900 ml / 1.2 L · coffee cup with lid 350 ml · car cup-holder size"
+    },
+    {
+     "k": "Finish",
+     "v": "Powder-coat matte black (standard) · brushed steel · white"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving (reads white on black powder-coat, dark on bare steel) or pad print, one colour"
+    }
+   ],
+   "logo": "The full logo, 30–40 mm, on the side facing the drinker's hand-out; 20 mm is the laser minimum.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Food-grade steel with the certificate on file"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Full-colour wraps",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "water-bottles": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Stainless vacuum 500 / 750 ml · glass with sleeve · sport plastic (giveaway) · smart bottle with temperature display · disposable water bottle with a printed label"
+    },
+    {
+     "k": "Colours",
+     "v": "Black, white, silver / grey, natural"
+    },
+    {
+     "k": "Label (disposable)",
+     "v": "Wrap label: black with the white logo 30 mm; the designs change per event"
+    }
+   ],
+   "logo": "Laser or pad print, one colour, 30 mm (20 mm minimum); on the disposable label 30 mm, centred.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Bottles at the booth carry our label, not the venue's"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "thermos-flask": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Tea flask with infuser · large thermos 1 L · Arabic coffee dallah-style flask"
+    },
+    {
+     "k": "Colours",
+     "v": "Black, white, silver / grey, natural"
+    },
+    {
+     "k": "Markets",
+     "v": "Tea culture in China and the Middle East — a welcome, useful gift"
+    }
+   ],
+   "logo": "Laser engraving, 30–40 mm, one colour.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Offer the dallah flask in Arabic markets, the tea flask in China"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Full-colour wraps"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "tea-and-coffee-sets": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Chinese gongfu tea set · porcelain tea cups set · Arabic coffee cups (finjan) set · coffee set with beans"
+    },
+    {
+     "k": "Decoration",
+     "v": "The logo small on the box only (standard); on each cup only for our own offices"
+    },
+    {
+     "k": "Packaging",
+     "v": "Black gift box or premium box with insert"
+    }
+   ],
+   "logo": "On the box: white, 40 mm, top-left; on a cup, 20 mm on the base or side, one colour.",
+   "do": [
+    "Choose the set by market: gongfu tea for China, finjan for the Gulf and Egypt",
+    "Plain white or black porcelain"
+   ],
+   "dont": [
+    "Patterns or colours on the porcelain",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    124,
+    39
+   ]
+  },
+  "disposable-cups": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Paper cup 8 / 12 oz · double-wall hot cup · cold cup with lid · water cone"
+    },
+    {
+     "k": "Colours",
+     "v": "Black with the white logo (standard) · white with the black logo"
+    },
+    {
+     "k": "Print",
+     "v": "One-colour flexo; the printable file also lives in Packaging"
+    }
+   ],
+   "logo": "The full logo, 30–40 mm, once on the cup, centred on the side.",
+   "do": [
+    "Use them at the booth and in the pantry"
+   ],
+   "dont": [
+    "Two logos or a pattern of logos on one cup",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39,
+    110
+   ]
+  },
+  "power-banks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "5,000 mAh slim card · 10,000 mAh · 20,000 mAh · magnetic snap-on · with built-in cables · wireless charging"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    },
+    {
+     "k": "Travel",
+     "v": "20,000 mAh is the most a traveller should carry on a plane (airline limit)"
+    }
+   ],
+   "logo": "The full logo, 30 mm, centred on the largest face; 20 mm is the minimum.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "CE / FCC / UN38.3 certificates on file before the order"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Uncertified batteries"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "wireless-chargers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Pad · 3-in-1 stand (phone, watch, earbuds) · desk lamp with charger · mouse pad with charger"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    }
+   ],
+   "logo": "Laser or pad print, 25–30 mm, off the charging spot.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Certificates on file (CE / FCC)"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Light-up logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "cables-and-adapters": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "3-in-1 charging cable keyring · retractable cable · universal travel adapter · multi-port USB charger"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    }
+   ],
+   "logo": "Pad print or laser, 20 mm or wider; leave it off a part too small for 20 mm.",
+   "do": [
+    "Black first with the logo white; white is the second version"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "The K alone on a small part"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39,
+    41
+   ]
+  },
+  "audio": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Bluetooth speaker · wireless earbuds · headphones (VIP)"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    }
+   ],
+   "logo": "Laser or pad print, one colour, 20–30 mm; on earbuds, on the case only.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "A known sound brand's quality level — test on the sample"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Light-up or RGB logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "phone-accessories": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Phone stand · ring holder · microfibre screen cloth · card wallet for the phone back · tracker-tag holder"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    }
+   ],
+   "logo": "One colour, 20 mm or wider; on the microfibre cloth a woven or printed logo 25 mm in a corner.",
+   "do": [
+    "Black first with the logo white; white is the second version"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39,
+    41
+   ]
+  },
+  "desk-gadgets": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "LED desk lamp · mini desk fan · reusable smart notebook · digital photo frame"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · silver / grey · natural"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser engraving or pad print, one colour; UV print only for the logo, never a full-colour wrap"
+    }
+   ],
+   "logo": "Laser or pad print, one colour, 25–30 mm, on the base.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Certificates on file"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Light-up logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "backpacks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Laptop backpack 15.6\" · anti-theft · technician backpack (tools + laptop) · roll-top · drawstring bag (events)"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Mark",
+     "v": "Flat embroidery or heat transfer in white; a flat black rubber patch with the white logo; woven label; reflective print for night use"
+    }
+   ],
+   "logo": "The full logo 60–80 mm on the upper front (ch. 123); embroidery never under 50 mm.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "The technician backpack holds the tool roll and a 15.6\" laptop"
+   ],
+   "dont": [
+    "3D puff or metallic thread",
+    "A patch border around the logo",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "tote-bags": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "Black cotton canvas, screen print in white"
+    },
+    {
+     "k": "Kinds",
+     "v": "Cotton canvas · recycled PET · jute · foldable nylon"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · natural · white"
+    },
+    {
+     "k": "Mark",
+     "v": "The logo 120–150 mm, centred"
+    }
+   ],
+   "logo": "The full logo, 120–150 mm, centred on the front — never the K alone, never a pattern of K's.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Screen print, matte ink"
+   ],
+   "dont": [
+    "The large K pattern (the K is never used alone — owner, 30/09/2026)",
+    "The tagline or slogans on the bag",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "laptop-and-document-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Laptop sleeve · messenger bag · briefcase (VIP)"
+    },
+    {
+     "k": "Material",
+     "v": "Black nylon · PU leather · genuine leather (VIP)"
+    },
+    {
+     "k": "Mark",
+     "v": "Blind deboss or laser in the material's own tone on leather; flat embroidery or print on nylon"
+    }
+   ],
+   "logo": "30–40 mm, lower front or on the flap; leather 30 mm minimum, never a metal plate.",
+   "do": [
+    "Black, one logo",
+    "A physical sample of the leather colour"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Metal plates glued on"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "travel-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Duffel / weekend bag · carry-on case (VIP) · toiletry bag · cable and tech pouch"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Carry-on",
+     "v": "Black hard shell: UV print with a clear coat or a black engraved badge, the group lockup upper centre (ch. 123)"
+    }
+   ],
+   "logo": "The group lockup upper centre on the carry-on; the full logo 50–60 mm on soft bags.",
+   "do": [
+    "Black first with the logo white; white is the second version"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Luggage in colours"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    43,
+    39
+   ]
+  },
+  "cooler-and-lunch-bags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Lunch cooler bag · large cooler bag"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Mark",
+     "v": "Screen print white, 60–80 mm"
+    }
+   ],
+   "logo": "The full logo 60–80 mm on the front.",
+   "do": [
+    "Black first with the logo white; white is the second version"
+   ],
+   "dont": [
+    "Slogans, website lists or social icons on the item",
+    "Photos or patterns"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "caps-and-hats": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "Black cotton cap, flat embroidery in white"
+    },
+    {
+     "k": "Kinds",
+     "v": "Baseball cap · trucker cap · bucket hat · beanie (winter) · sun visor"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    },
+    {
+     "k": "Mark",
+     "v": "The full logo 50–60 mm on the front (ch. 123); 60–70 mm in the embroidery table (ch. 39)"
+    }
+   ],
+   "logo": "The full logo, 50–70 mm, centred on the front, flat satin stitch.",
+   "do": [
+    "Black first with the logo white; white is the second version",
+    "Matte polyester thread, one colour"
+   ],
+   "dont": [
+    "3D puff embroidery (ch. 39 — the workshop's \"3D embroidery\" option is replaced by flat)",
+    "Metallic thread, outline stitching or a patch border",
+    "The metal badge on a cap"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "t-shirts-and-hoodies-for-events": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Event T-shirt · hoodie · sweatshirt · rain poncho"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    },
+    {
+     "k": "Print",
+     "v": "Small chest logo 70–80 mm · big back logo 200–250 mm · the event's name and date under the back logo"
+    },
+    {
+     "k": "Method",
+     "v": "Screen print or DTF, matte, 40 mm minimum"
+    }
+   ],
+   "logo": "Left chest 70–80 mm, or the back 200–250 mm — one logo per garment side.",
+   "do": [
+    "The event's name in Inter, white, under the back logo",
+    "Staff uniforms follow the Uniforms section, not this one"
+   ],
+   "dont": [
+    "Sponsor logos next to ours without the co-brand rules (ch. 44)",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    44,
+    123
+   ]
+  },
+  "scarves-and-ties": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Silk scarf · tie with a small logo · pocket square"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · grey"
+    },
+    {
+     "k": "Scarf pattern",
+     "v": "The KOLEEX pattern (the scan lines) — never a pattern of K letters"
+    }
+   ],
+   "logo": "On a tie: one woven logo, 25 mm, low on the blade; on a scarf: the full logo once in a corner, 40 mm.",
+   "do": [
+    "Woven, not printed, on ties"
+   ],
+   "dont": [
+    "A K-letter pattern (the K is never used alone — owner, 30/09/2026)",
+    "Colours"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    57
+   ]
+  },
+  "pins-and-badges": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Lapel pin with the full logo · magnetic name badge · button badge (events)"
+    },
+    {
+     "k": "Finish",
+     "v": "Black enamel, the logo in white enamel, black-nickel lines"
+    },
+    {
+     "k": "Long service",
+     "v": "The same pin with the years engraved on the back"
+    }
+   ],
+   "logo": "The full logo, 20 mm (the engraving minimum) — a pin smaller than that carries no logo.",
+   "do": [
+    "Magnetic name badges printed from the Hub"
+   ],
+   "dont": [
+    "The K-only pin (the K is never used alone)",
+    "Gold or silver-look logos (ch. 39) — long-service pins are black and white too",
+    "The logo inside a badge or seal shape (ch. 40)"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    40,
+    41
+   ]
+  },
+  "tailor-s-scissors": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Tailor's shears 10\" · thread snips · embroidery scissors"
+    },
+    {
+     "k": "Mark",
+     "v": "Laser on the blade, black on bare steel"
+    },
+    {
+     "k": "Packaging",
+     "v": "None (giveaway) · paper sleeve · black gift box · premium box with insert"
+    }
+   ],
+   "logo": "The full logo along the blade, 20–30 mm.",
+   "do": [
+    "Give them to garment factories and technicians who use them daily"
+   ],
+   "dont": [
+    "Give scissors or knives as a personal gift in China (it means cutting a relationship) — only as working tools to factories",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "sewing-kits": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Mini travel kit · desk sewing box · premium leather sewing case (VIP)"
+    },
+    {
+     "k": "Inside",
+     "v": "Needles, threads, buttons, snips; plus tape measure and seam ripper"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white · natural"
+    }
+   ],
+   "logo": "On the case: one colour, 30–40 mm (leather: blind deboss, 30 mm minimum).",
+   "do": [
+    "Every customer: a small kit that says what we do"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Coloured threads as the design"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "machine-models": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Scale model of a KOLEEX machine · crystal block with the machine engraved · metal desk sculpture"
+    },
+    {
+     "k": "Base",
+     "v": "Black base with a silver plate (the model's name and year in silver — words, not the logo) · clear acrylic"
+    },
+    {
+     "k": "Model",
+     "v": "Our own machine, from our 3D files — no competitor's shape"
+    }
+   ],
+   "logo": "The full logo engraved on the base front, 30 mm, white on black; on crystal, laser inside, 30 mm.",
+   "do": [
+    "The model's name as on the machine",
+    "Approve a physical sample"
+   ],
+   "dont": [
+    "The logo in silver on the plate — the plate carries words",
+    "Gold"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    39,
+    107
+   ]
+  },
+  "workshop-helpers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Bobbin keyring · magnetic needle case · seam ripper · cleaning brush kit · oil pen for machines"
+    },
+    {
+     "k": "Mark",
+     "v": "Pad print along the longest flat side, one colour"
+    }
+   ],
+   "logo": "The full logo along the longest flat side, 20 mm or wider; leave it off anything smaller.",
+   "do": [
+    "Tools for the people who use our machines (ch. 123)"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "The K alone"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39,
+    41
+   ]
+  },
+  "fabric-and-thread-gifts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Thread spool set in a box · fabric swatch book with a logo cover · pin cushion"
+    },
+    {
+     "k": "Box",
+     "v": "Black box, the white logo top-left"
+    }
+   ],
+   "logo": "On the box or cover: white, 30–40 mm.",
+   "do": [
+    "Real threads and fabrics our customers use"
+   ],
+   "dont": [
+    "Colour boxes"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "keyrings": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Metal keyring with the full logo · leather keyring · bottle-opener keyring · bobbin keyring · tracker-tag keyring"
+    },
+    {
+     "k": "Finish",
+     "v": "Black metal, laser (the logo reads white) · black leather, blind deboss"
+    }
+   ],
+   "logo": "The full logo, 20–30 mm, along the long side.",
+   "do": [
+    "Black first"
+   ],
+   "dont": [
+    "The K-shaped keyring (the K is never used alone)",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    41,
+    123
+   ]
+  },
+  "card-holders-and-wallets": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Business-card case · slim card wallet · passport holder · travel document wallet"
+    },
+    {
+     "k": "Material",
+     "v": "Black PU leather · genuine leather (VIP) · aluminium"
+    },
+    {
+     "k": "Mark",
+     "v": "Blind deboss or laser in the material's tone"
+    }
+   ],
+   "logo": "30 mm, bottom centre or lower right; leather 30 mm minimum.",
+   "do": [
+    "The business-card case holds 15–20 cards of 90 × 54 mm"
+   ],
+   "dont": [
+    "Gold, chrome, mirror or silver-look logos",
+    "Metal plates glued on"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "luggage-tags": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "PU leather tag · metal tag · silicone tag"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · silver metal with black laser marking"
+    }
+   ],
+   "logo": "30 mm, one colour; on metal, black laser.",
+   "do": [
+    "An address window that closes"
+   ],
+   "dont": [
+    "The address visible from outside",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "umbrellas": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Golf umbrella 30\" · compact auto folding · reverse (inverted) · clear"
+    },
+    {
+     "k": "Colours",
+     "v": "Black canopy with the white logo"
+    }
+   ],
+   "logo": "One panel carries the full logo, 150–200 mm, white screen print; never on every panel.",
+   "do": [
+    "Lobbies, events and rainy seasons"
+   ],
+   "dont": [
+    "An umbrella as a personal gift in China (it sounds like 'separate')",
+    "The logo in silver ink (the logo is white)",
+    "The logo on every panel"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    47
+   ]
+  },
+  "hand-fans-and-cooling": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Folding hand fan · paper fan (giveaway) · neck cooling towel"
+    },
+    {
+     "k": "Colours",
+     "v": "Black with white"
+    }
+   ],
+   "logo": "The full logo, 40–60 mm, once.",
+   "do": [
+    "Hot countries and summer events"
+   ],
+   "dont": [
+    "Slogans, website lists or social icons on the item",
+    "Colours or pictures"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "watches-and-cufflinks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Wrist watch with the logo on the dial · cufflinks set · tie clip"
+    },
+    {
+     "k": "Finish",
+     "v": "Black, or steel with black marking"
+    }
+   ],
+   "logo": "On a dial: the full logo printed white, 10–12 mm — below the 20 mm minimum, so only on the dial print, never engraved; cufflinks and clips engraved 20 mm or left plain.",
+   "do": [
+    "VIP and long-service awards"
+   ],
+   "dont": [
+    "Gold (ch. 39)",
+    "The K alone on cufflinks"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    41
+   ]
+  },
+  "trophies": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Crystal trophy · black acrylic trophy · metal trophy with base · machine-shaped trophy"
+    },
+    {
+     "k": "Engraving",
+     "v": "The name, the title, the year — Inter, one colour"
+    },
+    {
+     "k": "Base",
+     "v": "Black"
+    }
+   ],
+   "logo": "The full logo, 30–40 mm, engraved on the front of the base or inside the crystal.",
+   "do": [
+    "Name and year exactly as on the certificate"
+   ],
+   "dont": [
+    "Gold cups or colours",
+    "The logo inside a laurel or seal shape (ch. 40)"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    40,
+    99
+   ]
+  },
+  "plaques": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Wall plaque black with a silver plate · desk plaque · glass plaque"
+    },
+    {
+     "k": "Size",
+     "v": "A4, A5"
+    },
+    {
+     "k": "Plate",
+     "v": "Silver plate carries the words (name, level, year) — the logo stays white on the black"
+    }
+   ],
+   "logo": "The full logo top centre, 40 mm (A4) / 30 mm (A5), white.",
+   "do": [
+    "Dealer authorisation walls follow ch. 128"
+   ],
+   "dont": [
+    "The logo on the silver plate",
+    "Gold"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    128
+   ]
+  },
+  "medals-and-crystal-cubes": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Medal with ribbon · laser crystal cube · paperweight award"
+    },
+    {
+     "k": "Ribbon",
+     "v": "Black"
+    }
+   ],
+   "logo": "Medal: the full logo 25–30 mm engraved; crystal: laser inside, 30 mm.",
+   "do": [
+    "Sport days and milestones"
+   ],
+   "dont": [
+    "Gold medals with the logo",
+    "Coloured ribbons"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39
+   ]
+  },
+  "executive-gift-sets": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Leather portfolio + pen · pen + notebook + card case · premium tea set · porcelain vase / plate · desk sculpture"
+    },
+    {
+     "k": "Box",
+     "v": "Black rigid box, silver foil band · wooden box"
+    }
+   ],
+   "logo": "Each piece one logo in its own method (ch. 39); the box: the white logo top-left.",
+   "do": [
+    "Choose by the person's culture",
+    "A handwritten card from the giver"
+   ],
+   "dont": [
+    "Alcohol or pigskin leather in the Middle East",
+    "Clocks, umbrellas, scissors or knives as personal gifts in China",
+    "Cash or cash-like gifts; tobacco"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    124,
+    39
+   ]
+  },
+  "gift-hampers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Dates box (Ramadan) · mooncake box (Mid-Autumn) · Chinese tea tin · chocolate box · coffee hamper"
+    },
+    {
+     "k": "Box",
+     "v": "Black rigid box, soft-touch, the white logo top-left, a silver band; wooden box as the second choice"
+    },
+    {
+     "k": "Card",
+     "v": "A6 black card, the greeting in silver foil in the partner's language, a handwritten line"
+    }
+   ],
+   "logo": "White, top-left of the box, 40 mm.",
+   "do": [
+    "Seasonal designs live in Occasions; this is the product",
+    "Halal certificates for the Ramadan box"
+   ],
+   "dont": [
+    "Seasonal colours on the box — it stays black and white",
+    "Alcohol"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    124,
+    123
+   ]
+  },
+  "sports-items": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Football · basketball · golf balls and tees · sports towel · yoga mat · gym bag"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    }
+   ],
+   "logo": "One logo per item, one colour, the method's minimum (print 40 mm on fabric, 20 mm pad print on balls).",
+   "do": [
+    "Company sport days and sponsorships"
+   ],
+   "dont": [
+    "Slogans, website lists or social icons on the item",
+    "Team colours"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39
+   ]
+  },
+  "outdoor-items": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Picnic blanket · camping chair · flashlight · multi-tool (not for China) · cooler box"
+    },
+    {
+     "k": "Colours",
+     "v": "Black"
+    }
+   ],
+   "logo": "One colour, the method's minimum; on fabric 40 mm, on metal 20 mm.",
+   "do": [
+    "Staff trips and gifts"
+   ],
+   "dont": [
+    "A multi-tool (a knife) as a gift in China",
+    "Gold, chrome, mirror or silver-look logos"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "home-items": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Throw blanket · scented candle · photo frame · cushion · towel set"
+    },
+    {
+     "k": "Colours",
+     "v": "Black · white · silver / grey · natural"
+    }
+   ],
+   "logo": "Woven or embroidered on textiles (25 mm woven label, 50 mm embroidery); on the candle's box only.",
+   "do": [
+    "Quiet, well-made pieces"
+   ],
+   "dont": [
+    "The logo across a cushion or blanket",
+    "Slogans, website lists or social icons on the item"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "low-cost-giveaways": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Pen · keyring · screen cloth · sticker pack · mint tin · hand sanitizer · stress ball shaped like a thread spool · lip balm · bottle opener"
+    },
+    {
+     "k": "Colours",
+     "v": "Black (standard) · white"
+    },
+    {
+     "k": "Quantities",
+     "v": "Given in hundreds: order from one approved sample per item"
+    }
+   ],
+   "logo": "The full logo at the method's minimum (20 mm pad print) — leave it off anything too small.",
+   "do": [
+    "Few things, good ones — a cheap one that breaks speaks about our machines (ch. 123)"
+   ],
+   "dont": [
+    "Slogans, website lists or social icons on the item",
+    "Items that break or smell of cheap plastic"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    123,
+    39,
+    41
+   ]
+  },
+  "gift-kits": {
+   "specs": [
+    {
+     "k": "Kits",
+     "v": "New dealer welcome kit · customer thank-you kit · VIP visitor kit · exhibition giveaway kit · new employee welcome kit (Employees) · training attendee kit"
+    },
+    {
+     "k": "Box",
+     "v": "Black box with silver foil · tote bag · drawstring bag"
+    },
+    {
+     "k": "List",
+     "v": "Each kit lists its items and its box so anyone orders it the same way"
+    }
+   ],
+   "logo": "The box: white logo top-left, 40 mm; each item its own mark.",
+   "do": [
+    "Keep each kit's list in its design files"
+   ],
+   "dont": [
+    "Mixing items from different kits"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery. The gift box: black rigid soft-touch box, the white logo top-left, a silver band (ch. 124).",
+   "book": [
+    123,
+    124
+   ]
+  },
+  "eco-line": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Bamboo pen · recycled PET tote · seed paper card · wheat-straw cup · cork notebook"
+    },
+    {
+     "k": "Colours",
+     "v": "The material's natural tone, the logo black"
+    }
+   ],
+   "logo": "Laser or print in the material's own tone or black, the method's minimum (wood 25 mm).",
+   "do": [
+    "Say what it is made of on the tag"
+   ],
+   "dont": [
+    "Green colours or leaf symbols next to the logo",
+    "Claims we cannot prove"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39
+   ]
+  },
+  "kids-and-family": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Colouring book · crayons set · puzzle with a machine picture · balloons · stickers"
+    },
+    {
+     "k": "Pictures",
+     "v": "Our own machine drawings and photos"
+    }
+   ],
+   "logo": "Small and single: the full logo, 25 mm, on the cover or box only.",
+   "do": [
+    "Safe, certified materials (EN 71 / ASTM for toys)"
+   ],
+   "dont": [
+    "The logo on the colouring pages",
+    "Balloons for children under 8"
+   ],
+   "vendor": "Send the logo from the master vector file only (never a screenshot, never retyped). Approve a physical sample before the order — the Marketing Manager, then the Founder & CEO (ch. 134); check the logo's size, colour and place against this page on delivery.",
+   "book": [
+    39,
+    63
+   ]
+  }
+ }
+}

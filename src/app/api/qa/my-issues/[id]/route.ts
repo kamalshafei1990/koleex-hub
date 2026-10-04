@@ -20,6 +20,7 @@ import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, issueLink } from "@/lib/qa/notify";
 import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
 import { watcherTargets } from "@/lib/qa/watchers";
+import type { NotifTpl } from "@/lib/notification-templates";
 import { loadFixEvidence } from "@/lib/qa/evidence";
 
 const BUCKET = "qa-screenshots";
@@ -212,22 +213,24 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // assignee gets the admin-console link.
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, parseMentions(message));
   const actor = auth.username ?? "Reporter";
-  const suffix = hasAttachment ? " (with image)" : "";
+  // Translated per reader (translations/notif-templates/qa.ts); "(with
+  // image)" is its own sentence, not a suffix glued on.
+  const p = { actor, title: issue.title as string };
+  const mentionTpl: NotifTpl = hasAttachment ? { k: "qa_issue_mentioned.image", p } : { k: "qa_issue_mentioned", p };
+  const replyTpl: NotifTpl = hasAttachment ? { k: "qa_comment_added.reply.image", p } : { k: "qa_comment_added.reply", p };
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
     [
       ...mentioned.map((u) => ({
         recipientId: u.id,
         type: "qa_issue_mentioned" as const,
-        title: "You were mentioned",
-        body: `${actor} mentioned you on "${issue.title as string}"${suffix}`,
+        tpl: mentionTpl,
         link: issueLink(id),
       })),
       {
         recipientId: issue.assigned_to as string | null,
         type: "qa_comment_added" as const,
-        title: "Reporter replied",
-        body: `${actor} replied on "${issue.title as string}"${suffix}`,
+        tpl: replyTpl,
         link: issueLink(id),
       },
       // Watchers (reporter replies are public → no internal restriction).
@@ -237,8 +240,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         actorId: auth.account_id,
         internal: false,
         type: "qa_comment_added",
-        title: "Reporter replied",
-        body: `${actor} replied on "${issue.title as string}"${suffix}`,
+        tpl: replyTpl,
       }),
     ],
   );
@@ -345,14 +347,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   // Notify the assignee + watchers that the report changed (not the actor).
   const actor = auth.username ?? "Reporter";
+  // Translated per reader (translations/notif-templates/qa.ts): the edited
+  // fields (1–3 of title / description / screenshots, in that order) are
+  // enum codes, listed by the template itself.
+  const [f1, f2, f3] = changed;
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
     [
       {
         recipientId: issue.assigned_to as string | null,
         type: "qa_comment_added" as const,
-        title: "Reporter edited their report",
-        body: `${actor} updated "${(patch.title as string) ?? issue.title}" (${changed.join(", ")})`,
+        tpl: { k: "qa_comment_added.edited", p: { actor, title: ((patch.title as string) ?? issue.title) as string, f1, f2, f3 } },
         link: issueLink(id),
       },
       ...await watcherTargets({
@@ -361,8 +366,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         actorId: auth.account_id,
         internal: false,
         type: "qa_comment_added",
-        title: "Reporter edited their report",
-        body: `${actor} updated their report (${changed.join(", ")})`,
+        tpl: { k: "qa_comment_added.edited.watcher", p: { actor, f1, f2, f3 } },
       }),
     ],
   );

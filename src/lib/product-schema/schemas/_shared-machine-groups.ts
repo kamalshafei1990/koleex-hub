@@ -82,14 +82,14 @@ export function physicalGroup(order: number): SpecGroup {
     fields: [
       {
         id: "machine_dimensions", key: "machine_dimensions",
-        label: "Machine Dimensions (L×W×H)", order: 10,
+        label: "Machine dimensions — net size, without packing (L×W×H)", order: 10,
         fieldType: "dimension", dataType: "string", unit: "mm", required: false,
         description: "Overall machine dimensions in mm (L×W×H).",
         ...pub, visualRenderType: "packing_block",
       },
       {
         id: "machine_weight_kg", key: "machine_weight_kg",
-        label: "Machine Weight", order: 20,
+        label: "Net weight (N.W.)", order: 20,
         fieldType: "unit_number", dataType: "number", unit: "kg", required: false,
         description: "Net weight of the machine.",
         suggestions: [100, 200, 350, 500, 800],
@@ -99,84 +99,12 @@ export function physicalGroup(order: number): SpecGroup {
   };
 }
 
-export function packingShippingGroup(order: number): SpecGroup {
-  return {
-    id: "packing-shipping",
-    title: "Packing & Shipping",
-    order,
-    formTab: "logistics",
-    fields: [
-      {
-        id: "packing_type", key: "packing_type", label: "Packing Type", order: 10,
-        fieldType: "select", dataType: "string", required: false,
-        description: "How the machine is packed for shipment.",
-        options: [
-          { value: "wooden_case", label: "Wooden Case" },
-          { value: "plywood_crate", label: "Plywood Crate" },
-          { value: "carton", label: "Carton" },
-          { value: "pallet_film", label: "Pallet + Stretch Film" },
-        ],
-        ...pub, visualRenderType: "technical_badge",
-      },
-      {
-        id: "packing_dimensions", key: "packing_dimensions",
-        label: "Packing Dimensions (L×W×H)", order: 20,
-        fieldType: "dimension", dataType: "string", unit: "mm", required: false,
-        description: "Packed crate dimensions in mm (L×W×H).",
-        ...pub, visualRenderType: "packing_block",
-      },
-      {
-        id: "cbm", key: "cbm", label: "CBM", order: 30,
-        fieldType: "unit_number", dataType: "number", unit: "m³", required: false,
-        description: "Packed volume in cubic metres.",
-        ...pub,
-        computed: { from: "packing_dimensions", formula: "cbm_m3_from_mm_dimensions" },
-        visualRenderType: "spec_card",
-      },
-      {
-        id: "net_weight", key: "net_weight", label: "Net Weight (N.W.)", order: 40,
-        fieldType: "unit_number", dataType: "number", unit: "kg", required: false,
-        description: "Net shipping weight on the packing list.",
-        ...pub,
-        computed: { from: "machine_weight_kg", formula: "copy_number" },
-        visualRenderType: "spec_card",
-      },
-      {
-        id: "gross_weight", key: "gross_weight", label: "Gross Weight", order: 50,
-        fieldType: "unit_number", dataType: "number", unit: "kg", required: false,
-        description: "Gross shipping weight.",
-        ...pub, visualRenderType: "spec_card",
-      },
-      {
-        id: "container_20ft_qty", key: "container_20ft_qty",
-        label: "Qty per 20ft Container", order: 60,
-        fieldType: "unit_number", dataType: "number", unit: "units", required: false,
-        description: "How many units load into one 20ft container.",
-        ...pub,
-        computed: { from: "cbm", formula: "qty_per_20ft_from_cbm" },
-        visualRenderType: "spec_card",
-      },
-      {
-        id: "container_40ft_qty", key: "container_40ft_qty",
-        label: "Qty per 40ft Container", order: 70,
-        fieldType: "unit_number", dataType: "number", unit: "units", required: false,
-        description: "How many units load into one 40ft STANDARD container.",
-        ...pub,
-        computed: { from: "cbm", formula: "qty_per_40ft_from_cbm" },
-        visualRenderType: "spec_card",
-      },
-      {
-        id: "container_40hq_qty", key: "container_40hq_qty",
-        label: "Qty per 40HQ Container", order: 80,
-        fieldType: "unit_number", dataType: "number", unit: "units", required: false,
-        description: "How many units load into one 40ft High-Cube container.",
-        ...pub,
-        computed: { from: "cbm", formula: "qty_per_40hq_from_cbm" },
-        visualRenderType: "spec_card",
-      },
-    ],
-  };
-}
+/* packingShippingGroup() — REMOVED 2026-09-13. Packing stopped being a
+   template question: a crate is a crate whatever the machine inside it does,
+   so the Hub asks it of EVERY product from one fixed section on the Packing &
+   Logistics tab (src/components/admin/form-sections/LogisticsBlocks.tsx),
+   stored in products.logistics. As a template field it reached 7 subcategories
+   out of 25, with two different option lists. Do not reinstate it here. */
 
 export function safetyComplianceGroup(
   order: number,

@@ -30,7 +30,7 @@ export function TranslatableBody({
   autoTranslate,
   targetLang,
   t,
-  className = "text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words",
+  className = "text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words",
 }: {
   body: string;
   messageId: string;

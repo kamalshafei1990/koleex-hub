@@ -3,9 +3,10 @@ import { stageTimer } from "@/lib/server/perf";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { getServerAuth } from "@/lib/server/auth";
+import { getServerAuthOutcome, authFailureResponse } from "@/lib/server/auth";
 import { isInCustomersServerListCohort } from "@/lib/server/customers-rollout";
 import { isInSuppliersServerListCohort } from "@/lib/server/suppliers-rollout";
+import { isInContactsServerListCohort } from "@/lib/server/contacts-rollout";
 
 /* GET /api/me/bootstrap
    Consolidates the three hot per-page /api/me/* lookups (context,
@@ -26,12 +27,24 @@ const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox", "Notes"];
 
 export async function GET() {
   const timer = stageTimer("me.bootstrap");
-  const auth = await getServerAuth();
+  /* THE OUTCOME, NOT THE BOOLEAN. `getServerAuth()` collapses every failure
+     to null, and this route turned that null into one flat 401 — so a DB
+     blip during the accounts lookup ("backend_unavailable", which the auth
+     layer classifies as 503 precisely because the caller IS signed in) came
+     back here as "Not signed in". The client treats a bootstrap 401 as proof
+     the cookie is dead and now clears the session hints on it; sending 401
+     for our own outage would sign a working session out. It also never sent
+     the `code` the client has been branching on, which left the
+     deactivated-account message unreachable. authFailureResponse carries
+     both the right status and the right code. */
+  const outcome = await getServerAuthOutcome();
   timer.mark("auth");
-  if (!auth) {
-    timer.done({ status: 401 });
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (!outcome.ok) {
+    const res = authFailureResponse(outcome.reason);
+    timer.done({ status: res.status });
+    return res;
   }
+  const auth = outcome.auth;
 
   /* In role-mode the SA is still themselves — but we want the HEADER
      row to reflect the target role too, so the picker / banner can
@@ -49,7 +62,7 @@ export async function GET() {
          role_id, contact_id, tenant_id, login_email, force_password_change,
          two_factor_enabled, last_login_at, created_at, updated_at,
          is_super_admin, preferences,
-         person:people(id, full_name, name_alt, email, avatar_url, first_name, last_name, phone, job_title, country, city, language),
+         person:people(id, full_name, name_alt, display_name, email, avatar_url, first_name, last_name, phone, mobile, job_title, country, city, state, postal_code, address_line1, address_line2, notes, language),
          role:roles(id, name, is_super_admin, can_view_private, description, display_order)`,
       )
       .eq("id", auth.account_id)
@@ -143,6 +156,12 @@ export async function GET() {
     /* Wave 2A.2 controlled rollout: same trusted, server-resolved pattern for
        the Suppliers server-list UI. Independent cohort (own env var). */
     suppliersServerList: isInSuppliersServerListCohort(
+      auth.real_account_id ?? auth.account_id,
+      auth.user_type,
+    ),
+    /* Wave 2A: same trusted, server-resolved pattern for the generic Contacts
+       server-list UI. Independent cohort (own env var). */
+    contactsServerList: isInContactsServerListCohort(
       auth.real_account_id ?? auth.account_id,
       auth.user_type,
     ),

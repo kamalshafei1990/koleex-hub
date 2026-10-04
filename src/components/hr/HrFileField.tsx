@@ -63,6 +63,7 @@ export default function HrFileField({
   errorLabel,
   disabled,
   shape = "wide",
+  endpoint = "/api/hr/upload",
 }: {
   /** Storage path (or a legacy URL), "" when empty. */
   value: string;
@@ -81,6 +82,10 @@ export default function HrFileField({
      identity document is a 1.58:1 card; "wide" keeps the original full-width
      banner for generic attachments. */
   shape?: "wide" | "square" | "card";
+  /** Where the file goes. HR's gateway by default; the employee's own
+   *  "My HR" leave form points it at /api/me/hr/upload, which needs no HR
+   *  permission and only ever writes into the leave folder. */
+  endpoint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -106,7 +111,7 @@ export default function HrFileField({
         fd.append("file", file);
         fd.append("name", file.name);
         fd.append("folder", folder);
-        const res = await fetch("/api/hr/upload", {
+        const res = await fetch(endpoint, {
           method: "POST",
           credentials: "include",
           body: fd,
@@ -125,7 +130,7 @@ export default function HrFileField({
         setBusy(false);
       }
     },
-    [folder, onChange, errorLabel],
+    [folder, onChange, errorLabel, endpoint],
   );
 
   const onDrop = (e: React.DragEvent) => {

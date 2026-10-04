@@ -11,6 +11,7 @@
    showing a hint or an error never shifts the rows below it.
    --------------------------------------------------------------------------- */
 
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 /* ── THE CARD RECIPE ──
@@ -100,6 +101,31 @@ export function TextField({
   );
 }
 
+/* ── dates are ALWAYS Day/Month/Year — the owner's standing rule ──
+   A native <input type="date"> renders in the BROWSER'S locale: en-US Chrome
+   shows mm/dd/yyyy and no attribute can override it, which is exactly what
+   the owner saw on six fields. On a visa document 03/12 vs 12/03 is a
+   different day, so the visible control is OURS: a dd/mm/yyyy text field.
+   State and API stay ISO (yyyy-mm-dd); only the display is day-first. The
+   native input survives HIDDEN behind the calendar button, so the picker is
+   still one tap away — and whatever it returns is re-displayed as DMY. */
+
+function isoToDmy(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
+function dmyToIso(text: string): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text.trim());
+  if (!m) return null;
+  const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  /* Reject 31/02 etc. by round-tripping through a real calendar. */
+  const probe = new Date(Date.UTC(y, mo - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== mo - 1 || probe.getUTCDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 export function DateField({
   label,
   value,
@@ -111,14 +137,74 @@ export function DateField({
   onChange: (v: string) => void;
   hint?: string;
 }) {
+  /* While the user types, `draft` holds their raw text; when they leave the
+     field (or a valid date lands), display derives from the ISO value again —
+     so autofill from the customer record or a passport scan always shows. */
+  const [draft, setDraft] = useState<string | null>(null);
+  const nativeRef = useRef<HTMLInputElement>(null);
+  const shown = draft ?? isoToDmy(value);
+
+  const commit = (text: string) => {
+    setDraft(text);
+    const iso = dmyToIso(text);
+    if (iso) onChange(iso);
+    else if (text.trim() === "") onChange("");
+  };
+
   return (
     <Field label={label} hint={hint}>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${CONTROL} tabular-nums`}
-      />
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="dd/mm/yyyy"
+          value={shown}
+          onChange={(e) => {
+            /* Auto-insert the slashes as digits arrive, so typing 12031985
+               lands as 12/03/1985 — but never fight a user who is deleting. */
+            let t = e.target.value;
+            if (t.length > (draft ?? shown).length && /^\d{2}$/.test(t)) t += "/";
+            else if (t.length > (draft ?? shown).length && /^\d{2}\/\d{2}$/.test(t)) t += "/";
+            commit(t);
+          }}
+          onBlur={() => setDraft(null)}
+          className={`${CONTROL} pe-10 tabular-nums`}
+        />
+        <button
+          type="button"
+          aria-label={`${label} — open calendar`}
+          onClick={() => {
+            const el = nativeRef.current;
+            if (!el) return;
+            try {
+              el.showPicker();
+            } catch {
+              el.focus();
+              el.click();
+            }
+          }}
+          className="absolute inset-y-0 end-2 my-auto flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+            <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+          </svg>
+        </button>
+        {/* The native input, hidden but functional: it powers the picker and
+            nothing else. Its locale-formatted text is never visible. */}
+        <input
+          ref={nativeRef}
+          type="date"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={value}
+          onChange={(e) => {
+            setDraft(null);
+            onChange(e.target.value);
+          }}
+          className="pointer-events-none absolute bottom-0 end-2 h-0 w-0 opacity-0"
+        />
+      </div>
     </Field>
   );
 }
@@ -226,7 +312,10 @@ export function ChipsField({
 }: {
   label: string;
   selected: string[];
-  options: string[];
+  /** value = the canonical (stored/printed) name; label = the display name
+   *  in the active language — dropdown/chip contents are translated, the
+   *  owner's standing rule. */
+  options: { value: string; label: string }[];
   onToggle: (v: string) => void;
   hint?: string;
 }) {
@@ -234,18 +323,18 @@ export function ChipsField({
     <Field label={label} hint={hint} wide>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {options.map((o) => {
-          const on = selected.includes(o);
+          const on = selected.includes(o.value);
           return (
             <button
-              key={o}
+              key={o.value}
               type="button"
-              onClick={() => onToggle(o)}
+              onClick={() => onToggle(o.value)}
               aria-pressed={on}
               className={`rounded-full border px-3 py-1 text-sm transition-colors ${
                 on ? SELECTED_CHIP : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
               }`}
             >
-              {o}
+              {o.label}
             </button>
           );
         })}

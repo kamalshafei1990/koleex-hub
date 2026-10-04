@@ -27,24 +27,48 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { clientConversationId, insertConversation } from "@/lib/server/ai/new-conversation";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
+import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
-import { buildUserContext } from "@/lib/server/ai-agent/permissions";
+import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
+import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
+import { conversationTitle } from "@/lib/server/ai/conversation-title";
+/* Phase 2C — the streaming lanes build their prompts from the prompt layer
+   directly, rather than reaching through the orchestrator for them. */
+import { buildBrandSystemPrompt, buildMinimalSystemPrompt, buildNowLine } from "@/lib/server/ai/prompts";
+/* Phase 2B — the seals are their own layer now. The route applies the same
+   two it always did; it just no longer reaches through the orchestrator to
+   get them. */
+import { sealPricingSafety, stripProcessNarration } from "@/lib/server/ai/seals";
+/* Phase 2A — the lane decision now comes from the module that owns it,
+   not from the orchestrator that used to re-export it. */
 import {
-  orchestrate,
   classifyBrandSection,
   isSmallTalk,
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
-  buildBrandSystemPrompt,
-  buildMinimalSystemPrompt,
-  sealPricingSafety,
-  stripProcessNarration,
-} from "@/lib/server/ai-agent/orchestrator";
-import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
+  isWorldFactQuery,
+  isImageCreationRequest,
+} from "@/lib/server/ai/core/decide-turn";
+import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
+import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib/server/ai/provider/koleex-model-slots";
+import { featureSwitchedOff, switchedOffModels } from "@/lib/server/ai/provider/model-switches";
+import { generalLaneTools, runGeneralSearchHop, GENERAL_LANE_TOOL, GENERAL_SEARCH_NOTE, READ_PAGE_NOTE } from "@/lib/server/ai/core/general-search";
+import { READ_PAGE_TOOL_DEF, READ_PAGE_MAX_PER_ANSWER, linksInText, readPageForModel } from "@/lib/server/ai/core/read-page";
+import { thinkingNote } from "@/lib/server/ai/core/thinking-note";
+import { buildThinkingRecord, type ThinkingNote } from "@/lib/ai/thinking-record";
+import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
+import { meterTurn } from "@/lib/server/ai/cost/meter";
+import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
+import { planReveal } from "@/lib/server/ai/streaming/reveal";
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import {
   detectLanguageDirective,
@@ -59,90 +83,61 @@ import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-
 import { detectEntityScope } from "@/lib/server/ai/entity-scope";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
-/* Hard cap on history we ship to the orchestrator. 6 messages = 3
-   user+assistant pairs; enough for short-term multi-turn context,
-   small enough to keep agent payloads tight (30–40% smaller than the
-   old 10-message cap). Pure performance/stability cap — does not
-   alter tool routing or business behaviour. */
-const HISTORY_LIMIT = 6;
+/* A ceiling on a turn. Without one a hung provider call could hold the SSE
+   open, keepalives hiding the failure, for as long as the platform allows
+   (audit, 2026-09-07). Five minutes: two did not cover a list of a hundred
+   rows on a model that reasons before it writes — the owner's "top 100
+   brands" on Deep hit the two-minute wall twice and got "No reply was
+   received" (2026-09-26). The loop's own time budget (orchestrator
+   LOOP_ANSWER_AFTER_MS) starts the answer long before this. */
+export const maxDuration = 300;
 
-/* Canned fast-path mirror. Keep in sync with /api/ai/chat FAST_REPLIES
-   and orchestrator.ts. Matched server-side before any provider call —
-   skips buildUserContext + history SELECT + orchestrator entirely so
-   greetings / identity / acks return in roughly the auth+writes budget
-   instead of auth+6-round-trips+provider. */
-/* Canned replies using the APPROVED Section 3 (Basic Conversation)
-   text verbatim. Exact-match regexes only — variations still flow
-   to the orchestrator and get a natural response. Q9 "what are
-   you?" intentionally NOT here — it routes through brand knowledge
-   for the Section 2 identity answer. */
-const Q1_GREETING =
-  "Hello.\n\nKoleex AI is here and ready to help.\n\nFeel free to ask anything — about Koleex, business topics, or general questions — or to request assistance with tasks.\n\nHow can I help you today?";
-const Q2_HOW_ARE_YOU =
-  "I'm doing well, thank you for asking.\n\nEverything is running smoothly, and I'm ready to help with anything you need — whether it's a question, a task, or just a quick conversation.\n\nHow can I help you today?";
-const Q3_HOW_OLD =
-  "I don't have an age like a human.\n\nI'm a digital system, so I don't grow older, but I'm continuously updated and improved to provide better support and performance over time.\n\nYou can think of me as always up to date and evolving to serve you better.";
-const Q4_WHAT_DOING =
-  "I'm here with you and ready to help.\n\nRight now, I'm just waiting for your next question or anything you'd like me to do — whether it's answering something, helping with a task, or just having a quick chat.";
-const Q5_WHERE_ARE_YOU =
-  "I'm not in a physical place like a person.\n\nI exist digitally, so you can access me from anywhere — whether you're using a computer, a phone, or any connected device.\n\nSo in a way, I'm right here with you.";
-const Q7_CAN_YOU_HELP =
-  "Of course, I'd be happy to help.\n\nJust tell me what you need, and I'll do my best to assist — whether it's answering a question, helping with a task, or guiding you through something step by step.\n\nYou can keep it simple and just say what's on your mind. I'm here for you.";
-const Q8_ARE_YOU_BUSY =
-  "Not at all.\n\nI'm always available and ready to help you whenever you need.\n\nYou can ask anything or request any task, and I'll be here to support you. Take your time — I'm here.";
-const Q10_PURPOSE =
-  "My purpose is to make things easier for you.\n\nI'm here to help you find information, complete tasks, and communicate more smoothly — whether it's related to Koleex, business needs, or general questions.\n\nI'm designed to save you time, simplify processes, and support you whenever you need assistance.";
-
-const FAST_REPLIES: Array<[RegExp, string]> = [
-  // Q1 — greetings
-  [/^(hi|hello|hey|yo|hola)[\s,!.?]*$/i,                       Q1_GREETING],
-  [/^(good\s+(morning|afternoon|evening|night))[\s,!.?]*$/i,   Q1_GREETING],
-  [/^(salam|salaam|مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/i,         "مرحبا! أنا Koleex AI، جاهز لمساعدتك. اسأل عن أي شيء يخص Koleex أو أي موضوع آخر، أو اطلب مساعدة في أي مهمة."],
-  [/^(你好|您好|嗨)[\s,!.?]*$/,                                 "你好!我是 Koleex AI,随时为您提供帮助。您可以问关于 Koleex、业务或任何其他话题的问题。"],
-
-  // Q2 — how are you
-  [/^how\s+(are|r)\s+(you|u)\s*[?!.]*$/i,                      Q2_HOW_ARE_YOU],
-  [/^how's\s+it\s+going\s*[?!.]*$/i,                           Q2_HOW_ARE_YOU],
-
-  // Q3 — how old are you
-  [/^how\s+old\s+(are|r)\s+(you|u)\s*[?!.]*$/i,                Q3_HOW_OLD],
-
-  // Q4 — what are you doing
-  [/^what\s+(are|r)\s+(you|u)\s+doing(\s+now)?\s*[?!.]*$/i,    Q4_WHAT_DOING],
-
-  // Q5 — where are you
-  [/^where\s+(are|r)\s+(you|u)(\s+now)?\s*[?!.]*$/i,           Q5_WHERE_ARE_YOU],
-
-  // Q7 — can you help / help me
-  [/^(can\s+you\s+help\s+(me|us)|help\s+me)(\s+with\s+something)?\s*[?!.]*$/i, Q7_CAN_YOU_HELP],
-
-  // Q8 — are you busy
-  [/^(are|r)\s+(you|u)\s+busy(\s+right\s+now)?\s*[?!.]*$/i,    Q8_ARE_YOU_BUSY],
-
-  // Q10 — what is your purpose
-  [/^what('?s|\s+is)\s+your\s+purpose\s*[?!.]*$/i,             Q10_PURPOSE],
-
-  /* Identity questions (Q9 "what are you", "who are you", "who
-     created you", "what can you do") DROPPED — they flow through
-     the orchestrator for Section 2 brand-knowledge answers. */
-
-  // Acks
-  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                   "You're welcome."],
-  [/^(ok|okay|cool|got\s+it|understood)[\s!.?]*$/i,            "Okay."],
-  [/^(bye|goodbye|see\s+you)[\s!.?]*$/i,                       "See you!"],
-];
-
-function tryFastReply(msg: string): string | null {
-  const m = msg.trim();
-  if (!m) return null;
-  for (const [pat, reply] of FAST_REPLIES) {
-    if (pat.test(m)) return reply;
-  }
-  return null;
+/* THE RETRACT FRAME CARRIES WHAT WAS SAID (owner, 2026-09-26: "the words come
+   quickly and remove quickly"). The narration a model streamed before it
+   looked something up leaves the answer, as before; the screen now keeps it
+   in the Thinking panel instead of dropping it. core/thinking-note.ts decides
+   what of it is safe to keep. Not a route export: segment files may export
+   only their config and handlers. */
+function retractFrame(said: string): { type: "retract"; note?: string } {
+  const note = thinkingNote(said);
+  return note ? { type: "retract", note } : { type: "retract" };
 }
 
-/** Auto-title rule — identical to /chat. Pulled into a helper so the
- *  canned and non-canned branches can share it without drift. */
+/* Conversation memory window. 6 messages (3 exchanges) turned out to be
+   the reason Koleex AI felt like a question-answerer rather than a
+   conversation partner — anything said four exchanges ago was simply gone
+   (owner: "make sure it has a memory and can remember the conversation").
+   60 messages = 30 exchanges, bounded by HISTORY_CHAR_BUDGET so a
+   long-winded thread cannot blow the payload: messages are kept newest-
+   first until the budget runs out, so it degrades to exactly the old
+   behaviour under heavy load. Attachment embeds stay bounded separately —
+   resolveHistoryAttachEmbeds keeps only the newest document's text. */
+const HISTORY_LIMIT = 60;
+/** Characters allowed in one typed turn; longer text goes as a file. */
+const MAX_CONTENT_CHARS = 24_000;
+/* The general lane's ceiling for a list asked for by name, or for Deep: a
+   hundred-row table fits, with room for a model that thinks first. At the
+   dearest serving model's output price this is a couple of cents. */
+const GENERAL_LONG_MAX_TOKENS = 4000;
+const HISTORY_CHAR_BUDGET = 48000;
+
+/** Newest-first char-budget trim, applied AFTER the chronological flip:
+ *  drop the OLDEST messages once the running total exceeds the budget. */
+function trimHistoryToBudget<T extends { content: string }>(history: T[]): T[] {
+  let total = 0;
+  const kept: T[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    total += history[i].content.length;
+    if (total > HISTORY_CHAR_BUDGET && kept.length > 0) break;
+    kept.unshift(history[i]);
+  }
+  return kept;
+}
+
+
+/** Auto-title rule, shared with the voice lane (lib/server/ai/conversation-title).
+ *  Pulled into a helper so the canned and non-canned branches can share it
+ *  without drift. */
 function computeTitle(
   conv: { title: string | null; message_count: number | null },
   content: string,
@@ -150,16 +145,21 @@ function computeTitle(
   if ((conv.title !== "New chat" && conv.title) || (conv.message_count ?? 0) !== 0) {
     return conv.title;
   }
-  const trimmed = content.trim();
-  const words = trimmed.split(/\s+/);
-  return words.length <= 4
-    ? trimmed.slice(0, 60)
-    : words.slice(0, 4).join(" ").slice(0, 60);
+  return conversationTitle(content) || content.trim().slice(0, 60);
 }
+
+/** A turn no model could answer (AgentResponse.failed) — thrown inside the
+ *  stream so the one catch reports it: error frame, ok=0, nothing saved. */
+class TurnFailedError extends Error {}
 
 export async function POST(req: Request) {
   const t0 = Date.now();
-  const auth = await requireAuth();
+  /* Plan G1: one id for this turn, on every line it writes. */
+  const trace = newTraceId();
+  /* WITH `req`: a super admin viewing as someone is read-only here as on
+     every other write route (deep check, 2026-09-24) — a chat turn writes
+     messages into that person's thread and can run write tools as them. */
+  const auth = await requireAuth(req);
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
   {
@@ -167,7 +167,48 @@ export async function POST(req: Request) {
     if (notInternal) return notInternal;
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
+  /* ── AUDIT ISSUE 4 (P0): rate limiting ────────────────────────────────
+     Nothing bounded AI volume before this. Authentication and
+     requireInternalUser stop strangers; they do nothing about a compromised
+     account or a client stuck in a retry loop, where each request costs four
+     model calls. Checked AFTER auth so the counter is keyed to a real
+     account, and before any provider work so a blocked request costs nothing.
+     Fails OPEN if the counter store is unreachable — see the module header. */
+  /* The body is parsed alongside the budget round trip — it needs nothing
+     from it (audit, 2026-09-07). */
+  const bodyP = req.json().catch(() => ({}));
+  /* THE BUDGET RUNS BESIDE THE OWNERSHIP READ (deep check, 2026-09-24): both
+     are round trips and neither needs the other, so the conversation lookup
+     no longer waits for the counter. The verdict is still applied BEFORE any
+     write or provider call — `budgetGate` is awaited just ahead of the
+     ownership check below, and a refused turn returns there. */
+  const budgetP = limitMode() !== "off"
+    ? Promise.all([
+        consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
+        consumeBudget(subjectFor.tenant(auth.tenant_id), BUDGETS.turnPerTenant()),
+      ])
+    : null;
+  /* A request refused for its body (400/413) returns before the gate is
+     read; the counter's promise must not become an unhandled rejection. */
+  void budgetP?.catch(() => undefined);
+  const budgetGate = async (): Promise<NextResponse | null> => {
+    if (!budgetP) return null;
+    const [perAccount, perTenant] = await budgetP;
+    const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
+    if (hit && !hit.allowed) {
+      const scope = !perAccount.allowed ? "account" : "tenant";
+      console.warn(`[ai.ratelimit] ep=agent scope=${scope} count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+      if (limitMode() === "enforce") {
+        return NextResponse.json(
+          { error: "Koleex AI is handling a lot of requests from your account right now. Give it a moment and try again." },
+          { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
+        );
+      }
+    }
+    return null;
+  };
+
+  const body = (await bodyP) as {
     conversationId?: string;
     content?: string;
     user_lang?: "en" | "zh" | "ar";
@@ -177,14 +218,37 @@ export async function POST(req: Request) {
     /** The composer's globe control. A nudge, not a command: it tells the
      *  orchestrator the user explicitly wants the web checked this turn. */
     web_search?: boolean;
+    /** The Koleex AI model the user picked (lib/ai/koleex-models). A REQUEST:
+     *  resolveRequestedModel() decides what is honoured. */
+    model?: unknown;
+    /** The app named this chat and it may not exist yet: make it (the
+     *  caller's own) instead of answering 404. */
+    newConversation?: boolean;
+    /** The folder a new chat starts in — verified as the caller's. */
+    project_id?: unknown;
   };
 
   const content = body.content?.trim();
   const conversationId = body.conversationId;
+  /* THE CLIENT ASKS, THE SERVER DECIDES (owner, 2026-09-23). An unknown or
+     switched-off model is Auto; the chosen model's provider goes first and
+     the others stay behind it as failover. */
+  /* The owner's switches ride along (model-switches.ts, cached half a
+     minute — no database trip on an ordinary turn). */
+  const chosenModel = resolveRequestedModel(body.model, await switchedOffModels());
+  const prefer = adapterForModel(chosenModel);
   const wantsStream =
     body.stream === true || req.headers.get("accept") === "text/event-stream";
   if (!content) {
     return NextResponse.json({ error: "content required" }, { status: 400 });
+  }
+  /* ONE TURN HAS A CEILING. History is budgeted (48k chars) and attachments
+     are (60k), but the live turn itself was not — the one paid input a
+     client could make as large as it liked (audit, 2026-09-11). Long text
+     belongs in an attachment, which is read once and summarised. The client
+     maps 413 to a translated sentence. */
+  if (content.length > MAX_CONTENT_CHARS) {
+    return NextResponse.json({ error: "too_long" }, { status: 413 });
   }
   if (!conversationId) {
     return NextResponse.json({ error: "conversationId required" }, { status: 400 });
@@ -208,23 +272,60 @@ export async function POST(req: Request) {
   const attachMarker = attFinal.length
     ? "\n\n" + attFinal.map((a) => `📎 ${a.name}`).join("\n")
     : "";
+  /* AUDIT ISSUE 5 (P0) — extracted text is fenced, not pasted.
+     The previous framing said "answer using it" with a CONSTANT `"""`
+     delimiter: a document containing its own `"""` line closed the fence
+     early and everything after it read as top-level conversation. The fence
+     id is now a per-turn nonce the document cannot have been written to
+     contain. Images arrive through this same path (vision output is text),
+     so this covers photographed instructions too. */
+  const fenceId = newFenceId();
   const attachBlock = attFinal
-    .map(
-      (a) =>
-        `\n\n[ATTACHED FILE: ${a.name}] (uploaded by the user — its extracted text follows; answer using it and never claim you cannot open files)\n"""\n${a.text}\n"""`,
-    )
+    .map((a) => fenceUntrusted(a.text, "document", a.name, fenceId))
     .join("");
+  /* The row this turn writes. The history SELECT runs beside the INSERT,
+     and when the insert lands first the select returns it — so the turn
+     was appended a second time and the model saw the question twice
+     (audit, 2026-09-07). The newest history row equal to it is dropped. */
+  const persistedUserContent = content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : "");
+  const withoutThisTurn = <T extends { role: string; content: string }>(rows: T[]): T[] => {
+    const last = rows[rows.length - 1];
+    return last && last.role === "user" && last.content === persistedUserContent ? rows.slice(0, -1) : rows;
+  };
 
-  /* Confirm the conversation is mine. Must stay sequential — a 404
-     should be side-effect-free; no inserts fire if the conv isn't ours. */
-  const { data: conv } = await supabaseServer
-    .from("ai_conversations")
-    .select("id, title, message_count")
-    .eq("id", conversationId)
-    .eq("tenant_id", auth.tenant_id)
-    .eq("account_id", auth.account_id)
-    .maybeSingle();
+
+  /* Confirm the conversation is mine. Must stay BEFORE any insert — a 404
+     should be side-effect-free. The reply-language READ beside it needs
+     nothing from it and used to wait a full round trip for it (audit,
+     2026-09-07); a read on a 404 costs nothing. */
+  const [refused, { data: found }, storedLang] = await Promise.all([
+    budgetGate(),
+    supabaseServer
+      .from("ai_conversations")
+      .select("id, title, message_count")
+      .eq("id", conversationId)
+      .eq("tenant_id", auth.tenant_id)
+      .eq("account_id", auth.account_id)
+      .maybeSingle(),
+    getReplyLanguage(auth.account_id),
+  ]);
   const tConv = Date.now();
+  if (refused) return refused;
+  /* THE FIRST MESSAGE MAKES ITS CHAT (owner, 2026-09-26, from the phone in
+     the mainland: the answer to a separate "make a chat" request was lost on
+     the link twice before the question could even leave — twenty seconds).
+     The app names a new chat's id and says so; the row is made here, by the
+     same rules as POST /api/ai/conversations (the caller's own, a UUID, a
+     second ask finds the first). Anything else that is not found is still a
+     side-effect-free 404. */
+  let conv = found;
+  if (!conv && body.newConversation === true) {
+    const newId = clientConversationId(conversationId);
+    if (newId) {
+      const made = await insertConversation(auth, { id: newId, projectId: body.project_id });
+      if (made.ok) conv = { id: made.row.id, title: String(made.row.title ?? "New chat"), message_count: Number(made.row.message_count ?? 0) };
+    }
+  }
   if (!conv) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -245,7 +346,7 @@ export async function POST(req: Request) {
     "en";
 
   const directive = detectLanguageDirective(content);
-  let lockedLang = await getReplyLanguage(auth.account_id);
+  let lockedLang = storedLang;
   if (directive === "clear") {
     lockedLang = null;
     void setReplyLanguage(auth.account_id, null);
@@ -263,7 +364,7 @@ export async function POST(req: Request) {
      Skips buildUserContext + history SELECT + orchestrate. Writes
      (user turn, assistant turn, conversation update) are independent
      once we know the conversation is ours, so run them in parallel. */
-  const fast = attFinal.length > 0 ? null : tryFastReply(content);
+  const fast = attFinal.length > 0 ? null : tryCannedReply(content);
   if (fast) {
     const finalTitle = computeTitle(conv, content);
     const [, assistantInsert] = await Promise.all([
@@ -305,7 +406,8 @@ export async function POST(req: Request) {
        see lane / endpoint / provider / intent / fallback / sizes / ms. */
     console.log(
       `[ai] lane=protected ep=agent provider=fast-path intent=canned` +
-        ` fallback=0 in_bytes=${content.length} hist=0 ms=${tEnd - t0}`,
+        ` fallback=0 in_bytes=${content.length} hist=0 ms=${tEnd - t0}` +
+        traceFields({ trace, ttftMs: tEnd - t0, ok: true }),
     );
 
     const agent: AgentResponse = {
@@ -331,8 +433,15 @@ export async function POST(req: Request) {
           controller.enqueue(
             send({
               type: "end",
-              agent,
-              message: assistantInsert.data,
+              /* PHASE 7 / finding N11 — the browser is told the LANE, not the
+                 vendor. The row persisted above keeps the real label, because
+                 the audit trail is not the browser. See
+                 observability/public-provider.ts. */
+              agent: withPublicProvider(agent),
+              /* Which Koleex model answered — a Koleex name, never a vendor. Null
+                 when no model did (a canned or degraded reply). */
+              model: servedKoleexModel(agent.provider),
+              message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
             }),
@@ -351,8 +460,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      agent,
-      message: assistantInsert.data,
+      agent: withPublicProvider(agent),
+      /* Which Koleex model answered — a Koleex name, never a vendor. Null
+         when no model did (a canned or degraded reply). */
+      model: servedKoleexModel(agent.provider),
+      message: withPublicProvider(assistantInsert.data),
       conversation: { id: conversationId, title: finalTitle },
     });
   }
@@ -373,28 +485,105 @@ export async function POST(req: Request) {
      row once it's available. */
   if (wantsStream) {
     const encoder = new TextEncoder();
-    const send = (obj: unknown) =>
-      encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+    /* THE THINKING RECORD, SAVED WITH THE REPLY (owner, 2026-09-26: keep the
+       Thinking panel). It is read off the frames this turn sends, so it holds
+       exactly what the screen was shown: each retract's note, how many
+       lookups had been announced when it was said, and when the answer began
+       (the first delta after the last lookup). lib/ai/thinking-record.ts
+       decides what of it is stored. */
+    const thinkT0 = Date.now();
+    const thinkNotes: ThinkingNote[] = [];
+    let thinkLookups = 0;
+    let thinkAnswerAt: number | null = null;
+    const trackThinking = (obj: unknown) => {
+      const f = obj as { type?: string; note?: unknown; steps?: unknown };
+      if (f?.type === "retract") {
+        if (typeof f.note === "string" && f.note) thinkNotes.push({ text: f.note, at: thinkLookups });
+        thinkAnswerAt = null;
+      } else if (f?.type === "steps" && Array.isArray(f.steps)) {
+        const n = (f.steps as AgentStep[]).filter((s) => s.kind === "tool-call").length;
+        if (n > thinkLookups) {
+          thinkLookups = n;
+          thinkAnswerAt = null;
+        }
+      } else if (f?.type === "delta" && thinkAnswerAt === null) {
+        thinkAnswerAt = Date.now();
+      }
+    };
+    const send = (obj: unknown) => {
+      trackThinking(obj);
+      return encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+    };
 
+    /* STOP REACHES THE SERVER (deep check, 2026-09-24). The browser's Stop
+       aborts its fetch; the stream is cancelled, and until now nothing here
+       noticed: the next enqueue threw into the catch, and the turn — model
+       rounds, lookups, WRITES — ran on to the end. `stopped` is set by
+       cancel(); every frame goes through emit(), which goes quiet; the
+       orchestrator reads it before each round and before any tool runs. */
+    let stopped = false;
     const stream = new ReadableStream<Uint8Array>({
+      cancel() {
+        stopped = true;
+      },
       async start(controller) {
+        const emit = (chunk: Uint8Array) => {
+          if (stopped) return;
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            stopped = true;
+          }
+        };
         /* Audit P1 #4 — lifted out of try{} so the finally{} block at
            the bottom can always clearInterval(), even when an early
            load step throws before the original `const keepalive` line. */
         let alive = true;
         let keepalive: ReturnType<typeof setInterval> | null = null;
+        /* Declared before the try so the failure path can name the lane and
+           the first-token time on its own [ai] line (plan G1). */
+        let fastLane: "brand" | "small" | "general" | null = null;
+        /* Plan G1: when the first streamed byte left for the browser. */
+        let tFirst: number | null = null;
+        /* HOW MANY TURNS WENT IN, READABLE FROM THE CATCH (owner, 2026-09-18:
+           "fix any issue in this app"). `history` is declared INSIDE the try
+           below, and the catch read `history.length` — which is not in scope
+           there. It compiled only because tsconfig's "lib" includes "dom",
+           whose global `history: History` carries a `.length`; on the server
+           that global does not exist, so the catch threw `ReferenceError:
+           history is not defined` on its first statement after the
+           console.error — BEFORE the `{type:"error"}` frame was enqueued.
+
+           What that cost on every failed turn: the browser got a stream that
+           simply ENDED, so the screen fell through to "No reply was received"
+           instead of the sentence written for this case; and the
+           `[ai] … ok=false` line that plan G1 added — the whole error-rate
+           signal — was never written, so the failures were invisible in the
+           very logs meant to count them. Pressing Stop mid-answer takes this
+           path too: the aborted stream makes the next enqueue throw.
+
+           Captured here, beside the timer it is logged with, so both lines
+           read a binding that exists on both paths. */
+        let histLen = 0;
         try {
-          controller.enqueue(send({ type: "start", conversationId }));
+          emit(send({ type: "start", conversationId }));
 
           /* Load history + ctx + insert user turn in parallel, same
              as the JSON path — but emit a keepalive comment every
              ~1.5s so intermediate proxies don't close the connection
              and the client sees activity even when orchestrate is slow. */
-          const [historyRes, ctx] = await Promise.all([
+          /* The taught block rides the same batch: it needs only the tenant,
+             and it used to be a further round trip after these (audit,
+             2026-09-07). Cached 60 s in the lib. */
+          const [historyRes, ctx, , taughtBlock] = await Promise.all([
             supabaseServer
               .from("ai_messages")
               .select("role, content, created_at")
               .eq("conversation_id", conversationId)
+              /* Ownership was checked on the conversation; the tenant is on
+                 this read too, so the rule "tenant on every read" does not
+                 depend on the order of the checks (security review). */
+              .eq("tenant_id", auth.tenant_id)
               .order("created_at", { ascending: false })
               .limit(HISTORY_LIMIT),
             buildUserContext(auth),
@@ -402,17 +591,25 @@ export async function POST(req: Request) {
               tenant_id: auth.tenant_id,
               conversation_id: conversationId,
               role: "user",
-              content: content + attachMarker,
+              content: persistedUserContent,
             }),
+            getTaughtAnswersBlock(auth.tenant_id ?? null),
           ]);
 
-          const history = (historyRes.data ?? [])
-            .slice()
-            .reverse()
-            .map((m) => ({
-              role: m.role as "user" | "assistant",
-              content: m.content as string,
-            }));
+          const history = trimHistoryToBudget(
+            resolveHistoryAttachEmbeds(
+              withoutThisTurn(
+                (historyRes.data ?? [])
+                  .slice()
+                  .reverse()
+                  .map((m) => ({
+                    role: m.role as "user" | "assistant",
+                    content: m.content as string,
+                  })),
+              ),
+            ),
+          );
+          histLen = history.length;
 
           /* Keepalive comments while orchestrate / fast-path runs.
              SSE treats lines starting with ":" as comments — they
@@ -420,7 +617,7 @@ export async function POST(req: Request) {
           keepalive = setInterval(() => {
             if (!alive) return;
             try {
-              controller.enqueue(encoder.encode(": ping\n\n"));
+              emit(encoder.encode(": ping\n\n"));
             } catch {
               /* Controller closed — nothing to do. */
             }
@@ -485,8 +682,25 @@ export async function POST(req: Request) {
              orchestrate() is ever called, so the exclusion has to exist here
              too. Any future tool that answers everyday questions needs the
              same treatment or this lane will swallow it. */
+          /* A FACT ABOUT THE WORLD IS LOOKED UP, NOT RECALLED (dependability
+             plan A4) — on the general lane when that lane can look it up for
+             this caller, otherwise in the tool loop. Owner, 2026-09-26: "top
+             100 brands" on Deep took three and a half minutes in the loop,
+             every round a reasoning call before a word appeared. The general
+             lane makes the lookup its first call (forced, below) and streams
+             the answer from the result, so the table starts appearing as soon
+             as the model starts writing. */
+          const worldFactOnGeneral =
+            isWorldFactQuery(normalizedContent) &&
+            !isLiveInfoQuery(normalizedContent) &&
+            body.web_search !== true &&
+            generalLaneTools(ctx) !== null;
           const isLiveInfo =
-            isLiveInfoQuery(normalizedContent) || body.web_search === true;
+            isLiveInfoQuery(normalizedContent) ||
+            (isWorldFactQuery(normalizedContent) && !worldFactOnGeneral) ||
+            /* "Draw me…" needs generate_image, which only the tool loop has. */
+            isImageCreationRequest(normalizedContent) ||
+            body.web_search === true;
           /* Memory/teaching intents ("remember this", "save for the team",
              "احفظ", "تذكر", "记住") MUST reach the tool loop — the fast
              lanes carry no tools, so they can only HALLUCINATE a saved
@@ -516,31 +730,57 @@ export async function POST(req: Request) {
           const isMidFlowReply =
             (assistantAskedConfirm || assistantAskedQuestion) &&
             normalizedContent.trim().length <= 300;
-          /* DeepSeek powers the fast lanes now (Groq fully removed).
-             USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
+          /* Both halves of the gate, stated here rather than discovered two
+             call frames down. Until Phase 4D the flag was checked INSIDE
+             deepseekChatStream, so a flag-off request entered this lane,
+             received an immediate error chunk and fell through — the same
+             destination, reached the long way. streamingFastLaneEnabled()
+             makes that explicit; see router/provider-policy.ts, which also
+             records what the flag does NOT do. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
           /* Owner-taught canonical answers ride EVERY lane — the fast
              paths too, since brand-ish questions are exactly what gets
-             taught. Cached 60s in the lib. */
-          const taughtBlock = await getTaughtAnswersBlock(auth.tenant_id ?? null);
+             taught. Loaded in the batch above. */
           /* Knowledge nudge: strongest approved-knowledge hits for THIS
              question ride the fast lanes too — the fast paths carry no
              tools, so without this the curated knowledge base was
              invisible exactly where most casual questions land. */
-          const knowledgeNudge = await getKnowledgeNudgeBlock(auth.tenant_id ?? null, normalizedContent);
+          /* AUDIT ISSUE 7 (P1) — the nudge bypassed its own permission gate.
+             `search_knowledge` is gated on the "AI Knowledge" module precisely
+             so that someone who cannot open Knowledge cannot read ingested
+             documents (with source title and page) by asking the agent. This
+             block surfaces THE SAME corpus with THE SAME citations, and it was
+             injected unconditionally on every fast lane for every internal
+             user — the exact exposure the tool's gate was written to prevent,
+             through a different door. Same module, same action.
+
+             NOT gated: the taught-answers block above. That distinction is
+             deliberate. Taught Q&A are canonical answers the owner WROTE FOR
+             THE ASSISTANT TO GIVE to users; withholding them defeats their
+             purpose. The nudge is document content with citations. Different
+             thing, different rule. checkModule() is a pure in-memory read of
+             the ctx we already built — no extra round-trip. */
+          const canReadKnowledge = checkModule(ctx, "AI Knowledge", "view").allowed;
+          const knowledgeNudge = canReadKnowledge
+            ? await getKnowledgeNudgeBlock(auth.tenant_id ?? null, normalizedContent)
+            : "";
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
-          let fastLane: "brand" | "small" | "general" | null = null;
+          /* The lookup's steps, when the general lane made one: shown on
+             the screen as they happened and kept on the answer's record. */
+          let fastSteps: AgentStep[] = [];
 
           /* Data queries ALWAYS win over the tool-less fast lanes: a
              question can read as a brand question AND a catalog/data
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
           const canFastPath =
-            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
+            fastPathKey && streamingFastLaneEnabled() && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
 
           if (canFastPath) {
-            fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
+            /* A world fact takes the general lane, the one that can look it
+               up — never the tool-less brand or small-talk prompt. */
+            fastLane = worldFactOnGeneral ? "general" : isBrand ? "brand" : isSmall ? "small" : "general";
             const analysis = analyzeIntent(normalizedContent);
             const systemPromptBase =
               fastLane === "brand"
@@ -562,7 +802,30 @@ export async function POST(req: Request) {
                       expectedFormat: analysis.expectedFormat,
                       entityScope: entity.scope,
                     })[0].content;
-            const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge;
+            /* THE CLOCK, ON EVERY FAST LANE. The brand and small-talk builders
+               carry it themselves; the general prompt takes no context, so
+               the line is added here — at the tail, where per-minute text
+               belongs (owner, 2026-09-11: "what day is it today" answered
+               "I have no access to the date" from this path). */
+            /* ONE LOOKUP ON THE GENERAL LANE (dependability plan A4, second
+               slice). The lane may call search_web once and answer from the
+               result — for the world-fact questions isWorldFactQuery does
+               not catch. Offered only when the connector lists the tool for
+               this caller; the second call carries no tools, so this is a
+               hop, never a loop. core/general-search.ts has the rules. */
+            const generalTools = fastLane === "general" ? generalLaneTools(ctx) : null;
+            /* THE PAGE READER (core/read-page.ts, owner 2026-09-26): after the
+               lookup, one more hop may open up to two pages — a search
+               result's, or a link the user wrote; nothing else. Only where the
+               lookup is offered, and only while its switch is on. */
+            const readOn = generalTools !== null && !(await featureSwitchedOff("read_page"));
+            const allowedLinks = new Set<string>(readOn ? linksInText(normalizedContent) : []);
+            const readPage = readOn ? (url: unknown) => readPageForModel(ctx, url, allowedLinks) : undefined;
+            const laneTools = generalTools && readOn && allowedLinks.size > 0 ? [...generalTools, READ_PAGE_TOOL_DEF] : generalTools;
+            const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge +
+              (fastLane === "general" ? `\n\n${buildNowLine(ctx.timezone)}` : "") +
+              (generalTools ? `\n\n${GENERAL_SEARCH_NOTE}` : "") +
+              (readOn ? `\n\n${READ_PAGE_NOTE}` : "");
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */
@@ -574,45 +837,150 @@ export async function POST(req: Request) {
             /* Token budget per lane. General gets a bigger ceiling
                than small-talk so explanations can breathe but still
                bounded so we don't run away on open-ended prompts. */
+            /* LONG ANSWERS WHERE THEY ARE ASKED FOR (owner, 2026-09-26: a
+               100-row table cannot fit 1400 tokens, and Deep thinks before
+               it writes, on the same budget). A list asked for by name, or
+               any general answer from Deep — the model chosen for depth —
+               gets the long ceiling. */
             const maxTokens =
               fastLane === "brand" ? 1200
               : fastLane === "small" ? 200
+              : analysis.expectedFormat === "list" || chosenModel === "deep" ? GENERAL_LONG_MAX_TOKENS
               : 1400;
             let accumulated = "";
             let gotFirst = false;
+            /* PHASE 4D — audit finding N8 closed. This lane used to call
+               deepseekChatStream() directly: a second, parallel path to a
+               provider that bypassed the core entirely, so it had no failover,
+               no circuit breaker, and its own copy of the endpoint and the
+               retry rules. It goes through the same door as everything else
+               now, and inherits all three.
+
+               Behaviour is preserved in both switch positions, which is why
+               canFastPath gained streamingFastLaneEnabled() above — see
+               router/provider-policy.ts for the trace. The request shape is
+               the same one this lane always sent: no tools, streamed,
+               per-lane token budget. */
             try {
-              for await (const ch of deepseekChatStream(fastMessages, {
-                maxTokens,
-              })) {
-                if (ch.type === "delta" && ch.text) {
-                  if (!gotFirst) gotFirst = true;
-                  accumulated += ch.text;
-                  controller.enqueue(send({ type: "delta", text: ch.text }));
-                } else if (ch.type === "done") {
-                  fastReply = ch.text ?? accumulated;
-                  /* Lane-truthful label. deepseekChatStream reports the
-                     bare model id ("deepseek:deepseek-chat") — identical
-                     to orchestrate()'s label, which made ai_messages
-                     .provider useless for telling "tool loop ran" from
-                     "tool-less fast lane answered" (it cost a full
-                     mis-diagnosis on 2026-08-08). fast-<lane> keeps the
-                     distinction queryable. */
-                  fastProvider = `deepseek:fast-${fastLane}`;
-                } else if (ch.type === "error") {
-                  /* Drop what we have and fall through to orchestrate.
-                     Can't "un-emit" the deltas the client already got —
-                     but gotFirst will be false on TTFB-timeout / auth
-                     errors, which is the only realistic pre-first-
-                     token failure mode. */
-                  if (gotFirst) {
-                    fastReply = accumulated || null;
-                    fastProvider = `deepseek:fast-${fastLane}`;
-                  }
-                  break;
+              const onDelta = (text: string) => {
+                if (!gotFirst) gotFirst = true;
+                if (tFirst === null) tFirst = Date.now();
+                accumulated += text;
+                emit(send({ type: "delta", text }));
+              };
+              /* Plan G1: the fast lanes' calls were the one path that wrote
+                 no [ai.usage] line. Same meter, same fields, this turn's trace. */
+              const meter = (o: Awaited<ReturnType<typeof chatWithTools>>, lane: string) =>
+                meterTurn(o, { tenantId: auth.tenant_id ?? null, accountId: auth.account_id ?? null, lane, traceId: trace });
+              const irMessages = fastMessages.map((m) => ({ role: m.role, content: m.content }));
+              let out = await chatWithTools(
+                {
+                  messages: irMessages,
+                  maxTokens,
+                  temperature: 0.3,
+                  /* Small talk is the cheapest thing the assistant does; brand
+                     and general answers are prose. The general lane alone may
+                     make the one lookup; brand and small talk stay tool-less. */
+                  modelClass: fastLane === "small" ? ("FAST" as const) : ("GENERAL" as const),
+                  stream: true,
+                  /* A world fact's first call IS the lookup; anything else may
+                     look something up or answer directly. */
+                  ...(laneTools
+                    ? { tools: laneTools, toolChoice: worldFactOnGeneral ? { forceTool: GENERAL_LANE_TOOL } : ("auto" as const) }
+                    : {}),
+                },
+                { onDelta, prefer },
+              );
+              meter(out, `fast-${fastLane}`);
+              /* THE HOP. The model asked to look something up: whatever it
+                 narrated first comes off the screen (the answer replaces it),
+                 the lookup runs and is shown as it happens, and a second,
+                 tool-less call answers from the result. A second call that
+                 fails before its first delta leaves fastReply null below, so
+                 the turn falls through to the orchestrator as any other fast
+                 lane failure does. */
+              if (out.ok && laneTools && out.response.toolCalls.length > 0) {
+                if (accumulated) emit(send(retractFrame(accumulated)));
+                const hop = await runGeneralSearchHop({
+                  ctx,
+                  conversationId: conversationId!,
+                  calls: out.response.toolCalls,
+                  priorContent: accumulated,
+                  messages: irMessages,
+                  onStep: (steps) => emit(send({ type: "steps", steps })),
+                  traceId: trace,
+                  readPage,
+                  allowedLinks,
+                });
+                fastSteps = hop.steps;
+                emit(send({ type: "steps", steps: hop.steps }));
+                accumulated = "";
+                gotFirst = false;
+                /* THE READING HOP, bounded: offered only when the lookup found
+                   pages (or the user sent one) and reads are left; it carries
+                   read_page alone, and the call after it carries nothing. */
+                const canRead = !!readPage && allowedLinks.size > 0 && hop.reads < READ_PAGE_MAX_PER_ANSWER;
+                out = await chatWithTools(
+                  {
+                    messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true,
+                    ...(canRead ? { tools: [READ_PAGE_TOOL_DEF], toolChoice: "auto" as const } : {}),
+                  },
+                  { onDelta, prefer },
+                );
+                if (canRead && out.ok && out.response.toolCalls.length > 0) {
+                  meter(out, "fast-general+search");
+                  if (accumulated) emit(send(retractFrame(accumulated)));
+                  const readHop = await runGeneralSearchHop({
+                    ctx,
+                    conversationId: conversationId!,
+                    calls: out.response.toolCalls,
+                    priorContent: accumulated,
+                    messages: hop.messages,
+                    onStep: (steps) => emit(send({ type: "steps", steps: [...hop.steps, ...steps] })),
+                    traceId: trace,
+                    readPage,
+                    readsBefore: hop.reads,
+                    allowedLinks,
+                    allowSearch: false,
+                  });
+                  fastSteps = [...hop.steps, ...readHop.steps];
+                  emit(send({ type: "steps", steps: fastSteps }));
+                  accumulated = "";
+                  gotFirst = false;
+                  out = await chatWithTools(
+                    { messages: readHop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
+                    { onDelta, prefer },
+                  );
                 }
+                meter(out, "fast-general+search");
               }
+              /* Lane-truthful label. The registry reports the bare model id
+                 ("deepseek:deepseek-chat") — identical to orchestrate()'s
+                 label, which made ai_messages.provider useless for telling
+                 "tool loop ran" from "tool-less fast lane answered" (it cost a
+                 full mis-diagnosis on 2026-08-08). fast-<lane> keeps the
+                 distinction queryable, and the provider half now names
+                 whichever adapter actually served. */
+              if (out.ok) {
+                /* NULL, NOT "": a lane that returned nothing at all is a lane
+                   that did not answer, and the turn falls through to the
+                   orchestrator — an empty string was sealed and sent as the
+                   reply (bug hunt, 2026-09-12). */
+                fastReply = (out.response.content || accumulated) || null;
+                fastProvider = `${out.servedBy ? `${out.servedBy}:${out.model ?? "unknown"}` : activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
+              } else if (gotFirst) {
+                /* Failed after deltas were already on the client's screen. We
+                   cannot un-emit them, so keep what was said rather than
+                   letting orchestrate() append a second answer to it. The
+                   registry applies the same rule one level down: it does not
+                   fail over once a delta has been emitted. */
+                fastReply = accumulated || null;
+                fastProvider = `${out.servedBy ? `${out.servedBy}:${out.model ?? "unknown"}` : activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
+              }
+              /* Failed before any delta → fastReply stays null and the turn
+                 falls through to orchestrate(), exactly as before. */
             } catch {
-              /* Generator threw — fall through to orchestrate. */
+              /* Fall through to orchestrate. */
             }
           }
 
@@ -623,13 +991,14 @@ export async function POST(req: Request) {
                between the two branches. sealPricingSafety runs with no
                evidence steps — any pricing-like content in a brand /
                small-talk reply gets replaced with PRICING_GUARD_MESSAGE. */
-            const sealed = sealPricingSafety(fastReply, []);
+            const sealed = sealPricingSafety(fastReply, fastSteps);
             agent = {
               steps: [
+                ...fastSteps,
                 { kind: "answer", text: sealed, permissionStatus: "allowed" },
               ],
               finalReply: sealed,
-              provider: fastProvider ?? "deepseek:stream",
+              provider: fastProvider ?? `${activeProviderLabel()}:fast-stream`,
               conversationId: conversationId!,
             };
             /* If sealPricingSafety redacted content, the client has
@@ -638,11 +1007,25 @@ export async function POST(req: Request) {
                with end.agent.finalReply — same contract as chat. */
           } else {
             let liveDeltaCount = 0;
+            /* What streamed since the last retract — the note a retract carries. */
+            let liveText = "";
             agent = await orchestrate({
+              model: chosenModel,
               dialect: wantsRewrite ? ("egyptian" as const) : null,
               onDelta: (text) => {
                 liveDeltaCount++;
-                controller.enqueue(send({ type: "delta", text }));
+                liveText += text;
+                if (tFirst === null) tFirst = Date.now();
+                emit(send({ type: "delta", text }));
+              },
+              traceId: trace,
+              isCancelled: () => stopped,
+              /* The streamed first call narrated and then called a tool: the
+                 client clears what it showed; the real answer follows. */
+              onRetract: () => {
+                liveDeltaCount = 0;
+                emit(send(retractFrame(liveText)));
+                liveText = "";
               },
               ctx,
               history,
@@ -652,7 +1035,24 @@ export async function POST(req: Request) {
               webSearchRequested: body.web_search === true,
               languageLock: langLock,
               taughtAnswers: taughtBlock + knowledgeNudge,
+              /* LIVE. The owner: "when I ask a question that needs the
+                 internet I can't see any response or action until the end".
+                 Each tool call is sent the moment it is recorded, so the orb
+                 shows searching and the chip appears while it runs. The
+                 same frame the end-of-turn emit below sends, sent earlier. */
+              onStep: (steps) => {
+                const live = steps.filter((s) => s.kind !== "answer");
+                if (live.length > 0) emit(send({ type: "steps", steps: live }));
+              },
             });
+            /* NO MODEL ANSWERED (deep check, 2026-09-24). The apology used to
+               be revealed and saved as the assistant's answer, logged ok=1 —
+               so the next turn's history held "I couldn't complete that
+               request" as something Koleex AI had said, and the error rate
+               could not be read. It is a failed turn: the catch below sends
+               the error frame (the browser words it in the user's language)
+               and logs ok=0; nothing is saved as a reply. */
+            if (agent.failed) throw new TurnFailedError();
 
             /* Emit tool-chip steps up front so the UI can render them
                above the streamed answer — mirrors how ChatGPT shows
@@ -661,22 +1061,33 @@ export async function POST(req: Request) {
               (s) => s.kind !== "answer",
             );
             if (toolSteps.length > 0) {
-              controller.enqueue(send({ type: "steps", steps: toolSteps }));
+              emit(send({ type: "steps", steps: toolSteps }));
             }
 
-            /* Pseudo-stream the finalReply. Chunk size + delay
-               calibrated to feel natural without dragging the total
-               time out:
-                 · ~28 chars/chunk
-                 · 12 ms between chunks → ~2 200 chars/sec visible rate
-               A 200-word (~1 200 char) answer streams in ~520 ms. */
+            /* Reveal a reply that arrived COMPLETE, with no deltas of its
+               own — a degraded turn, a local-knowledge answer, a rescue
+               after a provider failure. When the turn streamed genuinely
+               `liveDeltaCount` is non-zero and none of this runs, so a real
+               stream is never re-chunked on top of itself.
+
+               PHASE 5A. This used to be a fixed 28-char chunk and a fixed
+               12 ms pause with NO CEILING, and that pause is real wall-clock
+               time sitting in front of the `end` event — so it delayed the
+               turn, not just the animation. Multiplied out, a 9 000-char
+               answer paid 3 852 ms of invented waiting after it was already
+               fully computed. planReveal() bounds the whole reveal to
+               REVEAL_BUDGET_MS at any length: long replies get bigger chunks
+               instead of more waiting. The gradual reveal survives, because
+               dropping the pause entirely would deliver every frame at once,
+               which is a block of text with extra steps. */
             const full = liveDeltaCount > 0 ? "" : (agent.finalReply ?? "");
-            const CHUNK = 28;
-            for (let i = 0; i < full.length; i += CHUNK) {
-              const text = full.slice(i, i + CHUNK);
-              controller.enqueue(send({ type: "delta", text }));
-              if (i + CHUNK < full.length) {
-                await new Promise((r) => setTimeout(r, 12));
+            if (full.length > 0) {
+              const plan = planReveal(full.length);
+              for (let i = 0; i < full.length; i += plan.chunkChars) {
+                emit(send({ type: "delta", text: full.slice(i, i + plan.chunkChars) }));
+                if (i + plan.chunkChars < full.length && plan.delayMs > 0) {
+                  await new Promise((r) => setTimeout(r, plan.delayMs));
+                }
               }
             }
           }
@@ -727,6 +1138,11 @@ export async function POST(req: Request) {
              the full text by now; the DB write can finish after the
              controller closes without affecting UX. */
           const finalTitle = computeTitle(conv, content);
+          const thinking = buildThinkingRecord({
+            notes: thinkNotes,
+            steps: agent.steps,
+            ms: (thinkAnswerAt ?? Date.now()) - thinkT0,
+          });
           const [assistantInsert] = await Promise.all([
             supabaseServer
               .from("ai_messages")
@@ -736,6 +1152,9 @@ export async function POST(req: Request) {
                 role: "assistant",
                 content: agent.finalReply,
                 provider: agent.provider,
+                /* Named only when there is a record, so a turn with no
+                   thinking writes exactly the row it always did. */
+                ...(thinking ? { thinking } : {}),
               })
               .select("*")
               .single(),
@@ -752,11 +1171,18 @@ export async function POST(req: Request) {
           ]);
 
           const tEnd = Date.now();
-          controller.enqueue(
+          emit(
             send({
               type: "end",
-              agent,
-              message: assistantInsert.data,
+              /* PHASE 7 / finding N11 — the browser is told the LANE, not the
+                 vendor. The row persisted above keeps the real label, because
+                 the audit trail is not the browser. See
+                 observability/public-provider.ts. */
+              agent: withPublicProvider(agent),
+              /* Which Koleex model answered — a Koleex name, never a vendor. Null
+                 when no model did (a canned or degraded reply). */
+              model: servedKoleexModel(agent.provider),
+              message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
             }),
@@ -764,17 +1190,32 @@ export async function POST(req: Request) {
           console.log(
             `[ai] lane=${fastLane ?? "protected"} ep=agent provider=${agent.provider} intent=agent` +
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
-              ` fast_stream=${fastReply !== null ? 1 : 0}` +
+              ` fast_stream=${fastReply !== null ? 1 : 0} fast_search=${fastSteps.filter((s) => s.kind === "tool-result").length}` +
               ` msg_lang=${detected.language} rewrote_egy=${rewroteReply ? 1 : 0}` +
-              ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
-              ` stream=1 reply_bytes=${agent.finalReply.length}`,
+              ` in_bytes=${content.length} hist=${histLen} ms=${tEnd - t0}` +
+              ` stream=1 reply_bytes=${agent.finalReply.length}` +
+              traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: true }),
           );
         } catch (e) {
-          controller.enqueue(
-            send({
-              type: "error",
-              message: e instanceof Error ? e.message : String(e),
-            }),
+          /* The cause goes to the log; the frame carries one neutral sentence
+             — a transport or provider message named hosts and models on the
+             screen (audit, 2026-09-11). */
+          const noModel = e instanceof TurnFailedError;
+          if (!noModel) console.error("[ai.agent.stream] failed:", e instanceof Error ? e.message : String(e));
+          /* Plan G1: the failed turn gets its [ai] line too, so an error rate
+             can be read from the same lines as the latency. */
+          console.log(
+            `[ai] lane=${fastLane ?? "protected"} ep=agent provider=none intent=agent fallback=0` +
+              ` in_bytes=${content.length} hist=${histLen} ms=${Date.now() - t0} stream=1` +
+              traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: false }),
+          );
+          emit(
+            send(
+              noModel
+                ? /* No message: the browser says it in the user's language. */
+                  { type: "error" }
+                : { type: "error", message: "Koleex AI hit a problem while answering. Please try again." },
+            ),
           );
         } finally {
           /* Audit P1 #4 — keepalive must be cleared on every exit
@@ -785,7 +1226,7 @@ export async function POST(req: Request) {
              interval callback already fired after clear. */
           alive = false;
           if (keepalive) clearInterval(keepalive);
-          controller.close();
+          try { controller.close(); } catch { /* the browser already went (Stop) */ }
         }
       },
     });
@@ -810,6 +1251,7 @@ export async function POST(req: Request) {
       .from("ai_messages")
       .select("role, content, created_at")
       .eq("conversation_id", conversationId)
+      .eq("tenant_id", auth.tenant_id)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT),
     buildUserContext(auth),
@@ -817,7 +1259,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       conversation_id: conversationId,
       role: "user",
-      content: content + attachMarker,
+      content: persistedUserContent,
     }),
   ]);
   const tDeps = Date.now();
@@ -825,24 +1267,45 @@ export async function POST(req: Request) {
   /* Query pulled newest-first with a limit, then flipped back to
      chronological order for the orchestrator. Behaviour (tool routing,
      multi-turn context) is unchanged — only the window size is bounded. */
-  const history = (historyRes.data ?? [])
-    .slice()
-    .reverse()
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content as string,
-    }));
+  const history = trimHistoryToBudget(
+    resolveHistoryAttachEmbeds(
+      withoutThisTurn(
+        (historyRes.data ?? [])
+          .slice()
+          .reverse()
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content as string,
+          })),
+      ),
+    ),
+  );
 
   const agent = await orchestrate({
+    model: chosenModel,
     ctx,
     history,
     userMessage: content + attachBlock,
     userLang,
     conversationId,
+    traceId: trace,
     webSearchRequested: body.web_search === true,
-    taughtAnswers: (await getTaughtAnswersBlock(auth.tenant_id ?? null)) + (await getKnowledgeNudgeBlock(auth.tenant_id ?? null, content)),
+    /* Same gate as the streaming path — see AUDIT ISSUE 7 note above. */
+    taughtAnswers:
+      (await getTaughtAnswersBlock(auth.tenant_id ?? null)) +
+      (checkModule(ctx, "AI Knowledge", "view").allowed
+        ? await getKnowledgeNudgeBlock(auth.tenant_id ?? null, content)
+        : ""),
     languageLock: langLock,
   });
+  /* Same rule as the stream: an apology is not an answer (see TurnFailedError). */
+  if (agent.failed) {
+    console.log(
+      `[ai] lane=protected ep=agent provider=none intent=agent fallback=0 in_bytes=${content.length} ms=${Date.now() - t0} stream=0` +
+        traceFields({ trace, ttftMs: null, ok: false }),
+    );
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
+  }
   const tOrch = Date.now();
 
   /* Final writes — assistant insert + conversation meta update are
@@ -885,12 +1348,16 @@ export async function POST(req: Request) {
   console.log(
     `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
       ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
-      ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}`,
+      ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
+      traceFields({ trace, ttftMs: null, ok: true }),
   );
 
   return NextResponse.json({
-    agent,
-    message: assistantInsert.data,
+    agent: withPublicProvider(agent),
+    /* Which Koleex model answered — a Koleex name, never a vendor. Null
+       when no model did (a canned or degraded reply). */
+    model: servedKoleexModel(agent.provider),
+    message: withPublicProvider(assistantInsert.data),
     conversation: { id: conversationId, title: finalTitle },
   });
 }

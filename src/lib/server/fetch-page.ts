@@ -1,7 +1,6 @@
 import "server-only";
 
-import dns from "node:dns/promises";
-import net from "node:net";
+import { assertSafeUrl, isPrivateAddress } from "./safe-url";
 
 /* ---------------------------------------------------------------------------
    Safe outbound page fetch — for the Translator's Website tab.
@@ -36,65 +35,9 @@ export type FetchPageError =
   | "fetch_failed"
   | "empty_page";
 
-/** True for addresses that must never be reachable from a user-supplied URL. */
-function isPrivateAddress(ip: string): boolean {
-  const v = net.isIP(ip);
-  if (v === 4) {
-    const [a, b] = ip.split(".").map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;      // link-local incl. cloud metadata
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    if (a >= 224) return true;                     // multicast / reserved
-    return false;
-  }
-  if (v === 6) {
-    const s = ip.toLowerCase();
-    if (s === "::1" || s === "::") return true;
-    if (s.startsWith("fe80") || s.startsWith("fc") || s.startsWith("fd")) return true;
-    // IPv4-mapped (::ffff:10.0.0.1) — unwrap and re-check.
-    const mapped = s.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateAddress(mapped[1]);
-    return false;
-  }
-  return true; // not an IP at all → refuse
-}
-
-/** Validate one URL: scheme, hostname, and every address it resolves to. */
-async function assertSafeUrl(raw: string): Promise<URL> {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("bad_url" satisfies FetchPageError);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("bad_url" satisfies FetchPageError);
-  }
-
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(host)) {
-    if (isPrivateAddress(host)) throw new Error("blocked_host" satisfies FetchPageError);
-    return url;
-  }
-  if (/^localhost$/i.test(host) || host.endsWith(".local") || host.endsWith(".internal")) {
-    throw new Error("blocked_host" satisfies FetchPageError);
-  }
-
-  let addrs: Array<{ address: string }>;
-  try {
-    addrs = await dns.lookup(host, { all: true });
-  } catch {
-    throw new Error("fetch_failed" satisfies FetchPageError);
-  }
-  if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) {
-    // ANY private answer disqualifies the host — a DNS round-robin must not
-    // be able to smuggle an internal address past us on a later attempt.
-    throw new Error("blocked_host" satisfies FetchPageError);
-  }
-  return url;
-}
+/* The address check lives in safe-url.ts (shared with Koleex AI's picture
+   proxy since 2026-09-07); the rules are the ones described above. */
+export { isPrivateAddress, assertSafeUrl };
 
 export interface FetchedPage {
   url: string;
@@ -103,8 +46,19 @@ export interface FetchedPage {
   truncated: boolean;
 }
 
+/** How a caller wants the page read. The Translator keeps every cell a block
+ *  of its own (it translates block by block); Koleex AI's page reader wants a
+ *  table's row kept together, cells joined by " | ", so a ranking reads as a
+ *  ranking. */
+export interface FetchPageOptions {
+  tableRows?: boolean;
+  userAgent?: string;
+  /** Blocks kept; the Translator's PAGE_MAX_BLOCKS unless the caller caps by size itself. */
+  maxBlocks?: number;
+}
+
 /** Fetch a page and return its readable text blocks in document order. */
-export async function fetchPageText(input: string): Promise<FetchedPage> {
+export async function fetchPageText(input: string, opts: FetchPageOptions = {}): Promise<FetchedPage> {
   let current = await assertSafeUrl(input.trim());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
@@ -117,7 +71,7 @@ export async function fetchPageText(input: string): Promise<FetchedPage> {
         signal: controller.signal,
         headers: {
           // Identify honestly and ask for HTML; some sites 403 an empty UA.
-          "User-Agent": "KoleexHub-Translator/1.0 (+https://hub.koleexgroup.com)",
+          "User-Agent": opts.userAgent ?? "KoleexHub-Translator/1.0 (+https://hub.koleexgroup.com)",
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "en,zh,ar;q=0.8",
         },
@@ -144,14 +98,14 @@ export async function fetchPageText(input: string): Promise<FetchedPage> {
     }
 
     const html = await readCapped(res, PAGE_MAX_BYTES);
-    const { title, blocks } = extractReadableText(html);
+    const { title, blocks } = extractReadableText(html, { tableRows: opts.tableRows });
     if (!blocks.length) throw new Error("empty_page" satisfies FetchPageError);
 
     return {
       url: current.toString(),
       title,
-      blocks: blocks.slice(0, PAGE_MAX_BLOCKS),
-      truncated: blocks.length > PAGE_MAX_BLOCKS,
+      blocks: blocks.slice(0, opts.maxBlocks ?? PAGE_MAX_BLOCKS),
+      truncated: blocks.length > (opts.maxBlocks ?? PAGE_MAX_BLOCKS),
     };
   } finally {
     clearTimeout(timer);
@@ -203,7 +157,7 @@ function safeCodePoint(n: number): string {
  * dropped, and the result is split on those breaks. Good enough to translate
  * a supplier page or a product spec; it is not trying to rebuild the layout.
  */
-export function extractReadableText(html: string): { title: string | null; blocks: string[] } {
+export function extractReadableText(html: string, opts: { tableRows?: boolean } = {}): { title: string | null; blocks: string[] } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1]).trim().slice(0, 300) : null;
 
@@ -213,6 +167,12 @@ export function extractReadableText(html: string): { title: string | null; block
   s = s.replace(/<(script|style|noscript|svg|canvas|template|iframe)[\s\S]*?<\/\1>/gi, " ");
   s = s.replace(/<(nav|header|footer|aside|form|select)[\s\S]*?<\/\1>/gi, " ");
 
+  /* A table's row stays one block when asked: cells joined by " | ", the row
+     ended by a break. Before the generic rule below, which would split them. */
+  if (opts.tableRows) {
+    s = s.replace(/<\/(td|th)>/gi, " | ");
+    s = s.replace(/<\/tr>/gi, "\n\n");
+  }
   // Block-level boundaries become explicit breaks so paragraphs stay separate.
   s = s.replace(/<\/(p|div|section|article|li|tr|h[1-6]|blockquote|td|th|dd|dt)>/gi, "\n\n");
   s = s.replace(/<br\s*\/?>/gi, "\n");

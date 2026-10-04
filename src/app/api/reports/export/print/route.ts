@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     filters: body.filters ?? {},
     channel: "print",
   });
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  if (!res.ok) return NextResponse.json({ error: res.error, code: res.code }, { status: res.status });
 
   return NextResponse.json({
     export_id: res.result.exportId,

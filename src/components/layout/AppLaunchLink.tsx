@@ -35,6 +35,7 @@ import { trackAppOpen } from "@/lib/app-launcher";
 import { markAppLaunch } from "@/lib/perf/client";
 import { prefetchTier, readNetworkContext, isPreloadAllowed } from "@/lib/app-prefetch";
 import { preloadAppChunk, wasChunkWarmed } from "@/lib/app-chunk-preload";
+import { busyWithSomethingUninterruptible } from "@/components/pwa/UpdateWatcher";
 
 /* Renders INSIDE the <Link>: while the navigation this link started is still
    in flight (RSC payload / chunk on a slow network), the tile itself speaks
@@ -150,7 +151,10 @@ export default function AppLaunchLink({
         __kxStaleBuild?: boolean;
         __kxStaleBuildId?: string;
       };
-      if (g.__kxStaleBuild) {
+      /* NEVER MID-CALL. A full navigation ends a voice call the way a
+         reload does; the same guard the update watcher uses. The soft
+         path below keeps the call. */
+      if (g.__kxStaleBuild && !busyWithSomethingUninterruptible()) {
         const target = g.__kxStaleBuildId ?? "unknown";
         let healed = "";
         try { healed = window.localStorage.getItem("kx_healed_build") ?? ""; } catch { /* ignore */ }
@@ -180,11 +184,21 @@ export default function AppLaunchLink({
       markAppLaunch(app.id, pressMs, !wasChunkWarmed(app.id));
       // Tell the launch splash a same-tab app launch just started — it takes
       // over the screen if the route doesn't arrive almost immediately.
+      // `rect` = the pressed tile's box: the zoom transition blooms the app
+      // out of the exact tile the user touched (extra fields are ignored by
+      // older listeners).
       try {
-        window.dispatchEvent(new CustomEvent("kx:app-launch", { detail: { appId: app.id, route: app.route } }));
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        window.dispatchEvent(new CustomEvent("kx:app-launch", {
+          detail: {
+            appId: app.id,
+            route: app.route,
+            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          },
+        }));
       } catch { /* best-effort */ }
     },
-    [inactive, app.id, onNavigate],
+    [inactive, app.id, app.route, onNavigate],
   );
 
   if (inactive) {
@@ -217,6 +231,13 @@ export default function AppLaunchLink({
       onPointerEnter={doPreload}
       onFocus={doPreload}
       onTouchStart={doPreload}
+      /* App launches own their transition (AppLaunchZoom blooms the app out
+         of this tile) — the generic cross-fade must stand down or the two
+         run stacked. This is ViewTransitions' documented opt-out hatch. */
+      data-no-view-transition=""
+      /* The RETURN leg reads this to find where to shrink back to: when the
+         user presses back inside an app, the card lands on this tile. */
+      data-app-tile={app.id}
       {...aria}
     >
       {children}

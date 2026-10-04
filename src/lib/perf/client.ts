@@ -246,6 +246,48 @@ export function markAppLaunch(app: string, pressToActivateMs?: number, cold?: bo
    Delay (the gap between the user's first tap and the handler running). Only
    durations leave the browser — never account/permission/route content. */
 let homeInteractiveDone = false;
+
+/* ── Which loads are "a Home load" ─────────────────────────────────────────
+   home.interactive_ms runs from the DOCUMENT's navigation start to Home's
+   first frame, so it is Home's load time only when the document itself was a
+   load of Home, watched, by someone already signed in. Measured 25/09/2026 on
+   21 days of production samples: 12% were tabs that opened on /ai or
+   /quotations and reached Home later (recorded as 20–57 s "loads"), and a
+   sign-in adds however long the password took. Neither is Home loading, and
+   both made the owner's numbers look far worse than Home is. */
+let signInShown = false;
+let pageWasHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+if (typeof document !== "undefined") {
+  try {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") pageWasHidden = true;
+    });
+  } catch { /* ignore */ }
+}
+
+/** The sign-in form was on screen in this document (AdminAuth calls this),
+ *  so a Home that mounts afterwards includes the time spent signing in. */
+export function noteSignInShown(): void { signInShown = true; }
+
+/** Pure: may this document's Home mark be recorded as a Home load? */
+export function isCountableHomeLoad(f: { landingPath: string | null; signInShown: boolean; wasHidden: boolean }): boolean {
+  if (f.signInShown || f.wasHidden || !f.landingPath) return false;
+  return f.landingPath.split(/[?#]/)[0].replace(/\/+$/, "") === "";
+}
+
+function landingPathOf(nav: PerformanceNavigationTiming | undefined): string | null {
+  try { return nav?.name ? new URL(nav.name).pathname : null; } catch { return null; }
+}
+
+/** A tab that was hidden at any point since navigation start: the Page
+ *  Visibility entries where the browser keeps them, plus the listener above. */
+function wasHiddenSinceStart(): boolean {
+  if (pageWasHidden) return true;
+  try {
+    return (performance.getEntriesByType?.("visibility-state") ?? []).some((e) => e.name === "hidden");
+  } catch { return false; }
+}
+
 export function markHomeInteractive(): void {
   try {
     if (!isBrowser() || homeInteractiveDone) return;
@@ -253,6 +295,7 @@ export function markHomeInteractive(): void {
     const nav = performance.getEntriesByType?.("navigation")?.[0] as
       | PerformanceNavigationTiming
       | undefined;
+    if (!isCountableHomeLoad({ landingPath: landingPathOf(nav), signInShown, wasHidden: wasHiddenSinceStart() })) return;
     const start = nav?.startTime ?? 0;
     record("home.interactive_ms", Math.max(0, performance.now() - start));
     try {

@@ -24,6 +24,8 @@ import { buildReconciliationReport } from "./builders/reconciliation-report";
 import { buildTreasuryReport } from "./builders/treasury-report";
 import { buildExpenseReport } from "./builders/expense-report";
 import { buildExecutiveSummary } from "./builders/executive-summary";
+import { buildVatReturn } from "./builders/vat-return";
+import { buildArAgingLedger, buildApAgingLedger } from "./builders/ledger-aging";
 
 export type ReportBuilder = (ctx: ReportBuildContext) => Promise<ReportPayload>;
 
@@ -117,8 +119,43 @@ const REGISTRY: Record<ReportType, RegistryEntry> = {
     },
     build: buildExecutiveSummary,
   },
+  vat_return: {
+    descriptor: {
+      type: "vat_return",
+      visibility: "internal",
+      title: "VAT Return",
+      description: "Output tax, input tax and net payable for a period, straight from account 2200. Internal only.",
+      required_filters: ["date_from", "date_to"],
+      optional_filters: [],
+      icon: "tax",
+    },
+    build: buildVatReturn,
+  },
+  ar_aging_ledger: {
+    descriptor: {
+      type: "ar_aging_ledger",
+      visibility: "internal",
+      title: "Receivables Aging (Ledger)",
+      description: "Open receivables by customer from the 1100 control account, aged 0–30 · 31–60 · 61–90 · 90+. Totals equal the trial balance.",
+      required_filters: [],
+      optional_filters: ["date_to"],
+      icon: "users",
+    },
+    build: buildArAgingLedger,
+  },
+  ap_aging_ledger: {
+    descriptor: {
+      type: "ap_aging_ledger",
+      visibility: "internal",
+      title: "Payables Aging (Ledger)",
+      description: "Open payables by supplier from the 2000 control account, aged 0–30 · 31–60 · 61–90 · 90+. Totals equal the trial balance.",
+      required_filters: [],
+      optional_filters: ["date_to"],
+      icon: "handshake",
+    },
+    build: buildApAgingLedger,
+  },
 };
-
 export function listReportTemplates(): ReportTemplateDescriptor[] {
   return Object.values(REGISTRY).map((r) => r.descriptor);
 }

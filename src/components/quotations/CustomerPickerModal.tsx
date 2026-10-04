@@ -10,12 +10,19 @@
    payload's `displayName`, `companyName`, `email`, `phone`, `mobile`,
    `address`, `website` AND stores `customerContactId` on the doc so
    the link survives save/reload.
+
+   Built on the KDS FormModal (Escape, backdrop, body scroll-lock, the
+   pop-in motion) with the Hub's tokens — it used to be a hand-styled
+   overlay with its own dark hex fallbacks that ignored the light skin
+   and spoke English only.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { FormModal, SearchInput } from "@/components/kds";
 import { record } from "@/lib/perf/client";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { useTranslation } from "@/lib/i18n";
+import { docsT } from "@/lib/translations/docs";
 
 export interface CustomerPickResult {
   id: string;
@@ -37,11 +44,11 @@ export default function CustomerPickerModal({
   onClose: () => void;
   onPick: (row: CustomerPickResult) => void;
 }) {
+  const { t } = useTranslation(docsT);
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<CustomerPickResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   /* Monotonic token so a slow older response can't overwrite a newer one
      after a rapid type (belt-and-braces with AbortController). */
   const seqRef = useRef(0);
@@ -51,8 +58,6 @@ export default function CustomerPickerModal({
     setQuery("");
     setRows([]);
     setError(null);
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    return () => clearTimeout(t);
   }, [open]);
 
   useEffect(() => {
@@ -61,7 +66,7 @@ export default function CustomerPickerModal({
     const seq = ++seqRef.current;
     const controller = new AbortController();
     const t0 = typeof performance !== "undefined" ? performance.now() : 0;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/contacts/search-customers?q=${encodeURIComponent(query)}&limit=40`,
@@ -91,18 +96,9 @@ export default function CustomerPickerModal({
     }, 200);
     return () => {
       controller.abort();
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [open, query]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   const pick = useCallback(
     (row: CustomerPickResult) => {
@@ -112,147 +108,53 @@ export default function CustomerPickerModal({
     [onPick, onClose],
   );
 
-  if (!open) return null;
-
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--bg-secondary, #1f2937)",
-          color: "var(--text-primary, #e5e7eb)",
-          width: "100%",
-          maxWidth: 720,
-          maxHeight: "85vh",
-          borderRadius: 14,
-          border: "1px solid var(--border-color, #374151)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 18px",
-            borderBottom: "1px solid var(--border-color, #374151)",
-          }}
-        >
-          <div style={{ fontWeight: 600, fontSize: 15 }}>Link a customer</div>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "inherit",
-              cursor: "pointer",
-              padding: 4,
-              borderRadius: 6,
-              display: "inline-flex",
-            }}
-          >
-            <CrossIcon className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-color, #374151)" }}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, company, or email…"
-            style={{
-              width: "100%",
-              height: 36,
-              borderRadius: 8,
-              border: "1px solid var(--border-color, #374151)",
-              background: "var(--bg-primary, #111827)",
-              color: "inherit",
-              padding: "0 12px",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-        </div>
-
-        <div style={{ overflowY: "auto", flex: 1, padding: 8 }}>
-          {loading && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 32, gap: 8, opacity: 0.7 }}>
-              <SpinnerIcon className="h-4 w-4" />
-              <span style={{ fontSize: 13 }}>Searching…</span>
-            </div>
-          )}
-          {!loading && error && (
-            <div style={{ padding: 32, textAlign: "center", color: "#f87171", fontSize: 13 }}>{error}</div>
-          )}
-          {!loading && !error && rows.length === 0 && (
-            <div style={{ padding: 32, textAlign: "center", opacity: 0.6, fontSize: 13 }}>
-              No customers match {query ? `"${query}"` : "your CRM yet"}.
-            </div>
-          )}
-          {!loading && rows.map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              onClick={() => pick(row)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid transparent",
-                background: "transparent",
-                color: "inherit",
-                cursor: "pointer",
-                textAlign: "left",
-                marginBottom: 2,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-primary, #111827)";
-                e.currentTarget.style.borderColor = "var(--border-color, #374151)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "transparent";
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
-                  {row.displayName || "—"}
-                </div>
-                <div style={{ fontSize: 12, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {row.companyName || row.email || row.phone || "—"}
-                </div>
-              </div>
-              {row.email && (
-                <div style={{ fontSize: 11, opacity: 0.6, fontFamily: "ui-monospace, monospace" }}>
-                  {row.email}
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
+    <FormModal open={open} onClose={onClose} title={t("picker.customerTitle")} width="max-w-2xl">
+      {/* Pinned above the scrolling results — the modal body is the scroll
+          container; the negative top margin closes the body padding
+          above it so nothing scrolls past the search box. */}
+      <div className="sticky top-0 z-[1] -mt-5 bg-[var(--bg-secondary)] pt-5 pb-3">
+        <SearchInput value={query} onChange={setQuery} placeholder={t("picker.customerPh")} autoFocus />
       </div>
-    </div>
+
+      <div className="min-h-[200px]">
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-[var(--text-dim)]" role="status" aria-live="polite">
+            <SpinnerIcon className="h-4 w-4" />
+            {t("picker.searching")}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="py-8 text-center text-[13px] text-rose-400" role="alert">{error}</div>
+        )}
+        {!loading && !error && rows.length === 0 && (
+          <div className="py-8 text-center text-[13px] text-[var(--text-dim)]">
+            {query ? t("picker.noCustomers").replace("{q}", query) : t("picker.noCustomersYet")}
+          </div>
+        )}
+        {!loading && rows.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => pick(row)}
+            className="mb-0.5 flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-start transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)] focus-visible:outline-none focus-visible:border-[var(--border-focus)]"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13.5px] font-semibold text-[var(--text-primary)]">
+                {row.displayName || "—"}
+              </div>
+              <div className="truncate text-[12px] text-[var(--text-dim)]">
+                {row.companyName || row.email || row.phone || "—"}
+              </div>
+            </div>
+            {row.email && (
+              <div className="shrink-0 font-mono text-[11px] text-[var(--text-faint)]">
+                {row.email}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </FormModal>
   );
 }

@@ -52,13 +52,18 @@ import {
   markChannelRead,
   subscribeToMyChannels,
   subscribeToChannel,
+  connectDiscussStream,
+  type DiscussChannelListRow,
 } from "@/lib/discuss";
+import { discussT } from "@/lib/translations/discuss";
+import BellOffIcon from "@/components/icons/ui/BellOffIcon";
 import { useCurrentAccount } from "@/lib/identity";
 import { useSkin } from "@/lib/appearance";
 import type {
   DiscussChannelWithState,
   DiscussMessageWithAuthor,
 } from "@/types/supabase";
+import { textDirection } from "@/lib/text-direction";
 
 /* ── Theme hook ── */
 function useTheme() {
@@ -104,6 +109,8 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
 
 export default function FloatingPanel() {
   const { t } = useTranslation(hubT);
+  /* Discuss strings (muted pill) live in the Discuss dictionary. */
+  const { t: td } = useTranslation(discussT);
   const pathname = usePathname();
   const dk = useTheme();
   /* Aurora restyles the dock's three surfaces; Core keeps every value below
@@ -186,11 +193,13 @@ export default function FloatingPanel() {
     if (!showAi && tab === "ai") setTab("discuss");
     if (!showDiscuss && tab === "discuss") setTab("ai");
   }, [showAi, showDiscuss, tab]);
-  const [channels, setChannels] = useState<DiscussChannelWithState[]>([]);
+  const [channels, setChannels] = useState<DiscussChannelListRow[]>([]);
   const [activeChannel, setActiveChannel] = useState<DiscussChannelWithState | null>(null);
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [msgInput, setMsgInput] = useState("");
+  /* Dock send failed — shown above the input until the next attempt. */
+  const [dockSendError, setDockSendError] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "ai"; text: string }>>([]);
   /* ── Same-brain mode (owner directive 2026-08-03): the FAB's AI tab is
@@ -222,6 +231,25 @@ export default function FloatingPanel() {
     };
     window.addEventListener("koleex:copilot-context", handler as EventListener);
     return () => window.removeEventListener("koleex:copilot-context", handler as EventListener);
+  }, []);
+
+  /* ── Open-with-context ("Ask AI" on a product page, 19/09/2026) ──
+     A page can hand the operator straight into the AI tab with the subject
+     already in the composer and the page's hints as chips — one click from
+     a product to a conversation about it. The draft is only PLACED, never
+     sent: the operator reads it and decides. Same event shape as the hints
+     above, plus an optional draft. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ draft?: string; hints?: CopilotHint[] }>;
+      if (Array.isArray(ce.detail?.hints)) setCopilotHints(ce.detail.hints.slice(0, 4));
+      if (typeof ce.detail?.draft === "string") setAiInput(ce.detail.draft);
+      setTab("ai");
+      setOpen(true);
+    };
+    window.addEventListener("koleex:ai-open", handler as EventListener);
+    return () => window.removeEventListener("koleex:ai-open", handler as EventListener);
   }, []);
 
   /* Restore the rolling FAB conversation (id + its history) the first
@@ -281,10 +309,14 @@ export default function FloatingPanel() {
     return subscribeToMyChannels({
       onMessageInsert: (msg) => {
         if (msg.author_account_id === accountIdRef.current) return;
+        /* A muted chat counts in muted_unread_count (quiet pill, off the
+           FAB badge) — the same split as the server read and Discuss. */
         setChannels(prev =>
           prev.map(c =>
             c.id === msg.channel_id
-              ? { ...c, unread_count: (c.unread_count ?? 0) + 1 }
+              ? c.muted
+                ? { ...c, muted_unread_count: (c.muted_unread_count ?? 0) + 1 }
+                : { ...c, unread_count: (c.unread_count ?? 0) + 1 }
               : c,
           ),
         );
@@ -303,13 +335,45 @@ export default function FloatingPanel() {
     setMessages([]);
     try {
       const msgs = await fetchChannelMessages(ch.id, { currentAccountId: aid, limit: 40 });
-      setMessages(msgs.reverse()); // oldest first
+      /* The read endpoint already returns oldest → newest. Reversing it here
+         put the newest message at the TOP of the dock. */
+      setMessages(msgs);
       await markChannelRead(ch.id, aid);
-      setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, unread_count: 0 } : c));
+      setChannels(prev => prev.map(c => c.id === ch.id ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
       window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
     } catch { /* ignore */ }
     setLoadingMsgs(false);
   }, []);
+
+  /* ── Open a conversation from a notification card (26/09/2026) ──
+     A Discuss card's "Open chat" brings this panel up on that conversation,
+     over the page the reader is on — nothing unsaved is left behind (owner:
+     "he will move to another app … and he will lose the data"). The card
+     sets `handled` only when a panel answers; otherwise it falls back to the
+     Discuss app. Never on Discuss itself, where the panel stands down. */
+  const channelsRef = useRef(channels);
+  useEffect(() => { channelsRef.current = channels; });
+  useEffect(() => {
+    if (!showDiscuss) return;
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent<{ channelId?: string; handled?: boolean }>).detail;
+      if (!d?.channelId) return;
+      d.handled = true;
+      setTab("discuss");
+      setOpen(true);
+      const known = channelsRef.current.find((c) => c.id === d.channelId);
+      if (known) { void openChannel(known); return; }
+      const aid = accountIdRef.current;
+      if (!aid) return;
+      void fetchMyChannels(aid).then((rows) => {
+        setChannels(rows);
+        const ch = rows.find((c) => c.id === d.channelId);
+        if (ch) void openChannel(ch);
+      }).catch(() => { /* the panel is open on the list — the reader picks it */ });
+    };
+    window.addEventListener("koleex:discuss-open", handler as EventListener);
+    return () => window.removeEventListener("koleex:discuss-open", handler as EventListener);
+  }, [showDiscuss, openChannel]);
 
   /* ── Realtime messages for active channel ── */
   useEffect(() => {
@@ -318,20 +382,42 @@ export default function FloatingPanel() {
       onMessageInsert: (msg) => {
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
+          const cmid = (msg as { client_msg_id?: string | null }).client_msg_id;
+          if (cmid && prev.some(m => m.client_msg_id === cmid)) return prev;
           return [...prev, msg as unknown as DiscussMessageWithAuthor];
         });
         // Auto mark read
         const aid = accountIdRef.current;
         if (aid && msg.author_account_id !== aid) {
           void markChannelRead(activeChannel.id, aid);
-          setChannels(prev => prev.map(c => c.id === activeChannel.id ? { ...c, unread_count: 0 } : c));
+          setChannels(prev => prev.map(c => c.id === activeChannel.id ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
         }
       },
       onMessageUpdate: () => {},
       onReactionInsert: () => {},
       onReactionDelete: () => {},
     });
-    return unsub;
+    /* The first-party stream is the path that actually reaches users on the
+       China link (the broadcast above rarely connects there). */
+    const channelId = activeChannel.id;
+    const unsubStream = connectDiscussStream((m) => {
+      if (m.channel_id !== channelId) return;
+      const aid = accountIdRef.current;
+      setMessages((prev) => {
+        if (prev.some((x) => x.id === m.id)) return prev;
+        /* My own send already shows as its optimistic bubble. */
+        if (m.client_msg_id && prev.some((x) => x.client_msg_id === m.client_msg_id)) return prev;
+        return [...prev, m];
+      });
+      if (aid && m.author_account_id !== aid) {
+        void markChannelRead(channelId, aid);
+        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, unread_count: 0, muted_unread_count: 0 } : c));
+      }
+    });
+    return () => {
+      unsub();
+      unsubStream();
+    };
   }, [activeChannel]);
 
   /* ── Auto scroll ── */
@@ -344,16 +430,53 @@ export default function FloatingPanel() {
     const aid = accountIdRef.current;
     if (!aid || !activeChannel || !msgInput.trim()) return;
     const body = msgInput.trim();
+    /* Optimistic bubble keyed by the same idempotency id the server uses,
+       so a retry can never double-post and the canonical row replaces it. */
+    const clientMsgId = crypto.randomUUID();
+    const tempId = `temp_${clientMsgId}`;
+    const optimistic = {
+      id: tempId,
+      channel_id: activeChannel.id,
+      author_account_id: aid,
+      reply_to_message_id: null,
+      kind: "text",
+      body,
+      body_html: null,
+      metadata: { media: [] },
+      edited_at: null,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      client_msg_id: clientMsgId,
+      author: null,
+      reactions: [],
+    } as unknown as DiscussMessageWithAuthor;
+    setMessages((prev) => [...prev, optimistic]);
     setMsgInput("");
+    setDockSendError(false);
     setSending(true);
+    let saved: Awaited<ReturnType<typeof sendDiscussMessage>> = null;
     try {
-      await sendDiscussMessage({
+      saved = await sendDiscussMessage({
         channelId: activeChannel.id,
         authorId: aid,
         body,
         kind: "text",
+        clientMsgId,
       });
-    } catch { /* ignore */ }
+    } catch { saved = null; }
+    if (saved) {
+      const row = saved;
+      setMessages((prev) => {
+        /* The stream may have delivered the canonical row first. */
+        if (prev.some((m) => m.id === row.id)) return prev.filter((m) => m.id !== tempId);
+        return prev.map((m) => (m.id === tempId ? { ...m, id: row.id, created_at: row.created_at } : m));
+      });
+    } else {
+      /* Keep what was typed (unless a new message was started) and say so. */
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMsgInput((cur) => (cur ? cur : body));
+      setDockSendError(true);
+    }
     setSending(false);
   }, [activeChannel, msgInput]);
 
@@ -527,10 +650,12 @@ export default function FloatingPanel() {
                   | { type: "start" }
                   | { type: "steps" }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | { type: "end"; reply?: string; agent?: { finalReply?: string } }
                   | { type: "error"; message?: string };
-                if (json.type === "delta") {
-                  accumulated += json.text;
+                if (json.type === "delta" || json.type === "retract") {
+                  /* A retract clears narration that preceded a lookup. */
+                  accumulated = json.type === "retract" ? "" : accumulated + json.text;
                   setAiMessages(prev => {
                     if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
                     const next = prev.slice();
@@ -637,6 +762,7 @@ export default function FloatingPanel() {
     setActiveChannel(null);
     setMessages([]);
     setMsgInput("");
+    setDockSendError(false);
   };
 
   /* ── Sorted channels ── */
@@ -917,6 +1043,10 @@ export default function FloatingPanel() {
                   ) : (
                     sortedChannels.map((ch) => {
                       const hasUnread = (ch.unread_count ?? 0) > 0;
+                      /* Muted rows keep their count (WeChat) in a quieter
+                         pill, as in the Discuss sidebar; it never reaches
+                         the FAB badge. */
+                      const mutedUnread = ch.muted ? (ch.muted_unread_count ?? 0) : 0;
                       const preview = ch.last_message?.body?.trim() || "";
                       const author = ch.last_message?.author_username;
                       const avatar = channelAvatar(ch);
@@ -949,10 +1079,25 @@ export default function FloatingPanel() {
                               <span className={`text-[11.5px] truncate ${hasUnread ? (dk ? "text-white/60" : "text-black/60") : textG}`}>
                                 {author && preview ? `${author}: ${preview}` : preview || "No messages"}
                               </span>
-                              {hasUnread && (
+                              {hasUnread ? (
                                 <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
                                   {ch.unread_count! > 99 ? "99+" : ch.unread_count}
                                 </span>
+                              ) : mutedUnread > 0 ? (
+                                <span
+                                  title={td("conv.mutedUnread", "{n} unread · muted").replace("{n}", String(mutedUnread))}
+                                  className={`min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold tabular-nums flex items-center justify-center shrink-0 ${
+                                    dk ? "bg-white/[0.10] text-white/55" : "bg-black/[0.07] text-black/50"
+                                  }`}
+                                >
+                                  {mutedUnread > 99 ? "99+" : mutedUnread}
+                                </span>
+                              ) : null}
+                              {ch.muted && (
+                                <BellOffIcon
+                                  className={`h-3 w-3 shrink-0 ${textG}`}
+                                  aria-label={td("conv.mutedLabel", "Muted")}
+                                />
                               )}
                             </div>
                           </div>
@@ -1032,8 +1177,12 @@ export default function FloatingPanel() {
                       </div>
                       {/* Message bubble — assistant renders the SAME
                           markdown pipeline as the /ai app (headings,
-                          lists, tables); user text stays literal. */}
-                      <div dir="auto" style={{ unicodeBidi: "plaintext" }} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
+                          lists, tables); user text stays literal.
+                          Direction is measured from the whole message: a
+                          reply opening with "Koleex Hub…" is still Arabic,
+                          and dir="auto" would have called it English and
+                          reversed it. */}
+                      <div dir={textDirection(m.text)} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                         m.role === "user"
                           ? `whitespace-pre-line ${dk ? "bg-white/[0.12] text-white" : "bg-black/[0.08] text-black"}`
                           : dk ? "bg-white/[0.05] text-white/85" : "bg-black/[0.04] text-black/85"
@@ -1064,6 +1213,11 @@ export default function FloatingPanel() {
           {/* ── Input bar ── */}
           {(tab === "ai" || (tab === "discuss" && activeChannel)) && (
             <div className={`shrink-0 border-t ${border} px-3 py-2.5`}>
+              {tab === "discuss" && dockSendError && (
+                <p role="alert" className={`mb-1.5 text-[11px] ${textM}`}>
+                  {t("panel.sendFailed", "Message not sent — try again")}
+                </p>
+              )}
               <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
                 dk ? "border-white/[0.08] bg-white/[0.03]" : "border-black/[0.06] bg-black/[0.02]"
               }`}>
@@ -1073,6 +1227,7 @@ export default function FloatingPanel() {
                   value={tab === "ai" ? aiInput : msgInput}
                   onChange={(e) => tab === "ai" ? setAiInput(e.target.value) : setMsgInput(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return; // IME
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       tab === "ai" ? handleAiSend() : handleSend();

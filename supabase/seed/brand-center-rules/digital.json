@@ -1,0 +1,974 @@
+{
+ "section": "digital",
+ "items": {
+  "platforms-we-are-on": {
+   "specs": [
+    {
+     "k": "Main",
+     "v": "Facebook (Arabic, English) · Instagram · LinkedIn (English, the most formal) · YouTube · TikTok · X (secondary, English) · WhatsApp Business"
+    },
+    {
+     "k": "China",
+     "v": "WeChat Official Account and Channels (Chinese) · Douyin — its own enterprise account under our Taizhou company, never a TikTok re-upload · Xiaohongshu, Weibo, Bilibili, Kuaishou as the market needs"
+    },
+    {
+     "k": "Other markets",
+     "v": "VK · LINE · Zalo — opened only with someone to answer in that language"
+    },
+    {
+     "k": "Rhythm",
+     "v": "Facebook and Instagram 3–4 posts a week · LinkedIn 1–2 · TikTok / Douyin 2–3 short videos · YouTube 1–2 videos a month · WeChat 1 article a week"
+    },
+    {
+     "k": "Replies",
+     "v": "Messages answered within one working day"
+    }
+   ],
+   "logo": "The logo tile as the profile picture on every platform (ch. 79).",
+   "do": [
+    "The same picture, name and cover on every platform at the same time",
+    "An account opened only when someone will post and reply on it"
+   ],
+   "dont": [
+    "Accounts nobody answers",
+    "Personal staff accounts named as the company"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    79,
+    80,
+    81,
+    87
+   ]
+  },
+  "profile-picture-and-cover": {
+   "specs": [
+    {
+     "k": "Profile picture",
+     "v": "The logo tile — the full white logo on black, at 70% of the width, whole — uploaded at 1024 × 1024 (400 × 400 on LinkedIn and X)"
+    },
+    {
+     "k": "Cover",
+     "v": "Black; the headline in silver on the left, the machine on the right — no logo (the profile picture carries it); two to four words"
+    },
+    {
+     "k": "Safe area",
+     "v": "Headline and machine inside the middle 70% — phones crop the edges"
+    },
+    {
+     "k": "Sizes",
+     "v": "Facebook 1640 × 624 · LinkedIn 1128 × 191 · YouTube 2560 × 1440 (safe 1546 × 423) · X 1500 × 500 · WeChat article cover 900 × 383"
+    },
+    {
+     "k": "Changes",
+     "v": "With each campaign or launch — the same cover everywhere at the same time"
+    }
+   ],
+   "logo": "The full logo tile, never squeezed, stretched or cropped to fill the circle.",
+   "do": [
+    "One file per platform, from the same design"
+   ],
+   "dont": [
+    "A different picture or name on each platform",
+    "The K alone as the profile picture"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    79,
+    41
+   ]
+  },
+  "bio-handles-and-links": {
+   "specs": [
+    {
+     "k": "Name",
+     "v": "KOLEEX — regional accounts KOLEEX Egypt, KOLEEX China; LinkedIn page: KOLEEX International Group"
+    },
+    {
+     "k": "Handle",
+     "v": "@koleex + the market — @koleexegypt, @koleexchina (owner, 01/10/2026); never variants with numbers or underscores"
+    },
+    {
+     "k": "Bio",
+     "v": "The short description (ch. 79): \"Industrial garment machinery — selected, checked, delivered. Since 1955 · Taizhou · Cairo\" — in English, Arabic, Chinese"
+    },
+    {
+     "k": "Link",
+     "v": "The website in the reader's language, or the WhatsApp link — one link, or a link page with the same few links"
+    },
+    {
+     "k": "Instagram highlights",
+     "v": "Machines · Services · Events · Contact — each a Hub library icon, white on Ink"
+    },
+    {
+     "k": "Category",
+     "v": "Industrial Equipment / Machinery (the platform's closest)"
+    }
+   ],
+   "logo": "Not applicable — the profile picture carries it.",
+   "do": [
+    "Translations of the bio reviewed before they go up"
+   ],
+   "dont": [
+    "Hashtag lists, emoji rows or phone numbers in the name field"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    79,
+    82
+   ]
+  },
+  "product-posts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Single machine hero · feature close-up · specs card · launch teaser · machine in a customer's factory (written permission) · new arrival / in stock"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Anatomy",
+     "v": "The KOLEEX edge down the left side (11 px on 1080), the logo 200–240 px top-left, a small grey label, the headline Bold then Light, our own photo, 72 px margins; text on the image 20% at most (ch. 80)"
+    },
+    {
+     "k": "Caption",
+     "v": "Two to four short lines, the hook under 80 characters, 3–5 hashtags (#KOLEEX first), one emoji or none; only true, checkable facts — never \"best\", \"No. 1\" or \"cheapest\" (ch. 80)"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic; the market's language on request — each a reviewed translation (ch. 30)"
+    },
+    {
+     "k": "Data",
+     "v": "Model and features from Koleex Hub's product data (active products only)"
+    }
+   ],
+   "logo": "200–240 px top-left (or top-right), the same place across a series.",
+   "do": [
+    "Our own photographs of our machines",
+    "Alternate black and white posts so the grid breathes"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Supplier names, codes or photos",
+    "Red bursts, arrows, many messages"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    63
+   ],
+   "templates": [
+    "product-post"
+   ]
+  },
+  "event-posts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Save the date · countdown · live from the booth · recap / thank you · webinar"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Bento board",
+     "v": "A fair on five black tiles on white — the booth number the largest text; the event's logo on a white tab, never on black; no KOLEEX edge"
+    },
+    {
+     "k": "Photo posts",
+     "v": "KOLEEX | the event | DAY n top-left, our own booth photo, black bands at 45% top and bottom; no edge"
+    },
+    {
+     "k": "People",
+     "v": "Visitors' badges unreadable, no close-up faces without consent, no competitors' booths (ch. 68)"
+    },
+    {
+     "k": "Caption",
+     "v": "Two to four short lines, the hook under 80 characters, 3–5 hashtags (#KOLEEX first), one emoji or none; only true, checkable facts — never \"best\", \"No. 1\" or \"cheapest\" (ch. 80)"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic; the market's language on request — each a reviewed translation (ch. 30)"
+    }
+   ],
+   "logo": "Top-left as on every post; on the Bento board, in its own tile.",
+   "do": [
+    "The same photo preset for the whole series",
+    "Dates DD/MM/YYYY"
+   ],
+   "dont": [
+    "The names of customers we will visit",
+    "Flag colours"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    68
+   ],
+   "templates": [
+    "event-post"
+   ]
+  },
+  "company-posts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Company news / milestone · founder's message · team spotlight · hiring · awards and certificates · new dealer · travel and visits · community / CSR"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Anatomy",
+     "v": "The KOLEEX edge down the left side (11 px on 1080), the logo 200–240 px top-left, a small grey label, the headline Bold then Light, our own photo, 72 px margins; text on the image 20% at most (ch. 80)"
+    },
+    {
+     "k": "Caption",
+     "v": "Two to four short lines, the hook under 80 characters, 3–5 hashtags (#KOLEEX first), one emoji or none; only true, checkable facts — never \"best\", \"No. 1\" or \"cheapest\" (ch. 80)"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic; the market's language on request — each a reviewed translation (ch. 30)"
+    },
+    {
+     "k": "Visits",
+     "v": "An upcoming visit: the city and the date only — never the customers we will meet"
+    },
+    {
+     "k": "Hiring",
+     "v": "The job, the region, skills and languages, one way to apply — never age, gender, religion or nationality (ch. 125)"
+    }
+   ],
+   "logo": "200–240 px top-left, as on every post.",
+   "do": [
+    "Numbers with a source we can show",
+    "Partner logos only with written permission (ch. 44)"
+   ],
+   "dont": [
+    "Stock photos of people or handshakes",
+    "Certificates we do not hold, or expired ones"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    125,
+    133
+   ],
+   "templates": [
+    "hiring-post"
+   ]
+  },
+  "customer-and-service-posts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Customer story / testimonial · installation done · service tip / how-to · before and after (production gain) · FAQ"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Anatomy",
+     "v": "The KOLEEX edge down the left side (11 px on 1080), the logo 200–240 px top-left, a small grey label, the headline Bold then Light, our own photo, 72 px margins; text on the image 20% at most (ch. 80)"
+    },
+    {
+     "k": "Caption",
+     "v": "Two to four short lines, the hook under 80 characters, 3–5 hashtags (#KOLEEX first), one emoji or none; only true, checkable facts — never \"best\", \"No. 1\" or \"cheapest\" (ch. 80)"
+    },
+    {
+     "k": "Language",
+     "v": "English, Chinese and Arabic; the market's language on request — each a reviewed translation (ch. 30)"
+    },
+    {
+     "k": "Permission",
+     "v": "The customer's written permission for their name, logo, factory or people (ch. 131)"
+    }
+   ],
+   "logo": "200–240 px top-left.",
+   "do": [
+    "Gains stated as the customer measured them, with their permission"
+   ],
+   "dont": [
+    "A customer named without written permission",
+    "Before / after numbers nobody measured"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    131
+   ]
+  },
+  "engagement-posts": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Question / poll · did you know? · quiz · quote · infographic / data"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Anatomy",
+     "v": "The KOLEEX edge down the left side (11 px on 1080), the logo 200–240 px top-left, a small grey label, the headline Bold then Light, our own photo, 72 px margins; text on the image 20% at most (ch. 80)"
+    },
+    {
+     "k": "Caption",
+     "v": "Two to four short lines, the hook under 80 characters, 3–5 hashtags (#KOLEEX first), one emoji or none; only true, checkable facts — never \"best\", \"No. 1\" or \"cheapest\" (ch. 80)"
+    },
+    {
+     "k": "Charts",
+     "v": "No blue: grey, with the one key value black on white or silver on black; bars start at zero; label directly, no legend (ch. 61)"
+    },
+    {
+     "k": "Data",
+     "v": "Every number with a source"
+    }
+   ],
+   "logo": "200–240 px top-left.",
+   "do": [
+    "One question per post"
+   ],
+   "dont": [
+    "Quotes from people who did not say them",
+    "A colour per series — then nothing stands out"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    61
+   ]
+  },
+  "carousels": {
+   "specs": [
+    {
+     "k": "Slides",
+     "v": "3–10, one grid, the logo in the same corner on every slide"
+    },
+    {
+     "k": "Kinds",
+     "v": "Product walk-through · step-by-step how-to · top 5 tips · customer story in slides"
+    },
+    {
+     "k": "Size",
+     "v": "1080 × 1350 each; a LinkedIn document carousel = PDF pages 1080 × 1350, 10 at most"
+    },
+    {
+     "k": "Anatomy",
+     "v": "The KOLEEX edge down the left side (11 px on 1080), the logo 200–240 px top-left, a small grey label, the headline Bold then Light, our own photo, 72 px margins; text on the image 20% at most (ch. 80)"
+    }
+   ],
+   "logo": "200–240 px top-left on every slide.",
+   "do": [
+    "Slide 1 says what the reader gets; the last slide the one next step"
+   ],
+   "dont": [
+    "A different layout per slide"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    83
+   ]
+  },
+  "occasion-greetings": {
+   "specs": [
+    {
+     "k": "Occasions",
+     "v": "Ramadan / Eid · Chinese New Year · Mid-Autumn · New Year / Christmas · national days of our markets · Labour Day · Women's Day"
+    },
+    {
+     "k": "Sizes",
+     "v": "1080 × 1350 (4:5) for the feed; 1080 × 1080 where a platform needs square; 1080 × 1920 for stories and reels; 1200 × 627 for LinkedIn"
+    },
+    {
+     "k": "Look",
+     "v": "One white flat object on black — the crescent, the lantern, the tree (ch. 57); Chinese red only for Spring Festival / Lantern Festival"
+    },
+    {
+     "k": "Words",
+     "v": "The greeting in the language of the people who celebrate it"
+    }
+   ],
+   "logo": "200–240 px top-left, white; never red or gold.",
+   "do": [
+    "Posted on the day, not after"
+   ],
+   "dont": [
+    "Flag colours (the book forbids them; the owner's national-days kit is still open)",
+    "Religious symbols drawn by guesswork — checked by someone who celebrates it"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    57
+   ],
+   "templates": [
+    "occasion-post"
+   ]
+  },
+  "story-templates": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Announcement · question sticker · countdown · link · behind the scenes"
+    },
+    {
+     "k": "Size",
+     "v": "1080 × 1920; top 250 px and bottom 340 px stay clear (Instagram) — 420 px on TikTok"
+    },
+    {
+     "k": "Look",
+     "v": "Black or white ground, the post anatomy (ch. 80)"
+    }
+   ],
+   "logo": "Top-left inside the safe area.",
+   "do": [
+    "Stickers placed inside the safe area"
+   ],
+   "dont": [
+    "Text under the app's buttons"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    82,
+    70
+   ]
+  },
+  "reel-and-short-video-covers": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Cover with title · series covers (numbered)"
+    },
+    {
+     "k": "Size",
+     "v": "1080 × 1920, the layout inside the central 1080 × 1440 (it shows cropped on the grid)"
+    },
+    {
+     "k": "Layout",
+     "v": "Logo top-left, silver headline, the machine (ch. 71)"
+    }
+   ],
+   "logo": "Top-left, as on the posts.",
+   "do": [
+    "The same series cover design with its number"
+   ],
+   "dont": [
+    "Faces pulling expressions, arrows, red circles"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    82,
+    84,
+    71
+   ]
+  },
+  "youtube-thumbnails": {
+   "specs": [
+    {
+     "k": "Size",
+     "v": "1280 × 720"
+    },
+    {
+     "k": "Layout",
+     "v": "The logo top-left, the title in silver on the left, the machine on the right (ch. 71)"
+    },
+    {
+     "k": "Titles",
+     "v": "What the video shows, under 60 characters — \"Threading an overlock machine in 60 seconds\""
+    },
+    {
+     "k": "Kinds",
+     "v": "Product video · how-to · event · interview"
+    }
+   ],
+   "logo": "Top-left.",
+   "do": [
+    "Our own frame from the video"
+   ],
+   "dont": [
+    "Arrows, red circles, shocked faces, long titles, CAPITALS WITH !!!"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    71,
+    85
+   ]
+  },
+  "social-ads": {
+   "specs": [
+    {
+     "k": "Placements",
+     "v": "Feed 1:1 / 4:5 · story / reels 9:16 · LinkedIn single image · TikTok in-feed · carousel ad"
+    },
+    {
+     "k": "Sizes",
+     "v": "Meta 1080 × 1350 · 1080 × 1920 · 1080 × 1080; LinkedIn 1200 × 627 · 1080 × 1350; TikTok 1080 × 1920 video"
+    },
+    {
+     "k": "Message",
+     "v": "One message, one machine, one action, the logo; the headline six words or fewer"
+    },
+    {
+     "k": "Call to action",
+     "v": "Names what happens: \"Chat on WhatsApp\", \"Download the spec sheet\""
+    },
+    {
+     "k": "Destination",
+     "v": "The matching machine page or WhatsApp — never the home page; every link with UTM tags"
+    },
+    {
+     "k": "Leads",
+     "v": "Forms feed Koleex Hub contacts"
+    }
+   ],
+   "logo": "Top-left, as on the posts.",
+   "do": [
+    "The language of the people targeted, with its own reviewed translation"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Best / lowest / free gift / limited time",
+    "No logo"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    89
+   ]
+  },
+  "google-display-ads": {
+   "specs": [
+    {
+     "k": "Sizes",
+     "v": "300 × 250 · 728 × 90 · 160 × 600 · 300 × 600 · 320 × 50 · 970 × 250 (and responsive 1200 × 628 · 1200 × 1200)"
+    },
+    {
+     "k": "Message",
+     "v": "One message, one machine, one action, the logo"
+    },
+    {
+     "k": "Destination",
+     "v": "The machine page with UTM tags"
+    }
+   ],
+   "logo": "In every size, left or top, whole and readable.",
+   "do": [
+    "One design system across the sizes"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Animated flashing"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    89
+   ]
+  },
+  "video-ads": {
+   "specs": [
+    {
+     "k": "Lengths",
+     "v": "6-second bumper · 15 s · 30 s"
+    },
+    {
+     "k": "End card",
+     "v": "The logo and one call to action — the outro of ch. 71"
+    },
+    {
+     "k": "Subtitles",
+     "v": "Always burned in (most ads play muted)"
+    },
+    {
+     "k": "Formats",
+     "v": "16:9 and 9:16 cut from the same shoot"
+    }
+   ],
+   "logo": "In the first or last second, and on the end card.",
+   "do": [
+    "Real machine sound where there is sound"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Music outside the platform's licensed library"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    89,
+    70,
+    71
+   ]
+  },
+  "email": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Email signature (from Employees) · newsletter · announcement · event invitation · email banner · auto-reply / out-of-office · Hub notification emails"
+    },
+    {
+     "k": "Width",
+     "v": "600 px, single column; two columns only for product cards"
+    },
+    {
+     "k": "Fonts",
+     "v": "Arial / Helvetica for Latin, Tahoma for Arabic, Microsoft YaHei / PingFang for Chinese — email apps do not load Inter"
+    },
+    {
+     "k": "Layout",
+     "v": "White email, the black logo top-left in a white header, then a black hero: the headline, one button, the machine"
+    },
+    {
+     "k": "Buttons",
+     "v": "Hub Blue Steel #567FB2 pill, white text, at least 44 px tall"
+    },
+    {
+     "k": "Footer",
+     "v": "Legal name in English and Chinese, website, email, one-click unsubscribe"
+    },
+    {
+     "k": "Signature",
+     "v": "The logo 120 px on its own white tile; name and title; one phone in international format; the event banner 600 × 120 only while an event is announced"
+    },
+    {
+     "k": "Consent",
+     "v": "Marketing email only to people who agreed to receive it"
+    }
+   ],
+   "logo": "PNG from our own domain, on a white header so it survives dark mode.",
+   "do": [
+    "Subject lines under 50 characters, sentence case",
+    "Sender \"KOLEEX\" for newsletters, \"Full Name · KOLEEX\" for people"
+   ],
+   "dont": [
+    "Silver headlines as live text — send them as images",
+    "Quotes, animated images or social icon rows in signatures"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    78,
+    93
+   ],
+   "templates": [
+    "email-signature"
+   ]
+  },
+  "whatsapp-business": {
+   "specs": [
+    {
+     "k": "Numbers",
+     "v": "One Egyptian and one Chinese business number (owner decision)"
+    },
+    {
+     "k": "Business name",
+     "v": "KOLEEX Egypt · KOLEEX China"
+    },
+    {
+     "k": "Profile photo",
+     "v": "The logo tile, 1024 × 1024"
+    },
+    {
+     "k": "Catalogue",
+     "v": "1080 × 1080, our own photo on white, the machine name and a short description — never prices"
+    },
+    {
+     "k": "Status",
+     "v": "1080 × 1920, like a story"
+    },
+    {
+     "k": "Messages",
+     "v": "Greeting and away messages from the book's approved text; quick replies for the common questions"
+    }
+   ],
+   "logo": "The logo tile as the profile photo.",
+   "do": [
+    "Working hours of that office, in its time zone"
+   ],
+   "dont": [
+    "Prices — they go in quotations only (catalogue included)",
+    "Personal numbers as the company's"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    88
+   ]
+  },
+  "wechat": {
+   "specs": [
+    {
+     "k": "Account",
+     "v": "Official account KOLEEX, verified as 科莱恪斯国际商业管理（台州）有限公司; the Chinese short description"
+    },
+    {
+     "k": "Menu",
+     "v": "产品 · 服务 · 联系我们"
+    },
+    {
+     "k": "Article cover",
+     "v": "900 × 383 (2.35:1) — the subject centred, it is cropped to a square in shares; second image 500 × 500"
+    },
+    {
+     "k": "Articles",
+     "v": "Chinese, 15–16 px body, 1.75 line height, Hub Blue for links only; every article ends with the logo, the account QR and one contact"
+    },
+    {
+     "k": "Channels",
+     "v": "1080 × 1260 or 1080 × 1920"
+    },
+    {
+     "k": "Business card QR",
+     "v": "The digital card from the business-card template"
+    }
+   ],
+   "logo": "The logo tile as the avatar; at the end of every article.",
+   "do": [
+    "Moments by staff from approved images"
+   ],
+   "dont": [
+    "Links or text in any colour but Hub Blue for links"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    87
+   ]
+  },
+  "marketplace-storefronts": {
+   "specs": [
+    {
+     "k": "Platforms",
+     "v": "Alibaba.com · Made-in-China.com · Global Sources · 1688 · IndiaMART · TradeKey"
+    },
+    {
+     "k": "Assets",
+     "v": "Store banner · company profile block · category banners — each at the platform's size"
+    },
+    {
+     "k": "Look",
+     "v": "Black banners, the headline in silver, the machine; the company profile's facts only (ch. 102)"
+    }
+   ],
+   "logo": "The platform's logo slot: the logo tile; banners top-left.",
+   "do": [
+    "The same company facts as the profile and the website"
+   ],
+   "dont": [
+    "Supplier names, logos or photos",
+    "Claims we cannot show (\"No. 1\", \"biggest\")"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    102,
+    79
+   ]
+  },
+  "marketplace-product-images": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Main image on white 800 × 800 · detail images · the long product-detail page (Chinese-style long image) · listing video"
+    },
+    {
+     "k": "Photos",
+     "v": "Our own photographs — the machine on white for the main image (ch. 63)"
+    },
+    {
+     "k": "Data",
+     "v": "From Koleex Hub's product data, KOLEEX model names"
+    }
+   ],
+   "logo": "Small, top-left of detail images; none on the main image if the platform forbids it.",
+   "do": [
+    "The same photos as the website"
+   ],
+   "dont": [
+    "Supplier logos or watermarks — ever",
+    "Prices on the images",
+    "Borrowed photos"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    63,
+    103
+   ]
+  },
+  "website-graphics": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Home hero · page headers · campaign landing pages · product page images · 404 and empty pages"
+    },
+    {
+     "k": "Home hero",
+     "v": "Black, centred: the headline in silver, one line, one button and one link — the machine below"
+    },
+    {
+     "k": "Header",
+     "v": "Light and translucent (Cloud #F5F5F7 at 86%, blurred), the black logo top-left, grey menu, the language switch, one Hub Blue button"
+    },
+    {
+     "k": "Languages",
+     "v": "Each language its own address; Arabic mirrored right to left"
+    }
+   ],
+   "logo": "The black logo top-left in the header.",
+   "do": [
+    "One call to action per page"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Stock photos"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    75
+   ]
+  },
+  "digital-signage": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Welcome screen with the visitor's name · looping product slides · event schedule · office news"
+    },
+    {
+     "k": "Sizes",
+     "v": "16:9 landscape 1920 × 1080 · 9:16 portrait totem 1080 × 1920"
+    },
+    {
+     "k": "Look",
+     "v": "Black, one message per screen, the post anatomy (ch. 80)"
+    }
+   ],
+   "logo": "Top-left on every slide.",
+   "do": [
+    "The visitor's name spelled as they write it"
+   ],
+   "dont": [
+    "Prices — they go in quotations only",
+    "Small text"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    80,
+    118
+   ]
+  },
+  "wallpapers-and-backgrounds": {
+   "specs": [
+    {
+     "k": "Video-call background",
+     "v": "16:9, 1920 × 1080: black, the light line, the lockup top-right"
+    },
+    {
+     "k": "Mirror",
+     "v": "Your own preview may show the logo reversed; the people you call see it the right way round"
+    },
+    {
+     "k": "Kinds",
+     "v": "Video-call backgrounds A / B · desktop wallpaper · phone wallpaper · profile photo frame for events"
+    }
+   ],
+   "logo": "Top-right on the call background (your head covers the middle).",
+   "do": [
+    "Download from Brand Center, not redrawn"
+   ],
+   "dont": [
+    "Busy photos behind your head"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    90
+   ]
+  },
+  "e-cards-and-e-documents": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "E-invitation · e-greeting card · e-certificate · digital business card (vCard / QR)"
+    },
+    {
+     "k": "E-certificate",
+     "v": "From the certificate template — numbered and recorded"
+    },
+    {
+     "k": "Digital card",
+     "v": "The business-card template's contact QR"
+    }
+   ],
+   "logo": "As on the printed piece it copies.",
+   "do": [
+    "The same design as the printed version"
+   ],
+   "dont": [
+    "Animated GIF greetings"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    99,
+    91
+   ],
+   "templates": [
+    "certificate",
+    "business-card"
+   ]
+  },
+  "sticker-pack": {
+   "specs": [
+    {
+     "k": "Platforms",
+     "v": "WhatsApp · WeChat · Telegram"
+    },
+    {
+     "k": "Style",
+     "v": "Machine characters in black and white — flat 2D"
+    },
+    {
+     "k": "Size",
+     "v": "Each platform's own sticker size"
+    }
+   ],
+   "logo": "The full logo only, on the pack's cover sticker.",
+   "do": [
+    "Characters built from our real machines"
+   ],
+   "dont": [
+    "The K alone as a character or sticker (owner, 30/09/2026)",
+    "Colours"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    57,
+    59
+   ]
+  },
+  "app-icons-and-small-marks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Koleex Hub icon (exists) · Koleex AI icon · favicon (exists) · app store screenshot frames"
+    },
+    {
+     "k": "Source",
+     "v": "The existing files in Downloads (ch. 136) — never redrawn"
+    }
+   ],
+   "logo": "The existing Hub icon and favicon, unchanged.",
+   "do": [
+    "Every new icon as a draft until the owner approves it"
+   ],
+   "dont": [
+    "The K alone as an app icon",
+    "Redrawing the existing icons"
+   ],
+   "vendor": "Made in Brand Center (the templates) or by the designer from the master files; named by the file-naming rules (ch. 135). The Marketing Manager checks it against the book; the Founder & CEO approves anything new or public-facing before it is posted (ch. 134).",
+   "book": [
+    76,
+    136
+   ]
+  }
+ }
+}

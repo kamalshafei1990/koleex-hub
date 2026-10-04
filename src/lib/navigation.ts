@@ -11,7 +11,7 @@
    To hide by role:     fill the `visibleTo` array (engine coming later).
    --------------------------------------------------------------------------- */
 
-import AppsIcon from "@/components/icons/ui/AppsIcon";
+import ChartPieIcon from "@/components/icons/ui/ChartPieIcon";
 import ActivityMonitorIcon from "@/components/icons/ui/ActivityIcon";
 import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
 import ManagementIcon from "@/components/icons/ManagementIcon";
@@ -29,6 +29,8 @@ import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
 import ContactsIcon from "@/components/icons/ContactsIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
+import OrdersIcon from "@/components/icons/OrdersIcon";
+import ContractIcon from "@/components/icons/ui/ContractIcon";
 import LandedCostIcon from "@/components/icons/LandedCostIcon";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
@@ -48,18 +50,27 @@ import DiscussIcon from "@/components/icons/DiscussIcon";
 import CalendarIcon from "@/components/icons/CalendarIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import MarketingCardsIcon from "@/components/icons/MarketingCardsIcon";
+import MarketingSidebarIcon from "@/components/icons/MarketingSidebarIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import CrownIcon from "@/components/icons/ui/CrownIcon";
+import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 import EventsIcon from "@/components/icons/EventsIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
+import BrandCenterIcon from "@/components/icons/BrandCenterIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import SoftwareCenterIcon from "@/components/icons/ui/DownloadIcon";
-import MailIcon from "@/components/icons/MailIcon";
+import BellIcon from "@/components/icons/ui/BellIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import KoleexOrbIcon from "@/components/ai/KoleexOrbIcon";
 import HrIcon from "@/components/icons/HrIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import OperationsSidebarIcon from "@/components/icons/OperationsSidebarIcon";
 import CommercialSidebarIcon from "@/components/icons/CommercialSidebarIcon";
 import FinanceSidebarIcon from "@/components/icons/FinanceSidebarIcon";
@@ -68,6 +79,8 @@ import CommunicationSidebarIcon from "@/components/icons/CommunicationSidebarIco
 import PlanningSidebarIcon from "@/components/icons/PlanningSidebarIcon";
 import KnowledgeSidebarIcon from "@/components/icons/KnowledgeSidebarIcon";
 import SystemSidebarIcon from "@/components/icons/SystemSidebarIcon";
+import ShippingIcon from "@/components/icons/ShippingIcon";
+import ReportsIcon from "@/components/icons/ReportsIcon";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -123,8 +136,12 @@ export interface AppDef {
    * With this flag the module still appears in Roles & Permissions, and an
    * explicit row ALWAYS wins — so an admin can still restrict or hide it.
    * The flag only decides what happens when nothing has been said yet.
+   *
+   * `"view"` opens READING only (Brand Center, 28/09/2026: every employee
+   * reads and downloads the brand; creating, editing and deleting need a
+   * grant in Roles & Permissions like any other module).
    */
-  openAccess?: boolean;
+  openAccess?: boolean | "view";
 
   /**
    * ISO-date (YYYY-MM-DD) marking when the app was first launched.
@@ -206,6 +223,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/inventory",        active: true,  newSince: "2026-05-17" },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: true,  newSince: "2026-05-26" },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
+  { id: "shipping",         tKey: "app.shipping",         name: "Shipping",          icon: ShippingIcon,   route: "/shipping",        active: true, newSince: "2026-09-15" },
   { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: "2026-06-04" },
   { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: true,  newSince: "2026-07-09" },
 
@@ -215,6 +233,13 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "crm",              tKey: "app.crm",              name: "CRM",               icon: CrmIcon,       route: "/crm",              active: true  },
   { id: "quotations",       tKey: "app.quotations",       name: "Quotations",        icon: QuotationIcon, route: "/quotations",       active: true  },
   { id: "invoices",         tKey: "app.invoices",         name: "Invoices",          icon: InvoicesIcon,  route: "/invoices",         active: true  },
+  /* A sales contract used to be reachable ONLY from the invoice it was
+     raised on, which answered "what did we agree on THIS invoice" and no
+     other question. It is an app because the questions people actually
+     ask are "what have we signed", "what is waiting for signature" and
+     "where is KL-CN-12351". */
+  { id: "contracts",        tKey: "app.contracts",        name: "Contracts",         icon: ContractIcon,  route: "/contracts",        active: true,  newSince: "2026-08-25" },
+  { id: "orders",           tKey: "app.orders",           name: "Orders",            icon: OrdersIcon,    route: "/orders",           active: true,  newSince: "2026-08-24" },
   { id: "customers",        tKey: "app.customers",        name: "Customers",         icon: CustomersIcon, route: "/customers",        active: true  },
   { id: "suppliers",        tKey: "app.suppliers",        name: "Suppliers",         icon: SuppliersIcon, route: "/suppliers",        active: true  },
   { id: "contacts",         tKey: "app.contacts",         name: "Contacts",          icon: ContactsIcon,  route: "/contacts",         active: true  },
@@ -228,19 +253,47 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "management",       tKey: "app.management",       name: "Management",        icon: ManagementIcon, route: "/management",       active: true  },
   { id: "employees",        tKey: "app.employees",        name: "Employees",         icon: EmployeesIcon, route: "/employees",        active: true  },
   { id: "hr",               tKey: "app.hr",               name: "HR",                icon: HrIcon,        route: "/hr",               active: true  },
+  /* My HR — every employee's own leave/attendance/payslips/profile. Identity-
+     scoped (the API resolves the caller's employee record; no employee_id is
+     ever taken from the request), so it is openAccess: no role setup needed
+     for a new hire to request leave on day one. Roles can still revoke it. */
+  { id: "me",               tKey: "app.me",               name: "My HR",             icon: UserCheckIcon, route: "/me",               active: true,  newSince: "2026-09-20", openAccess: true },
 
   /* ── Communication ── */
   { id: "discuss",          tKey: "app.discuss",          name: "Discuss",           icon: DiscussIcon,   route: "/discuss",          active: true  },
   { id: "calendar",         tKey: "app.calendar",         name: "Calendar",          icon: CalendarIcon,  route: "/calendar",         active: true  },
   { id: "todo",             tKey: "app.todo",             name: "To-do",             icon: TodoIcon,      route: "/todo",             active: true  },
   { id: "notes",            tKey: "app.notes",            name: "Notes",             icon: NotesIcon,     route: "/notes",            active: true  },
+  /* Reports — every written work report (daily, weekly, visits, memos, HR
+     incidents…) sent to named readers, plus the Library of number reports.
+     Identity-scoped like My HR (the server decides who may read each report
+     from its author, readers and the manager chain), so it is openAccess:
+     no role setup before an employee can send a daily report. */
+  { id: "reports",          tKey: "app.reports",          name: "Reports",           icon: ReportsIcon,   route: "/reports",          active: true,  newSince: "2026-09-25", openAccess: true },
   { id: "translator",       tKey: "app.translator",       name: "Translator",        icon: TranslatorIcon, route: "/translator",      active: true,  newSince: "2026-07-22", openAccess: true },
 
-  /* ── Marketing & Growth ── */
-  { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
+  /* ── Marketing — the section's 8 apps (owner, 27/09/2026, plan v6). Built
+     in phases: an app stays active:false — off the rail for everyone, a
+     "coming soon" tile on Home for super admins only — until its first real
+     screen ships. Their icons here are fallbacks; each gets its app.* binding
+     in the Visual Library when it goes live. */
   { id: "marketing",        tKey: "app.marketing",        name: "Marketing",         icon: MarketingIcon, route: "/marketing",        active: false },
+  { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
+  /* First screen shipped (connecting Facebook & Instagram); super admins only
+     until the Feed and the composer land — then drop superAdminOnly and grant
+     it from Roles (the marketing manager first). */
+  { id: "social-marketing", tKey: "app.social-marketing", name: "Social Marketing",  icon: Share2Icon,    route: "/social-marketing", active: true,  superAdminOnly: true },
+  /* The CEO's personal accounts on the Social engine (owner, 29/09/2026),
+     opened to his assistant on 30/09/2026: whoever is granted «CEO Brand» in
+     Roles writes posts and sends them to him. Approving is «CEO Brand
+     Approvals» on the CEO's own account only; removing an account needs
+     "delete". */
+  { id: "ceo-brand",        tKey: "app.ceo-brand",        name: "CEO Brand",         icon: CrownIcon,     route: "/ceo-brand",        active: true  },
+  { id: "email-marketing",  tKey: "app.email-marketing",  name: "Email Marketing",   icon: MailOpenIcon,  route: "/email-marketing",  active: false },
+  { id: "sms-whatsapp",     tKey: "app.sms-whatsapp",     name: "SMS & WhatsApp",    icon: MessageSquareIcon, route: "/sms-whatsapp", active: false },
+  { id: "marketing-automation", tKey: "app.marketing-automation", name: "Marketing Automation", icon: WorkflowIcon, route: "/marketing-automation", active: false },
   { id: "marketing-cards",  tKey: "app.marketing-cards",  name: "Marketing Cards",   icon: MarketingCardsIcon, route: "/marketing-cards", active: false },
-  { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: false },
+  { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: true,  newSince: "2026-10-04" },
 
   /* ── Planning ── */
   { id: "planning",         tKey: "app.planning",         name: "Planning",          icon: PlanningIcon,  route: "/planning",         active: true  },
@@ -248,12 +301,26 @@ export const APP_REGISTRY: AppDef[] = [
 
   /* ── Knowledge ── */
   { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
+  /* Brand Center (owner, 28/09/2026): the brand as a working tool — the full
+     guidelines, every branded item with its files, fill-in templates. Open
+     to every employee to read and download (openAccess "view"); creating,
+     editing and deleting are granted in Roles & Permissions. */
+  { id: "brand-center",     tKey: "app.brand-center",     name: "Brand Center",      icon: BrandCenterIcon, route: "/brand-center",   active: true,  newSince: "2026-09-28", openAccess: "view" },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: true,  newSince: "2026-06-03" },
   /* Owner 2026-08-07: Issue Reports is TOTALLY separate from the Database
      app — its own tile, its own /issues route (the old /database/issues
      redirects here so existing deep-links keep working). */
   { id: "issue-reports",    tKey: "app.issueReports",     name: "Issue Reports",     icon: ExclamationIcon, route: "/issues", active: true, newSince: "2026-08-07" },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
+  /* AI KNOWLEDGE IS A MODULE, NOT A TILE. It is reached from inside the AI
+     app, so it must not appear in the launcher — but it needs a registry
+     entry all the same, because that is what makes it grantable in Roles &
+     Permissions. Without one the only expressible states were "super admin
+     only" or "every internal user", and the owner asked for the third:
+     his by default, and grantable to named accounts.
+     Deny-by-default like every other module (no openAccess): a role with no
+     row cannot read the AI's knowledge corpus, and super admins always can. */
+  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: SparklesIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
@@ -264,11 +331,25 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
-  { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: MailIcon,      route: "/inbox",            active: true  },
+  /* The notification center (Koleex Mail retired 26/09/2026). `name` stays
+     "Mail": it IS the permission module's name (permission-modules.ts), and
+     every role's saved row for this app is keyed on it — the words people
+     see come from app.inbox. */
+  { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: BellIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   /* Brands is NOT an app — it lives inside Database → Visual Library
      (/database/brands). Intentionally not registered here. */
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
+  /* Dashboard — ACTIVE behind the same dark-launch gate as its page: the
+     registry flips with the flag, so a sibling push cannot expose it in
+     production (launcher entry + roles module + page all appear together).
+     openAccess: the app itself is open to everyone — every widget inside is
+     already gated per-module by /api/dashboard, so the app shows each person
+     only what their role can see. */
+  /* Dashboard tile uses a pie-chart mark — AppsIcon (the grid) is reserved
+     for the All-Apps launcher itself, so the two never read as the same
+     thing on Home. */
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: ChartPieIcon,    route: "/dashboard",
+    active: process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development", openAccess: true },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -281,14 +362,24 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.operations",
     label: "Operations",
     icon: OperationsSidebarIcon,
-    appIds: ["products", "product-data", "inventory", "purchase", "landed-cost", "catalogs", "documents"],
+    appIds: ["products", "product-data", "inventory", "purchase", "shipping", "landed-cost", "catalogs", "documents"],
   },
   {
     id: "commercial",
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "travel", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "contracts", "orders", "sales", "crm", "contacts", "markets", "price-calculator"],
+  },
+  /* Marketing (owner, 27/09/2026): the section with its 8 apps. Website moved
+     back here from Commercial. The rail lists only what is active and what the
+     viewer may open, so it grows as each app ships. */
+  {
+    id: "marketing",
+    tKey: "cat.marketing",
+    label: "Marketing",
+    icon: MarketingSidebarIcon,
+    appIds: ["marketing", "brand-center", "website", "social-marketing", "ceo-brand", "email-marketing", "sms-whatsapp", "marketing-automation", "marketing-cards"],
   },
   {
     id: "finance",
@@ -302,25 +393,22 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.people",
     label: "People",
     icon: PeopleSidebarIcon,
-    appIds: ["hr", "employees", "management"],
+    appIds: ["me", "hr", "employees", "management"],
   },
   {
     id: "communication",
     tKey: "cat.communication",
     label: "Communication",
     icon: CommunicationSidebarIcon,
-    appIds: ["todo", "discuss", "calendar", "notes"],
+    /* Notifications (the center, /inbox) sits beside Discuss — owner, 26/09. */
+    appIds: ["todo", "discuss", "inbox", "calendar", "notes", "reports"],
   },
-  /* "Marketing & Growth" group dissolved 2026-07-31 (owner-approved): it
-     rendered a single live item (Website, ~7 events/30d). Website now lives
-     under Commercial as a commercial channel; marketing/marketing-cards/
-     events return with their own group when they actually ship. */
   {
     id: "planning",
     tKey: "cat.planning",
     label: "Planning",
     icon: PlanningSidebarIcon,
-    appIds: ["planning", "projects"],
+    appIds: ["planning", "projects", "travel"],
   },
   {
     id: "knowledge",
@@ -384,7 +472,6 @@ export function getAppCategory(appId: string): string {
     if (group.appIds.includes(appId)) return group.id;
   }
   const extra: Record<string, string> = {
-    inbox: "communication",
     "price-calculator": "commercial",
     dashboard: "system",
   };

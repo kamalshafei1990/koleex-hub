@@ -50,6 +50,10 @@ export interface FinanceOrderSupplier {
   paid_amount: number;
   due_date: string | null;
   notes: string | null;
+  /** What is still owed on this line (supplier_cost − paid_amount, never
+   *  below 0). A payable, not a cost price: it stays when the caller has no
+   *  private-records switch and supplier_cost / paid_amount arrive as 0. */
+  outstanding_amount?: number;
 }
 
 export interface FinanceOrder {
@@ -88,6 +92,13 @@ export interface FinanceOrder {
   realized_cash_position?: number;    // collected − paid_supplier − paid_expenses
   outstanding_receivable?: number;    // max(0, selling_price − collected)
   outstanding_payable?: number;       // unpaid supplier + unpaid linked expenses
+  /* ── Who may see what (src/lib/experience, hideOrderFigures) ──── */
+  /** No «Bank & Profit»: gross/net profit, margin, realized cash and
+   *  expected_profit arrived as 0 and show as «•••». */
+  profit_hidden?: boolean;
+  /** No private-records switch: the supplier costs and what was paid on
+   *  them arrived as 0 and show as «•••»; outstanding amounts stay. */
+  cost_hidden?: boolean;
 }
 
 /* ── Expenses ───────────────────────────────────────────────────── */
@@ -261,6 +272,7 @@ export interface FinancePayment {
   linked_order_id: string | null;
   linked_order_supplier_id: string | null;
   linked_expense_id: string | null;
+  bank_account_id?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -312,6 +324,9 @@ export interface BankAccount {
   available_balance: number;
   pending_balance: number;
   restricted_balance: number;
+  /** Set when the caller has no «Bank & Profit»: the balance fields above
+   *  arrived as 0 and show as «•••» (src/lib/experience, hideBankBalances). */
+  balances_hidden?: boolean;
   status: BankAccountStatus;
   is_primary: boolean;
   last_reconciled_at: string | null;
@@ -601,6 +616,9 @@ export interface FinanceSupplierAccount {
   unpaid_amount?: number;
   outstanding_payable?: number;
   next_due_date?: string | null;
+  /** No private-records switch: total_purchases and paid_amount came as 0
+   *  and show «•••»; what is still owed is real (src/lib/experience). */
+  cost_hidden?: boolean;
 }
 
 /* ── Notifications ──────────────────────────────────────────────── */
@@ -625,6 +643,10 @@ export interface FinanceNotification {
 export type FinancialHealth = "healthy" | "watch" | "stress" | "unknown";
 
 export interface DashboardKpi {
+  /** No private-records switch: total_supplier_cost and
+   *  expected_vs_realized.paid_supplier arrived as 0 — the screens hide what
+   *  is built on them (profit flow, cash cycle, supplier concentration). */
+  cost_hidden?: boolean;
   total_revenue: number;
   total_supplier_cost: number;
   total_expenses: number;

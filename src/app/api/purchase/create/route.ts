@@ -17,6 +17,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { ledgerDraft } from "@/lib/accounting/hooks";
+import { defaultBankAccountId } from "@/lib/finance/bank";
 
 type Body = {
   kind: "requisition" | "order" | "receipt" | "bill" | "payment";
@@ -205,6 +207,8 @@ export async function POST(req: Request) {
             line_total: lineTotal,
           });
         }
+        /* A posted bill is a payable: draft Dr Expense (or GRNI) / Cr A/P. */
+        await ledgerDraft("vendor_bill", created.id, tid, auth.account_id);
         return NextResponse.json({ ok: true, id: created.id, docNo: bill_no });
       }
 
@@ -259,7 +263,38 @@ export async function POST(req: Request) {
               .eq("tenant_id", tid);
           }
         }
-        return NextResponse.json({ ok: true, id: created.id, docNo: payment_no });
+
+        /* The same outflow as a Finance payment: this is what the ledger
+           (Dr A/P / Cr Bank), the bank reconciliation and the treasury
+           forecast read. Paying a supplier is approved by that fact. */
+        const { data: sup } = await supabaseServer
+          .from("suppliers").select("name, company_name").eq("id", supplier_id).maybeSingle();
+        const supName = (sup as { name?: string | null; company_name?: string | null } | null);
+        const { data: finPay } = await supabaseServer
+          .from("finance_payments")
+          .insert({
+            tenant_id: tid,
+            direction: "out",
+            party_type: "supplier",
+            party_id: supplier_id,
+            party_name: supName?.company_name || supName?.name || "Supplier",
+            amount,
+            currency: str(doc.currency) ?? "USD",
+            payment_date: str(doc.paid_at) ?? new Date().toISOString().slice(0, 10),
+            payment_method: str(doc.method) ?? "bank_transfer",
+            reference_no: str(doc.reference) ?? payment_no,
+            bank_account_id: str(doc.bank_account_id) ?? (await defaultBankAccountId(tid, str(doc.currency) ?? "USD")),
+            status: "completed",
+            approval_status: "approved",
+            approved_at: new Date().toISOString(),
+            approved_by: auth.account_id,
+            notes: str(doc.notes) ?? `Vendor payment ${payment_no}`,
+            created_by_account_id: auth.account_id,
+          })
+          .select("id")
+          .maybeSingle();
+        if (finPay?.id) await ledgerDraft("payment", (finPay as { id: string }).id, tid, auth.account_id);
+        return NextResponse.json({ ok: true, id: created.id, docNo: payment_no, finance_payment_id: (finPay as { id: string } | null)?.id ?? null });
       }
 
       default:

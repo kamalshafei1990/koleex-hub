@@ -73,7 +73,7 @@ const suggestTeamKnowledge: ToolDef<
     const title = String(args.title ?? "").trim().slice(0, MAX_TITLE);
     const fact = String(args.fact ?? "").trim().slice(0, MAX_FACT);
     if (!title || fact.length < 20) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "A title and a substantial fact are required." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "A title and a substantial fact are required." };
     }
     const tags = Array.isArray(args.tags)
       ? args.tags.map((x) => String(x).trim().toLowerCase()).filter(Boolean).slice(0, 6)

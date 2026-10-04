@@ -1,0 +1,730 @@
+{
+ "section": "machine",
+ "items": {
+  "logo-on-the-machine": {
+   "specs": [
+    {
+     "k": "Places",
+     "v": "1 the operator side of the arm, centred between the head and the pillar · 2 the model name on the face of the head · 5 the full logo along the long side of the control box and motor cover; small parts carry no mark"
+    },
+    {
+     "k": "Automatic systems",
+     "v": "At most 3 places: the cabinet front (large, black), the sewing head (as a single machine), the gantry cover (white, about 60% of its length); no logo on the table top"
+    },
+    {
+     "k": "Width on the arm",
+     "v": "60–90 mm by the head's size; never below 20 mm"
+    },
+    {
+     "k": "Colour",
+     "v": "Black on the white body, one flat colour"
+    },
+    {
+     "k": "Method",
+     "v": "Printed black on the arm (pad or screen print) — the default; a raised black badge with the white logo only where the surface is curved, small or textured"
+    },
+    {
+     "k": "Durability",
+     "v": "Rub 20 times with a cloth soaked in sewing-machine oil: the logo must not fade, smear or lift"
+    }
+   ],
+   "logo": "Operator side of the arm, 60–90 mm, black, centred between the head and the pillar.",
+   "do": [
+    "The master logo file only, printed by pad or screen print",
+    "The oil-rub test on the first machine"
+   ],
+   "dont": [
+    "A supplier's or third party's brand facing the operator",
+    "Chrome, mirror, gold or silver-look logos and raised polished letters (ch. 39)",
+    "More than 3 logos on an automatic system",
+    "A supplier's logo left on any part"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107
+   ]
+  },
+  "k-tile-on-the-machine": {
+   "specs": [
+    {
+     "k": "Rule",
+     "v": "No K tile: small parts (presser-foot area, bobbin cover, handwheel centre, buttons) carry no mark (ch. 107)"
+    },
+    {
+     "k": "Where a mark fits",
+     "v": "The full logo, 20 mm or wider, engraved or printed in one colour — or the plain logo tile (ch. 41) where the part is square"
+    }
+   ],
+   "logo": "The full logo at 20 mm or more, or nothing — never the K.",
+   "do": [
+    "Leave small parts clean"
+   ],
+   "dont": [
+    "The K alone as a mark or a tile (owner, 30/09/2026) — the full logo, or nothing — the workshop's K tile is withdrawn",
+    "Metal inserts that look like badges"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    41,
+    40
+   ]
+  },
+  "model-name-badge": {
+   "specs": [
+    {
+     "k": "Model name",
+     "v": "Inter SemiBold, capitals, the same colour as the logo, 4–6 mm tall, on the face of the head or on the pillar"
+    },
+    {
+     "k": "Name",
+     "v": "Exactly as written in Koleex Hub"
+    },
+    {
+     "k": "Method",
+     "v": "Printed next to the logo, or on the nameplate only"
+    }
+   ],
+   "logo": "The model name sits apart from the logo with 1 x clear space — never touching it.",
+   "do": [
+    "The Hub's model name, never the supplier's reference"
+   ],
+   "dont": [
+    "A silver or chrome model badge",
+    "The supplier's model code on the machine"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    37
+   ]
+  },
+  "series-and-sub-brand-marks": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "NEXO series mark · special series names (PRO, SMART) · anniversary edition mark"
+    },
+    {
+     "k": "Rule",
+     "v": "Always with KOLEEX, never alone; smaller than the logo, in Inter, the logo's colour"
+    }
+   ],
+   "logo": "The series word in Inter SemiBold beside or under the model name — never a second logo.",
+   "do": [
+    "Always next to the KOLEEX logo"
+   ],
+   "dont": [
+    "A series mark alone, or larger than the logo",
+    "Invented symbols for a series"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    42
+   ]
+  },
+  "nameplate-rating-plate": {
+   "specs": [
+    {
+     "k": "Size",
+     "v": "80 × 50 mm on machine heads; 60 × 40 mm on small machines"
+    },
+    {
+     "k": "Material",
+     "v": "Black anodised aluminium 0.8 mm, logo and text laser-engraved (read white) — approved; white plate with black print on a black machine"
+    },
+    {
+     "k": "Content",
+     "v": "The logo · the model (as in the Hub) · the serial · voltage, frequency, power as tested · the year · the legal name and city · MADE IN CHINA · CE and other marks only when that model is certified · the QR to the machine's page"
+    },
+    {
+     "k": "Position",
+     "v": "Back or side of the pillar, readable when the machine stands on its table"
+    },
+    {
+     "k": "Fixing",
+     "v": "Four rivets, or industrial adhesive where rivets are impossible"
+    }
+   ],
+   "logo": "Top-left of the plate, from the master file.",
+   "do": [
+    "Serials unique, never reused"
+   ],
+   "dont": [
+    "Marks for certifications the model does not have",
+    "The supplier's company name on the plate"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    108,
+    104,
+    136
+   ]
+  },
+  "serial-number-label": {
+   "specs": [
+    {
+     "k": "Label",
+     "v": "50 × 20 mm polyester, thermal-transfer print, Code 128 barcode"
+    },
+    {
+     "k": "Also",
+     "v": "The serial on the nameplate; engraved on the frame for high-value systems"
+    },
+    {
+     "k": "Tamper",
+     "v": "A tamper-proof label where warranty depends on it"
+    }
+   ],
+   "logo": "No logo on the serial label.",
+   "do": [
+    "Printed from the Hub"
+   ],
+   "dont": [
+    "Handwritten serials"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    108
+   ]
+  },
+  "service-qr-sticker": {
+   "specs": [
+    {
+     "k": "Designs",
+     "v": "A black · B white with a black band (default) · C round \"Service & parts\" with the serial — all approved (ch. 108)"
+    },
+    {
+     "k": "Service sticker",
+     "v": "60 × 40 mm matte polyester beside the nameplate; the technician writes the dates by hand"
+    },
+    {
+     "k": "QR sticker",
+     "v": "40 mm round on the operator side of the head: the serial, and a service request for that machine"
+    },
+    {
+     "k": "QR",
+     "v": "Black on white, the logo in the middle, tested before printing (ch. 104)"
+    }
+   ],
+   "logo": "The full logo 20 mm on the sticker's band.",
+   "do": [
+    "Test every QR on two phones before the run"
+   ],
+   "dont": [
+    "Stickers over the logo or the nameplate"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    108,
+    104
+   ]
+  },
+  "safety-and-warning-labels": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "ISO 7010 symbols in the ISO 3864 layout and colours; ANSI style for the US market"
+    },
+    {
+     "k": "Electrical hazard",
+     "v": "ISO 7010 W012"
+    },
+    {
+     "k": "Kinds",
+     "v": "Needle / moving parts · electric shock · hot surface · cutting blade · pinch point · read the manual · wear gloves / eye protection"
+    },
+    {
+     "k": "Languages",
+     "v": "English + the language of the market; pictogram-only where the standard allows"
+    },
+    {
+     "k": "Place",
+     "v": "Where the hazard is, as the standard requires"
+    }
+   ],
+   "logo": "No logo on safety labels.",
+   "do": [
+    "Safety colours (yellow, red, blue) always beat the brand palette",
+    "Durable polyester, oil-resistant"
+   ],
+   "dont": [
+    "Restyling safety pictograms in the house icon style",
+    "Black-and-white safety labels"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    109
+   ]
+  },
+  "operation-labels": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Threading diagram · oil level and lubrication points · rotation arrow on the handwheel · voltage tag on the cable · air pressure setting (pneumatic) · control-panel key legend"
+    },
+    {
+     "k": "Style",
+     "v": "Black on white, the house icons; IEC 60417 panel symbols with English words under them"
+    },
+    {
+     "k": "Rotation",
+     "v": "An arrow on the handwheel, no words"
+    }
+   ],
+   "logo": "No logo on operation labels.",
+   "do": [
+    "Drawn from our own manuals' diagrams"
+   ],
+   "dont": [
+    "The supplier's labels in another style left on"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    109,
+    58
+   ]
+  },
+  "certification-and-origin-marks": {
+   "specs": [
+    {
+     "k": "Marks",
+     "v": "CE · UKCA · EAC · CCC — only the ones that model holds, with the certificate on file"
+    },
+    {
+     "k": "Origin",
+     "v": "MADE IN CHINA on the nameplate"
+    },
+    {
+     "k": "Place",
+     "v": "On the nameplate (default), or a separate label beside it"
+    }
+   ],
+   "logo": "The marks follow each standard's own artwork and minimum size — never redrawn.",
+   "do": [
+    "Keep each certificate's number in the Hub"
+   ],
+   "dont": [
+    "A mark the model is not certified for"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    108
+   ]
+  },
+  "anti-counterfeit-and-warranty-seals": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Holographic anti-fake sticker · \"Warranty void if removed\" seal · QR authenticity check"
+    },
+    {
+     "k": "QR",
+     "v": "Opens our page with the serial's record"
+    }
+   ],
+   "logo": "The full logo 20 mm on the holographic sticker, one colour.",
+   "do": [
+    "Record each seal's number against the serial"
+   ],
+   "dont": [
+    "Seals over the nameplate data"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    108,
+    104
+   ]
+  },
+  "machine-body": {
+   "specs": [
+    {
+     "k": "Standard",
+     "v": "White, matte, fine texture — every KOLEEX machine (proposal RAL 9016 traffic white, confirmed on a painted sample)"
+    },
+    {
+     "k": "Special",
+     "v": "Black special edition · anniversary / limited colour (owner's approval each time)"
+    },
+    {
+     "k": "Paint spec",
+     "v": "RAL code + gloss level + a texture sample on file for every supplier"
+    }
+   ],
+   "logo": "Black logo on the white body; white logo on a black edition.",
+   "do": [
+    "One painted sample approved per supplier and kept in the office"
+   ],
+   "dont": [
+    "Colours other than white and black without the owner's approval"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    46
+   ]
+  },
+  "secondary-parts": {
+   "specs": [
+    {
+     "k": "Colour",
+     "v": "The supplier's standard grey (approved) — one grey across a machine family; black or white where the part is ours"
+    },
+    {
+     "k": "Rule",
+     "v": "The brand rule is the white body; the parts stay quiet"
+    }
+   ],
+   "logo": "The full logo along the long side of the control box and motor cover, or nothing.",
+   "do": [
+    "One grey per family"
+   ],
+   "dont": [
+    "Different greys on one machine",
+    "A supplier's or third party's brand facing the operator"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107
+   ]
+  },
+  "table-and-stand": {
+   "specs": [
+    {
+     "k": "Top",
+     "v": "White laminate (standard) · black · grey · wood look"
+    },
+    {
+     "k": "Stand",
+     "v": "Black powder-coat (standard) · grey"
+    },
+    {
+     "k": "Logo",
+     "v": "A small engraved plate on the front edge, or none — never on the table top"
+    }
+   ],
+   "logo": "Front edge only: a black plate, the white logo 40 mm — or nothing.",
+   "do": [
+    "White top, black stand"
+   ],
+   "dont": [
+    "A logo on the table top (the fabric covers it and the work wears it away)",
+    "A supplier's or third party's brand facing the operator"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107
+   ]
+  },
+  "automatic-systems-and-big-machines": {
+   "specs": [
+    {
+     "k": "Parts",
+     "v": "Side panels · gantry · cabinet doors · computer station · signal tower"
+    },
+    {
+     "k": "Colour",
+     "v": "White body, black details; black edition"
+    },
+    {
+     "k": "Logos",
+     "v": "Cabinet front large black · the head as a single machine · the gantry cover white, about 60% of its length — at most 3"
+    },
+    {
+     "k": "Safety",
+     "v": "Yellow / black safety zones on the floor · light-curtain labels"
+    }
+   ],
+   "logo": "At most three places, as set above.",
+   "do": [
+    "Safety zones in yellow / black whatever the brand colours"
+   ],
+   "dont": [
+    "More than 3 logos",
+    "Coloured signal-tower covers with our logo"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    109
+   ]
+  },
+  "control-panel-design": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Membrane keypad graphics · touch-screen interface · motor controller display"
+    },
+    {
+     "k": "Style",
+     "v": "Black panel, white icons (standard) · white panel, black icons"
+    },
+    {
+     "k": "Icons",
+     "v": "The house icon set (ch. 58); IEC 60417 symbols with English words"
+    }
+   ],
+   "logo": "The full logo top-left of the panel, 20–30 mm, white on black.",
+   "do": [
+    "The Hub's words for every key"
+   ],
+   "dont": [
+    "The supplier's logo or colours on the panel",
+    "Coloured buttons except safety red / green"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    58,
+    109
+   ]
+  },
+  "start-up-screen": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "The KOLEEX logo on black · the logo and the model name · a short logo animation (big systems)"
+    },
+    {
+     "k": "Timing",
+     "v": "The logo on screen 1.5–2 s, a fade — never a spin or a sweep"
+    }
+   ],
+   "logo": "Centred, white on black, 40% of the screen's width at most.",
+   "do": [
+    "The model name in Inter under the logo"
+   ],
+   "dont": [
+    "Animating the logo's letters, rotating it or drawing it",
+    "The supplier's boot screen"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    36,
+    88
+   ]
+  },
+  "machine-software-look": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Wallpaper · software splash · the software's colour theme · the remote-support app"
+    },
+    {
+     "k": "Theme",
+     "v": "Black and white; Hub Blue only for the active control on screens"
+    }
+   ],
+   "logo": "Splash: the logo centred white on black; the wallpaper: the logo small bottom-right.",
+   "do": [
+    "One theme across all our machines' software"
+   ],
+   "dont": [
+    "Supplier branding in the software"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    48,
+    88
+   ]
+  },
+  "dust-cover": {
+   "specs": [
+    {
+     "k": "Material",
+     "v": "Black waterproof fabric (standard) · clear PVC · grey fabric"
+    },
+    {
+     "k": "Logo",
+     "v": "White print or embroidery, the full logo 150–200 mm on the front"
+    }
+   ],
+   "logo": "The full logo on the operator side, 150–200 mm, white.",
+   "do": [
+    "Cut to the model's size"
+   ],
+   "dont": [
+    "Silver print",
+    "A supplier's or third party's brand facing the operator"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    39
+   ]
+  },
+  "accessory-box": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Black plastic box with the logo · card box · zip pouch"
+    },
+    {
+     "k": "Label",
+     "v": "The contents list and the model, printed from the Hub"
+    }
+   ],
+   "logo": "The full logo 40–60 mm on the lid, white on black.",
+   "do": [
+    "The contents list inside the lid"
+   ],
+   "dont": [
+    "The supplier's box"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    39,
+    112
+   ]
+  },
+  "tool-kit-and-tool-bag": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Operator tool pouch · technician tool bag (black nylon, the group lockup large on the front, ch. 123) · screwdriver set with the logo"
+    },
+    {
+     "k": "Marks",
+     "v": "Pad print along the handle, 20 mm"
+    }
+   ],
+   "logo": "Tool bag: the group lockup, large, from the lockup file; tools: the full logo along the longest flat side.",
+   "do": [
+    "Tools for the people who use our machines"
+   ],
+   "dont": [
+    "The K alone as a mark or a tile (owner, 30/09/2026) — the full logo, or nothing"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    123,
+    39
+   ]
+  },
+  "consumables": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Machine oil bottle label · needle pack · bobbin box · grease tube label"
+    },
+    {
+     "k": "Style",
+     "v": "Black label with the logo in white (standard) · white label with the logo in black"
+    },
+    {
+     "k": "Content",
+     "v": "The product name, the size, the batch and date DD/MM/YYYY, the safety data where the law asks"
+    }
+   ],
+   "logo": "The full logo 20–30 mm, white on black.",
+   "do": [
+    "Safety data sheets on file for oils and greases"
+   ],
+   "dont": [
+    "A silver logo on the label (the workshop's \"silver logo\" becomes white)"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    39,
+    112
+   ]
+  },
+  "small-accessories": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "LED machine lamp · thread stand · knee lifter · drawer · keys and key tags"
+    },
+    {
+     "k": "Logo",
+     "v": "Small print where 20 mm fits — or none"
+    }
+   ],
+   "logo": "20 mm or nothing.",
+   "do": [
+    "Leave small parts clean"
+   ],
+   "dont": [
+    "The K alone as a mark or a tile (owner, 30/09/2026) — the full logo, or nothing"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    41
+   ]
+  },
+  "dealer-mark-on-the-machine": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "A small \"Sold & serviced by\" sticker · the dealer's name on the service sticker"
+    },
+    {
+     "k": "Rule",
+     "v": "Never bigger than the KOLEEX logo, never on the logo's area — beside the nameplate"
+    }
+   ],
+   "logo": "The KOLEEX logo stays alone on the arm; the dealer mark goes by the nameplate.",
+   "do": [
+    "The dealer's name in Inter on our service sticker"
+   ],
+   "dont": [
+    "The dealer's logo next to ours on the arm (ch. 44, 128)"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    128,
+    44,
+    108
+   ]
+  },
+  "customer-edition": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "A plate \"Made for <factory>\" on the back or side of the pillar"
+    },
+    {
+     "k": "Rule",
+     "v": "The customer's own logo never faces the operator (ch. 107) — the plate carries their name in Inter"
+    }
+   ],
+   "logo": "Our logo stays in its place; the customer's name on the plate, never their logo on the table.",
+   "do": [
+    "Owner's approval for every customer edition"
+   ],
+   "dont": [
+    "The customer's logo on the table edge (the workshop option) — only the \"Made for\" plate"
+   ],
+   "vendor": "Send the logo and plate artwork from the master vector files only (ch. 136); the factory never redraws them. Approve the first production machine (T0 sample) on site: the logo's size, colour and place, the oil-rub test, the plate's data and fixing — the Marketing Manager, then the Founder & CEO (ch. 134).",
+   "book": [
+    107,
+    44
+   ]
+  },
+  "showroom-and-exhibition-machines": {
+   "specs": [
+    {
+     "k": "Kinds",
+     "v": "Info card on a stand beside the machine · QR to the video · \"Demo machine\" tag · floor sticker with the model"
+    },
+    {
+     "k": "Info card",
+     "v": "A5 on a black stand: the model in Inter Bold, three facts, the QR (ch. 104)"
+    }
+   ],
+   "logo": "On the info card, top-left, 30 mm.",
+   "do": [
+    "No prices on the card or the stand"
+   ],
+   "dont": [
+    "Prices on the machine or its card",
+    "Stickers on the machine itself"
+   ],
+   "vendor": "Labels printed from the Hub's data (model, serial, QR) — never typed by hand at the factory. Approve one printed label per model before the run; test every QR on two phones (ch. 104).",
+   "book": [
+    114,
+    104
+   ]
+  }
+ }
+}

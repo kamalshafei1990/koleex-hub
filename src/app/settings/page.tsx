@@ -4,17 +4,14 @@
    /settings — self-service account settings.
 
    Deliberately narrower than the admin Accounts app. Exposes only what
-   a regular user can change about themselves:
-
-     - Profile photo
-     - Display name + personal phone + personal email
-     - Preferences (language / theme / notifications / signature)
-     - Calendar (timezone / working hours / default meeting length / OOO)
+   a regular user can change about themselves: profile, calendar, display,
+   wallpaper, sounds, Koleex AI, language & region, notifications, their own
+   password, sign-in history and privacy (plus the tenant's stamp and admin
+   tools for Super Admins).
 
    Locked away on purpose (admin-only, in /accounts/[id]):
      - Username
      - Login email
-     - Password       ← super-admin-only per policy
      - Role / permissions / access rights
      - Status, tenant, company, user_type
      - HR data (hire date, salary, bank, visa, passport, etc.)
@@ -49,6 +46,7 @@ import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -83,26 +81,62 @@ const tabLoading = () => (
     <SpinnerIcon size={20} />
   </div>
 );
-const ProfileTab        = dynamic(() => import("@/components/settings/tabs/ProfileTab"),        { loading: tabLoading });
-const CalendarTab       = dynamic(() => import("@/components/admin/accounts/tabs/CalendarTab"), { loading: tabLoading });
-const DisplayTab        = dynamic(() => import("@/components/settings/tabs/DisplayTab"),        { loading: tabLoading });
-const SoundsTab         = dynamic(() => import("@/components/settings/tabs/SoundsTab"),         { loading: tabLoading });
-const WallpaperTab      = dynamic(() => import("@/components/settings/tabs/WallpaperTab"),      { loading: tabLoading });
-const RegionTab         = dynamic(() => import("@/components/settings/tabs/RegionTab"),         { loading: tabLoading });
-const NotificationsTab  = dynamic(() => import("@/components/settings/tabs/NotificationsTab"),  { loading: tabLoading });
-const PasswordTab       = dynamic(() => import("@/components/settings/tabs/PasswordTab"),       { loading: tabLoading });
-const LoginHistoryTab   = dynamic(() => import("@/components/settings/tabs/LoginHistoryTab"),   { loading: tabLoading });
-const PrivacyTab        = dynamic(() => import("@/components/settings/tabs/PrivacyTab"),        { loading: tabLoading });
-const StampSignatureTab = dynamic(() => import("@/components/settings/tabs/StampSignatureTab"), { loading: tabLoading });
-const AdminTab          = dynamic(() => import("@/components/settings/tabs/AdminTab"),          { loading: tabLoading });
-const AboutTab          = dynamic(() => import("@/components/settings/tabs/AboutTab"),          { loading: tabLoading });
+/* One loader per tab, so the same import can be started early (below) and
+   by the row under the pointer — import() de-dupes, next/dynamic reuses it. */
+const TAB_LOADERS = {
+  profile:       () => import("@/components/settings/tabs/ProfileTab"),
+  calendar:      () => import("@/components/admin/accounts/tabs/CalendarTab"),
+  display:       () => import("@/components/settings/tabs/DisplayTab"),
+  sounds:        () => import("@/components/settings/tabs/SoundsTab"),
+  wallpaper:     () => import("@/components/settings/tabs/WallpaperTab"),
+  region:        () => import("@/components/settings/tabs/RegionTab"),
+  notifications: () => import("@/components/settings/tabs/NotificationsTab"),
+  password:      () => import("@/components/settings/tabs/PasswordTab"),
+  security:      () => import("@/components/settings/tabs/LoginHistoryTab"),
+  privacy:       () => import("@/components/settings/tabs/PrivacyTab"),
+  assets:        () => import("@/components/settings/tabs/StampSignatureTab"),
+  admin:         () => import("@/components/settings/tabs/AdminTab"),
+  about:         () => import("@/components/settings/tabs/AboutTab"),
+  ai:            () => import("@/components/settings/tabs/AiTab"),
+} as const;
+const ProfileTab        = dynamic(TAB_LOADERS.profile,       { loading: tabLoading });
+const CalendarTab       = dynamic(TAB_LOADERS.calendar,      { loading: tabLoading });
+const DisplayTab        = dynamic(TAB_LOADERS.display,       { loading: tabLoading });
+const SoundsTab         = dynamic(TAB_LOADERS.sounds,        { loading: tabLoading });
+const WallpaperTab      = dynamic(TAB_LOADERS.wallpaper,     { loading: tabLoading });
+const RegionTab         = dynamic(TAB_LOADERS.region,        { loading: tabLoading });
+const NotificationsTab  = dynamic(TAB_LOADERS.notifications, { loading: tabLoading });
+const PasswordTab       = dynamic(TAB_LOADERS.password,      { loading: tabLoading });
+const LoginHistoryTab   = dynamic(TAB_LOADERS.security,      { loading: tabLoading });
+const PrivacyTab        = dynamic(TAB_LOADERS.privacy,       { loading: tabLoading });
+const StampSignatureTab = dynamic(TAB_LOADERS.assets,        { loading: tabLoading });
+const AdminTab          = dynamic(TAB_LOADERS.admin,         { loading: tabLoading });
+const AboutTab          = dynamic(TAB_LOADERS.about,         { loading: tabLoading });
+const AiTab             = dynamic(TAB_LOADERS.ai,            { loading: tabLoading });
+
+/** Start a tab's code early. Safe to call often. */
+function warmTab(id: string) {
+  const load = (TAB_LOADERS as Record<string, (() => Promise<unknown>) | undefined>)[id];
+  if (load) void load().catch(() => {});
+}
 
 /* Language names in their own script, the way the switcher shows them — a
    reader scanning for "العربية" should find the word they picked, not a
    translation of it. */
 const LANG_LABEL: Record<string, string> = { en: "English", zh: "中文", ar: "العربية" };
 
-type Tab = "profile" | "calendar" | "display" | "wallpaper" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "calendar" | "display" | "wallpaper" | "sounds" | "region" | "ai" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+const TABS: readonly Tab[] = ["profile", "calendar", "display", "wallpaper", "sounds", "region", "ai", "notifications", "password", "security", "privacy", "assets", "admin", "about"];
+function requestedTab(): Tab | null {
+  if (typeof window === "undefined") return null;
+  const want = new URLSearchParams(window.location.search).get("tab");
+  return want && (TABS as readonly string[]).includes(want) ? (want as Tab) : null;
+}
+
+/* THE FIRST TAB STARTS DOWNLOADING WITH THE PAGE (speed audit, 29/09/2026).
+   It used to wait for hydration, AuthGate and the account — then one more
+   round trip for its own code. Now its chunk loads alongside all of that. */
+if (typeof window !== "undefined") warmTab(requestedTab() ?? "profile");
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -163,9 +197,14 @@ function SettingsContent() {
   const skin = useSkin();
   const aurora = skin === "aurora";
   const isSA = !!boot?.isSuperAdmin;
-  const [tab, setTab] = useState<Tab>("profile");
+  /* DEEP LINK: /settings?tab=ai opens a section directly — the Koleex AI
+     sidebar points here. Read once, lazily, allow-listed to the tabs that
+     exist; on the server there is no window and the default stands. Nothing
+     visible depends on it during hydration: this page renders a skeleton
+     until the account arrives. */
+  const [tab, setTab] = useState<Tab>(() => requestedTab() ?? "profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
-  const [mobileDetail, setMobileDetail] = useState(false);
+  const [mobileDetail, setMobileDetail] = useState(() => requestedTab() !== null);
   /* ABOVE the `if (!account)` return below. A hook under an early return is
      what took out /projects with React #310 — the order changes the moment
      the account resolves. Every hook in this component stays up here. */
@@ -173,7 +212,7 @@ function SettingsContent() {
 
   if (!account) {
     return (
-      <WorkspaceSkeleton label="Loading settings…" />
+      <WorkspaceSkeleton label={t("loading")} />
     );
   }
 
@@ -228,9 +267,9 @@ function SettingsContent() {
      and it says so there. */
   const pushValue = pushPermissionValue(t);
   const notifPrefs = withDefaults(account.preferences).notifications as NotificationPrefs;
-  const mutedCount = Object.entries(notifPrefs).filter(
-    ([k, v]) => k !== "email" && k !== "in_app" && v === false,
-  ).length;
+  /* Activities switched off — not pop-up cards (a presentation choice, not a
+     silenced activity) and not the pause/quiet-hours values. */
+  const mutedCount = Object.entries(notifPrefs).filter(([k, v]) => v === false && k !== "popup_cards").length;
 
   const sections: SectionDef[] = [
     {
@@ -264,6 +303,11 @@ function SettingsContent() {
       node: <SoundsTab />,
     },
     {
+      id: "ai", label: t("nav.ai"), subtitle: t("nav.ai.sub"),
+      icon: <SparklesIcon className="h-3.5 w-3.5" />,
+      node: <AiTab account={account} onChanged={onChanged} />,
+    },
+    {
       id: "region", label: t("nav.region"), subtitle: t("nav.region.sub"),
       value: langLabel,
       icon: <GlobeIcon className="h-3.5 w-3.5" />,
@@ -278,7 +322,7 @@ function SettingsContent() {
     {
       id: "password", label: t("nav.password"), subtitle: t("nav.password.sub"),
       icon: <KeyIcon className="h-3.5 w-3.5" />,
-      node: <PasswordTab account={account} />,
+      node: <PasswordTab />,
     },
     {
       /* The id is "security" for historical reasons; the section is a LIST OF
@@ -292,14 +336,14 @@ function SettingsContent() {
     {
       id: "privacy", label: t("nav.privacy"), subtitle: t("nav.privacy.sub"),
       icon: <ShieldIcon className="h-3.5 w-3.5" />,
-      node: <PrivacyTab account={account} />,
+      node: <PrivacyTab />,
     },
     /* Super-admin-only sections. */
     ...(isSA ? [
       {
         id: "assets" as Tab, label: t("nav.assets"), subtitle: t("nav.assets.sub"),
         icon: <FileBadge2Icon className="h-3.5 w-3.5" />,
-        node: <StampSignatureTab account={account} />,
+        node: <StampSignatureTab />,
       },
       {
         /* Shield stays with Privacy & data, which is the one of the two that
@@ -307,7 +351,7 @@ function SettingsContent() {
            QA reporter, activity, roles, accounts — so it takes the toolbox. */
         id: "admin" as Tab, label: t("nav.admin"), subtitle: t("nav.admin.sub"),
         icon: <WrenchIcon className="h-3.5 w-3.5" />,
-        node: <AdminTab account={account} />,
+        node: <AdminTab />,
       },
     ] : []),
     {
@@ -339,7 +383,7 @@ function SettingsContent() {
        why it was already Super-Admin-only. A group of one called "Workspace"
        was hiding that. */
   const personalItems = (["profile"] as Tab[]).map(byId);
-  const displayItems = (["display", "wallpaper", "sounds", "region", "calendar"] as Tab[]).map(byId);
+  const displayItems = (["display", "wallpaper", "sounds", "region", "ai", "calendar"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
   const adminItems = isSA ? (["assets", "admin"] as Tab[]).map(byId) : [];
@@ -373,10 +417,12 @@ function SettingsContent() {
 
       {/* Body */}
       <div className="relative z-[1] flex-1 min-h-0">
-        <div className="mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
+        <div className={`kx-md-split ${mobileDetail ? "kx-md-pushed" : ""} mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8`}>
 
-          {/* Master list — sidebar on iPad, full screen on iPhone. */}
-          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
+          {/* Master list — sidebar on iPad, full screen on iPhone. The
+              hidden/block flip became the kx-md push (motion system):
+              opening a section slides the detail in over this list. */}
+          <aside className="kx-md-list md:block h-full overflow-y-auto no-scrollbar space-y-4">
             {/* Account card (Apple-ID style).
 
                 REFRACTION WAS TRIED HERE AND REMOVED. LiquidGlass wrapped this
@@ -430,6 +476,7 @@ function SettingsContent() {
                 <SettingsRow
                   active={!mobileDetail && tab === "notifications"}
                   onClick={() => openSection("notifications")}
+                  onIntent={() => warmTab("notifications")}
                   icon={notificationsItem.icon}
                   label={notificationsItem.label}
                   subtitle={notificationsItem.subtitle}
@@ -472,15 +519,18 @@ function SettingsContent() {
           </aside>
 
           {/* Detail pane */}
-          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full overflow-y-auto no-scrollbar`}>
+          <main className="kx-md-detail max-md:bg-[var(--bg-primary)] md:block h-full overflow-y-auto no-scrollbar">
             {/* Mobile-only back to the settings list (iOS push nav). */}
             <button
               type="button"
               onClick={() => setMobileDetail(false)}
-              className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
+              className="md:hidden h-11 -ms-1 pe-3 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--text-primary)]"
             >
               <Chevron back /> {t("allSettings")}
             </button>
+            {/* On a phone the section had no name once pushed — Admin, Stamp
+                and Calendar open straight onto a card. */}
+            <h1 className="md:hidden mb-3 text-[20px] font-semibold text-[var(--text-primary)]">{active.label}</h1>
             {/* Fill the detail pane on desktop; cap only so ultra-wide
                 monitors don't stretch forms to unreadable line lengths.
                 key + kx-tab-in: switching sections must RIDE in, never
@@ -514,6 +564,7 @@ function MasterGroup({
             key={s.id}
             active={!mobileDetail && activeTab === s.id}
             onClick={() => onOpen(s.id)}
+            onIntent={() => warmTab(s.id)}
             icon={s.icon}
             label={s.label}
             subtitle={s.subtitle}
@@ -529,9 +580,12 @@ function MasterGroup({
 /* ─────────────── iOS-style disclosure row ─────────────── */
 
 function SettingsRow({
-  active, onClick, href, icon, label, subtitle, value, isLast,
+  active, onClick, onIntent, href, icon, label, subtitle, value, isLast,
 }: {
-  active?: boolean; onClick?: () => void; href?: string;
+  active?: boolean; onClick?: () => void;
+  /** Pointer or focus arrived — warm the tab's code before the tap. */
+  onIntent?: () => void;
+  href?: string;
   icon: React.ReactNode; label: string; subtitle?: string;
   /** Current state, shown at the inline end. Omit when the row has none. */
   value?: string; isLast?: boolean;
@@ -586,7 +640,7 @@ function SettingsRow({
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls} data-selected={active} data-kx-keep-hover="">
+    <button type="button" onClick={onClick} onPointerEnter={onIntent} onTouchStart={onIntent} onFocus={onIntent} className={cls} data-selected={active} aria-current={active ? "page" : undefined} data-kx-keep-hover="">
       {inner}
     </button>
   );

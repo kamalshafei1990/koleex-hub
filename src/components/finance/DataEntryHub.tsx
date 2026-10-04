@@ -19,17 +19,17 @@
 
      2. DAY-TO-DAY ENTRIES (ongoing, opens SmartCreate flow)
         · New Expense                    → /create/expense
-        · New Vendor Bill                → /finance/suppliers?new-bill=1
+        · New Vendor Bill                → /purchase/bills?new=1
         · New Invoice                    → /invoices?new=1
         · New Payment                    → /finance/payments?new=1
         · New Sales Order                → /sales/orders?new=1
-        · New Purchase Order             → /purchase?new=1
+        · New Purchase Order             → /purchase/orders?new=1
         · New Customer                   → /create/customer
         · New Supplier                   → /create/supplier
         · New Inventory Item             → /create/inventory-item
         · New Asset (ongoing)            → /create/asset
         · New Bank Account               → /finance/bank-accounts?new=1
-        · New FX Rate                    → /finance/fx-rates
+        · New FX Rate                    → /finance/fx-rates?new=1
 
    Every row is a Link, every row has a one-line description so the
    operator never wonders "what does this even mean?".
@@ -39,7 +39,7 @@ import Link from "next/link";
 import { ErpEyebrow, ErpHairline, ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_DATAENTRY } from "@/lib/translations/finance/dataEntry";
 
 interface EntryRow {
   href: string;
@@ -63,21 +63,21 @@ const STARTING_DATA: EntryRow[] = [
 
 const DAILY_ENTRIES: EntryRow[] = [
   { href: "/create/expense",                 icon: "receipt",             labelKey: "de.daily.expense.label",  labelFallback: "Record an Expense",    meaningKey: "de.daily.expense.meaning",  meaningFallback: "Operating cost — rent, salaries, marketing.",                       tag: "required" },
-  { href: "/finance/suppliers?new-bill=1",   icon: "file-invoice",        labelKey: "de.daily.bill.label",     labelFallback: "Record a Vendor Bill", meaningKey: "de.daily.bill.meaning",     meaningFallback: "Bill received from a supplier (booked into AP).",                  tag: "recommended" },
+  { href: "/purchase/bills?new=1",           icon: "file-invoice",        labelKey: "de.daily.bill.label",     labelFallback: "Record a Vendor Bill", meaningKey: "de.daily.bill.meaning",     meaningFallback: "Bill received from a supplier (booked into AP).",                  tag: "recommended" },
   { href: "/invoices?new=1",                 icon: "file-invoice-dollar", labelKey: "de.daily.invoice.label",  labelFallback: "Issue an Invoice",     meaningKey: "de.daily.invoice.meaning",  meaningFallback: "Bill sent to a customer (booked into AR).",                        tag: "required" },
   { href: "/finance/payments?new=1",         icon: "money",               labelKey: "de.daily.payment.label",  labelFallback: "Record a Payment",     meaningKey: "de.daily.payment.meaning",  meaningFallback: "Money in or out, linked to an invoice / bill / expense.",          tag: "required" },
   { href: "/sales/orders?new=1",             icon: "file-invoice-dollar", labelKey: "de.daily.so.label",       labelFallback: "New Sales Order",      meaningKey: "de.daily.so.meaning",       meaningFallback: "Commitment to ship to a customer.",                                tag: "required" },
-  { href: "/purchase?new=1",                 icon: "shipping-fast",       labelKey: "de.daily.po.label",       labelFallback: "New Purchase Order",   meaningKey: "de.daily.po.meaning",       meaningFallback: "Commitment to a supplier.",                                        tag: "required" },
+  { href: "/purchase/orders?new=1",          icon: "shipping-fast",       labelKey: "de.daily.po.label",       labelFallback: "New Purchase Order",   meaningKey: "de.daily.po.meaning",       meaningFallback: "Commitment to a supplier.",                                        tag: "required" },
   { href: "/create/customer",                icon: "users",               labelKey: "de.daily.customer.label", labelFallback: "New Customer",         meaningKey: "de.daily.customer.meaning", meaningFallback: "A party you sell to.",                                             tag: "required" },
   { href: "/create/supplier",                icon: "id-badge",            labelKey: "de.daily.supplier.label", labelFallback: "New Supplier",         meaningKey: "de.daily.supplier.meaning", meaningFallback: "A party you buy from.",                                            tag: "required" },
   { href: "/create/inventory-item",          icon: "box-open",            labelKey: "de.daily.item.label",     labelFallback: "New Inventory Item",   meaningKey: "de.daily.item.meaning",     meaningFallback: "A product or material you stock or sell.",                         tag: "recommended" },
   { href: "/create/asset",                   icon: "briefcase",           labelKey: "de.daily.asset.label",    labelFallback: "New Asset",            meaningKey: "de.daily.asset.meaning",    meaningFallback: "A new capital purchase, depreciated over time.",                   tag: "optional" },
   { href: "/finance/bank-accounts?new=1",    icon: "bank",                labelKey: "de.daily.newBank.label",  labelFallback: "New Bank Account",     meaningKey: "de.daily.newBank.meaning",  meaningFallback: "Add a new operating / savings / FX account.",                      tag: "optional" },
-  { href: "/finance/fx-rates",               icon: "balance-scale-left",  labelKey: "de.daily.fx.label",       labelFallback: "Add an Exchange Rate", meaningKey: "de.daily.fx.meaning",       meaningFallback: "Add a new rate (e.g. when USD → CNY shifts).",                     tag: "recommended" },
+  { href: "/finance/fx-rates?new=1",         icon: "balance-scale-left",  labelKey: "de.daily.fx.label",       labelFallback: "Add an Exchange Rate", meaningKey: "de.daily.fx.meaning",       meaningFallback: "Add a new rate (e.g. when USD → CNY shifts).",                     tag: "recommended" },
 ];
 
 export default function DataEntryHub() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_DATAENTRY);
   return (
     <ErpPage
       title={t("dataEntry.title", "Data Entry")}
@@ -137,7 +137,7 @@ export default function DataEntryHub() {
 }
 
 function EntryRowItem({ row }: { row: EntryRow }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_DATAENTRY);
   const tagCls =
     row.tag === "required"    ? "border-rose-500/60 dark:border-rose-300/40 bg-rose-500/15 dark:bg-rose-300/[0.08] text-rose-800 dark:text-rose-100" :
     row.tag === "recommended" ? "border-amber-500/60 dark:border-amber-300/40 bg-amber-500/15 dark:bg-amber-300/[0.08] text-amber-800 dark:text-amber-100" :

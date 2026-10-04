@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { adminRecipients } from "@/lib/server/admin-recipients";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { prepareTpl } from "@/lib/notification-templates";
 
 /* Must stay in step with PROBLEMS in SignInHelpDialog and with the
    support_requests_category_check constraint — three places, one list. The
@@ -178,15 +179,18 @@ export async function POST(req: Request) {
       `Reference   ${ref}`,
     ].filter(Boolean) as string[];
 
+    /* The subject in the reader's language; the body is the request, line
+       by line — data, stored as written. */
+    const text = prepareTpl(urgent
+      ? { k: "support_request.urgent", p: { name: full_name } }
+      : { k: "support_request", p: { name: full_name } });
     const { error: mailErr } = await supabaseServer.from("inbox_messages").insert(
       recipients.map((rid) => ({
         recipient_account_id: rid,
         sender_account_id: null,
         category: "alert",
-        subject: urgent
-          ? `⚠ Suspected account misuse · ${full_name}`
-          : `Sign-in help · ${full_name}`,
-        body: lines.join("\n"),
+        subject: text.subject,
+        body: text.body ?? lines.join("\n"),
         link: "/accounts",
         metadata: {
           type: "support_request",
@@ -201,6 +205,7 @@ export async function POST(req: Request) {
           full_name, email,
           phone: `${phone_code ? phone_code + " " : ""}${phone}`,
           country_code: country_code || null,
+          ...(text.tpl ? { tpl: text.tpl } : {}),
         },
       })),
     );

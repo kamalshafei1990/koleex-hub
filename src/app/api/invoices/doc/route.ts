@@ -50,6 +50,7 @@ export async function GET(req: Request) {
       `id, tenant_id, inv_no, customer_id, status, currency,
        issue_date, due_date, total, amount_paid, balance,
        doc, created_at, updated_at, paid_at,
+       order_id, deal_no,
        customer:customer_id ( id, display_name:name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
@@ -71,7 +72,8 @@ export async function GET(req: Request) {
      image-rich lines. /:id still returns the full doc. */
   const slim = (data ?? []).map((row) => {
     const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
-    const { items: _items, ...rest } = full;
+    const rest = { ...full };
+    delete rest.items;
     return { ...(row as Record<string, unknown>), doc: rest };
   });
 

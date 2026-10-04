@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai/providers/groq — Groq chat + translate adapter.
@@ -82,7 +83,7 @@ export async function groqChat(messages: ChatMessage[]): Promise<ChatResult | nu
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.chat]", res.status, bodyText);
+    logProviderFailure("[ai.groq.chat]", res.status, bodyText);
     lastGroqError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -129,7 +130,7 @@ export async function groqTranslate(input: TranslateInput): Promise<TranslateRes
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.translate]", res.status, bodyText);
+    logProviderFailure("[ai.groq.translate]", res.status, bodyText);
     lastGroqError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -201,7 +202,7 @@ export async function* groqChatStream(
 
   if (!res.ok || !res.body) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.stream]", res.status, bodyText);
+    logProviderFailure("[ai.groq.stream]", res.status, bodyText);
     lastGroqError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     yield { type: "error", error: lastGroqError };
     return;

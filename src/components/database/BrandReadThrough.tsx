@@ -45,13 +45,13 @@ interface SupplierRow {
 }
 
 const COMPANY_ASSETS: { label: string; src: string; dark?: boolean }[] = [
-  { label: "Hub logo · light", src: "/brand/hub-logo/koleex-hub-logo-for-light.png" },
-  { label: "Hub logo · dark", src: "/brand/hub-logo/koleex-hub-logo-for-dark.png", dark: true },
-  { label: "Stacked · light", src: "/brand/hub-logo/koleex-hub-stacked-for-light.png" },
-  { label: "Stacked · dark", src: "/brand/hub-logo/koleex-hub-stacked-for-dark.png", dark: true },
-  { label: "Mono · light", src: "/brand/hub-logo/koleex-hub-logo-mono-light.png" },
-  { label: "Mono · dark", src: "/brand/hub-logo/koleex-hub-logo-mono-dark.png", dark: true },
-  { label: "Script", src: "/brand/hub-logo/hub-script.png", dark: true },
+  { label: "Hub logo · light", src: "/brand/hub-logo/koleex-hub-logo-for-light-e.png" },
+  { label: "Hub logo · dark", src: "/brand/hub-logo/koleex-hub-logo-for-dark-e.png", dark: true },
+  { label: "Stacked · light", src: "/brand/hub-logo/koleex-hub-stacked-for-light-e.png" },
+  { label: "Stacked · dark", src: "/brand/hub-logo/koleex-hub-stacked-for-dark-e.png", dark: true },
+  { label: "Mono · light", src: "/brand/hub-logo/koleex-hub-logo-mono-light-e.png" },
+  { label: "Mono · dark", src: "/brand/hub-logo/koleex-hub-logo-mono-dark-e.png", dark: true },
+  { label: "Script", src: "/brand/hub-logo/hub-script-e.png", dark: true },
   { label: "AI face", src: "/brand/koleex-ai-face.png", dark: true },
 ];
 
@@ -175,7 +175,7 @@ export default function BrandReadThrough() {
                       type="button"
                       disabled={busyId !== null}
                       onClick={() => { targetRef.current = r.id; fileRef.current?.click(); }}
-                      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                      className="rounded-md border border-[var(--border-subtle)] bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
                     >
                       {t("vl.brands.replace", "Replace")}
                     </button>
@@ -184,7 +184,7 @@ export default function BrandReadThrough() {
                         type="button"
                         disabled={busyId !== null}
                         onClick={() => { void patchLogo(r.id, null); }}
-                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40"
+                        className="rounded-md border border-[var(--border-subtle)] bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40"
                       >
                         {t("vl.brands.remove", "Remove")}
                       </button>

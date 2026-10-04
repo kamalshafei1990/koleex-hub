@@ -5,9 +5,9 @@
    "Vendor Pricelists", SAP "Info Records"). Each list is owned by
    one supplier and carries many product → unit_price rows. */
 
-import { useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatDate, sectionTitleCls } from "../shared";
+import { useMemo } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatDate, sectionTitleCls, supplierNames, usePurchaseList } from "../shared";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -18,36 +18,18 @@ type PriceList = {
 };
 
 export default function PriceListsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<PriceList[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [itemCount, setItemCount] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=pricelists", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { rows: [], items: [], suppliers: [] }) as {
-        rows: PriceList[];
-        items: { price_list_id: string }[];
-        suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-      };
-      if (cancelled) return;
-      setRows(data.rows);
-      const counts: Record<string, number> = {};
-      for (const it of data.items) {
-        counts[it.price_list_id] = (counts[it.price_list_id] || 0) + 1;
-      }
-      setItemCount(counts);
-      const m = new Map<string, string>();
-      for (const c of data.suppliers) {
-        m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-      }
-      setSupplierName(m);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{
+    rows: PriceList[];
+    items: { price_list_id: string }[];
+    suppliers: SupplierRef[];
+  }>("pricelists");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
+  const itemCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const it of data?.items ?? []) counts[it.price_list_id] = (counts[it.price_list_id] || 0) + 1;
+    return counts;
+  }, [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

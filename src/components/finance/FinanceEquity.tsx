@@ -5,11 +5,19 @@
    Statement of equity from POSTED journal lines.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { useWarmData } from "@/lib/warm-cache";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_EQUITY } from "@/lib/translations/finance/equity";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_EQUITY } as const;
+
 
 interface EquityMovement { label: string; amount: number; detail?: string }
 interface EquityStatement {
@@ -23,37 +31,28 @@ interface EquityStatement {
   retained_earnings: number;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 
 export default function FinanceEquity() {
-  const { t } = useTranslation(financeT);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { t } = useTranslation(DICT);
+  const today = useMemo(() => todayIso(), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);
-  const [data, setData] = useState<EquityStatement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`/api/accounting/equity?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.statement as EquityStatement);
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const res = await fetch(`/api/accounting/equity?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.statement as EquityStatement;
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<EquityStatement>(`fin:eq:${from}:${to}`, fetchData);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.eq.title", "Statement of Equity")}
           subtitle={t("accounting.eq.subtitle.long", "Opening equity, contributions, current-year earnings, closing equity.")}

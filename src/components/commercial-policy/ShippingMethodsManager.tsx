@@ -206,7 +206,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by mode, carrier, or sub-type (FCL, DHL, RoRo…)"
-          className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
+          className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
         />
       </div>
 
@@ -299,7 +299,7 @@ function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingM
       : null;
 
   return (
-    <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
+    <div className="kx-glass bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
         {/* Mode badge */}
         <div className={`shrink-0 w-14 h-14 flex flex-col items-center justify-center rounded-lg border ${MODE_META[row.mode].chip}`}>

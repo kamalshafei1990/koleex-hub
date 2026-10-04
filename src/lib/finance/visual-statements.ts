@@ -8,9 +8,13 @@ import "server-only";
    table without a second round-trip.
    ========================================================================== */
 
-import { buildProfitLoss, buildCashFlow, type Period, type ProfitLoss, type CashFlowStatement } from "@/lib/accounting/statements";
+import {
+  buildProfitLoss, buildCashFlow, buildBalanceSheet,
+  type Period, type ProfitLoss, type CashFlowStatement, type BalanceSheet, type BalanceLine, type BalanceSection,
+} from "@/lib/accounting/statements";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
-import { getSupabaseServer } from "@/lib/server/supabase-server";
+
+export type { BalanceSheet, BalanceLine, BalanceSection };
 
 export type Granularity = "week" | "month" | "quarter" | "year";
 
@@ -20,19 +24,6 @@ export interface TrendBucket {
   to: string;
   revenue: number;
   net_income: number;
-}
-
-export interface BalanceLine { code: string; name: string; amount: number }
-export interface BalanceSection { label: string; amount: number; accounts: BalanceLine[] }
-export interface BalanceSheet {
-  as_of: string;
-  currency: string;
-  assets: BalanceSection;
-  liabilities: BalanceSection;
-  equity: BalanceSection;
-  total_assets: number;
-  total_liab_eq: number;
-  reconciled: boolean;
 }
 
 export interface VisualSnapshot {
@@ -60,7 +51,6 @@ export interface BuildVisualSnapshotOpts {
 
 /* ─── Period helpers ──────────────────────────────────────── */
 
-function endOfDay(d: Date) { d.setUTCHours(23, 59, 59, 999); return d; }
 function todayIso() { return new Date().toISOString().slice(0, 10); }
 
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -105,86 +95,6 @@ function periodFor(granularity: Granularity, base: Date): { from: string; to: st
     from: start.toISOString().slice(0, 10),
     to: end.toISOString().slice(0, 10),
     label: `${d.getUTCFullYear()}`,
-  };
-}
-
-function priorBase(granularity: Granularity, base: Date): Date {
-  const d = new Date(base);
-  if (granularity === "week")    d.setUTCDate(d.getUTCDate() - 7);
-  if (granularity === "month")   d.setUTCMonth(d.getUTCMonth() - 1);
-  if (granularity === "quarter") d.setUTCMonth(d.getUTCMonth() - 3);
-  if (granularity === "year")    d.setUTCFullYear(d.getUTCFullYear() - 1);
-  return d;
-}
-
-/* ─── Balance sheet builder ───────────────────────────────── */
-/* We build it directly here rather than depending on a separate
-   buildBalanceSheet() that may not exist. Same posted-line logic as
-   the P&L: sum debits and credits per account, classify by COA code
-   range. */
-
-async function buildBalanceSheet(tenantId: string, asOf: string, currency: string): Promise<BalanceSheet> {
-  const { data: acctsRaw } = await getSupabaseServer()
-    .from("accounting_accounts").select("id, code, name, type, normal_balance")
-    .eq("tenant_id", tenantId);
-  type Acct = { id: string; code: string; name: string; type: string; normal_balance: string };
-  const accts = (acctsRaw ?? []) as Acct[];
-
-  const { data: linesRaw } = await getSupabaseServer()
-    .from("accounting_journal_lines")
-    .select("account_id, debit, credit, accounting_journal_entries!inner(entry_date, status, tenant_id)")
-    .eq("tenant_id", tenantId)
-    .eq("accounting_journal_entries.tenant_id", tenantId)
-    .eq("accounting_journal_entries.status", "posted")
-    .lte("accounting_journal_entries.entry_date", asOf);
-  type LineRow = {
-    account_id: string; debit: number | string; credit: number | string;
-    accounting_journal_entries: { entry_date: string; status: string };
-  };
-  const lines = (linesRaw ?? []) as unknown as LineRow[];
-
-  const debitMap  = new Map<string, number>();
-  const creditMap = new Map<string, number>();
-  for (const l of lines) {
-    debitMap.set(l.account_id,  (debitMap.get(l.account_id)  ?? 0) + (Number(l.debit)  || 0));
-    creditMap.set(l.account_id, (creditMap.get(l.account_id) ?? 0) + (Number(l.credit) || 0));
-  }
-  function balanceFor(a: Acct) {
-    const d = debitMap.get(a.id)  ?? 0;
-    const c = creditMap.get(a.id) ?? 0;
-    return a.normal_balance === "debit" ? d - c : c - d;
-  }
-
-  const asset = accts.filter((a) => a.type === "asset" || a.type === "contra_asset");
-  const liab  = accts.filter((a) => a.type === "liability" || a.type === "contra_liability");
-  const eq    = accts.filter((a) => a.type === "equity");
-
-  function section(label: string, group: Acct[]): BalanceSection {
-    const accLines = group.map((a) => ({ code: a.code, name: a.name, amount: balanceFor(a) }))
-      .filter((x) => Math.abs(x.amount) > 0.005)
-      .sort((a, b) => a.code.localeCompare(b.code));
-    const amount = accLines.reduce((s, l) => s + l.amount, 0);
-    return { label, amount, accounts: accLines };
-  }
-  const assets = section("Assets", asset);
-  const liabilities = section("Liabilities", liab);
-  const equity = section("Equity", eq);
-
-  /* Roll year-to-date earnings into Equity. */
-  const yearStart = `${asOf.slice(0, 4)}-01-01`;
-  const pl = await buildProfitLoss(tenantId, { from: yearStart, to: asOf }, { currency });
-  if (Math.abs(pl.net_profit) > 0.005) {
-    equity.accounts.push({ code: "3900", name: "Current Year Earnings", amount: pl.net_profit });
-    equity.amount += pl.net_profit;
-  }
-
-  const total_assets  = assets.amount;
-  const total_liab_eq = liabilities.amount + equity.amount;
-  return {
-    as_of: asOf, currency,
-    assets, liabilities, equity,
-    total_assets, total_liab_eq,
-    reconciled: Math.abs(total_assets - total_liab_eq) < 0.5,
   };
 }
 
@@ -263,8 +173,6 @@ export async function buildVisualSnapshot(
     revenue: trendPLs[idx].revenue.amount,
     net_income: trendPLs[idx].net_profit,
   }));
-  void endOfDay;
-  void priorBase;
 
   return {
     base_currency: baseCurrency,

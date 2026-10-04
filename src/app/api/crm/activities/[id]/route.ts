@@ -1,8 +1,9 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { settleFollowup } from "@/lib/server/commerce-notify";
 
 async function existsInTenant(
   id: string,
@@ -40,6 +41,9 @@ export async function PATCH(
     console.error("[api/crm/activities/[id] PATCH]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  /* Done, or moved to another day: today's "follow-up due" no longer holds
+     (a new due day is reminded on the day). */
+  if (patch.done_at || "due_at" in patch) after(() => settleFollowup(id));
   return NextResponse.json({ ok: true });
 }
 
@@ -65,5 +69,6 @@ export async function DELETE(
     console.error("[api/crm/activities/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  after(() => settleFollowup(id));
   return NextResponse.json({ ok: true });
 }

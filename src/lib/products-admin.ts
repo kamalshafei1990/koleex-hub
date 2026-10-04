@@ -21,7 +21,7 @@ import {
 import type {
   DivisionRow, CategoryRow, SubcategoryRow,
   ProductRow, ProductModelRow, ProductMediaRow,
-  ProductTranslationRow, ModelTranslationRow,
+  ProductTranslationRow,
   ProductMarketPriceRow, RelatedProductRow,
   SewingMachineSpecsRow,
 } from "@/types/supabase";
@@ -29,9 +29,31 @@ import type {
 const BUCKET = "media";
 
 /* ── tiny fetch helpers (credentials always included) ────────────────── */
+
+/* Write-version cache-buster. The product APIs answer GETs with
+   `Cache-Control: private, max-age=30, stale-while-revalidate=300`, so the
+   save→back-to-list→reopen loop (measured at 7 seconds on production,
+   2026-08-19) refetches the SAME URL and the browser serves the pre-save
+   payload — the operator's fresh member prices "revert to the family's".
+   The DB was right the whole time; only the URL was stale. Same trap and
+   same cure as the To-do app (kx_todo_write_v): every successful write
+   bumps a version, every read carries it, a changed URL can never hit the
+   old cache entry. localStorage, not sessionStorage — an iOS PWA relaunch
+   is a new session and must still see its own last write. */
+const PRODUCTS_WRITE_V_KEY = "kx_products_write_v";
+function productsWriteVersion(): string {
+  if (typeof window === "undefined") return "0";
+  try { return window.localStorage.getItem(PRODUCTS_WRITE_V_KEY) || "0"; } catch { return "0"; }
+}
+function bumpProductsWriteVersion(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(PRODUCTS_WRITE_V_KEY, String(Date.now())); } catch { /* best-effort */ }
+}
+
 async function jget<T>(url: string, fallback: T): Promise<T> {
+  const versioned = `${url}${url.includes("?") ? "&" : "?"}v=${productsWriteVersion()}`;
   try {
-    const res = await fetch(url, { credentials: "include" });
+    const res = await fetch(versioned, { credentials: "include" });
     if (!res.ok) return fallback;
     return (await res.json()) as T;
   } catch (e) {
@@ -43,7 +65,7 @@ async function jsend(
   url: string,
   method: "POST" | "PATCH" | "PUT" | "DELETE",
   body?: unknown,
-): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   try {
     const res = await fetch(url, {
       method,
@@ -53,10 +75,14 @@ async function jsend(
     });
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) console.error(`[products-admin ${method}]`, url, json.error || res.status);
-    return { ok: res.ok, json };
+    /* Any successful write invalidates every cached product GET (see
+       bumpProductsWriteVersion above) — reads after a save must never be
+       answered by the browser's HTTP cache. */
+    if (res.ok) bumpProductsWriteVersion();
+    return { ok: res.ok, status: res.status, json };
   } catch (e) {
     console.error(`[products-admin ${method}]`, url, e);
-    return { ok: false, json: {} };
+    return { ok: false, status: 0, json: {} };
   }
 }
 
@@ -121,8 +147,11 @@ function clearTaxoKey(key: string): void {
   try { store.removeItem(key); } catch { /* noop */ }
 }
 
-/** Call this from every taxonomy mutation so the next read pulls fresh data. */
-export function invalidateTaxonomyCache(): void {
+/* Called from every taxonomy mutation below so the next read pulls fresh
+   data. Module-private: every caller lives in this file, and exporting it
+   made an audit read it as dead code and very nearly delete a live cache
+   invalidation. */
+function invalidateTaxonomyCache(): void {
   clearTaxoKey("kx:taxo:divisions");
   clearTaxoKey("kx:taxo:categories");
   clearTaxoKey("kx:taxo:subcategories");
@@ -353,9 +382,20 @@ export async function createModel(model: Record<string, unknown>): Promise<Produ
   const { ok, json } = await jsend("/api/product-models", "POST", model);
   return ok ? ((json.model as ProductModelRow) ?? null) : null;
 }
-export async function updateModel(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  const { ok } = await jsend(`/api/product-models/${id}`, "PATCH", updates);
-  return ok;
+export interface UpdateModelResult {
+  ok: boolean;
+  /** true when the row changed under us (optimistic-lock 409) */
+  conflict?: boolean;
+  /** the row's new updated_at after a successful write */
+  updated_at?: string | null;
+}
+export async function updateModel(id: string, updates: Record<string, unknown>): Promise<UpdateModelResult> {
+  const { ok, status, json } = await jsend(`/api/product-models/${id}`, "PATCH", updates);
+  return {
+    ok,
+    conflict: status === 409 || (json as { conflict?: boolean } | null)?.conflict === true,
+    updated_at: (json as { updated_at?: string | null } | null)?.updated_at ?? null,
+  };
 }
 export async function deleteModel(id: string): Promise<boolean> {
   const { ok } = await jsend(`/api/product-models/${id}`, "DELETE");
@@ -408,23 +448,6 @@ export async function deleteTranslation(id: string): Promise<boolean> {
   return ok;
 }
 
-// ── Model Translations → /api/model-translations ──
-export async function fetchModelTranslations(modelIds: string[]): Promise<ModelTranslationRow[]> {
-  if (!modelIds.length) return [];
-  const json = await jget<{ translations?: ModelTranslationRow[] }>(
-    `/api/model-translations?model_ids=${encodeURIComponent(modelIds.join(","))}`, {},
-  );
-  return json.translations ?? [];
-}
-export async function upsertModelTranslation(t: Record<string, unknown>): Promise<boolean> {
-  const { ok } = await jsend("/api/model-translations", "POST", t);
-  return ok;
-}
-export async function deleteModelTranslation(id: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/model-translations/${id}`, "DELETE");
-  return ok;
-}
-
 // ── Market Prices → /api/product-market-prices ──
 export async function fetchMarketPricesByModelIds(modelIds: string[]): Promise<ProductMarketPriceRow[]> {
   if (!modelIds.length) return [];
@@ -435,10 +458,6 @@ export async function fetchMarketPricesByModelIds(modelIds: string[]): Promise<P
 }
 export async function upsertMarketPrice(p: Record<string, unknown>): Promise<boolean> {
   const { ok } = await jsend("/api/product-market-prices", "POST", p);
-  return ok;
-}
-export async function deleteMarketPrice(id: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/product-market-prices/${id}`, "DELETE");
   return ok;
 }
 
@@ -472,9 +491,19 @@ export interface ProductSupplierLinkRow {
   lead_time_days?: number | null;
   unit_cost_cny?: number | null;
   currency?: string | null;
-  /* What unit_cost_cny already includes (display + warning, no math yet). */
+  /* What unit_cost_cny already includes. */
   cost_basis?: "factory_only" | "packing" | "delivered" | null;
   cost_includes_tax?: boolean | null;
+  /* The missing pieces when the cost is NOT full-landed/tax-in, so pricing
+     can work from the TRUE landed cost (owner request 2026-08-28).
+     combined=true → packing+delivery entered as ONE number (combined_cny). */
+  cost_extras?: {
+    tax_rate_percent?: number | null;
+    delivery_cny?: number | null;
+    packing_cny?: number | null;
+    combined_cny?: number | null;
+    combined?: boolean | null;
+  } | null;
   payment_terms?: string | null;
   notes?: string | null;
   notes_i18n?: Record<string, string> | null;
@@ -553,6 +582,31 @@ export async function saveProductDocuments(productId: string, documents: Product
   return ok;
 }
 
+// ── Feature Highlights → /api/product-feature-highlights ──
+// The supplier-catalog card: small photo + trilingual title/explanation of
+// one feature/function. Not media, not specs — its own rows.
+export interface ProductFeatureHighlightRow {
+  id?: string; product_id?: string;
+  model_id?: string | null;
+  title: string; title_zh?: string | null; title_ar?: string | null;
+  description?: string | null; description_zh?: string | null; description_ar?: string | null;
+  /** free-locale translations, hero-style: { "<code>": { title?, description? } } */
+  translations?: Record<string, { title?: string; description?: string }>;
+  image_url?: string | null;
+  sort?: number;
+}
+export async function fetchProductFeatureHighlights(productId: string): Promise<ProductFeatureHighlightRow[]> {
+  if (!productId) return [];
+  const json = await jget<{ highlights?: ProductFeatureHighlightRow[] }>(
+    `/api/product-feature-highlights?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.highlights ?? [];
+}
+export async function saveProductFeatureHighlights(productId: string, highlights: ProductFeatureHighlightRow[]): Promise<boolean> {
+  const { ok } = await jsend(`/api/product-feature-highlights`, "PUT", { product_id: productId, highlights });
+  return ok;
+}
+
 // ── Search → /api/products/search ──
 export async function searchProducts(query: string, excludeId?: string): Promise<Pick<ProductRow, "id" | "product_name" | "slug">[]> {
   const params = new URLSearchParams({ q: query });
@@ -622,12 +676,6 @@ export async function fetchUniqueBrands(): Promise<string[]> {
   } catch { return []; }
 }
 
-export async function fetchUniqueFamilies(): Promise<string[]> {
-  try {
-    const json = await cachedGet<{ families?: string[] }>("/api/products/facets");
-    return json.families ?? [];
-  } catch { return []; }
-}
 
 // ── Taxonomy logos (storage proxy — no secrets, unchanged) ──
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {
@@ -814,7 +862,47 @@ export async function upsertSewingSpecs(specs: {
   );
   return ok;
 }
-export async function deleteSewingSpecs(productId: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/sewing-specs`, "DELETE");
-  return ok;
+
+
+/* ── Landed cost ──────────────────────────────────────────────────────────
+   ONE place turns (unit_cost_cny, cost_basis, cost_includes_tax, cost_extras)
+   into the TRUE landed CNY cost the pricing engine should work from.
+   VAT applies AFTER the goods+packing+delivery subtotal, matching how the
+   supplier invoices. Missing pieces contribute 0 — the UI warns separately. */
+export interface LandedCostPart { label: string; amount: number }
+export function landedCostCny(link: {
+  unit_cost_cny?: number | string | null;
+  cost_basis?: string | null;
+  cost_includes_tax?: boolean | null;
+  cost_extras?: ProductSupplierLinkRow["cost_extras"];
+}): { landed: number | null; parts: LandedCostPart[]; taxPercent: number | null } {
+  const base = link.unit_cost_cny != null && link.unit_cost_cny !== "" ? Number(link.unit_cost_cny) : null;
+  if (base === null || !Number.isFinite(base) || base <= 0) return { landed: null, parts: [], taxPercent: null };
+  const ex = link.cost_extras ?? {};
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+  const parts: LandedCostPart[] = [];
+  if (link.cost_basis === "factory_only") {
+    if (ex.combined) {
+      const c = n(ex.combined_cny);
+      if (c) parts.push({ label: "packing+delivery", amount: c });
+    } else {
+      const pk = n(ex.packing_cny);
+      const dl = n(ex.delivery_cny);
+      if (pk) parts.push({ label: "packing", amount: pk });
+      if (dl) parts.push({ label: "delivery", amount: dl });
+    }
+  } else if (link.cost_basis === "packing") {
+    const dl = n(ex.delivery_cny);
+    if (dl) parts.push({ label: "delivery", amount: dl });
+  }
+  let landed = base + parts.reduce((t, p) => t + p.amount, 0);
+  let taxPercent: number | null = null;
+  if (link.cost_includes_tax === false) {
+    const rate = n(ex.tax_rate_percent);
+    if (rate) {
+      taxPercent = rate;
+      landed = landed * (1 + rate / 100);
+    }
+  }
+  return { landed: Math.round(landed * 100) / 100, parts, taxPercent };
 }

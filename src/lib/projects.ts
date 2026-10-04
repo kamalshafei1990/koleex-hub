@@ -57,18 +57,57 @@ export interface ProjectRow {
   is_favorite: boolean;
   customer_id: string | null;
   manager_account_id: string | null;
+  created_by_account_id?: string | null;
   planned_start: string | null;
   planned_end: string | null;
   budget_hours: number | null;
   budget_amount: number | null;
   billing_rate: number | null;
   progress_pct: number | null;
+  /** ISO currency code for budget_amount / billing_rate (null = none set).
+   *  Absent until 20260926_projects_additions.sql is applied. */
+  currency?: string | null;
+  /** When the project was archived (status "archived"); null otherwise. */
+  archived_at?: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
   customer?: { id: string; display_name: string | null; company_name: string | null } | null;
   manager?: { id: string; username: string } | null;
+  /** Only on list rows (GET /api/projects): open/overdue count every open
+   *  task; done/total are top-level non-cancelled (progress rule). */
+  task_counts?: ProjectTaskCounts;
+  /** Only on list rows: the caller manages / created / holds a task. */
+  involved?: boolean;
+  /** project_members rows (list + detail payloads) — the Members button
+   *  count without fetching the member list. */
+  member_count?: number;
+  /** The caller's effective permission (list + detail payloads). "view" =
+   *  read-only: every write route answers 403, so the UI hides writes. */
+  my_access?: ProjectAccess;
+  /** Why `my_access` is "view" (null otherwise): "viewer" = viewer
+   *  membership is the only way in; "module" = no edit right in the
+   *  Projects module. Drives the "View only" tooltip wording. */
+  my_access_reason?: ProjectViewReason | null;
+  /** Server-computed: the Projects module's create action AND project
+   *  write access — adding a (top-level) task. Absent = follow my_access. */
+  can_create?: boolean;
+  /** Server-computed: the module's delete action AND project write access
+   *  — deleting tasks of this project. Absent = follow my_access. */
+  can_delete?: boolean;
 }
+
+export type ProjectAccess = "manage" | "edit" | "view";
+export type ProjectViewReason = "viewer" | "module";
+
+export interface ProjectTaskCounts {
+  open: number;
+  overdue: number;
+  done: number;
+  total: number;
+}
+
+export type ProjectStatusCounts = Record<ProjectStatus | "all", number>;
 
 export interface ProjectStage {
   id: string;
@@ -91,7 +130,7 @@ export interface ProjectTag {
 
 export interface TaskRow {
   id: string;
-  tenant_id: string;
+  tenant_id?: string;
   project_id: string;
   stage_id: string | null;
   parent_task_id: string | null;
@@ -99,11 +138,11 @@ export interface TaskRow {
   description: string | null;
   priority: TaskPriority;
   assignee_account_id: string | null;
-  followers_account_ids: string[];
+  followers_account_ids?: string[];
   tag_ids: string[];
   blocked_by_task_ids: string[];
   due_date: string | null;
-  start_date: string | null;
+  start_date?: string | null;
   estimated_hours: number | null;
   logged_hours: number;
   progress_pct: number;
@@ -115,10 +154,27 @@ export interface TaskRow {
   sort_order: number;
   closed_at: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   project?: Pick<ProjectRow, "id" | "name" | "color"> | null;
   stage?: Pick<ProjectStage, "id" | "name" | "color" | "is_closed" | "is_default_new" | "sort_order"> | null;
   assignee?: { id: string; username: string } | null;
+  created_by_account_id?: string | null;
+  /** Server-computed (task list / detail / create / update payloads): the
+   *  caller may write THIS task — project access manage/edit, or they are
+   *  its assignee / creator (a view-only member keeps edit rights on the
+   *  tasks they created). Absent on older payloads = follow the project. */
+  can_edit?: boolean;
+  /** Server-computed: the Projects module's create action AND write
+   *  access to THIS task — adding a subtask under it (the POST route's
+   *  rule). Absent on older payloads = follow can_edit. */
+  can_create?: boolean;
+  /** Server-computed: the module's delete action AND write access to THIS
+   *  task (the DELETE and bulk-delete routes' rule). Absent = follow
+   *  can_edit. */
+  can_delete?: boolean;
+  /** The caller's project-level access for the task's project (e.g. the
+   *  "you edit this because it is yours" note). */
+  project_access?: ProjectAccess;
 }
 
 export const PRIORITY_COLOR: Record<TaskPriority, string> = {
@@ -128,8 +184,42 @@ export const PRIORITY_COLOR: Record<TaskPriority, string> = {
   urgent: "#f87171",
 };
 
+/* ── Transport ────────────────────────────────────── */
+
+/** A failed Projects API call. `message` is the server's (generic,
+ *  user-safe) error text, ready for a toast. */
+export class ProjectsApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(url, {
+    credentials: "include",
+    cache: "no-store",
+    ...init,
+    headers: init.body && !(init.body instanceof FormData)
+      ? { "Content-Type": "application/json", ...(init.headers ?? {}) }
+      : init.headers,
+  });
+  if (!res.ok) {
+    const j = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+    throw new ProjectsApiError(j?.error ?? `HTTP ${res.status}`, res.status, j?.code);
+  }
+  return (await res.json()) as T;
+}
+const send = <T>(url: string, method: string, body?: unknown) =>
+  api<T>(url, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+
 /* ── Projects ─────────────────────────────────────── */
 
+/** Lenient list read (Todo's project picker, the template gallery):
+ *  never throws, an error reads as an empty list. */
 export async function fetchProjects(params: {
   status?: ProjectStatus | "all";
   customer_id?: string;
@@ -147,115 +237,155 @@ export async function fetchProjects(params: {
   return projects ?? [];
 }
 
-export async function fetchProject(id: string): Promise<ProjectRow | null> {
-  const res = await fetch(`/api/projects/${id}`, { credentials: "include" });
-  if (!res.ok) return null;
-  const { project } = (await res.json()) as { project: ProjectRow };
-  return project ?? null;
+/* Home warms `/api/projects` (bare) into the browser HTTP cache on hover
+   (src/app/page.tsx). The FIRST list read of the session asks for that
+   exact URL in the default cache mode so it can reuse the warm entry;
+   every later read uses "reload" — always the network, and it refreshes
+   the HTTP cache so a later default-mode read can never see stale rows. */
+let firstListRead = true;
+
+/** The Projects list screen's read: rows + per-status counts. Throws. */
+export async function fetchProjectList(params: {
+  status: ProjectStatus | "all";
+  search?: string;
+  involves?: string;
+}): Promise<{ projects: ProjectRow[]; counts: ProjectStatusCounts }> {
+  const q = new URLSearchParams();
+  if (params.status !== "active") q.set("status", params.status);
+  if (params.search) q.set("search", params.search);
+  if (params.involves) q.set("involves", params.involves);
+  const qs = q.toString();
+  const url = qs ? `/api/projects?${qs}` : "/api/projects";
+  const cache: RequestCache = firstListRead && !qs ? "default" : "reload";
+  firstListRead = false;
+  const j = await api<{ projects: ProjectRow[]; counts: Partial<ProjectStatusCounts> }>(url, { cache });
+  return {
+    projects: j.projects ?? [],
+    counts: { active: 0, on_hold: 0, completed: 0, archived: 0, all: 0, ...(j.counts ?? {}) },
+  };
 }
 
-export async function createProject(body: Partial<ProjectRow> & { name: string; template_id?: string | null }): Promise<ProjectRow | null> {
-  const res = await fetch("/api/projects", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { project } = (await res.json()) as { project: ProjectRow };
-  return project;
+export async function fetchProjectById(id: string): Promise<ProjectRow> {
+  return (await api<{ project: ProjectRow }>(`/api/projects/${id}`)).project;
 }
 
-export async function updateProject(
-  id: string,
-  patch: Partial<ProjectRow>,
-): Promise<ProjectRow | null> {
-  const res = await fetch(`/api/projects/${id}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) return null;
-  const { project } = (await res.json()) as { project: ProjectRow };
-  return project;
+export async function createProject(
+  body: Partial<ProjectRow> & { name: string; template_id?: string | null; copy_tasks?: boolean },
+): Promise<ProjectRow> {
+  return (await send<{ project: ProjectRow }>("/api/projects", "POST", body)).project;
 }
 
-export async function deleteProject(id: string): Promise<boolean> {
-  const res = await fetch(`/api/projects/${id}`, { method: "DELETE", credentials: "include" });
-  return res.ok;
+export async function updateProject(id: string, patch: Partial<ProjectRow>): Promise<ProjectRow> {
+  return (await send<{ project: ProjectRow }>(`/api/projects/${id}`, "PATCH", patch)).project;
 }
 
-/** Duplicate a project as a fresh starter — copies core fields + its stage
- *  pipeline (not the tasks). Returns the new project. */
-export async function duplicateProject(source: ProjectRow): Promise<ProjectRow | null> {
-  const created = await createProject({
+/** Permanent delete — super admins only (the server refuses everyone else;
+ *  they archive instead). */
+export async function deleteProject(id: string): Promise<void> {
+  await send(`/api/projects/${id}`, "DELETE");
+}
+
+/** Archive (restorable): status "archived", the server stamps archived_at. */
+export async function archiveProject(id: string): Promise<ProjectRow> {
+  return updateProject(id, { status: "archived" });
+}
+
+/** Restore an archived project to Active. */
+export async function restoreProject(id: string): Promise<ProjectRow> {
+  return updateProject(id, { status: "active" });
+}
+
+/* ── Project members ──────────────────────────────── */
+
+export type ProjectMemberRole = "manager" | "member" | "viewer";
+
+export interface ProjectMember {
+  account_id: string;
+  role: ProjectMemberRole;
+  added_by: string | null;
+  created_at: string;
+  /** 'auto' = added because they manage the project or were assigned a
+   *  task; removed again automatically once that reason is gone. Adding
+   *  them or changing their role makes it 'manual'. Absent before the
+   *  20260930 migration. */
+  source?: "manual" | "auto";
+  account?: { id: string; username: string } | null;
+}
+
+export interface ProjectMembersResponse {
+  /** false until the members migration is applied. */
+  available: boolean;
+  members: ProjectMember[];
+  can_manage: boolean;
+  manager_account_id: string | null;
+}
+
+export async function fetchProjectMembers(projectId: string): Promise<ProjectMembersResponse> {
+  return api<ProjectMembersResponse>(`/api/projects/${projectId}/members`);
+}
+
+export async function addProjectMembers(projectId: string, accountIds: string[], role: ProjectMemberRole = "member"): Promise<void> {
+  await send(`/api/projects/${projectId}/members`, "POST", { account_ids: accountIds, role });
+}
+
+export async function updateProjectMemberRole(projectId: string, accountId: string, role: ProjectMemberRole): Promise<void> {
+  await send(`/api/projects/${projectId}/members`, "PATCH", { account_id: accountId, role });
+}
+
+export async function removeProjectMember(projectId: string, accountId: string): Promise<void> {
+  await send(`/api/projects/${projectId}/members?account_id=${encodeURIComponent(accountId)}`, "DELETE");
+}
+
+/** Find-or-create the project's Discuss chat; returns the channel id. */
+export async function openProjectChat(projectId: string): Promise<string> {
+  return (await send<{ channel_id: string }>(`/api/projects/${projectId}/chat`, "POST")).channel_id;
+}
+
+/** Duplicate a project as a fresh starter — core fields + its stage
+ *  pipeline (not the tasks), through the same server-side copy path that
+ *  templates use (one request, bulk inserts). The code is NOT copied:
+ *  codes identify a project. */
+export async function duplicateProject(source: ProjectRow): Promise<ProjectRow> {
+  return createProject({
     name: `${source.name} (copy)`,
-    code: source.code,
+    code: null,
     description: source.description,
     color: source.color,
     is_billable: source.is_billable,
     customer_id: source.customer_id,
     manager_account_id: source.manager_account_id,
     budget_hours: source.budget_hours,
+    budget_amount: source.budget_amount,
+    billing_rate: source.billing_rate,
     status: "active",
+    template_id: source.id,
+    copy_tasks: false,
   });
-  if (!created) return null;
-  const stages = await fetchStages(source.id);
-  for (const s of stages.sort((a, b) => a.sort_order - b.sort_order)) {
-    await createStage(created.id, {
-      name: s.name,
-      color: s.color,
-      sort_order: s.sort_order,
-      is_closed: s.is_closed,
-      is_default_new: s.is_default_new,
-    });
-  }
-  return created;
 }
 
 /* ── Stages ───────────────────────────────────────── */
 
 export async function fetchStages(projectId: string): Promise<ProjectStage[]> {
-  const res = await fetch(`/api/projects/${projectId}/stages`, { credentials: "include" });
-  if (!res.ok) return [];
-  const { stages } = (await res.json()) as { stages: ProjectStage[] };
-  return stages ?? [];
+  return (await api<{ stages: ProjectStage[] }>(`/api/projects/${projectId}/stages`)).stages ?? [];
 }
 
-export async function createStage(projectId: string, body: { name: string; color?: string | null; sort_order?: number; is_closed?: boolean; is_default_new?: boolean }): Promise<ProjectStage | null> {
-  const res = await fetch(`/api/projects/${projectId}/stages`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { stage } = (await res.json()) as { stage: ProjectStage };
-  return stage;
+export async function createStage(projectId: string, body: { name: string; color?: string | null; sort_order?: number; is_closed?: boolean; is_default_new?: boolean }): Promise<ProjectStage> {
+  return (await send<{ stage: ProjectStage }>(`/api/projects/${projectId}/stages`, "POST", body)).stage;
 }
 
-export async function updateStage(id: string, patch: Partial<ProjectStage>): Promise<ProjectStage | null> {
-  const res = await fetch(`/api/projects/stages/${id}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) return null;
-  const { stage } = (await res.json()) as { stage: ProjectStage };
-  return stage;
+export async function updateStage(id: string, patch: Partial<ProjectStage>): Promise<ProjectStage> {
+  return (await send<{ stage: ProjectStage }>(`/api/projects/stages/${id}`, "PATCH", patch)).stage;
 }
 
-export async function deleteStage(id: string): Promise<boolean> {
-  const res = await fetch(`/api/projects/stages/${id}`, { method: "DELETE", credentials: "include" });
-  return res.ok;
+export async function deleteStage(id: string): Promise<void> {
+  await send(`/api/projects/stages/${id}`, "DELETE");
 }
 
 /* ── Tasks ────────────────────────────────────────── */
 
 export async function fetchTasks(params: {
   project_id?: string;
+  parent_task_id?: string;
   mine?: boolean;
   status?: TaskStatus | "all";
   priority?: TaskPriority;
@@ -263,6 +393,10 @@ export async function fetchTasks(params: {
   search?: string;
   linked_entity_type?: string;
   linked_entity_id?: string;
+  assignee?: string;
+  tag?: string;
+  due_lte?: string;
+  limit?: number;
 } = {}): Promise<TaskRow[]> {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -271,39 +405,71 @@ export async function fetchTasks(params: {
       if (v) q.set(k, "1");
     } else q.set(k, String(v));
   });
-  const { tasks } = await cachedGet<{ tasks: TaskRow[] }>(
-    `/api/projects/tasks?${q.toString()}`, 0,
-  ).catch(() => ({ tasks: [] as TaskRow[] }));
+  /* Throws on failure so screens can tell an error from an empty list. */
+  const { tasks } = await cachedGet<{ tasks: TaskRow[] }>(`/api/projects/tasks?${q.toString()}`, 0);
   return tasks ?? [];
 }
 
-export async function createTask(body: Partial<TaskRow> & { project_id: string; title: string }): Promise<TaskRow | null> {
-  const res = await fetch("/api/projects/tasks", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { task } = (await res.json()) as { task: TaskRow };
-  return task;
+export async function createTask(body: Partial<TaskRow> & { project_id: string; title: string }): Promise<TaskRow> {
+  return (await send<{ task: TaskRow }>("/api/projects/tasks", "POST", body)).task;
 }
 
-export async function updateTask(id: string, patch: Partial<TaskRow>): Promise<TaskRow | null> {
-  const res = await fetch(`/api/projects/tasks/${id}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) return null;
-  const { task } = (await res.json()) as { task: TaskRow };
-  return task;
+export async function updateTask(id: string, patch: Partial<TaskRow>): Promise<TaskRow> {
+  return (await send<{ task: TaskRow }>(`/api/projects/tasks/${id}`, "PATCH", patch)).task;
 }
 
-export async function deleteTask(id: string): Promise<boolean> {
-  const res = await fetch(`/api/projects/tasks/${id}`, { method: "DELETE", credentials: "include" });
-  return res.ok;
+export async function deleteTask(id: string): Promise<void> {
+  await send(`/api/projects/tasks/${id}`, "DELETE");
+}
+
+export type BulkTaskAction =
+  | { action: "stage"; value: string | null }
+  | { action: "status"; value: TaskStatus }
+  | { action: "assign"; value: string | null }
+  | { action: "due"; value: string | null }
+  | { action: "priority"; value: TaskPriority }
+  | { action: "delete"; value?: undefined };
+
+/** One request for a multi-select action (server applies access + the
+ *  stage⇄status rules per task; all-or-nothing). */
+export async function bulkTasks(taskIds: string[], op: BulkTaskAction): Promise<void> {
+  await send("/api/projects/tasks/bulk", "POST", { task_ids: taskIds, ...op });
+}
+
+/* ── Saved filters (per user, accounts.preferences) ── */
+
+export interface SavedTaskFilter {
+  id: string;
+  name: string;
+  /** Where it was saved: My Tasks, All Tasks, or a project board. */
+  scope: "mine" | "all" | "project";
+  assignee: string | null;
+  tag: string | null;
+  status: TaskStatus | "all";
+  priority: TaskPriority | "all";
+  search: string;
+  overdue: boolean;
+}
+
+export async function fetchSavedFilters(): Promise<SavedTaskFilter[]> {
+  return (await api<{ filters: SavedTaskFilter[] }>("/api/projects/saved-filters")).filters ?? [];
+}
+
+export async function saveSavedFilters(filters: SavedTaskFilter[]): Promise<SavedTaskFilter[]> {
+  return (await send<{ filters: SavedTaskFilter[] }>("/api/projects/saved-filters", "PUT", { filters })).filters ?? [];
+}
+
+/** One board drop → one request. `orderedIds` is the whole target column
+ *  after the drop (including the moved card). The server writes only the
+ *  moved card's sort_order when there is room between its new neighbours
+ *  (`positions` lists every card it wrote). */
+export async function reorderTasks(body: {
+  project_id: string;
+  stage_id: string | null;
+  ordered_ids: string[];
+  moved_id: string;
+}): Promise<{ moved: { id: string; stage_id: string | null; status: TaskStatus }; positions?: Record<string, number> }> {
+  return send("/api/projects/tasks/reorder", "POST", body);
 }
 
 /* ── Tags ─────────────────────────────────────────── */
@@ -315,33 +481,21 @@ export async function fetchTags(): Promise<ProjectTag[]> {
   return tags ?? [];
 }
 
-export async function createTag(body: { name: string; color?: string | null }): Promise<ProjectTag | null> {
-  const res = await fetch("/api/projects/tags", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return null;
-  const { tag } = (await res.json()) as { tag: ProjectTag };
-  return tag;
+/** Tags for the editors — throws, unlike the lenient fetchTags. */
+export async function fetchTagsStrict(): Promise<ProjectTag[]> {
+  return (await api<{ tags: ProjectTag[] }>("/api/projects/tags")).tags ?? [];
 }
 
-export async function updateTag(id: string, patch: Partial<ProjectTag>): Promise<ProjectTag | null> {
-  const res = await fetch(`/api/projects/tags/${id}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) return null;
-  const { tag } = (await res.json()) as { tag: ProjectTag };
-  return tag;
+export async function createTag(body: { name: string; color?: string | null }): Promise<ProjectTag> {
+  return (await send<{ tag: ProjectTag }>("/api/projects/tags", "POST", body)).tag;
 }
 
-export async function deleteTag(id: string): Promise<boolean> {
-  const res = await fetch(`/api/projects/tags/${id}`, { method: "DELETE", credentials: "include" });
-  return res.ok;
+export async function updateTag(id: string, patch: Partial<ProjectTag>): Promise<ProjectTag> {
+  return (await send<{ tag: ProjectTag }>(`/api/projects/tags/${id}`, "PATCH", patch)).tag;
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  await send(`/api/projects/tags/${id}`, "DELETE");
 }
 
 /* ── Phase 2: comments / checklist / milestones / time / files ───── */
@@ -354,6 +508,9 @@ export interface TaskComment {
   created_at: string;
   updated_at: string;
   author?: { id: string; username: string } | null;
+  /** Server-computed: the DELETE route would accept it (author or project
+   *  moderator, with write access to the task). Absent = hide. */
+  can_delete?: boolean;
 }
 export interface ChecklistItem {
   id: string;
@@ -380,7 +537,11 @@ export interface TimeEntry {
   entry_date: string;
   note: string | null;
   created_at: string;
+  invoiced_invoice_id?: string | null;
   account?: { id: string; username: string } | null;
+  /** Server-computed: the DELETE route would accept it (author or project
+   *  moderator, write access to the task, not invoiced). Absent = hide. */
+  can_delete?: boolean;
 }
 export interface TaskAttachment {
   id: string;
@@ -394,86 +555,67 @@ export interface TaskAttachment {
   url?: string | null;
 }
 
-async function getJson<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) return null;
-  return (await res.json()) as T;
-}
-async function sendJson<T>(url: string, method: string, body?: unknown): Promise<T | null> {
-  const res = await fetch(url, {
-    method,
-    credentials: "include",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) return null;
-  if (res.status === 204) return {} as T;
-  return (await res.json()) as T;
-}
-
 /* Comments */
 export async function fetchComments(taskId: string): Promise<TaskComment[]> {
-  return (await getJson<{ comments: TaskComment[] }>(`/api/projects/tasks/${taskId}/comments`))?.comments ?? [];
+  return (await api<{ comments: TaskComment[] }>(`/api/projects/tasks/${taskId}/comments`)).comments ?? [];
 }
-export async function createComment(taskId: string, body: string): Promise<TaskComment | null> {
-  return (await sendJson<{ comment: TaskComment }>(`/api/projects/tasks/${taskId}/comments`, "POST", { body }))?.comment ?? null;
+export async function createComment(taskId: string, body: string): Promise<TaskComment> {
+  return (await send<{ comment: TaskComment }>(`/api/projects/tasks/${taskId}/comments`, "POST", { body })).comment;
 }
-export async function deleteComment(taskId: string, id: string): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/tasks/${taskId}/comments/${id}`, "DELETE"));
+export async function deleteComment(taskId: string, id: string): Promise<void> {
+  await send(`/api/projects/tasks/${taskId}/comments/${id}`, "DELETE");
 }
 
 /* Checklist */
 export async function fetchChecklist(taskId: string): Promise<ChecklistItem[]> {
-  return (await getJson<{ items: ChecklistItem[] }>(`/api/projects/tasks/${taskId}/checklist`))?.items ?? [];
+  return (await api<{ items: ChecklistItem[] }>(`/api/projects/tasks/${taskId}/checklist`)).items ?? [];
 }
-export async function createChecklistItem(taskId: string, title: string): Promise<ChecklistItem | null> {
-  return (await sendJson<{ item: ChecklistItem }>(`/api/projects/tasks/${taskId}/checklist`, "POST", { title }))?.item ?? null;
+export async function createChecklistItem(taskId: string, title: string): Promise<ChecklistItem> {
+  return (await send<{ item: ChecklistItem }>(`/api/projects/tasks/${taskId}/checklist`, "POST", { title })).item;
 }
-export async function updateChecklistItem(taskId: string, id: string, patch: Partial<ChecklistItem>): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/tasks/${taskId}/checklist/${id}`, "PATCH", patch));
+export async function updateChecklistItem(taskId: string, id: string, patch: Partial<ChecklistItem>): Promise<void> {
+  await send(`/api/projects/tasks/${taskId}/checklist/${id}`, "PATCH", patch);
 }
-export async function deleteChecklistItem(taskId: string, id: string): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/tasks/${taskId}/checklist/${id}`, "DELETE"));
+export async function deleteChecklistItem(taskId: string, id: string): Promise<void> {
+  await send(`/api/projects/tasks/${taskId}/checklist/${id}`, "DELETE");
 }
 
 /* Milestones */
 export async function fetchMilestones(projectId: string): Promise<Milestone[]> {
-  return (await getJson<{ milestones: Milestone[] }>(`/api/projects/${projectId}/milestones`))?.milestones ?? [];
+  return (await api<{ milestones: Milestone[] }>(`/api/projects/${projectId}/milestones`)).milestones ?? [];
 }
-export async function createMilestone(projectId: string, body: Partial<Milestone> & { name: string }): Promise<Milestone | null> {
-  return (await sendJson<{ milestone: Milestone }>(`/api/projects/${projectId}/milestones`, "POST", body))?.milestone ?? null;
+export async function createMilestone(projectId: string, body: Partial<Milestone> & { name: string }): Promise<Milestone> {
+  return (await send<{ milestone: Milestone }>(`/api/projects/${projectId}/milestones`, "POST", body)).milestone;
 }
-export async function updateMilestone(projectId: string, id: string, patch: Partial<Milestone>): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/${projectId}/milestones/${id}`, "PATCH", patch));
+export async function updateMilestone(projectId: string, id: string, patch: Partial<Milestone>): Promise<void> {
+  await send(`/api/projects/${projectId}/milestones/${id}`, "PATCH", patch);
 }
-export async function deleteMilestone(projectId: string, id: string): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/${projectId}/milestones/${id}`, "DELETE"));
+export async function deleteMilestone(projectId: string, id: string): Promise<void> {
+  await send(`/api/projects/${projectId}/milestones/${id}`, "DELETE");
 }
 
-/* Time entries */
+/* Time entries — each write returns the task's recomputed logged_hours. */
 export async function fetchTimeEntries(taskId: string): Promise<TimeEntry[]> {
-  return (await getJson<{ entries: TimeEntry[] }>(`/api/projects/tasks/${taskId}/time`))?.entries ?? [];
+  return (await api<{ entries: TimeEntry[] }>(`/api/projects/tasks/${taskId}/time`)).entries ?? [];
 }
-export async function createTimeEntry(taskId: string, body: { minutes: number; entry_date?: string; note?: string }): Promise<TimeEntry | null> {
-  return (await sendJson<{ entry: TimeEntry }>(`/api/projects/tasks/${taskId}/time`, "POST", body))?.entry ?? null;
+export async function createTimeEntry(taskId: string, body: { minutes: number; entry_date?: string; note?: string }): Promise<TimeEntry> {
+  return (await send<{ entry: TimeEntry }>(`/api/projects/tasks/${taskId}/time`, "POST", body)).entry;
 }
-export async function deleteTimeEntry(taskId: string, id: string): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/tasks/${taskId}/time/${id}`, "DELETE"));
+export async function deleteTimeEntry(taskId: string, id: string): Promise<void> {
+  await send(`/api/projects/tasks/${taskId}/time/${id}`, "DELETE");
 }
 
 /* Attachments */
 export async function fetchAttachments(taskId: string): Promise<TaskAttachment[]> {
-  return (await getJson<{ attachments: TaskAttachment[] }>(`/api/projects/tasks/${taskId}/attachments`))?.attachments ?? [];
+  return (await api<{ attachments: TaskAttachment[] }>(`/api/projects/tasks/${taskId}/attachments`)).attachments ?? [];
 }
-export async function uploadAttachment(taskId: string, file: File): Promise<TaskAttachment | null> {
+export async function uploadAttachment(taskId: string, file: File): Promise<TaskAttachment> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`/api/projects/tasks/${taskId}/attachments`, { method: "POST", credentials: "include", body: fd });
-  if (!res.ok) return null;
-  return ((await res.json()) as { attachment: TaskAttachment }).attachment ?? null;
+  return (await api<{ attachment: TaskAttachment }>(`/api/projects/tasks/${taskId}/attachments`, { method: "POST", body: fd })).attachment;
 }
-export async function deleteAttachment(taskId: string, id: string): Promise<boolean> {
-  return !!(await sendJson(`/api/projects/tasks/${taskId}/attachments/${id}`, "DELETE"));
+export async function deleteAttachment(taskId: string, id: string): Promise<void> {
+  await send(`/api/projects/tasks/${taskId}/attachments/${id}`, "DELETE");
 }
 
 /* ── Accounts (assignee / manager pickers) ────────── */
@@ -509,27 +651,89 @@ export async function fetchAccounts(): Promise<AccountLite[]> {
   return list;
 }
 
-/* ── Helpers ──────────────────────────────────────── */
+/* ── Dates ────────────────────────────────────────────
+   Task and milestone dates are calendar DAYS ("2026-09-25"), not instants.
+   `new Date("2026-09-25")` parses that as UTC midnight, which west of UTC
+   is the PREVIOUS local day — a task due today showed as "Yesterday" and
+   overdue. Parse the parts as a LOCAL date instead. Display is D/M/Y
+   (owner standing rule). */
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** "2026-09-25" (or an ISO timestamp) → local-midnight Date, or null. */
+export function parseLocalDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Local Date → "YYYY-MM-DD". */
+export function toISODay(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** "YYYY-MM-DD" shifted by `n` calendar days (DST-safe: local noon math). */
+export function addDaysISO(iso: string, n: number): string {
+  const d = parseLocalDate(iso);
+  if (!d) return iso;
+  d.setHours(12);
+  d.setDate(d.getDate() + n);
+  return toISODay(d);
+}
+
+/** Whole calendar days from a to b (b − a). */
+export function daysBetween(a: string, b: string): number {
+  const da = parseLocalDate(a);
+  const db = parseLocalDate(b);
+  if (!da || !db) return 0;
+  return Math.round((Date.UTC(db.getFullYear(), db.getMonth(), db.getDate()) - Date.UTC(da.getFullYear(), da.getMonth(), da.getDate())) / 86400000);
+}
+
+/** Today's LOCAL calendar day as "YYYY-MM-DD". */
+export function todayLocalISO(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** "25/09/2026" — the one D/M/Y formatter for the Projects app. Accepts a
+ *  day key or a full timestamp (timestamps render in local time). */
+export function formatDMY(iso: string | null | undefined, opts: { short?: boolean } = {}): string {
+  if (!iso) return "";
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? parseLocalDate(iso) : new Date(iso);
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const dm = `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+  if (opts.short && d.getFullYear() === new Date().getFullYear()) return dm;
+  return `${dm}/${d.getFullYear()}`;
+}
 
 export function formatDueDate(
   iso: string | null,
   lang: string = "en",
   labels?: { today: string; tomorrow: string; yesterday: string },
 ): string {
-  if (!iso) return "";
-  const d = new Date(iso);
+  const target = parseLocalDate(iso);
+  if (!target) return "";
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
   if (diff === 0) return labels?.today ?? "Today";
   if (diff === 1) return labels?.tomorrow ?? "Tomorrow";
   if (diff === -1) return labels?.yesterday ?? "Yesterday";
-  if (diff > 1 && diff <= 6) return d.toLocaleDateString(lang, { weekday: "long" });
-  return d.toLocaleDateString(lang, { month: "short", day: "numeric" });
+  if (diff > 1 && diff <= 6) {
+    const loc = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-EG" : "en-GB";
+    return target.toLocaleDateString(loc, { weekday: "long" });
+  }
+  return formatDMY(iso, { short: true });
 }
 
 export function isOverdue(iso: string | null): boolean {
-  if (!iso) return false;
-  return new Date(iso) < new Date(new Date().toDateString());
+  const d = parseLocalDate(iso);
+  if (!d) return false;
+  const now = new Date();
+  return d < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/** Deep link that opens a project board, optionally with a task open. */
+export function projectLink(projectId: string, taskId?: string | null): string {
+  return taskId ? `/projects?project=${projectId}&task=${taskId}` : `/projects?project=${projectId}`;
 }

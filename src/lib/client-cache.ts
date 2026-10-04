@@ -78,7 +78,21 @@ const SHELL_SECTION: Record<string, string> = {
    module-level promise becomes several independent ones and the "single"
    flight fires once per copy — measured 2 /api/shell calls instead of 1.
    Anchoring on globalThis makes every copy share one promise. */
-interface ShellState { inflight: Promise<Record<string, unknown> | null> | null }
+/* ⚠️ THE RESOLVED BODY IS KEPT, NOT JUST THE IN-FLIGHT PROMISE.
+   Coalescing only ever helped callers that asked DURING a request. Measured on
+   prod: /api/shell is 93 KB and 1.2-2.9s, it is fetched on EVERY navigation,
+   and it is the slowest thing on screens whose own data is a single ~1s call.
+   Holding the answer for a minute means moving between apps costs nothing for
+   the chrome — permissions, settings, FX, icon bindings and the badge counts
+   do not change between one screen and the next. A mutation still clears it
+   through invalidateCachedGet(), and 60s matches the badge poll, so a counter
+   is never more stale than it already was. */
+const BATCH_TTL_MS = 60_000;
+interface ShellState {
+  inflight: Promise<Record<string, unknown> | null> | null;
+  body?: Record<string, unknown> | null;
+  at?: number;
+}
 const sg = globalThis as typeof globalThis & { __kxShellBatch?: ShellState };
 const shellState: ShellState = sg.__kxShellBatch ?? (sg.__kxShellBatch = { inflight: null });
 
@@ -108,6 +122,7 @@ async function fetchBatch(
   sections: Record<string, string>,
 ): Promise<Record<string, unknown> | null> {
   if (state.inflight) return state.inflight;
+  if (state.body && state.at != null && Date.now() - state.at < BATCH_TTL_MS) return state.body;
   state.inflight = (async () => {
     try {
       const res = await fetch(url, { credentials: "include", cache: "no-store" });
@@ -118,6 +133,10 @@ async function fetchBatch(
         const value = body[section];
         if (value != null && !cache.get(path)?.inflight) cache.set(path, { value, at: now });
       }
+      /* Only a REAL answer is kept: a failed batch must not be served for a
+         minute, and its callers still fall through to their own endpoints. */
+      state.body = body;
+      state.at = now;
       return body;
     } catch {
       return null;
@@ -215,8 +234,19 @@ export async function cachedGet<T>(url: string, ttlMs = 15_000): Promise<T> {
  *  second account never reads the first one's reference data). A string clears
  *  every URL that starts with it, which covers query-string variants. */
 export function invalidateCachedGet(urlPrefix?: string): void {
-  if (!urlPrefix) { cache.clear(); return; }
+  /* The batch bodies are a cache too, and the whole point of invalidating is
+     that the next read must see the mutation — so they go with the map. A
+     prefix clears the batch that CARRIES that key, since its body holds the
+     stale copy. */
+  if (!urlPrefix) {
+    cache.clear();
+    for (const b of BATCHES) { b.state.body = undefined; b.state.at = undefined; }
+    return;
+  }
   for (const key of cache.keys()) {
     if (key.startsWith(urlPrefix)) cache.delete(key);
+  }
+  for (const b of BATCHES) {
+    if (Object.keys(b.map).some((k) => k.startsWith(urlPrefix))) { b.state.body = undefined; b.state.at = undefined; }
   }
 }

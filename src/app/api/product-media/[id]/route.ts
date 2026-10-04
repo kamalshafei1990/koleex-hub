@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireProductDataAction } from "@/lib/server/product-access";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,6 +27,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   delete body.id;
   const { error } = await supabaseServer.from("product_media").update(body).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }
 
@@ -35,5 +37,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (deny) return deny;
   const { error } = await supabaseServer.from("product_media").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateWebsite(["products"]);
   return NextResponse.json({ ok: true });
 }

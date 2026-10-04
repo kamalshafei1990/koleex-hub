@@ -53,7 +53,6 @@
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
-  packingShippingGroup,
   physicalGroup,
 } from "./_shared-machine-groups";
 
@@ -163,7 +162,6 @@ export const MACHINE_PARTS_SCHEMA: ProductSchemaDefinition = {
       ],
     },
     physicalGroup(30),
-    packingShippingGroup(40),
   ],
 };
 

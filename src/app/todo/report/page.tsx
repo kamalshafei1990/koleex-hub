@@ -3,242 +3,278 @@
 /* ══════════════════════════════════════════════════════════════
    ASSIGNMENT REPORT — manager view.
    "What I asked [person] to do, over [period], and how it's going."
-   Uses only tasks the viewer assigned (assigned_by = me), so it needs
-   no extra permission: a manager already sees what they delegated.
+   Only tasks the viewer assigned (assigned_by = me), so it needs no extra
+   permission: a manager already sees what they delegated.
+
+   Paints from the list's warm snapshot (same account, same rows), so opening
+   it from the list is instant; the network answer replaces it.
    ══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useSkin } from "@/lib/appearance";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
-import { fetchTodos, fetchAssignableEmployees } from "@/lib/todo-admin";
-import { getCurrentAccountIdSync } from "@/lib/identity";
-import { loadScopeContext, type ScopeContext } from "@/lib/scope";
-import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
+import { fetchAssignableEmployees } from "@/lib/todo-admin";
+import { collapseSeries } from "@/lib/todo-series";
+import { useCurrentAccountId } from "@/lib/identity";
+import { useWarm } from "@/lib/warm-cache";
+import type { TodoAssigneeInfo, TodoStatus, TodoWithRelations } from "@/types/supabase";
+import KdsSelect from "@/components/kds/Select";
+import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import DatePicker from "@/components/ui/DatePicker";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { loadCompletedSince, loadOpenTodos, mergeTodos, todoWarmKey, type TodoSnap } from "@/components/todo/todo-data";
+import { dayKey, fmtDay, horizonRange, isOverdueDate } from "@/components/todo/todo-dates";
+import { statusOf } from "@/components/todo/todo-ui";
 
 type Period = "today" | "week" | "month" | "custom";
 
-/* Local-time period bounds. */
-function periodRange(p: Period, from: string, to: string): [Date, Date] {
-  const now = new Date();
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  if (p === "today") return [startOfDay(now), endOfDay(now)];
-  if (p === "week") {
-    const dow = (now.getDay() + 6) % 7; // Monday = 0
-    const mon = new Date(now); mon.setDate(now.getDate() - dow);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return [startOfDay(mon), endOfDay(sun)];
-  }
-  if (p === "month") {
-    return [
-      new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0),
-      new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
-    ];
-  }
-  const f = from ? startOfDay(new Date(from)) : new Date(0);
-  const t = to ? endOfDay(new Date(to)) : endOfDay(now);
-  return [f, t];
-}
-
 const STATUS_TONE: Record<TodoStatus, string> = {
   todo: "text-[var(--text-dim)] bg-[var(--bg-surface)]",
-  in_progress: "text-blue-400 bg-blue-500/10",
+  in_progress: "text-[#7FA9D6] bg-[#567FB2]/10",
   blocked: "text-red-400 bg-red-500/10",
   done: "text-green-400 bg-green-500/10",
 };
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en", { month: "short", day: "numeric" });
+/* Display name with the alternate (Chinese) name when it differs. */
+function personLabel(p: { full_name: string | null; username: string; name_alt?: string | null }): string {
+  const base = p.full_name || p.username;
+  const alt = (p.name_alt ?? "").trim();
+  return alt && alt !== (p.full_name ?? "").trim() ? `${base} (${alt})` : base;
 }
 
+const isDone = (r: TodoWithRelations) => r.completed || r.status === "done";
+/* Finished after its due day (calendar days, not instants). */
+const finishedLate = (r: TodoWithRelations) => {
+  const done = dayKey(r.completed_at), due = dayKey(r.due_date);
+  return isDone(r) && !!done && !!due && done > due;
+};
+
+/* Same ground the To-do list mounts — Core never pays for the canvas. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+
 export default function TodoReportPage() {
-  const { t } = useTranslation(todoT);
-  const accountId = getCurrentAccountIdSync();
-  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
-  const [todos, setTodos] = useState<TodoWithRelations[]>([]);
-  const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t, lang } = useTranslation(todoT);
+  const aurora = useSkin() === "aurora";
+  /* Subscribed, not a one-shot read: the report is filtered by "assigned by
+     me", so rendering before the id lands would show an empty report. */
+  const accountId = useCurrentAccountId();
+  const warm = useWarm<TodoSnap>(todoWarmKey(accountId), 6 * 60 * 60 * 1000);
+  const [fresh, setFresh] = useState<{ todos: TodoWithRelations[]; people: TodoAssigneeInfo[]; partial: boolean } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const [person, setPerson] = useState<string>(""); // "" = everyone
   const [period, setPeriod] = useState<Period>("week");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  useEffect(() => {
-    if (!accountId) return;
-    loadScopeContext(accountId).then(setScopeCtx);
-  }, [accountId]);
-
+  /* The open set, plus finished history back to the period's first day —
+     a task created or due in the period and finished can only have been
+     finished on or after that day's tasks were created. A custom range with
+     no start reads all history (capped). */
+  const since = period === "custom" ? (from || null) : horizonRange(period)[0];
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchTodos(scopeCtx), fetchAssignableEmployees()]).then(([tds, ppl]) => {
-      if (!alive) return;
-      setTodos(tds);
-      setPeople(ppl);
-      setLoading(false);
-    });
+    Promise.all([loadOpenTodos(attempt > 0), loadCompletedSince(since), fetchAssignableEmployees()])
+      .then(([open, doneSince, people]) => {
+        if (!alive) return;
+        setFresh({ todos: mergeTodos(open.todos, doneSince.todos), people, partial: !doneSince.complete || open.truncated });
+        setFailed(false);
+      })
+      .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, [scopeCtx]);
+  }, [attempt, since]);
 
-  /* Tasks I assigned, to the chosen person, whose due OR created date falls in the period. */
+  const todos = fresh?.todos ?? warm?.todos ?? null;
+  const people = fresh?.people ?? warm?.employees ?? [];
+
+  /* Tasks I assigned, to the chosen person, whose due OR created day falls
+     in the period. Dead periods of a recurring series collapse with the same
+     rule the list uses, so a daily task counts once, not once per day. */
   const rows = useMemo(() => {
-    const [start, end] = periodRange(period, from, to);
-    const inRange = (iso: string | null) => {
-      if (!iso) return false;
-      const d = new Date(iso);
-      return !Number.isNaN(d.getTime()) && d >= start && d <= end;
-    };
-    return todos
+    if (!todos) return [];
+    const [start, end] = period === "custom" ? [from || "0000-01-01", to || "9999-12-31"] : horizonRange(period);
+    const inRange = (v: string | null) => { const k = dayKey(v); return !!k && k >= start && k <= end; };
+    return collapseSeries(todos)
       .filter((x) => x.assigned_by_account_id === accountId)
       .filter((x) => (person ? x.assignees.some((a) => a.account_id === person) : true))
-      .filter((x) => inRange(x.due_date) || inRange(x.created_at));
+      .filter((x) => inRange(x.due_date) || inRange(x.created_at))
+      .sort((a, b) => (dayKey(a.due_date) ?? "9999").localeCompare(dayKey(b.due_date) ?? "9999"));
   }, [todos, accountId, person, period, from, to]);
 
   const stats = useMemo(() => {
-    const total = rows.length;
-    const by = (s: TodoStatus) => rows.filter((r) => (r.status ?? (r.completed ? "done" : "todo")) === s).length;
-    const done = rows.filter((r) => r.completed || r.status === "done").length;
-    const overdue = rows.filter((r) => !r.completed && r.due_date && r.due_date.split("T")[0] < new Date().toISOString().split("T")[0]).length;
-    const dueDone = rows.filter((r) => (r.completed || r.status === "done") && r.due_date && r.completed_at);
-    const onTime = dueDone.filter((r) => r.completed_at!.split("T")[0] <= r.due_date!.split("T")[0]).length;
-    const onTimeRate = dueDone.length ? Math.round((onTime / dueDone.length) * 100) : null;
-    return { total, done, inProgress: by("in_progress"), blocked: by("blocked"), notStarted: by("todo"), overdue, onTimeRate };
+    const by = (s: TodoStatus) => rows.filter((r) => statusOf(r) === s).length;
+    const dueDone = rows.filter((r) => isDone(r) && r.due_date && r.completed_at);
+    const onTime = dueDone.filter((r) => !finishedLate(r)).length;
+    return {
+      total: rows.length,
+      done: rows.filter(isDone).length,
+      inProgress: by("in_progress"),
+      blocked: by("blocked"),
+      notStarted: by("todo"),
+      overdue: rows.filter((r) => !isDone(r) && isOverdueDate(r.due_date)).length,
+      onTimeRate: dueDone.length ? Math.round((onTime / dueDone.length) * 100) : null,
+    };
   }, [rows]);
 
   const exportCsv = () => {
-    const head = ["Task", "For", "Status", "Due", "Done", "On time"];
+    /* Headers in the reader's language; a BOM so Excel reads 中文 / العربية
+       as UTF-8; dates as YYYY-MM-DD, which no spreadsheet misreads. */
+    const head = [t("report.taskCol"), t("report.forCol"), t("f.status"), t("report.dueCol"), t("report.doneCol"), t("report.onTimeRate")];
     const lines = rows.map((r) => {
       const who = r.assignees.map((a) => a.full_name || a.username).join("; ");
-      const st = r.status ?? (r.completed ? "done" : "todo");
-      const onTime = (r.completed || r.status === "done") && r.due_date && r.completed_at
-        ? (r.completed_at.split("T")[0] <= r.due_date.split("T")[0] ? "yes" : "no") : "";
-      return [r.title, who, st, r.due_date?.split("T")[0] ?? "", r.completed_at?.split("T")[0] ?? "", onTime]
+      const onTime = isDone(r) && r.due_date && r.completed_at ? (finishedLate(r) ? t("row.late") : t("row.onTime")) : "";
+      return [r.title, who, t("st." + statusOf(r)), dayKey(r.due_date) ?? "", dayKey(r.completed_at) ?? "", onTime]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",");
     });
-    const csv = [head.join(","), ...lines].join("\n");
+    const csv = "﻿" + [head.join(","), ...lines].join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url; a.download = `todo-report-${period}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const tiles = [
     { label: t("report.assigned"), value: stats.total, color: "text-[var(--text-primary)]" },
-    { label: t("st.in_progress"), value: stats.inProgress, color: "text-blue-400" },
+    { label: t("st.in_progress"), value: stats.inProgress, color: "text-[#7FA9D6]" },
     { label: t("st.blocked"), value: stats.blocked, color: "text-red-400" },
     { label: t("kpi.completed"), value: stats.done, color: "text-green-400" },
     { label: t("kpi.overdue"), value: stats.overdue, color: "text-orange-400" },
     { label: t("report.notStarted"), value: stats.notStarted, color: "text-[var(--text-dim)]" },
-    { label: t("report.onTimeRate"), value: stats.onTimeRate === null ? "—" : `${stats.onTimeRate}%`, color: "text-violet-400" },
+    { label: t("report.onTimeRate"), value: stats.onTimeRate === null ? "—" : `${stats.onTimeRate}%`, color: "text-violet-300" },
   ];
 
-  const selectCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
-
   return (
-    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full" style={{ height: "calc(100dvh - 3.5rem)" }}>
-      {/* Header */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-3 pt-5 pb-1">
-            <Link href="/todo" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <BarChart3Icon size={16} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("report.title")}</h1>
-            </div>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">{t("report.subtitle")}</p>
-
-          {/* Controls */}
-          <div className="flex flex-wrap items-center gap-2 pb-4">
-            <div className="flex items-center gap-1.5">
-              <UsersIcon size={13} className="text-[var(--text-dim)]" />
-              <select value={person} onChange={(e) => setPerson(e.target.value)} className={selectCls + " min-w-[160px]"}>
-                <option value="">{t("report.everyone")}</option>
-                {people.map((p) => { const alt = (p.name_alt ?? "").trim(); const label = (p.full_name || p.username) + (alt && alt !== (p.full_name ?? "").trim() ? ` ${alt}` : ""); return <option key={p.account_id} value={p.account_id}>{label}</option>; })}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {(["today", "week", "month", "custom"] as Period[]).map((p) => (
-                <button key={p} onClick={() => setPeriod(p)}
-                  className={`h-8 px-3 rounded-lg text-[12px] font-semibold border transition-all ${
-                    period === p ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                  }`}>
-                  {t("report." + p)}
-                </button>
-              ))}
-            </div>
-            {period === "custom" && (
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={selectCls} />
-                <span className="text-[var(--text-dim)]">→</span>
-                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={selectCls} />
-              </div>
-            )}
-            <button onClick={exportCsv} disabled={rows.length === 0}
-              className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
-              {t("report.export")}
-            </button>
-          </div>
+    /* Same Aurora conversion as the list: `kx-app` remaps the app's tokens,
+       the ground mounts only under the skin. */
+    <div className="kx-app kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
+      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}>
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <WavyBackground />
         </div>
-      </div>
+      )}
+      <div className="relative z-[1] flex flex-col min-h-0 flex-1">
+        <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
+            {/* The original report header: back chip · icon chip · title. */}
+            <div className="flex items-center gap-3 pt-5 pb-1">
+              <Link href="/todo" aria-label={t("report.back")}
+                className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                <ArrowLeftIcon className="h-4 w-4 rtl:-scale-x-100" />
+              </Link>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <BarChart3Icon size={16} />
+              </div>
+              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate min-w-0">{t("report.title")}</h1>
+            </div>
+            <p className="text-[12px] text-[var(--text-dim)] mb-3 ms-0 md:ms-11">{t("report.subtitle")}</p>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5">
-          {loading ? (
-            <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-6 w-6 text-[var(--text-dim)]" /></div>
-          ) : (
-            <>
-              {/* Summary tiles */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
-                {tiles.map((c) => (
-                  <div key={c.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3 min-w-0">
-                    <p className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</p>
-                    <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
-                  </div>
+            <div className="flex flex-wrap items-center gap-2 pb-4">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto sm:min-w-[220px]">
+                <UsersIcon size={13} className="text-[var(--text-dim)] shrink-0" />
+                <KdsSelect value={person} onChange={setPerson} wrapperClassName="flex-1 min-w-0"
+                  options={[{ value: "", label: t("report.everyone") }, ...people.map((p) => ({ value: p.account_id, label: personLabel(p) }))]}
+                  triggerClassName="h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none" role="group" aria-label={t("report.period")}>
+                {(["today", "week", "month", "custom"] as Period[]).map((p) => (
+                  <button key={p} type="button" onClick={() => setPeriod(p)} aria-pressed={period === p}
+                    className={`h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors whitespace-nowrap ${
+                      period === p ? "bg-[var(--bg-surface-active)] border-[var(--border-color)] text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    }`}>
+                    {t("report." + p)}
+                  </button>
                 ))}
               </div>
-
-              {/* Task list */}
-              {rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
-                  <p className="text-[var(--text-faint)] text-sm font-medium">{t("report.empty")}</p>
-                  <p className="text-[12px] text-[var(--text-dim)]">{t("report.emptyHint")}</p>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
-                  <div className="hidden md:grid grid-cols-[1fr_140px_120px_90px_90px] gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-                    <span>{t("report.taskCol")}</span><span>{t("report.forCol")}</span><span>{t("f.status")}</span><span>{t("report.dueCol")}</span><span>{t("report.doneCol")}</span>
-                  </div>
-                  {rows.map((r) => {
-                    const st = (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
-                    const late = (r.completed || r.status === "done") && r.due_date && r.completed_at && r.completed_at.split("T")[0] > r.due_date.split("T")[0];
-                    return (
-                      <div key={r.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_90px_90px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface-subtle)] transition-colors">
-                        <AutoTranslatedText text={r.title} className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`} />
-                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map((a) => { const base = a.full_name || a.username; const alt = (a.name_alt ?? "").trim(); return alt && alt !== (a.full_name ?? "").trim() ? `${base} (${alt})` : base; }).join(", ") || "—"}</span>
-                        <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
-                        <span className={`text-[11.5px] ${late ? "text-red-400" : "text-[var(--text-muted)]"}`}>{fmtDate(r.due_date)}</span>
-                        <span className="text-[11.5px] text-[var(--text-muted)]">{fmtDate(r.completed_at)}{late ? ` · ${t("row.late")}` : (r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : "")}</span>
-                      </div>
-                    );
-                  })}
+              {period === "custom" && (
+                <div className="grid grid-cols-2 gap-1.5 w-full sm:w-[300px]">
+                  <DatePicker value={from} onChange={setFrom} placeholder={t("filters.fromDate")} lang={lang} heightCls="h-9" max={to || undefined} floating />
+                  <DatePicker value={to} onChange={setTo} placeholder={t("filters.toDate")} lang={lang} heightCls="h-9" min={from || undefined} floating />
                 </div>
               )}
-            </>
-          )}
+              <button type="button" onClick={exportCsv} disabled={rows.length === 0}
+                className="ms-auto h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-40">
+                {t("report.export")}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 space-y-5">
+            {failed && (
+              <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300">
+                <TriangleWarningIcon size={14} className="shrink-0" />
+                <span className="flex-1 min-w-0">{todos ? t("err.loadStale") : t("err.loadFailed")}</span>
+                <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold underline underline-offset-2">{t("common.retry")}</button>
+              </div>
+            )}
+
+            {fresh?.partial && (
+              <p className="text-[11.5px] text-[var(--text-dim)]">{t("report.partial")}</p>
+            )}
+
+            {!todos ? (
+              !failed && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2" aria-hidden>
+                  {Array.from({ length: 7 }, (_, i) => <div key={i} className="h-[62px] rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] animate-pulse" />)}
+                </div>
+              )
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 [&>*]:min-w-0">
+                  {tiles.map((c) => (
+                    <div key={c.label} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3">
+                      <p className="text-[9.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</p>
+                      <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {rows.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 gap-2 text-center px-6">
+                    <p className="text-[13px] font-medium text-[var(--text-muted)]">{t("report.empty")}</p>
+                    <p className="text-[12px] text-[var(--text-dim)]">{t("report.emptyHint")}</p>
+                  </div>
+                ) : (
+                  <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
+                    <div className="hidden md:grid grid-cols-[minmax(0,1fr)_160px_110px_90px_130px] gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                      <span>{t("report.taskCol")}</span><span>{t("report.forCol")}</span><span>{t("f.status")}</span><span>{t("report.dueCol")}</span><span>{t("report.doneCol")}</span>
+                    </div>
+                    {rows.map((r) => {
+                      const st = statusOf(r);
+                      const late = finishedLate(r);
+                      const overdue = !isDone(r) && isOverdueDate(r.due_date);
+                      return (
+                        <div key={r.id} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_160px_110px_90px_130px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 [&>*]:min-w-0">
+                          <span className={`text-[13px] font-medium truncate ${isDone(r) ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>
+                            <AutoTranslatedText text={r.title} plain />
+                          </span>
+                          <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map(personLabel).join(", ") || "—"}</span>
+                          <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
+                          <span className={`text-[11.5px] ${overdue || late ? "text-red-400" : "text-[var(--text-muted)]"}`}>
+                            <span className="md:hidden text-[var(--text-dim)]">{t("report.dueCol")}: </span>{fmtDay(r.due_date, lang)}
+                          </span>
+                          <span className="text-[11.5px] text-[var(--text-muted)]">
+                            <span className="md:hidden text-[var(--text-dim)]">{t("report.doneCol")}: </span>
+                            {r.completed_at ? fmtDay(r.completed_at, lang) : "—"}
+                            {late ? ` · ${t("row.late")}` : r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

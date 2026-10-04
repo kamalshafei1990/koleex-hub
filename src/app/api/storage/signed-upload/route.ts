@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { normaliseUploadPath } from "@/lib/server/storage-tenant";
+import { recordDiscussUpload } from "@/lib/discuss-pending-uploads";
 
 /** Mirrors /api/storage/upload — the two must never drift, or a bucket
  *  refused by one is reachable through the other. */
@@ -73,6 +74,18 @@ export async function POST(req: Request) {
   if (error || !data) {
     console.error("[api/storage/signed-upload]", error?.message);
     return NextResponse.json({ error: "Failed to mint upload URL" }, { status: 500 });
+  }
+
+  /* Discuss: the browser PUTs the bytes itself, so signing is the only moment
+     the server knows who uploads this path. Bind it now (first writer wins),
+     for /api/discuss/pending-media. No-op for other buckets. */
+  if (bucket === "discuss-media" || bucket === "discuss-voice") {
+    await recordDiscussUpload({
+      bucket,
+      path: norm.path,
+      accountId: auth.account_id,
+      tenantId: auth.tenant_id,
+    });
   }
 
   /* `signedUrl` is a PATH relative to the storage origin, not an absolute URL —

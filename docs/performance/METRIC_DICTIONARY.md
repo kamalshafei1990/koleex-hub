@@ -37,9 +37,9 @@ New metrics MUST be added to this dictionary in the same commit that introduces 
 | Metric | Tags | Class | Meaning |
 |---|---|---|---|
 | `rt.join_ms` | scope (`discuss:channel` / `discuss:account` / `inbox:account`) | A | `.subscribe()` → first SUBSCRIBED |
-| `rt.reconnect` | scope | A | SUBSCRIBED again after a drop (auto-rejoin) |
-| `rt.status` | s (CHANNEL_ERROR/TIMED_OUT/CLOSED), scope | A | Non-healthy status transitions |
-| `rt.channels` | — | A | Gauge: live shared channels after each change (duplicates are impossible by construction — `subscribeBroadcast` ref-counts per topic; this gauge proves it stays small) |
+| `rt.reconnect` | scope, via (`timer` / `kick`), r (backoff step at the time) | A | SUBSCRIBED again after a drop. `via` separates a scheduled rejoin from an online/visible nudge — the two look identical in a bare event stream and the gap between them is the whole diagnosis (a timer cannot fire under 800 ms; a nudge can). `r` is where the ramp stood. |
+| `rt.status` | s (CHANNEL_ERROR/TIMED_OUT/CLOSED), scope, held (seconds the subscription lived) | A | Non-healthy status transitions. `held` is what the flap rule is judged on: under `REJOIN_STABLE_MS` it was a flap, over it the backoff eases by half (`retryAfterRecovery`). |
+| `rt.channels` | — | A | Gauge: live shared channels, recorded where the set actually changes — a topic's first join and its teardown (duplicates are impossible by construction — `subscribeBroadcast` ref-counts per topic; this gauge proves it stays small). It used to fire on every status change too, where the size cannot have moved: on a mainland link that was half of every perf beacon spent re-sending a constant. |
 
 ## Server — `[kx-server-timing]` logs (+ `Server-Timing` headers)
 

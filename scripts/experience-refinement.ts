@@ -19,8 +19,9 @@
      06  ExecutiveDashboard: primary KPI row reduced to 4 cards
      07  ExecutiveDashboard: secondary KPIs + inventory-intel + FX
          wrapped in FocusBoundary
-     08  Reports: OperationalReports renders SummaryStrip (Top
-         contributor / Top-3 share / Everything else) above the table
+     08  Reports: the operational numbers page shows its summary figures
+         (total, count, rows, top contributor) above the table — since
+         Reports 6C (26/09/2026) as the house KPI cards in OperationalNumbers
      09  "+ Create" header chip wired on FinanceWorkspace +
          ExecutiveDashboard (opens SmartCreateDrawer)
      10  No raw "HTTP ${" leaks remaining in audited touch files
@@ -41,7 +42,7 @@ async function main() {
 
   const workspace  = await fs.readFile("./src/components/finance/FinanceWorkspace.tsx", "utf8");
   const exec       = await fs.readFile("./src/components/executive/ExecutiveDashboard.tsx", "utf8");
-  const reports    = await fs.readFile("./src/components/reports/OperationalReports.tsx", "utf8");
+  const reports    = await fs.readFile("./src/components/reports/numbers/OperationalNumbers.tsx", "utf8");
 
   /* 04 — FinanceWorkspace: "Top actions" section has 3 or 4 tiles
      (was 4 + 8 in the previous layout). 4 is the current shape after
@@ -67,8 +68,9 @@ async function main() {
      exec.includes("Secondary KPIs") && (exec.match(/<FocusBoundary>/g) ?? []).length >= 2);
 
   /* 08 */
-  ok("08  OperationalReports: SummaryStrip renders above the table",
-     reports.includes("function SummaryStrip") && reports.includes("<SummaryStrip"));
+  const kpiAt = reports.indexOf("<MoneyKpi"), tableAt = reports.indexOf("<NumbersTable");
+  ok("08  Operational numbers: the summary figures render above the table",
+     kpiAt > 0 && tableAt > kpiAt && reports.includes('label={t(`num.kpi.${kind}.top`)}'));
 
   /* 09 */
   const createChip = "openSmartCreate()";

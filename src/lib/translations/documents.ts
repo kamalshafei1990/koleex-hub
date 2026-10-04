@@ -23,7 +23,7 @@ import type { Translations } from "@/lib/i18n";
    of a translation sweep.
 
    Also left English on purpose: the registered company name
-   ("KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.") and the brand line
+   (lib/legal-name — the one in force when the document was made) and the brand line
    ("SHAPING THE FUTURE.") — a legal entity name and a trademark.
 
    What IS translated: the buttons, tabs, tooltips and status text that belong

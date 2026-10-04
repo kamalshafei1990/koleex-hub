@@ -409,6 +409,8 @@ export const inventoryT: Translations = {
 
   /* ── Alert labels ──────────────────────────────────────────── */
   "inv.alert.low_stock":             { en: "Low stock items",       zh: "低库存物料",      ar: "أصناف منخفضة المخزون" },
+  "inv.items.none_low":              { en: "Nothing is low in stock", zh: "没有低库存物料", ar: "لا توجد أصناف منخفضة المخزون" },
+  "inv.items.none_low_hint":         { en: "Every tracked item is above its reorder point (or its minimum, when it has no reorder point).", zh: "所有跟踪库存的物料都高于再订货点（未设再订货点时高于最低库存）。", ar: "كل الأصناف المتابَعة أعلى من حد إعادة الطلب (أو من الحد الأدنى إذا لم يكن لها حد إعادة طلب)." },
   "inv.alert.expired_batches":       { en: "Expired batches",       zh: "过期批次",        ar: "دفعات منتهية" },
   "inv.alert.pending_approvals":     { en: "Pending approvals",     zh: "待审批",          ar: "بانتظار الاعتماد" },
   "inv.alert.pending_transfers":     { en: "Pending transfers",     zh: "待处理调拨",      ar: "تحويلات قيد التنفيذ" },
@@ -608,4 +610,10 @@ export const inventoryT: Translations = {
   "inv.common.stock_value_label": { en: "Stock value:", zh: "库存金额：", ar: "قيمة المخزون:" },
   "inv.common.void_reason": { en: "Void reason:", zh: "作废原因：", ar: "سبب الإلغاء:" },
   "inv.common.open": { en: "Open", zh: "打开", ar: "فتح" },
+
+  /* Item cost without the «private records» switch (src/lib/experience):
+     the quick-add form's refusal line. */
+  "inv.items.costHidden":     { en: "Item costs are shown and set only with «Can see private data» in Roles & Permissions.",
+                                zh: "只有在角色与权限中开启「可查看私密数据」才能查看和设置物品成本。",
+                                ar: "تكاليف الأصناف تُعرض وتُضبط فقط مع «يرى البيانات الخاصة» في الأدوار والصلاحيات." },
 };

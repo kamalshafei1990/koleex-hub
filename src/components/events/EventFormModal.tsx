@@ -1,0 +1,225 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   EventFormModal — create / edit an event. One form, two callers: the
+   dashboard's "New Event" and the workspace's "Edit". The API validates the
+   same fields; this form only makes the common mistakes impossible.
+   --------------------------------------------------------------------------- */
+
+import { useEffect, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { eventsT } from "@/lib/translations/events";
+import {
+  EVENT_STATUSES,
+  EVENT_TYPES,
+  type EventStatus,
+  type EventType,
+  type KxEventRow,
+} from "@/lib/events/types";
+import Modal from "@/components/kds/Modal";
+import Button from "@/components/ui/Button";
+import {
+  SelectField,
+  TextAreaField,
+  TextField,
+  DateTimeField,
+} from "@/components/events/fields";
+
+/** ISO instant → yyyy-mm-dd for the datetime-local defaultValue dance. */
+function toInputValue(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export interface EventFormValues {
+  title: string;
+  type: EventType;
+  status: EventStatus;
+  start_at: string | null;
+  end_at: string | null;
+  location: string;
+  city: string;
+  country: string;
+  budget_total: string;
+  description: string;
+}
+
+export function emptyFormValues(): EventFormValues {
+  return {
+    title: "",
+    type: "exhibition",
+    status: "idea",
+    start_at: null,
+    end_at: null,
+    location: "",
+    city: "",
+    country: "",
+    budget_total: "",
+    description: "",
+  };
+}
+
+export function formValuesFromEvent(ev: KxEventRow): EventFormValues {
+  return {
+    title: ev.title,
+    type: ev.type,
+    status: ev.status,
+    start_at: ev.start_at,
+    end_at: ev.end_at,
+    location: ev.location ?? "",
+    city: ev.city ?? "",
+    country: ev.country ?? "",
+    budget_total: ev.budget_total != null ? String(ev.budget_total) : "",
+    description: ev.description ?? "",
+  };
+}
+
+export default function EventFormModal({
+  open,
+  onClose,
+  event,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Present = edit mode; absent = create. */
+  event?: KxEventRow | null;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation(eventsT);
+  const [values, setValues] = useState<EventFormValues>(emptyFormValues);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  /* Reset whenever the modal opens (with the event to edit, or blank). */
+  useEffect(() => {
+    if (!open) return;
+    setValues(event ? formValuesFromEvent(event) : emptyFormValues());
+    setError(null);
+  }, [open, event]);
+
+  const set = <K extends keyof EventFormValues>(key: K, v: EventFormValues[K]) =>
+    setValues((prev) => ({ ...prev, [key]: v }));
+
+  const save = async () => {
+    if (!values.title.trim()) {
+      setError(t("form.titleRequired"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const body = {
+        title: values.title,
+        type: values.type,
+        status: values.status,
+        start_at: toInputValue(values.start_at),
+        end_at: toInputValue(values.end_at),
+        location: values.location || null,
+        city: values.city || null,
+        country: values.country || null,
+        budget_total: values.budget_total === "" ? null : Number(values.budget_total),
+        description: values.description || null,
+      };
+      const res = event
+        ? await fetch(`/api/events/${event.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+        : await fetch("/api/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+      if (res.ok) {
+        onClose();
+        onSaved();
+        return;
+      }
+      const bodyJson = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(bodyJson?.error ?? `HTTP ${res.status}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={event ? t("form.editTitle") : t("form.newTitle")}
+      maxWidth="max-w-xl"
+      actions={
+        <>
+          <Button variant="primary" loading={busy} onClick={save}>
+            {event ? t("common.save") : t("form.create")}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <TextField
+          label={t("form.title")}
+          value={values.title}
+          onChange={(v) => set("title", v)}
+          placeholder={t("form.titlePh")}
+          wide
+        />
+        <SelectField<EventType>
+          label={t("form.type")}
+          value={values.type}
+          onChange={(v) => set("type", v)}
+          options={EVENT_TYPES.map((tp) => ({ value: tp, label: t(`type.${tp}`) }))}
+        />
+        <SelectField<EventStatus>
+          label={t("form.status")}
+          value={values.status}
+          onChange={(v) => set("status", v)}
+          options={EVENT_STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) }))}
+        />
+        <DateTimeField
+          label={t("form.starts")}
+          value={values.start_at}
+          onChange={(iso) => set("start_at", iso)}
+        />
+        <DateTimeField
+          label={t("form.ends")}
+          value={values.end_at}
+          onChange={(iso) => set("end_at", iso)}
+        />
+        <TextField
+          label={t("form.location")}
+          value={values.location}
+          onChange={(v) => set("location", v)}
+          placeholder={t("form.locationPh")}
+          wide
+        />
+        <TextField label={t("form.city")} value={values.city} onChange={(v) => set("city", v)} />
+        <TextField
+          label={t("form.country")}
+          value={values.country}
+          onChange={(v) => set("country", v)}
+        />
+        <TextField
+          label={t("form.budget")}
+          value={values.budget_total}
+          onChange={(v) => set("budget_total", v.replace(/[^\d.]/g, ""))}
+          hint={t("common.optional")}
+        />
+        <TextAreaField
+          label={t("form.description")}
+          value={values.description}
+          onChange={(v) => set("description", v)}
+        />
+      </div>
+      {error && <p className="text-[12px] text-rose-400">{error}</p>}
+    </Modal>
+  );
+}

@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/i18n";
 import { priceCalcT } from "@/lib/translations/price-calculator";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/back-chrome";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
@@ -363,8 +364,11 @@ export default function PriceCalculator() {
 
         {/* ── Page Header ── */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href={backHref} className="h-8 w-8 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
+          {/* The destination can come from ?from=, so the chip names it only
+              when it is known to be the Hub — no label beats a wrong one. */}
+          <Link href={backHref} aria-label={backHref === "/" ? "Back to Hub" : "Back"} className={BACK_CHROME}>
+            <ArrowLeftIcon size={14} />
+            {backHref === "/" && <span className="hidden text-[12px] font-medium sm:inline">Hub</span>}
           </Link>
           <div className="flex-1 flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PriceCalculatorIcon size={16} /></div>

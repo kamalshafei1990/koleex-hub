@@ -3,12 +3,22 @@ import "server-only";
 /* GET /api/me/work — the viewer's cross-app work snapshot:
    open project tasks assigned to them (due-soonest first) and their
    published Planning items for the next 7 days. To-dos are NOT included —
-   the strip renders inside the To-do app, which already shows them. */
+   the strip renders inside the To-do app, which already shows them.
+
+   `reportsDue` (Reports Phase 3C): the reports they owe now — missing from
+   the last week, then due soon — for the Home greeting's line. It rides
+   here, in the /api/shell batch every screen already opens, instead of
+   costing Home a round trip of its own; it runs beside the rest (never
+   after it), answers [] before tracking starts, and a failure there never
+   takes the snapshot down. `reportsStart` (staff readiness, 26/09/2026):
+   the day their reports begin, while it is still ahead — the greeting's
+   line before anything is owed. */
 
 import { NextResponse } from "next/server";
 import { countOpenTodos } from "@/lib/todo-open-count";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { loadMyReports } from "@/lib/server/reports/obligations";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +26,10 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
+  const reports = loadMyReports(auth).catch((e: unknown) => {
+    console.error("[api/me/work] reports due:", e instanceof Error ? e.message : e);
+    return { due: [], guide: null };
+  });
   const [taskRes, resourceRes] = await Promise.all([
     supabaseServer
       .from("project_tasks")
@@ -70,5 +84,10 @@ export async function GET() {
     planning,
     planningCount,
     todoCount,
+    ...(await reports.then((r) => ({
+      reportsDue: r.due,
+      /* Staff readiness: before their start, the greeting says when reports begin. */
+      ...(r.guide?.upcoming ? { reportsStart: r.guide.start } : {}),
+    }))),
   });
 }

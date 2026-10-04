@@ -7,8 +7,32 @@ import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
+import ShipIcon from "@/components/icons/ui/ShipIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 
 const knowledgeBases = [
+  {
+    id: "brand-guidelines",
+    title: "KOLEEX Brand Guidelines",
+    description:
+      "The logo, the K monogram, colors, typography and every rule for using the KOLEEX brand — with real examples, the official files and downloads. 140 chapters, published in phases.",
+    icon: PaletteIcon,
+    href: "/knowledge/brand-guidelines",
+    pages: 140,
+    sections: ["Logo", "K Monogram", "Colors", "Typography", "Downloads", "Documents", "Social", "Packaging"],
+    color: "#567FB2",
+  },
+  {
+    id: "trade-terms",
+    title: "Trade & Payment Terms",
+    description:
+      "What FOB, CIF, T/T, L/C and D/A actually mean, and what each one changes for the seller and the buyer. Written for someone who has never exported anything.",
+    icon: ShipIcon,
+    href: "/knowledge/trade-terms",
+    pages: 1,
+    sections: ["Incoterms", "Payment", "Risk", "L/C", "T/T", "Collections"],
+    color: "#7FA9D6",
+  },
   {
     id: "commercial-policy",
     title: "Commercial Policy & Pricing",
@@ -81,7 +105,7 @@ const knowledgeBases = [
 
 export default function KnowledgePage() {
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* The comment here used to read "Header — matches Hub pattern", and

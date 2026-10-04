@@ -54,7 +54,17 @@ export type JournalSourceType =
   | "manual"
   | "void"
   | "inventory_cogs"
-  | "sales_revenue";
+  | "sales_revenue"
+  | "vendor_bill"
+  | "inventory_receipt"
+  | "payroll"
+  | "fx_exchange"
+  | "closing";
+
+/** Entries whose lines count in every balance: posted, plus voided
+ *  originals — the reversal is posted too, so the pair nets to zero.
+ *  Reading posted only double-counted every void. */
+export const LEDGER_EFFECTIVE_STATUSES = ["posted", "voided"] as const;
 
 export type JournalStatus = "draft" | "posted" | "voided";
 
@@ -136,6 +146,9 @@ export interface GeneralLedgerRow {
   party_type: "customer" | "supplier" | null;
   source_type: JournalSourceType;
   status: JournalStatus;
+  /** The line's own currency and its rate to base; debit/credit above are in base. */
+  currency?: string;
+  exchange_rate?: number;
 }
 
 export interface GeneralLedger {

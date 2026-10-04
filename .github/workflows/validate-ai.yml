@@ -1,0 +1,61 @@
+name: Validate AI
+# Every Koleex AI / voice validator, on every change to the code they guard.
+# The suites ran only by hand before this (audit, 2026-09-11). They need no
+# secrets and no network: everything is source pins and pure-function checks.
+on:
+  pull_request:
+    paths:
+      - "src/lib/server/ai/**"
+      - "src/lib/server/ai-agent/**"
+      - "src/lib/server/ai-knowledge/**"
+      - "src/lib/server/ai-provider.ts"
+      - "src/lib/server/safe-url.ts"
+      - "src/app/api/ai/**"
+      - "src/app/api/v1/ai/**"
+      - "src/app/api/cron/voice-watch*/**"
+      - "src/app/ai/**"
+      - "src/components/ai/**"
+      - "src/components/ai-orb/**"
+      - "src/lib/voice/**"
+      - "scripts/validate-ai-*"
+      - "scripts/validate-voice-*"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/validate-ai.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/server/ai/**"
+      - "src/lib/server/ai-agent/**"
+      - "src/lib/server/ai-knowledge/**"
+      - "src/lib/server/ai-provider.ts"
+      - "src/app/api/ai/**"
+      - "src/app/api/v1/ai/**"
+      - "src/app/ai/**"
+      - "src/components/ai/**"
+      - "src/components/ai-orb/**"
+      - "src/lib/voice/**"
+      - "scripts/validate-ai-*"
+      - "scripts/validate-voice-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-ai-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate:ai (${{ github.event_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:ai

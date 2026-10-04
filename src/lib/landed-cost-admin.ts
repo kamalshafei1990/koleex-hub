@@ -98,7 +98,11 @@ export async function duplicateSimulation(id: string): Promise<string | null> {
    landed-cost tool already requires) instead of the anon client. */
 export async function fetchProductsForLookup(): Promise<{ id: string; product_name: string; brand: string | null; hs_code: string | null }[]> {
   try {
-    const res = await fetch("/api/products", { credentials: "include" });
+    /* ?view=list (id, name, brand, taxonomy…) — the lookup is a name search.
+       hs_code is not in the list projection; it reads as null here and is
+       fetched with the chosen product's models, which is when the tool
+       actually needs it. The full projection this replaced was 978 KB. */
+    const res = await fetch("/api/products?view=list", { credentials: "include" });
     if (!res.ok) return [];
     const json = (await res.json()) as { products?: { id: string; product_name: string; brand: string | null; hs_code: string | null }[] };
     return (json.products ?? [])

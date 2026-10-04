@@ -63,7 +63,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -202,7 +201,6 @@ export const DIGITAL_TEXTILE_PRINTER_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };

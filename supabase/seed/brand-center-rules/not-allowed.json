@@ -1,0 +1,528 @@
+{
+ "stationery": {
+  "business-card": [
+   {
+    "option": "finish.silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "finish.spot-uv",
+    "why": "No spot gloss or spot UV"
+   }
+  ],
+  "presentation-folder": [
+   {
+    "option": "finish.silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "notebooks": [
+   {
+    "option": "logo.silver-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "stamps-seals": [
+   {
+    "option": "ink.silver-logo-stamp-on-black",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "certificates": [
+   {
+    "option": "seal.silver-foil-seal",
+    "why": "No seal around the logo on certificates (book ch. 40; owner, 01/10/2026)"
+   }
+  ]
+ },
+ "gifts": {
+  "caps-and-hats": [
+   {
+    "option": "logo.3d-embroidery",
+    "why": "Flat embroidery only — no 3D puff (book ch. 39)"
+   },
+   {
+    "option": "logo.metal-badge",
+    "why": "No metal badge on a cap — the logo is embroidered flat"
+   }
+  ],
+  "keyrings": [
+   {
+    "option": "kind.metal-k-keyring",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "finish.silver-on-black",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "scarves-and-ties": [
+   {
+    "option": "kind.silk-scarf-with-k-pattern",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "tote-bags": [
+   {
+    "option": "print.large-k-pattern",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "print.logo-tagline",
+    "why": "The logo alone on gifts — no tagline or slogans (book ch. 123)"
+   }
+  ],
+  "pins-and-badges": [
+   {
+    "option": "kind.lapel-pin-k",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "finish.silver-on-black-enamel",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "finish.brushed-silver",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "finish.gold-long-service-awards",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "umbrellas": [
+   {
+    "option": "colour.black-with-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "laptop-and-document-bags": [
+   {
+    "option": "logo.metal-plate",
+    "why": "No metal plates glued on"
+   },
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "card-holders-and-wallets": [
+   {
+    "option": "logo.metal-plate",
+    "why": "No metal plates glued on"
+   },
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "tumblers-and-travel-mugs": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "water-bottles": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "thermos-flask": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "power-banks": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "wireless-chargers": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "cables-and-adapters": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "workshop-helpers": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "audio": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "phone-accessories": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "desk-gadgets": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "sewing-kits": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "travel-bags": [
+   {
+    "option": "logo.full-colour-wrap",
+    "why": "Black and white only — no full-colour prints"
+   }
+  ],
+  "mugs": [
+   {
+    "option": "print.logo-tagline",
+    "why": "The logo alone on gifts — no tagline or slogans (book ch. 123)"
+   }
+  ]
+ },
+ "packaging": {
+  "rigid-lid-and-base-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.spot-uv",
+    "why": "No spot gloss or spot UV"
+   }
+  ],
+  "magnetic-book-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "inside-print.k-pattern-under-the-lid",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "drawer-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "tube-cylinder-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "foldable-rigid-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "window-box": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "small-boxes": [
+   {
+    "option": "outside-finish.matte-black-paper-silver-foil-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "tray-and-sleeve-box": [
+   {
+    "option": "sleeve.black-with-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "fabric-pouches": [
+   {
+    "option": "logo.silver-print",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "tissue-paper": [
+   {
+    "option": "print.black-with-small-silver-k-pattern",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "print.white-with-grey-k-pattern",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "wrapping-paper": [
+   {
+    "option": "kind.black-matte-with-silver-logo-repeat",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "paper-carrier-bags": [
+   {
+    "option": "logo.silver-hot-foil",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "ribbons": [
+   {
+    "option": "colour.black-with-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "wooden-box": [
+   {
+    "option": "logo.metal-plate",
+    "why": "No metal plates glued on"
+   }
+  ]
+ },
+ "uniforms": {
+  "modest-wear-option": [
+   {
+    "option": "kind.black-scarf-with-small-silver-k",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "blazer-and-suit": [
+   {
+    "option": "detail.silver-k-lapel-pin",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "booth-staff-outfit": [
+   {
+    "option": "extras.silver-k-lapel-pin",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "event-team-wear": [
+   {
+    "option": "print.back-koleex-team",
+    "why": "KOLEEX is never typed as text — the logo, with the word under it"
+   }
+  ],
+  "hi-vis-vest": [
+   {
+    "option": "print.koleex-service-on-back",
+    "why": "KOLEEX is never typed as text — the logo, with the word under it"
+   }
+  ]
+ },
+ "machine": {
+  "logo-on-the-machine": [
+   {
+    "option": "method.raised-chrome-metal-badge",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   },
+   {
+    "option": "colour.silver",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "k-tile-on-the-machine": [
+   {
+    "option": "where.presser-foot-area",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "where.bobbin-cover",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "where.hand-wheel-centre",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "where.control-buttons",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "method.printed",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "method.engraved",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   },
+   {
+    "option": "method.metal-insert",
+    "why": "The K tile is withdrawn — the full logo, or nothing (owner, 30/09/2026)"
+   }
+  ],
+  "model-name-badge": [
+   {
+    "option": "colour.silver",
+    "why": "No silver or chrome model badges"
+   }
+  ],
+  "consumables": [
+   {
+    "option": "style.black-label-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ],
+  "customer-edition": [
+   {
+    "option": "kind.customer-logo-on-the-table-edge",
+    "why": "Never the customer's logo on the machine — only the \"Made for\" plate"
+   }
+  ]
+ },
+ "shipping": {
+  "machine-carton": [
+   {
+    "option": "print.2-colours",
+    "why": "Shipping cartons print in one colour only"
+   }
+  ],
+  "kits": [
+   {
+    "option": "design.black-box-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ]
+ },
+ "digital": {
+  "profile-picture-and-cover": [
+   {
+    "option": "profile-picture.k-tile-black",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   },
+   {
+    "option": "profile-picture.k-tile-white",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "sticker-pack": [
+   {
+    "option": "style.machine-and-k-characters-black-and-white",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ]
+ },
+ "offices": {
+  "entrance-door": [
+   {
+    "option": "kind.door-handle-with-engraved-k",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "glass-film": [
+   {
+    "option": "kind.frosted-band-with-k-pattern",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ],
+  "wall-graphics": [
+   {
+    "option": "kind.k-pattern-wallpaper",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ]
+ },
+ "signage": {
+  "monument-and-pylon-signs": [
+   {
+    "option": "finish.black-with-silver-logo",
+    "why": "The logo is never silver, gold or chrome — it prints white or black (book ch. 39)"
+   }
+  ]
+ },
+ "events": {
+  "photo-booth": [
+   {
+    "option": "kind.props-with-k-and-logo",
+    "why": "The K is never used alone — the full logo, or no mark (owner, 30/09/2026)"
+   }
+  ]
+ },
+ "vehicles": {
+  "dealer-vehicles": [
+   {
+    "option": "kind.authorized-koleex-service-vehicle-kit",
+    "why": "KOLEEX is never typed as text — the logo, with the word under it"
+   }
+  ]
+ },
+ "dealers": {
+  "service-centre": [
+   {
+    "option": "kind.koleex-service-center-sign",
+    "why": "KOLEEX is never typed as text — the logo, with the word under it"
+   }
+  ]
+ },
+ "video": {
+  "animated-explainers": [
+   {
+    "option": "kind.machine-line-drawing-animation",
+    "why": "No drawings of machines — our own photographs and film only (owner, 27/09/2026; book ch. 60)"
+   }
+  ]
+ },
+ "paperwork": {
+  "warranty-certificate": [
+   {
+    "option": "format.a4-certificate-with-silver-seal",
+    "why": "No seal around the logo on certificates (book ch. 40; owner, 01/10/2026) — the A4 certificate without it"
+   }
+  ]
+ },
+ "print": {
+  "company-profile": [
+   {
+    "option": "format.house-size-210-270-mm",
+    "why": "Landscape 16:10 only (book ch. 102; owner, 01/10/2026)"
+   }
+  ]
+ },
+ "documents": {
+  "presentation-master-template": [
+   {
+    "option": "ratio.4-3-old-projectors",
+    "why": "16:9 only (book ch. 90; owner, 01/10/2026)"
+   }
+  ]
+ }
+}

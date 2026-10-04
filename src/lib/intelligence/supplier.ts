@@ -9,6 +9,7 @@
    Inputs: orders.suppliers + payments. No schema or API changes.
    ========================================================================== */
 
+import { supplierOutstanding } from "@/lib/finance/calc";
 import type { FinanceOrder, FinancePayment } from "@/lib/finance/types";
 import type {
   Direction,
@@ -40,7 +41,7 @@ export function aggregateSuppliersFromOrders(orders: FinanceOrder[]): SupplierAg
         ordersCount: 0,
       };
       prev.totalSpend += Number(s.supplier_cost) || 0;
-      prev.outstanding += Math.max(0, (Number(s.supplier_cost) || 0) - (Number(s.paid_amount) || 0));
+      prev.outstanding += supplierOutstanding(s);
       prev.ordersCount += 1;
       acc.set(id, prev);
     }

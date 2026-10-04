@@ -16,13 +16,15 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_SETUP } from "@/lib/translations/finance/setup";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { fmtDMY, fmtMoney } from "@/lib/finance/format";
 
 type CardKey =
   | "base_currency" | "bank_accounts" | "cash_accounts" | "opening_balances"
@@ -37,6 +39,9 @@ interface SetupCard {
   status: CardStatus;
   count: number;
   total: number;
+  /** A figure this role may not see (src/lib/experience, hideSetupCardTotal):
+   *  it came as 0 and shows «•••». */
+  total_hidden?: boolean;
   currency: string;
   href: string;
 }
@@ -46,11 +51,6 @@ interface SetupSnapshot {
   ready: boolean;
   completion: number;
   cards: SetupCard[];
-}
-
-function fmtMoney(n: number, currency: string) {
-  if (!Number.isFinite(n) || Math.abs(n) < 0.005) return "—";
-  return `${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 /* ─── Status dot ──────────────────────────────────────────────── */
@@ -65,27 +65,20 @@ function StatusDot({ status }: { status: CardStatus }) {
 /* ─── Main page ───────────────────────────────────────────────── */
 
 export default function FinanceSetup() {
-  const { t } = useTranslation(financeT);
-  const [snapshot, setSnapshot] = useState<SetupSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation(FIN_SETUP);
   const [activeCard, setActiveCard] = useState<CardKey | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const r = await fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setSnapshot(j.snapshot as SetupSnapshot);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: the setup status takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchStatus = useCallback(async () => {
+    const r = await fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.snapshot as SetupSnapshot;
   }, []);
-
-  useEffect(() => { void load(); }, [load]);
+  const { data: snapshot, loading, error: loadError, reload: load } =
+    useWarmData<SetupSnapshot>("fin:setup", fetchStatus);
+  const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
 
   /* Hash-to-drawer: /finance/setup#assets now opens the Assets drawer
      directly. Discoverability fix — operators land here from
@@ -111,7 +104,7 @@ export default function FinanceSetup() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
+      <div className="space-y-5 pt-5 pb-6">
         <FinanceHeader
           title={t("setup.title.long", "Financial Setup")}
           subtitle={t("setup.subtitle.long", "One-time onboarding. Fill the cards below in any order; the dashboard tracks progress.")}
@@ -179,12 +172,16 @@ export default function FinanceSetup() {
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("setup.card.total", "Total")}</div>
-                  <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : fmtMoney(c.total, c.currency)}</div>
+                  <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : c.total_hidden ? "•••" : fmtMoney(c.total, c.currency)}</div>
                 </div>
               </div>
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="pb-8">
+        <PeriodCloseSection />
       </div>
 
       {activeCard && snapshot && (
@@ -199,15 +196,159 @@ export default function FinanceSetup() {
   );
 }
 
+/* ─── Period close ───────────────────────────────────────────────
+   The lock date and the close. Reads and writes /api/accounting/periods:
+   closing posts one entry that moves the period's P&L to Retained
+   Earnings and locks every date on or before it. Reopening is a Super
+   Admin action; the API refuses it for anyone else. */
+
+interface PeriodState {
+  locked_through: string | null;
+  locked_at: string | null;
+  closings: Array<{ id: string; journal_no: string; entry_date: string; status: string; description: string | null }>;
+}
+
+function PeriodCloseSection() {
+  const { t } = useTranslation(FIN_SETUP);
+  const [state, setState] = useState<PeriodState | null>(null);
+  const [through, setThrough] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [ask, setAsk] = useState<"close" | "reopen" | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await fetch("/api/accounting/periods", { credentials: "include", cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j) setState(j as PeriodState);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  /* Default the picker to the last day of the previous month — the usual close. */
+  useEffect(() => {
+    if (through) return;
+    const d = new Date(); d.setDate(0);
+    setThrough(fmtDMY(d) === "—" ? "" : d.toISOString().slice(0, 10));
+  }, [through]);
+
+  const run = async (mode: "close" | "reopen") => {
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const r = await fetch("/api/accounting/periods", {
+        method: mode === "close" ? "POST" : "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ through: mode === "close" ? through : null }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+      setNotice(mode === "close"
+        ? t("setup.period.closed", "Period closed through {date}").replace("{date}", fmtDMY(through))
+        : t("setup.period.reopened", "Books reopened"));
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  const locked = state?.locked_through ?? null;
+
+  /* Month-end entries on demand — the close runs them too. */
+  const runMonthEnd = async (action: "depreciation" | "revaluation") => {
+    if (!through) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const r = await fetch("/api/accounting/month-end", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "depreciation" ? { action, through } : { action, as_of: through }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(humanizeError(j.error ?? j.errors?.[0]?.error ?? `HTTP ${r.status}`)); return; }
+      setNotice(action === "depreciation"
+        ? t("setup.period.depDone", "Depreciation posted for {n} month(s)").replace("{n}", String(j.runs ?? 0))
+        : (j.entry_id ? t("setup.period.fxDone", "FX revaluation posted ({no})").replace("{no}", String(j.journal_no ?? "")) : t("setup.period.fxNone", "Nothing to revalue at this date")));
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <section className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
+      <ConfirmDialog
+        open={ask !== null}
+        title={ask === "reopen"
+          ? t("setup.period.reopenConfirm", "Reopen the books? The lock is removed; closing entries stay until voided.")
+          : t("setup.period.confirm", "Close the books through {date}? Draft entries inside the period must be posted or removed first.").replace("{date}", fmtDMY(through))}
+        confirmLabel={ask === "reopen" ? t("setup.period.reopen", "Reopen") : t("setup.period.closeBtn", "Close period")}
+        onCancel={() => setAsk(null)}
+        onConfirm={() => { const m = ask; setAsk(null); if (m) void run(m); }}
+      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-xl">
+          <Eyebrow>{t("setup.period.eyebrow", "Period close")}</Eyebrow>
+          <div className="mt-1 text-[15px] text-[var(--text-highlight)]">{t("setup.period.title", "Close the books through a date")}</div>
+          <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("setup.period.hint", "Closing moves the period's revenue and expenses to Retained Earnings in one posted entry and locks every date on or before it. Nothing can be posted, voided or edited inside a closed period.")}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("setup.period.monthEndHint", "Before it closes, the period gets its month-end entries: straight-line depreciation for every whole month from the asset register, and a revaluation of foreign-currency bank, receivable and payable balances at the closing rate. Both can also be run here on their own.")}</p>
+        </div>
+        <div className="text-end">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("setup.period.lockedThrough", "Locked through")}</div>
+          <div className="mt-0.5 font-mono text-[18px] tabular-nums">{locked ? fmtDMY(locked) : "—"}</div>
+          {!locked && <div className="text-[10.5px] text-[var(--text-dim)]">{t("setup.period.open", "No period closed yet")}</div>}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="block">
+          <div className={labelCls}>{t("setup.period.closeThrough", "Close through")}</div>
+          <input type="date" value={through} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setThrough(e.target.value)} className={`${inputCls} w-auto`} />
+        </label>
+        <button
+          type="button"
+          disabled={busy || !through || (locked !== null && through <= locked)}
+          onClick={() => setAsk("close")}
+          className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition hover:opacity-90 disabled:opacity-50"
+        >{t("setup.period.closeBtn", "Close period")}</button>
+        <button type="button" disabled={busy || !through} onClick={() => void runMonthEnd("depreciation")} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50">
+          {t("setup.period.runDep", "Run depreciation")}
+        </button>
+        <button type="button" disabled={busy || !through} onClick={() => void runMonthEnd("revaluation")} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50">
+          {t("setup.period.runFx", "Revalue FX")}
+        </button>
+        {locked && (
+          <button type="button" disabled={busy} onClick={() => setAsk("reopen")} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--text-dim)] transition hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-50">
+            {t("setup.period.reopen", "Reopen")}
+          </button>
+        )}
+        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+        {notice && <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-700 dark:text-emerald-200">{notice}</div>}
+      </div>
+
+      <div className="mt-4">
+        <div className={labelCls}>{t("setup.period.history", "Closing entries")}</div>
+        {!state || state.closings.length === 0 ? (
+          <div className="text-[11px] text-[var(--text-ghost)]">{t("setup.period.none", "None yet.")}</div>
+        ) : (
+          <ul className="divide-y divide-[var(--border-faint)] text-[11.5px]">
+            {state.closings.map((c) => (
+              <li key={c.id} className="flex items-center justify-between py-1.5">
+                <span className="font-mono text-[var(--text-highlight)]">{c.journal_no}</span>
+                <span className="text-[var(--text-secondary)]">{c.description ?? ""}</span>
+                <span className="font-mono text-[var(--text-dim)]">{fmtDMY(c.entry_date)} · {c.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /* ─── Drawer chrome ──────────────────────────────────────────── */
 
 function DrawerShell({
   title, subtitle, onClose, children, footer,
 }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
+      <div onClick={(e) => e.stopPropagation()} className="kx-app kx-glass-drawer relative flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">{title}</h2>
@@ -251,7 +392,7 @@ function SetupDrawer({
 /* ─── Base currency ──────────────────────────────────────────── */
 
 function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +457,7 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
 interface BankRow { id: string; bank_name: string | null; account_name: string | null; account_number: string | null; iban: string | null; swift_code: string | null; currency: string; opening_balance: number; is_primary: boolean; status: string }
 
 function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [rows, setRows] = useState<BankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -329,6 +470,9 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
   const [currency, setCurrency] = useState(baseCurrency);
   const [opening, setOpening] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /* Without «Bank & Profit» the balances arrive as 0 and a non-zero opening
+     balance is refused (src/lib/experience): show «•••» and no input. */
+  const [balancesHidden, setBalancesHidden] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -336,6 +480,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
       const r = await fetch("/api/finance/bank-accounts", { credentials: "include", cache: "no-store" });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "Failed"); return; }
+      setBalancesHidden(j.visibility?.can_see_bank_balances === false);
       setRows(((j.accounts ?? []) as BankRow[]).filter((b) => b.status !== "archived"));
     } finally { setLoading(false); }
   }, []);
@@ -383,7 +528,11 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
             <input placeholder={t("setup.banks.ibanPlaceholder", "IBAN")}            value={iban}          onChange={(e) => setIban(e.target.value.toUpperCase())}  className={`${inputCls} font-mono uppercase`} />
             <input placeholder={t("setup.banks.ccyPlaceholder", "Currency (USD)")}  value={currency}      onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
           </div>
-          <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
+          {balancesHidden ? (
+            <div className="text-[11px] text-[var(--text-dim)]">{t("setup.banks.balancesHidden", "Opening balances are shown and set only with «Bank & Profit» in Roles & Permissions.")}</div>
+          ) : (
+            <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
+          )}
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
           <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
         </div>
@@ -400,7 +549,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
                     <div className="text-[var(--text-highlight)]">{b.account_name ?? b.bank_name ?? "—"} <span className="text-[var(--text-dim)]">· {b.currency}</span></div>
                     <div className="text-[10.5px] text-[var(--text-dim)] font-mono">{b.account_number ?? "—"}{b.swift_code ? ` · ${b.swift_code}` : ""}</div>
                   </div>
-                  <span className="font-mono tabular-nums">{Number(b.opening_balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono tabular-nums">{balancesHidden ? "•••" : Number(b.opening_balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </li>
               ))}
             </ul>
@@ -416,7 +565,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
 interface FxRow { id: string; from_currency: string; to_currency: string; rate: number; effective_date: string; notes: string | null }
 
 function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [rows, setRows] = useState<FxRow[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(baseCurrency);
@@ -466,7 +615,9 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
   };
 
   return (
-    <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         title={t("setup.fx.removeConfirm", "Remove this rate?")}
@@ -474,40 +625,42 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
-          <div className="grid grid-cols-3 gap-2">
-            <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input placeholder={t("setup.fx.toPlaceholder", "To")}   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input type="number" min="0" step="0.00000001" placeholder={t("setup.fx.ratePlaceholder", "Rate")} value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
+      <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
+            <div className="grid grid-cols-3 gap-2">
+              <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+              <input placeholder={t("setup.fx.toPlaceholder", "To")}   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
+              <input type="number" min="0" step="0.00000001" placeholder={t("setup.fx.ratePlaceholder", "Rate")} value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
+            </div>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+            <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
           </div>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-          <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
-        </div>
 
-        <div>
-          <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
-                  </div>
-                  <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div>
+            <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    </div>
+                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
@@ -516,7 +669,7 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
 interface AssetRow { id: string; name: string; category: string | null; purchase_value: number; purchase_date: string | null; depreciation_method: string; useful_life_years: number | null; currency: string; notes: string | null; status: string }
 
 function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const DEPRECIATION_METHODS: Array<{ value: string; label: string }> = [
     { value: "straight_line",      label: t("setup.assets.method.sl", "Straight line") },
     { value: "declining_balance",  label: t("setup.assets.method.db", "Declining balance") },
@@ -581,7 +734,9 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
   };
 
   return (
-    <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         tone="neutral"
@@ -590,48 +745,50 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
-          <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder={t("setup.assets.categoryPlaceholder", "Category (e.g. Machinery)")} value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.01" placeholder={t("setup.assets.valuePlaceholder", "Purchase value")} value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.1" placeholder={t("setup.assets.lifePlaceholder", "Useful life (years)")} value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-              {DEPRECIATION_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            <input placeholder={t("setup.assets.currencyPlaceholder", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+      <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
+            <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder={t("setup.assets.categoryPlaceholder", "Category (e.g. Machinery)")} value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
+              <input type="number" min="0" step="0.01" placeholder={t("setup.assets.valuePlaceholder", "Purchase value")} value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+              <input type="number" min="0" step="0.1" placeholder={t("setup.assets.lifePlaceholder", "Useful life (years)")} value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+                {DEPRECIATION_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              <input placeholder={t("setup.assets.currencyPlaceholder", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            </div>
+            <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
           </div>
-          <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
-        </div>
 
-        <div>
-          <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.assets.empty", "No assets registered yet.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((a) => (
-                <li key={a.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]">{a.name} {a.category && <span className="text-[var(--text-dim)]">· {a.category}</span>}</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
-                    <button onClick={() => remove(a.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.assets.archive", "Archive")}</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div>
+            <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.assets.empty", "No assets registered yet.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]">{a.name} {a.category && <span className="text-[var(--text-dim)]">· {a.category}</span>}</div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
+                      <button onClick={() => remove(a.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.assets.archive", "Archive")}</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
@@ -639,10 +796,14 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
 
 type OBCategory = "cash" | "owner_capital" | "loan" | "customer_receivable" | "supplier_payable" | "fixed_asset" | "inventory" | "other";
 
-interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string }
+/* amount_hidden: a line this role may not see (src/lib/experience,
+   openingCategoryRefusal) — cash, capital, loans and other need «Bank &
+   Profit», the inventory opening the «private records» switch. It came as 0
+   and shows «•••»; such a role neither adds nor removes one. */
+interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string; amount_hidden?: boolean }
 
 function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { category: OBCategory; baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const CATEGORY_META: Record<OBCategory, { title: string; hint: string; placeholder: string }> = {
     cash:                { title: t("setup.ob.cat.cash.title", "Cash Accounts"),         hint: t("setup.ob.cat.cash.hint", "Physical cash on hand and petty-cash floats."),                placeholder: t("setup.ob.cat.cash.placeholder", "Main petty cash") },
     owner_capital:       { title: t("setup.ob.cat.owner.title", "Equity / Capital"),      hint: t("setup.ob.cat.owner.hint", "Owner-injected capital at company formation."),                placeholder: t("setup.ob.cat.owner.placeholder", "Founder contribution") },
@@ -656,6 +817,9 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   const meta = CATEGORY_META[category];
   const [rows, setRows] = useState<OBRow[]>([]);
   const [loading, setLoading] = useState(true);
+  /* The server's answer for this category, so a drawer with no lines yet
+     knows too. */
+  const [amountsHidden, setAmountsHidden] = useState(false);
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(baseCurrency);
@@ -667,7 +831,10 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
     setLoading(true);
     const r = await fetch(`/api/finance/setup/opening-balances?category=${encodeURIComponent(category)}`, { credentials: "include", cache: "no-store" });
     const j = await r.json();
-    if (r.ok) setRows((j.entries ?? []) as OBRow[]);
+    if (r.ok) {
+      setRows((j.entries ?? []) as OBRow[]);
+      setAmountsHidden(j.amounts_hidden === true);
+    }
     setLoading(false);
   }, [category]);
   useEffect(() => { void load(); }, [load]);
@@ -705,13 +872,17 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   };
 
   const totalsByCurrency = useMemo(() => {
+    /* A sum of hidden zeros is not a total. */
+    if (rows.some((r) => r.amount_hidden)) return [];
     const m = new Map<string, number>();
     for (const r of rows) m.set(r.currency, (m.get(r.currency) ?? 0) + Number(r.amount || 0));
     return Array.from(m.entries());
   }, [rows]);
 
   return (
-    <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
+    <>
+      {/* The confirm sits BESIDE the drawer, not in it: the drawer is glass
+          (backdrop-filter), which would trap a fixed dialog inside its box. */}
       <ConfirmDialog
         open={removeAsk !== null}
         title={t("setup.ob.removeConfirm", "Remove this entry?")}
@@ -719,59 +890,71 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
         onCancel={() => setRemoveAsk(null)}
         onConfirm={() => { const id = removeAsk; setRemoveAsk(null); if (id) void doRemove(id); }}
       />
-      <div className="space-y-4">
-        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
-          <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
-          <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input type="number" min="0" step="0.01" placeholder={t("setup.ob.entry.amount", "Amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <input placeholder={t("setup.ob.entry.currency", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
-          </div>
-          <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-          {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
-        </div>
-
-        <div>
-          <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
-          ) : (
-            <ul className="space-y-1">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
-                  <div>
-                    <div className="text-[var(--text-highlight)]">{r.label}</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
-                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {totalsByCurrency.length > 0 && (
-            <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-right text-[11px] tabular-nums">
-              {totalsByCurrency.map(([cur, tot]) => (
-                <div key={cur}>
-                  <span className="text-[var(--text-dim)]">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
-                  <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-              ))}
+      <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
+        <div className="space-y-4">
+          {amountsHidden ? (
+            <div className="rounded-md border border-[var(--border-subtle)] px-3 py-2 text-[11px] text-[var(--text-dim)]">
+              {category === "inventory"
+                ? t("setup.ob.hidden.cost", "Inventory opening values are shown and set only with «Can see private data» in Roles & Permissions.")
+                : t("setup.ob.hidden.bankProfit", "These opening figures are shown and set only with «Bank & Profit» in Roles & Permissions.")}
             </div>
+          ) : (
+          <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+            <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
+            <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min="0" step="0.01" placeholder={t("setup.ob.entry.amount", "Amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
+              <input placeholder={t("setup.ob.entry.currency", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            </div>
+            <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+            {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+            <button onClick={save} disabled={submitting} className="w-full h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
+          </div>
           )}
+
+          <div>
+            <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
+            {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+              <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {rows.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
+                    <div>
+                      <div className="text-[var(--text-highlight)]">{r.label}</div>
+                      <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono tabular-nums">{r.amount_hidden ? "•••" : `${Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${r.currency}`}</div>
+                      {!r.amount_hidden && (
+                        <button onClick={() => remove(r.id)} className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {totalsByCurrency.length > 0 && (
+              <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-right text-[11px] tabular-nums">
+                {totalsByCurrency.map(([cur, tot]) => (
+                  <div key={cur}>
+                    <span className="text-[var(--text-dim)]">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
+                    <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </DrawerShell>
+      </DrawerShell>
+    </>
   );
 }
 
 /* ─── Setup guidance — operator-friendly checklist + warnings ─── */
 
 function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   /* Recommended setup order — operators repeatedly asked "where do I
      start?" The checklist below is the answer: do these in this
      order and the rest unlocks. */

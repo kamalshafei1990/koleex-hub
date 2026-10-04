@@ -185,7 +185,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by code or name (FOB, CIF, Delivered Duty Paid…)"
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
+            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-strong)]"
           />
         </div>
         <div className="flex gap-1.5">
@@ -259,7 +259,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
 function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   const { t } = useTranslation(commercialPolicyT);
   return (
-    <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
+    <div className="kx-glass bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
         {/* Code badge */}
         <div className="shrink-0 w-14 h-14 flex flex-col items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">

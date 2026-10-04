@@ -1,0 +1,22 @@
+/* KOLEEX brand colours — from the KOLEEX Brand Guidelines v3.0 (27/09/2026).
+   Black and white carry every piece. Silver is the premium material. Hub Blue is for links and buttons only.
+   Status colours are for states only. Proportions: black or white 60 · neutrals 28 · silver 8 · Hub Blue 4. */
+:root {
+  --koleex-black: #000000; /* Black */
+  --koleex-white: #FFFFFF; /* White */
+  --koleex-graphite: #1D1D1F; /* Graphite */
+  --koleex-gray: #6E6E73; /* Gray */
+  --koleex-mist: #D2D2D7; /* Mist */
+  --koleex-cloud: #F5F5F7; /* Cloud */
+  --koleex-silver: #C7C7CC; /* Silver */
+  --koleex-deep: #3E6796; /* Hub Blue Deep */
+  --koleex-steel: #567FB2; /* Hub Blue Steel */
+  --koleex-sky: #7FA9D6; /* Hub Blue Sky */
+  --koleex-ice: #BCD8F0; /* Hub Blue Ice */
+  --koleex-success: #059669; /* Status Green */
+  --koleex-warning: #D97706; /* Status Amber */
+  --koleex-error: #DC2626; /* Status Red */
+  --koleex-silver-gradient: linear-gradient(135deg, #AEAEB2 0%, #FFFFFF 38%, #D1D1D6 60%, #8E8E93 100%);
+  --koleex-silver-text: linear-gradient(170deg, #C7C7CC 0%, #FFFFFF 35%, #D1D1D6 60%, #8E8E93 100%);
+  --koleex-hub-gradient: linear-gradient(180deg, #567FB2 0%, #BCD8F0 100%); /* the Koleex Hub mark only */
+}

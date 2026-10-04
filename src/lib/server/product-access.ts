@@ -87,9 +87,19 @@ export const LIST_PRODUCT_COLUMNS = [
   "brand",
   "level",
   "tags",
-  "excerpt",
-  "description",      // part of the client-side search haystack
-  "alternate_names",   // Chinese/other-language product names — search haystack
+  /* ⚠️ excerpt and description are NOT here, and that is the point.
+     Measured 18/09/2026 over the real 394 products: `excerpt` alone was 70 KB
+     of a 155 KB response — 45% of everything the catalogue downloads — and it
+     is rendered NOWHERE on the list. Its only reader was the browser-side
+     search haystack, and the server already searches it: `search_text` is a
+     GENERATED STORED column covering product_name, slug, brand, excerpt,
+     description, alternate_names and tags, with a GIN trigram index
+     (products-config.ts searchColumns). So the bytes bought a second, worse
+     copy of a search Postgres was already doing.
+     `description` went with it for the same reason.
+     alternate_names STAYS: it is the Chinese/other-language name (熔接机 finds
+     the fusing machine) and it is small. */
+  "alternate_names",
   "status",
   "visible",
   "featured",
@@ -137,6 +147,31 @@ export const SECRET_MODEL_FIELDS: readonly string[] = [
   "cost_price",   // purchase price from supplier
   "supplier",     // supplier name on the model row itself
   "moq",          // supplier minimum order qty
+  /* Cost PROVENANCE is as internal as the number: "cost set by Kamal from
+     the supplier quote on 12 Aug" tells a reader everything except the
+     digits. These four columns exist on product_models and were surviving
+     every strip, so a no-cost-permission account still learned where the
+     cost came from and who last touched it. */
+  "cost_source",
+  "cost_updated_at",
+  "cost_updated_by",
+  "cost_updated_by_name",
+];
+
+/** The full COST-side surface of a model row: the secrets plus the cost
+ *  provenance columns. This is what a Product Data editor WITHOUT
+ *  can_view_private must never read — and never write. Everything else on
+ *  the row (specs_overrides, supplier_overrides, i18n, packing, coding…)
+ *  is normal catalog data such an editor works with every day; stripping
+ *  more than this from their read made the form hydrate those fields
+ *  empty and the next save NULL them in the DB (the family-override
+ *  data-loss bug, 2026-08-21). */
+export const MODEL_COST_FIELDS: readonly string[] = [
+  ...SECRET_MODEL_FIELDS,
+  "cost_source",
+  "cost_updated_at",
+  "cost_updated_by",
+  "cost_updated_by_name",
 ];
 
 /** Strip a list of keys from any row/object. Safe on null. */

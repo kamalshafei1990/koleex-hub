@@ -28,6 +28,69 @@ const S = {
 
 function paths(token: string): React.ReactNode {
   switch (token) {
+    /* ── Packing types — how the machine ships (owner request,
+       2026-08-20: "add icon for each type from our icons library").
+       Same single-stroke monochrome language as every other glyph. ── */
+    case "pack-wooden-case":
+      return (
+        <>
+          <path d="M4 8l8-4 8 4v9l-8 4-8-4z" {...S} />
+          <path d="M4 8l8 4 8-4M12 12v9" {...S} />
+          <path d="M7 6.5v9M17 6.5v9" {...S} />
+        </>
+      );
+    case "pack-plywood-crate":
+      return (
+        <>
+          <rect x="4" y="6" width="16" height="13" rx="1" {...S} />
+          <path d="M4 6l16 13M20 6L4 19" {...S} />
+        </>
+      );
+    case "pack-carton":
+      return (
+        <>
+          <rect x="4" y="7" width="16" height="12" rx="1" {...S} />
+          <path d="M4 7l3-3h10l3 3M12 7v12M9.5 10h5" {...S} />
+        </>
+      );
+    case "pack-carton-foam":
+      return (
+        <>
+          <rect x="4" y="6" width="16" height="13" rx="1" {...S} />
+          <rect x="7.5" y="9.5" width="9" height="6" rx="1" {...S} />
+          <path d="M4 9h3.5M16.5 9H20M4 16h3.5M16.5 16H20" {...S} />
+        </>
+      );
+    case "pack-pallet-film":
+      return (
+        <>
+          <rect x="6" y="4" width="12" height="11" rx="1" {...S} />
+          <path d="M6 7.5c4-1.6 8 1.6 12 0M6 11.5c4-1.6 8 1.6 12 0" {...S} />
+          <path d="M4 18h16M5.5 18v2.5M12 18v2.5M18.5 18v2.5" {...S} />
+        </>
+      );
+    case "pack-pallet":
+      return (
+        <>
+          <path d="M3 10h18M3 14h18" {...S} />
+          <path d="M5 10v4M12 10v4M19 10v4" {...S} />
+        </>
+      );
+    case "pack-metal-frame":
+      return (
+        <>
+          <path d="M5 8l7-3.5L19 8v8l-7 3.5L5 16z" {...S} />
+          <path d="M5 8l7 3.5L19 8M12 11.5v8M5 12l7 3.5 7-3.5" {...S} />
+        </>
+      );
+    case "pack-bulk":
+      return (
+        <>
+          <rect x="3" y="7" width="18" height="11" rx="1" {...S} />
+          <path d="M7 7v11M11 7v11M15 7v11" {...S} />
+        </>
+      );
+
     /* ── Boolean / state ── */
     case "check":
       return <path d="M5 12.5l4 4 10-10" {...S} />;

@@ -24,6 +24,7 @@ import {
   type Priority,
 } from "@/lib/qa/types";
 import { logActivity } from "@/lib/qa/activity";
+import { SETTLED_STATUSES, settleIssueNotifications } from "@/lib/qa/notify";
 
 const MAX_IDS = 200;
 
@@ -106,6 +107,12 @@ export async function POST(req: Request) {
   if (upErr) {
     console.error("[api/qa/reports/bulk update]", upErr.message);
     return NextResponse.json({ error: "Update failed." }, { status: 500 });
+  }
+
+  /* Bulk-closing sends no notifications, but it still settles the issues:
+     their unread QA rows leave every bell. */
+  if (patch.status && SETTLED_STATUSES.has(patch.status as IssueStatus)) {
+    await settleIssueNotifications(validIds.filter((i) => beforeById.get(i)?.status !== patch.status));
   }
 
   // Best-effort activity log per issue. Failures are swallowed so a slow

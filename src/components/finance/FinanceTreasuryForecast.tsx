@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_FORECAST } from "@/lib/translations/finance/forecast";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -87,7 +87,7 @@ function zeroY(H: number, vMin: number, vMax: number, padY = 8): number {
 type ScenarioPreset = "base" | "delay7" | "delay15" | "delay30" | "accel7" | "accel15" | "fx5" | "fx10" | "cost10" | "combined" | "custom";
 
 export default function FinanceTreasuryForecast() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_FORECAST);
   const baseCurrency = useBaseCurrency();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +105,17 @@ export default function FinanceTreasuryForecast() {
      server" so the operator can always pull fresh data. */
   const [cachedInputs, setCachedInputs] = useState<ForecastInputs | null>(null);
 
-  /* Fetch fresh inputs from the server and run the base case. The
+  /* DELIBERATELY NOT WARM-CACHED — the one Finance tab left cold on
+     purpose, so the reasoning is here rather than discovered later.
+     Every other screen in the sweep serves a stored list and revalidates
+     behind it; this one is not a list. It POSTs a set of assumptions and
+     gets back a COMPUTATION, and its results are then recomputed locally as
+     the operator toggles presets. A cached answer here would be a forecast
+     produced from assumptions the operator can no longer see, presented as
+     the current scenario — and unlike a stale row count, a stale liquidity
+     projection is acted on. It waits, honestly.
+
+     Fetch fresh inputs from the server and run the base case. The
      server bundles `inputs` into the response when we ask for them,
      so subsequent preset toggles can recompute locally. */
   const refreshFromServer = useCallback(async (a: ScenarioAssumptions | null) => {
@@ -209,7 +219,7 @@ export default function FinanceTreasuryForecast() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("forecast.title", "Treasury Forecast")}
           subtitle={t("forecast.subtitle", "Deterministic 90-day cash projection. Apply scenarios to stress-test customer delays, FX shocks, supplier acceleration, and cost shocks.")}
@@ -248,7 +258,7 @@ export default function FinanceTreasuryForecast() {
         {/* Save-as-plan drawer */}
         {saveDraft && base && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={() => setSaveDraft(null)}>
-            <div className="relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="kx-app kx-glass-pop kx-pop-in relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
                 <div>
                   <h2 className="text-[14px] font-semibold">{t("forecast.save.title", "Save scenario as plan")}</h2>
@@ -596,7 +606,7 @@ function DriverList({
   items: Array<{ key: string; party: string; amountReporting: number; daysFromNow: number; source: string }>;
   tone: "positive" | "negative";
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_FORECAST);
   const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>

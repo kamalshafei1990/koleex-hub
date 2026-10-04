@@ -379,3 +379,52 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **⚠️ TRAP RECORDED IN THE CODE.** A shirt catalogue also sells an **"Automatic Rotation Shoulder and Yoke Press"** — a *press*, Finishing, not sewing. It is the **first** thing a text search for "yoke" returns. Anyone repeating this search will hit it before the real evidence.
 - **Conflict scan:** `tsc` exit 0 / 0 lines · `validate:budgets` **59 passed, 0 failed** — section H: 102 kinds, 79 facet pairs, all en/zh/ar.
 - **Status:** **Applied — live. The CL-0023 family is closed.** Remaining open items are unrelated to it: the overlock `thread_count` facet gap (CL-0023b) and the seven legacy `templateSlug` values left alone on purpose.
+
+### CL-0024 · 2026-08-20 · Six shelves from the Lingrai read — two approved backlog items executed, four new types
+- **Approved by:** Kamal ("continue" — 2026-08-20, on the gap list the S-LINGRAI 2025 inventory §4 put in front of him).
+- **Trigger:** the Lingrai catalogue prints real spec tables for machine classes that had no live shelf. Two were already Approved in the FINAL DECISION TABLE and simply never applied; four had no home anywhere.
+- **Executed (already-approved, now live):**
+  - `XSF` **Flatlock (Flat Seamer)** → live shelf `flatlock-machines` under Industrial Sewing. CL-0020's own relabel note said these do not belong under Interlock; the 740/740DSX family finally has its shelf.
+  - `XATM` **Template Sewing** → live shelf `template-sewing-machines` under Automatic Sewing Systems (LR-988A-4-FOUR class).
+- **NEW types (this entry is their authorization):**
+  - `XSEF` **Fur Sewing Machine** → `fur-sewing-machines` under Leather & Footwear (XSE\*). Bonis-class skin overseaming sits with the skin-goods family, not the garment stitch classes.
+  - `XSRG` **Carpet Overedging Machine** → `carpet-overedging-machines` under Industrial Sewing. Not Overlock — different bed, purpose and thread system. `XSRG` chosen so no live code (`XSC`, `XSO`) is a prefix of it.
+  - `XATA` **Automatic Tape Attaching System** → `tape-attaching-units` under Automatic Sewing Systems. The robotic multi-needle tape cells (LR-008-…-VPLSDk/SDC). Distinct from `XALB` (labels) and leather `XSET`.
+  - `XAPK` **Automatic Pintuck Machine** → `pintuck-sewing-units` under Automatic Sewing Systems (LR-3000-1400 class). The VPT pintuck DEVICE on multi-needle machines stays a device; the standalone PLC cell is a type.
+- **Decided WITHOUT a type:** the LR-20S thread distributor — before/after-sewing bench gear, catalogued as device/parts, no Product Type.
+- **Prefix note for the record:** the live tree already contains code-extends-code pairs (`XAS` stands ⊂ `XASS`/`XASL`), so extension alone is not a conflict; the rule applied here is semantic — a new code must not READ as a subtype of an unrelated live code, which is why carpet is `XSRG` and not `XSCP`/`XSOC`.
+- **Synchronized:** live `subcategories` (6 rows, with name_zh/name_ar per the translated-dropdowns rule) · `product-types-master.md` · `product-type-approval-matrix.md` (rows + FINAL DECISION TABLE + counts) · `sewing-machine-templates.ts` SUBCATEGORY_TO_TEMPLATE (6 slugs) · S-LINGRAI inventory §4/§6.
+- **Status:** **Applied — live.** Open, unchanged: fur/carpet spec templates (no source tables read yet beyond Lingrai's brief rows), and the JOOKE no-code decision (separate file).
+
+### CL-0025 · 2026-08-20 · Four more approved-backlog shelves — the JOOKE reconciliation
+- **Approved by:** Kamal ("ok" — 2026-08-20, on preparing the JOOKE decision paper; these four need NO decision, they were already Approved in the FINAL DECISION TABLE and never applied — the same situation CL-0024 found for XSF/XATM).
+- **The finding:** the S-JOOKE inventory's §4 "no home" list was written against the LIVE tree only. Reconciled against the registry, four of its gaps already had Approved types: G1 Ultrasonic → `XSUS`, G4 Belt loop attaching → `XABL`, G5 Dart → `XADT`, G9 Elastic splicing/attaching → `XSEA`. G10's tape-attaching half → `XATA` (live since CL-0024).
+- **Applied:** `ultrasonic-sewing-machines[XSUS]` and `elastic-attaching-machines[XSEA]` under Industrial Sewing; `belt-loop-attaching-units[XABL]` and `dart-sewing-units[XADT]` under Automatic Sewing Systems. All with name_zh/name_ar and SUBCATEGORY_TO_TEMPLATE entries.
+- **Naming correction in passing:** `XAPK` (pintuck units, CL-0024) had Arabic name "وحدات خياطة البنسات" — but *dart* is the garment term for بنس, and XADT now exists. XAPK is renamed "وحدات خياطة الكسرات الآلية" so the two Arabic names cannot be confused; dart takes "وحدات خياطة البنس الآلية".
+- **Still homeless (the ACTUAL decision paper):** G2 glue dispensing (9), G3 intimates hardware (6), G6 zipper/cord prep (3), G8 creasing (1), G7 velcro cut+sew (2), G11 pad printing (1), G10's seamless oven (1) — see `jooke-taxonomy-decision-paper.md`.
+- **Status:** **Applied — live.**
+
+### CL-0026 · 2026-08-20 · The JOOKE decision paper executed — and the Knowledge page caught up
+- **Approved by:** Kamal ("I have no idea, do the right way, and make sure everything is in coding system in knowledge" — 2026-08-20). Per the CL-0023c precedent, the delegation was taken as: apply the paper's own recommendations.
+- **Decisions taken (from `jooke-taxonomy-decision-paper.md`):**
+  - **D1-A** → `XAGD` **Glue Dispensing Machine** → `glue-dispensing-machines` under Automatic Sewing Systems (9 dispensers + the curing oven as a kind). Garment-automation cells in every mechanical respect; no new top-level category for 10 machines from one source.
+  - **D2-A** → `XFAB` **Bra Hardware Machine** → `bra-hardware-machines` under Fastening & Press, beside `XFAS`. Same process class (hardware onto garment), different workpiece.
+  - **D3-A** → `XAGP` **Garment Prep Unit** → `garment-prep-units` under Automatic Sewing Systems (zipper pre-expansion, cord inserting, creasing — kinds, not shelves).
+  - **D4 → PARKED, no code:** velcro cut-&-sew and label pad printing wait for a second source; a prefix earned by one machine from one supplier is how codes get burned. If pad printing must be filed sooner, it enters as a kind under `XPSP` with a process facet.
+- **The Knowledge half of the instruction:** the standing rule ("every new code goes into the coding system in the Knowledge app") had been broken by CL-0024 and CL-0025 themselves — all 10 of their codes were missing from `product-coding/data.ts`, invisible to the budgets §K gate because none carries a spec template. **All 13 codes** (CL-0024's six, CL-0025's four, CL-0026's three) are now taught: data.ts rows in their category blocks + full en/zh/ar labels in the page's LBL i18n table.
+- **JOOKE status after this entry:** 0 of 77 machines without a home. 15 housed by CL-0024/0025, 20 by this entry, 3 parked by decision, the rest always had homes.
+- **Status:** **Applied — live.**
+
+### CL-0027 · 2026-08-21 · The S-KILO pair — printing gets its four missing shelves, plus the actuation rule
+- **Approved by:** Kamal ("do it" — 2026-08-21, after the full what-we-have/what-we-need table for Printing & Heat Press).
+- **Trigger:** the S-KILO 2024+2025 catalogues (~85 models). The live 7 printing shelves absorb everything EXCEPT four families; everything outside printing already had homes (incl. `garment-prep-units` receiving the string-thrusting machines one day after CL-0026 created it).
+- **Executed (Approved-never-applied):**
+  - `XPDF` **DTF Printer** → `dtf-printers` — the opening family of both catalogues (6 models).
+  - `XPPS` **DTF Powder Shaker** → `dtf-powder-shakers` (6 standalone units).
+  - `XFPB` **Pressing Machine (Buck)** → `pressing-machines` under Ironing Systems (CL-0018 family; XF token) — the household steam presses.
+- **NEW code:** `XPUV` **UV-DTF Printer** → `uv-dtf-printers`. Not even registry-proposed, minted on judgment: an established global market class (crystal-label roll + cylinder/object UV printing), two models in S-KILO 2024.
+- **UN-PARKED:** `XPPD` **Pad Printing Machine** → `pad-printing-machines`. CL-0026 parked pad printing (JOOKE, one source) with the condition "wait for a second source" — S-KILO carries SIX pad printers across its two editions. The condition is met exactly as written.
+- **STILL PARKED:** the rhinestone shaking machine (one source, S-KILO only) — same one-source rule that parked velcro.
+- **FILING RULE (owner question: "pneumatic has double-station too — new subcategory?"):** **NO — actuation outranks station count.** Station count is a FACET (CL-0020 doctrine). The live `XPPH`/`XPDH` pair predates the doctrine and overlaps on pneumatic twins; rather than break live codes: a pneumatic press of ANY station count files under `pneumatic-heat-press-machines`; `double-station-heat-press-machines` keeps only NON-pneumatic twins; station count is recorded as a spec in every case. One machine, one home.
+- **Synchronized:** live subcategories (5 rows, zh/ar), Knowledge data.ts + i18n **in the same change** (the §K blind-spot lesson), master registry, approval matrix, S-KILO inventory doc, JOOKE decision paper un-park note.
+- **Status:** **Applied — live.** Printing & Heat Press: 7 → 11 shelves; both S-KILO catalogues fully absorbable.

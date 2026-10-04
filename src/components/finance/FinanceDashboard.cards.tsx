@@ -24,7 +24,13 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import RrIcon from "@/components/ui/RrIcon";
 import type { DashboardKpi } from "@/lib/finance/types";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PROFITFLOW } from "@/lib/translations/finance/profitFlow";
+import { FIN_TOPCATEGORIES } from "@/lib/translations/finance/topCategories";
+import { FIN_TOPORDERS } from "@/lib/translations/finance/topOrders";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_PROFITFLOW, ...FIN_TOPCATEGORIES, ...FIN_TOPORDERS } as const;
+
 
 export const ProfitFlow = memo(function ProfitFlow({
   revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
@@ -32,7 +38,7 @@ export const ProfitFlow = memo(function ProfitFlow({
   revenue: number; supplierCost: number; expenses: number; taxRefund: number;
   finCharges: number; gross: number; net: number; currency: string;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const steps: { label: string; value: number; sign: 1 | -1; total?: boolean; tone: Tone; helpId: string }[] = [
     { label: t("profitFlow.revenue", "Revenue"),        helpId: "finance.revenue",        value: revenue,      sign: 1,  tone: "positive" },
     { label: t("profitFlow.supplierCost", "Supplier cost"),  helpId: "finance.supplierCost",   value: supplierCost, sign: -1, tone: "neutral" },
@@ -77,7 +83,7 @@ export const ProfitFlow = memo(function ProfitFlow({
 });
 
 export const TopOrdersCard = memo(function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const rows = kpi?.top_orders ?? [];
   return (
     <ChartCard title={t("topOrders.title", "Top profitable orders")} subtitle={t("topOrders.subtitle", "Ranked by net profit this period.")} helpId="finance.topOrders">
@@ -113,7 +119,7 @@ export const TopOrdersCard = memo(function TopOrdersCard({ kpi, currency }: { kp
 });
 
 export const TopCategoriesCard = memo(function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const rows = kpi?.top_expense_categories ?? [];
   return (
     <ChartCard title={t("topCategories.title", "Top expense categories")} subtitle={t("topCategories.subtitle", "Biggest spend buckets this period.")} helpId="finance.topCategories">

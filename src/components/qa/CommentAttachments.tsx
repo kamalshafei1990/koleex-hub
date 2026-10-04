@@ -17,6 +17,7 @@
        loaded, opening a lightweight lightbox on click.
    --------------------------------------------------------------------------- */
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
@@ -215,8 +216,10 @@ export function AttachmentThumbs({ attachments, internal = false }: { attachment
         ))}
       </div>
 
-      {active && (
+      {/* On <body>: the thumbnails also sit inside glass drawers, whose backdrop-filter would hold a fixed viewer inside their box. */}
+      {active && typeof document !== "undefined" && createPortal(
         <div
+          data-kx-viewer
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
           onClick={() => setActive(null)}
           role="dialog"
@@ -232,7 +235,8 @@ export function AttachmentThumbs({ attachments, internal = false }: { attachment
           >
             ×
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

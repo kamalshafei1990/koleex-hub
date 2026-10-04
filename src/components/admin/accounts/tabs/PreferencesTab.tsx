@@ -1,15 +1,14 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   PreferencesTab — general user preferences (language, theme, email signature,
-   notifications). Stored in accounts.preferences jsonb.
+   PreferencesTab — general user preferences (language, theme, email
+   signature). Stored in accounts.preferences jsonb.
 
    The tab reads from the merged AccountPreferences bag (stored + defaults),
    and only persists the keys the user actually interacts with.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import BellIcon from "@/components/icons/ui/BellIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
@@ -30,7 +29,6 @@ import {
   selectClass,
   textareaClass,
   labelClass,
-  Toggle,
   TabActionBar,
 } from "./shared";
 
@@ -48,7 +46,13 @@ export default function PreferencesTab({ account, onChanged }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setPrefs(initial), [initial]);
+  /* Follow the account only while there are no unsaved edits, during render
+     (no stale frame, no effect-driven second render). */
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
+    if (JSON.stringify(prefs) === JSON.stringify(seenInitial)) setPrefs(initial);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -61,9 +65,14 @@ export default function PreferencesTab({ account, onChanged }: Props) {
   async function save() {
     setSaving(true);
     setError(null);
-    // Persist the full merged bag — simpler than diffing and the jsonb
-    // payload is small.
-    const ok = await updateAccountPreferences(account.id, prefs);
+    /* Only what this screen edits (Settings audit, 29/09/2026): the full
+       withDefaults bag wrote this screen's copy of every other slice — the
+       person's wallpaper, My apps, display, pause — back over newer values. */
+    const ok = await updateAccountPreferences(account.id, {
+      language: prefs.language,
+      theme: prefs.theme,
+      email_signature: prefs.email_signature,
+    });
     setSaving(false);
     if (!ok) {
       setError(t("acc.err.preferencesFailed"));
@@ -89,10 +98,11 @@ export default function PreferencesTab({ account, onChanged }: Props) {
               className={selectClass}
               value={prefs.language ?? "en"}
               onChange={(e) =>
-                setPrefs({ ...prefs, language: e.target.value as "en" | "ar" })
+                setPrefs({ ...prefs, language: e.target.value as "en" | "zh" | "ar" })
               }
             >
               <option value="en">{t("acc.prefs.langEnglish")}</option>
+              <option value="zh">中文 (Chinese)</option>
               <option value="ar">العربية (Arabic)</option>
             </select>
           </div>
@@ -136,39 +146,10 @@ export default function PreferencesTab({ account, onChanged }: Props) {
         </p>
       </section>
 
-      <section className={tabCardClass}>
-        <h2 className={tabSectionTitle}>
-          <BellIcon className="h-3.5 w-3.5" />
-          {t("acc.prefs.notifications")}
-        </h2>
-        <div className="space-y-4">
-          <Toggle
-            label={t("acc.prefs.emailNotifications")}
-            description={t("acc.prefs.emailNotifDesc")}
-            checked={prefs.notifications?.email ?? true}
-            onChange={(v) =>
-              setPrefs({
-                ...prefs,
-                /* Spread the EXISTING bag: the server merge is shallow, so
-                   rebuilding it as {email, in_app} silently wiped the eight
-                   per-activity switches from Settings → Notifications. */
-                notifications: { ...withDefaults(prefs).notifications!, email: v },
-              })
-            }
-          />
-          <Toggle
-            label={t("acc.prefs.inAppNotifications")}
-            description={t("acc.prefs.inAppNotifDesc")}
-            checked={prefs.notifications?.in_app ?? true}
-            onChange={(v) =>
-              setPrefs({
-                ...prefs,
-                notifications: { ...withDefaults(prefs).notifications!, in_app: v },
-              })
-            }
-          />
-        </div>
-      </section>
+      {/* No notification switches here. The two this card carried ("Email",
+          "In-app") were read by nothing — there is no email channel, and the
+          bell never consulted in_app. The real switches, per activity, live
+          in the person's own Settings → Notifications. */}
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">

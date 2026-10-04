@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
 import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
 import { watcherTargets } from "@/lib/qa/watchers";
+import type { NotifTpl } from "@/lib/notification-templates";
 
 interface IssueParticipants {
   id: string;
@@ -131,27 +132,28 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const mentionedUsernames = parseMentions(message);
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, mentionedUsernames);
   const actor = auth.username ?? "Someone";
-  const suffix = hasAttachment ? " (with image)" : "";
+  // Translated per reader (translations/notif-templates/qa.ts); "(with
+  // image)" is its own sentence, not a suffix glued on.
+  const p = { actor, title: issue.title };
+  const mentionTpl: NotifTpl = hasAttachment ? { k: "qa_issue_mentioned.image", p } : { k: "qa_issue_mentioned", p };
+  const commentTpl: NotifTpl = hasAttachment ? { k: "qa_comment_added.image", p } : { k: "qa_comment_added", p };
   const targets: NotifyTarget[] = [
     ...mentioned.map((u) => ({
       recipientId: u.id,
       type: "qa_issue_mentioned" as const,
-      title: "You were mentioned",
-      body: `${actor} mentioned you on "${issue.title}"${suffix}`,
+      tpl: mentionTpl,
     })),
     {
       recipientId: issue.assigned_to,
       type: "qa_comment_added" as const,
-      title: "New comment",
-      body: `${actor} commented on "${issue.title}"${suffix}`,
+      tpl: commentTpl,
     },
   ];
   if (!row.is_internal_note) {
     targets.push({
       recipientId: issue.reporter_id,
       type: "qa_comment_added" as const,
-      title: "New comment",
-      body: `${actor} commented on "${issue.title}"${suffix}`,
+      tpl: commentTpl,
       link: reporterIssueLink(id), // reporter → safe read-only view
     });
   }
@@ -162,8 +164,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     actorId: auth.account_id,
     internal: row.is_internal_note,
     type: "qa_comment_added",
-    title: "New comment",
-    body: `${actor} commented on "${issue.title}"${suffix}`,
+    tpl: commentTpl,
   }));
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },

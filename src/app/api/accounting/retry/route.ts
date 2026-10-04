@@ -1,26 +1,13 @@
 import "server-only";
 
-/* ===========================================================================
-   POST /api/accounting/retry
-   Body: { kind: "payment" | "expense" | "cash_movement", source_id: string }
-
-   Re-attempts recognition for a failed (or stuck-drafted) source.
-   Clears accounting_last_error on success.
-
-   Flow:
-     1. If an active draft exists, post it.
-     2. Otherwise rebuild the draft from scratch (recomputes Dr/Cr
-        from the current operational row) and post.
-   ========================================================================== */
+/* POST /api/accounting/retry   { kind, source_id }
+   Recovers a failed or stuck source: posts its draft when one exists,
+   otherwise rebuilds the entry from the current source row and posts it.
+   Committing to the ledger is a Finance "edit" action. */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
-import { retryRecognition } from "@/lib/accounting/posting";
-
-interface Body {
-  kind?: "payment" | "expense" | "cash_movement";
-  source_id?: string;
-}
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { retryRecognition, isSourceKind } from "@/lib/accounting/posting";
 
 export async function POST(req: Request) {
   const auth = await requireAuth();
@@ -28,12 +15,11 @@ export async function POST(req: Request) {
   const deny = await requireModuleAction(auth, "Finance", "edit");
   if (deny) return deny;
 
-  const body = (await req.json().catch(() => ({}))) as Body;
-  if (!body.kind || !body.source_id) {
+  const body = (await req.json().catch(() => ({}))) as { kind?: unknown; source_id?: unknown };
+  if (!isSourceKind(body.kind) || typeof body.source_id !== "string" || !body.source_id) {
     return NextResponse.json({ error: "kind + source_id required" }, { status: 400 });
   }
-  const ctx = { tenantId: auth.tenant_id, postedByAccountId: auth.account_id };
-  const res = await retryRecognition(ctx, body.kind, body.source_id);
-  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.code ?? 500 });
+  const res = await retryRecognition({ tenantId: auth.tenant_id, postedByAccountId: auth.account_id }, body.kind, body.source_id);
+  if (!res.ok) return NextResponse.json({ error: res.error, details: res.details }, { status: res.code ?? 500 });
   return NextResponse.json(res);
 }

@@ -5,7 +5,6 @@
    one is re-hashed with Argon2id. */
 
 import { useState } from "react";
-import type { AccountWithLinks } from "@/types/supabase";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -13,7 +12,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 const MIN_LENGTH = 8;
 
-export default function PasswordTab(_props: { account: AccountWithLinks }) {
+export default function PasswordTab() {
   const [current, setCurrent] = useState("");
   const { t } = useTranslation(settingsT);
   const [next, setNext] = useState("");

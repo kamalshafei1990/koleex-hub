@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { allRows } from "@/lib/server/all-rows";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 /* GET /api/skills — the tenant's Skill Library: active categories with their
@@ -29,13 +30,13 @@ export async function GET() {
       .eq("is_active", true)
       .order("sort_order"),
     /* Company-wide usage per skill — powers the picker's "Popular in your
-       company" section. One projected read; counted in JS (PostgREST can't
-       GROUP BY without an RPC and this is a few hundred rows). */
-    supabaseServer
+       company" section. One projected read, in pages (the API alone stops at
+       1000 rows); counted in JS (PostgREST can't GROUP BY without an RPC). */
+    allRows(supabaseServer
       .from("employee_skill_assessments")
       .select("skill_id")
       .eq("tenant_id", auth.tenant_id)
-      .limit(20_000),
+      .order("id"), "skill assessments"),
   ]);
   if (catErr || skErr) {
     return NextResponse.json({ error: catErr?.message || skErr?.message }, { status: 500 });

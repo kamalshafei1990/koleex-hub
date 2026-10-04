@@ -1,5 +1,11 @@
 # Supabase Auth Setup Notes
 
+> **RETIRED 26/09/2026.** The app-side switch this guide ends with
+> (`NEXT_PUBLIC_USE_SUPABASE_AUTH=true`) no longer exists: SupabaseGate and
+> `src/lib/auth-client.ts` were removed, and nothing reads the flag. The Hub
+> signs in through AdminAuth and the `koleex_session` cookie only. Kept as a
+> record of the plan; following it does not switch anything on.
+
 This document describes the dashboard steps required to replace the current
 `AdminAuth` client-side gate with real Supabase Authentication. The database
 side of things (Security tab tables, audit log, API keys) is already live in

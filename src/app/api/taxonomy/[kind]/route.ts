@@ -14,6 +14,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { revalidateWebsite } from "@/lib/server/website-bridge";
 import { requireAuth } from "@/lib/server/auth";
 import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 import {
@@ -144,5 +145,6 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   invalidateTaxonomyAll();
+  revalidateWebsite(["taxonomy"]);
   return NextResponse.json({ row: data });
 }
