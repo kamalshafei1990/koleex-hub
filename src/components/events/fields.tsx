@@ -1,31 +1,138 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   events/fields — the Events app's field primitives.
+   events/fields — the Events app's field primitives, on the kds in-app form
+   shape (the Todo/ProductPicker convention): h-9 controls, 12px text,
+   surface fill, focus ring on the focus token, uppercase 10px labels.
 
-   REUSE, not duplication: the generic pieces (card recipe, selected-state
-   recipe, labelled field, text/select/textarea) live in travel/fields and
-   are re-exported here so the Events app never grows a second styling
-   dialect. Only the datetime field is new — agenda sessions and event
-   windows are instants, so a native datetime-local control is right here
-   (unlike the visa letters, where dates on a DOCUMENT are always DMY).
+   The card/selected recipes stay re-exported from travel/fields (surface
+   recipes, identical everywhere) — but the FIELD primitives are this app's
+   own: the visa-letter form deliberately uses the taller travel shape, and
+   sharing it made every Events form read oversized against the other apps.
    --------------------------------------------------------------------------- */
 
-export {
-  CARD,
-  SELECTED,
-  SELECTED_CHIP,
-  Field,
-  TextField,
-  SelectField,
-  TextAreaField,
-} from "@/components/travel/fields";
+import type { ReactNode } from "react";
+import { CARD, SELECTED, SELECTED_CHIP } from "@/components/travel/fields";
 
-import { Field } from "@/components/travel/fields";
+export { CARD, SELECTED, SELECTED_CHIP };
 
+const LABEL =
+  "block text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-dim)] mb-1.5";
 const CONTROL =
-  "mt-1 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] " +
-  "px-3 py-2 text-sm text-[var(--text-primary)] outline-none tabular-nums";
+  "h-9 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] " +
+  "px-3 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] " +
+  "outline-none transition-colors focus:border-[var(--border-focus)]";
+const CONTROL_AREA = CONTROL.replace("h-9", "min-h-[64px] py-2");
+
+/** Labelled field with a fixed hint slot — a hint appearing never shifts
+ *  the rows below it. */
+export function Field({
+  label,
+  hint,
+  children,
+  wide,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <span className={LABEL}>{label}</span>
+      {children}
+      <p className="mt-1 min-h-[0.85rem] text-[10px] leading-[0.85rem] text-[var(--text-dim)]">
+        {hint ?? ""}
+      </p>
+    </div>
+  );
+}
+
+export function TextField({
+  label,
+  value,
+  onChange,
+  hint,
+  placeholder,
+  wide,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string;
+  placeholder?: string;
+  wide?: boolean;
+}) {
+  return (
+    <Field label={label} hint={hint} wide={wide}>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={CONTROL}
+      />
+    </Field>
+  );
+}
+
+export function SelectField<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+  wide,
+}: {
+  label: string;
+  value: T | "";
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  hint?: string;
+  wide?: boolean;
+}) {
+  return (
+    <Field label={label} hint={hint} wide={wide}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className={`${CONTROL} cursor-pointer appearance-none`}
+      >
+        <option value="">—</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+export function TextAreaField({
+  label,
+  value,
+  onChange,
+  hint,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string;
+  rows?: number;
+}) {
+  return (
+    <Field label={label} hint={hint} wide>
+      <textarea
+        value={value}
+        rows={rows}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${CONTROL_AREA} resize-y`}
+      />
+    </Field>
+  );
+}
 
 /** ISO instant → the datetime-local input's value (the viewer's own zone).
  *  An invalid/empty value becomes "" — the field simply shows empty. */

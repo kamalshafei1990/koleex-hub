@@ -152,7 +152,7 @@ export default function EventFormModal({
       open={open}
       onClose={onClose}
       title={event ? t("form.editTitle") : t("form.newTitle")}
-      maxWidth="max-w-2xl"
+      maxWidth="max-w-xl"
       actions={
         <>
           <Button variant="primary" loading={busy} onClick={save}>
@@ -164,7 +164,7 @@ export default function EventFormModal({
         </>
       }
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField
           label={t("form.title")}
           value={values.title}
