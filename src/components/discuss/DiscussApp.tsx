@@ -248,6 +248,12 @@ import { useKeyboardLift } from "./useKeyboardLift";
    Small helpers — shared by multiple subsections of the file
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Emoji-only message detector (WeChat bare-emoji rule): pictographs, emoji
+   components (skin tones, keycap marks), ZWJ sequences and variation
+   selectors, whitespace — and nothing else. Length cap keeps "👋 hi there"
+   out: that is a text message that starts with an emoji, not an emoji. */
+const EMOJI_ONLY_RE = /^[\p{Extended_Pictographic}\p{Emoji_Component}‍️\s]{1,12}$/u;
+
 type Recipient = DiscussRecipient;
 type TFn = (key: string, fallback?: string) => string;
 
@@ -5300,7 +5306,10 @@ function MessageSurface({
 }) {
   if (bare) {
     return (
-      <div className="inline-block text-start max-w-[min(78%,62ch)] text-[13px]">
+      /* POLISH (owner: "the conversation font size is small"): 13 → 15px,
+         WeChat-class readability. Bare surfaces carry photos/products/big
+         emoji, so this mostly settles alt captions and file names. */
+      <div className="inline-block text-start max-w-[min(78%,62ch)] text-[15px]">
         {children}
       </div>
     );
@@ -5308,7 +5317,7 @@ function MessageSurface({
   return (
     <div
       className={
-        "inline-block text-start max-w-[min(78%,62ch)] text-[13px] px-3 py-2 " +
+        "inline-block text-start max-w-[min(78%,62ch)] text-[15px] leading-relaxed px-3 py-2 " +
         "rounded-2xl border " +
         (isSelf
           /* Mine: a clean Apple-style card — white in light / neutral elevated
@@ -5407,6 +5416,14 @@ function MessageBubble({
      card IS the message, the message has no surface of its own. */
   const isProductOnly =
     noChrome && attachmentMedia.length === 0 && !!meta.products?.length;
+  /* WeChat polish: a message that is ONLY emoji (one to a few) drops the
+     bubble and renders the glyphs big — the emoji IS the message, like
+     photos and product cards above. Capped at ~12 code points so a sentence
+     that merely STARTS with an emoji keeps its bubble. */
+  const isEmojiOnly =
+    !isDeleted && !isEditing && !voiceMedia && !msg.reply_preview &&
+    attachmentMedia.length === 0 && !(meta.products && meta.products.length > 0) &&
+    !!msg.body && EMOJI_ONLY_RE.test(msg.body.trim());
 
   /* WeChat-style context menu: right-click (desktop) or long-press (mobile)
      opens an actions menu next to the message instead of a hover bar that
@@ -5617,7 +5634,7 @@ function MessageBubble({
 
         {/* T2 surface — own messages only. The author header stays OUTSIDE it:
             the panel marks the utterance, not the attribution. */}
-        <MessageSurface isSelf={isSelf} bare={isPhotoOnly || isProductOnly}>
+        <MessageSurface isSelf={isSelf} bare={isPhotoOnly || isProductOnly || isEmojiOnly}>
         {/* Reply-to preview — shown before the body when this msg quotes another */}
         {msg.reply_preview && !isDeleted && (
           <ReplyPreviewPill preview={msg.reply_preview} t={t} />
@@ -5687,13 +5704,20 @@ function MessageBubble({
                 />
                 {/* "Convert to text" result (WeChat): the words sit in a quiet
                     sub-bubble under the voice note; long-press → "Discard
-                    converted text" removes them. */}
+                    converted text" removes them.
+                    POLISH (owner pass): it was a bordered, filled CARD — a
+                    bubble inside the bubble, visually heavier than the voice
+                    note itself. WeChat's converted text is plain words under
+                    the note, set off by a hairline and a quieter colour only. */}
                 {voiceMedia.transcript && (
-                  <div className="mt-1.5 max-w-[320px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap">
+                  <div className="mt-2 max-w-[320px] border-t border-[var(--border-subtle)] pt-2 text-[13px] leading-relaxed text-[var(--text-muted)] whitespace-pre-wrap">
                     {voiceMedia.transcript.text}
                   </div>
                 )}
               </div>
+            ) : isEmojiOnly ? (
+              /* Bare big emoji — no bubble, no translate chip. */
+              <span className="text-[34px] leading-tight select-text">{msg.body}</span>
             ) : (
               msg.body && (
                 <TranslatableBody
