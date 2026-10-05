@@ -12,10 +12,11 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { CARD, SELECTED, SELECTED_CHIP } from "@/components/travel/fields";
 import DatePicker from "@/components/ui/DatePicker";
 import SearchCombobox, { type ComboOption } from "@/components/shipping/SearchCombobox";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getCitiesOfCountrySync, useStateCity } from "@/lib/geo/state-city-lazy";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
@@ -170,19 +171,11 @@ export function TimePicker({
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [h, m] = value ? value.split(":") : ["", ""];
   const cell = (v: string, selected: boolean) =>
-    `h-7 rounded-md text-[12px] tabular-nums transition-colors ${
+    `h-7 w-full rounded-md text-[12px] tabular-nums transition-colors ${
       selected
         ? "bg-[var(--accent)]/[0.14] font-semibold text-[var(--text-primary)]"
         : "text-[var(--text-secondary)] hover:bg-[var(--bg-inverted)]/[0.06]"
@@ -197,7 +190,7 @@ export function TimePicker({
           onClick={() => {
             set(v);
           }}
-          className={`block w-full ${cell(v, cur === v)}`}
+          className={cell(v, cur === v)}
         >
           {v}
         </button>
@@ -208,6 +201,7 @@ export function TimePicker({
   return (
     <div ref={wrapRef} className="relative w-24 shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         aria-label={ariaLabel}
@@ -221,8 +215,19 @@ export function TimePicker({
         </span>
         <ClockIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
       </button>
-      {open && !disabled && (
-        <div className="absolute top-full end-0 z-50 mt-1 flex w-36 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated,var(--bg-surface))] p-1 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+      {/* Portalled like SearchCombobox's panel: inside the scrollable modal
+          body the panel clipped against the footer and painted over the rows
+          below; the portal anchors it to the trigger with edge detection. */}
+      <PopoverPanel
+        anchorRef={triggerRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        scrim={false}
+        matchAnchorWidth={false}
+        align="start"
+        className="w-40"
+      >
+        <div className="flex p-1">
           {col(
             Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")),
             h,
@@ -234,7 +239,7 @@ export function TimePicker({
             (v) => onChange(`${h || "00"}:${v}`),
           )}
         </div>
-      )}
+      </PopoverPanel>
     </div>
   );
 }
