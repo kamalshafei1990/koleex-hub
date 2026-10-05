@@ -237,8 +237,10 @@ export function CountryField({
     const term = rawTerm.trim().toLowerCase();
     const rows = COUNTRIES.filter(
       (c) => !term || c.name.toLowerCase().includes(term) || c.code.toLowerCase() === term,
-    ).slice(0, 50);
-    return Promise.resolve(rows.map(countryOption));
+    );
+    /* Browse (empty term) shows ALL 249 — a capped browse with no hint read
+     * as "not all the countries". Typed searches stay capped at 80. */
+    return Promise.resolve((term ? rows.slice(0, 80) : rows).map(countryOption));
   };
   const selected = COUNTRIES.find((c) => c.name === value) ?? null;
   return (
@@ -253,9 +255,7 @@ export function CountryField({
         loadingLabel=""
         icon={selected?.flag}
         ariaLabel={label}
-        resultCap={50}
-        cappedHint={searchPlaceholder}
-        triggerClassName={`${CONTROL} flex justify-between text-start`}
+        triggerClassName={`${CONTROL} flex items-center justify-between text-start`}
       />
     </Field>
   );
@@ -310,7 +310,7 @@ export function CityField({
         disabledHint={!countryCode ? hint : undefined}
         scopeKey={`${countryCode}:${ready ? 1 : 0}`}
         ariaLabel={label}
-        triggerClassName={`${CONTROL} flex justify-between text-start`}
+        triggerClassName={`${CONTROL} flex items-center justify-between text-start`}
       />
     </Field>
   );
