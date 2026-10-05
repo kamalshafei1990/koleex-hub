@@ -72,6 +72,9 @@ export async function POST(req: Request) {
       country: fields.country ?? null,
       description: fields.description ?? null,
       budget_total: fields.budget_total ?? null,
+      expected_guests: fields.expected_guests ?? null,
+      booth: fields.booth ?? null,
+      website: fields.website ?? null,
       owner_account_id: auth.account_id,
       created_by: auth.account_id,
     })

@@ -235,6 +235,9 @@ export interface EventFields {
   country?: string | null;
   description?: string | null;
   budget_total?: number | null;
+  expected_guests?: number | null;
+  booth?: string | null;
+  website?: string | null;
 }
 
 /** Read the event form body. Returns either the fields or an error message. */
@@ -255,7 +258,7 @@ export function readEventFields(body: unknown): { fields?: EventFields; error?: 
     if (!isEventStatus(b.status)) return { error: "Unknown event status" };
     fields.status = b.status;
   }
-  for (const key of ["location", "city", "country", "description"] as const) {
+  for (const key of ["location", "city", "country", "description", "booth", "website"] as const) {
     if (b[key] !== undefined) {
       fields[key] = b[key] === null ? null : String(b[key]).slice(0, 2000);
     }
@@ -266,6 +269,11 @@ export function readEventFields(body: unknown): { fields?: EventFields; error?: 
     const n = b.budget_total === null || b.budget_total === "" ? null : Number(b.budget_total);
     if (n !== null && (!Number.isFinite(n) || n < 0)) return { error: "Invalid budget" };
     fields.budget_total = n;
+  }
+  if (b.expected_guests !== undefined) {
+    const n = b.expected_guests === null || b.expected_guests === "" ? null : Number(b.expected_guests);
+    if (n !== null && (!Number.isInteger(n) || n < 0)) return { error: "Invalid guest target" };
+    fields.expected_guests = n;
   }
   return { fields };
 }

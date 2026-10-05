@@ -117,6 +117,9 @@ export interface KxEventRow {
   country: string | null;
   description: string | null;
   budget_total: number | null;
+  expected_guests: number | null;
+  booth: string | null;
+  website: string | null;
   owner_account_id: string;
   created_by: string | null;
   created_at: string;

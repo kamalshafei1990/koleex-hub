@@ -1,9 +1,14 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   EventFormModal — create / edit an event. One form, two callers: the
-   dashboard's "New Event" and the workspace's "Edit". The API validates the
-   same fields; this form only makes the common mistakes impossible.
+   EventFormModal — create / edit an event, on the kds FormModal (the kit's
+   chromed heavy-form dialog): header with subtitle, grouped sections,
+   scrollable body and a pinned right-aligned footer. One form, two callers:
+   the dashboard's "New Event" and the workspace's "Edit".
+
+   The brief holds the BASICS; guests/agenda/budget/check-in live in the
+   event's own tabs — the form says so in its subtitle so nobody hunts for
+   them here.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -16,7 +21,7 @@ import {
   type EventType,
   type KxEventRow,
 } from "@/lib/events/types";
-import Modal from "@/components/kds/Modal";
+import FormModal from "@/components/kds/FormModal";
 import Button from "@/components/ui/Button";
 import {
   SelectField,
@@ -25,7 +30,6 @@ import {
   DateTimeField,
 } from "@/components/events/fields";
 
-/** ISO instant → yyyy-mm-dd for the datetime-local defaultValue dance. */
 function toInputValue(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -43,7 +47,10 @@ export interface EventFormValues {
   location: string;
   city: string;
   country: string;
+  booth: string;
+  expected_guests: string;
   budget_total: string;
+  website: string;
   description: string;
 }
 
@@ -57,7 +64,10 @@ export function emptyFormValues(): EventFormValues {
     location: "",
     city: "",
     country: "",
+    booth: "",
+    expected_guests: "",
     budget_total: "",
+    website: "",
     description: "",
   };
 }
@@ -72,9 +82,21 @@ export function formValuesFromEvent(ev: KxEventRow): EventFormValues {
     location: ev.location ?? "",
     city: ev.city ?? "",
     country: ev.country ?? "",
+    booth: ev.booth ?? "",
+    expected_guests: ev.expected_guests != null ? String(ev.expected_guests) : "",
     budget_total: ev.budget_total != null ? String(ev.budget_total) : "",
+    website: ev.website ?? "",
     description: ev.description ?? "",
   };
+}
+
+/** Small uppercase section divider inside the form body. */
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="col-span-full mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)] first:mt-0">
+      {children}
+    </p>
+  );
 }
 
 export default function EventFormModal({
@@ -90,7 +112,7 @@ export default function EventFormModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation(eventsT);
-  const [values, setValues] = useState<EventFormValues>(emptyFormValues);
+  const [values, setValues] = useState<EventFormValues>(emptyFormValues());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -121,7 +143,10 @@ export default function EventFormModal({
         location: values.location || null,
         city: values.city || null,
         country: values.country || null,
+        booth: values.booth || null,
+        expected_guests: values.expected_guests === "" ? null : Number(values.expected_guests),
         budget_total: values.budget_total === "" ? null : Number(values.budget_total),
+        website: values.website || null,
         description: values.description || null,
       };
       const res = event
@@ -148,23 +173,25 @@ export default function EventFormModal({
   };
 
   return (
-    <Modal
+    <FormModal
       open={open}
       onClose={onClose}
       title={event ? t("form.editTitle") : t("form.newTitle")}
-      maxWidth="max-w-xl"
-      actions={
+      subtitle={t("form.subtitle")}
+      width="max-w-xl"
+      footer={
         <>
-          <Button variant="primary" loading={busy} onClick={save}>
-            {event ? t("common.save") : t("form.create")}
-          </Button>
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
+          </Button>
+          <Button variant="primary" loading={busy} onClick={save}>
+            {event ? t("common.save") : t("form.create")}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SectionTitle>{t("form.section.details")}</SectionTitle>
         <TextField
           label={t("form.title")}
           value={values.title}
@@ -184,6 +211,8 @@ export default function EventFormModal({
           onChange={(v) => set("status", v)}
           options={EVENT_STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) }))}
         />
+
+        <SectionTitle>{t("form.section.when")}</SectionTitle>
         <DateTimeField
           label={t("form.starts")}
           value={values.start_at}
@@ -194,6 +223,8 @@ export default function EventFormModal({
           value={values.end_at}
           onChange={(iso) => set("end_at", iso)}
         />
+
+        <SectionTitle>{t("form.section.where")}</SectionTitle>
         <TextField
           label={t("form.location")}
           value={values.location}
@@ -207,11 +238,32 @@ export default function EventFormModal({
           value={values.country}
           onChange={(v) => set("country", v)}
         />
+
+        <SectionTitle>{t("form.section.more")}</SectionTitle>
+        <TextField
+          label={t("form.booth")}
+          value={values.booth}
+          onChange={(v) => set("booth", v)}
+          placeholder={t("form.boothPh")}
+          hint={t("form.boothHint")}
+        />
+        <TextField
+          label={t("form.expectedGuests")}
+          value={values.expected_guests}
+          onChange={(v) => set("expected_guests", v.replace(/[^\d]/g, ""))}
+          hint={t("form.expectedGuestsHint")}
+        />
         <TextField
           label={t("form.budget")}
           value={values.budget_total}
           onChange={(v) => set("budget_total", v.replace(/[^\d.]/g, ""))}
           hint={t("common.optional")}
+        />
+        <TextField
+          label={t("form.website")}
+          value={values.website}
+          onChange={(v) => set("website", v)}
+          placeholder={t("form.websitePh")}
         />
         <TextAreaField
           label={t("form.description")}
@@ -219,7 +271,7 @@ export default function EventFormModal({
           onChange={(v) => set("description", v)}
         />
       </div>
-      {error && <p className="text-[12px] text-rose-400">{error}</p>}
-    </Modal>
+      {error && <p className="mt-3 text-[12px] text-rose-400">{error}</p>}
+    </FormModal>
   );
 }

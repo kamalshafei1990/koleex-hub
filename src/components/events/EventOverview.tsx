@@ -49,6 +49,24 @@ export default function EventOverview({ detail }: { detail: EventDetail }) {
             <span className="tabular-nums">{detail.budget_total.toLocaleString("en-US")}</span>
           </Fact>
         )}
+        {detail.expected_guests != null && (
+          <Fact label={t("form.expectedGuests")}>
+            <span className="tabular-nums">{detail.expected_guests}</span>
+          </Fact>
+        )}
+        {detail.booth && <Fact label={t("form.booth")}>{detail.booth}</Fact>}
+        {detail.website && (
+          <Fact label={t("form.website")}>
+            <a
+              href={detail.website}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--text-secondary)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text-primary)]"
+            >
+              {detail.website}
+            </a>
+          </Fact>
+        )}
         {detail.description && (
           <Fact label={t("ov.description")}>
             <p className="whitespace-pre-wrap text-[var(--text-secondary)]">{detail.description}</p>
