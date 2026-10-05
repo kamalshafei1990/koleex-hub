@@ -173,12 +173,7 @@ export default function EventWorkspace({ id }: { id: string }) {
         <EventCheckin eventId={detail.id} guests={detail.guests} onChanged={load} />
       )}
       {tab === "budget" && (
-        <EventBudget
-          eventId={detail.id}
-          budget={detail.budget}
-          eventBudgetTotal={detail.budget_total}
-          onChanged={load}
-        />
+        <EventBudget eventId={detail.id} budget={detail.budget} onChanged={load} />
       )}
       {tab === "post" && <EventPostEvent detail={detail} />}
 

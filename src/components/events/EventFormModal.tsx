@@ -28,7 +28,10 @@ import {
   TextAreaField,
   TextField,
   DateTimeField,
+  CountryField,
+  CityField,
 } from "@/components/events/fields";
+import { COUNTRIES } from "@/lib/commercial-policy/countries";
 
 function toInputValue(iso: string | null): string | null {
   if (!iso) return null;
@@ -49,7 +52,6 @@ export interface EventFormValues {
   country: string;
   booth: string;
   expected_guests: string;
-  budget_total: string;
   website: string;
   description: string;
 }
@@ -66,7 +68,6 @@ export function emptyFormValues(): EventFormValues {
     country: "",
     booth: "",
     expected_guests: "",
-    budget_total: "",
     website: "",
     description: "",
   };
@@ -84,7 +85,6 @@ export function formValuesFromEvent(ev: KxEventRow): EventFormValues {
     country: ev.country ?? "",
     booth: ev.booth ?? "",
     expected_guests: ev.expected_guests != null ? String(ev.expected_guests) : "",
-    budget_total: ev.budget_total != null ? String(ev.budget_total) : "",
     website: ev.website ?? "",
     description: ev.description ?? "",
   };
@@ -111,7 +111,7 @@ export default function EventFormModal({
   event?: KxEventRow | null;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(eventsT);
+  const { t, lang } = useTranslation(eventsT);
   const [values, setValues] = useState<EventFormValues>(emptyFormValues());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -145,7 +145,6 @@ export default function EventFormModal({
         country: values.country || null,
         booth: values.booth || null,
         expected_guests: values.expected_guests === "" ? null : Number(values.expected_guests),
-        budget_total: values.budget_total === "" ? null : Number(values.budget_total),
         website: values.website || null,
         description: values.description || null,
       };
@@ -217,11 +216,13 @@ export default function EventFormModal({
           label={t("form.starts")}
           value={values.start_at}
           onChange={(iso) => set("start_at", iso)}
+          lang={lang}
         />
         <DateTimeField
           label={t("form.ends")}
           value={values.end_at}
           onChange={(iso) => set("end_at", iso)}
+          lang={lang}
         />
 
         <SectionTitle>{t("form.section.where")}</SectionTitle>
@@ -232,11 +233,24 @@ export default function EventFormModal({
           placeholder={t("form.locationPh")}
           wide
         />
-        <TextField label={t("form.city")} value={values.city} onChange={(v) => set("city", v)} />
-        <TextField
+        <CountryField
           label={t("form.country")}
           value={values.country}
           onChange={(v) => set("country", v)}
+          placeholder={t("form.countryPh")}
+          searchPlaceholder={t("form.countrySearchPh")}
+          emptyLabel={t("form.countryEmpty")}
+        />
+        <CityField
+          label={t("form.city")}
+          value={values.city}
+          onChange={(v) => set("city", v)}
+          countryCode={COUNTRIES.find((c) => c.name === values.country)?.code ?? null}
+          placeholder={t("form.cityPh")}
+          searchPlaceholder={t("form.citySearchPh")}
+          emptyLabel={t("form.cityEmpty")}
+          loadingLabel={t("form.cityLoading")}
+          hint={t("form.cityHint")}
         />
 
         <SectionTitle>{t("form.section.more")}</SectionTitle>
@@ -252,12 +266,6 @@ export default function EventFormModal({
           value={values.expected_guests}
           onChange={(v) => set("expected_guests", v.replace(/[^\d]/g, ""))}
           hint={t("form.expectedGuestsHint")}
-        />
-        <TextField
-          label={t("form.budget")}
-          value={values.budget_total}
-          onChange={(v) => set("budget_total", v.replace(/[^\d.]/g, ""))}
-          hint={t("common.optional")}
         />
         <TextField
           label={t("form.website")}

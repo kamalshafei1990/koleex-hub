@@ -40,12 +40,10 @@ function fmt(n: number): string {
 export default function EventBudget({
   eventId,
   budget,
-  eventBudgetTotal,
   onChanged,
 }: {
   eventId: string;
   budget: EventBudgetLineRow[];
-  eventBudgetTotal: number | null;
   onChanged: () => void;
 }) {
   const { t } = useTranslation(eventsT);
@@ -136,14 +134,16 @@ export default function EventBudget({
     return { planned, actual };
   }, [budget]);
 
-  const reference = eventBudgetTotal ?? totals.planned;
+  /* The planned lines ARE the budget — the form no longer carries a separate
+   * budget number, so remaining is measured against the plan itself. */
+  const reference = totals.planned;
   const remaining = reference - totals.actual;
   const over = remaining < 0;
 
   return (
     <div className="space-y-3">
       {/* summary */}
-      <div className={`${CARD} grid grid-cols-2 divide-x divide-[var(--border-subtle)] text-center sm:grid-cols-4`}>
+      <div className={`${CARD} grid grid-cols-3 divide-x divide-[var(--border-subtle)] text-center`}>
         <div className="px-2 py-4">
           <p className="text-[18px] font-bold tabular-nums">{fmt(totals.planned)}</p>
           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{t("b.totalPlanned")}</p>
@@ -159,10 +159,6 @@ export default function EventBudget({
           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-dim)]">
             {over ? t("b.over") : t("b.remaining")}
           </p>
-        </div>
-        <div className="px-2 py-4">
-          <p className="text-[18px] font-bold tabular-nums">{eventBudgetTotal != null ? fmt(eventBudgetTotal) : "—"}</p>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{t("b.eventBudget")}</p>
         </div>
       </div>
 
