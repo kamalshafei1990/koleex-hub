@@ -86,12 +86,15 @@ interface Props<T> {
   resultCap?: number;
   /** Shown when the cap is hit. Should tell the operator to type. */
   cappedHint?: string;
+  /** Caller-owned trigger look (kds Select's contract: the caller owns the
+      trigger, this owns the panel). Omit for the shipping default. */
+  triggerClassName?: string;
 }
 
 export default function SearchCombobox<T>({
   value, onChange, search, placeholder, searchPlaceholder, emptyLabel, loadingLabel,
   disabled, disabledHint, icon, ariaLabel, clearLabel, className = "", scopeKey = "",
-  resultCap, cappedHint,
+  resultCap, cappedHint, triggerClassName,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -188,7 +191,7 @@ export default function SearchCombobox<T>({
   /* A control shaped like a field is MADE of field under Aurora — the global
      rule keys on a `bg-[var(--bg-inverted)]/…` tint plus w-full on a button,
      so this trigger gets the skin's own field material for free. */
-  const triggerClass =
+  const triggerClass = triggerClassName ??
     "group flex h-10 w-full items-center gap-2 rounded-xl border border-[var(--border-subtle)] " +
     "bg-[var(--bg-inverted)]/[0.04] px-3 text-start text-[13px] " +
     "hover:border-[var(--border-focus)] focus:outline-none focus-visible:border-[#567FB2]/60 " +

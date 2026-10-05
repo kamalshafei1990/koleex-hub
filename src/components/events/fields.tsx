@@ -235,7 +235,7 @@ export function CountryField({
     const term = rawTerm.trim().toLowerCase();
     const rows = COUNTRIES.filter(
       (c) => !term || c.name.toLowerCase().includes(term) || c.code.toLowerCase() === term,
-    ).slice(0, 20);
+    ).slice(0, 50);
     return Promise.resolve(rows.map(countryOption));
   };
   const selected = COUNTRIES.find((c) => c.name === value) ?? null;
@@ -251,7 +251,9 @@ export function CountryField({
         loadingLabel=""
         icon={selected?.flag}
         ariaLabel={label}
-        className={CONTROL}
+        resultCap={50}
+        cappedHint={searchPlaceholder}
+        triggerClassName={`${CONTROL} flex justify-between text-start`}
       />
     </Field>
   );
@@ -306,7 +308,7 @@ export function CityField({
         disabledHint={!countryCode ? hint : undefined}
         scopeKey={`${countryCode}:${ready ? 1 : 0}`}
         ariaLabel={label}
-        className={CONTROL}
+        triggerClassName={`${CONTROL} flex justify-between text-start`}
       />
     </Field>
   );
