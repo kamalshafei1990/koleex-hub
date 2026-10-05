@@ -12,11 +12,13 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CARD, SELECTED, SELECTED_CHIP } from "@/components/travel/fields";
 import DatePicker from "@/components/ui/DatePicker";
 import SearchCombobox, { type ComboOption } from "@/components/shipping/SearchCombobox";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import { getCitiesOfCountrySync, useStateCity } from "@/lib/geo/state-city-lazy";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 
 export { CARD, SELECTED, SELECTED_CHIP };
 
@@ -150,9 +152,96 @@ function isoToLocalParts(iso: string | null | undefined): { date: string; time: 
   };
 }
 
+/** A time picker wearing the DatePicker's clothes: same trigger field, a
+ *  popover with two scrollable columns (hours, minutes). The native
+ *  <input type=time> renders an unthemeable OS popup, which is exactly what
+ *  the brand DatePicker exists to replace. */
+export function TimePicker({
+  value,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  /** "HH:mm" or "". */
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const [h, m] = value ? value.split(":") : ["", ""];
+  const cell = (v: string, selected: boolean) =>
+    `h-7 rounded-md text-[12px] tabular-nums transition-colors ${
+      selected
+        ? "bg-[var(--accent)]/[0.14] font-semibold text-[var(--text-primary)]"
+        : "text-[var(--text-secondary)] hover:bg-[var(--bg-inverted)]/[0.06]"
+    }`;
+  const col = (list: string[], cur: string, set: (v: string) => void) => (
+    <div className="max-h-44 flex-1 overflow-y-auto py-1 pe-1">
+      {list.map((v) => (
+        <button
+          key={v}
+          type="button"
+          tabIndex={-1}
+          onClick={() => {
+            set(v);
+          }}
+          className={`block w-full ${cell(v, cur === v)}`}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div ref={wrapRef} className="relative w-24 shrink-0">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+        className={`${CONTROL} flex items-center justify-between gap-1 px-2.5 disabled:opacity-40 ${
+          open ? "border-[var(--border-focus)]" : ""
+        }`}
+      >
+        <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>
+          {value || "--:--"}
+        </span>
+        <ClockIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
+      </button>
+      {open && !disabled && (
+        <div className="absolute top-full end-0 z-50 mt-1 flex w-36 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated,var(--bg-surface))] p-1 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+          {col(
+            Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")),
+            h,
+            (v) => onChange(`${v}:${m || "00"}`),
+          )}
+          {col(
+            Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")),
+            m,
+            (v) => onChange(`${h || "00"}:${v}`),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Date and time as ONE instant, on the platform's own controls: the brand
  *  DatePicker calendar (not the unthemeable native datetime-local) plus a
- *  small native time input. Clearing the date clears the value. */
+ *  matching TimePicker. Clearing the date clears the value. */
 export function DateTimeField({
   label,
   value,
@@ -189,15 +278,11 @@ export function DateTimeField({
             className="w-full"
           />
         </div>
-        <input
-          type="time"
+        <TimePicker
           value={parts.time}
-          onChange={(e) => commit(parts.date, e.target.value)}
+          onChange={(time) => commit(parts.date, time)}
           disabled={!parts.date}
-          aria-label={`${label} — time`}
-          /* CONTROL carries w-full — replacing it, not appending, or the two
-             widths fight and the date picker collapses to zero. */
-          className={`${CONTROL.replace("w-full", "w-24 shrink-0")} disabled:opacity-40`}
+          ariaLabel={`${label} — time`}
         />
       </div>
     </Field>

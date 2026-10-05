@@ -17,7 +17,11 @@ export const EVENT_TYPES = [
   "mission",
   "visit",
   "training",
+  "workshop",
+  "seminar",
   "gathering",
+  "ceremony",
+  "roadshow",
   "online",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -40,7 +44,11 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   mission: "Business Mission",
   visit: "Factory Visit",
   training: "Training",
+  workshop: "Workshop",
+  seminar: "Seminar",
   gathering: "Gathering",
+  ceremony: "Ceremony",
+  roadshow: "Roadshow",
   online: "Online / Webinar",
 };
 

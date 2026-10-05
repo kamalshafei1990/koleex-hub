@@ -203,7 +203,11 @@ const TYPE_STYLE: Record<EventType, string> = {
   mission: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
   visit: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
   training: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
+  workshop: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
+  seminar: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
   gathering: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
+  ceremony: "border-[var(--border-strong)] text-[var(--text-highlight)]",
+  roadshow: "border-[var(--border-subtle)] text-[var(--text-secondary)]",
   online: "border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]",
 };
 

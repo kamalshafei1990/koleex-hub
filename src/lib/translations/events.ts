@@ -79,7 +79,11 @@ export const eventsT = {
   "type.mission": { en: "Business Mission", zh: "商务出差团", ar: "بعثة عمل" },
   "type.visit": { en: "Factory Visit", zh: "工厂参观", ar: "زيارة مصنع" },
   "type.training": { en: "Training", zh: "培训", ar: "تدريب" },
+  "type.workshop": { en: "Workshop", zh: "工作坊", ar: "ورشة عمل" },
+  "type.seminar": { en: "Seminar", zh: "研讨会", ar: "ندوة" },
   "type.gathering": { en: "Gathering", zh: "聚会", ar: "اجتماع" },
+  "type.ceremony": { en: "Ceremony", zh: "典礼", ar: "حفل" },
+  "type.roadshow": { en: "Roadshow", zh: "巡回展示", ar: "جولة تعريفية" },
   "type.online": { en: "Online / Webinar", zh: "线上 / 网络研讨会", ar: "أونلاين / ندوة" },
 
   "status.idea": { en: "Idea", zh: "构想", ar: "فكرة" },
