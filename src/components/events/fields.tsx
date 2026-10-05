@@ -195,7 +195,9 @@ export function DateTimeField({
           onChange={(e) => commit(parts.date, e.target.value)}
           disabled={!parts.date}
           aria-label={`${label} — time`}
-          className={`${CONTROL} w-24 shrink-0 disabled:opacity-40`}
+          /* CONTROL carries w-full — replacing it, not appending, or the two
+             widths fight and the date picker collapses to zero. */
+          className={`${CONTROL.replace("w-full", "w-24 shrink-0")} disabled:opacity-40`}
         />
       </div>
     </Field>
