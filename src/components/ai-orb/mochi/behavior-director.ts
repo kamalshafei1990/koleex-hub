@@ -79,9 +79,16 @@ export class MochiBehaviorDirector {
   private timer: ReturnType<typeof setInterval> | null = null;
   private audioLevel = 0;
   private detachFns: Array<() => void> = [];
+  private getOrbCenter: (() => { x: number; y: number } | null) | null = null;
+  private ambientNextAt = Date.now() + 8_000;
+  private lastGreetAt = 0;
 
-  constructor(engine: BotEngine) {
+  constructor(
+    engine: BotEngine,
+    opts?: { getOrbCenter?: () => { x: number; y: number } | null },
+  ) {
     this.engine = engine;
+    this.getOrbCenter = opts?.getOrbCenter ?? null;
 
     /* Three quick slaps → dizzy spin, then recover on his own. */
     engine.onDizzy = () => {
@@ -97,7 +104,18 @@ export class MochiBehaviorDirector {
   attach(): void {
     if (this.timer) return;
 
-    const onMove = () => this.noteUserActivity();
+    const onMove = (e: PointerEvent) => {
+      this.noteUserActivity();
+      /* The gaze follows the pointer — eyes and a leaning head, through the
+         engine's lookX/lookY. Sleeping and dizzy states override it inside
+         the engine, so there is nothing to gate here. */
+      const c = this.getOrbCenter?.();
+      if (!c) return;
+      const gx = (e.clientX - c.x) / (window.innerWidth * 0.5);
+      const gy = (e.clientY - c.y) / (window.innerHeight * 0.5);
+      this.engine.lookX = Math.max(-1, Math.min(1, gx));
+      this.engine.lookY = Math.max(-1, Math.min(1, gy));
+    };
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onMove, { passive: true });
     this.detachFns.push(() => {
@@ -111,6 +129,7 @@ export class MochiBehaviorDirector {
     try {
       if (localStorage.getItem(GREET_KEY) !== todayKey()) {
         localStorage.setItem(GREET_KEY, todayKey());
+        this.lastGreetAt = Date.now();
         setTimeout(() => this.engine.greet(), 600);
       }
     } catch {
@@ -181,8 +200,38 @@ export class MochiBehaviorDirector {
     if (!this.sleeping && idleFor >= ATTENTION_SLEEP_MS) {
       this.sleeping = true;
       this.engine.setState("sleeping");
-    } else if (!this.sleeping && idleFor >= ATTENTION_YAWN_MS) {
+      return;
+    }
+    if (this.sleeping) return;
+    if (idleFor >= ATTENTION_YAWN_MS) {
       this.fireEmote("yawn");
+      return;
+    }
+
+    /* AMBIENT LIFE (owner, 2026-10-06): an idle Mochi is not a statue. Every
+       12–28 s he does something small — a wink, a happy flash, a glance to
+       the side, a surprised take, and rarely the peek wave. Emote cooldowns
+       still apply, so a busy minute never turns twitchy. */
+    if (nowMs >= this.ambientNextAt) {
+      this.ambientNextAt = nowMs + 12_000 + Math.random() * 16_000;
+      const r = Math.random();
+      if (r < 0.3) {
+        this.fireEmote("wink");
+      } else if (r < 0.55) {
+        this.fireEmote("happy");
+      } else if (r < 0.75) {
+        /* glance aside, then back to center */
+        const dir = Math.random() < 0.5 ? -0.75 : 0.75;
+        this.engine.lookX = dir;
+        setTimeout(() => {
+          if (this.current === "idle" && !this.sleeping) this.engine.lookX = 0;
+        }, 1400);
+      } else if (r < 0.9) {
+        this.fireEmote("surprised");
+      } else if (nowMs - this.lastGreetAt > 10 * 60_000) {
+        this.lastGreetAt = nowMs;
+        this.engine.greet();
+      }
     }
   }
 

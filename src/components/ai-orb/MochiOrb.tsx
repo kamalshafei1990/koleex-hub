@@ -65,7 +65,12 @@ export default function MochiOrb({
     if (!cv) return;
     const engine = new BotEngine();
     engineRef.current = engine;
-    const director = new MochiBehaviorDirector(engine);
+    const director = new MochiBehaviorDirector(engine, {
+      getOrbCenter: () => {
+        const r = cv.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      },
+    });
     directorRef.current = director;
     director.attach();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);

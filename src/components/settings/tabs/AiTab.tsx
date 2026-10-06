@@ -529,8 +529,10 @@ function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () 
               }`}
             >
               {/* Drawn in its own style whatever is chosen — a preview that
-                  followed the choice would show the same orb twice. */}
-              <ChosenOrb style={style} state="thinking" size={64} />
+                  followed the choice would show the same orb twice. Shown at
+                  rest: the idle face is the face you live with, and for Mochi
+                  it carries the breathing, the gaze, and the ambient life. */}
+              <ChosenOrb style={style} state="idle" size={64} />
               <span className="text-[13px] font-medium text-[var(--text-primary)]">{t(`ai.orb.${style}`)}</span>
               {on && (
                 <span aria-hidden className="absolute top-2 end-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0066FF] text-white">
