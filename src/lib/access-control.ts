@@ -383,6 +383,11 @@ export interface AccountPreferences {
      personalization route and would drop a key it does not know. Values and
      the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
   orb?: "aura" | "dots" | "mochi";
+  /* Whether Mochi's character sounds play (the wave whoosh, slaps, hearts).
+     Off unless the user turns it on — Settings → Koleex AI. The store and
+     the engine's player live in components/ai-orb/orb-sound.ts and
+     mochi/sound.ts. */
+  orb_sound?: boolean;
   /* Which Koleex AI model this user asks for (the picker beside the message
      box). A preference the server resolves, never a permission: an unknown
      or switched-off model is served as Auto. Values and the store live in
@@ -462,6 +467,7 @@ export const DEFAULT_PREFERENCES: Required<
   },
   ai: DEFAULT_AI_PERSONALIZATION,
   orb: "aura",
+  orb_sound: false,
   ai_model: "auto",
   home_apps: { pins: [], source: "none" },
   home_layout: "classic",
@@ -539,7 +545,10 @@ export function withDefaults(
     ai: p.ai ?? DEFAULT_PREFERENCES.ai,
     /* And again: without this line, changing the language would quietly put
        the orb back to the default. */
-    orb: p.orb === "dots" ? "dots" : DEFAULT_PREFERENCES.orb,
+    orb: p.orb === "dots" || p.orb === "mochi" ? p.orb : DEFAULT_PREFERENCES.orb,
+    /* Same passthrough for Mochi's sounds: an unrelated save must not mute
+       (or un-mute) him. */
+    orb_sound: p.orb_sound === true,
     /* And the model choice, for the same reason: a language change must not
        quietly put the picker back to Auto. */
     ai_model: normalizeKoleexModel(p.ai_model),

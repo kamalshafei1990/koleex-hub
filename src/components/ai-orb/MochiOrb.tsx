@@ -20,6 +20,7 @@ import type { AIOrbProps } from "./ai-orb-types";
 import { resolveOrbState, clamp01 } from "./ai-orb-types";
 import { BotEngine } from "./mochi/engine";
 import { MochiBehaviorDirector, type MochiSituation } from "./mochi/behavior-director";
+import { applyMochiSoundFromStorage } from "./orb-sound";
 
 function situationFromProps(props: AIOrbProps): MochiSituation {
   const visual = resolveOrbState(props.state ?? "idle", props.result ?? "none");
@@ -65,6 +66,9 @@ export default function MochiOrb({
     if (!cv) return;
     const engine = new BotEngine();
     engineRef.current = engine;
+    /* Sounds: the stored choice applies before the first frame — no waiting
+       on the account bootstrap. */
+    applyMochiSoundFromStorage();
     const director = new MochiBehaviorDirector(engine, {
       getOrbCenter: () => {
         const r = cv.getBoundingClientRect();

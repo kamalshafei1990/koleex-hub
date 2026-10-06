@@ -42,6 +42,7 @@ import { KOLEEX_MODEL_INFO, type KoleexServingModel } from "@/lib/ai/koleex-mode
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import ChosenOrb from "@/components/ai-orb/ChosenOrb";
 import { ORB_STYLES, setOrbStyle, useOrbStyle, type OrbStyle } from "@/components/ai-orb/orb-style";
+import { setMochiSound, useMochiSound } from "@/components/ai-orb/orb-sound";
 
 const API = "/api/ai/personalization";
 /** The hours a morning brief may be sent: early morning to noon. */
@@ -493,6 +494,7 @@ function UsageSection({ t }: { t: (k: string) => string }) {
 function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () => void }) {
   const { t } = useTranslation(settingsT);
   const current = useOrbStyle();
+  const soundOn = useMochiSound();
   const [failed, setFailed] = useState(false);
 
   function pick(style: OrbStyle) {
@@ -505,6 +507,17 @@ function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () 
     void updateAccountPreferences(accountId, { orb: style }).then((ok) => {
       if (ok) { onChanged(); return; }
       setOrbStyle(before);
+      setFailed(true);
+    });
+  }
+
+  function toggleSound(v: boolean) {
+    const before = soundOn;
+    setMochiSound(v);
+    setFailed(false);
+    void updateAccountPreferences(accountId, { orb_sound: v }).then((ok) => {
+      if (ok) { onChanged(); return; }
+      setMochiSound(before);
       setFailed(true);
     });
   }
@@ -543,6 +556,18 @@ function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () 
           );
         })}
       </div>
+      {/* Mochi's character sounds — only meaningful when he is the chosen
+          orb, so the row appears with him. Applies instantly, saves on its
+          own, like the orb choice itself. */}
+      {current === "mochi" && (
+        <SwitchRow
+          label={t("ai.orb.sound")}
+          hint={t("ai.orb.sound.hint")}
+          checked={soundOn}
+          onChange={toggleSound}
+          last
+        />
+      )}
     </SettingsGroup>
   );
 }

@@ -149,6 +149,8 @@ export const settingsT: Translations = {
   "ai.orb.aura":          { en: "Aura", zh: "光晕", ar: "هالة" },
   "ai.orb.dots":          { en: "Dots", zh: "点阵", ar: "نقط" },
   "ai.orb.mochi":         { en: "Mochi", zh: "Mochi", ar: "موتشي" },
+  "ai.orb.sound":         { en: "Mochi sounds", zh: "Mochi 音效", ar: "أصوات موتشي" },
+  "ai.orb.sound.hint":    { en: "The wave whoosh, hearts and little reactions. Off by default.", zh: "挥手、爱心和小反应的音效，默认关闭。", ar: "صوت التحية والقلوب والردود الصغيرة. مقفول افتراضيًا." },
   "ai.tone.title":        { en: "Style and tone", zh: "风格与语气", ar: "الأسلوب والنبرة" },
   "ai.guard":             { en: "These shape how Koleex AI talks to you. They never change your permissions or what it can access.", zh: "这些设置只影响 Koleex AI 与您交流的方式，不会改变您的权限或它可访问的内容。", ar: "الإعدادات دي بتحدد طريقة كلام Koleex AI معاك بس، ومش بتغيّر صلاحياتك ولا اللي يقدر يوصل له." },
   "ai.style":             { en: "Base style", zh: "基本风格", ar: "الأسلوب الأساسي" },

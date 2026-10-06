@@ -61,6 +61,7 @@ const EMOTE_COOLDOWN_MS: Record<BotEmoteName, number> = {
 
 const ATTENTION_YAWN_MS = 25_000;
 const ATTENTION_SLEEP_MS = 70_000;
+const NAP_WAKE_MS = 30_000;
 const DIZZY_HOLD_MS = 2_200;
 
 export class MochiBehaviorDirector {
@@ -79,6 +80,8 @@ export class MochiBehaviorDirector {
   private gazeDriftNextAt = Date.now() + 4_000;
   private rareLastAt: Record<string, number> = {};
   private recentAmbient: string[] = [];
+  private introPending: boolean;
+  private sleepStartAt = 0;
   private introEnabled: boolean;
 
   constructor(
@@ -92,6 +95,7 @@ export class MochiBehaviorDirector {
     this.engine = engine;
     this.getOrbCenter = opts?.getOrbCenter ?? null;
     this.introEnabled = opts?.intro ?? false;
+    this.introPending = this.introEnabled;
 
     /* Three quick slaps → dizzy spin, then recover on his own. */
     engine.onDizzy = () => {
@@ -128,23 +132,26 @@ export class MochiBehaviorDirector {
 
     this.timer = setInterval(() => this.tick(), 250);
 
-    /* OPENING PERFORMANCE (owner, 2026-10-06): every fresh load or refresh
-       starts with the coucou wave, then a short one-time showcase — a look
-       around, a wink, a happy flash, a little roll — each guarded so a user
-       who is already working never gets interrupted. After it, the ambient
-       loop takes over (those actions can all appear again later).
-       Large orbs only — a page full of waving bubbles is a circus. */
-    if (!this.introEnabled) return;
+    /* The opening performance waits for the first truly idle moment — tick()
+       starts it. (Home types its greeting first, putting him in "thinking";
+       fixed timers used to skip every step.) */
+  }
+
+  /** Opening performance: the coucou wave, then a short showcase — a look
+      around, a wink, a happy flash, a little roll. Runs once per load, and
+      only while he stays idle; a user who is already working is never
+      interrupted. After it, the ambient rotation takes over. */
+  private playIntro(): void {
     const intro: Array<[number, () => void]> = [
-      [500, () => { this.rareLastAt.wave = Date.now(); this.engine.greet(); }],
-      [2600, () => { // double take — left, right, back
+      [300, () => { this.rareLastAt.wave = Date.now(); this.engine.greet(); }],
+      [2400, () => { // double take — left, right, back
         this.glance(-0.7, 0, 700);
         setTimeout(() => this.glance(0.7, 0, 700), 750);
         setTimeout(() => { this.engine.lookX = 0; this.engine.lookY = 0; }, 1500);
       }],
-      [4400, () => this.fireEmote("wink")],
-      [6200, () => this.fireEmote("happy")],
-      [8000, () => { this.engine.squash(); setTimeout(() => this.engine.doRoll(950, 1), 160); }],
+      [4200, () => this.fireEmote("wink")],
+      [6000, () => this.fireEmote("happy")],
+      [7800, () => { this.engine.squash(); setTimeout(() => this.engine.doRoll(950, 1), 160); }],
     ];
     for (const [delay, run] of intro) {
       const t = setTimeout(() => {
@@ -152,6 +159,17 @@ export class MochiBehaviorDirector {
       }, delay);
       this.detachFns.push(() => clearTimeout(t));
     }
+  }
+
+  /** He wakes himself from a nap: a stretch, a blink, back to life. Mobile
+      has no cursor to wake him, so sleeping forever read as dead. */
+  private wakeUp(): void {
+    this.sleeping = false;
+    this.lastActivityAt = Date.now();
+    this.engine.setState("idle");
+    this.engine.anim("sy", [[1.08, 400, Ease.out], [1, 600, Ease.inOut]]);
+    this.engine.anim("sx", [[0.94, 400, Ease.out], [1, 600, Ease.inOut]]);
+    this.engine.blink();
   }
 
   detach(): void {
@@ -165,10 +183,7 @@ export class MochiBehaviorDirector {
   /** Any user activity (pointer, slap, state change) resets the attention clock. */
   noteUserActivity(): void {
     this.lastActivityAt = Date.now();
-    if (this.sleeping) {
-      this.sleeping = false;
-      if (this.current === "idle") this.engine.setState("idle");
-    }
+    if (this.sleeping) this.wakeUp();
   }
 
   slap(): void {
@@ -213,17 +228,31 @@ export class MochiBehaviorDirector {
 
     /* attention cycle — only when there is nothing going on */
     if (this.current !== "idle") return;
+
+    /* The opening performance starts at the first truly idle moment. */
+    if (this.introPending && !this.sleeping) {
+      this.introPending = false;
+      this.playIntro();
+    }
+
+    /* A nap, not a coma: he sleeps after 70 s of nothing, rests ~30 s, then
+       wakes himself with a stretch (mobile has no cursor to do it). Pointer
+       activity still wakes him instantly via noteUserActivity. */
+    if (this.sleeping) {
+      if (nowMs - this.sleepStartAt >= NAP_WAKE_MS) this.wakeUp();
+      return;
+    }
     const idleFor = nowMs - this.lastActivityAt;
-    if (!this.sleeping && idleFor >= ATTENTION_SLEEP_MS) {
+    if (idleFor >= ATTENTION_SLEEP_MS) {
       this.sleeping = true;
+      this.sleepStartAt = nowMs;
       this.engine.setState("sleeping");
       return;
     }
-    if (this.sleeping) return;
-    if (idleFor >= ATTENTION_YAWN_MS) {
-      this.fireEmote("yawn");
-      return;
-    }
+    /* A yawn after 25 s of quiet — the 20 s emote cooldown paces it, and it
+       must NOT gate the life below: yawning used to swallow every later
+       action, leaving sleep as the only thing he ever did. */
+    if (idleFor >= ATTENTION_YAWN_MS) this.fireEmote("yawn");
 
     /* GAZE DRIFT (owner, 2026-10-06): the eyes wander on their own in idle —
        a soft look in a random direction every 5–9 s, held briefly, then back.

@@ -1,6 +1,6 @@
-/* Mochi sounds — off by default in the Hub until the behavior settings
-   (plan phase 5) decide where sounds play. The 28 wavs live in
-   /orb-lab-sounds/ ready to wire. */
+/* Mochi sounds — off unless the user turns them on in Settings → Koleex AI
+   ("Mochi sounds"). The store in ../orb-sound.ts owns the choice and writes
+   it here; the 28 wavs live in /orb-lab-sounds/. */
 const cache = new Map<string, HTMLAudioElement>();
 let enabled = false;
 export function setMochiSoundEnabled(v: boolean) { enabled = v; }
