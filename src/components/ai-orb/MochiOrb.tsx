@@ -94,10 +94,10 @@ export default function MochiOrb({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
       /* Mochi's body spans ~68% of the canvas where the aura orb's glow fills
-         the frame — draw him ~20% larger so all three styles read at the same
-         visual size on every surface (Home greeting especially). */
+         the frame — draw him ~30% larger so all three styles read at the same
+         visual size on every surface (Home greeting, Settings preview). */
       ctx.translate(size / 2, size / 2);
-      ctx.scale(1.2, 1.2);
+      ctx.scale(1.3, 1.3);
       ctx.translate(-size / 2, -size / 2);
       engine.draw(ctx, size, size);
     };
