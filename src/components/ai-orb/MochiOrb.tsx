@@ -70,6 +70,10 @@ export default function MochiOrb({
         const r = cv.getBoundingClientRect();
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
       },
+      /* The opening wave belongs to the orbs you actually look at — Home
+         greeting, the AI welcome, the settings preview — not the 38px bubble
+         dots. */
+      intro: size >= 60,
     });
     directorRef.current = director;
     director.attach();
@@ -90,6 +94,7 @@ export default function MochiOrb({
     document.addEventListener("visibilitychange", onVis);
 
     const ctx = cv.getContext("2d")!;
+    let boost = 1.3;
     const frame = (nowMs: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (nowMs - last) / 1000);
@@ -100,9 +105,16 @@ export default function MochiOrb({
       ctx.clearRect(0, 0, size, size);
       /* Mochi's body spans ~68% of the canvas where the aura orb's glow fills
          the frame — draw him ~30% larger so all three styles read at the same
-         visual size on every surface (Home greeting, Settings preview). */
+         visual size on every surface (Home greeting, Settings preview).
+         Except during the wave: the coucou hand sweeps out past the body, so
+         the boost eases down to fit it inside the frame instead of cropping
+         it (owner, 2026-10-06). */
+      const n = nowMs / 1000;
+      const waving = n > engine.waveStart - 0.2 && n < engine.waveUntil + 0.4;
+      const boostTarget = waving ? 1.0 : 1.3;
+      boost += (boostTarget - boost) * Math.min(1, dt * 6);
       ctx.translate(size / 2, size / 2);
-      ctx.scale(1.3, 1.3);
+      ctx.scale(boost, boost);
       ctx.translate(-size / 2, -size / 2);
       engine.draw(ctx, size, size);
     };
