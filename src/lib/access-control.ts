@@ -382,7 +382,7 @@ export interface AccountPreferences {
      lives beside `ai`, not inside it: that slice is normalised by the
      personalization route and would drop a key it does not know. Values and
      the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
-  orb?: "aura" | "dots";
+  orb?: "aura" | "dots" | "mochi";
   /* Which Koleex AI model this user asks for (the picker beside the message
      box). A preference the server resolves, never a permission: an unknown
      or switched-off model is served as Auto. Values and the store live in

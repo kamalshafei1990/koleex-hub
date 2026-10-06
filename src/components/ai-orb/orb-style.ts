@@ -29,9 +29,9 @@
 
 import { useSyncExternalStore } from "react";
 
-export type OrbStyle = "aura" | "dots";
+export type OrbStyle = "aura" | "dots" | "mochi";
 
-export const ORB_STYLES: readonly OrbStyle[] = ["aura", "dots"] as const;
+export const ORB_STYLES: readonly OrbStyle[] = ["aura", "dots", "mochi"] as const;
 export const DEFAULT_ORB_STYLE: OrbStyle = "aura";
 
 const KEY = "koleex-orb";
@@ -39,7 +39,7 @@ const EVENT = "kx-orb-style";
 
 /** Anything that is not a known style reads as the default. Pure. */
 export function normalizeOrbStyle(v: unknown): OrbStyle {
-  return v === "dots" ? "dots" : DEFAULT_ORB_STYLE;
+  return v === "dots" || v === "mochi" ? v : DEFAULT_ORB_STYLE;
 }
 
 export function getOrbStyle(): OrbStyle {

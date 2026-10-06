@@ -34,6 +34,7 @@ import type { DottedOrbProps } from "./DottedOrb";
    useOrbStyle's server snapshot is the aura — so there is nothing to bail
    out of. */
 const DottedOrb = lazy<React.ComponentType<DottedOrbProps>>(() => import("./DottedOrb"));
+const MochiOrb = lazy<React.ComponentType<AIOrbProps>>(() => import("./MochiOrb"));
 
 export interface ChosenOrbProps extends AIOrbProps {
   /** "dark" for surfaces that are dark in both themes (the call screen). The
@@ -50,12 +51,16 @@ export interface ChosenOrbProps extends AIOrbProps {
 export default function ChosenOrb({ surface, style, wander, ...props }: ChosenOrbProps) {
   const chosen = useOrbStyle();
   const draw = style ?? chosen;
-  if (draw === "dots") {
+  if (draw === "dots" || draw === "mochi") {
     const size = props.size ?? 72;
     return (
       <span className={`inline-flex shrink-0 ${props.className ?? ""}`} style={{ width: size, height: size }}>
         <Suspense fallback={null}>
-          <DottedOrb {...props} className="" surface={surface} wander={wander} />
+          {draw === "dots" ? (
+            <DottedOrb {...props} className="" surface={surface} wander={wander} />
+          ) : (
+            <MochiOrb {...props} />
+          )}
         </Suspense>
       </span>
     );

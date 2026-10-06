@@ -148,6 +148,7 @@ export const settingsT: Translations = {
   "ai.orb.hint":          { en: "How Koleex AI looks everywhere in the Hub — Home, the chat, calls and Discuss.", zh: "Koleex AI 在整个 Hub 中的样子——首页、对话、通话和 Discuss。", ar: "شكل Koleex AI في كل مكان في الـ Hub — الرئيسية والشات والمكالمات وDiscuss." },
   "ai.orb.aura":          { en: "Aura", zh: "光晕", ar: "هالة" },
   "ai.orb.dots":          { en: "Dots", zh: "点阵", ar: "نقط" },
+  "ai.orb.mochi":         { en: "Mochi", zh: "Mochi", ar: "موتشي" },
   "ai.tone.title":        { en: "Style and tone", zh: "风格与语气", ar: "الأسلوب والنبرة" },
   "ai.guard":             { en: "These shape how Koleex AI talks to you. They never change your permissions or what it can access.", zh: "这些设置只影响 Koleex AI 与您交流的方式，不会改变您的权限或它可访问的内容。", ar: "الإعدادات دي بتحدد طريقة كلام Koleex AI معاك بس، ومش بتغيّر صلاحياتك ولا اللي يقدر يوصل له." },
   "ai.style":             { en: "Base style", zh: "基本风格", ar: "الأسلوب الأساسي" },
