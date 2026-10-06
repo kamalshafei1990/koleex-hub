@@ -195,7 +195,7 @@ export class MochiBehaviorDirector {
   setAudioLevel(level: number): void {
     this.audioLevel = Math.min(1, Math.max(0, level));
     if (this.current === "speaking") {
-      this.engine.slotHTarget = 0.08 + this.audioLevel * 0.34;
+      this.engine.speakLevel = this.audioLevel;
     } else if (this.current === "listening") {
       this.engine.tgEs = 1 + this.audioLevel * 0.2;
     }
@@ -379,6 +379,7 @@ export class MochiBehaviorDirector {
       this.engine.eyeOverrideUntil = 0;
       this.engine.tgEs = 1;
       this.engine.speakMode = false;
+      this.engine.speakLevel = 0;
       this.engine.slotHTarget = 0;
     }
     if (this.sleeping && next !== "idle") {
@@ -395,7 +396,7 @@ export class MochiBehaviorDirector {
       case "speaking":
         this.engine.setState("idle");
         this.engine.speakMode = true;
-        this.engine.slotHTarget = 0.08 + this.audioLevel * 0.34;
+        this.engine.speakLevel = this.audioLevel;
         break;
       case "thinking":
         this.engine.setState("thinking");

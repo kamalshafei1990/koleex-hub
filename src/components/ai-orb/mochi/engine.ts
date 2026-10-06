@@ -196,6 +196,8 @@ export class BotEngine {
   slotH = 0; slotHTarget = 0; slotHVel = 0; isChewing = false;
   /** LAB demo: speaking shows the mouth at face level (see drawMouth). */
   speakMode = false;
+  /** Live voice level 0..1 while speaking — the speech rhythm rides it. */
+  speakLevel = 0;
 
   col: RGB = C.idle;
   colT: RGB = C.idle;
@@ -621,18 +623,18 @@ export class BotEngine {
     this.particles = this.particles.filter((p) => p.age < p.life);
 
     // Mouth slot spring — ω₀ = 2π/0.25, ζ = 0.6
-    /* While speaking, the mouth must never freeze: the real audio level can
-       stall at 0 mid-answer (metering gaps, quiet passages), which used to
-       leave the mouth shut while the voice was still going. A layered speech
-       flutter under the level-driven target keeps him talking until the
-       state itself leaves "speaking". */
+    /* SPEECH RHYTHM (owner, 2026-10-06): while speaking, the mouth must
+       visibly OPEN AND CLOSE — syllables over a slower phrase swell, with
+       micro-pauses, riding the real voice level (speakLevel). A fixed open
+       mouth reads as a statue; the earlier floor kept it moving only when
+       the level stream stalled, and froze it again when the level held
+       steady. */
     if (this.speakMode) {
-      const flutter =
-        0.12 +
-        0.05 * Math.sin(n * 11.3) +
-        0.04 * Math.sin(n * 17.7 + 1.3) +
-        0.03 * Math.sin(n * 5.1 + 0.4);
-      if (this.slotHTarget < flutter) this.slotHTarget = flutter;
+      const phrase = 0.55 + 0.45 * Math.sin(n * 1.7 + 0.5);
+      const syllable = Math.abs(Math.sin(n * 9.1) * 0.6 + Math.sin(n * 14.7 + 1.1) * 0.4);
+      const pause = Math.sin(n * 2.9) > 0.86 ? 0.12 : 1;
+      const energy = 0.12 + this.speakLevel * 0.3;
+      this.slotHTarget = energy * (0.35 + 0.65 * syllable) * phrase * pause + 0.03;
     }
     const omega = (2 * Math.PI) / 0.25;
     const zeta = 0.6;
