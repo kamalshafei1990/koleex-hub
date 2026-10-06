@@ -15,7 +15,7 @@
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { cdnImage } from "@/lib/cdn";
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 import {
   DEFAULT_PUBLIC_VISIBILITY,
   DEFAULT_INTERNAL_VISIBILITY,

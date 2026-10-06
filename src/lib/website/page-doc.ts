@@ -20,7 +20,7 @@
    HTML), so the page cannot carry markup.
    --------------------------------------------------------------------------- */
 
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 
 export const PAGE_LANGS = ["en", "ar", "zh"] as const;
 export type PageLang = (typeof PAGE_LANGS)[number];

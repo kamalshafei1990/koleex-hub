@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ProductKnowledgeBlock, SpecField } from "@/types/product-schema";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 
 export const isEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;

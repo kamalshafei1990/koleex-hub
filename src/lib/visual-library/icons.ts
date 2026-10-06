@@ -37,7 +37,7 @@ export const VL_ICON_PATHS = {
   globe:              "visual-library/general/maps/globe.svg",
   "link-alt":         "visual-library/pack/actions/link-alt.svg",
 } as const;
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 
 export type VlIconSlug = keyof typeof VL_ICON_PATHS;
 

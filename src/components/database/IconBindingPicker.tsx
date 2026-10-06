@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 import LockIcon from "@/components/icons/ui/LockIcon";
 
 

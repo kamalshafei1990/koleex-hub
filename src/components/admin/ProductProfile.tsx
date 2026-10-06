@@ -18,7 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { announceProductChange } from "@/lib/products-change";
-import { publicUrl } from "@/lib/storage-client";
+import { publicUrl } from "@/lib/storage-url";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import Link from "next/link";

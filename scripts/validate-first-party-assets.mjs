@@ -13,6 +13,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ALLOW = new Set([
   // intentionally retained (reason: URL construction for uploads / data fields, not browser fetches)
   "src/lib/storage-client.ts",
+  "src/lib/storage-url.ts",       // the ONE home of the public-object path shape — every other file builds through publicUrl()
   "src/lib/cdn.ts",              // the interception point itself
   // SVG icon builders: optimizer-incompatible (SVG deliberately blocked from
   // the image pipeline); all have local fallbacks (glyph/Simple Icons) so CN
