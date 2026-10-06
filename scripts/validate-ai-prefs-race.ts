@@ -187,7 +187,7 @@ console.log("\n── 2. No NEW direct writer may be added ──");
     const settings = strip(readFileSync("src/app/api/accounts/[id]/preferences/route.ts", "utf8"));
     check(
       "the settings route merges through the RPC rather than read-modify-write",
-      /mergeAccountPrefs\(/.test(settings) && !/update\(\{ *preferences/.test(settings),
+      /mergeAccountPrefs(Nested)?\(/.test(settings) && !/update\(\{ *preferences/.test(settings),
     );
     /* The boundary moved out of the UPDATE and must still exist. It is only
        needed when a super-admin edits someone else — a self-edit's id IS the

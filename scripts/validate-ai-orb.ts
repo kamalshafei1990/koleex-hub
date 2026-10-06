@@ -234,10 +234,11 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     !/fetch\(|XMLHttpRequest|WebSocket|import\(|https?:\/\//.test(engineSrc));
 
   /* The store. */
-  check("style: the two styles, aura first and default",
-    JSON.stringify(style.ORB_STYLES) === JSON.stringify(["aura", "dots"]) && style.DEFAULT_ORB_STYLE === "aura");
+  check("style: the three styles, aura first and default",
+    JSON.stringify(style.ORB_STYLES) === JSON.stringify(["aura", "dots", "mochi"]) && style.DEFAULT_ORB_STYLE === "aura");
   check("style: anything unknown reads as the default",
-    style.normalizeOrbStyle("dots") === "dots" && style.normalizeOrbStyle("aura") === "aura" &&
+    style.normalizeOrbStyle("dots") === "dots" && style.normalizeOrbStyle("mochi") === "mochi" &&
+    style.normalizeOrbStyle("aura") === "aura" &&
     style.normalizeOrbStyle("DOTS") === "aura" && style.normalizeOrbStyle(null) === "aura" && style.normalizeOrbStyle(7) === "aura");
   check("style: without a window it reads the default and writes nothing",
     style.getOrbStyle() === "aura" && (() => { style.setOrbStyle("dots"); return style.getOrbStyle() === "aura"; })());
@@ -245,8 +246,8 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   /* The account keeps it — and every wholesale save keeps it too. */
   const acSrc = readFileSync(join(__dirname, "../src/lib/access-control.ts"), "utf8");
   check("style: the account type names it, the defaults default it, and withDefaults passes it through",
-    /orb\?: "aura" \| "dots";/.test(acSrc) && /ai: DEFAULT_AI_PERSONALIZATION,\s*orb: "aura",/.test(acSrc) &&
-    /orb: p\.orb === "dots" \? "dots" : DEFAULT_PREFERENCES\.orb,/.test(acSrc));
+    /orb\?: "aura" \| "dots" \| "mochi";/.test(acSrc) && /ai: DEFAULT_AI_PERSONALIZATION,\s*orb: "aura",/.test(acSrc) &&
+    /orb: p\.orb === "dots" \|\| p\.orb === "mochi" \? p\.orb : DEFAULT_PREFERENCES\.orb,/.test(acSrc));
 
   /* THE ONE DOOR. No surface draws a style directly; only ChosenOrb (and the
      admin labs, which exist to show each one) may. */
@@ -262,9 +263,9 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /* Code only: a comment that says "never <AIOrb> directly" is the rule
        being written down, not broken. */
     const code = stripComments(readFileSync(f, "utf8"), { line: "all" });
-    return /<(AIOrb|DottedOrb)\b/.test(code);
+    return /<(AIOrb|DottedOrb|MochiOrb)\b/.test(code);
   }).map((f) => f.slice(srcRoot.length + 1));
-  check("wiring: no surface draws <AIOrb> or <DottedOrb> directly — every orb goes through <ChosenOrb>",
+  check("wiring: no surface draws <AIOrb>, <DottedOrb> or <MochiOrb> directly — every orb goes through <ChosenOrb>",
     direct.length === 0, direct.join(", "));
 
   const glow = readFileSync(join(srcRoot, "components/ai/KoleexGlowOrb.tsx"), "utf8");
@@ -276,22 +277,39 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   const chosen = readFileSync(join(srcRoot, "components/ai-orb/ChosenOrb.tsx"), "utf8");
   check("wiring: ChosenOrb reads the store, and a preview can pin its own style",
     /const chosen = useOrbStyle\(\);/.test(chosen) && /const draw = style \?\? chosen;/.test(chosen) &&
-    /if \(draw === "dots"\) \{[\s\S]{0,300}?<DottedOrb \{\.\.\.props\}/.test(chosen));
+    /if \(draw === "dots" \|\| draw === "mochi"\) \{[\s\S]{0,500}?<DottedOrb \{\.\.\.props\}/.test(chosen) &&
+    /<MochiOrb \{\.\.\.props\}/.test(chosen));
   /* The dots load only for whoever chose them: a static import put DottedOrb
      and its engine in the chunk every orb route shares, and validate:budgets
-     failed on 19 routes. */
-  check("wiring: the dotted orb is loaded on demand, never in the shared bundle every aura user downloads",
+     failed on 19 routes. Mochi follows the same rule — his engine, the
+     behavior director and the sound map stay out of the shared chunk. */
+  check("wiring: the dotted orb and mochi are loaded on demand, never in the shared bundle every aura user downloads",
     /const DottedOrb = lazy<React\.ComponentType<DottedOrbProps>>\(\(\) => import\("\.\/DottedOrb"\)\);/.test(chosen) &&
-    /<Suspense fallback=\{null\}>\s*<DottedOrb /.test(chosen) &&
+    /const MochiOrb = lazy<React\.ComponentType<AIOrbProps>>\(\(\) => import\("\.\/MochiOrb"\)\);/.test(chosen) &&
+    /<Suspense fallback=\{null\}>/.test(chosen) &&
     /* and not next/dynamic, whose loader runtime lands in the shared shell */
     !/from "next\/dynamic"/.test(chosen) &&
     !/^import DottedOrb/m.test(chosen) &&
+    !/^import MochiOrb/m.test(chosen) &&
     walk(srcRoot).every((f) => {
       const rel = f.slice(srcRoot.length + 1).replace(/\\/g, "/");
       if (rel.startsWith("app/ai-orb-lab/") || rel === "components/ai-orb/DottedOrb.tsx") return true;
       /* `import type` is erased at build time and costs nothing. */
       return !/^import (?!type )[^;]*from "(?:@\/components\/ai-orb|\.)\/DottedOrb";/m.test(readFileSync(f, "utf8")) &&
              !/from "thinking-orbs(?:\/engine)?";/.test(readFileSync(f, "utf8"));
+    }) &&
+    walk(srcRoot).every((f) => {
+      const rel = f.slice(srcRoot.length + 1).replace(/\\/g, "/");
+      /* Mochi's own family may import itself; nobody else may pull the
+         engine, the director or the component statically. orb-sound.ts is
+         the one exception: it is the on/off switch the engine's player reads
+         before the lazy chunk arrives, and it is a dozen lines with no deps. */
+      if (rel.startsWith("app/ai-orb-lab/") || rel === "components/ai-orb/MochiOrb.tsx" ||
+          rel === "components/ai-orb/orb-sound.ts" ||
+          rel.startsWith("components/ai-orb/mochi/")) return true;
+      const code = readFileSync(f, "utf8");
+      return !/^import (?!type )[^;]*from "(?:@\/components\/ai-orb|\.)\/MochiOrb";/m.test(code) &&
+             !/from "(?:@\/components\/ai-orb|\.|\.\.)\/(?:mochi\/)?(?:engine|behavior-director|sound|anim)";/.test(code);
     }));
 
   const tab = readFileSync(join(srcRoot, "components/settings/tabs/AiTab.tsx"), "utf8");
