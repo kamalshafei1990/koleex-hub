@@ -18,7 +18,7 @@ import { mergeAccountPrefsNested } from "@/lib/server/account-prefs-nested";
    /api/ai/personalization only. */
 const WRITABLE = new Set([
   "language", "theme", "email_signature", "wallpaper", "profile", "notifications",
-  "display", "calendar", "orb", "ai_model", "home_apps", "home_layout",
+  "display", "calendar", "orb", "orb_sound", "ai_model", "home_apps", "home_layout",
 ]);
 const MAX_BODY_BYTES = 32 * 1024;
 
