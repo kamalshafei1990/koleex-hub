@@ -623,18 +623,16 @@ export class BotEngine {
     this.particles = this.particles.filter((p) => p.age < p.life);
 
     // Mouth slot spring — ω₀ = 2π/0.25, ζ = 0.6
-    /* SPEECH RHYTHM (owner, 2026-10-06): while speaking, the mouth must
-       visibly OPEN AND CLOSE — syllables over a slower phrase swell, with
-       micro-pauses, riding the real voice level (speakLevel). A fixed open
-       mouth reads as a statue; the earlier floor kept it moving only when
-       the level stream stalled, and froze it again when the level held
-       steady. */
+    /* SPEECH RHYTHM (owner, 2026-10-06): while speaking, the mouth visibly
+       opens and closes — syllables over a slower phrase swell, riding the
+       real voice level (speakLevel). Everything is CONTINUOUS and the mouth
+       never closes below a resting slit: an earlier binary "pause" snapped
+       the target to near-zero and the mouth vanished mid-sentence. */
     if (this.speakMode) {
-      const phrase = 0.55 + 0.45 * Math.sin(n * 1.7 + 0.5);
+      const phrase = 0.62 + 0.38 * Math.sin(n * 1.7 + 0.5);
       const syllable = Math.abs(Math.sin(n * 9.1) * 0.6 + Math.sin(n * 14.7 + 1.1) * 0.4);
-      const pause = Math.sin(n * 2.9) > 0.86 ? 0.12 : 1;
-      const energy = 0.12 + this.speakLevel * 0.3;
-      this.slotHTarget = energy * (0.35 + 0.65 * syllable) * phrase * pause + 0.03;
+      const energy = 0.14 + this.speakLevel * 0.3;
+      this.slotHTarget = Math.max(0.07, energy * (0.4 + 0.6 * syllable) * phrase + 0.03);
     }
     const omega = (2 * Math.PI) / 0.25;
     const zeta = 0.6;
@@ -966,7 +964,10 @@ export class BotEngine {
   private drawMouth(x: CanvasRenderingContext2D, body: Path2D, R: number) {
     const m = this.morph;
     const mm = this.speakMode ? Math.max(m, 0.34) : m;
-    const hW = R * 1.8 * mm * (this.speakMode ? 0.55 : 1);
+    /* Speech width breathes with the openness — consonants narrow, vowels
+       wide — instead of a fixed-width slot sliding up and down. */
+    const wide = this.speakMode ? 0.8 + Math.min(1, this.slotH * 2.2) * 0.4 : 1;
+    const hW = R * 1.8 * mm * (this.speakMode ? 0.55 : 1) * wide;
     const hH = this.slotH * R * mm;
     /* speakMode: the mouth rides the gaze with the EXACT eye parallax —
        same formula the eyes use (sin(yaw)·cos(pitch)·rx for X, the
@@ -996,7 +997,7 @@ export class BotEngine {
     x.lineTo(R * 0.9 * m, boxTop + 1);
     x.stroke();
 
-    if (hH > 0.8) {
+    if (hH > (this.speakMode ? 0.3 : 0.8)) {
       const hR = Math.min(hW / 2, hH / 2);
       const g = x.createLinearGradient(0, hY, 0, hY + hH);
       g.addColorStop(0, "rgb(7,8,10)");

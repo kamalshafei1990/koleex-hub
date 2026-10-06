@@ -852,10 +852,14 @@ export default function VoiceCallScreen({
        this on `muted` left a caller who had just let go looking at a still
        orb until the voice arrived. What Koleex AI is doing outranks the
        caller's closed microphone; the Mic control still shows it. */
-    : searching || phase === "thinking"
-      ? "thinking"
     : phase === "speaking"
       ? "speaking"
+      /* SPEAKING OUTRANKS THE LOOKUP (owner, 2026-10-06). While the voice is
+         actually playing, the orb must keep speaking — flipping to "thinking"
+         whenever a search flag rides along made the mouth pop in and out
+         mid-sentence. The lookup still shows the instant the voice pauses. */
+    : searching || phase === "thinking"
+      ? "thinking"
       /* MUTED IS NOT LISTENING. AIOrb feeds audioLevel into its motion only
          while listening or speaking, so leaving it on "listening" would leave
          an orb reacting to a microphone whose audio goes nowhere — the same

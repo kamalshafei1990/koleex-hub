@@ -14,6 +14,8 @@
  */
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
+import { cdnImage } from "@/lib/cdn";
+import { publicUrl } from "@/lib/storage-client";
 import {
   DEFAULT_PUBLIC_VISIBILITY,
   DEFAULT_INTERNAL_VISIBILITY,
@@ -85,11 +87,11 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           required: true,
           description: "Fabric constructions and formats the machine can spread.",
           options: [
-            { value: "knit", label: "Knit", image: "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/spec-visuals/fabrics/knit.jpg" },
-            { value: "woven", label: "Woven", image: "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/spec-visuals/fabrics/woven.jpg" },
-            { value: "roll", label: "Roll Fabric", image: "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/spec-visuals/fabrics/roll.jpg" },
-            { value: "folded", label: "Folded Fabric", image: "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/spec-visuals/fabrics/folded.jpg" },
-            { value: "tubular", label: "Tubular Fabric", image: "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/spec-visuals/fabrics/tubular.jpg" },
+            { value: "knit", label: "Knit", image: cdnImage(publicUrl("media", "spec-visuals/fabrics/knit.jpg"), { width: 300 }) },
+            { value: "woven", label: "Woven", image: cdnImage(publicUrl("media", "spec-visuals/fabrics/woven.jpg"), { width: 300 }) },
+            { value: "roll", label: "Roll Fabric", image: cdnImage(publicUrl("media", "spec-visuals/fabrics/roll.jpg"), { width: 300 }) },
+            { value: "folded", label: "Folded Fabric", image: cdnImage(publicUrl("media", "spec-visuals/fabrics/folded.jpg"), { width: 300 }) },
+            { value: "tubular", label: "Tubular Fabric", image: cdnImage(publicUrl("media", "spec-visuals/fabrics/tubular.jpg"), { width: 300 }) },
             { value: "piece", label: "Piece Fabric" },
             { value: "stepped", label: "Stepped / Ladder Fabric" },
           ],

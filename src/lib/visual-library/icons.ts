@@ -37,13 +37,13 @@ export const VL_ICON_PATHS = {
   globe:              "visual-library/general/maps/globe.svg",
   "link-alt":         "visual-library/pack/actions/link-alt.svg",
 } as const;
+import { publicUrl } from "@/lib/storage-client";
 
 export type VlIconSlug = keyof typeof VL_ICON_PATHS;
 
 /** Public CDN URL for a Visual Library icon. */
 export function vlIconUrl(slug: VlIconSlug): string {
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
-  return `${base}/storage/v1/object/public/media/${VL_ICON_PATHS[slug]}`;
+  return publicUrl("media", VL_ICON_PATHS[slug]);
 }
 
 /** Inline style that paints a Visual Library SVG as a CSS mask in

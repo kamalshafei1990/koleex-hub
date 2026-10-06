@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { announceProductChange } from "@/lib/products-change";
+import { publicUrl } from "@/lib/storage-client";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import Link from "next/link";
@@ -535,7 +536,6 @@ let NOT_SET = "Not set";
    inherits the label's ghost tone in both themes. iconForLabel() keyword-
    matches the (translated) label so EVERY row in EVERY tab gets a glyph
    automatically — new fields inherit one with zero wiring. */
-const VL_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/";
 
 let BINDINGS_SNAPSHOT: Record<string, string> = {};
 
@@ -681,7 +681,7 @@ function fieldKeyForLabel(label: string): string {
 
 function iconForField(bindings: Record<string, string>, fieldKey: string): string {
   if (!fieldKey) return "";
-  return bindings[`field.${fieldKey}`] || (FIELD_ICON_FALLBACK[fieldKey] ? VL_BASE + FIELD_ICON_FALLBACK[fieldKey] : "");
+  return bindings[`field.${fieldKey}`] || (FIELD_ICON_FALLBACK[fieldKey] ? publicUrl("media", `visual-library/${FIELD_ICON_FALLBACK[fieldKey]}`) : "");
 }
 
 

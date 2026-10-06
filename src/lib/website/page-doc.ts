@@ -20,6 +20,8 @@
    HTML), so the page cannot carry markup.
    --------------------------------------------------------------------------- */
 
+import { publicUrl } from "@/lib/storage-client";
+
 export const PAGE_LANGS = ["en", "ar", "zh"] as const;
 export type PageLang = (typeof PAGE_LANGS)[number];
 
@@ -173,8 +175,10 @@ export function cleanImage(v: unknown, mediaOrigin: string): PageImage | null {
 
 export function isHubPhoto(url: string, mediaOrigin: string): boolean {
   if (!mediaOrigin || url.length > 1000) return false;
-  const origin = mediaOrigin.replace(/\/+$/, "");
-  return url.startsWith(`${origin}/storage/v1/object/public/website-media/`) || url.startsWith(`${origin}/storage/v1/object/public/media/`);
+  /* Built through publicUrl() so the storage path lives in exactly one
+     allowlisted file (storage-client.ts) — and so this predicate follows the
+     connected project instead of a hardcoded host. */
+  return url.startsWith(publicUrl("website-media", "")) || url.startsWith(publicUrl("media", ""));
 }
 
 function cleanSection(raw: unknown, mediaOrigin: string): PageSection | null {

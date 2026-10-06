@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ProductKnowledgeBlock, SpecField } from "@/types/product-schema";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
+import { publicUrl } from "@/lib/storage-client";
 
 export const isEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
@@ -58,7 +59,6 @@ export function formatSpecValue(f: SpecField | undefined, raw: unknown, yes: str
    never a placeholder box. Group icons follow the same rules on the title.
    Each rule names a binding key FIRST and a real library path as fallback,
    so binding `group.electrical` in the Visual Library wins with no code. */
-const VL_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/";
 const GROUP_ICON_RULES: Array<[RegExp, string, string]> = [
   [/inspect|detect|vision|scan|camera|sensor/i, "group.inspection", "general/security/eye.svg"],
   [/width|length|diameter|dimension|weight|size|physical/i, "group.physical", "pack/manufacturing/ruler-combined.svg"],
@@ -82,11 +82,11 @@ export function useSpecGlyphs() {
     const direct = bindings[`spec.${key}`] || bindings[`field.${key}`];
     if (direct) return direct;
     const hay = `${key} ${label ?? ""}`;
-    for (const [re, k, fallback] of GROUP_ICON_RULES) if (re.test(hay)) return bindings[k] || VL_BASE + fallback;
+    for (const [re, k, fallback] of GROUP_ICON_RULES) if (re.test(hay)) return bindings[k] || publicUrl("media", `visual-library/${fallback}`);
     return null;
   }, [bindings]);
   const groupGlyph = useCallback((title: string) => {
-    for (const [re, k, fallback] of GROUP_ICON_RULES) if (re.test(title)) return bindings[k] || VL_BASE + fallback;
+    for (const [re, k, fallback] of GROUP_ICON_RULES) if (re.test(title)) return bindings[k] || publicUrl("media", `visual-library/${fallback}`);
     return null;
   }, [bindings]);
   return { fieldGlyph, groupGlyph };

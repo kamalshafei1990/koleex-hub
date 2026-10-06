@@ -11,9 +11,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchIconBindings, invalidateIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
+import { publicUrl } from "@/lib/storage-client";
 import LockIcon from "@/components/icons/ui/LockIcon";
 
-const MEDIA_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
 
 interface AssetRow {
   id: string;
@@ -134,11 +134,11 @@ export default function IconBindingPicker({
             <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
               {rows.filter((a) => {
                 if (!freeOnly) return true;
-                const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
+                const url = (a.public_url || publicUrl("media", a.svg_path ?? "")).replace(/\s+/g, "");
                 const owner = boundBy.get(url);
                 return !owner || owner === semanticKey;
               }).map((a) => {
-                const url = (a.public_url || MEDIA_BASE + a.svg_path).replace(/\s+/g, "");
+                const url = (a.public_url || publicUrl("media", a.svg_path ?? "")).replace(/\s+/g, "");
                 const active = currentUrl === url;
                 const owner = boundBy.get(url);
                 const takenByOther = !!owner && owner !== semanticKey;
