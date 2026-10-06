@@ -74,6 +74,15 @@ const EYE_W = 0.25;
 const EYE_H = 0.27;
 const EYE_SP = 0.37;
 const EYE_P = -0.12;
+
+/* Speech visemes — the four mouth shapes a talking face cycles through.
+   w: width factor, o: openness factor, r: roundness (0 = spread, 1 = round). */
+const VISEMES: ReadonlyArray<{ w: number; o: number; r: number; weight: number }> = [
+  { w: 0.95, o: 1.0,  r: 0.35, weight: 0.34 }, // aa — wide open
+  { w: 1.3,  o: 0.42, r: 0.12, weight: 0.24 }, // ee — spread, low open
+  { w: 0.55, o: 0.72, r: 1.0,  weight: 0.2  }, // oo — narrow and round
+  { w: 0.7,  o: 0.1,  r: 0.4,  weight: 0.22 }, // m/p/b — consonant, near-closed
+];
 const BASE_TOP: RGB = [0.929, 0.929, 0.937]; // #EDEDEF
 const BASE_BOTTOM: RGB = [0.769, 0.773, 0.792]; // #C4C5CA
 const INK = "rgb(26,20,18)"; // #1A1412
@@ -196,8 +205,25 @@ export class BotEngine {
   slotH = 0; slotHTarget = 0; slotHVel = 0; isChewing = false;
   /** LAB demo: speaking shows the mouth at face level (see drawMouth). */
   speakMode = false;
-  /** Live voice level 0..1 while speaking — the speech rhythm rides it. */
+  /** Live voice level 0..1 while speaking — the speech envelope rides it. */
   speakLevel = 0;
+
+  /* ── Speech system (owner, 2026-10-07: the pill that only slid up and down
+     never read as talking). Three parts, the way real speech animation works:
+       · an ENVELOPE FOLLOWER on the true voice level (fast attack, slower
+         release — how audio drives faces in production rigs)
+       · a VISEME CLOCK cycling mouth SHAPES (aa / ee / oo / m) at syllable
+         rate, crossfaded, never repeating back-to-back
+       · a lip-shaped bezier mouth (drawMouth) instead of the rounded slot
+     Speech openness = viseme shape × envelope, so quiet speech makes small
+     shapes and loud speech makes big ones — the thing that was missing. */
+  speechEnv = 0;
+  speechViseme = 0;
+  private speechFrom = 0;
+  private speechAt = 0;
+  private speechNextAt = 0;
+  /** Resolved per frame: width / openness / roundness factors drawMouth reads. */
+  speechW = 0.8; speechO = 0; speechR = 0.4;
 
   col: RGB = C.idle;
   colT: RGB = C.idle;
@@ -623,16 +649,43 @@ export class BotEngine {
     this.particles = this.particles.filter((p) => p.age < p.life);
 
     // Mouth slot spring — ω₀ = 2π/0.25, ζ = 0.6
-    /* SPEECH RHYTHM (owner, 2026-10-06): while speaking, the mouth visibly
-       opens and closes — syllables over a slower phrase swell, riding the
-       real voice level (speakLevel). Everything is CONTINUOUS and the mouth
-       never closes below a resting slit: an earlier binary "pause" snapped
-       the target to near-zero and the mouth vanished mid-sentence. */
-    if (this.speakMode) {
-      const phrase = 0.62 + 0.38 * Math.sin(n * 1.7 + 0.5);
-      const syllable = Math.abs(Math.sin(n * 9.1) * 0.6 + Math.sin(n * 14.7 + 1.1) * 0.4);
-      const energy = 0.14 + this.speakLevel * 0.3;
-      this.slotHTarget = Math.max(0.07, energy * (0.4 + 0.6 * syllable) * phrase + 0.03);
+    /* SPEECH (owner, 2026-10-07 — v2). An envelope follower on the true
+       voice level (30 ms attack, 100 ms release — production speech-rig
+       values) drives AMPLITUDE; a viseme clock swaps mouth SHAPES at
+       syllable rate (90–150 ms, crossfaded 50 ms, never repeating). The
+       result: openness = viseme × voice, so the mouth articulates instead
+       of sliding. After speaking ends the envelope releases and the lip
+       shape fades out smoothly (drawMouth reads speechEnv > 0.02). */
+    if (this.speakMode || this.speechEnv > 0.001) {
+      const lvl = this.speakMode ? this.speakLevel : 0;
+      const kEnv = lvl > this.speechEnv
+        ? 1 - Math.exp(-dt / 0.03)
+        : 1 - Math.exp(-dt / 0.1);
+      this.speechEnv += (lvl - this.speechEnv) * kEnv;
+
+      if (this.speakMode && n >= this.speechNextAt) {
+        /* weighted pick, never the same shape twice running */
+        let pick = this.speechViseme;
+        for (let tries = 0; tries < 2 && pick === this.speechViseme; tries++) {
+          let r = Math.random();
+          for (let i = 0; i < VISEMES.length; i++) {
+            r -= VISEMES[i].weight;
+            if (r <= 0) { pick = i; break; }
+          }
+        }
+        this.speechFrom = this.speechViseme;
+        this.speechViseme = pick;
+        this.speechAt = n;
+        this.speechNextAt = n + 0.09 + Math.random() * 0.06;
+      }
+      const cf = Math.min(1, (n - this.speechAt) / 0.05);
+      const sm = cf * cf * (3 - 2 * cf);
+      const A = VISEMES[this.speechFrom], B = VISEMES[this.speechViseme];
+      /* amplitude: even at level 0 a speaking face keeps breathing shapes */
+      const amp = 0.22 + 0.78 * this.speechEnv;
+      this.speechW = lerp(A.w, B.w, sm);
+      this.speechO = lerp(A.o, B.o, sm) * amp;
+      this.speechR = lerp(A.r, B.r, sm);
     }
     const omega = (2 * Math.PI) / 0.25;
     const zeta = 0.6;
@@ -730,7 +783,7 @@ export class BotEngine {
     }
 
     this.drawEyes(x, body, R, rx, ry);
-    if (this.morph > 0.05 || this.speakMode) this.drawMouth(x, body, R);
+    if (this.morph > 0.05 || this.speakMode || this.speechEnv > 0.02) this.drawMouth(x, body, R);
     drawOutfitFront(x, this.outfit, this.outfitH(R, rx, ry), body);
 
     x.restore();
@@ -963,33 +1016,91 @@ export class BotEngine {
   /** Mailbox slot: dark pill cut into the box face, with rim and lip highlights. */
   private drawMouth(x: CanvasRenderingContext2D, body: Path2D, R: number) {
     const m = this.morph;
-    const mm = this.speakMode ? Math.max(m, 0.34) : m;
-    /* Speech width breathes with the openness — consonants narrow, vowels
-       wide — instead of a fixed-width slot sliding up and down. */
-    const wide = this.speakMode ? 0.8 + Math.min(1, this.slotH * 2.2) * 0.4 : 1;
-    const hW = R * 1.8 * mm * (this.speakMode ? 0.55 : 1) * wide;
-    const hH = this.slotH * R * mm;
     /* speakMode: the mouth rides the gaze with the EXACT eye parallax —
        same formula the eyes use (sin(yaw)·cos(pitch)·rx for X, the
        sin(EYE_P+pitch)·ry delta for Y), so direction AND speed match.
        Anything else reads as "mouth moves wrong" (owner). */
-    let gazeX = 0, gazeY = 0;
-    if (this.speakMode) {
-      const rx = R * 1.14, ry = R * 0.88;
-      const cp = Math.cos(EYE_P + this.pitch);
-      gazeX = Math.sin(this.yaw) * cp * rx;
-      gazeY = (Math.sin(EYE_P) - Math.sin(EYE_P + this.pitch)) * ry;
+    const rx = R * 1.14, ry = R * 0.88;
+    const cp = Math.cos(EYE_P + this.pitch);
+    const gazeX = this.speakMode || this.speechEnv > 0.02 ? Math.sin(this.yaw) * cp * rx : 0;
+    const gazeY = this.speakMode || this.speechEnv > 0.02
+      ? (Math.sin(EYE_P) - Math.sin(EYE_P + this.pitch)) * ry
+      : 0;
+
+    /* ── SPEECH MOUTH (v2) — a lip-shaped bezier that articulates visemes,
+       not the sliding pill. Drawn while speaking and while the envelope
+       releases afterwards, so it never pops. */
+    if (this.speakMode || this.speechEnv > 0.02) {
+      const o = Math.min(1, this.speechO);
+      const wF = this.speechW;
+      const rd = this.speechR;
+      const mw = R * 0.42 * wF * (1 - 0.18 * rd);
+      const mh = R * 0.3 * o;
+      const cx = gazeX;
+      const cy = R * 0.3 + gazeY;
+
+      x.save();
+      x.clip(body);
+      if (mh < R * 0.022) {
+        /* Between syllables and on the way out: a soft closed lip line with
+           the faintest smile — not a hole, not nothing. */
+        x.strokeStyle = INK;
+        x.globalAlpha = 0.55;
+        x.lineWidth = Math.max(1, R * 0.022);
+        x.lineCap = "round";
+        x.beginPath();
+        x.moveTo(cx - mw * 0.75, cy);
+        x.quadraticCurveTo(cx, cy + R * 0.025, cx + mw * 0.75, cy);
+        x.stroke();
+        x.globalAlpha = 1;
+      } else {
+        /* The lips: pointed corners (both beziers meet), a top edge that
+           stays near the lip line, and a full rounded bottom. Roundness
+           pulls the corners in for "oo". */
+        const topDip = mh * 0.32 * (1 - rd);
+        const g = x.createLinearGradient(0, cy - topDip, 0, cy + mh);
+        g.addColorStop(0, "rgb(54,16,18)");
+        g.addColorStop(1, "rgb(14,8,10)");
+        x.beginPath();
+        x.moveTo(cx - mw, cy);
+        x.quadraticCurveTo(cx, cy - topDip, cx + mw, cy);
+        x.quadraticCurveTo(cx, cy + mh * 2, cx - mw, cy);
+        x.closePath();
+        x.fillStyle = g;
+        x.fill();
+        /* the tongue — only when the mouth is genuinely open */
+        if (o > 0.5) {
+          x.save();
+          x.clip();
+          x.fillStyle = "rgba(150,52,58,0.85)";
+          x.beginPath();
+          x.ellipse(cx, cy + mh * 1.55, mw * 0.72, mh * 0.62, 0, 0, Math.PI * 2);
+          x.fill();
+          x.restore();
+        }
+        /* lip edge — a whisper of ink around the shape, corners crisp */
+        x.strokeStyle = INK;
+        x.globalAlpha = 0.35;
+        x.lineWidth = Math.max(0.75, R * 0.012);
+        x.stroke();
+        x.globalAlpha = 1;
+      }
+      x.restore();
+      return;
     }
-    const hX = -hW / 2 + gazeX;
+
+    /* ── Mailbox slot (non-speech) — unchanged. */
+    const mm = m;
+    const hW = R * 1.8 * mm;
+    const hH = this.slotH * R * mm;
+    const hX = -hW / 2;
     const boxTop = -R * (0.88 + 0.06 * m);
-    /* speakMode (lab): a speaking mouth sits at face level, not at the box
-       top where the file-swallow hole belongs. */
-    const hY = this.speakMode ? R * 0.30 + gazeY : boxTop + R * 0.08 * m;
+    const hY = boxTop + R * 0.08 * m;
 
     x.save();
     x.clip(body);
 
-    x.strokeStyle = `rgba(255,255,255,${this.speakMode ? 0 : 0.55 * m})`;
+    x.strokeStyle = `rgba(255,255,255,${0.55 * m})`;
     x.lineWidth = 1;
     x.lineCap = "round";
     x.beginPath();
@@ -997,7 +1108,7 @@ export class BotEngine {
     x.lineTo(R * 0.9 * m, boxTop + 1);
     x.stroke();
 
-    if (hH > (this.speakMode ? 0.3 : 0.8)) {
+    if (hH > 0.8) {
       const hR = Math.min(hW / 2, hH / 2);
       const g = x.createLinearGradient(0, hY, 0, hY + hH);
       g.addColorStop(0, "rgb(7,8,10)");
