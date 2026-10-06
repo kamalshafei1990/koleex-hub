@@ -107,6 +107,16 @@ export class MochiBehaviorDirector {
     };
   }
 
+  private pointerGaze = { x: 0, y: 0 }; // where the pointer last asked him to look
+
+  /** The gaze target the ambient actions return to — the pointer's spot, not
+      a hard zero. Releasing a glance to 0 while the pointer sat far away made
+      the gaze snap home and jump back on the next pointermove (the tiny
+      glitch the owner caught, 2026-10-06). */
+  private restingGaze(): { x: number; y: number } {
+    return { ...this.pointerGaze };
+  }
+
   /** Start timers, window listeners, and the once-a-day greeting. */
   attach(): void {
     if (this.timer) return;
@@ -120,10 +130,13 @@ export class MochiBehaviorDirector {
       if (!c) return;
       const gx = (e.clientX - c.x) / (window.innerWidth * 0.5);
       const gy = (e.clientY - c.y) / (window.innerHeight * 0.5);
-      this.engine.lookX = Math.max(-1, Math.min(1, gx));
+      const lx = Math.max(-1, Math.min(1, gx));
       /* Y IS FLIPPED in this engine: positive lookY looks UP (the pupils sit
          at ey = -sin(pitch)·ry). Same convention the lab's handler used. */
-      this.engine.lookY = -Math.max(-1, Math.min(1, gy));
+      const ly = -Math.max(-1, Math.min(1, gy));
+      this.pointerGaze = { x: lx, y: ly };
+      this.engine.lookX = lx;
+      this.engine.lookY = ly;
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onMove, { passive: true });
@@ -149,7 +162,10 @@ export class MochiBehaviorDirector {
       [2400, () => { // double take — left, right, back
         this.glance(-0.7, 0, 700);
         setTimeout(() => this.glance(0.7, 0, 700), 750);
-        setTimeout(() => { this.engine.lookX = 0; this.engine.lookY = 0; }, 1500);
+        setTimeout(() => {
+          const r = this.restingGaze();
+          this.engine.lookX = r.x; this.engine.lookY = r.y;
+        }, 1500);
       }],
       [4200, () => this.fireEmote("wink")],
       [6000, () => this.fireEmote("happy")],
@@ -294,7 +310,12 @@ export class MochiBehaviorDirector {
       { key: "double-take", w: 10, run: () => { /* left, then right, then back */
         this.glance(-0.7, 0, 700);
         setTimeout(() => this.glance(0.7, 0, 700), 750);
-        setTimeout(() => { if (this.current === "idle" && !this.sleeping) { this.engine.lookX = 0; this.engine.lookY = 0; } }, 1500);
+        setTimeout(() => {
+          if (this.current === "idle" && !this.sleeping) {
+            const r = this.restingGaze();
+            this.engine.lookX = r.x; this.engine.lookY = r.y;
+          }
+        }, 1500);
       } },
       { key: "surprised", w: 8,  run: () => this.fireEmote("surprised") },
       { key: "look-up", w: 8,  run: () => this.glance(0, 0.6, 1200) }, // curious look up (engine: +lookY = up)
@@ -314,7 +335,10 @@ export class MochiBehaviorDirector {
           if (this.current === "idle" && !this.sleeping) { this.engine.lookX = s.x; this.engine.lookY = s.y; }
         }, i * 800));
         setTimeout(() => {
-          if (this.current === "idle" && !this.sleeping) { this.engine.lookX = 0; this.engine.lookY = 0; }
+          if (this.current === "idle" && !this.sleeping) {
+            const r = this.restingGaze();
+            this.engine.lookX = r.x; this.engine.lookY = r.y;
+          }
         }, 2500);
       } },
       { key: "lean", w: 8,  run: () => { /* shift his weight — the whole body
@@ -364,8 +388,9 @@ export class MochiBehaviorDirector {
     this.engine.lookY = y;
     setTimeout(() => {
       if (this.current === "idle" && !this.sleeping) {
-        this.engine.lookX = 0;
-        this.engine.lookY = 0;
+        const r = this.restingGaze();
+        this.engine.lookX = r.x;
+        this.engine.lookY = r.y;
       }
     }, holdMs);
   }
