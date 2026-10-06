@@ -621,6 +621,19 @@ export class BotEngine {
     this.particles = this.particles.filter((p) => p.age < p.life);
 
     // Mouth slot spring — ω₀ = 2π/0.25, ζ = 0.6
+    /* While speaking, the mouth must never freeze: the real audio level can
+       stall at 0 mid-answer (metering gaps, quiet passages), which used to
+       leave the mouth shut while the voice was still going. A layered speech
+       flutter under the level-driven target keeps him talking until the
+       state itself leaves "speaking". */
+    if (this.speakMode) {
+      const flutter =
+        0.12 +
+        0.05 * Math.sin(n * 11.3) +
+        0.04 * Math.sin(n * 17.7 + 1.3) +
+        0.03 * Math.sin(n * 5.1 + 0.4);
+      if (this.slotHTarget < flutter) this.slotHTarget = flutter;
+    }
     const omega = (2 * Math.PI) / 0.25;
     const zeta = 0.6;
     const acc = omega * omega * (this.slotHTarget - this.slotH) - 2 * zeta * omega * this.slotHVel;

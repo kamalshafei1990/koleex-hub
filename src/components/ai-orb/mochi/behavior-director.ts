@@ -60,7 +60,6 @@ const EMOTE_COOLDOWN_MS: Record<BotEmoteName, number> = {
 
 const ATTENTION_YAWN_MS = 25_000;
 const ATTENTION_SLEEP_MS = 70_000;
-const FINISHED_HOLD_MS = 1_600;
 const DIZZY_HOLD_MS = 2_200;
 const GREET_KEY = "koleex.mochi.greeted";
 
@@ -232,9 +231,15 @@ export class MochiBehaviorDirector {
         this.engine.setState("question");
         break;
       case "finished":
-        this.engine.setState("finished");
-        this.fireEmote("proud");
-        this.holdUntil = Date.now() + FINISHED_HOLD_MS;
+        /* AN ANSWER IS NOT A CELEBRATION (owner, 2026-10-06): a finished turn
+           used to fire the full roll + sparks + proud emote on every reply,
+           which read as over-excitement. A content little squash and a brief
+           happy flash is the right scale; the big roll stays available in the
+           engine for moments that genuinely earn it. */
+        this.engine.setState("idle");
+        this.engine.squash();
+        this.fireEmote("happy");
+        this.holdUntil = Date.now() + 400;
         break;
       case "error":
         this.engine.setState("error");
