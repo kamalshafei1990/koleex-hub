@@ -121,7 +121,9 @@ export class MochiBehaviorDirector {
       const gx = (e.clientX - c.x) / (window.innerWidth * 0.5);
       const gy = (e.clientY - c.y) / (window.innerHeight * 0.5);
       this.engine.lookX = Math.max(-1, Math.min(1, gx));
-      this.engine.lookY = Math.max(-1, Math.min(1, gy));
+      /* Y IS FLIPPED in this engine: positive lookY looks UP (the pupils sit
+         at ey = -sin(pitch)·ry). Same convention the lab's handler used. */
+      this.engine.lookY = -Math.max(-1, Math.min(1, gy));
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onMove, { passive: true });
@@ -295,11 +297,11 @@ export class MochiBehaviorDirector {
         setTimeout(() => { if (this.current === "idle" && !this.sleeping) { this.engine.lookX = 0; this.engine.lookY = 0; } }, 1500);
       } },
       { key: "surprised", w: 8,  run: () => this.fireEmote("surprised") },
-      { key: "look-up", w: 8,  run: () => this.glance(0, -0.6, 1200) }, // curious look up
-      { key: "look-down", w: 6,  run: () => this.glance(0, 0.55, 1300) }, // thoughtful look down
+      { key: "look-up", w: 8,  run: () => this.glance(0, 0.6, 1200) }, // curious look up (engine: +lookY = up)
+      { key: "look-down", w: 6,  run: () => this.glance(0, -0.55, 1300) }, // thoughtful look down
       { key: "diagonal", w: 6,  run: () => { // a corner of the room caught his eye
         const sx = Math.random() < 0.5 ? -0.6 : 0.6;
-        const sy = Math.random() < 0.5 ? -0.45 : 0.45;
+        const sy = Math.random() < 0.5 ? 0.45 : -0.45;
         this.glance(sx, sy, 1400);
       } },
       { key: "look-around", w: 5,  run: () => { // three wandering stops
@@ -331,7 +333,7 @@ export class MochiBehaviorDirector {
         this.engine.anim("sx", [
           [0.95, 420, Ease.out], [0.95, 700, Ease.lin], [1, 550, Ease.inOut],
         ]);
-        this.glance(0, -0.4, 1500);
+        this.glance(0, 0.4, 1500); // rises tall, gaze lifting with him
       } },
       { key: "love", w: 7,  run: () => { if (rareOk("love", 3 * 60_000)) this.fireEmote("love"); else this.fireEmote("happy"); } },
       { key: "proud", w: 7,  run: () => { if (rareOk("proud", 4 * 60_000)) this.fireEmote("proud"); else this.fireEmote("wink"); } },
