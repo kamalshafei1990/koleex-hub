@@ -119,7 +119,9 @@ console.log("\n── 2. The constants the plan quotes are the constants that ru
   );
 
   const facts = /Memory \| 🟡 Partial \((\d+) facts\)/.exec(plan);
-  const code = /const MAX_FACTS = (\d+);/.exec(readFileSync("src/lib/server/ai-agent/tools/user-memory.ts", "utf8"));
+  /* The cap constant moved to the table store when facts left the JSON
+     document (2026-10-07, ai_memories). */
+  const code = /MEMORY_MAX_FACTS = (\d+)/.exec(readFileSync("src/lib/server/ai/user-memory-store.ts", "utf8"));
   check(
     `§K's memory row quotes the real cap (plan ${facts?.[1] ?? "—"}, code ${code?.[1] ?? "—"})`,
     facts !== null && code !== null && facts[1] === code[1],

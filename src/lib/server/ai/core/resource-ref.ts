@@ -38,7 +38,10 @@ export type ResourceKind =
   | "calendar_event"
   | "note"
   /* Reports 6B: a work report the caller may read, or the draft they started. */
-  | "report";
+  | "report"
+  /* Phase 3 memory recall: the caller's own past conversation (their own
+     history, reached through search_past_conversations only). */
+  | "conversation";
 
 export interface ResourceRef {
   kind: ResourceKind;

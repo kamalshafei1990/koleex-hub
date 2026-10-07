@@ -20,6 +20,7 @@ import "server-only";
 import { supabaseServer } from "../../supabase-server";
 import { readPersonalization } from "@/lib/server/ai/personalization-prompt";
 import { ilikeAny } from "@/lib/notes-server";
+import { resourceRef, type ResourceRef } from "@/lib/server/ai/core/resource-ref";
 import type { ToolDef, ToolResult } from "../types";
 
 const MAX_RESULTS = 8;
@@ -72,7 +73,10 @@ type Hit = {
   date: string;
   role: string;
   snippet: string;
+  /** The Hub's own deep link, and a client-neutral ref beside it — the
+      client-neutral validator's rule for every tool link. */
   link: string;
+  resource: ResourceRef;
 };
 
 const searchPastConversations: ToolDef<{ q?: string; limit?: number }, { hits: Hit[] }> = {
@@ -122,6 +126,7 @@ const searchPastConversations: ToolDef<{ q?: string; limit?: number }, { hits: H
         role: "conversation",
         snippet: (c.last_preview ?? "").slice(0, SNIPPET),
         link: `/ai?c=${c.id}`,
+        resource: resourceRef("conversation", c.id),
       }));
       return { ok: true, permissionStatus: "allowed", data: { hits } };
     }
@@ -157,6 +162,7 @@ const searchPastConversations: ToolDef<{ q?: string; limit?: number }, { hits: H
         role: row.role,
         snippet: snippetOf(row.content, terms),
         link: `/ai?c=${row.conversation_id}`,
+        resource: resourceRef("conversation", row.conversation_id),
       });
       if (hits.length >= limit) break;
     }

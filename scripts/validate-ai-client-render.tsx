@@ -1654,9 +1654,11 @@ console.log("\n── An Arabic opening before an English code block reads right
   check("the AI route is still gated — by the shell, which cannot bypass it",
     /const BYPASS_SUFFIXES = \["\/print"\];/.test(shell) &&
     /* /legal (28/09/2026): Koleex's public legal pages, read by the social
-       platforms' reviewers who never sign in — named here, so any other
-       prefix is still a permissions change this check refuses. */
-    /const BYPASS_PREFIXES = \["\/auth", "\/legal"\];/.test(shell) &&
+       platforms' reviewers who never sign in; /invite (Events, bd5d0cece):
+       public event RSVP links a guest opens without a Hub account — both
+       named here, so any other prefix is still a permissions change this
+       check refuses. */
+    /const BYPASS_PREFIXES = \["\/auth", "\/legal", "\/invite"\];/.test(shell) &&
     !/"\/ai"/.test(/const BYPASS_(SUFFIXES|PREFIXES)[^;]*;/.exec(shell)?.[0] ?? "") &&
     /if \(isBypassed\(pathname\)\) \{\s*return <>\{children\}<\/>;\s*\}\s*return \(\s*<AuthGate>/.test(shell));
   check("  …and AuthGate is AdminAuthGate, with no flag or second branch that could open a hole",
