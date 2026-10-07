@@ -53,15 +53,27 @@ export default function ChosenOrb({ surface, style, wander, ...props }: ChosenOr
   const draw = style ?? chosen;
   if (draw === "dots" || draw === "mochi") {
     const size = props.size ?? 72;
+    /* KoleexOrbIcon shrinks the whole orb at icon sizes (scale-[0.78]) to
+       level the glow orb with its line-icon neighbours. Mochi already tucks
+       ITSELF at icon sizes (engine boost 0.92 < 48px), so the wrapper's
+       shrink lands twice and the face reads too small — counter-scale the
+       mochi branch so the net is Mochi's own intended tuck
+       (0.78 × 1.18 ≈ 0.92). */
+    const mochiCounter = draw === "mochi" && (props.size ?? 72) < 48 ? " scale-[1.18]" : "";
     return (
       <span className={`inline-flex shrink-0 ${props.className ?? ""}`} style={{ width: size, height: size }}>
-        <Suspense fallback={null}>
-          {draw === "dots" ? (
-            <DottedOrb {...props} className="" surface={surface} wander={wander} />
-          ) : (
-            <MochiOrb {...props} />
-          )}
-        </Suspense>
+        {/* The counter-scale lives on an INNER span: two scale-* classes on
+            one element would fight (stylesheet order wins, not class order);
+            nested transforms multiply, which is the intent. */}
+        <span className={`inline-flex h-full w-full${mochiCounter}`}>
+          <Suspense fallback={null}>
+            {draw === "dots" ? (
+              <DottedOrb {...props} className="" surface={surface} wander={wander} />
+            ) : (
+              <MochiOrb {...props} />
+            )}
+          </Suspense>
+        </span>
       </span>
     );
   }
