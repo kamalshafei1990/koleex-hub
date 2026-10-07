@@ -147,5 +147,25 @@ console.log("\n── 8. Phase 5 — AI coaching, guarded ──");
     /in\("rating_cycles.status", \["finalized", "published"\]\)/.test(tool));
 }
 
+console.log("\n── 9. Phase 6 — the monthly rhythm runs itself ──");
+{
+  const sched = readFileSync("src/lib/server/ratings/scheduler.ts", "utf8");
+  const cron = readFileSync("src/app/api/cron/rating-cycle/route.ts", "utf8");
+  const vercel = readFileSync("vercel.json", "utf8");
+  const types = readFileSync("src/lib/notification-types.ts", "utf8");
+  check("the cron route exists, is daily, and is secret-guarded with a SA dry-run",
+    /CRON_SECRET/.test(cron) && /is_super_admin/.test(cron) && /rating-cycle/.test(vercel));
+  check("day 20 opens next month and composes; day 1 publishes only a FINALIZED cycle",
+    /day === 20/.test(sched) && /composeCycleItems/.test(sched) && /prev\.status === "finalized"/.test(sched));
+  check("a cycle stuck in scoring/review is NEVER auto-finalized — the CEO is nudged",
+    /never auto-finalize/.test(sched) || /nudgedPublish/.test(sched));
+  check("reminders go to the cycle opener plus every super admin",
+    /is_super_admin", true/.test(sched) && /ids\.add\(openedBy\)/.test(sched));
+  check("every reminder supersedes its older unread copy — no stacking",
+    /supersede: \{ rating_cycle/.test(sched));
+  check("the reminder type is registered under the Reports activity (mutable in Settings)",
+    /report_rating_reminder/.test(types) && /activity: "reports_activity"/.test(types));
+}
+
 console.log(failures === 0 ? "\nvalidate:ratings — all checks passed" : `\nvalidate:ratings FAILED — ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

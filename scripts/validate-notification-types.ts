@@ -266,6 +266,7 @@ const NO_TEMPLATE: Record<string, string> = {
   discuss_message: "push-only: never an inbox row",
   test: "push-only: the user's own test push",
   report_rating_published: "system-written words (ratings/publish.ts) — the report is the content, the note just points at it",
+  report_rating_reminder: "system-written nudges (ratings/scheduler.ts) — the wording is the schedule's, no template needed",
 };
 const staleNoTpl = Object.keys(NO_TEMPLATE).filter((t) => !entries.has(t));
 check("every NO_TEMPLATE exception is a registered type", staleNoTpl.length === 0, staleNoTpl.join(", "));

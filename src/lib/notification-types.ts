@@ -106,6 +106,8 @@ export const NOTIFICATION_TYPES = {
   report_submitted:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   /* Monthly ratings: the employee's own report just published. */
   report_rating_published:  { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
+  /* The monthly rhythm nudges the scorers/CEO (ratings/scheduler.ts). */
+  report_rating_reminder:   { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_decided:           { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },
   report_comment:           { app: "reports", activity: "comments_activity", severity: "info", lifecycle: { kind: "supersede", key: "report_id" } },
   report_forwarded:         { app: "reports", activity: "reports_activity", severity: "info", lifecycle: { kind: "info" } },

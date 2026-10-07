@@ -385,7 +385,12 @@ the platform's established rhythm.
   operational rule (who is responsible for closing) is the CEO's to assign, not the
   software's.
 - **Decided by the owner, 2026-10-07:** weights skills 60 / behavior 40 ✓; deadlines
-  28th / 3rd / 5th ✓; self-assessment ships in Phase 2 (owner's call: "as you see") ✓;
+  CHANGED (owner, 2026-10-07 — "the report reaches employees on the FIRST
+  day of the month"): score by the 25th, finalize by the 28th, PUBLISH on
+  the 1st of the next month ✓; the rhythm runs itself via /api/cron/
+  rating-cycle (open on the 20th, nudges on the 25th and 28th, publish on
+  the 1st) with reminders to the cycle opener + super admins — mutable in
+  Settings → Notifications under the Reports activity ✓; self-assessment ships in Phase 2 (owner's call: "as you see") ✓;
   scorers for now = CEO + HR manager only — direct-manager scoring arrives in a later
   phase (the matrix in A.2's "primary scorer" column reads HR manager until then) ✓;
   employees see BOTH the number and the band (my call, owner delegated) ✓.
