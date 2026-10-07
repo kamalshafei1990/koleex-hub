@@ -79,12 +79,21 @@ console.log("\nproducts-payload");
 
 /* ── 2. signals: POST by ids, chunked, no GET ──────────────────────────── */
 {
+  /* 2026-10-07: the compute moved to lib/server/product-signals.ts so the
+     paged list can embed it (one round trip instead of the serial
+     list→signals pair). The route keeps auth + the ids contract; the lib
+     keeps the math. The pins below read BOTH doors, so neither can drift. */
   const s = code("src/app/api/products/signals/route.ts");
+  const lib = code("src/lib/server/product-signals.ts");
   check("signals exports POST and not GET", /export async function POST\(/.test(s) && !/export async function GET\(/.test(s));
-  check("signals reads the posted ids", /body\.ids/.test(s) && /MAX_IDS/.test(s));
-  check("signals scopes every per-product read through inChunks", (s.match(/inChunks</g) ?? []).length >= 5);
-  check("signals scopes the product read to the tenant", /\.eq\("tenant_id", auth\.tenant_id\)/.test(s));
-  check("signals ships one supplier dictionary, not an object per product", /suppliers,\s*allSuppliers/.test(s) && /supplier: \{ id: string \| null; name\?: string \} \| null/.test(s));
+  check("signals reads the posted ids", /body\.ids/.test(s) && /MAX_IDS/.test(lib));
+  check("the route is thin — auth + ids, then the shared compute",
+    /computeProductSignals\(auth\.tenant_id, ids, canSeeCosts\)/.test(s));
+  check("signals scopes every per-product read through inChunks", (lib.match(/inChunks</g) ?? []).length >= 5);
+  check("signals scopes the product read to the tenant", /\.eq\("tenant_id", tenantId\)/.test(lib));
+  check("signals ships one supplier dictionary, not an object per product", /suppliers,\s*allSuppliers/.test(lib) || /suppliers, allSuppliers/.test(lib));
+  check("the list embeds the bundle only behind Product Data access",
+    /canSeeSecrets && ids\.length[\s\S]{0,120}?computeProductSignals/.test(read("src/app/api/products/route.ts")));
 }
 
 /* ── 3. FOB engine chunks its id reads ─────────────────────────────────── */

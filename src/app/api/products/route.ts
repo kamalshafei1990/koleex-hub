@@ -27,7 +27,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { allRows } from "@/lib/server/all-rows";
 import { requireAuth } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
-import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { hasProductCostAccess, hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { computeProductSignals } from "@/lib/server/product-signals";
 import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
 import { FRESHNESS_COLUMNS, foldFreshness } from "@/lib/products-freshness";
@@ -203,6 +204,18 @@ export async function GET(req: Request) {
         })()
       : null;
 
+    /* THE WORK SIGNALS RIDE WITH THE PAGE (owner, 2026-10-07: "products show
+       but family/price/supplier come late"). They used to be a second, serial
+       round trip — the client POSTed the page's ids to /api/products/signals
+       after the list landed, so every column it refines painted a full China
+       round trip (~1.5–2 s) after the grid. The list already knows the page's
+       ids and runs its other queries in parallel; the signals join them, and
+       the response time becomes the SLOWEST query, not the SUM of two trips.
+       Product Data access only — the same gate the signals endpoint uses, so
+       the public catalogue's slim payload is unchanged. */
+    const signalsPromise = canSeeSecrets && ids.length
+      ? computeProductSignals(auth.tenant_id, ids, await hasProductCostAccess(auth))
+      : null;
     let models: {
       counts: Record<string, number>;
       primaryModelNames: Record<string, string>;
@@ -299,7 +312,18 @@ export async function GET(req: Request) {
     }
     _t.mark("groups");
 
-    const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts };
+    let signalsBundle: unknown;
+    if (signalsPromise) {
+      const b = await signalsPromise.catch((e: unknown) => {
+        /* a signals hiccup must not sink the list — the client falls back
+           to the POST waterfall when the bundle is absent */
+        console.error("[api/products paged signals]", e instanceof Error ? e.message : e);
+        return null;
+      });
+      if (b) signalsBundle = b;
+      _t.mark("signals");
+    }
+    const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts, ...(signalsBundle ? { signalsBundle } : {}) };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
     /* SYNC RULE (owner, 19/09/2026): a change in Product Data shows on the
        next open. `max-age` alone keeps that promise — within 30 s a repeat

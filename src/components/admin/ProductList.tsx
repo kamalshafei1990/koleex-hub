@@ -1487,6 +1487,9 @@ export default function ProductList() {
              (measured: card body 208px -> 311px after paint). Signals still
              arrive later and refine suppliers/readiness — they just no longer
              change the card's size or correct its text. */
+          if ((json as { signalsBundle?: Record<string, unknown> }).signalsBundle) {
+            signalsBundleRef.current = (json as { signalsBundle?: Record<string, unknown> }).signalsBundle ?? null;
+          }
           if (json.models) {
             modelsFromPageRef.current = json.models;
             setModelCounts(json.models.counts);
@@ -1653,6 +1656,13 @@ export default function ProductList() {
      break the grid — the cards simply render without the readiness strip. */
   const signalsHaveRef = useRef<Set<string>>(new Set());
   const signalsInflightRef = useRef<Set<string>>(new Set());
+  /* THE BUNDLE BEAT THE WATERFALL (owner, 2026-10-07): /api/products embeds
+     the page's work signals (family/price/supplier) in the list response for
+     Product Data callers, so the internal grid paints them WITH the rows —
+     one round trip, not the serial list→signals pair that used to paint those
+     columns a full China round trip late. Absent (older server, public
+     catalogue), the POST below runs exactly as before. */
+  const signalsBundleRef = useRef<Record<string, unknown> | null>(null);
   useEffect(() => {
     /* Retry = start over, including everything already fetched. */
     signalsHaveRef.current = new Set();
@@ -1666,7 +1676,7 @@ export default function ProductList() {
     if (want.length === 0) return;
     /* The route caps at 500 ids; a longer catalogue asks again on the next
        pass of this effect, which the merge below triggers. */
-    const ids = want.slice(0, 500);
+    let ids = want.slice(0, 500);
     let cancelled = false;
     const ctrl = new AbortController();
     for (const id of ids) signalsInflightRef.current.add(id);
@@ -1686,24 +1696,16 @@ export default function ProductList() {
       });
     };
     type SignalsWire = Omit<ProductSignal, "supplier"> & { supplier: { id: string | null; name?: string } | null };
-    fetch("/api/products/signals", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-      signal: ctrl.signal,
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((j: {
-        signals?: Record<string, SignalsWire>;
-        suppliers?: Record<string, { name: string; cn: string | null; logo: string | null }>;
-        allSuppliers?: string[];
-        nameAlts?: Record<string, string>;
-        mainImages?: Record<string, string>;
-      }) => {
+    type SignalsPayload = {
+      signals?: Record<string, SignalsWire>;
+      suppliers?: Record<string, { name: string; cn: string | null; logo: string | null }>;
+      allSuppliers?: string[];
+      nameAlts?: Record<string, string>;
+      mainImages?: Record<string, string>;
+    };
+    /* One merge for both doors: the embedded bundle and the POST answer are
+       the same payload shape, from the same server function. */
+    const merge = (j: SignalsPayload) => {
         if (cancelled) return;
         const dict = j.suppliers ?? {};
         /* The wire carries a supplier ID into the dictionary; the card keeps
@@ -1739,7 +1741,38 @@ export default function ProductList() {
         /* The supplier answer has arrived — cards may now state it,
            including stating that there ISN'T one. */
         setSignalsReady(true);
+    };
+
+    /* If the list response already carried this page's signals (the bundle),
+       apply them and fetch only what it does not cover — later pages still
+       POST for their own ids, exactly as before. */
+    const bundled = signalsBundleRef.current as SignalsPayload | null;
+    if (bundled) {
+      const covered = ids.filter((id) => (bundled.signals ?? {})[id] !== undefined);
+      if (covered.length > 0) {
+        merge(bundled);
+        signalsBundleRef.current = null;
+        for (const id of covered) signalsInflightRef.current.delete(id);
+        ids = ids.filter((id) => !signalsHaveRef.current.has(id));
+        if (ids.length === 0) {
+          return () => { cancelled = true; };
+        }
+        for (const id of ids) signalsInflightRef.current.add(id);
+      }
+    }
+
+    fetch("/api/products/signals", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+      signal: ctrl.signal,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
+      .then(merge)
       .catch(async (e) => {
         /* An abort is this effect being torn down, not a failure — running
            the fallback there would fire two more requests on the way out. */
