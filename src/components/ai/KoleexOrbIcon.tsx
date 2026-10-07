@@ -10,7 +10,11 @@ import KoleexOrb from "./KoleexGlowOrb";
 export default function KoleexOrbIcon({
   size = 24,
   className,
-  scaleClass = "scale-100",
+  /** Owner call (2026-10-07): the orb visually overwhelmed the neighbouring
+     line icons in the rail and launcher — a filled glowing ball carries
+     more weight than a 1.5px stroke at the same box size. It now renders
+     slightly UNDER the box and lets its natural glow make up the weight. */
+  scaleClass = "scale-[0.78]",
 }: {
   size?: number | string;
   className?: string;
@@ -19,9 +23,9 @@ export default function KoleexOrbIcon({
   scaleClass?: string;
 }) {
   const px = typeof size === "string" ? parseInt(size, 10) || 24 : size;
-  /* The orb artboard has transparent margin, so it reads ~40% smaller than its
-     box. Scale it up (layout box stays `px`, only the visual grows) so it fills
-     an icon slot with the same weight as the other line icons. */
+  /* The orb artboard has transparent margin; earlier this wrapper scaled the
+     orb UP to compensate, which the owner flagged as "much bigger than the
+     others". Slightly under the box reads level with the line icons. */
   return (
     <KoleexOrb
       state="idle"

@@ -283,7 +283,7 @@ function estimateLauncherColumns(): number {
 /** The Koleex AI tile's orb, as a multiple of the icon slot (30/34 px):
  *  54/61 px. Checked in a rendered tile at 1, 1.7, 1.8 and 1.9 — the sphere
  *  stays clear of the label below it at every one. */
-const AI_TILE_ORB = 1.8;
+const AI_TILE_ORB = 1.15;
 
 /* The tiles that count something of their own: Discuss its unread messages,
    To-do the open tasks on you, Projects your open tasks, Planning your
@@ -572,7 +572,7 @@ const AppRow = memo(function AppRow({
         {isAi ? (
           (() => {
             const AnimatedIcon = Icon as React.ComponentType<{ size?: number; animated?: boolean; scaleClass?: string }>;
-            return <AnimatedIcon size={28} animated scaleClass="scale-100" />;
+            return <AnimatedIcon size={18} animated />;
           })()
         ) : (
           <BoundIcon semanticKey={`app.${app.id}`} className="h-[18px] w-[18px]" fallback={<Icon size={18} />} />
